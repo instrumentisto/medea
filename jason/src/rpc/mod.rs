@@ -194,10 +194,7 @@ pub trait RpcTransport {
     /// Returns [`LocalBoxStream`] of all messages received by this transport.
     fn on_message(
         &self,
-    ) -> Result<
-        LocalBoxStream<'static, Result<ServerMsg, Traced<TransportError>>>,
-        Traced<TransportError>,
-    >;
+    ) -> Result<LocalBoxStream<'static, ServerMsg>, Traced<TransportError>>;
 
     /// Returns [`LocalBoxStream`] which will produce [`CloseMsg`]s on
     /// [`RpcTransport`] close. This is [`LocalBoxStream`] because
@@ -259,7 +256,7 @@ impl Inner {
             sock: None,
             on_close_subscribers: Vec::new(),
             subs: vec![],
-            heartbeat: Heartbeat::new(heartbeat_interval),
+            heartbeat: Heartbeat::new(10000.into()),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             is_closed: false,
             reconnection_timeout: 10000,
@@ -415,13 +412,8 @@ impl WebSocketRpcClient {
         let reconnection_timeout = self.0.borrow().reconnection_timeout as u64;
         // This is safe to cast timestamp from 'Date::now' to u64 because
         // '18446744073709551615' timestamp is very far.
-        let last_pong = self
-            .0
-            .borrow()
-            .heartbeat
-            .get_pong_at()
-            .unwrap_or_else(|| Date::now() as u64);
-        let deadline = (idle_timeout * 2) + reconnection_timeout + last_pong;
+        let last_pong = self.0.borrow().heartbeat.get_last_activity();
+        let deadline = (idle_timeout * 2) + reconnection_timeout + last_pong.0;
 
         let mut delayer = ProgressiveDelayer::new(deadline);
         let sock = self
@@ -514,34 +506,16 @@ impl WebSocketRpcClient {
 
     /// Handles messages from a remote server.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn on_transport_message(
-        &self,
-        msg: Result<ServerMsg, Traced<TransportError>>,
-    ) {
+    fn on_transport_message(&self, msg: ServerMsg) {
         let inner = self.0.borrow();
-        match msg {
-            Ok(ServerMsg::Pong(_num)) => {
-                // TODO: detect no pings
-
-                // This is safe to cast timestamp from 'Date::now' to u64
-                // because '18446744073709551615' timestamp
-                // is very far.
-                inner.heartbeat.set_pong_at(Date::now() as u64);
-            }
-            Ok(ServerMsg::Event(event)) => {
-                // TODO: many subs, filter messages by session
-                if let Some(sub) = inner.subs.iter().next() {
-                    if let Err(err) = sub.unbounded_send(event) {
-                        // TODO: receiver is gone, should delete
-                        //       this subs tx
-                        console_error(err.to_string());
-                    }
+        if let ServerMsg::Event(event) = msg {
+            // TODO: many subs, filter messages by session
+            if let Some(sub) = inner.subs.iter().next() {
+                if let Err(err) = sub.unbounded_send(event) {
+                    // TODO: receiver is gone, should delete
+                    //       this subs tx
+                    console_error(err.to_string());
                 }
-            }
-            Err(err) => {
-                // TODO: protocol versions mismatch? should drop
-                //       connection if so
-                JasonError::from(err).print();
             }
         }
     }

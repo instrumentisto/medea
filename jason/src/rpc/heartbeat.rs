@@ -1,131 +1,153 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::{Display, From};
-use medea_client_api_proto::ClientMsg;
+use futures::{
+    channel::mpsc,
+    future::{self, AbortHandle, Abortable},
+    stream::LocalBoxStream,
+    StreamExt as _,
+};
+use js_sys::Date;
+use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{window, IntervalHandle, JsCaused, JsError},
+    utils::{
+        console_error, resolve_after, window, IntervalHandle, JsCaused, JsError,
+    },
 };
+
+#[derive(Clone, Copy, Debug, Display, From)]
+pub struct Timestamp(pub u64);
+
+impl Timestamp {
+    pub fn now() -> Self {
+        Self(Date::now() as u64)
+    }
+}
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
 pub enum HeartbeatError {
-    /// Occurs when `ping` cannot be send because no transport.
-    #[display(fmt = "unable to ping: no transport")]
-    NoSocket,
-
-    /// Occurs when a handler cannot be set to send `ping`.
-    #[display(fmt = "cannot set callback for ping send: {}", _0)]
-    SetIntervalHandler(JsError),
-
-    /// Occurs when socket failed to send `ping`.
-    #[display(fmt = "failed to send ping: {}", _0)]
-    SendPing(#[js(cause)] TransportError),
+    Transport(#[js(cause)] TransportError),
 }
 
 type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
-/// Responsible for sending/handling keep-alive requests, detecting connection
-/// loss.
-// TODO: Implement connection loss detection.
-pub struct Heartbeat(Rc<RefCell<InnerHeartbeat>>);
+#[derive(Debug, From)]
+struct Abort(AbortHandle);
 
-struct InnerHeartbeat {
-    interval: i32,
-    /// Sent pings counter.
-    num: u64,
-    /// Timestamp of last pong received.
-    pong_at: Option<u64>,
-    /// Connection with remote RPC server.
-    transport: Option<Rc<dyn RpcTransport>>,
-    /// Handler of sending `ping` task. Task is dropped if you drop handler.
-    ping_task: Option<PingTaskHandler>,
-}
-
-impl InnerHeartbeat {
-    /// Send ping message to RPC server.
-    /// Returns errors if no open transport found.
-    fn send_now(&mut self) -> Result<()> {
-        match self.transport.as_ref() {
-            None => Err(tracerr::new!(HeartbeatError::NoSocket)),
-            Some(transport) => {
-                self.num += 1;
-                Ok(transport
-                    .send(&ClientMsg::Ping(self.num))
-                    .map_err(tracerr::map_from_and_wrap!())?)
-            }
-        }
+impl Drop for Abort {
+    fn drop(&mut self) {
+        self.0.abort();
     }
 }
 
-/// Handler for binding closure that runs when `ping` is sent.
-struct PingTaskHandler {
-    _closure: Closure<dyn FnMut()>,
-    _interval_handler: IntervalHandle,
+struct Inner {
+    idle_timeout: Timestamp,
+    transport: Option<Rc<dyn RpcTransport>>,
+    last_activity: Timestamp,
+    pong_task_abort: Option<Abort>,
+    idle_sender: Option<mpsc::UnboundedSender<()>>,
+    idle_resolver_abort: Option<Abort>,
 }
 
+pub struct Heartbeat(Rc<RefCell<Inner>>);
+
 impl Heartbeat {
-    /// Returns new instance of [`interval`] with given interval for ping in
-    /// milliseconds.
-    pub fn new(interval: i32) -> Self {
-        Self(Rc::new(RefCell::new(InnerHeartbeat {
-            interval,
-            num: 0,
-            pong_at: None,
+    pub fn new(idle_timeout: Timestamp) -> Self {
+        Self(Rc::new(RefCell::new(Inner {
+            idle_timeout,
             transport: None,
-            ping_task: None,
+            last_activity: Timestamp::now(),
+            pong_task_abort: None,
+            idle_sender: None,
+            idle_resolver_abort: None,
         })))
     }
 
-    /// Starts [`Heartbeat`] for given [`RpcTransport`].
-    ///
-    /// Sends first `ping` immediately, so provided [`RpcTransport`] must be
-    /// active.
-    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<()> {
-        let mut inner = self.0.borrow_mut();
-        inner.num = 0;
-        inner.pong_at = None;
-        inner.transport = Some(transport);
-        inner.send_now().map_err(tracerr::wrap!())?;
+    fn update_idle_resolver(&self) {
+        self.0.borrow_mut().idle_resolver_abort.take();
 
-        let inner_rc = Rc::clone(&self.0);
-        let do_ping = Closure::wrap(Box::new(move || {
-            // its_ok if ping fails few times
-            let _ = inner_rc.borrow_mut().send_now();
-        }) as Box<dyn FnMut()>);
+        let weak_this = Rc::downgrade(&self.0);
+        let (idle_resolver, idle_resolver_abort) =
+            future::abortable(async move {
+                // FIXME (evdokimovs): use ping interval from server
+                if let Some(this) = weak_this.upgrade() {
+                    let idle_timeout = this.borrow().idle_timeout;
+                    // FIXME (evdokimovs): u64 as i32 look very bad
+                    resolve_after(idle_timeout.0 as i32).await.unwrap();
+                    if let Some(idle_sender) = &this.borrow().idle_sender {
+                        idle_sender.unbounded_send(());
+                    }
+                }
+            });
 
-        let interval_id = window()
-            .set_interval_with_callback_and_timeout_and_arguments_0(
-                do_ping.as_ref().unchecked_ref(),
-                inner.interval,
-            )
-            .map_err(JsError::from)
-            .map_err(tracerr::from_and_wrap!())?;
-
-        inner.ping_task = Some(PingTaskHandler {
-            _closure: do_ping,
-            _interval_handler: IntervalHandle(interval_id),
+        spawn_local(async move {
+            idle_resolver.await;
         });
+
+        self.0.borrow_mut().idle_resolver_abort =
+            Some(idle_resolver_abort.into());
+    }
+
+    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<()> {
+        let weak_this = Rc::downgrade(&self.0);
+        let mut on_message_stream = transport
+            .on_message()
+            .map_err(tracerr::map_from_and_wrap!())?;
+        let (fut, pong_abort) = future::abortable(async move {
+            while let Some(msg) = on_message_stream.next().await {
+                if let Some(this) = weak_this.upgrade().map(Heartbeat) {
+                    this.update_idle_resolver();
+                    this.0.borrow_mut().last_activity = Timestamp::now();
+
+                    if let ServerMsg::Ping(num) = msg {
+                        if let Some(transport) =
+                            &mut this.0.borrow_mut().transport
+                        {
+                            if let Err(e) =
+                                transport.send(&ClientMsg::Pong(num))
+                            {
+                                console_error(e.to_string());
+                            }
+                        } else {
+                            console_error(
+                                "RpcTransport from Heartbeat unexpectedly \
+                                 gone.",
+                            );
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        });
+        spawn_local(async move {
+            fut.await;
+        });
+        self.0.borrow_mut().pong_task_abort = Some(pong_abort.into());
 
         Ok(())
     }
 
-    /// Stops [`Heartbeat`].
     pub fn stop(&self) {
-        self.0.borrow_mut().ping_task.take();
         self.0.borrow_mut().transport.take();
+        self.0.borrow_mut().pong_task_abort.take();
+        self.0.borrow_mut().idle_resolver_abort.take();
     }
 
-    /// Sets timestamp of last received pong.
-    pub fn set_pong_at(&self, at: u64) {
-        self.0.borrow_mut().pong_at = Some(at);
+    pub fn on_idle(&self) -> LocalBoxStream<'_, ()> {
+        let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
+        self.0.borrow_mut().idle_sender = Some(on_idle_tx);
+
+        Box::pin(on_idle_rx)
     }
 
-    /// Returns timestamp of last received pong.
-    pub fn get_pong_at(&self) -> Option<u64> {
-        self.0.borrow().pong_at
+    pub fn get_last_activity(&self) -> Timestamp {
+        self.0.borrow().last_activity
     }
 }

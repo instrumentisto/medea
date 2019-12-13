@@ -22,7 +22,8 @@ use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 use crate::{
     rpc::{ClientDisconnect, CloseMsg, RpcTransport},
     utils::{
-        console_error, EventListener, EventListenerBindError, JsCaused, JsError,
+        console_error, EventListener, EventListenerBindError, JasonError,
+        JsCaused, JsError,
     },
 };
 
@@ -158,7 +159,7 @@ struct InnerSocket {
 
     /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_message`]'s
     /// [`LocalBoxStream`].
-    on_message: Option<mpsc::UnboundedSender<Result<ServerMsg>>>,
+    on_message: Option<mpsc::UnboundedSender<ServerMsg>>,
 
     /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_close`]'s
     /// [`LocalBoxStream`].
@@ -215,7 +216,7 @@ impl InnerSocket {
 }
 
 impl RpcTransport for WebSocketRpcTransport {
-    fn on_message(&self) -> Result<LocalBoxStream<'static, Result<ServerMsg>>> {
+    fn on_message(&self) -> Result<LocalBoxStream<'static, ServerMsg>> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_message = Some(tx);
 
@@ -398,9 +399,16 @@ impl WebSocketRpcTransport {
             Rc::clone(&self.0.borrow().socket),
             "message",
             move |msg| {
-                let parsed = ServerMessage::try_from(&msg)
-                    .map(Into::into)
-                    .map_err(tracerr::wrap!());
+                let parsed = match ServerMessage::try_from(&msg).map(Into::into)
+                {
+                    Ok(parsed) => parsed,
+                    Err(e) => {
+                        // TODO: protocol versions mismatch? should drop
+                        //       connection if so
+                        JasonError::from(tracerr::new!(e)).print();
+                        return;
+                    }
+                };
                 let transport = if let Some(t) = weak_transport.upgrade() {
                     t
                 } else {

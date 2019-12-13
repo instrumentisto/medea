@@ -52,9 +52,9 @@ impl_incrementable!(TrackId);
 #[derive(Clone, Debug)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
-    /// `pong` message that server answers with to WebSocket client in response
-    /// to received `ping` message.
-    Pong(u64),
+    /// `ping` message that WebSocket server is expected to send to the client
+    /// periodically.
+    Ping(u64),
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
     Event(Event),
@@ -64,9 +64,9 @@ pub enum ServerMsg {
 #[derive(Clone, Debug)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
-    /// `ping` message that WebSocket client is expected to send to the server
-    /// periodically.
-    Ping(u64),
+    /// `pong` message that client answers with to WebSocket server in response
+    /// to received `ping` message.
+    Pong(u64),
     /// Request of `Web Client` to change the state on `Media Server`.
     Command(Command),
 }
@@ -280,9 +280,9 @@ impl Serialize for ClientMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            Self::Ping(n) => {
-                let mut ping = serializer.serialize_struct("ping", 1)?;
-                ping.serialize_field("ping", n)?;
+            Self::Pong(n) => {
+                let mut ping = serializer.serialize_struct("pong", 1)?;
+                ping.serialize_field("pong", n)?;
                 ping.end()
             }
             Self::Command(command) => command.serialize(serializer),
@@ -303,15 +303,15 @@ impl<'de> Deserialize<'de> for ClientMsg {
             Error::custom(format!("unable to deser ClientMsg [{:?}]", &ev))
         })?;
 
-        if let Some(v) = map.get("ping") {
+        if let Some(v) = map.get("pong") {
             let n = v.as_u64().ok_or_else(|| {
                 Error::custom(format!(
-                    "unable to deser ClientMsg::Ping [{:?}]",
+                    "unable to deser ClientMsg::Pong [{:?}]",
                     &ev
                 ))
             })?;
 
-            Ok(Self::Ping(n))
+            Ok(Self::Pong(n))
         } else {
             let command =
                 serde_json::from_value::<Command>(ev).map_err(|e| {
@@ -334,9 +334,9 @@ impl Serialize for ServerMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            Self::Pong(n) => {
-                let mut ping = serializer.serialize_struct("pong", 1)?;
-                ping.serialize_field("pong", n)?;
+            Self::Ping(n) => {
+                let mut ping = serializer.serialize_struct("ping", 1)?;
+                ping.serialize_field("ping", n)?;
                 ping.end()
             }
             Self::Event(command) => command.serialize(serializer),
@@ -357,15 +357,15 @@ impl<'de> Deserialize<'de> for ServerMsg {
             Error::custom(format!("unable to deser ServerMsg [{:?}]", &ev))
         })?;
 
-        if let Some(v) = map.get("pong") {
+        if let Some(v) = map.get("ping") {
             let n = v.as_u64().ok_or_else(|| {
                 Error::custom(format!(
-                    "unable to deser ServerMsg::Pong [{:?}]",
+                    "unable to deser ServerMsg::Ping [{:?}]",
                     &ev
                 ))
             })?;
 
-            Ok(Self::Pong(n))
+            Ok(Self::Ping(n))
         } else {
             let event = serde_json::from_value::<Event>(ev).map_err(|e| {
                 Error::custom(format!(
