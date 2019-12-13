@@ -19,9 +19,9 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::MemberId,
+        RpcServer,
     },
     log::prelude::*,
-    signalling::Room,
 };
 
 /// Long-running WebSocket connection of Client API.
@@ -31,7 +31,7 @@ pub struct WsSession {
     member_id: MemberId,
 
     /// [`Room`] that [`Member`] is associated with.
-    room: Addr<Room>,
+    room: Box<dyn RpcServer>,
 
     /// Timeout of receiving any messages from client.
     idle_timeout: Duration,
@@ -52,7 +52,7 @@ impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
     pub fn new(
         member_id: MemberId,
-        room: Addr<Room>,
+        room: Box<dyn RpcServer>,
         idle_timeout: Duration,
     ) -> Self {
         Self {
@@ -72,16 +72,14 @@ impl WsSession {
                 > session.idle_timeout
             {
                 info!("WsSession of member {} is idle", session.member_id);
-                if let Err(err) = session.room.try_send(RpcConnectionClosed {
-                    member_id: session.member_id.clone(),
-                    reason: ClosedReason::Lost,
-                }) {
-                    error!(
-                        "WsSession of member {} failed to remove from Room, \
-                         because: {:?}",
-                        session.member_id, err,
-                    )
-                }
+
+                ctx.spawn(wrap_future(session.room.send_closed(
+                    RpcConnectionClosed {
+                        member_id: session.member_id.clone(),
+                        reason: ClosedReason::Lost,
+                    },
+                )));
+
                 ctx.notify(Close::with_normal_code(&CloseDescription::new(
                     CloseReason::Idle,
                 )))
@@ -103,34 +101,18 @@ impl Actor for WsSession {
         Self::start_watchdog(ctx);
 
         ctx.wait(
-            wrap_future(self.room.send(RpcConnectionEstablished {
+            wrap_future(self.room.send_established(RpcConnectionEstablished {
                 member_id: self.member_id.clone(),
                 connection: Box::new(ctx.address()),
             }))
-            .map(
-                move |auth_result,
-                      session: &mut Self,
-                      ctx: &mut ws::WebsocketContext<Self>| {
-                    if let Err(e) = auth_result {
-                        error!(
-                            "Room rejected Established for member {}, cause \
-                             {:?}",
-                            session.member_id, e
-                        );
-                        ctx.notify(Close::with_normal_code(
-                            &CloseDescription::new(CloseReason::Rejected),
-                        ));
-                    }
-                },
-            )
             .map_err(
-                move |send_err,
+                move |err,
                       session: &mut Self,
                       ctx: &mut ws::WebsocketContext<Self>| {
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
-                        session.member_id, send_err,
+                        session.member_id, err,
                     );
                     ctx.notify(Close::with_normal_code(
                         &CloseDescription::new(CloseReason::InternalError),
@@ -234,14 +216,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         );
                     }
                     Ok(ClientMsg::Command(command)) => {
-                        if let Err(err) =
-                            self.room.try_send(CommandMessage::from(command))
-                        {
-                            error!(
-                                "Cannot send Command to Room from Member [{}], because {}",
-                                self.member_id, err
-                            )
-                        }
+                        ctx.spawn(wrap_future(
+                            self.room
+                                .send_command(CommandMessage::from(command)),
+                        ));
                     }
                     Err(err) => error!(
                         "Error [{:?}] parsing client message [{}]",
@@ -251,16 +229,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
-                    if let Err(err) = self.room.try_send(RpcConnectionClosed {
-                        member_id: self.member_id.clone(),
-                        reason: ClosedReason::Closed,
-                    }) {
-                        error!(
-                            "WsSession of member {} failed to remove from \
-                             Room, because: {:?}",
-                            self.member_id, err,
-                        )
-                    };
+                    ctx.spawn(wrap_future(self.room.send_closed(
+                        RpcConnectionClosed {
+                            member_id: self.member_id.clone(),
+                            reason: ClosedReason::Closed,
+                        },
+                    )));
+
                     ctx.close(reason);
                     ctx.stop();
                 }
@@ -270,5 +245,35 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.member_id
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use std::time::Duration;
+
+//    use actix::Actor;
+    use actix_web_actors::ws::WebsocketContext;
+
+    use crate::api::{MockRpcServer, control::MemberId};
+
+    use super::WsSession;
+
+    #[test]
+    fn close_if_rpc_established_failed() {
+        let sys = actix::System::new("close_if_rpc_established_failed");
+
+        let member_id = MemberId::from(String::from("test_member"));
+        let rpc_server = MockRpcServer::new();
+        let idle_timeout = Duration::from_secs(5);
+
+        rpc_server.
+
+        let ws_session = WsSession::new(member_id, Box::new(rpc_server), idle_timeout);
+        let stream = futures::stream::empty();
+
+        let asd = WebsocketContext::create_with_addr(ws_session, stream);
+
     }
 }

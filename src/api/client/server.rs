@@ -65,7 +65,11 @@ fn ws_index(
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    WsSession::new(member_id, room, state.config.idle_timeout),
+                    WsSession::new(
+                        member_id,
+                        Box::new(room),
+                        state.config.idle_timeout,
+                    ),
                     &request,
                     payload,
                 ),

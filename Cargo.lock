@@ -1391,6 +1391,7 @@ dependencies = [
  "medea-client-api-proto 0.1.1-dev",
  "medea-control-api-proto 0.1.0-dev",
  "medea-macro 0.2.0-dev",
+ "mockall 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "redis 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1586,8 +1587,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "mockall"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "downcast 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fragile 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mockall_derive 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates-tree 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "mockall_derive"
 version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3213,7 +3239,9 @@ dependencies = [
 "checksum mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum mockall 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7601dfc82314f4e4ad844055452f71c1d5d171e4b530f817b9353bb2e63a271d"
+"checksum mockall 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b95a7e7cfbce0e99ebbf5356a085d3b5e320a7ef300f77cd50a7148aa362e7c2"
 "checksum mockall_derive 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a26211f315c132a546ed185f3a17f7617a8e58d8511025d5f8665017194cf8be"
+"checksum mockall_derive 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d5a615a1ad92048ad5d9633251edb7492b8abc057d7a679a9898476aef173935"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
 "checksum nom 4.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
 "checksum normalize-line-endings 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2e0a1a39eab95caf4f5556da9289b9e68f0aafac901b2ce80daaf020d3b733a8"
