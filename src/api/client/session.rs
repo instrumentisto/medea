@@ -279,6 +279,8 @@ mod test {
 
     use super::WsSession;
 
+    type SharedChan<T> = (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
+
     fn test_server(factory: fn() -> WsSession) -> TestServerRuntime {
         TestServer::new(move || {
             HttpService::new(App::new().service(web::resource("/").to(
@@ -403,10 +405,7 @@ mod test {
     #[test]
     fn passes_commands_to_rpc_server() {
         lazy_static::lazy_static! {
-            static ref CHAN: (
-                Mutex<Option<Sender<CommandMessage>>>,
-                Mutex<Option<Receiver<CommandMessage>>>
-            ) = {
+            static ref CHAN: SharedChan<CommandMessage> = {
                 let (tx, rx) = oneshot::channel();
                 (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
             };
@@ -472,10 +471,7 @@ mod test {
     #[test]
     fn close_when_rpc_connection_close() {
         lazy_static::lazy_static! {
-            static ref CHAN: (
-                Mutex<Option<Sender<Box<dyn RpcConnection>>>>,
-                Mutex<Option<Receiver<Box<dyn RpcConnection>>>>
-            ) = {
+            static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
                 let (tx, rx) = oneshot::channel();
                 (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
             };
@@ -540,10 +536,7 @@ mod test {
     #[test]
     fn send_text_message_when_rpc_connection_send_event() {
         lazy_static::lazy_static! {
-            static ref CHAN: (
-                Mutex<Option<Sender<Box<dyn RpcConnection>>>>,
-                Mutex<Option<Receiver<Box<dyn RpcConnection>>>>
-            ) = {
+            static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
                 let (tx, rx) = oneshot::channel();
                 (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
             };
