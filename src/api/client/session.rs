@@ -6,7 +6,7 @@ use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
-use actix_web_actors::ws;
+use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, ServerMsg,
@@ -252,9 +252,21 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
+                    let closed_reason = if let Some(reason) = &reason {
+                        if reason.code == CloseCode::Normal
+                            || reason.code == CloseCode::Away
+                        {
+                            ClosedReason::Closed { normal: true }
+                        } else {
+                            ClosedReason::Lost
+                        }
+                    } else {
+                        ClosedReason::Lost
+                    };
+
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id.clone(),
-                        reason: ClosedReason::Closed,
+                        reason: closed_reason,
                     }) {
                         error!(
                             "WsSession of member {} failed to remove from \

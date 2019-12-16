@@ -15,7 +15,13 @@ use crate::{
     api::control::MemberId,
     log::prelude::*,
     media::{New, Peer, PeerStateMachine},
-    signalling::{elements::Member, room::RoomError},
+    signalling::{
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            Member,
+        },
+        room::RoomError,
+    },
 };
 
 #[derive(Debug)]
@@ -259,6 +265,69 @@ impl PeerRepository {
         let mut peers_id_to_delete = HashSet::new();
         peers_id_to_delete.insert(peer_id);
         self.remove_peers(&member_id, peers_id_to_delete)
+    }
+
+    /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
+    /// doesn't exist.
+    ///
+    /// Adds `send` track to source member's [`Peer`] and `recv` to
+    /// sink member's [`Peer`].
+    ///
+    /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
+    ///
+    /// # Panics
+    ///
+    /// Panics if provided endpoints have interconnected [`Peer`]s already.
+    pub fn connect_endpoints(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        sink: &WebRtcPlayEndpoint,
+    ) -> Option<(PeerId, PeerId)> {
+        debug!(
+            "Connecting endpoints of Member [id = {}] with Member [id = {}]",
+            src.owner().id(),
+            sink.owner().id(),
+        );
+        let src_owner = src.owner();
+        let sink_owner = sink.owner();
+
+        if let Some((src_peer_id, sink_peer_id)) =
+            self.get_peer_by_members_ids(&src_owner.id(), &sink_owner.id())
+        {
+            // TODO: when dynamic patching of [`Room`] will be done then we need
+            //       rewrite this code to updating [`Peer`]s in not
+            //       [`Peer<New>`] state.
+            let mut src_peer: Peer<New> =
+                self.take_inner_peer(src_peer_id).unwrap();
+            let mut sink_peer: Peer<New> =
+                self.take_inner_peer(sink_peer_id).unwrap();
+
+            src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+
+            src.add_peer_id(src_peer_id);
+            sink.set_peer_id(sink_peer_id);
+
+            self.add_peer(src_peer);
+            self.add_peer(sink_peer);
+        } else {
+            let (mut src_peer, mut sink_peer) =
+                self.create_peers(&src_owner, &sink_owner);
+
+            src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+
+            src.add_peer_id(src_peer.id());
+            sink.set_peer_id(sink_peer.id());
+
+            let src_peer_id = src_peer.id();
+            let sink_peer_id = sink_peer.id();
+
+            self.add_peer(src_peer);
+            self.add_peer(sink_peer);
+
+            return Some((src_peer_id, sink_peer_id));
+        };
+
+        None
     }
 }
 

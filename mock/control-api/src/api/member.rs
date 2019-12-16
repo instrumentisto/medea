@@ -27,6 +27,14 @@ pub struct Member {
     ///
     /// If `None` then random credentials will be generated on Medea side.
     credentials: Option<String>,
+
+    /// URL to which `OnJoin` Control API callback will be sent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_join: Option<String>,
+
+    /// URL to which `OnLeave` Control API callback will be sent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_leave: Option<String>,
 }
 
 impl Member {
@@ -39,6 +47,12 @@ impl Member {
         }
         proto.set_id(id);
         proto.set_pipeline(members_elements);
+        if let Some(on_leave) = self.on_leave {
+            proto.set_on_leave(on_leave);
+        }
+        if let Some(on_join) = self.on_join {
+            proto.set_on_join(on_join);
+        }
 
         if let Some(credentials) = self.credentials {
             proto.set_credentials(credentials);
@@ -61,10 +75,30 @@ impl From<MemberProto> for Member {
         for (id, endpoint) in proto.take_pipeline() {
             member_pipeline.insert(id, endpoint.into());
         }
+
+        let on_leave = {
+            let on_leave = proto.take_on_leave();
+            if on_leave.is_empty() {
+                None
+            } else {
+                Some(on_leave)
+            }
+        };
+        let on_join = {
+            let on_join = proto.take_on_join();
+            if on_join.is_empty() {
+                None
+            } else {
+                Some(on_join)
+            }
+        };
+
         Self {
             id: proto.take_id(),
             pipeline: member_pipeline,
             credentials: Some(proto.take_credentials()),
+            on_join,
+            on_leave,
         }
     }
 }

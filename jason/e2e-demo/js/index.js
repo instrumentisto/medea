@@ -1,4 +1,5 @@
-const controlUrl = "http://127.0.0.1:8000/control-api/";
+const controlDomain = 'http://127.0.0.1:8000';
+const controlUrl = controlDomain + '/control-api/';
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
@@ -18,7 +19,9 @@ async function createRoom(roomId, memberId) {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always'
             },
-          }
+          },
+          on_join: "grpc://127.0.0.1:9099",
+          on_leave: "grpc://127.0.0.1:9099"
         }
       }
     }
@@ -55,6 +58,8 @@ async function createMember(roomId, memberId) {
       kind: 'Member',
       credentials: 'test',
       pipeline: pipeline,
+      on_join: "grpc://127.0.0.1:9099",
+      on_leave: "grpc://127.0.0.1:9099"
     }
   });
 
@@ -202,6 +207,51 @@ const controlDebugWindows = {
       resultContainer.innerHTML = colorizedJson.prettyPrint(res);
     })
   },
+
+  callbacks: function() {
+    let container = document.getElementsByClassName('control-debug__window_callbacks')[0];
+    let resultContainer = container.getElementsByClassName('control-debug__table-result')[0];
+    bindCloseWindow(container);
+
+    let execute = container.getElementsByClassName('control-debug__execute')[0];
+    execute.addEventListener('click', async () => {
+      while (resultContainer.firstChild) {
+        resultContainer.firstChild.remove();
+      }
+
+      let callbacks = await controlApi.getCallbacks();
+
+      let table = document.createElement("table");
+
+      let header = document.createElement("tr");
+      let eventHeader = document.createElement("th");
+      eventHeader.innerHTML = 'Event';
+      header.appendChild(eventHeader);
+      let timeHeader = document.createElement("th");
+      timeHeader.innerHTML = 'Time';
+      header.appendChild(timeHeader);
+      let elementHeader = document.createElement('th');
+      elementHeader.innerHTML = 'FID';
+      header.appendChild(elementHeader);
+      table.appendChild(header);
+
+      for (callback of callbacks) {
+        let row = document.createElement('tr');
+        let event = document.createElement('th');
+        event.innerHTML = JSON.stringify(callback.event);
+        row.appendChild(event);
+        let time = document.createElement('th');
+        time.innerHTML = callback.at;
+        row.appendChild(time);
+        let element = document.createElement('th');
+        element.innerHTML = callback.fid;
+        row.appendChild(element);
+        table.appendChild(row);
+      }
+
+      resultContainer.appendChild(table);
+    })
+  }
 };
 
 window.onload = async function() {
@@ -251,7 +301,7 @@ window.onload = async function() {
   }
 
   let room = newRoom();
-  let connectBtnsDiv = document.getElementsByClassName("connect")[0];
+  let connectBtnsDiv = document.getElementsByClassName('connect')[0];
   let controlBtns = document.getElementsByClassName('control')[0];
   let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
   let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
@@ -495,6 +545,15 @@ const controlApi = {
     } catch (e) {
       alert(JSON.stringify(e.response.data));
     }
+  },
+
+  getCallbacks: async function() {
+    try {
+      let resp = await axios.get(controlDomain + '/callbacks');
+      return resp.data;
+    } catch (e) {
+      alert(JSON.stringify(e.response.data));
+    }
   }
 };
 
@@ -510,6 +569,7 @@ const debugMenuItems = [
   'create-room',
   'delete',
   'get',
+  'callbacks',
 ];
 
 function bindControlDebugMenu() {
