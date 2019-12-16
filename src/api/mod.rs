@@ -81,10 +81,7 @@ impl RpcServer for Addr<Room> {
         Box::new(
             self.send(msg)
                 .map_err(|err| {
-                    error!(
-                        "Failed to send CommandMessage cause {:?}",
-                        err,
-                    );
+                    error!("Failed to send CommandMessage cause {:?}", err,);
                 })
                 .then(|_| Ok(())),
         )

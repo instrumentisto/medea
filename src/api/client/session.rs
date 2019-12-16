@@ -251,29 +251,238 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
 #[cfg(test)]
 mod test {
 
-    use std::time::Duration;
+    use std::{sync::Mutex, time::Duration};
 
-//    use actix::Actor;
-    use actix_web_actors::ws::WebsocketContext;
+    use actix_http::HttpService;
+    use actix_http_test::TestServer;
+    use actix_web::{web, App, HttpRequest};
+    use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
+    use medea_client_api_proto::Command;
 
-    use crate::api::{MockRpcServer, control::MemberId};
+    use futures::{
+        future,
+        sync::mpsc::{Receiver, Sender},
+        Sink, Stream,
+    };
+
+    use crate::api::{
+        client::rpc_connection::{
+            ClosedReason, CommandMessage, RpcConnectionClosed,
+        },
+        control::MemberId,
+        MockRpcServer,
+    };
 
     use super::WsSession;
 
+    //    fn test_server<F>(factory:&'static F) -> TestServerRuntime
+    //        where F: Fn() -> WsSession + Send + Sync + 'static
+    //    {
+    //        TestServer::new(|| {
+    //            HttpService::new(App::new().service(web::resource("/").to(
+    //                |req: HttpRequest, stream: web::Payload| {
+    //                    ws::start(factory(), &req, stream)
+    //                },
+    //            )))
+    //        })
+    //    }
+
+    // WsSession is dropped when RpcServer errors on RpcConnectionEstablished.
     #[test]
     fn close_if_rpc_established_failed() {
-        let sys = actix::System::new("close_if_rpc_established_failed");
+        fn factory() -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
 
-        let member_id = MemberId::from(String::from("test_member"));
-        let rpc_server = MockRpcServer::new();
-        let idle_timeout = Duration::from_secs(5);
+            let expected = member_id.clone();
+            rpc_server
+                .expect_send_established()
+                .withf(move |actual| actual.member_id == expected)
+                .return_once(|_| Box::new(future::err(())));
 
-        rpc_server.
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        }
 
-        let ws_session = WsSession::new(member_id, Box::new(rpc_server), idle_timeout);
-        let stream = futures::stream::empty();
+        let mut serv = TestServer::new(|| {
+            HttpService::new(App::new().service(web::resource("/").to(
+                |req: HttpRequest, stream: web::Payload| {
+                    start(factory(), &req, stream)
+                },
+            )))
+        });
 
-        let asd = WebsocketContext::create_with_addr(ws_session, stream);
+        let client = serv.ws().unwrap();
 
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+
+        let close_frame = Frame::Close(Some(CloseReason {
+            code: CloseCode::Normal,
+            description: Some(String::from(r#"{"reason":"InternalError"}"#)),
+        }));
+
+        assert_eq!(item, Some(close_frame));
+    }
+
+    #[test]
+    fn answers_ping_with_pong() {
+        fn factory() -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server
+                .expect_send_established()
+                .return_once(|_| Box::new(future::ok(())));
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        }
+
+        let mut serv = TestServer::new(|| {
+            HttpService::new(App::new().service(web::resource("/").to(
+                |req: HttpRequest, stream: web::Payload| {
+                    start(factory(), &req, stream)
+                },
+            )))
+        });
+
+        let client = serv.ws().unwrap();
+
+        let client = serv
+            .block_on(
+                client.send(Message::Text(String::from(r#"{"ping":25}"#))),
+            )
+            .unwrap();
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        assert_eq!(
+            item,
+            Some(Frame::Text(Some(String::from(r#"{"pong":25}"#).into())))
+        );
+    }
+
+    #[test]
+    fn dropped_if_idle() {
+        fn factory() -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server
+                .expect_send_established()
+                .return_once(|_| Box::new(future::ok(())));
+
+            let expected = RpcConnectionClosed {
+                member_id: member_id.clone(),
+                reason: ClosedReason::Lost,
+            };
+            rpc_server
+                .expect_send_closed()
+                .withf(move |actual| *actual == expected)
+                .return_once(|_| Box::new(future::ok(())));
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_millis(100),
+            )
+        }
+
+        let mut serv = TestServer::new(|| {
+            HttpService::new(App::new().service(web::resource("/").to(
+                |req: HttpRequest, stream: web::Payload| {
+                    start(factory(), &req, stream)
+                },
+            )))
+        });
+
+        let client = serv.ws().unwrap();
+
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+
+        let close_frame = Frame::Close(Some(CloseReason {
+            code: CloseCode::Normal,
+            description: Some(String::from(r#"{"reason":"Idle"}"#)),
+        }));
+
+        assert_eq!(item, Some(close_frame));
+    }
+
+    // Make sure that WsSession redirects all Commands it receives to RpcServer.
+    #[test]
+    fn passes_commands_to_rpc_server() {
+        lazy_static::lazy_static! {
+            static ref CHAN: (
+                Sender<CommandMessage>,
+                Mutex<Option<Receiver<CommandMessage>>>
+            ) = {
+                let (tx, rx) = futures::sync::mpsc::channel(10);
+                (tx, Mutex::new(Some(rx)))
+            };
+        }
+
+        fn factory() -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server
+                .expect_send_established()
+                .return_once(|_| Box::new(future::ok(())));
+
+            rpc_server.expect_send_command().return_once(|command| {
+                CHAN.0.clone().try_send(command).unwrap();
+                Box::new(future::ok(()))
+            });
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        }
+
+        let mut serv = TestServer::new(move || {
+            HttpService::new(App::new().service(web::resource("/").to(
+                |req: HttpRequest, stream: web::Payload| {
+                    start(factory(), &req, stream)
+                },
+            )))
+        });
+
+        let client = serv.ws().unwrap();
+
+        let command = r#"{
+                            "command":"SetIceCandidate",
+                                "data":{
+                                    "peer_id":15,
+                                    "candidate":{
+                                        "candidate":"asd",
+                                        "sdp_m_line_index":1,
+                                        "sdp_mid":"2"
+                                    }
+                                }
+                            }"#;
+
+        serv.block_on(client.send(Message::Text(String::from(command))))
+            .unwrap();
+
+        for i in CHAN.1.lock().unwrap().take().unwrap().wait() {
+            let i: CommandMessage = i.unwrap();
+            match i.0 {
+                Command::SetIceCandidate { peer_id, candidate } => {
+                    assert_eq!(peer_id.0, 15);
+                    assert_eq!(candidate.candidate, "asd");
+                    break;
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 }

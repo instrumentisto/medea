@@ -14,11 +14,11 @@ use crate::api::control::MemberId;
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct CommandMessage(Command);
+pub struct CommandMessage(pub Command);
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
-pub struct EventMessage(Event);
+pub struct EventMessage(pub Event);
 
 /// Abstraction over RPC connection with some remote [`Member`].
 ///
@@ -90,7 +90,7 @@ pub struct RpcConnectionEstablished {
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
-#[derive(Debug, Message)]
+#[derive(Debug, Message, PartialEq)]
 pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     ///
@@ -101,7 +101,7 @@ pub struct RpcConnectionClosed {
 }
 
 /// Reasons of why [`RpcConnection`] may be closed.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ClosedReason {
     /// [`RpcConnection`] was irrevocably closed.
     Closed,
