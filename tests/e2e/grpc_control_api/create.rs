@@ -8,8 +8,6 @@
 use medea::api::control::error_codes::ErrorCode;
 use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
 
-use crate::gen_insert_str_macro;
-
 use super::{
     create_room_req, ControlClient, MemberBuilder, RoomBuilder,
     WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
@@ -20,20 +18,20 @@ mod room {
 
     #[test]
     fn room() {
-        gen_insert_str_macro!("create-room");
+        const TEST_NAME: &str = "create-room";
 
         let client = ControlClient::new();
-        let sids = client.create(&create_room_req(&insert_str!("{}")));
+        let sids = client.create(&create_room_req(TEST_NAME));
         assert_eq!(sids.len(), 2);
         sids.get(&"publisher".to_string()).unwrap();
         let responder_sid =
             sids.get(&"responder".to_string()).unwrap().as_str();
         assert_eq!(
             responder_sid,
-            &insert_str!("ws://127.0.0.1:8080/ws/{}/responder/test")
+            &format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME)
         );
 
-        let mut get_resp = client.get(&insert_str!("{}"));
+        let mut get_resp = client.get(TEST_NAME);
         let room = get_resp.take_room();
 
         let responder =
@@ -45,7 +43,7 @@ mod room {
             responder_pipeline.get("play").unwrap().get_webrtc_play();
         assert_eq!(
             responder_play.get_src(),
-            insert_str!("local://{}/publisher/publish")
+            format!("local://{}/publisher/publish", TEST_NAME)
         );
 
         let publisher =
@@ -58,12 +56,11 @@ mod room {
 
     #[test]
     fn cant_create_rooms_with_duplicate_ids() {
-        gen_insert_str_macro!("cant_create_rooms_with_duplicate_ids");
-
+        const TEST_NAME: &str = "cant_create_rooms_with_duplicate_ids";
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("{}"))
+            .id(TEST_NAME)
             .build()
             .unwrap()
             .build_request("");
@@ -79,15 +76,14 @@ mod room {
 
     #[test]
     fn element_id_mismatch() {
-        gen_insert_str_macro!("element_id_mismatch");
-
+        const TEST_NAME: &str = "element_id_mismatch";
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("{}"))
+            .id(TEST_NAME)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}"));
+            .build_request(TEST_NAME);
 
         if let Err(err) = client.try_create(&create_room) {
             assert_eq!(err.code, ErrorCode::ElementIdMismatch as u32)
@@ -103,10 +99,10 @@ mod member {
 
     #[test]
     fn member() {
-        gen_insert_str_macro!("create-member");
+        const TEST_NAME: &str = "create-member";
 
         let client = ControlClient::new();
-        client.create(&create_room_req(&insert_str!("{}")));
+        client.create(&create_room_req(TEST_NAME));
 
         let add_member = MemberBuilder::default()
             .id("test-member")
@@ -114,38 +110,39 @@ mod member {
             .add_endpoint(
                 WebRtcPlayEndpointBuilder::default()
                     .id("play")
-                    .src(insert_str!("local://{}/publisher/publish"))
+                    .src(format!("local://{}/publisher/publish", TEST_NAME))
                     .build()
                     .unwrap(),
             )
             .build()
             .unwrap()
-            .build_request(insert_str!("{}"));
+            .build_request(TEST_NAME);
 
         let sids = client.create(&add_member);
         let e2e_test_member_sid =
             sids.get(&"test-member".to_string()).unwrap().as_str();
         assert_eq!(
             e2e_test_member_sid,
-            insert_str!("ws://127.0.0.1:8080/ws/{}/test-member/qwerty")
+            format!("ws://127.0.0.1:8080/ws/{}/test-member/qwerty", TEST_NAME)
         );
 
-        let member = client.get(&insert_str!("{}/test-member")).take_member();
+        let member = client
+            .get(&format!("{}/test-member", TEST_NAME))
+            .take_member();
         assert_eq!(member.get_pipeline().len(), 1);
         assert_eq!(member.get_credentials(), "qwerty");
     }
 
     #[test]
     fn cant_create_member_in_non_existent_room() {
-        gen_insert_str_macro!("cant_create_member_in_non_existent_room");
-
+        const TEST_NAME: &str = "cant_create_member_in_non_existent_room";
         let client = ControlClient::new();
 
         let create_member = MemberBuilder::default()
             .id("caller")
             .build()
             .unwrap()
-            .build_request(insert_str!("{}"));
+            .build_request(TEST_NAME);
 
         if let Err(err) = client.try_create(&create_member) {
             assert_eq!(err.code, ErrorCode::RoomNotFound as u32)
@@ -156,12 +153,12 @@ mod member {
 
     #[test]
     fn cant_create_members_with_duplicate_ids() {
-        gen_insert_str_macro!("cant_create_members_with_duplicate_ids");
+        const TEST_NAME: &str = "cant_create_members_with_duplicate_ids";
 
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("{}"))
+            .id(TEST_NAME)
             .build()
             .unwrap()
             .build_request("");
@@ -172,7 +169,7 @@ mod member {
             .id("caller")
             .build()
             .unwrap()
-            .build_request(insert_str!("{}"));
+            .build_request(TEST_NAME);
 
         client.create(&create_member);
 
@@ -207,35 +204,35 @@ mod endpoint {
 
     #[test]
     fn endpoint() {
-        gen_insert_str_macro!("create-endpoint");
+        const TEST_NAME: &str = "create-endpoint";
 
         let client = ControlClient::new();
-        client.create(&create_room_req(&insert_str!("{}")));
+        client.create(&create_room_req(TEST_NAME));
 
         let create_req = WebRtcPublishEndpointBuilder::default()
             .id("publish")
             .p2p_mode(WebRtcPublishEndpoint_P2P::NEVER)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/responder"));
+            .build_request(format!("{}/responder", TEST_NAME));
 
         let sids = client.create(&create_req);
         assert_eq!(sids.len(), 0);
 
         let endpoint = client
-            .get(&insert_str!("{}/responder/publish"))
+            .get(&format!("{}/responder/publish", TEST_NAME))
             .take_webrtc_pub();
         assert_eq!(endpoint.get_p2p(), WebRtcPublishEndpoint_P2P::NEVER);
     }
 
     #[test]
     fn cant_create_endpoint_in_non_existent_member() {
-        gen_insert_str_macro!("cant_create_endpoint_in_non_existent_member");
+        const TEST_NAME: &str = "cant_create_endpoint_in_non_existent_member";
 
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("{}"))
+            .id(TEST_NAME)
             .build()
             .unwrap()
             .build_request("");
@@ -247,7 +244,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member"));
+            .build_request(format!("{}/member", TEST_NAME));
 
         if let Err(err) = client.try_create(&create_play) {
             assert_eq!(err.code, ErrorCode::MemberNotFound as u32)
@@ -258,7 +255,7 @@ mod endpoint {
 
     #[test]
     fn cant_create_endpoint_in_non_existent_room() {
-        gen_insert_str_macro!("cant_create_endpoint_in_non_existent_room");
+        const TEST_NAME: &str = "cant_create_endpoint_in_non_existent_room";
 
         let client = ControlClient::new();
 
@@ -267,7 +264,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member"));
+            .build_request(format!("{}/member", TEST_NAME));
 
         if let Err(err) = client.try_create(&create_publish) {
             assert_eq!(err.code, ErrorCode::RoomNotFound as u32)
@@ -278,12 +275,12 @@ mod endpoint {
 
     #[test]
     fn cant_create_endpoints_with_duplicate_ids() {
-        gen_insert_str_macro!("cant_create_endpoints_with_duplicate_ids");
+        const TEST_NAME: &str = "cant_create_endpoints_with_duplicate_ids";
 
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("{}"))
+            .id(TEST_NAME)
             .add_member(MemberBuilder::default().id("member").build().unwrap())
             .build()
             .unwrap()
@@ -296,7 +293,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member"));
+            .build_request(format!("{}/member", TEST_NAME));
 
         client.create(&create_endpoint);
 
@@ -309,14 +306,13 @@ mod endpoint {
 
     #[test]
     fn cant_create_play_endpoint_when_no_pusblish_endpoints() {
-        gen_insert_str_macro!(
-            "cant_create_play_endpoint_when_no_pusblish_endpoints"
-        );
+        const TEST_NAME: &str =
+            "cant_create_play_endpoint_when_no_pusblish_endpoints";
 
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("{}"))
+            .id(TEST_NAME)
             .add_member(MemberBuilder::default().id("member").build().unwrap())
             .build()
             .unwrap()
@@ -326,10 +322,10 @@ mod endpoint {
 
         let create_endpoint = WebRtcPlayEndpointBuilder::default()
             .id("play")
-            .src(insert_str!("local://{}/member/publish"))
+            .src(format!("local://{}/member/publish", TEST_NAME))
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member"));
+            .build_request(format!("{}/member", TEST_NAME));
 
         if let Err(err) = client.try_create(&create_endpoint) {
             assert_eq!(err.code, ErrorCode::EndpointNotFound as u32)

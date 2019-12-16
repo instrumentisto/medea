@@ -5,9 +5,10 @@
 
 #![allow(clippy::module_name_repetitions)]
 
+pub mod api;
+pub mod callback;
 pub mod client;
 pub mod prelude;
-pub mod server;
 
 use clap::{
     app_from_crate, crate_authors, crate_description, crate_name,
@@ -22,7 +23,7 @@ fn main() {
     let opts = app_from_crate!()
         .arg(
             Arg::with_name("addr")
-                .help("Address where host control-api-mock-server.")
+                .help("Address to host medea-control-api-mock-server on.")
                 .default_value("0.0.0.0:8000")
                 .long("addr")
                 .short("a"),
@@ -34,12 +35,27 @@ fn main() {
                 .long("medea-addr")
                 .short("m"),
         )
+        .arg(
+            Arg::with_name("callback_port")
+                .help("Port to listen by gRPC Control API Callback service.")
+                .default_value("9099")
+                .long("callback-port")
+                .short("p"),
+        )
+        .arg(
+            Arg::with_name("callback_host")
+                .help("Address to host gRPC Control API Callback service on.")
+                .default_value("0.0.0.0")
+                .long("callback-host")
+                .short("c"),
+        )
         .get_matches();
 
     let _log_guard = init_logger();
 
     let sys = actix::System::new("control-api-mock");
-    server::run(&opts);
+    let callback_server = callback::server::run(&opts);
+    api::run(&opts, callback_server);
     sys.run().unwrap();
 }
 

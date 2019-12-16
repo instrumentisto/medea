@@ -191,6 +191,20 @@
     .json__string {
       color: olive;
     }
+
+    .control-debug__table-result>table {
+      border-collapse: separate;
+      border-spacing: 10px;
+      font-size: 11pt;
+    }
+
+    .control-debug__table-result>table>tr {
+      font-weight: normal;
+    }
+
+    .control-debug__table-result>table>tr>th {
+      font-weight: normal;
+    }
   </style>
 </head>
 <body>
@@ -317,6 +331,18 @@
     </div>
   </div>
 
+  <div class="window control-debug__window_callbacks toggle-content">
+    <div class="window__title">
+      <span>Callbacks</span>
+      <span class="window__close">X</span>
+    </div>
+    <div class="window__content">
+      <div class="control-debug__table-result"></div>
+
+      <button class="control-debug__execute">Execute</button>
+    </div>
+  </div>
+
   <div class="control-debug-menu__toggle">
     Dynamic Control API
   </div>
@@ -331,6 +357,8 @@
     <span class="control-debug-menu__item control-debug-menu__item_get">Get</span>
     <br>
     <span class="control-debug-menu__item control-debug-menu__item_delete">Delete</span>
+    <br>
+    <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks</span>
   </div>
 </body>
 </html>

@@ -2,6 +2,7 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+pub mod callback;
 pub mod endpoints;
 pub mod error_codes;
 pub mod grpc;
@@ -19,6 +20,7 @@ use futures::Future;
 use serde::Deserialize;
 
 use crate::{
+    api::control::callback::url::CallbackUrlParseError,
     log::prelude::*,
     signalling::room_service::{
         RoomService, RoomServiceError, StartStaticRooms,
@@ -69,11 +71,20 @@ pub enum TryFromProtobufError {
 
     #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
     UnimplementedEndpoint(String),
+
+    #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
+    CallbackUrlParseErr(CallbackUrlParseError),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
     fn from(from: SrcParseError) -> Self {
         Self::SrcUriError(from)
+    }
+}
+
+impl From<CallbackUrlParseError> for TryFromProtobufError {
+    fn from(from: CallbackUrlParseError) -> Self {
+        Self::CallbackUrlParseErr(from)
     }
 }
 

@@ -13,7 +13,9 @@ use crate::{api::control::RoomId, signalling::Room};
 #[derive(Clone, Debug, Default)]
 pub struct RoomRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.
-    //       [Tracking](https://github.com/crossbeam-rs/rfcs/issues/32).
+    //       [Tracking](https://github.com/crossbeam-rs/rfcs/issues/32),
+    //       or [ConcurrentHashMap port](https://github.com/jonhoo/flurry)
+    //       when its done.
     rooms: Arc<Mutex<HashMap<RoomId, Addr<Room>>>>,
 }
 

@@ -11,7 +11,9 @@ use medea_control_api_proto::grpc::api::{
 };
 use serde::Deserialize;
 
-use crate::api::control::{EndpointId, TryFromProtobufError};
+use crate::api::control::{
+    callback::url::CallbackUrl, EndpointId, TryFromProtobufError,
+};
 
 use super::{
     member::{MemberElement, MemberSpec},
@@ -36,6 +38,8 @@ pub enum RoomElement {
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
+        on_leave: Option<CallbackUrl>,
+        on_join: Option<CallbackUrl>,
     },
 }
 

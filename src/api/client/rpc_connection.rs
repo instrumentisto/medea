@@ -104,7 +104,18 @@ pub struct RpcConnectionClosed {
 #[derive(Debug, PartialEq)]
 pub enum ClosedReason {
     /// [`RpcConnection`] was irrevocably closed.
-    Closed,
+    Closed {
+        /// `true` if [`RpcConnection`] normally closed (with [`Normal`] or
+        /// [`Away`] [`CloseCode`] in WebSocket implementation).
+        ///
+        /// `false` if [`RpcConnection`]'s closing was considered as abnormal
+        /// (reconnection timeout, abnormal [`CloseCode`] etc).
+        ///
+        /// [`CloseCode`]: actix_http::ws::CloseCode
+        /// [`Normal`]: actix_http::ws::CloseCode::Normal
+        /// [`Away`]: actix_http::ws::CloseCode::Away
+        normal: bool,
+    },
     /// [`RpcConnection`] was lost, but may be reestablished.
     Lost,
 }
