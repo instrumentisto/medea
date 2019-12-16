@@ -22,6 +22,7 @@ pub struct OnLeaveEvent {
 }
 
 impl OnLeaveEvent {
+    #[inline]
     pub fn new(reason: OnLeaveReason) -> Self {
         Self { reason }
     }
@@ -38,14 +39,14 @@ impl Into<OnLeaveProto> for OnLeaveEvent {
 /// Reason of why `Member` was lost.
 #[derive(Debug)]
 pub enum OnLeaveReason {
-    /// Server is shutting down.
-    ServerShutdown,
+    /// `Member` was normally disconnected.
+    Disconnected,
 
     /// Connection with `Member` was lost.
     LostConnection,
 
-    /// Member was normally disconnected.
-    Disconnected,
+    /// Server is shutting down.
+    ServerShutdown,
 }
 
 impl Into<OnLeaveReasonProto> for OnLeaveReason {
@@ -101,10 +102,10 @@ pub struct CallbackRequest {
     /// FID (Full ID) of element with which event was occurred.
     fid: StatefulFid,
 
-    /// [`CallbackEvent`] which occured.
+    /// [`CallbackEvent`] which occurred.
     event: CallbackEvent,
 
-    /// Time on which event was occurred.
+    /// Time at which event occurred.
     at: DateTime<Utc>,
 }
 

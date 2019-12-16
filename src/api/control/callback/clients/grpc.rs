@@ -1,10 +1,6 @@
 //! Implementation of gRPC client for sending [`CallbackRequest`]s.
 
-use std::{
-    fmt,
-    fmt::{Error, Formatter},
-    sync::Arc,
-};
+use std::{fmt, sync::Arc};
 
 use futures::future::{Future, IntoFuture as _};
 use grpcio::{ChannelBuilder, EnvBuilder};
@@ -22,16 +18,15 @@ use crate::api::control::callback::{
 /// gRPC client for sending [`CallbackRequest`]s.
 #[allow(clippy::module_name_repetitions)]
 pub struct GrpcCallbackClient {
-    /// [`grpcio`] gRPC client for Control API callback.
+    /// [`grpcio`] gRPC client of Control API Callback service.
     client: ProtoCallbackClient,
 }
 
 impl fmt::Debug for GrpcCallbackClient {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(
-            f,
-            "GrpcCallbackClient {{ client: /* Cannot be printed */ }}"
-        )
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("GrpcCallbackClient")
+            .field("client", &"/* Cannot be printed */")
+            .finish()
     }
 }
 

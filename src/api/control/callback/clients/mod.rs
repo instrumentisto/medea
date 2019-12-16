@@ -4,8 +4,8 @@ pub mod grpc;
 
 use std::fmt::Debug;
 
+use derive_more::From;
 use futures::Future;
-use grpcio::Error;
 
 use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},
@@ -21,18 +21,15 @@ pub trait CallbackClient: Debug + Send + Sync {
     ) -> Box<dyn Future<Item = (), Error = CallbackClientError>>;
 }
 
-#[derive(Debug)]
+/// Error of sending [`CallbackRequest`] by [`CallbackClient`].
+#[derive(Debug, From)]
 pub enum CallbackClientError {
+    /// [`grpcio`] failed to send [`CallbackRequest`].
     Grpcio(grpcio::Error),
 }
 
-impl From<grpcio::Error> for CallbackClientError {
-    fn from(err: Error) -> Self {
-        Self::Grpcio(err)
-    }
-}
-
-/// Creates [`CallbackClient`] based on provided [`CallbackUrl`].
+/// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
+#[inline]
 pub fn build_client(url: &CallbackUrl) -> impl CallbackClient {
     info!("Creating CallbackClient for url: {}", url);
     match &url {

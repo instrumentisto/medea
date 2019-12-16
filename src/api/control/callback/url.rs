@@ -1,8 +1,8 @@
 //! URLs for callbacks implementation.
 
-use std::{convert::TryFrom, fmt, fmt::Display};
+use std::{convert::TryFrom, fmt};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use serde::{de::Visitor, Deserialize, Deserializer};
 use url::{ParseError, Url};
 
@@ -13,7 +13,8 @@ use url::{ParseError, Url};
 ///
 /// In [`Display`] implementation protocol will be added to this address.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Display, Eq, PartialEq, Hash)]
+#[display(fmt = "grpc://{}", _0)]
 pub struct GrpcCallbackUrl(String);
 
 impl GrpcCallbackUrl {
@@ -21,14 +22,9 @@ impl GrpcCallbackUrl {
     ///
     /// If you wish to get address with protocol - just use [`Display`]
     /// implementation.
+    #[inline]
     pub fn addr(&self) -> &str {
         &self.0
-    }
-}
-
-impl Display for GrpcCallbackUrl {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "grpc://{}", self.0)
     }
 }
 
@@ -36,26 +32,21 @@ impl Display for GrpcCallbackUrl {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, derive_more::Display, Debug, Eq, PartialEq, Hash)]
 pub enum CallbackUrl {
+    /// gRPC callbacks type.
     Grpc(GrpcCallbackUrl),
 }
 
-/// Error which can happen while callback URL parsing.
-#[derive(Debug, Display)]
+/// Error of [`CallbackUrl`] parsing.
+#[derive(Debug, Display, From)]
 pub enum CallbackUrlParseError {
     #[display(fmt = "{:?}", _0)]
     UrlParseErr(ParseError),
 
-    #[display(fmt = "Missing host.")]
+    #[display(fmt = "Missing host")]
     MissingHost,
 
-    #[display(fmt = "Unsupported URL scheme.")]
+    #[display(fmt = "Unsupported URL scheme")]
     UnsupportedScheme,
-}
-
-impl From<ParseError> for CallbackUrlParseError {
-    fn from(err: ParseError) -> Self {
-        Self::UrlParseErr(err)
-    }
 }
 
 impl TryFrom<String> for CallbackUrl {
@@ -80,9 +71,6 @@ impl TryFrom<String> for CallbackUrl {
     }
 }
 
-/// [Serde] deserializer for [`CallbackUrl`].
-///
-/// [Serde]: serde
 impl<'de> Deserialize<'de> for CallbackUrl {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

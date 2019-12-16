@@ -105,9 +105,8 @@ pub struct RpcConnectionClosed {
 pub enum ClosedReason {
     /// [`RpcConnection`] was irrevocably closed.
     Closed {
-        /// `true` if [`RpcConnection`] normally closed
-        /// (with [`Normal`] or [`Away`] [`CloseCode`] in WebSocket
-        /// implementation).
+        /// `true` if [`RpcConnection`] normally closed (with [`Normal`] or
+        /// [`Away`] [`CloseCode`] in WebSocket implementation).
         ///
         /// `false` if [`RpcConnection`]'s closing was considered as abnormal
         /// (reconnection timeout, abnormal [`CloseCode`] etc).
