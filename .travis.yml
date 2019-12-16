@@ -113,7 +113,7 @@ jobs:
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason browser=firefox
 
-    - name: E2E signalling (stable)
+    - name: E2E (stable)
       stage: test
       rust: stable
       services: ["docker"]

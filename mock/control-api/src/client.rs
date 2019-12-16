@@ -13,7 +13,7 @@ use medea_control_api_proto::grpc::{
 };
 use protobuf::RepeatedField;
 
-use crate::server::Element;
+use crate::api::Element;
 
 /// Fid to `Room` element.
 #[derive(Clone, Debug)]

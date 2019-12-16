@@ -300,7 +300,7 @@ impl ParticipantService {
     ) {
         let closed_at = Instant::now();
         match reason {
-            ClosedReason::Closed => {
+            ClosedReason::Closed { .. } => {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
                 ctx.spawn(wrap_future(
@@ -329,7 +329,7 @@ impl ParticipantService {
                             );
                             ctx.notify(RpcConnectionClosed {
                                 member_id,
-                                reason: ClosedReason::Closed,
+                                reason: ClosedReason::Closed { normal: false },
                             })
                         },
                     ),
@@ -448,5 +448,11 @@ impl ParticipantService {
                     as u64,
             },
         )
+    }
+
+    /// Returns [`Iterator`] over [`MemberId`] and [`Member`] which this
+    /// [`ParticipantRepository`] stores.
+    pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
+        self.members.iter()
     }
 }

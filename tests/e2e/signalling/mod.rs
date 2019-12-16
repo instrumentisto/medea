@@ -122,15 +122,15 @@ impl Actor for TestMember {
 
 #[derive(actix::Message)]
 #[rtype(result = "()")]
-pub struct CloseSocket;
+pub struct CloseSocket(pub CloseCode);
 
 impl Handler<CloseSocket> for TestMember {
     type Result = ();
 
-    fn handle(&mut self, _: CloseSocket, _: &mut Self::Context) {
+    fn handle(&mut self, msg: CloseSocket, _: &mut Self::Context) {
         self.writer
             .start_send(ws::Message::Close(Some(CloseReason {
-                code: CloseCode::Normal,
+                code: msg.0,
                 description: None,
             })))
             .unwrap();

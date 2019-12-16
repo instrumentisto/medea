@@ -22,7 +22,7 @@ CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.39
 CHROME_VERSION := 78.0
-FIREFOX_VERSION := 70.0
+FIREFOX_VERSION := 71.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -381,7 +381,8 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml
 
 test.e2e:
 ifeq ($(up),yes)
