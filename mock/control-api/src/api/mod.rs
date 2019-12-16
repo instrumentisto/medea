@@ -8,6 +8,7 @@ pub mod room;
 
 use std::collections::HashMap;
 
+use actix::Addr;
 use actix_cors::Cors;
 use actix_web::{
     middleware,
@@ -26,6 +27,7 @@ use medea_control_api_proto::grpc::api::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    callback::server::{GetCallbackItems, GrpcCallbackServer},
     client::{ControlClient, Fid},
     prelude::*,
 };
@@ -43,18 +45,22 @@ pub struct Context {
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Medea]: https://github.com/instrumentisto/medea
     client: ControlClient,
+
+    /// gRPC server which receives Control API callbacks.
+    callback_server: Addr<GrpcCallbackServer>,
 }
 
 /// Run REST [Control API] server mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub fn run(args: &ArgMatches) {
+pub fn run(args: &ArgMatches, callback_server_addr: Addr<GrpcCallbackServer>) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
     HttpServer::new(move || {
         App::new()
             .wrap(Cors::new())
             .data(Context {
                 client: ControlClient::new(&medea_addr),
+                callback_server: callback_server_addr.clone(),
             })
             .wrap(middleware::Logger::default())
             .service(
@@ -74,6 +80,10 @@ pub fn run(args: &ArgMatches) {
                     .route(web::post().to_async(create::create3))
                     .route(web::get().to_async(get::get3))
                     .route(web::delete().to_async(delete::delete3)),
+            )
+            .service(
+                web::resource("/callbacks")
+                    .route(web::get().to_async(get_callbacks)),
             )
     })
     .bind(args.value_of("addr").unwrap())
@@ -112,11 +122,23 @@ macro_rules! gen_request_macro {
     };
 }
 
+/// [`actix_web`] REST API endpoint which returns all
+/// [`Callback`]s received by this mock server.
+#[allow(clippy::needless_pass_by_value)]
+pub fn get_callbacks(
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .callback_server
+        .send(GetCallbackItems)
+        .map_err(|e| warn!("GrpcCallbackServer mailbox error. {:?}", e))
+        .map(|callbacks| HttpResponse::Ok().json(&callbacks.unwrap()))
+}
+
 /// Implementation of `Delete` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::module_name_repetitions)]
 mod delete {
     use super::*;
 
@@ -131,7 +153,6 @@ mod delete {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::module_name_repetitions)]
 mod get {
     use super::*;
 
@@ -146,7 +167,6 @@ mod get {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::module_name_repetitions)]
 mod create {
     use super::*;
 

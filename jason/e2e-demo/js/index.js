@@ -1,4 +1,5 @@
-const controlUrl = "http://127.0.0.1:8000/control-api/";
+const controlDomain = 'http://127.0.0.1:8000';
+const controlUrl = controlDomain + '/control-api/';
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
@@ -18,7 +19,9 @@ async function createRoom(roomId, memberId) {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always'
             },
-          }
+          },
+          on_join: "grpc://127.0.0.1:9099",
+          on_leave: "grpc://127.0.0.1:9099"
         }
       }
     }
@@ -55,6 +58,8 @@ async function createMember(roomId, memberId) {
       kind: 'Member',
       credentials: 'test',
       pipeline: pipeline,
+      on_join: "grpc://127.0.0.1:9099",
+      on_leave: "grpc://127.0.0.1:9099"
     }
   });
 
@@ -202,6 +207,51 @@ const controlDebugWindows = {
       resultContainer.innerHTML = colorizedJson.prettyPrint(res);
     })
   },
+
+  callbacks: function() {
+    let container = document.getElementsByClassName('control-debug__window_callbacks')[0];
+    let resultContainer = container.getElementsByClassName('control-debug__table-result')[0];
+    bindCloseWindow(container);
+
+    let execute = container.getElementsByClassName('control-debug__execute')[0];
+    execute.addEventListener('click', async () => {
+      while (resultContainer.firstChild) {
+        resultContainer.firstChild.remove();
+      }
+
+      let callbacks = await controlApi.getCallbacks();
+
+      let table = document.createElement("table");
+
+      let header = document.createElement("tr");
+      let eventHeader = document.createElement("th");
+      eventHeader.innerHTML = 'Event';
+      header.appendChild(eventHeader);
+      let timeHeader = document.createElement("th");
+      timeHeader.innerHTML = 'Time';
+      header.appendChild(timeHeader);
+      let elementHeader = document.createElement('th');
+      elementHeader.innerHTML = 'FID';
+      header.appendChild(elementHeader);
+      table.appendChild(header);
+
+      for (callback of callbacks) {
+        let row = document.createElement('tr');
+        let event = document.createElement('th');
+        event.innerHTML = JSON.stringify(callback.event);
+        row.appendChild(event);
+        let time = document.createElement('th');
+        time.innerHTML = callback.at;
+        row.appendChild(time);
+        let element = document.createElement('th');
+        element.innerHTML = callback.fid;
+        row.appendChild(element);
+        table.appendChild(row);
+      }
+
+      resultContainer.appendChild(table);
+    })
+  }
 };
 
 window.onload = async function() {
@@ -250,28 +300,69 @@ window.onload = async function() {
     return await jason.media_manager().init_local_stream(constraints);
   }
 
-  try {
-    let controlBtns = document.getElementsByClassName('control')[0];
-    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
-    let usernameInput = document.getElementsByClassName('connect__username')[0];
-    let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-    let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-    let localVideo = document.querySelector('.local-video > video');
+  let room = newRoom();
+  let connectBtnsDiv = document.getElementsByClassName('connect')[0];
+  let controlBtns = document.getElementsByClassName('control')[0];
+  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+  let localVideo = document.querySelector('.local-video > video');
 
-    const updateLocalVideo = async (stream) => {
-      localVideo.srcObject = stream;
-      await localVideo.play();
-    };
+  const updateLocalVideo = async (stream) => {
+    localVideo.srcObject = stream;
+    await localVideo.play();
+  };
 
-    const room = await jason.init_room();
+  async function newRoom() {
+    jason = new rust.Jason();
+    room = await jason.init_room();
+
     try {
       const stream = await getStream(audioSelect, videoSelect);
       await updateLocalVideo(stream);
       await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
       room.inject_local_stream(stream);
     } catch (e) {
-      console.error("Init local video failed: " + e);
+      console.error("Init local video failed: " + e.message());
     }
+
+    room.on_new_connection( (connection) => {
+      connection.on_remote_stream( async (stream) => {
+        let videoDiv = document.getElementsByClassName("remote-videos")[0];
+        let video = document.createElement("video");
+        video.srcObject = stream.get_media_stream();
+        let innerVideoDiv = document.createElement("div");
+        innerVideoDiv.className = "video";
+        innerVideoDiv.appendChild(video);
+        videoDiv.appendChild(innerVideoDiv);
+
+        await video.play();
+      });
+    });
+
+    room.on_failed_local_stream((error) => {
+      console.error(error);
+    });
+
+    room.on_close(function (on_closed) {
+      let videos = document.getElementsByClassName('remote-videos')[0];
+      while (videos.firstChild) {
+        videos.firstChild.remove();
+      }
+      room = newRoom();
+      contentVisibility.show(connectBtnsDiv);
+      contentVisibility.hide(controlBtns);
+      alert(
+        `Call was ended.
+        Reason: ${on_closed.reason()};
+        Is closed by server: ${on_closed.is_closed_by_server()};
+        Is error: ${on_closed.is_err()}.`
+      );
+    });
+  }
+
+  try {
+    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
+    let usernameInput = document.getElementsByClassName('connect__username')[0];
 
     audioSelect.addEventListener('change', async () => {
       try {
@@ -293,26 +384,9 @@ window.onload = async function() {
       }
     });
 
-    room.on_new_connection( (connection) => {
-      connection.on_remote_stream( async (stream) => {
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-        let video = document.createElement("video");
-        video.srcObject = stream.get_media_stream();
-        let innerVideoDiv = document.createElement("div");
-        innerVideoDiv.className = "video";
-        innerVideoDiv.appendChild(video);
-        videoDiv.appendChild(innerVideoDiv);
-
-        await video.play();
-      });
-    });
-
-    room.on_failed_local_stream((error) => {
-      console.error(error);
-    });
-
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
     let muteVideo = document.getElementsByClassName('control__mute_video')[0];
+    let closeApp = document.getElementsByClassName('control__close_app')[0];
     let isAudioMuted = false;
     let isVideoMuted = false;
 
@@ -338,11 +412,15 @@ window.onload = async function() {
         muteVideo.textContent = "Unmute video";
       }
     });
+    closeApp.addEventListener('click', () => {
+      jason.dispose();
+    });
 
     usernameInput.value = faker.name.firstName();
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
+        contentVisibility.hide(connectBtnsDiv);
         contentVisibility.show(controlBtns);
 
         try {
@@ -352,7 +430,7 @@ window.onload = async function() {
           } catch (e) {
             if (e.response.status === 400) {
               console.log("Room not found. Creating new room...");
-              room.join(await createRoom(roomId, username));
+              await room.join(await createRoom(roomId, username));
               return;
             }
           }
@@ -360,12 +438,16 @@ window.onload = async function() {
             await axios.get(controlUrl + roomId + '/' + username);
           } catch (e) {
             console.log("Member not found. Creating new member...");
-            room.join(await createMember(roomId, username));
+            await room.join(await createMember(roomId, username));
             return;
           }
-          room.join(baseUrl + roomId + '/' + username + '/test')
+          await room.join(baseUrl + roomId + '/' + username + '/test')
         } catch (e) {
-          console.error("Join to room failed: " + e);
+          console.error(
+            "Join to room failed: Error[name:[", e.name(), "], ",
+            "[msg:", e.message(), "], [source", e.source(), "]]",
+          );
+          console.error(e.trace());
         }
       };
     };
@@ -463,6 +545,15 @@ const controlApi = {
     } catch (e) {
       alert(JSON.stringify(e.response.data));
     }
+  },
+
+  getCallbacks: async function() {
+    try {
+      let resp = await axios.get(controlDomain + '/callbacks');
+      return resp.data;
+    } catch (e) {
+      alert(JSON.stringify(e.response.data));
+    }
   }
 };
 
@@ -478,6 +569,7 @@ const debugMenuItems = [
   'create-room',
   'delete',
   'get',
+  'callbacks',
 ];
 
 function bindControlDebugMenu() {

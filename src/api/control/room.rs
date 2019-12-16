@@ -11,7 +11,9 @@ use medea_control_api_proto::grpc::api::{
 };
 use serde::Deserialize;
 
-use crate::api::control::{EndpointId, TryFromProtobufError};
+use crate::api::control::{
+    callback::url::CallbackUrl, EndpointId, TryFromProtobufError,
+};
 
 use super::{
     member::{MemberElement, MemberSpec},
@@ -28,7 +30,6 @@ pub struct Id(pub String);
 /// Element of [`Room`]'s [`Pipeline`].
 ///
 /// [`Room`]: crate::signalling::room::Room
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RoomElement {
@@ -37,6 +38,8 @@ pub enum RoomElement {
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
+        on_leave: Option<CallbackUrl>,
+        on_join: Option<CallbackUrl>,
     },
 }
 
@@ -45,7 +48,6 @@ pub enum RoomElement {
 /// Newtype for [`RootElement::Room`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,

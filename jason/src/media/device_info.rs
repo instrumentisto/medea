@@ -4,15 +4,23 @@
 
 use std::convert::TryFrom;
 
+use derive_more::Display;
 use wasm_bindgen::prelude::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
-use crate::utils::WasmErr;
+/// Errors that may occur when parsing [MediaDeviceInfo][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#device-info
+#[derive(Debug, Display)]
+pub enum Error {
+    /// Occurs when kind of media device is not an input device.
+    #[display(fmt = "Not an input device")]
+    NotInputDevice,
+}
 
 /// Representation of [MediaDeviceInfo][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
-#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct InputDeviceInfo {
     device_type: InputDeviceKind,
@@ -44,13 +52,13 @@ impl InputDeviceKind {
 }
 
 impl TryFrom<MediaDeviceKind> for InputDeviceKind {
-    type Error = WasmErr;
+    type Error = Error;
 
     fn try_from(value: MediaDeviceKind) -> Result<Self, Self::Error> {
         match value {
             MediaDeviceKind::Audioinput => Ok(Self::Audio),
             MediaDeviceKind::Videoinput => Ok(Self::Video),
-            _ => Err(WasmErr::from("Not input device")),
+            _ => Err(Error::NotInputDevice),
         }
     }
 }
@@ -92,7 +100,7 @@ impl InputDeviceInfo {
 }
 
 impl TryFrom<MediaDeviceInfo> for InputDeviceInfo {
-    type Error = WasmErr;
+    type Error = Error;
 
     fn try_from(info: MediaDeviceInfo) -> Result<Self, Self::Error> {
         Ok(Self {

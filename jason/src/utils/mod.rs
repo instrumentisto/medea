@@ -13,8 +13,8 @@ use web_sys::Window;
 #[doc(inline)]
 pub use self::{
     callback::{Callback, Callback2},
-    errors::WasmErr,
-    event_listener::EventListener,
+    errors::{HandlerDetachedError, JasonError, JsCaused, JsError},
+    event_listener::{EventListener, EventListenerBindError},
 };
 
 /// Returns [`Window`] object.
@@ -38,15 +38,21 @@ impl Drop for IntervalHandle {
     }
 }
 
-/// Upgrades newtyped [`Weak`] reference, returning [`WasmErr`] if failed,
-/// or mapping [`Rc`]-referenced value with provided `$closure` otherwise.
+/// Upgrades newtyped [`Weak`] reference, returning [`HandlerDetachedError`] if
+/// failed, or maps the [`Rc`]-referenced value with provided `$closure`
+/// otherwise.
 ///
 /// [`Rc`]: std::rc::Rc
 /// [`Weak`]: std::rc::Weak
 macro_rules! map_weak {
-    ($v:expr, $closure:expr) => {{
+    ($v:ident, $closure:expr) => {{
         $v.0.upgrade()
-            .ok_or_else(|| js_sys::Error::new("Detached state").into())
+            .ok_or(
+                $crate::utils::JasonError::from(tracerr::new!(
+                    $crate::utils::HandlerDetachedError
+                ))
+                .into(),
+            )
             .map($closure)
     }};
 }

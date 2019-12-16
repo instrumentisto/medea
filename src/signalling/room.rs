@@ -13,7 +13,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerId, TrackId,
+    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
 use medea_control_api_proto::grpc::api::{
     Element as ElementProto, Room as RoomProto,
@@ -26,6 +26,10 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
+            callback::{
+                service::CallbackService, OnJoinEvent, OnLeaveEvent,
+                OnLeaveReason,
+            },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
@@ -58,7 +62,6 @@ use crate::{
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail, Display)]
 pub enum RoomError {
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
@@ -153,6 +156,11 @@ enum State {
 pub struct Room {
     id: RoomId,
 
+    /// Service for sending [`CallbackEvent`]s.
+    ///
+    /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
+    callbacks: CallbackService,
+
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
@@ -180,6 +188,7 @@ impl Room {
             peers: PeerRepository::from(HashMap::new()),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
+            callbacks: context.callbacks.clone(),
         })
     }
 
@@ -257,72 +266,6 @@ impl Room {
         )))
     }
 
-    /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
-    /// doesn't exist.
-    ///
-    /// Adds `send` track to source member's [`Peer`] and `recv` to
-    /// sink member's [`Peer`].
-    ///
-    /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
-    ///
-    /// # Panics
-    ///
-    /// Panics if provided endpoints have interconnected [`Peer`]s already.
-    fn connect_endpoints(
-        &mut self,
-        src: &WebRtcPublishEndpoint,
-        sink: &WebRtcPlayEndpoint,
-    ) -> Option<(PeerId, PeerId)> {
-        debug!(
-            "Connecting endpoints of Member [id = {}] with Member [id = {}]",
-            src.owner().id(),
-            sink.owner().id(),
-        );
-        let src_owner = src.owner();
-        let sink_owner = sink.owner();
-
-        if let Some((src_peer_id, sink_peer_id)) = self
-            .peers
-            .get_peer_by_members_ids(&src_owner.id(), &sink_owner.id())
-        {
-            // TODO: when dynamic patching of [`Room`] will be done then we need
-            //       rewrite this code to updating [`Peer`]s in not
-            //       [`Peer<New>`] state.
-            let mut src_peer: Peer<New> =
-                self.peers.take_inner_peer(src_peer_id).unwrap();
-            let mut sink_peer: Peer<New> =
-                self.peers.take_inner_peer(sink_peer_id).unwrap();
-
-            src_peer
-                .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
-
-            src.add_peer_id(src_peer_id);
-            sink.set_peer_id(sink_peer_id);
-
-            self.peers.add_peer(src_peer);
-            self.peers.add_peer(sink_peer);
-        } else {
-            let (mut src_peer, mut sink_peer) =
-                self.peers.create_peers(&src_owner, &sink_owner);
-
-            src_peer
-                .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
-
-            src.add_peer_id(src_peer.id());
-            sink.set_peer_id(sink_peer.id());
-
-            let src_peer_id = src_peer.id();
-            let sink_peer_id = sink_peer.id();
-
-            self.peers.add_peer(src_peer);
-            self.peers.add_peer(sink_peer);
-
-            return Some((src_peer_id, sink_peer_id));
-        };
-
-        None
-    }
-
     /// Creates and interconnects all [`Peer`]s between connected [`Member`]
     /// and all available at this moment other [`Member`]s.
     ///
@@ -334,41 +277,48 @@ impl Room {
         member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
-        let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
-
-        // Create all connected publish endpoints.
-        for publisher in member.srcs().values() {
-            for receiver in publisher.sinks() {
-                let receiver_owner = receiver.owner();
-
-                if receiver.peer_id().is_none()
-                    && self.members.member_has_connection(&receiver_owner.id())
-                {
-                    if let Some(p) =
-                        self.connect_endpoints(&publisher, &receiver)
-                    {
-                        created_peers.push(p)
-                    }
+        member
+            .srcs()
+            .into_iter()
+            .flat_map(|(_, publisher)| {
+                publisher
+                    .sinks()
+                    .into_iter()
+                    .map(move |receiver| (publisher.clone(), receiver))
+            })
+            .filter({
+                let members = &self.members;
+                move |(_, receiver)| {
+                    receiver.peer_id().is_none()
+                        && members.member_has_connection(&receiver.owner().id())
                 }
-            }
-        }
-
-        // Create all connected play's receivers peers.
-        for receiver in member.sinks().values() {
-            let publisher = receiver.src();
-
-            if receiver.peer_id().is_none()
-                && self.members.member_has_connection(&publisher.owner().id())
-            {
-                if let Some(p) = self.connect_endpoints(&publisher, &receiver) {
-                    created_peers.push(p);
+            })
+            .chain(
+                member
+                    .sinks()
+                    .into_iter()
+                    .map(|(_, receiver)| (receiver.src(), receiver))
+                    .filter({
+                        let members = &self.members;
+                        move |(publisher, receiver)| {
+                            receiver.peer_id().is_none()
+                                && members.member_has_connection(
+                                    &publisher.owner().id(),
+                                )
+                        }
+                    }),
+            )
+            .filter_map({
+                let peers = &mut self.peers;
+                move |(publisher, receiver)| {
+                    peers.connect_endpoints(&publisher, &receiver)
                 }
-            }
-        }
-
-        for (first_peer_id, second_peer_id) in created_peers {
-            self.connect_peers(ctx, first_peer_id, second_peer_id);
-        }
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|(first_peer_id, second_peer_id)| {
+                self.connect_peers(ctx, first_peer_id, second_peer_id);
+            });
     }
 
     /// Checks state of interconnected [`Peer`]s and sends [`Event`] about
@@ -415,6 +365,24 @@ impl Room {
     ) -> ResponseActFuture<Self, (), ()> {
         info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
+
+        self.members
+            .iter_members()
+            .filter_map(|(_, member)| {
+                member
+                    .get_on_leave()
+                    .map(move |on_leave| (member, on_leave))
+            })
+            .filter(|(member, _)| {
+                self.members.member_has_connection(&member.id())
+            })
+            .for_each(|(member, on_leave)| {
+                self.callbacks.send_callback(
+                    on_leave,
+                    member.get_fid().into(),
+                    OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                );
+            });
 
         Box::new(
             self.members
@@ -705,6 +673,8 @@ impl Room {
             self.id.clone(),
         );
 
+        signalling_member.set_callback_urls(spec);
+
         for (id, publish) in spec.publish_endpoints() {
             let signalling_publish = WebRtcPublishEndpoint::new(
                 id.clone(),
@@ -874,6 +844,15 @@ impl CommandHandler for Room {
             self.members.send_event_to_member(to_member_id, event),
         )))
     }
+
+    /// Does nothing atm.
+    fn on_add_peer_connection_metrics(
+        &mut self,
+        _peer_id: PeerId,
+        _candidate: PeerMetrics,
+    ) -> Self::Output {
+        Ok(Box::new(wrap_future(future::ok(()))))
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -1037,6 +1016,13 @@ impl Handler<RpcConnectionEstablished> for Room {
             })
             .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
+                if let Some(callback_url) = member.get_on_join() {
+                    room.callbacks.send_callback(
+                        callback_url,
+                        member.get_fid().into(),
+                        OnJoinEvent,
+                    );
+                }
             });
         Box::new(fut)
     }
@@ -1080,7 +1066,31 @@ impl Handler<RpcConnectionClosed> for Room {
         self.members
             .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
 
-        if let ClosedReason::Closed = msg.reason {
+        if let ClosedReason::Closed { normal } = msg.reason {
+            if let Some(member) = self.members.get_member_by_id(&msg.member_id)
+            {
+                if let Some(on_leave_url) = member.get_on_leave() {
+                    let reason = if normal {
+                        OnLeaveReason::Disconnected
+                    } else {
+                        OnLeaveReason::LostConnection
+                    };
+                    self.callbacks.send_callback(
+                        on_leave_url,
+                        member.get_fid().into(),
+                        OnLeaveEvent::new(reason),
+                    );
+                }
+            } else {
+                error!(
+                    "Member [id = {}] with ID from RpcConnectionClosed not \
+                     found.",
+                    msg.member_id,
+                );
+                let close_fut = self.close_gracefully(ctx);
+                ctx.spawn(close_fut);
+            }
+
             let removed_peers =
                 self.peers.remove_peers_related_to_member(&msg.member_id);
 

@@ -1,21 +1,20 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: {{ template "medea-demo.fullname" . }}-server
+  name: {{ printf "%s-server" (include "medea-demo.fullname" .) | quote }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
-    helm.sh/chart: {{ template "medea-demo.chart" . }}
-    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    helm.sh/chart: {{ include "medea-demo.chart" . | quote }}
+    app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
     app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
     app.kubernetes.io/component: server
   {{- with .Values.labels }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   selector:
-    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
     app.kubernetes.io/component: server
   ports:

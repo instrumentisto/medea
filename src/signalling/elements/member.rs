@@ -19,6 +19,7 @@ use medea_control_api_proto::grpc::api::{
 
 use crate::{
     api::control::{
+        callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
@@ -54,7 +55,7 @@ pub enum MembersLoadError {
     EndpointNotFound(String),
 }
 
-#[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
+#[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
@@ -67,7 +68,6 @@ pub enum MemberError {
 #[derive(Clone, Debug)]
 pub struct Member(Rc<RefCell<MemberInner>>);
 
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 struct MemberInner {
     /// [`RoomId`] of [`Room`] to which this [`Member`] relates.
@@ -87,6 +87,12 @@ struct MemberInner {
 
     /// [`IceUser`] of this [`Member`].
     ice_user: Option<IceUser>,
+
+    /// URL to which `on_join` Control API callback will be sent.
+    on_join: Option<CallbackUrl>,
+
+    /// URL to which `on_leave` Control API callback will be sent.
+    on_leave: Option<CallbackUrl>,
 }
 
 impl Member {
@@ -102,6 +108,8 @@ impl Member {
             credentials,
             ice_user: None,
             room_id,
+            on_leave: None,
+            on_join: None,
         })))
     }
 
@@ -146,6 +154,8 @@ impl Member {
         let this_member = store
             .get(&self.id())
             .ok_or_else(|| MembersLoadError::MemberNotFound(self.get_fid()))?;
+
+        this_member.set_callback_urls(&this_member_spec);
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
@@ -227,7 +237,7 @@ impl Member {
     }
 
     /// Returns [`Fid`] to this [`Member`].
-    fn get_fid(&self) -> Fid<ToMember> {
+    pub fn get_fid(&self) -> Fid<ToMember> {
         Fid::<ToMember>::new(self.room_id(), self.id())
     }
 
@@ -404,10 +414,25 @@ impl Member {
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
     }
+
+    /// Returns [`CallbackUrl`] to which Medea should send `OnJoin` callback.
+    pub fn get_on_join(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_join.clone()
+    }
+
+    /// Returns [`CallbackUrl`] to which Medea should send `OnLeave` callback.
+    pub fn get_on_leave(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_leave.clone()
+    }
+
+    /// Sets all [`CallbackUrl`]'s from [`MemberSpec`].
+    pub fn set_callback_urls(&self, spec: &MemberSpec) {
+        self.0.borrow_mut().on_leave = spec.on_leave().clone();
+        self.0.borrow_mut().on_join = spec.on_join().clone();
+    }
 }
 
 /// Weak pointer to [`Member`].
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct WeakMember(Weak<RefCell<MemberInner>>);
 
@@ -495,6 +520,12 @@ impl Into<ElementProto> for Member {
 
         member.set_id(self.id().to_string());
         member.set_credentials(self.credentials());
+        if let Some(on_leave) = self.get_on_leave() {
+            member.set_on_leave(on_leave.to_string());
+        }
+        if let Some(on_join) = self.get_on_join() {
+            member.set_on_join(on_join.to_string());
+        }
 
         element.set_member(member);
 

@@ -18,7 +18,7 @@ use medea::{
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
     let config = Conf::parse()?;
-    info!("{:?}", config);
+
     if let Some(lvl) = config.log.level() {
         std::env::set_var("RUST_LOG", lvl.as_str());
     }
@@ -26,6 +26,8 @@ fn main() -> Result<(), Error> {
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init()?;
+
+    info!("{:?}", config);
 
     actix::run(move || {
         new_turn_auth_service(&config.turn)

@@ -16,6 +16,8 @@ server:
     turn:
       host: demo.medea.stg.t11913.org
       pass: changeme
+    log:
+      level: DEBUG
 
   control-mock:
     image:
@@ -24,7 +26,7 @@ server:
 
   coturn:
     image:
-      tag: 4.5
+      tag: "4.5"
       pullPolicy: Always
     conf:
       listening_port: 9934

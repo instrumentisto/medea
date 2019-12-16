@@ -22,7 +22,7 @@ CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.39
 CHROME_VERSION := 78.0
-FIREFOX_VERSION := 70.0
+FIREFOX_VERSION := 71.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -415,7 +415,8 @@ endif
 
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL_API__STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml
 
 test.integration:
 ifeq ($(up),yes)
@@ -846,9 +847,7 @@ endif
 ##############################
 
 helm-cluster = $(if $(call eq,$(cluster),),minikube,$(cluster))
-helm-namespace = $(if $(call eq,$(helm-cluster),minikube),kube,staging)-system
-helm-cluster-args = $(strip \
-	--kube-context=$(helm-cluster) --tiller-namespace=$(helm-namespace))
+helm-cluster-args = --kube-context=$(helm-cluster)
 
 helm-chart = $(if $(call eq,$(chart),),medea-demo,$(chart))
 helm-chart-dir = jason/demo/chart/medea-demo
@@ -873,25 +872,16 @@ helm:
 # Usage:
 #	make helm.down [chart=medea-demo] [release=<release-name>]
 #	               [cluster=(minikube|staging)]
+#	               [check=(yes|no)]
 
 helm.down:
-	$(if $(shell helm ls $(helm-cluster-args) | grep '$(helm-release)'),\
-		helm del --purge $(helm-cluster-args) $(helm-release) ,\
-		@echo "--> No '$(helm-release)' release found in $(helm-cluster) cluster")
-
-
-# Upgrade (or initialize) Tiller (server side of Helm) of Minikube.
-#
-# Usage:
-#	make helm.init [client-only=no [upgrade=(yes|no)]]
-#	               [client-only=yes]
-
-helm.init:
-	helm init --wait \
-		$(if $(call eq,$(client-only),yes),\
-			--client-only,\
-			--kube-context=minikube --tiller-namespace=kube-system \
-				$(if $(call eq,$(upgrade),no),,--upgrade))
+ifneq ($(check),no)
+	$(if $(shell helm $(helm-cluster-args) list | grep '$(helm-release)'),\
+		helm $(helm-cluster-args) uninstall $(helm-release) ,\
+		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
+else
+	helm $(helm-cluster-args) uninstall $(helm-release)
+endif
 
 
 # Lint project Helm chart.
@@ -909,7 +899,7 @@ helm.lint:
 #	make helm.list [cluster=(minikube|staging)]
 
 helm.list:
-	helm ls $(helm-cluster-args)
+	helm $(helm-cluster-args) list
 
 
 # Build Helm package from project Helm chart.
@@ -957,9 +947,9 @@ endif
 #
 # Usage:
 #	make helm.up [chart=medea-demo] [release=<release-name>]
+#	             [atomic=(no|yes)] [force=(no|yes)] [wait=(yes|no)]
 #	             [cluster=minikube [rebuild=(no|yes) [no-cache=(no|yes)]]]
 #	             [cluster=staging]
-#	             [wait=(yes|no)]
 
 helm.up:
 ifeq ($(wildcard $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml),)
@@ -974,15 +964,19 @@ ifeq ($(rebuild),yes)
 endif
 endif
 endif
-	helm upgrade --install --force $(helm-cluster-args) \
+	helm $(helm-cluster-args) upgrade --install \
 		$(helm-release) $(helm-chart-dir)/ \
 			--namespace=$(helm-release-namespace) \
 			--values=$(helm-chart-vals-dir)/$(helm-cluster).vals.yaml \
 			--values=$(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml \
 			--set server.deployment.revision=$(shell date +%s) \
 			--set web-client.deployment.revision=$(shell date +%s) \
+			$(if $(call eq,$(force),yes),\
+				--force,)\
+			$(if $(call eq,$(atomic),yes),\
+				--atomic,\
 			$(if $(call eq,$(wait),no),,\
-				--wait )
+				--wait ))
 
 
 # Bootstrap Minikube cluster (local Kubernetes) for development environment.
@@ -1051,8 +1045,8 @@ protoc.rebuild:
         	docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
-        helm helm.down helm.init helm.lint helm.list \
-        	helm.package helm.package.release helm.up \
+        helm helm.down helm.lint helm.list helm.package helm.package.release \
+        	helm.up \
         minikube.boot \
         protoc.rebuild \
         release release.crates release.helm release.npm \

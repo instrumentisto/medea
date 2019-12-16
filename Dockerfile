@@ -65,10 +65,17 @@ RUN cargo build --bin=medea ${rustc_opts}
 # Prepare project distribution binary and all dependent dynamic libraries.
 RUN cp /app/target/${rustc_mode}/medea /out/medea \
  && ldd /out/medea \
+        # These libs are not reported by ldd(1) on binary,
+        # but are vital for DNS resolution.
+        # See: https://forums.aws.amazon.com/thread.jspa?threadID=291609
+        /lib/x86_64-linux-gnu/libnss_dns.so.2 \
+        /lib/x86_64-linux-gnu/libnss_files.so.2 \
     | awk 'BEGIN{ORS=" "}$1~/^\//{print $1}$3~/^\//{print $3}' \
     | sed 's/,$/\n/' \
+    | tr -d ':' \
     | tr ' ' "\n" \
-    | xargs -I '{}' cp -fL --parents '{}' /out/
+    | xargs -I '{}' cp -fL --parents '{}' /out/ \
+ && rm -rf /out/out
 
 
 

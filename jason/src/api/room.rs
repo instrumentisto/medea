@@ -7,36 +7,198 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use anyhow::Error;
-use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
+use derive_more::Display;
+use futures::{channel::mpsc, stream, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceServer, PeerId, Track,
+    IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
 };
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, MediaStreamHandle, PeerEvent, PeerEventHandler,
+        MediaStream, MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
         PeerRepository,
     },
-    rpc::RpcClient,
-    utils::Callback,
+    rpc::{
+        ClientDisconnect, CloseReason, RpcClient, RpcClientError,
+        TransportError, WebSocketRpcTransport,
+    },
+    utils::{Callback, JasonError, JsCaused, JsError},
 };
 
 use super::{connection::Connection, ConnectionHandle};
+
+/// Reason of why [`Room`] has been closed.
+///
+/// This struct is passed into `on_close_by_server` JS side callback.
+#[wasm_bindgen]
+pub struct RoomCloseReason {
+    /// Indicator if [`Room`] is closed by server.
+    ///
+    /// `true` if [`CloseReason::ByServer`].
+    is_closed_by_server: bool,
+
+    /// Reason of closing.
+    reason: String,
+
+    /// Indicator if closing is considered as error.
+    ///
+    /// This field may be `true` only on closing by client.
+    is_err: bool,
+}
+
+impl RoomCloseReason {
+    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// converted into [`String`].
+    ///
+    /// `is_err` may be `true` only on closing by client.
+    ///
+    /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
+    pub fn new(reason: CloseReason) -> Self {
+        match reason {
+            CloseReason::ByServer(reason) => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: true,
+                is_err: false,
+            },
+            CloseReason::ByClient { reason, is_err } => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: false,
+                is_err,
+            },
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl RoomCloseReason {
+    /// `wasm_bindgen` getter for [`RoomCloseReason::reason`] field.
+    pub fn reason(&self) -> String {
+        self.reason.clone()
+    }
+
+    /// `wasm_bindgen` getter for [`RoomCloseReason::is_closed_by_server`]
+    /// field.
+    pub fn is_closed_by_server(&self) -> bool {
+        self.is_closed_by_server
+    }
+
+    /// `wasm_bindgen` getter for [`RoomCloseReason::is_err`] field.
+    pub fn is_err(&self) -> bool {
+        self.is_err
+    }
+}
+
+/// Errors that may occur in a [`Room`].
+#[derive(Debug, Display, JsCaused)]
+enum RoomError {
+    /// Returned if the `on_failed_local_stream` callback was not set before
+    /// joining the room.
+    #[display(fmt = "`on_failed_local_stream` callback is not set")]
+    CallbackNotSet,
+
+    /// Returned if unable to init [`RpcTransport`].
+    #[display(fmt = "Unable to init RPC transport: {}", _0)]
+    InitRpcTransportFailed(#[js(cause)] TransportError),
+
+    /// Returned if [`RpcClient`] was unable to connect to RPC server.
+    #[display(fmt = "Unable to connect RPC server: {}", _0)]
+    CouldNotConnectToServer(#[js(cause)] RpcClientError),
+
+    /// Returned if the previously added local media stream does not satisfy
+    /// the tracks sent from the media server.
+    #[display(fmt = "Invalid local stream: {}", _0)]
+    InvalidLocalStream(#[js(cause)] PeerError),
+
+    /// Returned if [`PeerConnection`] cannot receive the local stream from
+    /// [`MediaManager`].
+    #[display(fmt = "Failed to get local stream: {}", _0)]
+    CouldNotGetLocalMedia(#[js(cause)] PeerError),
+
+    /// Returned if the requested [`PeerConnection`] is not found.
+    #[display(fmt = "Peer with id {} doesnt exist", _0)]
+    NoSuchPeer(PeerId),
+
+    /// Returned if an error occurred during the webrtc signaling process
+    /// with remote peer.
+    #[display(fmt = "Some PeerConnection error: {}", _0)]
+    PeerConnectionError(#[js(cause)] PeerError),
+
+    /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
+    /// [`Connection`] with remote [`Member`].
+    #[display(fmt = "Remote stream from unknown peer")]
+    UnknownRemotePeer,
+}
+
+impl From<RpcClientError> for RoomError {
+    fn from(err: RpcClientError) -> Self {
+        Self::CouldNotConnectToServer(err)
+    }
+}
+
+impl From<TransportError> for RoomError {
+    fn from(err: TransportError) -> Self {
+        Self::InitRpcTransportFailed(err)
+    }
+}
+
+impl From<PeerError> for RoomError {
+    fn from(err: PeerError) -> Self {
+        use PeerError::*;
+        match err {
+            MediaConnections(_) | StreamRequest(_) => {
+                Self::InvalidLocalStream(err)
+            }
+            MediaManager(_) => Self::CouldNotGetLocalMedia(err),
+            RtcPeerConnection(_) => Self::PeerConnectionError(err),
+        }
+    }
+}
 
 /// JS side handle to `Room` where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
-#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
+
+impl RoomHandle {
+    /// Implements externally visible `RoomHandle::join`.
+    pub fn inner_join(
+        &self,
+        token: String,
+    ) -> impl Future<Output = Result<(), JasonError>> + 'static {
+        let inner: Result<_, JasonError> = map_weak!(self, |inner| inner);
+
+        async move {
+            let inner = inner?;
+
+            if !inner.borrow().on_failed_local_stream.is_set() {
+                return Err(JasonError::from(tracerr::new!(
+                    RoomError::CallbackNotSet
+                )));
+            }
+
+            let websocket = WebSocketRpcTransport::new(&token)
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+            inner
+                .borrow()
+                .rpc
+                .connect(Rc::new(websocket))
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+
+            Ok(())
+        }
+    }
+}
 
 #[wasm_bindgen]
 impl RoomHandle {
@@ -49,6 +211,12 @@ impl RoomHandle {
             .borrow_mut()
             .on_new_connection
             .set_func(f))
+    }
+
+    /// Sets `on_close` callback, which will be invoked on [`Room`] close,
+    /// providing [`RoomCloseReason`].
+    pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
@@ -78,29 +246,13 @@ impl RoomHandle {
     ///   - `on_failed_local_stream` callback is not set
     ///   - unable to connect to media server.
     ///
-    /// Effectively returns `Result<(), js_sys::Error>`.
+    /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
-        match map_weak!(self, |inner| (
-            Rc::clone(&inner.borrow().rpc),
-            inner.borrow().on_failed_local_stream.is_set()
-        )) {
-            Ok((rpc, failed_callback_is_set)) => {
-                if !failed_callback_is_set {
-                    return future_to_promise(future::err(
-                        js_sys::Error::new(
-                            "`on_failed_local_stream` callback is not set",
-                        )
-                        .into(),
-                    ));
-                }
-                future_to_promise(async move {
-                    rpc.connect(token).await.map(|_| JsValue::NULL).map_err(
-                        |err| js_sys::Error::new(&format!("{}", err)).into(),
-                    )
-                })
-            }
-            Err(err) => future_to_promise(future::err(err)),
-        }
+        future_to_promise(
+            self.inner_join(token).map(|result| {
+                result.map(|_| JsValue::null()).map_err(Into::into)
+            }),
+        )
     }
 
     /// Injects local media stream for all created and new [`PeerConnection`]s
@@ -206,6 +358,21 @@ impl Room {
         Self(room)
     }
 
+    /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
+    ///
+    /// Supposed that this function will trigger [`Drop`] implementation of
+    /// [`InnerRoom`] and call JS side `on_close` callback with provided
+    /// [`CloseReason`].
+    ///
+    /// Note that this function __doesn't guarantee__ that [`InnerRoom`] will be
+    /// dropped because theoretically other pointers to the [`InnerRoom`]
+    /// can exist. If you need guarantee of [`InnerRoom`] dropping then you
+    /// may check count of pointers to [`InnerRoom`] with
+    /// [`Rc::strong_count`].
+    pub fn close(self, reason: CloseReason) {
+        self.0.borrow_mut().set_close_reason(reason);
+    }
+
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
@@ -247,13 +414,24 @@ struct InnerRoom {
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_stream: Rc<Callback<js_sys::Error>>,
+    on_failed_local_stream: Rc<Callback<JasonError>>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
 
     /// Indicates if outgoing video is enabled in this [`Room`].
     enabled_video: bool,
+
+    /// JS callback which will be called when this [`Room`] will be closed.
+    on_close: Rc<Callback<RoomCloseReason>>,
+
+    /// Reason of [`Room`] closing.
+    ///
+    /// This [`CloseReason`] will be provided into `on_close` JS callback.
+    ///
+    /// Note that `None` will be considered as error and `is_err` will be
+    /// `true` in [`JsCloseReason`] provided to JS callback.
+    close_reason: CloseReason,
 }
 
 impl InnerRoom {
@@ -275,6 +453,11 @@ impl InnerRoom {
             on_failed_local_stream: Rc::new(Callback::default()),
             enabled_audio: true,
             enabled_video: true,
+            on_close: Rc::new(Callback::default()),
+            close_reason: CloseReason::ByClient {
+                reason: ClientDisconnect::RoomUnexpectedlyDropped,
+                is_err: true,
+            },
         }
     }
 
@@ -294,6 +477,14 @@ impl InnerRoom {
 
             Ok(JsValue::from(js_array))
         })
+    }
+
+    /// Sets `close_reason` of [`InnerRoom`].
+    ///
+    /// [`Drop`] implementation of [`InnerRoom`] is supposed
+    /// to be triggered after this function call.
+    fn set_close_reason(&mut self, reason: CloseReason) {
+        self.close_reason = reason;
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided
@@ -352,12 +543,12 @@ impl InnerRoom {
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(async move {
             for peer in peers {
-                if let Err(err) =
-                    peer.inject_local_stream(&injected_stream).await
+                if let Err(err) = peer
+                    .inject_local_stream(&injected_stream)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    console_error!(err.to_string());
-                    error_callback
-                        .call(js_sys::Error::new(&format!("{}", err)));
+                    error_callback.call(JasonError::from(err));
                 }
             }
         });
@@ -381,16 +572,20 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     ) {
-        let peer = match self.peers.create_peer(
-            peer_id,
-            ice_servers,
-            self.peer_event_sender.clone(),
-            self.enabled_audio,
-            self.enabled_video,
-        ) {
+        let peer = match self
+            .peers
+            .create_peer(
+                peer_id,
+                ice_servers,
+                self.peer_event_sender.clone(),
+                self.enabled_audio,
+                self.enabled_video,
+            )
+            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+        {
             Ok(peer) => peer,
             Err(err) => {
-                console_error!(err.to_string());
+                JasonError::from(err).print();
                 return;
             }
         };
@@ -406,8 +601,11 @@ impl EventHandler for InnerRoom {
                     None => {
                         let sdp_offer = peer
                             .get_offer(tracks, local_stream.as_ref())
-                            .await?;
-                        let mids = peer.get_mids()?;
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let mids = peer
+                            .get_mids()
+                            .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
@@ -417,24 +615,29 @@ impl EventHandler for InnerRoom {
                     Some(offer) => {
                         let sdp_answer = peer
                             .process_offer(offer, tracks, local_stream.as_ref())
-                            .await?;
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
                         });
                     }
                 };
-                Result::<_, Error>::Ok(())
+                Result::<_, Traced<RoomError>>::Ok(())
             }
-            .then(|result| {
-                async move {
-                    if let Err(err) = result {
-                        console_error!(err.to_string());
-                        // TODO: only media errors should go here
-                        error_callback
-                            .call(js_sys::Error::new(&format!("{}", err)));
+            .then(|result| async move {
+                if let Err(err) = result {
+                    let (err, trace) = err.into_parts();
+                    match err {
+                        RoomError::InvalidLocalStream(_)
+                        | RoomError::CouldNotGetLocalMedia(_) => {
+                            let e = JasonError::from((err, trace));
+                            e.print();
+                            error_callback.call(e);
+                        }
+                        _ => JasonError::from((err, trace)).print(),
                     };
-                }
+                };
             }),
         );
     }
@@ -443,13 +646,18 @@ impl EventHandler for InnerRoom {
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
-                if let Err(err) = peer.set_remote_answer(sdp_answer).await {
-                    console_error!(err.to_string());
+                if let Err(err) = peer
+                    .set_remote_answer(sdp_answer)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                {
+                    JasonError::from(err).print()
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            console_error!(format!("Peer with id {} doesnt exist", peer_id))
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
         }
     }
 
@@ -467,14 +675,16 @@ impl EventHandler for InnerRoom {
                         candidate.sdp_m_line_index,
                         candidate.sdp_mid,
                     )
-                    .await;
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError));
                 if let Err(err) = add {
-                    console_error!(err.to_string());
+                    JasonError::from(err).print();
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            console_error!(format!("Peer with id {} doesnt exist", peer_id))
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print()
         }
     }
 
@@ -521,7 +731,8 @@ impl PeerEventHandler for InnerRoom {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
             None => {
-                console_error!("NewRemoteStream from sender without connection")
+                JasonError::from(tracerr::new!(RoomError::UnknownRemotePeer))
+                    .print()
             }
         }
     }
@@ -530,11 +741,36 @@ impl PeerEventHandler for InnerRoom {
     fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
         self.on_local_stream.call(stream.new_handle());
     }
+
+    /// Handles [`PeerEvent::IceConnectionStateChanged`] event and sends new
+    /// state to RPC server.
+    fn on_ice_connection_state_changed(
+        &mut self,
+        peer_id: PeerId,
+        ice_connection_state: IceConnectionState,
+    ) {
+        self.rpc.send_command(Command::AddPeerConnectionMetrics {
+            peer_id,
+            metrics: PeerMetrics::IceConnectionStateChanged(
+                ice_connection_state,
+            ),
+        });
+    }
 }
 
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
         self.rpc.unsub();
+
+        if let CloseReason::ByClient { reason, .. } = &self.close_reason {
+            self.rpc.set_close_reason(*reason);
+        };
+
+        self.on_close
+            .call(RoomCloseReason::new(self.close_reason))
+            .map(|result| {
+                result.map_err(|err| console_error!(err.as_string()))
+            });
     }
 }

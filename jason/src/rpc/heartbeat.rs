@@ -1,24 +1,32 @@
 use std::{cell::RefCell, rc::Rc};
 
+use derive_more::{Display, From};
 use medea_client_api_proto::ClientMsg;
-use thiserror::Error;
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
-    rpc::websocket::{Error as SocketError, WebSocket},
-    utils::{window, IntervalHandle, WasmErr},
+    rpc::{RpcTransport, TransportError},
+    utils::{window, IntervalHandle, JsCaused, JsError},
 };
 
 /// Errors that may occur in [`Heartbeat`].
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("unable to ping: no socket")]
+#[derive(Debug, Display, From, JsCaused)]
+pub enum HeartbeatError {
+    /// Occurs when `ping` cannot be send because no transport.
+    #[display(fmt = "unable to ping: no transport")]
     NoSocket,
-    #[error("cannot set callback for ping send: {0}")]
-    SetIntervalHandler(#[from] WasmErr),
-    #[error("failed to send ping: {0}")]
-    SendPing(#[from] SocketError),
+
+    /// Occurs when a handler cannot be set to send `ping`.
+    #[display(fmt = "cannot set callback for ping send: {}", _0)]
+    SetIntervalHandler(JsError),
+
+    /// Occurs when socket failed to send `ping`.
+    #[display(fmt = "failed to send ping: {}", _0)]
+    SendPing(#[js(cause)] TransportError),
 }
+
+type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
@@ -31,21 +39,23 @@ struct InnerHeartbeat {
     num: u64,
     /// Timestamp of last pong received.
     pong_at: Option<f64>,
-    /// WebSocket connection with remote server.
-    socket: Option<Rc<WebSocket>>,
+    /// Connection with remote RPC server.
+    transport: Option<Rc<dyn RpcTransport>>,
     /// Handler of sending `ping` task. Task is dropped if you drop handler.
     ping_task: Option<PingTaskHandler>,
 }
 
 impl InnerHeartbeat {
-    /// Send ping message into socket.
-    /// Returns error no open socket.
-    fn send_now(&mut self) -> Result<(), Error> {
-        match self.socket.as_ref() {
-            None => Err(Error::NoSocket),
-            Some(socket) => {
+    /// Send ping message to RPC server.
+    /// Returns errors if no open transport found.
+    fn send_now(&mut self) -> Result<()> {
+        match self.transport.as_ref() {
+            None => Err(tracerr::new!(HeartbeatError::NoSocket)),
+            Some(transport) => {
                 self.num += 1;
-                Ok(socket.send(&ClientMsg::Ping(self.num))?)
+                Ok(transport
+                    .send(&ClientMsg::Ping(self.num))
+                    .map_err(tracerr::map_from_and_wrap!())?)
             }
         }
     }
@@ -59,27 +69,27 @@ struct PingTaskHandler {
 
 impl Heartbeat {
     /// Returns new instance of [`interval`] with given interval for ping in
-    /// seconds.
+    /// milliseconds.
     pub fn new(interval: i32) -> Self {
         Self(Rc::new(RefCell::new(InnerHeartbeat {
             interval,
             num: 0,
             pong_at: None,
-            socket: None,
+            transport: None,
             ping_task: None,
         })))
     }
 
-    /// Starts [`Heartbeat`] for given [`WebSocket`].
+    /// Starts [`Heartbeat`] for given [`RpcTransport`].
     ///
-    /// Sends first `ping` immediately, so provided [`WebSocket`] must be
+    /// Sends first `ping` immediately, so provided [`RpcTransport`] must be
     /// active.
-    pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), Error> {
+    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         inner.num = 0;
         inner.pong_at = None;
-        inner.socket = Some(socket);
-        inner.send_now()?;
+        inner.transport = Some(transport);
+        inner.send_now().map_err(tracerr::wrap!())?;
 
         let inner_rc = Rc::clone(&self.0);
         let do_ping = Closure::wrap(Box::new(move || {
@@ -92,7 +102,8 @@ impl Heartbeat {
                 do_ping.as_ref().unchecked_ref(),
                 inner.interval,
             )
-            .map_err(WasmErr::from)?;
+            .map_err(JsError::from)
+            .map_err(tracerr::from_and_wrap!())?;
 
         inner.ping_task = Some(PingTaskHandler {
             _closure: do_ping,
@@ -105,7 +116,7 @@ impl Heartbeat {
     /// Stops [`Heartbeat`].
     pub fn stop(&self) {
         self.0.borrow_mut().ping_task.take();
-        self.0.borrow_mut().socket.take();
+        self.0.borrow_mut().transport.take();
     }
 
     /// Timestamp of last pong received.

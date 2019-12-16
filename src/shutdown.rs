@@ -25,14 +25,12 @@ pub struct Priority(pub u8);
 
 /// Message that [`Subscriber`] is informed with to perform its graceful
 /// shutdown.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct ShutdownGracefully;
 
 /// Service which listens incoming OS signals and performs graceful
 /// shutdown for all its [`Subscriber`]s.
-#[allow(clippy::module_name_repetitions)]
 pub struct GracefulShutdown {
     /// Subscribers being subscribed to [`GracefulShutdown`] service.
     subs: BTreeMap<Priority, HashSet<Recipient<ShutdownGracefully>>>,

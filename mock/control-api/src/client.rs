@@ -13,7 +13,7 @@ use medea_control_api_proto::grpc::{
 };
 use protobuf::RepeatedField;
 
-use crate::server::Element;
+use crate::api::Element;
 
 /// Fid to `Room` element.
 #[derive(Clone, Debug)]
@@ -61,7 +61,6 @@ fn id_request(ids: Vec<String>) -> IdRequest {
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 pub struct ControlClient {
     /// [`grpcio`] gRPC client for Medea Control API.
     grpc_client: ControlApiClient,

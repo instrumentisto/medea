@@ -4,51 +4,65 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
+use derive_more::Display;
 use medea_client_api_proto::TrackId;
-use thiserror::*;
+use tracerr::Traced;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::media::{
-    AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
-    VideoTrackConstraints,
+use crate::{
+    media::{
+        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+        VideoTrackConstraints,
+    },
+    utils::{JsCaused, JsError},
 };
 
 use super::{MediaStream, MediaTrack};
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
-#[derive(Debug, Error)]
-pub enum Error {
+#[derive(Debug, Display, JsCaused)]
+pub enum StreamRequestError {
     /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
-    #[error("only one audio track is  allowed in SimpleStreamRequest")]
+    #[display(fmt = "only one audio track is allowed in SimpleStreamRequest")]
     TooManyAudioTracks,
 
     /// [`StreamRequest`] contains multiple [`VideoTrackConstraints`].
-    #[error("only one video track is allowed in SimpleStreamRequest")]
+    #[display(fmt = "only one video track is allowed in SimpleStreamRequest")]
     TooManyVideoTracks,
 
     /// [`StreamRequest`] contains no track constraints at all.
-    #[error("SimpleStreamRequest should have at least one track")]
+    #[display(fmt = "SimpleStreamRequest should have at least one track")]
     NoTracks,
 
     /// Provided [`MediaStream`] has multiple audio [`MediaTrack`]s.
-    #[error("provided MediaStream was expected to have single audio track")]
+    #[display(
+        fmt = "provided MediaStream was expected to have single audio track"
+    )]
     ExpectedAudioTracks,
 
     /// Provided [`MediaStream`] has multiple video [`MediaTrack`]s.
-    #[error("provided MediaStream was expected to have single video track")]
+    #[display(
+        fmt = "provided MediaStream was expected to have single video track"
+    )]
     ExpectedVideoTracks,
 
     /// Audio [`MediaTrack`] fails to satisfy specified constraints.
-    #[error("provided audio track does not satisfy specified constraints")]
+    #[display(
+        fmt = "provided audio track does not satisfy specified constraints"
+    )]
     InvalidAudioTrack,
 
     /// Video [`MediaTrack`] fails to satisfy specified constraints.
-    #[error("provided video track does not satisfy specified constraints")]
+    #[display(
+        fmt = "provided video track does not satisfy specified constraints"
+    )]
     InvalidVideoTrack,
 }
+
+type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
@@ -86,7 +100,6 @@ impl StreamRequest {
 
 /// Subtype of [`StreamRequest`], which can have maximum one track of each kind
 /// and must have at least one track of any kind.
-#[allow(clippy::module_name_repetitions)]
 pub struct SimpleStreamRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
     video: Option<(TrackId, VideoTrackConstraints)>,
@@ -94,11 +107,8 @@ pub struct SimpleStreamRequest {
 
 impl SimpleStreamRequest {
     /// Parses raw [`SysMediaStream`] and returns [`MediaStream`].
-    pub fn parse_stream(
-        &self,
-        stream: &SysMediaStream,
-    ) -> Result<MediaStream, Error> {
-        use Error::*;
+    pub fn parse_stream(&self, stream: &SysMediaStream) -> Result<MediaStream> {
+        use StreamRequestError::*;
 
         let mut tracks = Vec::new();
 
@@ -119,10 +129,10 @@ impl SimpleStreamRequest {
                         TrackConstraints::Audio(audio.clone()),
                     ))
                 } else {
-                    return Err(InvalidAudioTrack);
+                    return Err(tracerr::new!(InvalidAudioTrack));
                 }
             } else {
-                return Err(ExpectedAudioTracks);
+                return Err(tracerr::new!(ExpectedAudioTracks));
             }
         }
 
@@ -143,10 +153,10 @@ impl SimpleStreamRequest {
                         TrackConstraints::Video(video.clone()),
                     ))
                 } else {
-                    return Err(InvalidVideoTrack);
+                    return Err(tracerr::new!(InvalidVideoTrack));
                 }
             } else {
-                return Err(ExpectedVideoTracks);
+                return Err(tracerr::new!(ExpectedVideoTracks));
             }
         }
 
@@ -155,10 +165,12 @@ impl SimpleStreamRequest {
 }
 
 impl TryFrom<StreamRequest> for SimpleStreamRequest {
-    type Error = Error;
+    type Error = StreamRequestError;
 
-    fn try_from(value: StreamRequest) -> Result<Self, Self::Error> {
-        use Error::*;
+    fn try_from(
+        value: StreamRequest,
+    ) -> std::result::Result<Self, Self::Error> {
+        use StreamRequestError::*;
 
         if value.video.len() > 1 {
             return Err(TooManyVideoTracks);
