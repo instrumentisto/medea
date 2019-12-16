@@ -27,7 +27,7 @@ use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, ClosedReason, EventMessage, RpcConnection,
+            AuthorizationError, ClosedReason, RpcConnection,
             RpcConnectionClosed,
         },
         control::{
@@ -202,7 +202,7 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         match self.connections.get(&member_id) {
             Some(conn) => Either::A(
-                conn.send_event(EventMessage::from(event))
+                conn.send_event(event)
                     .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
             ),
             None => Either::B(future::err(RoomError::ConnectionNotExists(

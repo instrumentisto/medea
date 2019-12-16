@@ -14,11 +14,11 @@ use crate::api::control::MemberId;
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct CommandMessage(pub Command);
+pub struct CommandMessage(Command);
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
-pub struct EventMessage(pub Event);
+pub struct EventMessage(Event);
 
 /// Abstraction over RPC connection with some remote [`Member`].
 ///
@@ -41,10 +41,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Sends [`Event`] to remote [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_event(
-        &self,
-        msg: EventMessage,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>>;
 }
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.

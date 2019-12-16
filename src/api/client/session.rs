@@ -9,7 +9,7 @@ use actix::{
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, ServerMsg,
 };
 
 use crate::{
@@ -148,12 +148,9 @@ impl RpcConnection for Addr<WsSession> {
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(
-        &self,
-        msg: EventMessage,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
+    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
-            .send(msg)
+            .send(EventMessage::from(msg))
             .map_err(|err| warn!("Failed send event {:?} ", err));
         Box::new(fut)
     }
@@ -279,7 +276,7 @@ mod test {
 
     use crate::api::{
         client::rpc_connection::{
-            ClosedReason, EventMessage, RpcConnection, RpcConnectionClosed,
+            ClosedReason, RpcConnection, RpcConnectionClosed,
         },
         control::MemberId,
         MockRpcServer,
@@ -587,10 +584,10 @@ mod test {
             .unwrap();
 
         rpc_connection
-            .send_event(EventMessage(Event::SdpAnswerMade {
+            .send_event(Event::SdpAnswerMade {
                 peer_id: PeerId(77),
                 sdp_answer: String::from("sdp_answer"),
-            }))
+            })
             .wait()
             .unwrap();
 
