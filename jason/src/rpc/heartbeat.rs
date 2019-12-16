@@ -71,6 +71,7 @@ impl Heartbeat {
 
     fn update_idle_resolver(&self) {
         self.0.borrow_mut().idle_resolver_abort.take();
+        console_error("IDLE resolver aborted.");
 
         let weak_this = Rc::downgrade(&self.0);
         let (idle_resolver, idle_resolver_abort) =
@@ -99,6 +100,7 @@ impl Heartbeat {
         let mut on_message_stream = transport
             .on_message()
             .map_err(tracerr::map_from_and_wrap!())?;
+        self.0.borrow_mut().transport = Some(transport);
         self.update_idle_resolver();
         let (fut, pong_abort) = future::abortable(async move {
             while let Some(msg) = on_message_stream.next().await {
@@ -141,7 +143,7 @@ impl Heartbeat {
         self.0.borrow_mut().idle_resolver_abort.take();
     }
 
-    pub fn on_idle(&self) -> LocalBoxStream<'_, ()> {
+    pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().idle_sender = Some(on_idle_tx);
 

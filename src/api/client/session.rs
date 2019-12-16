@@ -48,6 +48,8 @@ pub struct WsSession {
     closed_by_server: bool,
 
     last_ping_num: u64,
+
+    ping_interval: Duration,
 }
 
 impl WsSession {
@@ -56,6 +58,7 @@ impl WsSession {
         member_id: MemberId,
         room: Addr<Room>,
         idle_timeout: Duration,
+        ping_interval: Duration,
     ) -> Self {
         Self {
             member_id,
@@ -64,6 +67,7 @@ impl WsSession {
             last_activity: Instant::now(),
             closed_by_server: false,
             last_ping_num: 0,
+            ping_interval,
         }
     }
 
@@ -92,8 +96,8 @@ impl WsSession {
         });
     }
 
-    fn start_pinger(ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(Duration::from_secs(5), |session, ctx| {
+    fn start_pinger(&self, ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(self.ping_interval, |session, ctx| {
             debug!("Send ping.");
             session.last_ping_num += 1;
             ctx.text(serde_json::to_string(&ServerMsg::Ping(session.last_ping_num)).unwrap());
@@ -112,7 +116,7 @@ impl Actor for WsSession {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
         Self::start_watchdog(ctx);
-        Self::start_pinger(ctx);
+        self.start_pinger(ctx);
 
         ctx.wait(
             wrap_future(self.room.send(RpcConnectionEstablished {
@@ -241,10 +245,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Pong(n)) => {
                         debug!("Received ping: {}", n);
-                        // Answer with Heartbeat::Pong.
-//                        ctx.text(
-//                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
-//                        );
                     }
                     Ok(ClientMsg::Command(command)) => {
                         if let Err(err) =

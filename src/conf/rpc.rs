@@ -20,6 +20,10 @@ pub struct Rpc {
     #[default(Duration::from_secs(10))]
     #[serde(with = "humantime_serde")]
     pub reconnect_timeout: Duration,
+
+    #[default(Duration::from_secs(3))]
+    #[serde(with = "humantime_serde")]
+    pub ping_interval: Duration,
 }
 
 #[cfg(test)]

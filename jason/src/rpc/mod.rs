@@ -555,6 +555,16 @@ impl RpcClient for WebSocketRpcClient {
                 }
             });
 
+            let mut on_idle = this.0.borrow_mut().heartbeat.on_idle();
+            let weak_this = this.downgrade();
+            spawn_local(async move {
+                while let Some(_) = on_idle.next().await {
+                    if let Some(this) = weak_this.upgrade() {
+                        this.reconnect().await;
+                    }
+                }
+            });
+
             let this_clone = this.downgrade();
             let mut on_socket_close = transport
                 .on_close()
