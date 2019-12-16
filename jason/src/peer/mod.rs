@@ -262,8 +262,11 @@ impl PeerConnection {
     /// for this [`PeerConnection`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
-    pub fn get_stats(&self) -> impl Future<Output = Result<JsValue, WasmErr>> {
-        self.peer.get_stats()
+    pub async fn get_stats(&self) -> Result<JsValue> {
+        self.peer
+            .get_stats()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Handle `iceconnectionstatechange` event from underlying peer emitting

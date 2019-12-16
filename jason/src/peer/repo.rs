@@ -1,7 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::{channel::mpsc, Future};
-use futures::future::LocalBoxFuture;
+use futures::{channel::mpsc, future::LocalBoxFuture, Future};
 use medea_client_api_proto::{IceServer, PeerId};
 use std::pin::Pin;
 use tracerr::Traced;
@@ -100,10 +99,12 @@ impl PeerRepository for Repository {
     fn get_stats_for_all_peer_connections(
         &self,
     ) -> LocalBoxFuture<'static, Vec<Result<JsValue, Traced<PeerError>>>> {
-        let mut futs = Vec::new();
-        for peer in self.peers.values() {
-            futs.push(peer.get_stats());
-        }
+        let futs: Vec<_> = self
+            .peers
+            .values()
+            .cloned()
+            .map(|p| Box::pin(async move { p.get_stats().await }))
+            .collect();
 
         Box::pin(futures::future::join_all(futs))
     }
