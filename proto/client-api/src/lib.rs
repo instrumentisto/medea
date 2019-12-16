@@ -413,7 +413,7 @@ mod test {
 
     #[test]
     fn ping() {
-        let ping = ClientMsg::Ping(15);
+        let ping = ServerMsg::Ping(15);
         let ping_str = "{\"ping\":15}";
 
         assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
@@ -450,7 +450,7 @@ mod test {
 
     #[test]
     fn pong() {
-        let pong = ServerMsg::Pong(5);
+        let pong = ClientMsg::Pong(5);
         let pong_str = "{\"pong\":5}";
 
         assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
