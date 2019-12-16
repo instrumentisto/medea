@@ -4,52 +4,48 @@ syntax = "proto3";
 
 package medea_callback;
 
-// Service for receiving 'Callback's from Medea media server.
+// Service for receiving callbacks from Medea media server.
 service Callback {
-  // 'Callback' receiver.
+  /// Fires when a certain callback event happens on Medea media server.
   rpc OnEvent (Request) returns (Response);
 }
 
-// 'on_join' callback in Control API spec.
-//
-// Fires when 'Member' joins the 'Room'.
-message OnJoin {}
-
-// 'on_leave' callback in Control API spec.
-//
-// Fires when 'Member' leaves the 'Room'.
-message OnLeave {
-  // Reason of why 'Member' leaves server.
-  Reason reason = 1;
-
-  enum Reason {
-    // Connection with 'Member' was lost.
-    LOST_CONNECTION = 0;
-
-    // Server is shutting down.
-    SERVER_SHUTDOWN = 1;
-
-    // Member was normally disconnected.
-    DISCONNECTED = 2;
-  }
-}
-
-// Request with fired callback event and some meta information.
+// Request with a fired callback event and some meta information.
 message Request {
-  // FID (Full ID) of element with which event was occurred.
+  // FID (Full ID) of the element that event was occurred with.
   string fid = 1;
-  // Time on which event was occurred.
+  // Time of event occurring.
   string at = 2;
 
-  // 'Callback' event.
+  // Occurred callback event.
   oneof event {
     OnJoin on_join = 3;
     OnLeave on_leave = 4;
   }
 }
 
-// Response of 'OnEvent' RPC method.
+// Empty response of the Callback service.
 //
 // We don't use 'google.protobuf.Empty' to be able to add
 // some fields (if necessary) in the future.
 message Response {}
+
+// Event that fires when Member joins a Room.
+message OnJoin {}
+
+// Event that fires when Member leaves its Room.
+message OnLeave {
+  // Reason of why Member leaves the Room.
+  Reason reason = 1;
+
+  enum Reason {
+    // Member normally disconnected itself.
+    DISCONNECTED = 0;
+
+    // Connection with Member was lost.
+    LOST_CONNECTION = 1;
+
+    // Medea media server is shutting down.
+    SERVER_SHUTDOWN = 2;
+  }
+}

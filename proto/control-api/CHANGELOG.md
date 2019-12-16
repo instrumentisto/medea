@@ -13,18 +13,24 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Methods ([#57]):
-    - `Create`;
-    - `Get`;
-    - `Delete`.
-- Elements ([#57]):
-    - `Room`;
-    - `Member`;
-    - `WebRtcPlayEndpoint`;
-    - `WebRtcPublishEndpoint`.
-- Callbacks:
-    - `OnJoin` ([#63]);
-    - `OnLeave` ([#63]).
+- gRPC:
+    - Services:
+        - `ControlApi` ([#57]);
+        - `Callback` ([#63]).
+    - `ControlApi` service:
+        - Methods ([#57]):
+            - `Create`;
+            - `Get`;
+            - `Delete`.
+        - Elements ([#57]):
+            - `Room`;
+            - `Member`;
+            - `WebRtcPlayEndpoint`;
+            - `WebRtcPublishEndpoint`.
+    - `Callback` service:
+        - Callbacks ([#63]):
+            - `OnJoin`;
+            - `OnLeave`.
 
 [#57]: /../../pull/57
 [#63]: /../../pull/63
