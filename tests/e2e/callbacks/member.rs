@@ -24,7 +24,7 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// id: {{ PROVIDED NAME }}
 /// spec:
 ///    pipeline:
-///      test-member:
+///      {{ PROVIDED NAME }}:
 ///        kind: Member
 ///        on_join: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
 ///        on_leave: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
@@ -43,7 +43,7 @@ fn callback_test(
         .id(name)
         .add_member(
             MemberBuilder::default()
-                .id("test-member")
+                .id(String::from(name))
                 .on_leave(format!("grpc://127.0.0.1:{}", port))
                 .on_join(format!("grpc://127.0.0.1:{}", port))
                 .build()
@@ -58,7 +58,7 @@ fn callback_test(
         move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
     let deadline = Some(Duration::from_secs(5));
     TestMember::connect(
-        create_response.get("test-member").unwrap(),
+        create_response.get(name).unwrap(),
         Box::new(on_event),
         deadline,
     )

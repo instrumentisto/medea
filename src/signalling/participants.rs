@@ -310,11 +310,8 @@ impl ParticipantService {
                         self.rpc_reconnect_timeout,
                         move |room, ctx| {
                             info!(
-                                "Member [id = {}] connection lost at {:?}. \
-                                 Room [id = {}] will be be stopped.",
-                                member_id,
-                                closed_at,
-                                room.id()
+                                "Member [id = {}] connection lost at {:?}.",
+                                member_id, closed_at,
                             );
                             ctx.notify(RpcConnectionClosed {
                                 member_id,

@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
+    fut::{wrap_future, ok}, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
@@ -235,15 +235,17 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         ClosedReason::Lost
                     };
 
-                    ctx.spawn(wrap_future(self.room.send_closed(
+                    ctx.close(reason);
+                    ctx.wait(wrap_future(self.room.send_closed(
                         RpcConnectionClosed {
                             member_id: self.member_id.clone(),
                             reason: closed_reason,
                         },
-                    )));
+                    )).then(|_, _, ctx: &mut ws::WebsocketContext<Self>| {
+                        ctx.stop();
+                        ok(())
+                    }));
 
-                    ctx.close(reason);
-                    ctx.stop();
                 }
             }
             _ => error!(
