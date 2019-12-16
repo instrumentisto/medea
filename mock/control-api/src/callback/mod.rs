@@ -1,4 +1,4 @@
-//! Control API callback implementation.
+//! Control API Callback service implementation.
 
 pub mod server;
 
@@ -55,7 +55,6 @@ impl From<CallbackProto> for CallbackItem {
 
 /// `on_join` callback's related entities and implementations.
 mod join {
-
     use medea_control_api_proto::grpc::callback::OnJoin as OnJoinProto;
     use serde::Serialize;
 
@@ -73,7 +72,6 @@ mod join {
 
 /// `on_leave` callback's related entities and implementations.
 mod leave {
-
     use medea_control_api_proto::grpc::callback::{
         OnLeave as OnLeaveProto, OnLeave_Reason as OnLeaveReasonProto,
     };
@@ -98,14 +96,14 @@ mod leave {
     /// Reason of why `Member` leaves.
     #[derive(Clone, Serialize)]
     pub enum OnLeaveReason {
-        /// Server is shutting down.
-        ServerShutdown,
+        /// `Member` was normally disconnected.
+        Disconnected,
 
         /// Connection with `Member` was lost.
         LostConnection,
 
-        /// Member was normally disconnected.
-        Disconnected,
+        /// Server is shutting down.
+        ServerShutdown,
     }
 
     impl From<OnLeaveReasonProto> for OnLeaveReason {

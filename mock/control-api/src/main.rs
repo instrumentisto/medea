@@ -23,7 +23,7 @@ fn main() {
     let opts = app_from_crate!()
         .arg(
             Arg::with_name("addr")
-                .help("Address where host medea-control-api-mock-server.")
+                .help("Address to host medea-control-api-mock-server on.")
                 .default_value("0.0.0.0:8000")
                 .long("addr")
                 .short("a"),
@@ -37,20 +37,14 @@ fn main() {
         )
         .arg(
             Arg::with_name("callback_port")
-                .help(
-                    "Port on which gRPC Control API callback service will \
-                     listen.",
-                )
+                .help("Port to listen by gRPC Control API Callback service.")
                 .default_value("9099")
                 .long("callback-port")
                 .short("p"),
         )
         .arg(
             Arg::with_name("callback_host")
-                .help(
-                    "Address on which gRPC Control API callback service will \
-                     be hosted.",
-                )
+                .help("Address to host gRPC Control API Callback service on.")
                 .default_value("0.0.0.0")
                 .long("callback-host")
                 .short("c"),

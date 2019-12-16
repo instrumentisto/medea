@@ -39,7 +39,7 @@ message OnLeave {
   Reason reason = 1;
 
   enum Reason {
-    // Member normally disconnected itself.
+    // Member was normally disconnected.
     DISCONNECTED = 0;
 
     // Connection with Member was lost.

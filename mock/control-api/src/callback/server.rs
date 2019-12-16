@@ -1,6 +1,6 @@
-//! Implementation of Control API gRPC [callback service].
+//! Implementation of Control API gRPC [Callback service].
 //!
-//! [callback service]: https://tinyurl.com/y5fajesq
+//! [Callback service]: https://tinyurl.com/y5fajesq
 
 use std::sync::{Arc, Mutex};
 
