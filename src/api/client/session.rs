@@ -15,8 +15,8 @@ use medea_client_api_proto::{
 use crate::{
     api::{
         client::rpc_connection::{
-            ClosedReason, CommandMessage, EventMessage, RpcConnection,
-            RpcConnectionClosed, RpcConnectionEstablished,
+            ClosedReason, EventMessage, RpcConnection, RpcConnectionClosed,
+            RpcConnectionEstablished,
         },
         control::MemberId,
         RpcServer,
@@ -216,10 +216,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         );
                     }
                     Ok(ClientMsg::Command(command)) => {
-                        ctx.spawn(wrap_future(
-                            self.room
-                                .send_command(CommandMessage::from(command)),
-                        ));
+                        ctx.spawn(wrap_future(self.room.send_command(command)));
                     }
                     Err(err) => error!(
                         "Error [{:?}] parsing client message [{}]",
@@ -270,8 +267,7 @@ mod test {
 
     use crate::api::{
         client::rpc_connection::{
-            ClosedReason, CommandMessage, EventMessage, RpcConnection,
-            RpcConnectionClosed,
+            ClosedReason, EventMessage, RpcConnection, RpcConnectionClosed,
         },
         control::MemberId,
         MockRpcServer,
@@ -405,7 +401,7 @@ mod test {
     #[test]
     fn passes_commands_to_rpc_server() {
         lazy_static::lazy_static! {
-            static ref CHAN: SharedChan<CommandMessage> = {
+            static ref CHAN: SharedChan<Command> = {
                 let (tx, rx) = oneshot::channel();
                 (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
             };
@@ -457,7 +453,7 @@ mod test {
             .into_future()
             .wait()
             .unwrap();
-        match command.0 {
+        match command {
             Command::SetIceCandidate { peer_id, candidate } => {
                 assert_eq!(peer_id.0, 15);
                 assert_eq!(candidate.candidate, "asd");
