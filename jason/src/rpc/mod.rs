@@ -92,7 +92,7 @@ impl Into<CloseReason> for ClientDisconnect {
 }
 
 /// Connection with remote was closed.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
@@ -287,82 +287,65 @@ pub enum ProgressiveDelayerError {
     /// Error which can happen while setting JS timer.
     #[display(fmt = "{}", _0)]
     Js(JsError),
-
-    /// Occurs if time frame in which we can reconnect was passed.
-    #[display(fmt = "Deadline reached.")]
-    Deadline,
 }
 
 /// Delayer which will increase delay time in geometry progression after any
 /// `delay` calls.
 ///
-/// Delay time increasing will be stopped when 10 seconds of `current_delay`
-/// will be reached. 10 seconds is maximum delay. First delay will be `500ms`.
+/// Delay time increasing will be stopped when [`ProgressiveDelayer::max_delay`]
+/// milliseconds of `current_delay` will be reached. First delay will be
+/// [`ProgressiveDelayer::current_delay_ms`].
 struct ProgressiveDelayer {
     /// Milliseconds of [`ProgressiveDelayer::delay`] call.
     ///
     /// Will be increased by [`ProgressiveDelayer::delay`] call.
-    current_delay: i32,
+    current_delay_ms: i32,
 
-    /// Timestamp after which [`ProgressiveDelayer::delay`] should return
-    /// [`ProgressiveDelayerError::Deadline`].
-    deadline: u64,
+    max_delay_ms: i32,
+
+    multiplier: f32,
 }
 
 impl ProgressiveDelayer {
-    /// When `current_delay >= MAX_DELAY` then this delay will be returned.
-    ///
-    /// Delay increasing will be stopped on this value.
-    const MAX_DELAY: i32 = 2000;
-
-    /// Returns [`ProgressiveDelayer`] with first delay as `500ms`.
-    pub fn new(deadline: u64) -> Self {
+    /// Returns new [`ProgressiveDelayer`].
+    pub fn new(
+        starting_delay_ms: i32,
+        multiplier: f32,
+        max_delay_ms: i32,
+    ) -> Self {
         Self {
-            current_delay: 500,
-            deadline,
+            current_delay_ms: starting_delay_ms,
+            max_delay_ms,
+            multiplier,
         }
     }
 
     /// Returns next step of delay.
     fn get_delay(&mut self) -> i32 {
         if self.is_max_delay_reached() {
-            Self::MAX_DELAY
+            self.max_delay_ms
         } else {
-            let delay = self.current_delay;
-            self.current_delay *= 2;
+            let delay = self.current_delay_ms;
+            self.current_delay_ms =
+                (self.current_delay_ms as f32 * self.multiplier) as i32;
             delay
         }
     }
 
-    /// Returns `true` when current time is greater or equal then `deadline`.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn is_deadline_reached(&self) -> bool {
-        // This is safe to cast timestamp from 'Date::now' to u64 because
-        // '18446744073709551615' timestamp is very far.
-        Date::now() as u64 >= self.deadline
-    }
-
-    /// Returns `true` when max delay ([`ProgressiveDelayer::MAX_DELAY`]) is
+    /// Returns `true` when max delay ([`ProgressiveDelayer::max_delay_ms`]) is
     /// reached.
     fn is_max_delay_reached(&self) -> bool {
-        self.current_delay >= Self::MAX_DELAY
+        self.current_delay_ms >= self.max_delay_ms
     }
 
     /// Resolves after [`ProgressiveDelayer::current_delay`] milliseconds.
     ///
     /// Next call of this function will delay
-    /// [`ProgressiveDelayer::current_delay`] * 2 milliseconds.
-    ///
-    /// Initial delay is `500ms`.
-    ///
-    /// Maximum delay is `2s`.
+    /// [`ProgressiveDelayer::current_delay_ms`] *
+    /// [`ProgressiveDelayer::multiplier`] milliseconds.
     pub async fn delay(
         &mut self,
     ) -> Result<(), Traced<ProgressiveDelayerError>> {
-        if self.is_deadline_reached() {
-            return Err(tracerr::new!(ProgressiveDelayerError::Deadline));
-        }
-
         let delay_ms = self.get_delay();
         JsFuture::from(Promise::new(&mut |yes, _| {
             window()
@@ -415,7 +398,7 @@ impl WebSocketRpcClient {
         let last_pong = self.0.borrow().heartbeat.get_last_activity();
         let deadline = (idle_timeout * 2) + reconnection_timeout + last_pong.0;
 
-        let mut delayer = ProgressiveDelayer::new(deadline);
+        let mut delayer = ProgressiveDelayer::new(1000, 2.0, 10000);
         let sock = self
             .0
             .borrow()
@@ -424,30 +407,10 @@ impl WebSocketRpcClient {
             .map(Rc::clone)
             .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
         while let Err(_) = sock.reconnect().await {
-            if let Err(e) = delayer.delay().await {
-                match e.as_ref() {
-                    ProgressiveDelayerError::Deadline => {
-                        let reason = ClientDisconnect::ReconnectTimeout;
-                        let mut on_close_subs = Vec::new();
-                        std::mem::swap(
-                            &mut on_close_subs,
-                            &mut self.0.borrow_mut().on_close_subscribers,
-                        );
-                        on_close_subs
-                            .into_iter()
-                            .filter_map(|sub| sub.send(reason.into()).err())
-                            .for_each(|reason| {
-                                console_error(format!(
-                                    "Failed to send reason of Jason close to \
-                                     subscriber: {:?}",
-                                    reason
-                                ))
-                            });
-                        return Err(tracerr::new!(RpcClientError::Deadline));
-                    }
-                    _ => return Err(tracerr::map_from_and_new!(e)),
-                }
-            }
+            delayer
+                .delay()
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
         }
 
         let transport = self.0.borrow().sock.clone();
@@ -560,7 +523,9 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(_) = on_idle.next().await {
                     if let Some(this) = weak_this.upgrade() {
-                        this.reconnect().await;
+                        if let Err(e) = this.reconnect().await {
+                            console_error(e.to_string());
+                        }
                     }
                 }
             });

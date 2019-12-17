@@ -75,7 +75,7 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 /////
 ///// 3. Wait `600ms` for [`ClientMsg::Ping`].
 //#[wasm_bindgen_test]
-//async fn heartbeat() {
+// async fn heartbeat() {
 //    let mut transport = MockRpcTransport::new();
 //    transport
 //        .expect_on_message()

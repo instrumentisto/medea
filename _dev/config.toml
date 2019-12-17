@@ -3,3 +3,8 @@ static_specs_dir = "_dev/specs/"
 
 [log]
 level = "DEBUG"
+
+[rpc]
+reconnection_timeout = "1m"
+idle_timeout = "5s"
+ping_interval = "1s"

@@ -68,7 +68,7 @@ pub enum TransportError {
 /// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
-#[derive(From, Into)]
+#[derive(Clone, From, Into)]
 pub struct ServerMessage(ServerMsg);
 
 impl TryFrom<&MessageEvent> for ServerMessage {
@@ -159,11 +159,11 @@ struct InnerSocket {
 
     /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_message`]'s
     /// [`LocalBoxStream`].
-    on_message: Option<mpsc::UnboundedSender<ServerMsg>>,
+    on_message: Vec<mpsc::UnboundedSender<ServerMsg>>,
 
     /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_close`]'s
     /// [`LocalBoxStream`].
-    on_close: Option<mpsc::UnboundedSender<CloseMsg>>,
+    on_close: Vec<mpsc::UnboundedSender<CloseMsg>>,
 
     /// Reason of [`WebSocketRpcTransport`] closing. Will be sent in
     /// `WebSocket` [close frame].
@@ -202,8 +202,8 @@ impl InnerSocket {
             on_open_listener: None,
             on_message_listener: None,
             on_close_listener: None,
-            on_close: None,
-            on_message: None,
+            on_close: Vec::new(),
+            on_message: Vec::new(),
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
             url: url.to_string(),
         })
@@ -218,14 +218,14 @@ impl InnerSocket {
 impl RpcTransport for WebSocketRpcTransport {
     fn on_message(&self) -> Result<LocalBoxStream<'static, ServerMsg>> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_message = Some(tx);
+        self.0.borrow_mut().on_message.push(tx);
 
         Ok(Box::pin(rx))
     }
 
     fn on_close(&self) -> Result<LocalBoxStream<'static, CloseMsg>> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_close = Some(tx);
+        self.0.borrow_mut().on_close.push(tx);
 
         Ok(Box::pin(rx))
     }
@@ -254,14 +254,22 @@ impl RpcTransport for WebSocketRpcTransport {
     fn reconnect(&self) -> LocalBoxFuture<'static, Result<()>> {
         let this = Self(Rc::clone(&self.0));
         Box::pin(async move {
+            console_error("Reconnecting.");
             let url = this.0.borrow().url.clone();
             let new_transport = Self::new(&url).await?;
-            new_transport.0.borrow_mut().on_message =
-                this.0.borrow_mut().on_message.take();
-            new_transport.0.borrow_mut().on_close =
-                this.0.borrow_mut().on_close.take();
+
+            std::mem::swap(
+                &mut new_transport.0.borrow_mut().on_message,
+                &mut this.0.borrow_mut().on_message,
+            );
+            std::mem::swap(
+                &mut new_transport.0.borrow_mut().on_close,
+                &mut this.0.borrow_mut().on_close,
+            );
 
             RefCell::swap(&this.0, &new_transport.0);
+
+            std::mem::drop(new_transport);
 
             // Set listeners again for an update Rc in a listener.
             //
@@ -374,15 +382,21 @@ impl WebSocketRpcTransport {
                     };
                 let mut transport_ref_mut = transport.0.borrow_mut();
                 transport_ref_mut.update_state();
-                if let Some(on_close) = transport_ref_mut.on_close.as_ref() {
-                    on_close.unbounded_send(close_msg).unwrap_or_else(|e| {
-                        console_error(format!(
-                            "WebSocket's 'on_close' callback receiver \
-                             unexpectedly gone. {:?}",
-                            e
-                        ))
-                    });
-                }
+                transport_ref_mut
+                    .on_close
+                    .retain(|on_close| !on_close.is_closed());
+
+                transport_ref_mut.on_close.iter().for_each(|on_close| {
+                    on_close.unbounded_send(close_msg.clone()).unwrap_or_else(
+                        |e| {
+                            console_error(format!(
+                                "WebSocket's 'on_close' callback receiver \
+                                 unexpectedly gone. {:?}",
+                                e
+                            ))
+                        },
+                    );
+                })
             },
         )
         .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;
@@ -399,16 +413,16 @@ impl WebSocketRpcTransport {
             Rc::clone(&self.0.borrow().socket),
             "message",
             move |msg| {
-                let parsed = match ServerMessage::try_from(&msg).map(Into::into)
-                {
-                    Ok(parsed) => parsed,
-                    Err(e) => {
-                        // TODO: protocol versions mismatch? should drop
-                        //       connection if so
-                        JasonError::from(tracerr::new!(e)).print();
-                        return;
-                    }
-                };
+                let parsed: ServerMsg =
+                    match ServerMessage::try_from(&msg).map(Into::into) {
+                        Ok(parsed) => parsed,
+                        Err(e) => {
+                            // TODO: protocol versions mismatch? should drop
+                            //       connection if so
+                            JasonError::from(tracerr::new!(e)).print();
+                            return;
+                        }
+                    };
                 let transport = if let Some(t) = weak_transport.upgrade() {
                     t
                 } else {
@@ -417,16 +431,21 @@ impl WebSocketRpcTransport {
                     );
                     return;
                 };
-                let transport_ref = transport.0.borrow();
-                if let Some(on_message) = transport_ref.on_message.as_ref() {
-                    on_message.unbounded_send(parsed).unwrap_or_else(|e| {
-                        console_error(format!(
-                            "WebSocket's 'on_message' callback receiver \
-                             unexpectedly gone. {:?}",
-                            e
-                        ))
-                    });
-                }
+                let mut transport_ref = transport.0.borrow_mut();
+                transport_ref
+                    .on_message
+                    .retain(|on_message| !on_message.is_closed());
+                transport_ref.on_message.iter().for_each(|on_message| {
+                    on_message.unbounded_send(parsed.clone()).unwrap_or_else(
+                        |e| {
+                            console_error(format!(
+                                "WebSocket's 'on_message' callback receiver \
+                                 unexpectedly gone. {:?}",
+                                e
+                            ))
+                        },
+                    );
+                })
             },
         )
         .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;

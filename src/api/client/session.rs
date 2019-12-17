@@ -100,7 +100,10 @@ impl WsSession {
         ctx.run_interval(self.ping_interval, |session, ctx| {
             debug!("Send ping.");
             session.last_ping_num += 1;
-            ctx.text(serde_json::to_string(&ServerMsg::Ping(session.last_ping_num)).unwrap());
+            ctx.text(
+                serde_json::to_string(&ServerMsg::Ping(session.last_ping_num))
+                    .unwrap(),
+            );
         });
     }
 }
