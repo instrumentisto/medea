@@ -79,10 +79,10 @@ impl WsSession {
             {
                 info!("WsSession of member {} is idle", session.member_id);
 
-                ctx.spawn(wrap_future(session.room.connection_closed(
+                Arbiter::spawn(session.room.connection_closed(
                     session.member_id.clone(),
                     ClosedReason::Lost,
-                )));
+                ));
 
                 ctx.notify(Close::with_normal_code(&CloseDescription::new(
                     CloseReason::Idle,
