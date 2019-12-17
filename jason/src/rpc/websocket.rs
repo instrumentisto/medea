@@ -423,14 +423,15 @@ impl WebSocketRpcTransport {
                             return;
                         }
                     };
-                let transport = if let Some(t) = weak_transport.upgrade() {
-                    t
-                } else {
-                    console_error(
-                        "'WebSocketRpcTransport' was unexpectedly gone.",
-                    );
-                    return;
-                };
+                let transport =
+                    if let Some(transport) = weak_transport.upgrade() {
+                        transport
+                    } else {
+                        console_error(
+                            "'WebSocketRpcTransport' was unexpectedly gone.",
+                        );
+                        return;
+                    };
                 let mut transport_ref = transport.0.borrow_mut();
                 transport_ref
                     .on_message
