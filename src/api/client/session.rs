@@ -3,8 +3,8 @@
 use std::time::{Duration, Instant};
 
 use actix::{
-    fut::{wrap_future, ok}, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
-    Handler, Message, StreamHandler,
+    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
+    AsyncContext, Handler, Message, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
@@ -14,15 +14,19 @@ use medea_client_api_proto::{
 
 use crate::{
     api::{
-        client::rpc_connection::{
-            ClosedReason, EventMessage, RpcConnection, RpcConnectionClosed,
-            RpcConnectionEstablished,
-        },
+        client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
         control::MemberId,
         RpcServer,
     },
     log::prelude::*,
 };
+
+/// [`WsSession`] closed reason.
+#[derive(Debug)]
+enum InnerCloseReason {
+    ByServer,
+    ByClient(ClosedReason),
+}
 
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
@@ -43,9 +47,9 @@ pub struct WsSession {
     /// from client.
     last_activity: Instant,
 
-    /// Indicates whether WebSocket connection is closed by server ot by
-    /// client.
-    closed_by_server: bool,
+    /// [`WsSession`] closed reason. Should be set by the moment
+    /// `Actor::stopped()` for this [`WsSession`] is called.
+    close_reason: Option<InnerCloseReason>,
 }
 
 impl WsSession {
@@ -60,7 +64,7 @@ impl WsSession {
             room,
             idle_timeout,
             last_activity: Instant::now(),
-            closed_by_server: false,
+            close_reason: None,
         }
     }
 
@@ -73,11 +77,10 @@ impl WsSession {
             {
                 info!("WsSession of member {} is idle", session.member_id);
 
-                ctx.spawn(wrap_future(session.room.send_closed(
-                    RpcConnectionClosed {
-                        member_id: session.member_id.clone(),
-                        reason: ClosedReason::Lost,
-                    },
+                // TODO: what to do with this close?
+                ctx.spawn(wrap_future(session.room.connection_closed(
+                    session.member_id.clone(),
+                    ClosedReason::Lost,
                 )));
 
                 ctx.notify(Close::with_normal_code(&CloseDescription::new(
@@ -101,10 +104,10 @@ impl Actor for WsSession {
         Self::start_watchdog(ctx);
 
         ctx.wait(
-            wrap_future(self.room.send_established(RpcConnectionEstablished {
-                member_id: self.member_id.clone(),
-                connection: Box::new(ctx.address()),
-            }))
+            wrap_future(self.room.connection_established(
+                self.member_id.clone(),
+                Box::new(ctx.address()),
+            ))
             .map_err(
                 move |err,
                       session: &mut Self,
@@ -122,8 +125,31 @@ impl Actor for WsSession {
         );
     }
 
+    /// Invokes `RpcServer::connection_closed()` with `ClosedReason::Lost` if
+    /// `WsSession.close_reason` is `None`, with [`ClosedReason`] defined in
+    /// `WsSession.close_reason` if it is `Some(InnerCloseReason::ByClient)`,
+    /// does nothing if `WsSession.close_reason` is
+    /// `Some(InnerCloseReason::ByServer)`.
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         debug!("Stopped WsSession for member {}", self.member_id);
+        match self.close_reason.take() {
+            None => {
+                error!(
+                    "WsSession of Member [{}] was unexpectedly dropped",
+                    self.member_id
+                );
+                Arbiter::spawn(self.room.connection_closed(
+                    self.member_id.clone(),
+                    ClosedReason::Lost,
+                ));
+            }
+            Some(InnerCloseReason::ByClient(reason)) => Arbiter::spawn(
+                self.room.connection_closed(self.member_id.clone(), reason),
+            ),
+            Some(InnerCloseReason::ByServer) => {
+                // do nothing
+            }
+        }
     }
 }
 
@@ -177,7 +203,7 @@ impl Handler<Close> for WsSession {
     /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
         debug!("Closing WsSession for member {}", self.member_id);
-        self.closed_by_server = true;
+        self.close_reason = Some(InnerCloseReason::ByServer);
         ctx.close(Some(close.0));
         ctx.stop();
     }
@@ -222,7 +248,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
             }
             ws::Message::Close(reason) => {
-                if !self.closed_by_server {
+                if self.close_reason.is_none() {
                     let closed_reason = if let Some(reason) = &reason {
                         if reason.code == CloseCode::Normal
                             || reason.code == CloseCode::Away
@@ -235,17 +261,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         ClosedReason::Lost
                     };
 
+                    self.close_reason =
+                        Some(InnerCloseReason::ByClient(closed_reason));
                     ctx.close(reason);
-                    ctx.wait(wrap_future(self.room.send_closed(
-                        RpcConnectionClosed {
-                            member_id: self.member_id.clone(),
-                            reason: closed_reason,
-                        },
-                    )).then(|_, _, ctx: &mut ws::WebsocketContext<Self>| {
-                        ctx.stop();
-                        ok(())
-                    }));
-
+                    ctx.stop();
                 }
             }
             _ => error!(
@@ -277,9 +296,7 @@ mod test {
     };
 
     use crate::api::{
-        client::rpc_connection::{
-            ClosedReason, RpcConnection, RpcConnectionClosed,
-        },
+        client::rpc_connection::{ClosedReason, RpcConnection},
         control::MemberId,
         MockRpcServer,
     };
@@ -306,11 +323,11 @@ mod test {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
 
-            let expected = member_id.clone();
+            let expected_member_id = member_id.clone();
             rpc_server
-                .expect_send_established()
-                .withf(move |actual| actual.member_id == expected)
-                .return_once(|_| Box::new(future::err(())));
+                .expect_connection_established()
+                .withf(move |member_id, _| *member_id == expected_member_id)
+                .return_once(|_, _| Box::new(future::err(())));
 
             WsSession::new(
                 member_id,
@@ -342,8 +359,8 @@ mod test {
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
-                .expect_send_established()
-                .return_once(|_| Box::new(future::ok(())));
+                .expect_connection_established()
+                .return_once(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
@@ -376,17 +393,17 @@ mod test {
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
-                .expect_send_established()
-                .return_once(|_| Box::new(future::ok(())));
+                .expect_connection_established()
+                .return_once(|_, _| Box::new(future::ok(())));
 
-            let expected = RpcConnectionClosed {
-                member_id: member_id.clone(),
-                reason: ClosedReason::Lost,
-            };
+            let expected_member_id = member_id.clone();
             rpc_server
-                .expect_send_closed()
-                .withf(move |actual| *actual == expected)
-                .return_once(|_| Box::new(future::ok(())));
+                .expect_connection_closed()
+                .withf(move |member_id, reason| {
+                    *member_id == expected_member_id
+                        && *reason == ClosedReason::Lost
+                })
+                .return_once(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
@@ -423,8 +440,8 @@ mod test {
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
-                .expect_send_established()
-                .return_once(|_| Box::new(future::ok(())));
+                .expect_connection_established()
+                .return_once(|_, _| Box::new(future::ok(())));
 
             rpc_server.expect_send_command().return_once(|command| {
                 let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
@@ -488,18 +505,13 @@ mod test {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
 
-            rpc_server
-                .expect_send_established()
-                .return_once(|established| {
-                    let _ = CHAN
-                        .0
-                        .lock()
-                        .unwrap()
-                        .take()
-                        .unwrap()
-                        .send(established.connection);
+            rpc_server.expect_connection_established().return_once(
+                |_, connection| {
+                    let _ =
+                        CHAN.0.lock().unwrap().take().unwrap().send(connection);
                     Box::new(future::ok(()))
-                });
+                },
+            );
 
             WsSession::new(
                 member_id,
@@ -553,18 +565,13 @@ mod test {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
 
-            rpc_server
-                .expect_send_established()
-                .return_once(|established| {
-                    let _ = CHAN
-                        .0
-                        .lock()
-                        .unwrap()
-                        .take()
-                        .unwrap()
-                        .send(established.connection);
+            rpc_server.expect_connection_established().return_once(
+                |_, connection| {
+                    let _ =
+                        CHAN.0.lock().unwrap().take().unwrap().send(connection);
                     Box::new(future::ok(()))
-                });
+                },
+            );
 
             WsSession::new(
                 member_id,

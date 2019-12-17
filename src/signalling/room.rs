@@ -23,7 +23,7 @@ use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
-            RpcConnectionClosed, RpcConnectionEstablished,
+            RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
             callback::{
@@ -725,30 +725,35 @@ impl Room {
 impl RpcServer for Addr<Room> {
     /// Sends [`RpcConnectionEstablished`] message to [`Room`] actor propagating
     /// errors.
-    fn send_established(
+    fn connection_established(
         &self,
-        msg: RpcConnectionEstablished,
+        member_id: MemberId,
+        connection: Box<dyn RpcConnection>,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         Box::new(
-            self.send(msg)
-                .map_err(|err| {
-                    error!(
-                        "Failed to send RpcConnectionEstablished cause {:?}",
-                        err,
-                    );
-                })
-                .and_then(|result| result),
+            self.send(RpcConnectionEstablished {
+                member_id,
+                connection,
+            })
+            .map_err(|err| {
+                error!(
+                    "Failed to send RpcConnectionEstablished cause {:?}",
+                    err,
+                );
+            })
+            .and_then(|result| result),
         )
     }
 
     /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
     /// errors.
-    fn send_closed(
+    fn connection_closed(
         &self,
-        msg: RpcConnectionClosed,
+        member_id: MemberId,
+        reason: ClosedReason,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         Box::new(
-            self.send(msg)
+            self.send(RpcConnectionClosed { member_id, reason })
                 .map_err(|err| {
                     error!(
                         "Failed to send RpcConnectionClosed cause {:?}",

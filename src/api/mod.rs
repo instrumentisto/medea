@@ -8,8 +8,9 @@ use std::fmt::Debug;
 use futures::Future;
 use medea_client_api_proto::Command;
 
-use crate::api::client::rpc_connection::{
-    RpcConnectionClosed, RpcConnectionEstablished,
+use crate::api::{
+    client::rpc_connection::{ClosedReason, RpcConnection},
+    control::MemberId,
 };
 
 #[cfg_attr(test, mockall::automock)]
@@ -19,18 +20,20 @@ pub trait RpcServer: Debug + Send {
     /// result is err.
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_established(
+    fn connection_established(
         &self,
-        msg: RpcConnectionEstablished,
+        member_id: MemberId,
+        connection: Box<dyn RpcConnection>,
     ) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
     /// closed. Cannot fail.
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_closed(
+    fn connection_closed(
         &self,
-        msg: RpcConnectionClosed,
+        member_id: MemberId,
+        reason: ClosedReason,
     ) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Command`]. Cannot fail

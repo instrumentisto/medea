@@ -306,19 +306,16 @@ impl ParticipantService {
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
                     member_id.clone(),
-                    ctx.run_later(
-                        self.rpc_reconnect_timeout,
-                        move |room, ctx| {
-                            info!(
-                                "Member [id = {}] connection lost at {:?}.",
-                                member_id, closed_at,
-                            );
-                            ctx.notify(RpcConnectionClosed {
-                                member_id,
-                                reason: ClosedReason::Closed { normal: false },
-                            })
-                        },
-                    ),
+                    ctx.run_later(self.rpc_reconnect_timeout, move |_, ctx| {
+                        info!(
+                            "Member [id = {}] connection lost at {:?}.",
+                            member_id, closed_at,
+                        );
+                        ctx.notify(RpcConnectionClosed {
+                            member_id,
+                            reason: ClosedReason::Closed { normal: false },
+                        })
+                    }),
                 );
             }
         }
