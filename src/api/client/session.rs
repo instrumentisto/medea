@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
-    AsyncContext, Handler, Message, StreamHandler,
+    AsyncContext, Handler, Message, Running, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
@@ -176,9 +176,9 @@ impl RpcConnection for Addr<WsSession> {
     ///
     /// [`Event`]: medea_client_api_proto::Event
     fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>> {
-        let fut = self
-            .send(EventMessage::from(msg))
-            .map_err(|err| warn!("Failed send event {:?} ", err));
+        let fut = self.send(EventMessage::from(msg)).map_err(|err| {
+            warn!("Failed send Event to RpcConnection: {:?} ", err)
+        });
         Box::new(fut)
     }
 }
@@ -273,6 +273,29 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.member_id
             ),
         }
+    }
+
+    /// Method is called when stream emits error. Stops stream processing.
+    fn error(
+        &mut self,
+        err: ws::ProtocolError,
+        _: &mut Self::Context,
+    ) -> Running {
+        error!(
+            "Error in WsSession StreamHandler for Member [{}]: {:?}",
+            self.member_id, err
+        );
+        Running::Stop
+    }
+
+    /// Method is called when stream finishes. Stops [`WsSession`] actor
+    /// execution.
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        debug!(
+            "WsSession message stream for Member [{}] is finished",
+            self.member_id
+        );
+        ctx.stop()
     }
 }
 
