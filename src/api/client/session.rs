@@ -24,7 +24,9 @@ use crate::{
 /// [`WsSession`] closed reason.
 #[derive(Debug)]
 enum InnerCloseReason {
+    /// [`WsSession`] was closed by [`RpcServer`] or was considered idle.
     ByServer,
+    /// [`WsSession`] was closed by remote client.
     ByClient(ClosedReason),
 }
 
@@ -77,7 +79,6 @@ impl WsSession {
             {
                 info!("WsSession of member {} is idle", session.member_id);
 
-                // TODO: what to do with this close?
                 ctx.spawn(wrap_future(session.room.connection_closed(
                     session.member_id.clone(),
                     ClosedReason::Lost,
