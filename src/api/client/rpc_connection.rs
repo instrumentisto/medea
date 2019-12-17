@@ -87,7 +87,7 @@ pub struct RpcConnectionEstablished {
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
-#[derive(Debug, Message, PartialEq)]
+#[derive(Debug, Message)]
 pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     ///

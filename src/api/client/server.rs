@@ -122,8 +122,7 @@ impl Server {
         Ok(Self(server).start())
     }
 
-    /// Set application data. Application data could be accessed
-    /// by using `Data<T>` extractor where `T` is data type.
+    /// Set application data.
     fn register_data(rooms: RoomRepository, config: Rpc) -> Data<Context> {
         Data::new(Context { rooms, config })
     }

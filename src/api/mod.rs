@@ -13,6 +13,7 @@ use crate::api::{
     control::MemberId,
 };
 
+/// Server side of Medea RPC protocol.
 #[cfg_attr(test, mockall::automock)]
 pub trait RpcServer: Debug + Send {
     /// Send signal of new [`RpcConnection`] being established with specified
