@@ -26,6 +26,7 @@ use crate::{
 };
 
 use super::InputDeviceInfo;
+use crate::utils::JasonWeakHandler;
 
 /// Errors that may occur in a [`MediaManager`].
 #[derive(Debug, Display, JsCaused)]
@@ -248,7 +249,11 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 impl MediaManagerHandle {
     /// Returns the JS array of [`MediaDeviceInfo`] objects.
     pub fn enumerate_devices(&self) -> Promise {
-        match map_weak!(self, |_| InnerMediaManager::enumerate_devices()) {
+        match self
+            .0
+            .upgrade_handler()
+            .map(|_| InnerMediaManager::enumerate_devices())
+        {
             Ok(devices) => future_to_promise(async {
                 devices
                     .await
@@ -272,7 +277,7 @@ impl MediaManagerHandle {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
-        match map_weak!(self, |inner| { inner.get_stream(caps) }) {
+        match self.0.upgrade_handler().map(|inner| inner.get_stream(caps)) {
             Ok(stream) => future_to_promise(async {
                 stream
                     .await

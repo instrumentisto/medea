@@ -100,7 +100,9 @@ impl Heartbeat {
 
                     let idle_timeout = this.borrow().idle_timeout;
                     // FIXME (evdokimovs): u64 as i32 look very bad
-                    resolve_after((idle_timeout - wait_for_ping) as i32).await.unwrap();
+                    resolve_after((idle_timeout - wait_for_ping) as i32)
+                        .await
+                        .unwrap();
                     if let Some(idle_sender) = &this.borrow().idle_sender {
                         idle_sender.unbounded_send(());
                     }

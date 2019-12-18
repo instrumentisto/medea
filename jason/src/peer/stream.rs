@@ -11,7 +11,7 @@ use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::media::TrackConstraints;
+use crate::{media::TrackConstraints, utils::JasonWeakHandler as _};
 
 use super::MediaTrack;
 
@@ -135,6 +135,6 @@ pub struct MediaStreamHandle(Weak<InnerStream>);
 impl MediaStreamHandle {
     /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        map_weak!(self, |inner| inner.stream.clone())
+        self.0.upgrade_handler().map(|inner| inner.stream.clone())
     }
 }

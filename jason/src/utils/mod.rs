@@ -19,6 +19,7 @@ pub use self::{
     },
     event_listener::{EventListener, EventListenerBindError},
 };
+use std::rc::{Rc, Weak};
 
 /// Returns [`Window`] object.
 ///
@@ -41,23 +42,20 @@ impl Drop for IntervalHandle {
     }
 }
 
-/// Upgrades newtyped [`Weak`] reference, returning [`HandlerDetachedError`] if
-/// failed, or maps the [`Rc`]-referenced value with provided `$closure`
-/// otherwise.
-///
-/// [`Rc`]: std::rc::Rc
-/// [`Weak`]: std::rc::Weak
-macro_rules! map_weak {
-    ($v:ident, $closure:expr) => {{
-        $v.0.upgrade()
-            .ok_or(
-                $crate::utils::JasonError::from(tracerr::new!(
-                    $crate::utils::HandlerDetachedError
-                ))
-                .into(),
-            )
-            .map($closure)
-    }};
+pub trait JasonWeakHandler<I> {
+    fn upgrade_handler<E>(&self) -> Result<Rc<I>, E>
+    where
+        E: From<JasonError>;
+}
+
+impl<I> JasonWeakHandler<I> for Weak<I> {
+    fn upgrade_handler<E>(&self) -> Result<Rc<I>, E>
+    where
+        E: From<JasonError>,
+    {
+        self.upgrade()
+            .ok_or(JasonError::from(tracerr::new!(HandlerDetachedError)).into())
+    }
 }
 
 /// Returns property of JS object by name if its defined.

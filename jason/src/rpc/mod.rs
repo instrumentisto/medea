@@ -1,6 +1,7 @@
 //! Abstraction over RPC transport.
 
 mod heartbeat;
+mod reconnect_handle;
 mod websocket;
 
 use std::{
@@ -186,6 +187,10 @@ pub trait RpcClient {
 
     /// Updates RPC settings of this [`RpcClient`].
     fn update_settings(&self, idle_timeout: u64, ping_interval: u64);
+
+    fn reconnect(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 }
 
 /// RPC transport between a client and server.
@@ -378,36 +383,6 @@ impl WebSocketRpcClient {
         Self(Inner::new(ping_interval))
     }
 
-    /// Tries to reconnect [`WebSocketRpcTransport`] in a loop with delay until
-    /// it will not be reconnected or deadline not be reached.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
-        let mut delayer = ProgressiveDelayer::new(1000, 2.0, 10000);
-        let sock = self
-            .0
-            .borrow()
-            .sock
-            .as_ref()
-            .map(Rc::clone)
-            .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
-        while let Err(_) = sock.reconnect().await {
-            delayer
-                .delay()
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?;
-        }
-
-        let transport = self.0.borrow().sock.clone();
-        if let Some(transport) = transport {
-            self.0
-                .borrow_mut()
-                .heartbeat
-                .start(transport)
-                .map_err(tracerr::map_from_and_wrap!())?;
-        }
-        Ok(())
-    }
-
     /// Handles close message from a remote server.
     ///
     /// This function will be called on every WebSocket close (normal and
@@ -520,7 +495,6 @@ impl RpcClient for WebSocketRpcClient {
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
-                    console_error("ON CLOSE");
                     if let Some(this) = this_clone.upgrade() {
                         this.on_transport_close(&msg).await;
                     }
@@ -583,6 +557,36 @@ impl RpcClient for WebSocketRpcClient {
             .borrow_mut()
             .heartbeat
             .update_settings(idle_timeout, ping_interval);
+    }
+
+    fn reconnect(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
+        self.0.borrow_mut().heartbeat.stop();
+        let inner = self.0.clone();
+
+        Box::pin(async move {
+            let sock = inner
+                .borrow()
+                .sock
+                .as_ref()
+                .map(Rc::clone)
+                .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
+
+            sock.reconnect()
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
+
+            let transport = inner.borrow().sock.clone();
+            if let Some(transport) = transport {
+                inner
+                    .borrow_mut()
+                    .heartbeat
+                    .start(transport)
+                    .map_err(tracerr::map_from_and_wrap!())?;
+            }
+            Ok(())
+        })
     }
 }
 

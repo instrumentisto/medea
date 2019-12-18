@@ -32,6 +32,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::utils::JasonWeakHandler as _;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -174,7 +175,7 @@ impl RoomHandle {
         &self,
         token: String,
     ) -> impl Future<Output = Result<(), JasonError>> + 'static {
-        let inner: Result<_, JasonError> = map_weak!(self, |inner| inner);
+        let inner: Result<_, JasonError> = self.0.upgrade_handler();
 
         async move {
             let inner = inner?;
@@ -207,23 +208,26 @@ impl RoomHandle {
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner
-            .borrow_mut()
-            .on_new_connection
-            .set_func(f))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().on_new_connection.set_func(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve successfully. Only invoked if media
     /// request was initiated by media server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -232,10 +236,9 @@ impl RoomHandle {
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner
-            .borrow_mut()
-            .on_failed_local_stream
-            .set_func(f))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -261,27 +264,37 @@ impl RoomHandle {
         &self,
         stream: SysMediaStream,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().inject_local_stream(stream))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().inject_local_stream(stream))
     }
 
     /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(false))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().toggle_send_audio(false))
     }
 
     /// Unmutes outbound audio in this room.
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(true))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().toggle_send_audio(true))
     }
 
     /// Mutes outbound video in this room.
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(false))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().toggle_send_video(false))
     }
 
     /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().toggle_send_video(true))
     }
 }
 
