@@ -316,6 +316,19 @@ window.onload = async function() {
     jason = new rust.Jason();
     room = await jason.init_room();
 
+    room.on_connection_loss( async (reconnectHandle) => {
+      while (true) {
+        try {
+          await reconnectHandle.reconnect(1000);
+          break;
+        } catch (e) {
+          console.log(e);
+        }
+      }
+      console.log("YAY reconnected!!!!!");
+
+    });
+
     try {
       const stream = await getStream(audioSelect, videoSelect);
       await updateLocalVideo(stream);

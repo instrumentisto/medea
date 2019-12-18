@@ -25,8 +25,8 @@ use crate::{
         PeerRepository,
     },
     rpc::{
-        ClientDisconnect, CloseReason, RpcClient, RpcClientError,
-        TransportError, WebSocketRpcTransport,
+        ClientDisconnect, CloseReason, ReconnectionHandle, RpcClient,
+        RpcClientError, TransportError, WebSocketRpcTransport,
     },
     utils::{console_error, Callback, JasonError, JsCaused, JsError},
 };
@@ -175,7 +175,8 @@ impl RoomHandle {
         &self,
         token: String,
     ) -> impl Future<Output = Result<(), JasonError>> + 'static {
-        let inner: Result<_, JasonError> = self.0.upgrade_handler();
+        let this = Self(Weak::clone(&self.0));
+        let inner = self.0.upgrade_handler::<JasonError>();
 
         async move {
             let inner = inner?;
@@ -195,6 +196,20 @@ impl RoomHandle {
                 .connect(Rc::new(websocket))
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+
+            let mut connection_loss_stream =
+                inner.borrow().rpc.on_connection_loss();
+            spawn_local(async move {
+                while let Some(reconnect_handle) =
+                    connection_loss_stream.next().await
+                {
+                    let strong_inner = this.0.upgrade().unwrap();
+                    strong_inner
+                        .borrow()
+                        .on_connection_loss
+                        .call(reconnect_handle);
+                }
+            });
 
             Ok(())
         }
@@ -239,6 +254,15 @@ impl RoomHandle {
         self.0
             .upgrade_handler()
             .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
+    }
+
+    pub fn on_connection_loss(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        self.0
+            .upgrade_handler()
+            .map(|inner| inner.borrow_mut().on_connection_loss.set_func(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -416,6 +440,8 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_stream: Rc<Callback<JasonError>>,
 
+    on_connection_loss: Callback<ReconnectionHandle>,
+
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
 
@@ -450,6 +476,7 @@ impl InnerRoom {
             connections: HashMap::new(),
             on_new_connection: Callback::default(),
             on_local_stream: Callback::default(),
+            on_connection_loss: Callback::default(),
             on_failed_local_stream: Rc::new(Callback::default()),
             enabled_audio: true,
             enabled_video: true,

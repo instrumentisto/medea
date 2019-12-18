@@ -15,6 +15,7 @@ use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
     stream::{LocalBoxStream, StreamExt as _},
+    Future as _,
 };
 use js_sys::{Date, Promise};
 use medea_client_api_proto::{
@@ -31,7 +32,11 @@ use crate::utils::{console_error, window, JasonError, JsCaused, JsError};
 use self::heartbeat::{Heartbeat, HeartbeatError};
 
 #[doc(inline)]
-pub use self::websocket::{TransportError, WebSocketRpcTransport};
+pub use self::{
+    reconnect_handle::ReconnectionHandle,
+    websocket::{TransportError, WebSocketRpcTransport},
+};
+use crate::rpc::reconnect_handle::Reconnector;
 
 /// Reasons of closing by client side and server side.
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
@@ -174,6 +179,7 @@ pub trait RpcClient {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
+    // TODO (evdokimovs): Candidate to deletion
     /// Returns [`Future`] which will be resolved with [`CloseReason`] on
     /// RPC connection close, caused by underlying transport close. Will not be
     /// invoked on [`RpcClient`] drop.
@@ -188,9 +194,8 @@ pub trait RpcClient {
     /// Updates RPC settings of this [`RpcClient`].
     fn update_settings(&self, idle_timeout: u64, ping_interval: u64);
 
-    fn reconnect(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
+    fn on_connection_loss(&self)
+        -> LocalBoxStream<'static, ReconnectionHandle>;
 }
 
 /// RPC transport between a client and server.
@@ -246,6 +251,10 @@ struct Inner {
 
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
+
+    on_connection_loss_sub: Option<mpsc::UnboundedSender<ReconnectionHandle>>,
+
+    reconnector: Option<Reconnector>,
 }
 
 impl Inner {
@@ -257,6 +266,8 @@ impl Inner {
             heartbeat: Heartbeat::new(10000, 3000),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             is_closed: false,
+            on_connection_loss_sub: None,
+            reconnector: None,
         }))
     }
 }
@@ -379,8 +390,22 @@ pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 impl WebSocketRpcClient {
     /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
     /// milliseconds.
-    pub fn new(ping_interval: i32) -> Self {
-        Self(Inner::new(ping_interval))
+    pub fn new(ping_interval: i32) -> Rc<Self> {
+        let rc_this = Rc::new(Self(Inner::new(ping_interval)));
+        let weak_this = Rc::downgrade(&rc_this);
+        rc_this.0.borrow_mut().reconnector = Some(Reconnector::new(weak_this));
+
+        rc_this
+    }
+
+    fn send_connection_loss(&self) {
+        if let Some(on_connection_loss) =
+            &self.0.borrow().on_connection_loss_sub
+        {
+            let handle =
+                self.0.borrow().reconnector.as_ref().unwrap().new_handle();
+            on_connection_loss.unbounded_send(handle);
+        }
     }
 
     /// Handles close message from a remote server.
@@ -394,9 +419,7 @@ impl WebSocketRpcClient {
             CloseMsg::Normal(_, reason) => match reason {
                 CloseByServerReason::Reconnected => (),
                 CloseByServerReason::Idle => {
-                    if let Err(e) = self.reconnect().await {
-                        console_error(e.to_string());
-                    }
+                    self.send_connection_loss();
                 }
                 _ => {
                     self.0.borrow_mut().sock.take();
@@ -419,9 +442,7 @@ impl WebSocketRpcClient {
                 }
             },
             CloseMsg::Abnormal(_) => spawn_local(async move {
-                if let Err(e) = self.reconnect().await {
-                    console_error(e.to_string());
-                }
+                self.send_connection_loss();
             }),
         }
     }
@@ -482,9 +503,7 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(_) = on_idle.next().await {
                     if let Some(this) = weak_this.upgrade() {
-                        if let Err(e) = this.reconnect().await {
-                            console_error(e.to_string());
-                        }
+                        this.send_connection_loss();
                     }
                 }
             });
@@ -559,6 +578,23 @@ impl RpcClient for WebSocketRpcClient {
             .update_settings(idle_timeout, ping_interval);
     }
 
+    fn on_connection_loss(
+        &self,
+    ) -> LocalBoxStream<'static, ReconnectionHandle> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_connection_loss_sub = Some(tx);
+
+        Box::pin(rx)
+    }
+}
+
+pub trait ReconnectableRpcClient {
+    fn reconnect(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
+}
+
+impl ReconnectableRpcClient for WebSocketRpcClient {
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
