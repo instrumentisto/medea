@@ -317,14 +317,11 @@ window.onload = async function() {
     room = await jason.init_room();
 
     room.on_connection_loss( async (reconnectHandle) => {
-      while (true) {
         try {
-          await reconnectHandle.reconnect(1000);
-          break;
+          await reconnectHandle.reconnect_with_backoff(1, 2.0, 10);
         } catch (e) {
-          console.log(e);
+          console.log("Failed to reconnect " + e);
         }
-      }
       console.log("YAY reconnected!!!!!");
 
     });

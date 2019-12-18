@@ -156,6 +156,8 @@ pub enum RpcClientError {
     /// Occurs if time frame in which we can reconnect was passed.
     #[display(fmt = "Reconnection deadline passed.")]
     Deadline,
+
+    RpcClientGone,
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
@@ -399,6 +401,7 @@ impl WebSocketRpcClient {
     }
 
     fn send_connection_loss(&self) {
+        self.0.borrow_mut().heartbeat.stop();
         if let Some(on_connection_loss) =
             &self.0.borrow().on_connection_loss_sub
         {
@@ -592,13 +595,19 @@ pub trait ReconnectableRpcClient {
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
+
+    fn reconnect_with_backoff(
+        &self,
+        starting_delay: i32,
+        multiplier: f32,
+        max_delay_ms: i32,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 }
 
 impl ReconnectableRpcClient for WebSocketRpcClient {
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-        self.0.borrow_mut().heartbeat.stop();
         let inner = self.0.clone();
 
         Box::pin(async move {
@@ -617,6 +626,50 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
             if let Some(transport) = transport {
                 inner
                     .borrow_mut()
+                    .heartbeat
+                    .start(transport)
+                    .map_err(tracerr::map_from_and_wrap!())?;
+            }
+            Ok(())
+        })
+    }
+
+    fn reconnect_with_backoff(
+        &self,
+        starting_delay: i32,
+        multiplier: f32,
+        max_delay_ms: i32,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
+        let weak_this = self.downgrade();
+        Box::pin(async move {
+            let mut delayer = ProgressiveDelayer::new(
+                starting_delay,
+                multiplier,
+                max_delay_ms,
+            );
+            let sock = weak_this
+                .upgrade()
+                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?
+                .0
+                .borrow()
+                .sock
+                .as_ref()
+                .cloned()
+                .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
+            while let Err(_) = sock.reconnect().await {
+                delayer
+                    .delay()
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
+            }
+
+            let this = weak_this
+                .upgrade()
+                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
+            let transport = this.0.borrow().sock.clone();
+            if let Some(transport) = transport {
+                this.0
+                    .borrow()
                     .heartbeat
                     .start(transport)
                     .map_err(tracerr::map_from_and_wrap!())?;

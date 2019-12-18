@@ -9,8 +9,9 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::{ReconnectableRpcClient, RpcClient, WeakWebsocketRpcClient},
-    utils::{resolve_after, JasonError, JasonWeakHandler},
+    utils::{resolve_after, JasonError, JasonWeakHandler as _},
 };
+use js_sys::Math::max;
 
 struct Inner {
     rpc: Weak<dyn ReconnectableRpcClient>,
@@ -50,6 +51,29 @@ impl ReconnectionHandle {
             rpc.reconnect()
                 .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
+
+            Ok(JsValue::NULL)
+        })
+    }
+
+    pub fn reconnect_with_backoff(
+        &self,
+        starting_delay: i32,
+        multiplier: f32,
+        max_delay_ms: i32,
+    ) -> Promise {
+        let this = self.clone();
+        future_to_promise(async move {
+            let inner = this.0.upgrade_handler::<JsValue>()?;
+            let rpc = Weak::upgrade(&inner.rpc)
+                .ok_or_else(|| JsValue::from_str("RpcClient is gone."))?;
+            rpc.reconnect_with_backoff(
+                starting_delay,
+                multiplier,
+                max_delay_ms,
+            )
+            .await
+            .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)
         })
