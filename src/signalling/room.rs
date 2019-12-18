@@ -112,6 +112,20 @@ pub enum RoomError {
     EndpointAlreadyExists(Fid<ToEndpoint>),
 }
 
+#[derive(Debug, Fail, Display, PartialEq)]
+pub enum CommandValidationError {
+    #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
+    PeerNotFound(PeerId),
+
+    #[display(
+        fmt = "Member's Command targets Peer [id = {}] that does not belong \
+               to this Member [id = {}] ",
+        _0,
+        _1
+    )]
+    PeerDoesNotBelongToThisMember(PeerId, MemberId),
+}
+
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         Self::PeerError(err)
@@ -719,6 +733,33 @@ impl Room {
 
         Ok(())
     }
+
+    /// Validates [`CommandMessage`]. Two assertions are made:
+    /// 1. Specified [`PeerId`] must be known to Room.
+    /// 2. Found [`Peer`] must belong to specified [`Member`]
+    fn validate_command(
+        &self,
+        command: &CommandMessage,
+    ) -> Result<(), CommandValidationError> {
+        let peer_id = match command.command {
+            Command::MakeSdpOffer { peer_id, .. }
+            | Command::MakeSdpAnswer { peer_id, .. }
+            | Command::SetIceCandidate { peer_id, .. }
+            | Command::AddPeerConnectionMetrics { peer_id, .. } => peer_id,
+        };
+
+        let peer = self
+            .peers
+            .get_peer_by_id(peer_id)
+            .map_err(|_| CommandValidationError::PeerNotFound(peer_id))?;
+        if peer.member_id() != command.member_id {
+            return Err(CommandValidationError::PeerDoesNotBelongToThisMember(
+                peer_id,
+                peer.member_id(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl CommandHandler for Room {
@@ -965,7 +1006,14 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        match Command::from(msg).dispatch_with(self) {
+        if let Err(err) = self.validate_command(&msg) {
+            info!(
+                "Command from Member [{}], failed validation cause: {}",
+                msg.member_id, err
+            );
+        };
+
+        match msg.command.dispatch_with(self) {
             Ok(res) => {
                 Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
                     if res.is_ok() {
@@ -1217,5 +1265,65 @@ impl Handler<CreateEndpoint> for Room {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+
+    fn empty_room() -> Room {
+        let room_spec = RoomSpec {
+            id: RoomId(String::from("test")),
+            pipeline: Pipeline::new(HashMap::new()),
+        };
+        let ctx = AppContext::new(
+            Conf::default(),
+            crate::turn::new_turn_auth_service_mock(),
+        );
+
+        Room::new(&room_spec, &ctx).unwrap()
+    }
+
+    #[test]
+    fn command_validation_peer_not_found() {
+
+        let mut room = empty_room();
+
+        let member1 = MemberSpec::new(Pipeline::new(HashMap::new()), String::from("w/e"), None, None);
+
+        room.create_member(MemberId(String::from("member1")), &member1).unwrap();
+
+        let no_such_peer = CommandMessage::new(MemberId(String::from("member1")), Command::SetIceCandidate { peer_id: PeerId(1), candidate: IceCandidate {
+            candidate: "".to_string(),
+            sdp_m_line_index: None,
+            sdp_mid: None
+        } });
+
+        let validation = room.validate_command(&no_such_peer);
+
+        assert_eq!(validation, Err(CommandValidationError::PeerNotFound(PeerId(1))));
+    }
+
+    #[test]
+    fn command_validation_peer_does_not_belong_to_member() {
+
+        let mut room = empty_room();
+
+        let member1 = MemberSpec::new(Pipeline::new(HashMap::new()), String::from("w/e"), None, None);
+
+        room.create_member(MemberId(String::from("member1")), &member1).unwrap();
+
+        let no_such_peer = CommandMessage::new(MemberId(String::from("member1")), Command::SetIceCandidate { peer_id: PeerId(1), candidate: IceCandidate {
+            candidate: "".to_string(),
+            sdp_m_line_index: None,
+            sdp_mid: None
+        } });
+
+        let validation = room.validate_command(&no_such_peer);
+
+        assert_eq!(validation, Err(CommandValidationError::PeerNotFound(PeerId(1))));
     }
 }

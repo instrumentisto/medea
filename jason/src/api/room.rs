@@ -594,21 +594,19 @@ impl EventHandler for InnerRoom {
                 };
                 Result::<_, Traced<RoomError>>::Ok(())
             }
-            .then(|result| {
-                async move {
-                    if let Err(err) = result {
-                        let (err, trace) = err.into_parts();
-                        match err {
-                            RoomError::InvalidLocalStream(_)
-                            | RoomError::CouldNotGetLocalMedia(_) => {
-                                let e = JasonError::from((err, trace));
-                                e.print();
-                                error_callback.call(e);
-                            }
-                            _ => JasonError::from((err, trace)).print(),
-                        };
+            .then(|result| async move {
+                if let Err(err) = result {
+                    let (err, trace) = err.into_parts();
+                    match err {
+                        RoomError::InvalidLocalStream(_)
+                        | RoomError::CouldNotGetLocalMedia(_) => {
+                            let e = JasonError::from((err, trace));
+                            e.print();
+                            error_callback.call(e);
+                        }
+                        _ => JasonError::from((err, trace)).print(),
                     };
-                }
+                };
             }),
         );
     }

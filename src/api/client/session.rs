@@ -236,7 +236,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     }
                     Ok(ClientMsg::Command(command)) => {
                         if let Err(err) =
-                            self.room.try_send(CommandMessage::from(command))
+                            self.room.try_send(CommandMessage::new(
+                                self.member_id.clone(),
+                                command,
+                            ))
                         {
                             error!(
                                 "Cannot send Command to Room {}, because {}",

@@ -77,6 +77,21 @@ impl Into<RoomElement> for MemberSpec {
 }
 
 impl MemberSpec {
+
+    pub fn new(
+        pipeline: Pipeline<EndpointId, MemberElement>,
+        credentials: String,
+        on_join: Option<CallbackUrl>,
+        on_leave: Option<CallbackUrl>,
+    ) -> Self {
+        Self {
+            pipeline,
+            credentials,
+            on_join,
+            on_leave,
+        }
+    }
+
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(
         &self,

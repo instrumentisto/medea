@@ -12,9 +12,18 @@ use medea_client_api_proto::{CloseDescription, Command, Event};
 use crate::api::control::MemberId;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
-#[derive(From, Into, Message)]
+#[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct CommandMessage(Command);
+pub struct CommandMessage {
+    pub member_id: MemberId,
+    pub command: Command,
+}
+
+impl CommandMessage {
+    pub fn new(member_id: MemberId, command: Command) -> Self {
+        Self { member_id, command }
+    }
+}
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
