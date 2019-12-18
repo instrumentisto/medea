@@ -5,6 +5,6 @@ static_specs_dir = "_dev/specs/"
 level = "DEBUG"
 
 [rpc]
-reconnection_timeout = "1m"
+reconnect_timeout = "1m"
 idle_timeout = "5s"
 ping_interval = "1s"
