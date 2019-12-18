@@ -115,6 +115,8 @@ pub struct ParticipantService {
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     idle_timeout: Duration,
+
+    ping_interval: Duration,
 }
 
 impl ParticipantService {
@@ -131,6 +133,7 @@ impl ParticipantService {
             turn_service: context.turn_service.clone(),
             rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
             idle_timeout: context.config.rpc.idle_timeout,
+            ping_interval: context.config.rpc.ping_interval,
         })
     }
 
@@ -444,8 +447,7 @@ impl ParticipantService {
             // definitely enough.
             Event::RpcSettingsUpdated {
                 idle_timeout: self.idle_timeout.as_millis() as u64,
-                reconnection_timeout: self.rpc_reconnect_timeout.as_millis()
-                    as u64,
+                ping_interval: self.ping_interval.as_millis() as u64,
             },
         )
     }

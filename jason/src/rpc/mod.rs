@@ -185,7 +185,7 @@ pub trait RpcClient {
     fn set_close_reason(&self, close_reason: ClientDisconnect);
 
     /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(&self, idle_timeout: u64, reconnect_timeout: u64);
+    fn update_settings(&self, idle_timeout: u64, ping_interval: u64);
 }
 
 /// RPC transport between a client and server.
@@ -241,13 +241,6 @@ struct Inner {
 
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
-
-    /// Time for which server will wait if client connection was lost.
-    reconnection_timeout: u64,
-
-    /// Time after the last ping received by the server, after which the
-    /// server will consider that the connection with the client is lost.
-    idle_timeout: u64,
 }
 
 impl Inner {
@@ -256,11 +249,9 @@ impl Inner {
             sock: None,
             on_close_subscribers: Vec::new(),
             subs: vec![],
-            heartbeat: Heartbeat::new(10000.into()),
+            heartbeat: Heartbeat::new(10000, 3000),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             is_closed: false,
-            reconnection_timeout: 10000,
-            idle_timeout: 10000,
         }))
     }
 }
@@ -391,13 +382,6 @@ impl WebSocketRpcClient {
     /// it will not be reconnected or deadline not be reached.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
-        let idle_timeout = self.0.borrow().idle_timeout as u64;
-        let reconnection_timeout = self.0.borrow().reconnection_timeout as u64;
-        // This is safe to cast timestamp from 'Date::now' to u64 because
-        // '18446744073709551615' timestamp is very far.
-        let last_pong = self.0.borrow().heartbeat.get_last_activity();
-        let deadline = (idle_timeout * 2) + reconnection_timeout + last_pong.0;
-
         let mut delayer = ProgressiveDelayer::new(1000, 2.0, 10000);
         let sock = self
             .0
@@ -536,6 +520,7 @@ impl RpcClient for WebSocketRpcClient {
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
+                    console_error("ON CLOSE");
                     if let Some(this) = this_clone.upgrade() {
                         this.on_transport_close(&msg).await;
                     }
@@ -593,9 +578,11 @@ impl RpcClient for WebSocketRpcClient {
     }
 
     /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(&self, idle_timeout: u64, reconnection_timeout: u64) {
-        self.0.borrow_mut().idle_timeout = idle_timeout;
-        self.0.borrow_mut().reconnection_timeout = reconnection_timeout;
+    fn update_settings(&self, idle_timeout: u64, ping_interval: u64) {
+        self.0
+            .borrow_mut()
+            .heartbeat
+            .update_settings(idle_timeout, ping_interval);
     }
 }
 

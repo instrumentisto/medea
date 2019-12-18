@@ -669,9 +669,9 @@ impl EventHandler for InnerRoom {
     fn on_rpc_settings_updated(
         &mut self,
         idle_timeout: u64,
-        reconnect_timeout: u64,
+        ping_interval: u64,
     ) {
-        self.rpc.update_settings(idle_timeout, reconnect_timeout);
+        self.rpc.update_settings(idle_timeout, ping_interval);
     }
 }
 

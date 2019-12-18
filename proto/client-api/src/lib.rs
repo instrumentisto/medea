@@ -201,7 +201,7 @@ pub enum Event {
     /// settings.
     RpcSettingsUpdated {
         idle_timeout: u64,
-        reconnection_timeout: u64,
+        ping_interval: u64,
     },
 }
 
