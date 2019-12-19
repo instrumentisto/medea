@@ -1,6 +1,6 @@
 use std::rc::{Rc, Weak};
 
-use derive_more::Display;
+use derive_more::{Deref, Display};
 use js_sys::Promise;
 use tracerr::Traced;
 use wasm_bindgen::prelude::*;
@@ -20,20 +20,6 @@ struct Inner {
     is_busy: Cell<bool>,
 }
 
-impl Inner {
-    fn lock(&self) -> Result<(), Traced<ReconnectorError>> {
-        if self.is_busy.get() {
-            return Err(tracerr::new!(ReconnectorError::Busy));
-        }
-        self.is_busy.set(true);
-        Ok(())
-    }
-
-    fn unlock(&self) {
-        self.is_busy.set(false);
-    }
-}
-
 pub struct Reconnector(Rc<Inner>);
 
 impl Reconnector {
@@ -45,24 +31,56 @@ impl Reconnector {
     }
 
     pub fn new_handle(&self) -> ReconnectorHandle {
-        ReconnectorHandle(Rc::downgrade(&self.0))
+        ReconnectorHandle(ReconnectorLock::new(Rc::downgrade(&self.0)))
     }
 }
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectorHandle(Weak<Inner>);
-
-impl ReconnectorHandle {
-    pub(self) fn new(inner: Weak<Inner>) -> Self {
-        Self(inner)
-    }
-}
+pub struct ReconnectorHandle(ReconnectorLock);
 
 #[derive(Debug, Display, JsCaused)]
 enum ReconnectorError {
     Busy,
     RpcClientGone,
+    Detached,
+}
+
+#[derive(Deref)]
+struct ReconnectorGuard(Rc<Inner>);
+
+impl ReconnectorGuard {
+    pub fn new(inner: Rc<Inner>) -> Self {
+        Self(inner)
+    }
+}
+
+impl Drop for ReconnectorGuard {
+    fn drop(&mut self) {
+        self.0.is_busy.set(false);
+    }
+}
+
+#[derive(Clone)]
+struct ReconnectorLock(Weak<Inner>);
+
+impl ReconnectorLock {
+    pub fn new(inner: Weak<Inner>) -> Self {
+        Self(inner)
+    }
+
+    pub fn lock(&self) -> Result<ReconnectorGuard, Traced<ReconnectorError>> {
+        let inner = self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectorError::Detached))?;
+        if inner.is_busy.get() {
+            return Err(tracerr::new!(ReconnectorError::Busy));
+        }
+        inner.is_busy.set(true);
+
+        Ok(ReconnectorGuard::new(inner))
+    }
 }
 
 #[wasm_bindgen]
@@ -73,8 +91,8 @@ impl ReconnectorHandle {
     pub fn reconnect(&self, delay_ms: u64) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            let inner = this.0.upgrade_handler::<JsValue>()?;
-            inner
+            let inner = this
+                .0
                 .lock()
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
             resolve_after(Duration::from_millis(delay_ms).into()).await?;
@@ -85,7 +103,6 @@ impl ReconnectorHandle {
                     )))
                 })?;
             let reconnect_result = rpc.reconnect().await;
-            inner.is_busy.set(false);
             reconnect_result.map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)
@@ -102,17 +119,19 @@ impl ReconnectorHandle {
     ) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            let inner = this.0.upgrade_handler::<JsValue>()?;
-            inner.lock().map_err(|e| JsValue::from(JasonError::from(e)))?;
+            let inner = this
+                .0
+                .lock()
+                .map_err(|e| JsValue::from(JasonError::from(e)))?;
             let rpc = Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| JsValue::from_str("RpcClient is gone."))?;
-            let reconnection_result = rpc.reconnect_with_backoff(
-                Duration::from_millis(starting_delay).into(),
-                multiplier,
-                Duration::from_millis(max_delay_ms).into(),
-            )
-            .await;
-            inner.unlock();
+            let reconnection_result = rpc
+                .reconnect_with_backoff(
+                    Duration::from_millis(starting_delay).into(),
+                    multiplier,
+                    Duration::from_millis(max_delay_ms).into(),
+                )
+                .await;
             reconnection_result
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
