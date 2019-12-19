@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use derive_more::{Display, From};
+use derive_more::{Add, Display, From, Mul, Sub};
 use futures::{
     channel::mpsc,
     future::{self, AbortHandle},
@@ -14,7 +14,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{console_error, resolve_after, JsCaused, JsError},
+    utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
 };
 
 #[derive(Clone, Copy, Debug, Display, From)]
@@ -37,20 +37,26 @@ impl Drop for Abort {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct IdleTimeout(pub JsDuration);
+
+#[derive(Debug, Copy, Clone)]
+pub struct PingInterval(pub JsDuration);
+
 struct Inner {
-    idle_timeout: u64,
+    idle_timeout: IdleTimeout,
     transport: Option<Rc<dyn RpcTransport>>,
     pong_task_abort: Option<Abort>,
     idle_sender: Option<mpsc::UnboundedSender<()>>,
     idle_resolver_abort: Option<Abort>,
-    ping_interval: u64,
+    ping_interval: PingInterval,
     last_ping_num: u64,
 }
 
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
-    pub fn new(idle_timeout: u64, ping_interval: u64) -> Self {
+    pub fn new(idle_timeout: IdleTimeout, ping_interval: PingInterval) -> Self {
         Self(Rc::new(RefCell::new(Inner {
             idle_timeout,
             transport: None,
@@ -71,8 +77,8 @@ impl Heartbeat {
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
                     console_error("On IDLE resolver started.");
-                    let wait_for_ping = this.borrow().ping_interval * 2;
-                    resolve_after(wait_for_ping as i32).await.unwrap();
+                    let wait_for_ping = this.borrow().ping_interval.0 * 2;
+                    resolve_after(wait_for_ping).await.unwrap();
                     console_error("Wait for ping resolved.");
                     let last_ping_num = this.borrow().last_ping_num;
                     if let Some(transport) = &this.borrow().transport {
@@ -89,7 +95,7 @@ impl Heartbeat {
 
                     let idle_timeout = this.borrow().idle_timeout;
                     // FIXME (evdokimovs): u64 as i32 look very bad
-                    resolve_after((idle_timeout - wait_for_ping) as i32)
+                    resolve_after(idle_timeout.0 - wait_for_ping)
                         .await
                         .unwrap();
                     if let Some(idle_sender) = &this.borrow().idle_sender {
@@ -156,7 +162,11 @@ impl Heartbeat {
         self.0.borrow_mut().idle_resolver_abort.take();
     }
 
-    pub fn update_settings(&self, idle_timeout: u64, ping_interval: u64) {
+    pub fn update_settings(
+        &self,
+        idle_timeout: IdleTimeout,
+        ping_interval: PingInterval,
+    ) {
         self.0.borrow_mut().idle_timeout = idle_timeout;
         self.0.borrow_mut().ping_interval = ping_interval;
     }

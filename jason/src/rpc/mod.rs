@@ -26,16 +26,18 @@ use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, window, JsCaused, JsError};
+use crate::utils::{console_error, window, JsCaused, JsDuration, JsError};
 
 use self::heartbeat::{Heartbeat, HeartbeatError};
 
 #[doc(inline)]
 pub use self::{
-    reconnect_handle::ReconnectionHandle,
+    heartbeat::{IdleTimeout, PingInterval},
+    reconnect_handle::ReconnectorHandle,
     websocket::{TransportError, WebSocketRpcTransport},
 };
 use crate::rpc::reconnect_handle::Reconnector;
+use std::time::Duration;
 
 /// Reasons of closing by client side and server side.
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
@@ -193,10 +195,13 @@ pub trait RpcClient {
     fn set_close_reason(&self, close_reason: ClientDisconnect);
 
     /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(&self, idle_timeout: u64, ping_interval: u64);
+    fn update_settings(
+        &self,
+        idle_timeout: IdleTimeout,
+        ping_interval: PingInterval,
+    );
 
-    fn on_connection_loss(&self)
-        -> LocalBoxStream<'static, ReconnectionHandle>;
+    fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle>;
 }
 
 /// RPC transport between a client and server.
@@ -253,7 +258,7 @@ struct Inner {
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
 
-    on_connection_loss_sub: Option<mpsc::UnboundedSender<ReconnectionHandle>>,
+    on_connection_loss_sub: Option<mpsc::UnboundedSender<ReconnectorHandle>>,
 
     reconnector: Option<Reconnector>,
 }
@@ -264,7 +269,10 @@ impl Inner {
             sock: None,
             on_close_subscribers: Vec::new(),
             subs: vec![],
-            heartbeat: Heartbeat::new(10000, 3000),
+            heartbeat: Heartbeat::new(
+                IdleTimeout(Duration::from_secs(10).into()),
+                PingInterval(Duration::from_secs(3).into()),
+            ),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             is_closed: false,
             on_connection_loss_sub: None,
@@ -573,16 +581,20 @@ impl RpcClient for WebSocketRpcClient {
     }
 
     /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(&self, idle_timeout: u64, ping_interval: u64) {
+    fn update_settings(
+        &self,
+        idle_timeout: IdleTimeout,
+        ping_interval: PingInterval,
+    ) {
         self.0
             .borrow_mut()
             .heartbeat
             .update_settings(idle_timeout, ping_interval);
     }
 
-    fn on_connection_loss(
-        &self,
-    ) -> LocalBoxStream<'static, ReconnectionHandle> {
+    /// Returns [`LocalBoxStream`] to which will be sended
+    /// [`ReconnectionHandle`] on connection losing.
+    fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_sub = Some(tx);
 
@@ -591,10 +603,13 @@ impl RpcClient for WebSocketRpcClient {
 }
 
 pub trait ReconnectableRpcClient {
+    /// Tries to reconnect a [`RpcClient`].
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 
+    /// Tries to reconnect [`RpcTransport`] in a loop with delay until
+    /// it will not be reconnected or deadline not be reached.
     fn reconnect_with_backoff(
         &self,
         starting_delay: i32,

@@ -25,14 +25,18 @@ use crate::{
         PeerRepository,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ReconnectionHandle, RpcClient,
+        ClientDisconnect, CloseReason, ReconnectorHandle, RpcClient,
         RpcClientError, TransportError, WebSocketRpcTransport,
     },
     utils::{console_error, Callback, JasonError, JsCaused, JsError},
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::utils::JasonWeakHandler as _;
+use crate::{
+    rpc::{IdleTimeout, PingInterval},
+    utils::JasonWeakHandler as _,
+};
+use std::time::Duration;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -440,7 +444,7 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_stream: Rc<Callback<JasonError>>,
 
-    on_connection_loss: Callback<ReconnectionHandle>,
+    on_connection_loss: Callback<ReconnectorHandle>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
@@ -711,7 +715,10 @@ impl EventHandler for InnerRoom {
         idle_timeout: u64,
         ping_interval: u64,
     ) {
-        self.rpc.update_settings(idle_timeout, ping_interval);
+        self.rpc.update_settings(
+            IdleTimeout(Duration::from_millis(idle_timeout).into()),
+            PingInterval(Duration::from_millis(ping_interval).into()),
+        );
     }
 }
 

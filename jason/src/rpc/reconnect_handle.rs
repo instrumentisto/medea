@@ -8,6 +8,7 @@ use crate::{
     rpc::ReconnectableRpcClient,
     utils::{resolve_after, JasonError, JasonWeakHandler as _},
 };
+use std::time::Duration;
 
 struct Inner {
     rpc: Weak<dyn ReconnectableRpcClient>,
@@ -20,27 +21,30 @@ impl Reconnector {
         Self(Rc::new(Inner { rpc }))
     }
 
-    pub fn new_handle(&self) -> ReconnectionHandle {
-        ReconnectionHandle(Rc::downgrade(&self.0))
+    pub fn new_handle(&self) -> ReconnectorHandle {
+        ReconnectorHandle(Rc::downgrade(&self.0))
     }
 }
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectionHandle(Weak<Inner>);
+pub struct ReconnectorHandle(Weak<Inner>);
 
-impl ReconnectionHandle {
+impl ReconnectorHandle {
     pub(self) fn new(inner: Weak<Inner>) -> Self {
         Self(inner)
     }
 }
 
 #[wasm_bindgen]
-impl ReconnectionHandle {
-    pub fn reconnect(&self, delay_ms: i32) -> Promise {
+impl ReconnectorHandle {
+    /// Tries to reconnect after provided delay.
+    ///
+    /// Delay is in milliseconds.
+    pub fn reconnect(&self, delay_ms: u64) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            resolve_after(delay_ms).await?;
+            resolve_after(Duration::from_millis(delay_ms).into()).await?;
             let inner = this.0.upgrade_handler::<JsValue>()?;
             let rpc: Rc<dyn ReconnectableRpcClient> = Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| JsValue::from_str("RpcClient is gone"))?;
@@ -52,6 +56,8 @@ impl ReconnectionHandle {
         })
     }
 
+    /// Tries to reconnect [`RpcTransport`] in a loop with delay until
+    /// it will not be reconnected or deadline not be reached.
     pub fn reconnect_with_backoff(
         &self,
         starting_delay: i32,
