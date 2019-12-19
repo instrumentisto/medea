@@ -1,17 +1,13 @@
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
+use std::rc::{Rc, Weak};
 
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::{ReconnectableRpcClient, RpcClient, WeakWebsocketRpcClient},
+    rpc::ReconnectableRpcClient,
     utils::{resolve_after, JasonError, JasonWeakHandler as _},
 };
-use js_sys::Math::max;
 
 struct Inner {
     rpc: Weak<dyn ReconnectableRpcClient>,

@@ -3,31 +3,22 @@ use std::{cell::RefCell, rc::Rc};
 use derive_more::{Display, From};
 use futures::{
     channel::mpsc,
-    future::{self, AbortHandle, Abortable},
+    future::{self, AbortHandle},
     stream::LocalBoxStream,
     StreamExt as _,
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
-use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{
-        console_error, resolve_after, window, IntervalHandle, JsCaused, JsError,
-    },
+    utils::{console_error, resolve_after, JsCaused, JsError},
 };
 
 #[derive(Clone, Copy, Debug, Display, From)]
 pub struct Timestamp(pub u64);
-
-impl Timestamp {
-    pub fn now() -> Self {
-        Self(Date::now() as u64)
-    }
-}
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
@@ -49,7 +40,6 @@ impl Drop for Abort {
 struct Inner {
     idle_timeout: u64,
     transport: Option<Rc<dyn RpcTransport>>,
-    last_activity: Timestamp,
     pong_task_abort: Option<Abort>,
     idle_sender: Option<mpsc::UnboundedSender<()>>,
     idle_resolver_abort: Option<Abort>,
@@ -64,7 +54,6 @@ impl Heartbeat {
         Self(Rc::new(RefCell::new(Inner {
             idle_timeout,
             transport: None,
-            last_activity: Timestamp::now(),
             pong_task_abort: None,
             idle_sender: None,
             idle_resolver_abort: None,
@@ -128,7 +117,6 @@ impl Heartbeat {
             while let Some(msg) = on_message_stream.next().await {
                 if let Some(this) = weak_this.upgrade().map(Heartbeat) {
                     this.update_idle_resolver();
-                    this.0.borrow_mut().last_activity = Timestamp::now();
 
                     if let ServerMsg::Ping(num) = msg {
                         let last_ping_num = this.0.borrow().last_ping_num;
@@ -178,9 +166,5 @@ impl Heartbeat {
         self.0.borrow_mut().idle_sender = Some(on_idle_tx);
 
         Box::pin(on_idle_rx)
-    }
-
-    pub fn get_last_activity(&self) -> Timestamp {
-        self.0.borrow().last_activity
     }
 }

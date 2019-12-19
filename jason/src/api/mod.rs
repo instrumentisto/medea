@@ -44,7 +44,7 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = WebSocketRpcClient::new(3000);
+        let rpc = WebSocketRpcClient::new();
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));

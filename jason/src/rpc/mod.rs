@@ -15,9 +15,8 @@ use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
     stream::{LocalBoxStream, StreamExt as _},
-    Future as _,
 };
-use js_sys::{Date, Promise};
+use js_sys::Promise;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
@@ -27,7 +26,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, window, JasonError, JsCaused, JsError};
+use crate::utils::{console_error, window, JsCaused, JsError};
 
 use self::heartbeat::{Heartbeat, HeartbeatError};
 
@@ -260,7 +259,7 @@ struct Inner {
 }
 
 impl Inner {
-    fn new(heartbeat_interval: i32) -> Rc<RefCell<Self>> {
+    fn new() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
             on_close_subscribers: Vec::new(),
@@ -392,8 +391,8 @@ pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 impl WebSocketRpcClient {
     /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
     /// milliseconds.
-    pub fn new(ping_interval: i32) -> Rc<Self> {
-        let rc_this = Rc::new(Self(Inner::new(ping_interval)));
+    pub fn new() -> Rc<Self> {
+        let rc_this = Rc::new(Self(Inner::new()));
         let weak_this = Rc::downgrade(&rc_this);
         rc_this.0.borrow_mut().reconnector = Some(Reconnector::new(weak_this));
 
@@ -415,7 +414,7 @@ impl WebSocketRpcClient {
     ///
     /// This function will be called on every WebSocket close (normal and
     /// abnormal) regardless of the [`CloseReason`].
-    async fn on_transport_close(self, close_msg: &CloseMsg) {
+    fn on_transport_close(self, close_msg: &CloseMsg) {
         self.0.borrow_mut().heartbeat.stop();
 
         match &close_msg {
@@ -444,9 +443,9 @@ impl WebSocketRpcClient {
                     }
                 }
             },
-            CloseMsg::Abnormal(_) => spawn_local(async move {
+            CloseMsg::Abnormal(_) => {
                 self.send_connection_loss();
-            }),
+            }
         }
     }
 
@@ -518,7 +517,7 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
                     if let Some(this) = this_clone.upgrade() {
-                        this.on_transport_close(&msg).await;
+                        this.on_transport_close(&msg);
                     }
                 }
             });
