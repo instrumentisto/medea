@@ -93,8 +93,8 @@ impl From<EventListenerBindError> for TransportError {
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
 /// State of WebSocket.
-#[derive(Debug)]
-enum State {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum State {
     Connecting,
     Open,
     Closing,
@@ -282,6 +282,10 @@ impl RpcTransport for WebSocketRpcTransport {
 
             Ok(())
         })
+    }
+
+    fn get_state(&self) -> State {
+        self.0.borrow().socket_state
     }
 }
 

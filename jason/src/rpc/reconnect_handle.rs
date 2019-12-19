@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::ReconnectableRpcClient,
+    rpc::{websocket::State, ReconnectableRpcClient},
     utils::{
         resolve_after, JasonError, JasonWeakHandler as _, JsCaused, JsDuration,
         JsError,
@@ -95,6 +95,18 @@ impl ReconnectorHandle {
                 .0
                 .lock()
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
+            {
+                let rpc_state = Weak::upgrade(&inner.rpc)
+                    .ok_or_else(|| {
+                        JsValue::from(JasonError::from(tracerr::new!(
+                            ReconnectorError::RpcClientGone
+                        )))
+                    })?
+                    .get_transport_state();
+                if rpc_state == State::Open {
+                    return Ok(JsValue::NULL);
+                }
+            }
 
             resolve_after(Duration::from_millis(delay_ms).into()).await?;
 
@@ -127,19 +139,23 @@ impl ReconnectorHandle {
                 .lock()
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
-            Weak::upgrade(&inner.rpc)
-                .ok_or_else(|| {
-                    JsValue::from(JasonError::from(tracerr::new!(
-                        ReconnectorError::RpcClientGone
-                    )))
-                })?
-                .reconnect_with_backoff(
-                    Duration::from_millis(starting_delay).into(),
-                    multiplier,
-                    Duration::from_millis(max_delay_ms).into(),
-                )
-                .await
-                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+            let rpc = Weak::upgrade(&inner.rpc).ok_or_else(|| {
+                JsValue::from(JasonError::from(tracerr::new!(
+                    ReconnectorError::RpcClientGone
+                )))
+            })?;
+
+            if rpc.get_transport_state() == State::Open {
+                return Ok(JsValue::NULL);
+            }
+
+            rpc.reconnect_with_backoff(
+                Duration::from_millis(starting_delay).into(),
+                multiplier,
+                Duration::from_millis(max_delay_ms).into(),
+            )
+            .await
+            .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)
         })

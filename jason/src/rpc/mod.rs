@@ -36,7 +36,7 @@ pub use self::{
     reconnect_handle::ReconnectorHandle,
     websocket::{TransportError, WebSocketRpcTransport},
 };
-use crate::rpc::reconnect_handle::Reconnector;
+use crate::rpc::{reconnect_handle::Reconnector, websocket::State};
 use std::time::Duration;
 
 /// Reasons of closing by client side and server side.
@@ -231,6 +231,8 @@ pub trait RpcTransport {
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
+
+    fn get_state(&self) -> websocket::State;
 }
 
 /// Inner state of [`WebsocketRpcClient`].
@@ -616,6 +618,8 @@ pub trait ReconnectableRpcClient {
         multiplier: f32,
         max_delay_ms: JsDuration,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
+
+    fn get_transport_state(&self) -> State;
 }
 
 impl ReconnectableRpcClient for WebSocketRpcClient {
@@ -680,8 +684,7 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
             let this = weak_this
                 .upgrade()
                 .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
-            let transport = this.0.borrow().sock.clone();
-            if let Some(transport) = transport {
+            if let Some(transport) = this.0.borrow().sock.clone() {
                 this.0
                     .borrow()
                     .heartbeat
@@ -690,6 +693,14 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
             }
             Ok(())
         })
+    }
+
+    fn get_transport_state(&self) -> State {
+        if let Some(transport) = &self.0.borrow().sock {
+            transport.get_state()
+        } else {
+            State::Closed
+        }
     }
 }
 
