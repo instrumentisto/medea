@@ -26,7 +26,7 @@ impl Reconnector {
     pub fn new(rpc: Weak<dyn ReconnectableRpcClient>) -> Self {
         Self(Rc::new(Inner {
             rpc,
-            is_busy: Cell::new(true),
+            is_busy: Cell::new(false),
         }))
     }
 
@@ -95,15 +95,18 @@ impl ReconnectorHandle {
                 .0
                 .lock()
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
+
             resolve_after(Duration::from_millis(delay_ms).into()).await?;
-            let rpc: Rc<dyn ReconnectableRpcClient> = Weak::upgrade(&inner.rpc)
+
+            Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| {
                     JsValue::from(JasonError::from(tracerr::new!(
                         ReconnectorError::RpcClientGone
                     )))
-                })?;
-            let reconnect_result = rpc.reconnect().await;
-            reconnect_result.map_err(|e| JsValue::from(JasonError::from(e)))?;
+                })?
+                .reconnect()
+                .await
+                .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)
         })
@@ -123,16 +126,19 @@ impl ReconnectorHandle {
                 .0
                 .lock()
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
-            let rpc = Weak::upgrade(&inner.rpc)
-                .ok_or_else(|| JsValue::from_str("RpcClient is gone."))?;
-            let reconnection_result = rpc
+
+            Weak::upgrade(&inner.rpc)
+                .ok_or_else(|| {
+                    JsValue::from(JasonError::from(tracerr::new!(
+                        ReconnectorError::RpcClientGone
+                    )))
+                })?
                 .reconnect_with_backoff(
                     Duration::from_millis(starting_delay).into(),
                     multiplier,
                     Duration::from_millis(max_delay_ms).into(),
                 )
-                .await;
-            reconnection_result
+                .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)

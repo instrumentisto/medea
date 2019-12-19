@@ -320,7 +320,7 @@ window.onload = async function() {
         try {
           await reconnectHandle.reconnect_with_backoff(1n, 2.0, 10n);
         } catch (e) {
-          console.log("Failed to reconnect " + e);
+          console.log("Failed to reconnect " + e.message());
         }
       console.log("YAY reconnected!!!!!");
     });
