@@ -22,7 +22,10 @@ pub use self::{
     },
     event_listener::{EventListener, EventListenerBindError},
 };
-use std::rc::{Rc, Weak};
+use std::{
+    ops::Mul,
+    rc::{Rc, Weak},
+};
 
 /// Returns [`Window`] object.
 ///
@@ -35,12 +38,30 @@ pub fn window() -> Window {
     web_sys::window().unwrap()
 }
 
-#[derive(Debug, From, Copy, Clone, Add, Mul, Sub)]
+#[derive(Debug, From, Copy, Clone, Add, Sub, PartialEq, Eq, PartialOrd, Ord)]
 pub struct JsDuration(Duration);
 
 impl JsDuration {
     pub fn into_js_duration(self) -> i32 {
         self.0.as_millis() as i32
+    }
+}
+
+impl Mul<u32> for JsDuration {
+    type Output = Self;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        Self(self.0 * rhs)
+    }
+}
+
+impl Mul<f32> for JsDuration {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self(Duration::from_millis(
+            (self.0.as_millis() as f32 * rhs) as u64,
+        ))
     }
 }
 

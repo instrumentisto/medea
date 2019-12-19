@@ -6,7 +6,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::ReconnectableRpcClient,
-    utils::{resolve_after, JasonError, JasonWeakHandler as _},
+    utils::{resolve_after, JasonError, JasonWeakHandler as _, JsDuration},
 };
 use std::time::Duration;
 
@@ -60,9 +60,9 @@ impl ReconnectorHandle {
     /// it will not be reconnected or deadline not be reached.
     pub fn reconnect_with_backoff(
         &self,
-        starting_delay: i32,
+        starting_delay: u64,
         multiplier: f32,
-        max_delay_ms: i32,
+        max_delay_ms: u64,
     ) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
@@ -70,9 +70,9 @@ impl ReconnectorHandle {
             let rpc = Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| JsValue::from_str("RpcClient is gone."))?;
             rpc.reconnect_with_backoff(
-                starting_delay,
+                Duration::from_millis(starting_delay).into(),
                 multiplier,
-                max_delay_ms,
+                Duration::from_millis(max_delay_ms).into(),
             )
             .await
             .map_err(|e| JsValue::from(JasonError::from(e)))?;

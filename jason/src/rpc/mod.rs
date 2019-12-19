@@ -315,9 +315,9 @@ struct ProgressiveDelayer {
     /// Milliseconds of [`ProgressiveDelayer::delay`] call.
     ///
     /// Will be increased by [`ProgressiveDelayer::delay`] call.
-    current_delay_ms: i32,
+    current_delay_ms: JsDuration,
 
-    max_delay_ms: i32,
+    max_delay_ms: JsDuration,
 
     multiplier: f32,
 }
@@ -325,9 +325,9 @@ struct ProgressiveDelayer {
 impl ProgressiveDelayer {
     /// Returns new [`ProgressiveDelayer`].
     pub fn new(
-        starting_delay_ms: i32,
+        starting_delay_ms: JsDuration,
         multiplier: f32,
-        max_delay_ms: i32,
+        max_delay_ms: JsDuration,
     ) -> Self {
         Self {
             current_delay_ms: starting_delay_ms,
@@ -337,13 +337,12 @@ impl ProgressiveDelayer {
     }
 
     /// Returns next step of delay.
-    fn get_delay(&mut self) -> i32 {
+    fn get_delay(&mut self) -> JsDuration {
         if self.is_max_delay_reached() {
             self.max_delay_ms
         } else {
             let delay = self.current_delay_ms;
-            self.current_delay_ms =
-                (self.current_delay_ms as f32 * self.multiplier) as i32;
+            self.current_delay_ms = (self.current_delay_ms * self.multiplier);
             delay
         }
     }
@@ -366,7 +365,8 @@ impl ProgressiveDelayer {
         JsFuture::from(Promise::new(&mut |yes, _| {
             window()
                 .set_timeout_with_callback_and_timeout_and_arguments_0(
-                    &yes, delay_ms,
+                    &yes,
+                    delay_ms.into_js_duration(),
                 )
                 .unwrap();
         }))
@@ -612,9 +612,9 @@ pub trait ReconnectableRpcClient {
     /// it will not be reconnected or deadline not be reached.
     fn reconnect_with_backoff(
         &self,
-        starting_delay: i32,
+        starting_delay: JsDuration,
         multiplier: f32,
-        max_delay_ms: i32,
+        max_delay_ms: JsDuration,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 }
 
@@ -650,9 +650,9 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
 
     fn reconnect_with_backoff(
         &self,
-        starting_delay: i32,
+        starting_delay: JsDuration,
         multiplier: f32,
-        max_delay_ms: i32,
+        max_delay_ms: JsDuration,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
         let weak_this = self.downgrade();
         Box::pin(async move {
