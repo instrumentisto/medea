@@ -1,24 +1,47 @@
 use std::rc::{Rc, Weak};
 
+use derive_more::Display;
 use js_sys::Promise;
+use tracerr::Traced;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::ReconnectableRpcClient,
-    utils::{resolve_after, JasonError, JasonWeakHandler as _, JsDuration},
+    utils::{
+        resolve_after, JasonError, JasonWeakHandler as _, JsCaused, JsDuration,
+        JsError,
+    },
 };
-use std::time::Duration;
+use std::{cell::Cell, time::Duration};
 
 struct Inner {
     rpc: Weak<dyn ReconnectableRpcClient>,
+    is_busy: Cell<bool>,
+}
+
+impl Inner {
+    fn lock(&self) -> Result<(), Traced<ReconnectorError>> {
+        if self.is_busy.get() {
+            return Err(tracerr::new!(ReconnectorError::Busy));
+        }
+        self.is_busy.set(true);
+        Ok(())
+    }
+
+    fn unlock(&self) {
+        self.is_busy.set(false);
+    }
 }
 
 pub struct Reconnector(Rc<Inner>);
 
 impl Reconnector {
     pub fn new(rpc: Weak<dyn ReconnectableRpcClient>) -> Self {
-        Self(Rc::new(Inner { rpc }))
+        Self(Rc::new(Inner {
+            rpc,
+            is_busy: Cell::new(true),
+        }))
     }
 
     pub fn new_handle(&self) -> ReconnectorHandle {
@@ -36,6 +59,12 @@ impl ReconnectorHandle {
     }
 }
 
+#[derive(Debug, Display, JsCaused)]
+enum ReconnectorError {
+    Busy,
+    RpcClientGone,
+}
+
 #[wasm_bindgen]
 impl ReconnectorHandle {
     /// Tries to reconnect after provided delay.
@@ -44,13 +73,20 @@ impl ReconnectorHandle {
     pub fn reconnect(&self, delay_ms: u64) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            resolve_after(Duration::from_millis(delay_ms).into()).await?;
             let inner = this.0.upgrade_handler::<JsValue>()?;
-            let rpc: Rc<dyn ReconnectableRpcClient> = Weak::upgrade(&inner.rpc)
-                .ok_or_else(|| JsValue::from_str("RpcClient is gone"))?;
-            rpc.reconnect()
-                .await
+            inner
+                .lock()
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
+            resolve_after(Duration::from_millis(delay_ms).into()).await?;
+            let rpc: Rc<dyn ReconnectableRpcClient> = Weak::upgrade(&inner.rpc)
+                .ok_or_else(|| {
+                    JsValue::from(JasonError::from(tracerr::new!(
+                        ReconnectorError::RpcClientGone
+                    )))
+                })?;
+            let reconnect_result = rpc.reconnect().await;
+            inner.is_busy.set(false);
+            reconnect_result.map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)
         })
@@ -67,15 +103,18 @@ impl ReconnectorHandle {
         let this = self.clone();
         future_to_promise(async move {
             let inner = this.0.upgrade_handler::<JsValue>()?;
+            inner.lock().map_err(|e| JsValue::from(JasonError::from(e)))?;
             let rpc = Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| JsValue::from_str("RpcClient is gone."))?;
-            rpc.reconnect_with_backoff(
+            let reconnection_result = rpc.reconnect_with_backoff(
                 Duration::from_millis(starting_delay).into(),
                 multiplier,
                 Duration::from_millis(max_delay_ms).into(),
             )
-            .await
-            .map_err(|e| JsValue::from(JasonError::from(e)))?;
+            .await;
+            inner.unlock();
+            reconnection_result
+                .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
             Ok(JsValue::NULL)
         })

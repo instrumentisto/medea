@@ -108,6 +108,8 @@ enum RoomError {
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
     CallbackNotSet,
 
+    OnConnectionLossCallbackNotSet,
+
     /// Returned if unable to init [`RpcTransport`].
     #[display(fmt = "Unable to init RPC transport: {}", _0)]
     InitRpcTransportFailed(#[js(cause)] TransportError),
@@ -189,6 +191,12 @@ impl RoomHandle {
             if !inner.borrow().on_failed_local_stream.is_set() {
                 return Err(JasonError::from(tracerr::new!(
                     RoomError::CallbackNotSet
+                )));
+            }
+
+            if !inner.borrow().on_connection_loss.is_set() {
+                return Err(JasonError::from(tracerr::new!(
+                    RoomError::OnConnectionLossCallbackNotSet
                 )));
             }
 
