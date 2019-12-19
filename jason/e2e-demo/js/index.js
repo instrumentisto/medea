@@ -318,12 +318,11 @@ window.onload = async function() {
 
     room.on_connection_loss( async (reconnectHandle) => {
         try {
-          await reconnectHandle.reconnect_with_backoff(1, 2.0, 10);
+          await reconnectHandle.reconnect_with_backoff(1n, 2.0, 10n);
         } catch (e) {
           console.log("Failed to reconnect " + e);
         }
       console.log("YAY reconnected!!!!!");
-
     });
 
     try {

@@ -334,15 +334,13 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
-    pub fn is_send_audio_enabled(&self) -> bool {
-        self.media_connections
-            .are_senders_enabled(TransceiverKind::Audio)
+    pub fn is_send_audio_enabled(&self) -> EnabledAudio {
+        self.media_connections.is_send_audio_enabled()
     }
 
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
-    pub fn is_send_video_enabled(&self) -> bool {
-        self.media_connections
-            .are_senders_enabled(TransceiverKind::Video)
+    pub fn is_send_video_enabled(&self) -> EnabledVideo {
+        self.media_connections.is_send_video_enabled()
     }
 
     /// Track id to mid relations of all send tracks of this

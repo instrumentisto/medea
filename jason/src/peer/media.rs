@@ -2,7 +2,7 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -58,10 +58,10 @@ pub enum MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
-#[derive(Clone, Copy, Display, Debug)]
+#[derive(Clone, Copy, Display, Debug, From)]
 pub struct EnabledAudio(pub bool);
 
-#[derive(Clone, Copy, Display, Debug)]
+#[derive(Clone, Copy, Display, Debug, From)]
 pub struct EnabledVideo(pub bool);
 
 /// Actual data of [`MediaConnections`] storage.
@@ -81,6 +81,15 @@ struct InnerMediaConnections {
 
     /// Are senders video tracks muted or not.
     enabled_video: EnabledVideo,
+}
+
+impl InnerMediaConnections {
+    pub fn iter_senders_with_kind(
+        &self,
+        kind: TransceiverKind,
+    ) -> impl Iterator<Item = &Rc<Sender>> {
+        self.senders.values().filter(move |s| s.kind() == kind)
+    }
 }
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
@@ -105,34 +114,52 @@ impl MediaConnections {
     }
 
     pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
-        let mut s = self.0.borrow_mut();
-        s.enabled_audio = enabled;
-        s.senders
-            .values()
-            .filter(|s| s.kind() == TransceiverKind::Audio)
-            .for_each(|s| s.set_track_enabled(enabled.0))
+        self.0.borrow_mut().enabled_audio = enabled;
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Audio)
+            .for_each(|s| s.set_track_enabled(enabled.0));
     }
 
     pub fn toggle_send_video(&self, enabled: EnabledVideo) {
-        let mut s = self.0.borrow_mut();
-        s.enabled_video = enabled;
-        s.senders
-            .values()
-            .filter(|s| s.kind() == TransceiverKind::Video)
-            .for_each(|s| s.set_track_enabled(enabled.0))
+        self.0.borrow_mut().enabled_video = enabled;
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Video)
+            .for_each(|s| s.set_track_enabled(enabled.0));
+    }
+
+    pub fn is_send_audio_enabled(&self) -> EnabledAudio {
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Audio)
+            .skip_while(|s| s.is_track_enabled())
+            .next()
+            .is_some()
+            .into()
+    }
+
+    pub fn is_send_video_enabled(&self) -> EnabledVideo {
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Video)
+            .skip_while(|s| s.is_track_enabled())
+            .next()
+            .is_some()
+            .into()
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
     /// [`TransceiverKind`] are enabled or `false` otherwise.
-    pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
-        let conn = self.0.borrow();
-        for s in conn.senders.values().filter(|s| s.kind() == kind) {
-            if !s.is_track_enabled() {
-                return false;
-            }
-        }
-        true
-    }
+    //    pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
+    //        let conn = self.0.borrow();
+    //        for s in conn.senders.values().filter(|s| s.kind() == kind) {
+    //            if !s.is_track_enabled() {
+    //                return false;
+    //            }
+    //        }
+    //        true
+    //    }
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
