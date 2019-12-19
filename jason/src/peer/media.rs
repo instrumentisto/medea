@@ -22,6 +22,7 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
+use serde_json::error::ErrorCode::TrailingCharacters;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -57,6 +58,12 @@ pub enum MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
+#[derive(Clone, Copy, Display, Debug)]
+pub struct EnabledAudio(pub bool);
+
+#[derive(Clone, Copy, Display, Debug)]
+pub struct EnabledVideo(pub bool);
+
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
@@ -70,10 +77,10 @@ struct InnerMediaConnections {
     receivers: HashMap<TrackId, Receiver>,
 
     /// Are senders audio tracks muted or not.
-    enabled_audio: bool,
+    enabled_audio: EnabledAudio,
 
     /// Are senders video tracks muted or not.
-    enabled_video: bool,
+    enabled_video: EnabledVideo,
 }
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
@@ -85,8 +92,8 @@ impl MediaConnections {
     #[inline]
     pub fn new(
         peer: Rc<RtcPeerConnection>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
     ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
@@ -97,18 +104,22 @@ impl MediaConnections {
         }))
     }
 
-    /// Enables or disables all [`Sender`]s with specified [`TransceiverKind`]
-    /// [`MediaTrack`]s.
-    pub fn toggle_send_media(&self, kind: TransceiverKind, enabled: bool) {
+    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
         let mut s = self.0.borrow_mut();
-        match kind {
-            TransceiverKind::Audio => s.enabled_audio = enabled,
-            TransceiverKind::Video => s.enabled_video = enabled,
-        };
+        s.enabled_audio = enabled;
         s.senders
             .values()
-            .filter(|s| s.kind() == kind)
-            .for_each(|s| s.set_track_enabled(enabled))
+            .filter(|s| s.kind() == TransceiverKind::Audio)
+            .for_each(|s| s.set_track_enabled(enabled.0))
+    }
+
+    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
+        let mut s = self.0.borrow_mut();
+        s.enabled_video = enabled;
+        s.senders
+            .values()
+            .filter(|s| s.kind() == TransceiverKind::Video)
+            .for_each(|s| s.set_track_enabled(enabled.0))
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given

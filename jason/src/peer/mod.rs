@@ -38,7 +38,9 @@ pub use self::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
         TransceiverDirection, TransceiverKind,
     },
-    media::{MediaConnections, MediaConnectionsError},
+    media::{
+        EnabledAudio, EnabledVideo, MediaConnections, MediaConnectionsError,
+    },
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
@@ -178,8 +180,8 @@ impl PeerConnection {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
     ) -> Result<Self> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers)
@@ -322,15 +324,13 @@ impl PeerConnection {
     }
 
     /// Disables or enables all audio tracks for all [`Sender`]s.
-    pub fn toggle_send_audio(&self, enabled: bool) {
-        self.media_connections
-            .toggle_send_media(TransceiverKind::Audio, enabled)
+    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
+        self.media_connections.toggle_send_audio(enabled)
     }
 
     /// Disables or enables all video tracks for all [`Sender`]s.
-    pub fn toggle_send_video(&self, enabled: bool) {
-        self.media_connections
-            .toggle_send_media(TransceiverKind::Video, enabled)
+    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
+        self.media_connections.toggle_send_video(enabled)
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.

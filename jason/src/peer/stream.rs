@@ -14,6 +14,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{media::TrackConstraints, utils::JasonWeakHandler as _};
 
 use super::MediaTrack;
+use crate::peer::media::{EnabledAudio, EnabledVideo};
 
 /// Actual data of a [`MediaStream`].
 ///
@@ -102,16 +103,16 @@ impl MediaStream {
     }
 
     /// Enables or disables all audio [`MediaTrack`]s in this stream.
-    pub fn toggle_audio_tracks(&self, enabled: bool) {
+    pub fn toggle_audio_tracks(&self, enabled: EnabledAudio) {
         for track in self.0.audio_tracks.values() {
-            track.set_enabled(enabled);
+            track.set_enabled(enabled.0);
         }
     }
 
     /// Enables or disables all video [`MediaTrack`]s in this stream.
-    pub fn toggle_video_tracks(&self, enabled: bool) {
+    pub fn toggle_video_tracks(&self, enabled: EnabledVideo) {
         for track in self.0.video_tracks.values() {
-            track.set_enabled(enabled);
+            track.set_enabled(enabled.0);
         }
     }
 

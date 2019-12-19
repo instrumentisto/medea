@@ -33,6 +33,7 @@ use crate::{
 
 use super::{connection::Connection, ConnectionHandle};
 use crate::{
+    peer::{EnabledAudio, EnabledVideo},
     rpc::{IdleTimeout, PingInterval},
     utils::JasonWeakHandler as _,
 };
@@ -299,30 +300,30 @@ impl RoomHandle {
 
     /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        self.0
-            .upgrade_handler()
-            .map(|inner| inner.borrow_mut().toggle_send_audio(false))
+        self.0.upgrade_handler().map(|inner| {
+            inner.borrow_mut().toggle_send_audio(EnabledAudio(false))
+        })
     }
 
     /// Unmutes outbound audio in this room.
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        self.0
-            .upgrade_handler()
-            .map(|inner| inner.borrow_mut().toggle_send_audio(true))
+        self.0.upgrade_handler().map(|inner| {
+            inner.borrow_mut().toggle_send_audio(EnabledAudio(true))
+        })
     }
 
     /// Mutes outbound video in this room.
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        self.0
-            .upgrade_handler()
-            .map(|inner| inner.borrow_mut().toggle_send_video(false))
+        self.0.upgrade_handler().map(|inner| {
+            inner.borrow_mut().toggle_send_video(EnabledVideo(false))
+        })
     }
 
     /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        self.0
-            .upgrade_handler()
-            .map(|inner| inner.borrow_mut().toggle_send_video(true))
+        self.0.upgrade_handler().map(|inner| {
+            inner.borrow_mut().toggle_send_video(EnabledVideo(true))
+        })
     }
 }
 
@@ -447,10 +448,10 @@ struct InnerRoom {
     on_connection_loss: Callback<ReconnectorHandle>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
-    enabled_audio: bool,
+    enabled_audio: EnabledAudio,
 
     /// Indicates if outgoing video is enabled in this [`Room`].
-    enabled_video: bool,
+    enabled_video: EnabledVideo,
 
     /// JS callback which will be called when this [`Room`] will be closed.
     on_close: Rc<Callback<RoomCloseReason>>,
@@ -482,8 +483,8 @@ impl InnerRoom {
             on_local_stream: Callback::default(),
             on_connection_loss: Callback::default(),
             on_failed_local_stream: Rc::new(Callback::default()),
-            enabled_audio: true,
-            enabled_video: true,
+            enabled_audio: EnabledAudio(true),
+            enabled_video: EnabledVideo(true),
             on_close: Rc::new(Callback::default()),
             close_reason: CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
@@ -529,7 +530,7 @@ impl InnerRoom {
 
     /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_send_audio(&mut self, enabled: bool) {
+    fn toggle_send_audio(&mut self, enabled: EnabledAudio) {
         for peer in self.peers.get_all() {
             peer.toggle_send_audio(enabled);
         }
@@ -538,7 +539,7 @@ impl InnerRoom {
 
     /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_send_video(&mut self, enabled: bool) {
+    fn toggle_send_video(&mut self, enabled: EnabledVideo) {
         for peer in self.peers.get_all() {
             peer.toggle_send_video(enabled);
         }
