@@ -55,24 +55,11 @@ impl ReconnectorHandle {
     /// Tries to reconnect after provided delay.
     ///
     /// Delay is in milliseconds.
-    pub fn reconnect(&self, delay_ms: u64) -> Promise {
+    pub fn reconnect(&self, delay_ms: i32) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            let inner = this.0.upgrade_handler::<JsValue>()?;
-            {
-                let rpc_state = Weak::upgrade(&inner.rpc)
-                    .ok_or_else(|| {
-                        JsValue::from(JasonError::from(tracerr::new!(
-                            ReconnectorError::RpcClientGone
-                        )))
-                    })?
-                    .get_transport_state();
-                if rpc_state == State::Open {
-                    return Ok(JsValue::NULL);
-                }
-            }
-
-            resolve_after(Duration::from_millis(delay_ms).into()).await?;
+            resolve_after(Duration::from_millis(delay_ms as u64).into())
+                .await?;
 
             Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| {
@@ -105,10 +92,6 @@ impl ReconnectorHandle {
                     ReconnectorError::RpcClientGone
                 )))
             })?;
-
-            if rpc.get_transport_state() == State::Open {
-                return Ok(JsValue::NULL);
-            }
 
             rpc.reconnect_with_backoff(
                 Duration::from_millis(starting_delay as u64).into(),

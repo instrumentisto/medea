@@ -317,26 +317,28 @@ window.onload = async function() {
     room = await jason.init_room();
 
     room.on_connection_loss( async (reconnectHandle) => {
-      setTimeout(async () => {
-          while (true) {
-            try {
-              await reconnectHandle.reconnect(0n);
-              console.log("In timer reconnected!!!!!");
-              break;
-            } catch (e) {
-              console.log("in timer error" + e.message());
-            }
-          }
-      }, 10);
+      let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
+      contentVisibility.show(connectionLossNotification);
+
+      let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
+      let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
+      let connectionLossDefaultText = connectionLossMsg.textContent;
+      manualReconnectBtn.addEventListener('click', async () => {
+        try {
+          connectionLossMsg.textContent = 'Trying to manually reconnect...';
+          await reconnectHandle.reconnect(0);
+          contentVisibility.hide(connectionLossNotification);
+        } catch (e) {
+        } finally {
+          connectionLossMsg.textContent = connectionLossDefaultText;
+        }
+      });
       try {
-        while (true) {
-            await reconnectHandle.reconnect_with_backoff(500, 2.0, 10000);
-            console.log("Not in timer reconnected!!!!!");
-            break;
-          }
+        await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
       } catch (e) {
-        console.log("Failed to reconnect not in interval" + e.message());
+        console.error('Error in reconnection with backoff:\n' + e.message());
       }
+      contentVisibility.hide(connectionLossNotification);
     });
 
     try {

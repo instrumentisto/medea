@@ -755,11 +755,6 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                                 State::Open => {
                                     return Ok(());
                                 }
-                                State::Closed | State::Closing => {
-                                    return Err(tracerr::new!(
-                                        RpcClientError::ReconnectionFailed
-                                    ));
-                                }
                                 _ => (),
                             }
                         }
