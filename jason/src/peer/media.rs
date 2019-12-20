@@ -57,9 +57,11 @@ pub enum MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
+/// Newtype which indicates that audio is on or off.
 #[derive(Clone, Copy, Display, Debug, From, Not, PartialEq, Eq)]
 pub struct EnabledAudio(pub bool);
 
+/// Newtype which indicates that video is on or off.
 #[derive(Clone, Copy, Display, Debug, From, Not, PartialEq, Eq)]
 pub struct EnabledVideo(pub bool);
 

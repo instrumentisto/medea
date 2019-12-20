@@ -1,13 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
-use derive_more::{Add, Display, From, Mul, Sub};
+use derive_more::{Display, From};
 use futures::{
     channel::mpsc,
     future::{self, AbortHandle},
     stream::LocalBoxStream,
     StreamExt as _,
 };
-use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -112,13 +111,18 @@ impl Heartbeat {
                         .await
                         .unwrap();
                     if let Some(idle_sender) = &this.borrow().idle_sender {
-                        idle_sender.unbounded_send(());
+                        if let Err(_) = idle_sender.unbounded_send(()) {
+                            console_error(
+                                "Heartbeat::on_idle subscriber unexpectedly \
+                                 gone.",
+                            );
+                        }
                     }
                 }
             });
 
         spawn_local(async move {
-            idle_resolver.await;
+            idle_resolver.await.ok();
         });
 
         self.0.borrow_mut().idle_resolver_abort =
@@ -163,7 +167,7 @@ impl Heartbeat {
             }
         });
         spawn_local(async move {
-            fut.await;
+            fut.await.ok();
         });
         self.0.borrow_mut().pong_task_abort = Some(pong_abort.into());
 

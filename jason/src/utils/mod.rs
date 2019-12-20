@@ -8,7 +8,7 @@ mod event_listener;
 
 use std::time::Duration;
 
-use derive_more::{Add, From, Mul, Sub};
+use derive_more::{Add, From, Sub};
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -46,6 +46,7 @@ pub fn window() -> Window {
 pub struct JsDuration(Duration);
 
 impl JsDuration {
+    /// Converts this [`JsDuration`] into `i32` milliseconds.
     pub fn into_js_duration(self) -> i32 {
         self.0.as_millis() as i32
     }

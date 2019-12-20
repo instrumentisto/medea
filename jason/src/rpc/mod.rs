@@ -352,7 +352,7 @@ impl ProgressiveDelayer {
             self.max_delay
         } else {
             let delay = self.current_delay;
-            self.current_delay = (self.current_delay * self.multiplier);
+            self.current_delay = self.current_delay * self.multiplier;
             delay
         }
     }
@@ -426,7 +426,12 @@ impl WebSocketRpcClient {
         {
             let handle =
                 self.0.borrow().reconnector.as_ref().unwrap().new_handle();
-            on_connection_loss.unbounded_send(handle);
+            if let Err(_) = on_connection_loss.unbounded_send(handle) {
+                console_error(
+                    "RpcClient::on_connection_loss subscriber is unexpectedly \
+                     gone.",
+                );
+            }
         }
     }
 

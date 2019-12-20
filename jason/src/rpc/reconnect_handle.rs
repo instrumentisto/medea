@@ -12,10 +12,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::{websocket::State, ReconnectableRpcClient},
-    utils::{
-        resolve_after, JasonError, JasonWeakHandler as _, JsCaused, JsDuration,
-        JsError,
-    },
+    utils::{resolve_after, JasonError, JsCaused, JsError},
 };
 
 struct Inner {
@@ -91,6 +88,7 @@ impl Drop for ReconnectorGuard {
 struct ReconnectorLock(Weak<Inner>);
 
 impl ReconnectorLock {
+    /// Returns [`ReconnectorLock`] which points to provided [`Reconnector`].
     pub fn new(inner: Weak<Inner>) -> Self {
         Self(inner)
     }
@@ -98,7 +96,7 @@ impl ReconnectorLock {
     /// Locks [`Reconnector`].
     ///
     /// Anyone from JS-side can't get [`ReconnectorGuard`] until returned
-    /// [`ReconnectorGuard`] not dropped.
+    /// [`ReconnectorGuard`] is not dropped.
     pub fn lock(&self) -> Result<ReconnectorGuard, Traced<ReconnectorError>> {
         let inner = self
             .0
@@ -158,9 +156,9 @@ impl ReconnectorHandle {
     /// it will not be reconnected or deadline not be reached.
     pub fn reconnect_with_backoff(
         &self,
-        starting_delay: u64,
+        starting_delay: i32,
         multiplier: f32,
-        max_delay_ms: u64,
+        max_delay_ms: i32,
     ) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
@@ -180,9 +178,9 @@ impl ReconnectorHandle {
             }
 
             rpc.reconnect_with_backoff(
-                Duration::from_millis(starting_delay).into(),
+                Duration::from_millis(starting_delay as u64).into(),
                 multiplier,
-                Duration::from_millis(max_delay_ms).into(),
+                Duration::from_millis(max_delay_ms as u64).into(),
             )
             .await
             .map_err(|e| JsValue::from(JasonError::from(e)))?;
