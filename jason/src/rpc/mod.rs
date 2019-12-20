@@ -232,6 +232,8 @@ pub trait RpcTransport {
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
 
+    /// Returns [`websocket::State`] of underlying [`RpcTransport`]'s
+    /// connection.
     fn get_state(&self) -> websocket::State;
 }
 
@@ -260,8 +262,11 @@ struct Inner {
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
 
+    /// Senders for [`RpcClient::on_connection_loss`].
     on_connection_loss_sub: Option<mpsc::UnboundedSender<ReconnectorHandle>>,
 
+    /// [`Reconnector`] with which this [`RpcClient`] will be reconnected (or
+    /// not) on `on_connection_loss`.
     reconnector: Option<Reconnector>,
 }
 
@@ -317,10 +322,13 @@ struct ProgressiveDelayer {
     /// Milliseconds of [`ProgressiveDelayer::delay`] call.
     ///
     /// Will be increased by [`ProgressiveDelayer::delay`] call.
-    current_delay_ms: JsDuration,
+    current_delay: JsDuration,
 
-    max_delay_ms: JsDuration,
+    /// Max delay for which this [`ProgressiveDelayer`] may delay.
+    max_delay: JsDuration,
 
+    /// The multiplier by which [`ProgressiveDelayer::current_delay`] will be
+    /// multiplied on [`ProgressiveDelayer::delay`].
     multiplier: f32,
 }
 
@@ -332,8 +340,8 @@ impl ProgressiveDelayer {
         max_delay_ms: JsDuration,
     ) -> Self {
         Self {
-            current_delay_ms: starting_delay_ms,
-            max_delay_ms,
+            current_delay: starting_delay_ms,
+            max_delay: max_delay_ms,
             multiplier,
         }
     }
@@ -341,10 +349,10 @@ impl ProgressiveDelayer {
     /// Returns next step of delay.
     fn get_delay(&mut self) -> JsDuration {
         if self.is_max_delay_reached() {
-            self.max_delay_ms
+            self.max_delay
         } else {
-            let delay = self.current_delay_ms;
-            self.current_delay_ms = (self.current_delay_ms * self.multiplier);
+            let delay = self.current_delay;
+            self.current_delay = (self.current_delay * self.multiplier);
             delay
         }
     }
@@ -352,7 +360,7 @@ impl ProgressiveDelayer {
     /// Returns `true` when max delay ([`ProgressiveDelayer::max_delay_ms`]) is
     /// reached.
     fn is_max_delay_reached(&self) -> bool {
-        self.current_delay_ms >= self.max_delay_ms
+        self.current_delay >= self.max_delay
     }
 
     /// Resolves after [`ProgressiveDelayer::current_delay`] milliseconds.
@@ -409,6 +417,8 @@ impl WebSocketRpcClient {
         rc_this
     }
 
+    /// Stops [`Heartbeat`], sends [`ReconnectHandle`] to all
+    /// [`RpcClient::on_connection_loss`] subs
     fn send_connection_loss(&self) {
         self.0.borrow_mut().heartbeat.stop();
         if let Some(on_connection_loss) =
@@ -619,6 +629,7 @@ pub trait ReconnectableRpcClient {
         max_delay_ms: JsDuration,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 
+    /// Returns current [`websocket::State`] of [`RpcTransport`].
     fn get_transport_state(&self) -> State;
 }
 

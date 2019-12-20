@@ -7,7 +7,10 @@ use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
-    peer::{MockPeerRepository, PeerConnection, PeerEvent},
+    peer::{
+        EnabledAudio, EnabledVideo, MockPeerRepository, PeerConnection,
+        PeerEvent,
+    },
     rpc::MockRpcClient,
     utils::JasonError,
 };
@@ -16,7 +19,6 @@ use wasm_bindgen_test::*;
 use crate::{
     get_test_tracks, resolve_after, wait_and_check_test_result, MockNavigator,
 };
-use medea_jason::peer::{EnabledAudio, EnabledVideo};
 
 wasm_bindgen_test_configure!(run_in_browser);
 

@@ -4,10 +4,12 @@ use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 
-use crate::media::MediaManager;
+use crate::{
+    media::MediaManager,
+    peer::media::{EnabledAudio, EnabledVideo},
+};
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::peer::media::{EnabledAudio, EnabledVideo};
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]

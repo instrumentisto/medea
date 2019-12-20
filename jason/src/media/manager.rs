@@ -22,11 +22,10 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, JasonError, JsCaused, JsError},
+    utils::{window, JasonError, JasonWeakHandler, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
-use crate::utils::JasonWeakHandler;
 
 /// Errors that may occur in a [`MediaManager`].
 #[derive(Debug, Display, JsCaused)]

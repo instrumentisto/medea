@@ -38,6 +38,10 @@ pub fn window() -> Window {
     web_sys::window().unwrap()
 }
 
+/// Wrapper around [`Duration`] which can be transformed into i32 for JS side
+/// timers.
+///
+/// Also [`JsDuration`] can be multiplied by [`f32`].
 #[derive(Debug, From, Copy, Clone, Add, Sub, PartialEq, Eq, PartialOrd, Ord)]
 pub struct JsDuration(Duration);
 
@@ -75,7 +79,13 @@ impl Drop for IntervalHandle {
     }
 }
 
+/// Trait which adds ability to upgrade [`Weak`]'s of Jason handlers
+/// and returns [`HandlerDetachedError`] transformed into something which
+/// can be transformed [`From`] [`JasonError`] if handler considered as
+/// detached.
 pub trait JasonWeakHandler<I> {
+    /// Tries to upgrade handler and if it considered as detached - returns
+    /// [`HandlerDetachedError`] transformed into required error.
     fn upgrade_handler<E>(&self) -> Result<Rc<I>, E>
     where
         E: From<JasonError>;

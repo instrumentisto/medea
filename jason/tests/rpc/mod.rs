@@ -9,6 +9,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use futures::{
@@ -27,7 +28,6 @@ use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::{await_with_timeout, resolve_after};
-use std::time::Duration;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

@@ -17,9 +17,6 @@ use crate::{
     utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
 };
 
-#[derive(Clone, Copy, Debug, Display, From)]
-pub struct Timestamp(pub u64);
-
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
 pub enum HeartbeatError {
@@ -28,6 +25,7 @@ pub enum HeartbeatError {
 
 type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
+/// Just wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
 #[derive(Debug, From)]
 struct Abort(AbortHandle);
 
@@ -37,25 +35,43 @@ impl Drop for Abort {
     }
 }
 
+/// IDLE timeout of [`RpcClient`].
 #[derive(Debug, Copy, Clone)]
 pub struct IdleTimeout(pub JsDuration);
 
+/// Ping interval of [`RpcClient`].
 #[derive(Debug, Copy, Clone)]
 pub struct PingInterval(pub JsDuration);
 
 struct Inner {
-    idle_timeout: IdleTimeout,
+    /// [`RpcTransport`] which heartbeats.
     transport: Option<Rc<dyn RpcTransport>>,
+
+    /// [`Abort`] for [`Future`] which sends [`ClientMsg::Pong`] on
+    /// [`ServerMsg::Ping`].
     pong_task_abort: Option<Abort>,
+
+    /// Sender for [`Heartbeat::on_idle`].
     idle_sender: Option<mpsc::UnboundedSender<()>>,
+
+    /// [`Abort`] for IDLE resolved task.
     idle_resolver_abort: Option<Abort>,
-    ping_interval: PingInterval,
+
+    /// Number of last received [`ServerMsg::Ping`].
     last_ping_num: u64,
+
+    /// IDLE timeout of [`RpcClient`].
+    idle_timeout: IdleTimeout,
+
+    /// Ping interval of [`RpcClient`].
+    ping_interval: PingInterval,
 }
 
+/// Service for ping pongs between client and server.
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
+    /// Creates new [`Heartbeat`] with provided config.
     pub fn new(idle_timeout: IdleTimeout, ping_interval: PingInterval) -> Self {
         Self(Rc::new(RefCell::new(Inner {
             idle_timeout,
@@ -68,18 +84,16 @@ impl Heartbeat {
         })))
     }
 
+    /// Aborts IDLE resolver and sets new one.
     fn update_idle_resolver(&self) {
         self.0.borrow_mut().idle_resolver_abort.take();
-        console_error("IDLE resolver aborted.");
 
         let weak_this = Rc::downgrade(&self.0);
         let (idle_resolver, idle_resolver_abort) =
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
-                    console_error("On IDLE resolver started.");
                     let wait_for_ping = this.borrow().ping_interval.0 * 2;
                     resolve_after(wait_for_ping).await.unwrap();
-                    console_error("Wait for ping resolved.");
                     let last_ping_num = this.borrow().last_ping_num;
                     if let Some(transport) = &this.borrow().transport {
                         if let Err(e) =
@@ -94,7 +108,6 @@ impl Heartbeat {
                     }
 
                     let idle_timeout = this.borrow().idle_timeout;
-                    // FIXME (evdokimovs): u64 as i32 look very bad
                     resolve_after(idle_timeout.0 - wait_for_ping)
                         .await
                         .unwrap();
@@ -112,6 +125,7 @@ impl Heartbeat {
             Some(idle_resolver_abort.into());
     }
 
+    /// Start heartbeats for provided [`RpcTransport`].
     pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<()> {
         let weak_this = Rc::downgrade(&self.0);
         let mut on_message_stream = transport
@@ -156,12 +170,14 @@ impl Heartbeat {
         Ok(())
     }
 
+    /// Stops heartbeat.
     pub fn stop(&self) {
         self.0.borrow_mut().transport.take();
         self.0.borrow_mut().pong_task_abort.take();
         self.0.borrow_mut().idle_resolver_abort.take();
     }
 
+    /// Update [`RpcTransport`] settings.
     pub fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
@@ -171,6 +187,8 @@ impl Heartbeat {
         self.0.borrow_mut().ping_interval = ping_interval;
     }
 
+    /// Returns [`LocalBoxStream`] to which will be sent event when
+    /// [`Heartbeat`] considers that [`RpcTransport`] is IDLE.
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().idle_sender = Some(on_idle_tx);

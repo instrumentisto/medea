@@ -1,4 +1,8 @@
-use std::rc::{Rc, Weak};
+use std::{
+    cell::Cell,
+    rc::{Rc, Weak},
+    time::Duration,
+};
 
 use derive_more::{Deref, Display};
 use js_sys::Promise;
@@ -13,16 +17,23 @@ use crate::{
         JsError,
     },
 };
-use std::{cell::Cell, time::Duration};
 
 struct Inner {
+    /// Client which may be reconnected with this [`Reconnector`].
     rpc: Weak<dyn ReconnectableRpcClient>,
+
+    /// Indicates that reconnection is already in progress with this
+    /// reconnector.
+    ///
+    /// While this value is `true`, you can't get [`ReconnectorGuard`] from
+    /// [`ReconnectorLock`].
     is_busy: Cell<bool>,
 }
 
 pub struct Reconnector(Rc<Inner>);
 
 impl Reconnector {
+    /// Returns new [`Reconnector`] for provided [`ReconnectableRpcClient`].
     pub fn new(rpc: Weak<dyn ReconnectableRpcClient>) -> Self {
         Self(Rc::new(Inner {
             rpc,
@@ -30,22 +41,35 @@ impl Reconnector {
         }))
     }
 
+    /// Returns new [`ReconnectorHandle`] which points to this [`Reconnector`].
     pub fn new_handle(&self) -> ReconnectorHandle {
         ReconnectorHandle(ReconnectorLock::new(Rc::downgrade(&self.0)))
     }
 }
 
+/// JS side handle for [`ReconnectorLock`].
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct ReconnectorHandle(ReconnectorLock);
 
 #[derive(Debug, Display, JsCaused)]
 enum ReconnectorError {
+    /// This [`Reconnector`] already reconnecting.
     Busy,
+
+    /// [`RpcClient`] which will be reconnected is gone.
     RpcClientGone,
+
+    /// [`ReconnectHandle`] in detached state.
+    ///
+    /// Most likely [`RpcClient`] was closed.
     Detached,
 }
 
+/// Provides access to [`Inner`].
+///
+/// When this guard will be dropped, then [`Inner::is_busy`] field will be set
+/// to `false`.
 #[derive(Deref)]
 struct ReconnectorGuard(Rc<Inner>);
 
@@ -61,6 +85,8 @@ impl Drop for ReconnectorGuard {
     }
 }
 
+/// With this [`ReconnectorLock::lock`] you can get [`Rc`] [`Inner`] if it
+/// doesn't already locked.
 #[derive(Clone)]
 struct ReconnectorLock(Weak<Inner>);
 
@@ -69,6 +95,10 @@ impl ReconnectorLock {
         Self(inner)
     }
 
+    /// Locks [`Reconnector`].
+    ///
+    /// Anyone from JS-side can't get [`ReconnectorGuard`] until returned
+    /// [`ReconnectorGuard`] not dropped.
     pub fn lock(&self) -> Result<ReconnectorGuard, Traced<ReconnectorError>> {
         let inner = self
             .0

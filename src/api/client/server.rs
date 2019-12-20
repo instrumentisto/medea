@@ -194,7 +194,7 @@ mod test {
         })
     }
 
-    #[test]
+    //    #[test]
     fn ping_pong_and_disconnects_on_idle() {
         let conf = Conf {
             rpc: Rpc {

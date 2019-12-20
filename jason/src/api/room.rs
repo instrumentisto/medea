@@ -5,6 +5,7 @@ use std::{
     collections::HashMap,
     ops::DerefMut as _,
     rc::{Rc, Weak},
+    time::Duration,
 };
 
 use derive_more::Display;
@@ -31,13 +32,13 @@ use crate::{
     utils::{console_error, Callback, JasonError, JsCaused, JsError},
 };
 
-use super::{connection::Connection, ConnectionHandle};
 use crate::{
     peer::{EnabledAudio, EnabledVideo},
     rpc::{IdleTimeout, PingInterval},
     utils::JasonWeakHandler as _,
 };
-use std::time::Duration;
+
+use super::{connection::Connection, ConnectionHandle};
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -106,8 +107,10 @@ enum RoomError {
     /// Returned if the `on_failed_local_stream` callback was not set before
     /// joining the room.
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
-    CallbackNotSet,
+    OnFailedLocalStreamCallbackNotSet,
 
+    /// Returned if the `on_connection_loss` callback wasn't set before
+    /// joining the room.
     OnConnectionLossCallbackNotSet,
 
     /// Returned if unable to init [`RpcTransport`].
@@ -190,7 +193,7 @@ impl RoomHandle {
 
             if !inner.borrow().on_failed_local_stream.is_set() {
                 return Err(JasonError::from(tracerr::new!(
-                    RoomError::CallbackNotSet
+                    RoomError::OnFailedLocalStreamCallbackNotSet
                 )));
             }
 
@@ -269,6 +272,8 @@ impl RoomHandle {
             .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
     }
 
+    /// Sets `on_connection_loss` callback, which will be invoked on
+    /// [`RpcClient`] connection loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -453,6 +458,7 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_stream: Rc<Callback<JasonError>>,
 
+    /// Callback to be invoked when [`RpcClient`] loss connection.
     on_connection_loss: Callback<ReconnectorHandle>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].

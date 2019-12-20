@@ -11,10 +11,13 @@ use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::{media::TrackConstraints, utils::JasonWeakHandler as _};
+use crate::{
+    media::TrackConstraints,
+    peer::media::{EnabledAudio, EnabledVideo},
+    utils::JasonWeakHandler as _,
+};
 
 use super::MediaTrack;
-use crate::peer::media::{EnabledAudio, EnabledVideo};
 
 /// Actual data of a [`MediaStream`].
 ///
