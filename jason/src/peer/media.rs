@@ -2,7 +2,7 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use derive_more::{Display, From};
+use derive_more::{Display, From, Not};
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -22,7 +22,6 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
-use serde_json::error::ErrorCode::TrailingCharacters;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -58,10 +57,10 @@ pub enum MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
-#[derive(Clone, Copy, Display, Debug, From)]
+#[derive(Clone, Copy, Display, Debug, From, Not, PartialEq, Eq)]
 pub struct EnabledAudio(pub bool);
 
-#[derive(Clone, Copy, Display, Debug, From)]
+#[derive(Clone, Copy, Display, Debug, From, Not, PartialEq, Eq)]
 pub struct EnabledVideo(pub bool);
 
 /// Actual data of [`MediaConnections`] storage.
@@ -135,7 +134,7 @@ impl MediaConnections {
             .iter_senders_with_kind(TransceiverKind::Audio)
             .skip_while(|s| s.is_track_enabled())
             .next()
-            .is_some()
+            .is_none()
             .into()
     }
 
@@ -145,7 +144,7 @@ impl MediaConnections {
             .iter_senders_with_kind(TransceiverKind::Video)
             .skip_while(|s| s.is_track_enabled())
             .next()
-            .is_some()
+            .is_none()
             .into()
     }
 

@@ -16,6 +16,7 @@ use wasm_bindgen_test::*;
 use crate::{
     get_test_tracks, resolve_after, wait_and_check_test_result, MockNavigator,
 };
+use medea_jason::peer::{EnabledAudio, EnabledVideo};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -31,8 +32,8 @@ fn get_test_room_and_exist_peer(
             tx,
             vec![],
             Rc::new(MediaManager::default()),
-            true,
-            true,
+            true.into(),
+            true.into(),
         )
         .unwrap(),
     );
@@ -61,9 +62,9 @@ async fn mute_unmute_audio() {
         .unwrap();
     let handle = room.new_handle();
     assert!(handle.mute_audio().is_ok());
-    assert!(!peer.is_send_audio_enabled());
+    assert!(!peer.is_send_audio_enabled().0);
     assert!(handle.unmute_audio().is_ok());
-    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_audio_enabled().0);
 }
 
 #[wasm_bindgen_test]
@@ -77,15 +78,15 @@ async fn mute_unmute_video() {
 
     let handle = room.new_handle();
     assert!(handle.mute_video().is_ok());
-    assert!(!peer.is_send_video_enabled());
+    assert!(!peer.is_send_video_enabled().0);
     assert!(handle.unmute_video().is_ok());
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled().0);
 }
 
 fn get_test_room_and_new_peer(
     event_rx: mpsc::UnboundedReceiver<Event>,
-    with_enabled_audio: bool,
-    with_enabled_video: bool,
+    with_enabled_audio: EnabledAudio,
+    with_enabled_video: EnabledVideo,
 ) -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
@@ -111,8 +112,8 @@ fn get_test_room_and_new_peer(
             move |id: &PeerId,
                   _ice_servers: &Vec<IceServer>,
                   _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
-                  enabled_audio: &bool,
-                  enabled_video: &bool| {
+                  enabled_audio: &EnabledAudio,
+                  enabled_video: &EnabledVideo| {
                 *id == PeerId(1)
                     && *enabled_audio == with_enabled_audio
                     && *enabled_video == with_enabled_video
@@ -130,7 +131,8 @@ fn get_test_room_and_new_peer(
 #[wasm_bindgen_test]
 async fn mute_audio_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, peer) = get_test_room_and_new_peer(event_rx, false, true);
+    let (room, peer) =
+        get_test_room_and_new_peer(event_rx, false.into(), true.into());
     let (audio_track, video_track) = get_test_tracks();
 
     room.new_handle().mute_audio().unwrap();
@@ -145,14 +147,15 @@ async fn mute_audio_room_before_init_peer() {
 
     resolve_after(500).await.unwrap();
 
-    assert!(peer.is_send_video_enabled());
-    assert!(!peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled().0);
+    assert!(!peer.is_send_audio_enabled().0);
 }
 
 #[wasm_bindgen_test]
 async fn mute_video_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, peer) = get_test_room_and_new_peer(event_rx, true, false);
+    let (room, peer) =
+        get_test_room_and_new_peer(event_rx, true.into(), false.into());
     let (audio_track, video_track) = get_test_tracks();
 
     room.new_handle().mute_video().unwrap();
@@ -167,8 +170,8 @@ async fn mute_video_room_before_init_peer() {
 
     resolve_after(500).await.unwrap();
 
-    assert!(peer.is_send_audio_enabled());
-    assert!(!peer.is_send_video_enabled());
+    assert!(peer.is_send_audio_enabled().0);
+    assert!(!peer.is_send_video_enabled().0);
 }
 
 // Tests Room::inject_local_stream for create new PeerConnection.
@@ -184,7 +187,8 @@ async fn mute_video_room_before_init_peer() {
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
+    let (room, _peer) =
+        get_test_room_and_new_peer(event_rx, true.into(), true.into());
 
     let room_handle = room.new_handle();
     let (cb, test_result) = js_callback!(|err: JasonError| {
@@ -259,7 +263,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
 #[wasm_bindgen_test]
 async fn error_get_local_stream_on_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
+    let (room, _peer) =
+        get_test_room_and_new_peer(event_rx, true.into(), true.into());
 
     let room_handle = room.new_handle();
 

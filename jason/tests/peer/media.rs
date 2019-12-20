@@ -22,8 +22,8 @@ async fn get_test_media_connections(
 ) -> (MediaConnections, TrackId, TrackId) {
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
-        enabled_audio,
-        enabled_video,
+        enabled_audio.into(),
+        enabled_video.into(),
     );
     let (audio_track, video_track) = get_test_tracks();
     let audio_track_id = audio_track.id;
@@ -48,8 +48,8 @@ async fn get_test_media_connections(
 fn get_stream_request() {
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
-        true,
-        true,
+        true.into(),
+        true.into(),
     );
     let (audio_track, video_track) = get_test_tracks();
     media_connections
@@ -60,8 +60,8 @@ fn get_stream_request() {
 
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
-        true,
-        true,
+        true.into(),
+        true.into(),
     );
     media_connections.update_tracks(vec![]).unwrap();
     let request = media_connections.get_stream_request();
@@ -92,19 +92,19 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(audio_track.is_enabled());
     assert!(video_track.is_enabled());
 
-    media_connections.toggle_send_media(TransceiverKind::Audio, false);
+    media_connections.toggle_send_audio(false.into());
     assert!(!audio_track.is_enabled());
     assert!(video_track.is_enabled());
 
-    media_connections.toggle_send_media(TransceiverKind::Video, false);
+    media_connections.toggle_send_video(false.into());
     assert!(!audio_track.is_enabled());
     assert!(!video_track.is_enabled());
 
-    media_connections.toggle_send_media(TransceiverKind::Audio, true);
+    media_connections.toggle_send_audio(true.into());
     assert!(audio_track.is_enabled());
     assert!(!video_track.is_enabled());
 
-    media_connections.toggle_send_media(TransceiverKind::Video, true);
+    media_connections.toggle_send_video(true.into());
     assert!(audio_track.is_enabled());
     assert!(video_track.is_enabled());
 }
