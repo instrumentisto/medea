@@ -12,19 +12,12 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::{websocket::State, ReconnectableRpcClient},
-    utils::{resolve_after, JasonError, JsCaused, JsError},
+    utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
 };
 
 struct Inner {
     /// Client which may be reconnected with this [`Reconnector`].
     rpc: Weak<dyn ReconnectableRpcClient>,
-
-    /// Indicates that reconnection is already in progress with this
-    /// reconnector.
-    ///
-    /// While this value is `true`, you can't get [`ReconnectorGuard`] from
-    /// [`ReconnectorLock`].
-    is_busy: Cell<bool>,
 }
 
 pub struct Reconnector(Rc<Inner>);
@@ -32,28 +25,22 @@ pub struct Reconnector(Rc<Inner>);
 impl Reconnector {
     /// Returns new [`Reconnector`] for provided [`ReconnectableRpcClient`].
     pub fn new(rpc: Weak<dyn ReconnectableRpcClient>) -> Self {
-        Self(Rc::new(Inner {
-            rpc,
-            is_busy: Cell::new(false),
-        }))
+        Self(Rc::new(Inner { rpc }))
     }
 
     /// Returns new [`ReconnectorHandle`] which points to this [`Reconnector`].
     pub fn new_handle(&self) -> ReconnectorHandle {
-        ReconnectorHandle(ReconnectorLock::new(Rc::downgrade(&self.0)))
+        ReconnectorHandle(Rc::downgrade(&self.0))
     }
 }
 
 /// JS side handle for [`ReconnectorLock`].
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectorHandle(ReconnectorLock);
+pub struct ReconnectorHandle(Weak<Inner>);
 
 #[derive(Debug, Display, JsCaused)]
 enum ReconnectorError {
-    /// This [`Reconnector`] already reconnecting.
-    Busy,
-
     /// [`RpcClient`] which will be reconnected is gone.
     RpcClientGone,
 
@@ -61,54 +48,6 @@ enum ReconnectorError {
     ///
     /// Most likely [`RpcClient`] was closed.
     Detached,
-}
-
-/// Provides access to [`Inner`].
-///
-/// When this guard will be dropped, then [`Inner::is_busy`] field will be set
-/// to `false`.
-#[derive(Deref)]
-struct ReconnectorGuard(Rc<Inner>);
-
-impl ReconnectorGuard {
-    pub fn new(inner: Rc<Inner>) -> Self {
-        Self(inner)
-    }
-}
-
-impl Drop for ReconnectorGuard {
-    fn drop(&mut self) {
-        self.0.is_busy.set(false);
-    }
-}
-
-/// With this [`ReconnectorLock::lock`] you can get [`Rc`] [`Inner`] if it
-/// doesn't already locked.
-#[derive(Clone)]
-struct ReconnectorLock(Weak<Inner>);
-
-impl ReconnectorLock {
-    /// Returns [`ReconnectorLock`] which points to provided [`Reconnector`].
-    pub fn new(inner: Weak<Inner>) -> Self {
-        Self(inner)
-    }
-
-    /// Locks [`Reconnector`].
-    ///
-    /// Anyone from JS-side can't get [`ReconnectorGuard`] until returned
-    /// [`ReconnectorGuard`] is not dropped.
-    pub fn lock(&self) -> Result<ReconnectorGuard, Traced<ReconnectorError>> {
-        let inner = self
-            .0
-            .upgrade()
-            .ok_or_else(|| tracerr::new!(ReconnectorError::Detached))?;
-        if inner.is_busy.get() {
-            return Err(tracerr::new!(ReconnectorError::Busy));
-        }
-        inner.is_busy.set(true);
-
-        Ok(ReconnectorGuard::new(inner))
-    }
 }
 
 #[wasm_bindgen]
@@ -119,10 +58,7 @@ impl ReconnectorHandle {
     pub fn reconnect(&self, delay_ms: u64) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            let inner = this
-                .0
-                .lock()
-                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+            let inner = this.0.upgrade_handler::<JsValue>()?;
             {
                 let rpc_state = Weak::upgrade(&inner.rpc)
                     .ok_or_else(|| {
@@ -162,10 +98,7 @@ impl ReconnectorHandle {
     ) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
-            let inner = this
-                .0
-                .lock()
-                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+            let inner = this.0.upgrade_handler::<JsValue>()?;
 
             let rpc = Weak::upgrade(&inner.rpc).ok_or_else(|| {
                 JsValue::from(JasonError::from(tracerr::new!(

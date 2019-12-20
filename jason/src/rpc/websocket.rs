@@ -165,6 +165,8 @@ struct InnerSocket {
     /// [`LocalBoxStream`].
     on_close: Vec<mpsc::UnboundedSender<CloseMsg>>,
 
+    on_state_change: Vec<mpsc::UnboundedSender<State>>,
+
     /// Reason of [`WebSocketRpcTransport`] closing. Will be sent in
     /// `WebSocket` [close frame].
     ///
@@ -204,6 +206,7 @@ impl InnerSocket {
             on_close_listener: None,
             on_close: Vec::new(),
             on_message: Vec::new(),
+            on_state_change: Vec::new(),
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
             url: url.to_string(),
         })
@@ -211,7 +214,18 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates `socket_state`.
     fn update_state(&mut self) {
-        self.socket_state = self.socket.ready_state().into();
+        let current_socket_state = self.socket.ready_state().into();
+        self.socket_state = current_socket_state;
+
+        self.on_state_change = self
+            .on_state_change
+            .drain(..)
+            .filter(|sub| !sub.is_closed())
+            .collect();
+
+        self.on_state_change
+            .iter()
+            .for_each(|sub| sub.unbounded_send(current_socket_state).unwrap());
     }
 }
 
@@ -256,7 +270,16 @@ impl RpcTransport for WebSocketRpcTransport {
         Box::pin(async move {
             console_error("Reconnecting.");
             let url = this.0.borrow().url.clone();
-            let new_transport = Self::new(&url).await?;
+            // TODO (evdokimovs): This will not send state update. Maybe it
+            // should??
+            this.0.borrow_mut().socket_state = State::Connecting;
+            let new_transport = match Self::new(&url).await {
+                Ok(transport) => transport,
+                Err(e) => {
+                    this.0.borrow_mut().update_state();
+                    return Err(e);
+                }
+            };
 
             std::mem::swap(
                 &mut new_transport.0.borrow_mut().on_message,
@@ -286,6 +309,13 @@ impl RpcTransport for WebSocketRpcTransport {
 
     fn get_state(&self) -> State {
         self.0.borrow().socket_state
+    }
+
+    fn on_state_change(&self) -> LocalBoxStream<'static, State> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_state_change.push(tx);
+
+        Box::pin(rx)
     }
 }
 

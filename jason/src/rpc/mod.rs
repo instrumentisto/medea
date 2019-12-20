@@ -36,7 +36,10 @@ pub use self::{
     reconnect_handle::ReconnectorHandle,
     websocket::{TransportError, WebSocketRpcTransport},
 };
-use crate::rpc::{reconnect_handle::Reconnector, websocket::State};
+use crate::{
+    peer::TransceiverKind,
+    rpc::{reconnect_handle::Reconnector, websocket::State},
+};
 use std::time::Duration;
 
 /// Reasons of closing by client side and server side.
@@ -159,6 +162,8 @@ pub enum RpcClientError {
     Deadline,
 
     RpcClientGone,
+
+    ReconnectionFailed,
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
@@ -235,6 +240,8 @@ pub trait RpcTransport {
     /// Returns [`websocket::State`] of underlying [`RpcTransport`]'s
     /// connection.
     fn get_state(&self) -> websocket::State;
+
+    fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
 /// Inner state of [`WebsocketRpcClient`].
@@ -652,18 +659,42 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                 .map(Rc::clone)
                 .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
 
-            sock.reconnect()
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?;
+            match sock.get_state() {
+                State::Connecting => {
+                    let mut state_change_stream = sock.on_state_change();
+                    while let Some(state) = state_change_stream.next().await {
+                        match state {
+                            State::Open => {
+                                return Ok(());
+                            }
+                            State::Closed | State::Closing => {
+                                return Err(tracerr::new!(
+                                    RpcClientError::ReconnectionFailed
+                                ));
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+                State::Closing | State::Closed => {
+                    sock.reconnect()
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
 
-            let transport = inner.borrow().sock.clone();
-            if let Some(transport) = transport {
-                inner
-                    .borrow_mut()
-                    .heartbeat
-                    .start(transport)
-                    .map_err(tracerr::map_from_and_wrap!())?;
-            }
+                    let transport = inner.borrow().sock.clone();
+                    if let Some(transport) = transport {
+                        inner
+                            .borrow_mut()
+                            .heartbeat
+                            .start(transport)
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                    }
+                    return Ok(());
+                }
+                State::Open => {
+                    return Ok(());
+                }
+            };
             Ok(())
         })
     }
@@ -690,23 +721,52 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                 .as_ref()
                 .cloned()
                 .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
-            while let Err(_) = sock.reconnect().await {
+
+            loop {
                 delayer
                     .delay()
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
+                match sock.get_state() {
+                    State::Open => return Ok(()),
+                    State::Closing | State::Closed => {
+                        if let Ok(_) = sock.reconnect().await {
+                            let this =
+                                weak_this.upgrade().ok_or_else(|| {
+                                    tracerr::new!(RpcClientError::RpcClientGone)
+                                })?;
+                            if let Some(transport) =
+                                this.0.borrow().sock.clone()
+                            {
+                                this.0
+                                    .borrow()
+                                    .heartbeat
+                                    .start(transport)
+                                    .map_err(tracerr::map_from_and_wrap!())?;
+                            }
+                            return Ok(());
+                        }
+                    }
+                    State::Connecting => {
+                        let mut state_change_stream = sock.on_state_change();
+                        while let Some(state) = state_change_stream.next().await
+                        {
+                            match state {
+                                State::Open => {
+                                    return Ok(());
+                                }
+                                State::Closed | State::Closing => {
+                                    return Err(tracerr::new!(
+                                        RpcClientError::ReconnectionFailed
+                                    ));
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                }
             }
 
-            let this = weak_this
-                .upgrade()
-                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
-            if let Some(transport) = this.0.borrow().sock.clone() {
-                this.0
-                    .borrow()
-                    .heartbeat
-                    .start(transport)
-                    .map_err(tracerr::map_from_and_wrap!())?;
-            }
             Ok(())
         })
     }
