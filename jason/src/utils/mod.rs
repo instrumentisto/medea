@@ -8,6 +8,7 @@ mod event_listener;
 
 use std::time::Duration;
 
+use bigdecimal::{BigDecimal, ToPrimitive as _};
 use derive_more::{Add, From, Sub};
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::prelude::*;
@@ -47,6 +48,12 @@ pub struct JsDuration(Duration);
 
 impl JsDuration {
     /// Converts this [`JsDuration`] into `i32` milliseconds.
+    // Unfortunately, 'web_sys' believes that only 'i32' can be passed to a
+    // 'setTimeout'. But it is unlikely we will need a duration of more,
+    // than 596 hours, so it was decided to simply truncate the number. If we
+    // will need a longer duration in the future, then we can implement this
+    // with a few 'setTimeouts'.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn into_js_duration(self) -> i32 {
         self.0.as_millis() as i32
     }
@@ -63,10 +70,21 @@ impl Mul<u32> for JsDuration {
 impl Mul<f32> for JsDuration {
     type Output = Self;
 
+    // Truncation here is normal, because we will still be limited in 'JsDuration::into_js_duration'
+    // to the 596 hours (which is less than 'u64' limit).
+    #[allow(clippy::cast_possible_truncation)]
     fn mul(self, rhs: f32) -> Self::Output {
-        Self(Duration::from_millis(
-            (self.0.as_millis() as f32 * rhs) as u64,
-        ))
+        // Always positive.
+        let duration_ms = BigDecimal::from(self.0.as_millis() as u64);
+        // Can be negative, but that will be fixed result of calculation will be
+        // transformed to 'u128' bellow.
+        let multiplier = BigDecimal::from(rhs);
+        // Theoretically we can get negative number here. But all negative
+        // numbers will be reduced to zero. This is default behavior of
+        // JavaScript's 'setTimeout' and it's OK here.
+        let multiplied_duration =
+            (duration_ms * multiplier).to_u64().unwrap_or(0);
+        Self(Duration::from_millis(multiplied_duration))
     }
 }
 
