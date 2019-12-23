@@ -36,7 +36,7 @@ pub use self::{
     reconnect_handle::ReconnectorHandle,
     websocket::{State, TransportError, WebSocketRpcTransport},
 };
-use crate::{peer::TransceiverKind, rpc::reconnect_handle::Reconnector};
+use crate::rpc::reconnect_handle::Reconnector;
 use std::time::Duration;
 
 /// Reasons of closing by client side and server side.
@@ -158,8 +158,15 @@ pub enum RpcClientError {
     #[display(fmt = "Reconnection deadline passed.")]
     Deadline,
 
+    /// Occurs if [`Weak`] pointer to the [`RpcClient`] can't be upgraded to
+    /// [`Rc`].
+    #[display(fmt = "RpcClient unexpectedly gone.")]
     RpcClientGone,
 
+    /// Occurs if reconnection performed earlier was failed. We can't provide
+    /// concrete reason because we determine it by subscribing to the
+    /// [`RpcTransport::on_state_change`].
+    #[display(fmt = "Reconnection failed.")]
     ReconnectionFailed,
 }
 
@@ -203,6 +210,8 @@ pub trait RpcClient {
         ping_interval: PingInterval,
     );
 
+    /// Returns [`Stream`] to which will be sent [`ReconnectHandle`] (with which
+    /// JS side can perform reconnection) on all connection losses.
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle>;
 }
 
@@ -238,6 +247,10 @@ pub trait RpcTransport {
     /// connection.
     fn get_state(&self) -> websocket::State;
 
+    /// Subscribes to the [`State`] changes.
+    ///
+    /// This function guarantees that two identical [`State`]s in a row will be
+    /// thrown.
     fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
@@ -246,6 +259,7 @@ struct Inner {
     /// [`WebSocket`] connection to remote media server.
     sock: Option<Rc<dyn RpcTransport>>,
 
+    /// Service for sending/receiving ping pongs between the client and server.
     heartbeat: Heartbeat,
 
     /// Event's subscribers list.
@@ -500,6 +514,10 @@ impl WebSocketRpcClient {
         WeakWebsocketRpcClient::new(self)
     }
 
+    /// Tries to reconnect [`RpcTransport`].
+    ///
+    /// If reconnection is successful then [`Heartbeat`] of this [`RpcClient`]
+    /// will be started again with reconnected [`RpcTransport`].
     async fn try_reconnect(
         &self,
         sock: &Rc<dyn RpcTransport>,
@@ -643,23 +661,34 @@ impl RpcClient for WebSocketRpcClient {
     }
 }
 
+/// RPC client which can reconnect.
 pub trait ReconnectableRpcClient {
     /// Tries to reconnect a [`RpcClient`].
+    ///
+    /// If reconnection already performed on [`RpcTransport`], then
+    /// this function will simply subscribe on reconnection end.
+    ///
+    /// If connection already opened in [`RpcTransport`], then [`Future`]
+    /// will be instantly resolved.
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 
-    /// Tries to reconnect [`RpcTransport`] in a loop with delay until
-    /// it will not be reconnected or deadline not be reached.
+    /// Tries to reconnect [`RpcTransport`] in a loop with growing delay until
+    /// it will not be reconnected.
+    ///
+    /// This function will consider state of [`RpcTransport`]. If
+    /// [`RpcTransport`] already reconnecting, new reconnection will not be
+    /// performed in this step of loop. If already started reconnection
+    /// ended with [`State::Open`] then [`Future`] will simply resolve. If
+    /// already started reconnection ended with [`State::Close`] or
+    /// [`State::Closing`] then next step of loop will be preformed.
     fn reconnect_with_backoff(
         &self,
         starting_delay: JsDuration,
         multiplier: f32,
         max_delay_ms: JsDuration,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
-
-    /// Returns current [`websocket::State`] of [`RpcTransport`].
-    fn get_transport_state(&self) -> State;
 }
 
 impl ReconnectableRpcClient for WebSocketRpcClient {
@@ -757,17 +786,7 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                     }
                 }
             }
-
-            Ok(())
         })
-    }
-
-    fn get_transport_state(&self) -> State {
-        if let Some(transport) = &self.0.borrow().sock {
-            transport.get_state()
-        } else {
-            State::Closed
-        }
     }
 }
 

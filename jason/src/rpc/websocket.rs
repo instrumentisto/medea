@@ -95,9 +95,32 @@ type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 /// State of WebSocket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State {
+    /// Socket has been created. The connection is not yet open.
+    ///
+    /// Reflects `CONNECTING` state from JS side [`WebSocket.readyState`]
+    ///
+    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Connecting,
+
+    /// The connection is open and ready to communicate.
+    ///
+    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`]
+    ///
+    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Open,
+
+    /// The connection is in the process of closing.
+    ///
+    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`]
+    ///
+    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Closing,
+
+    /// The connection is closed or couldn't be opened.
+    ///
+    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`]
+    ///
+    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Closed,
 }
 

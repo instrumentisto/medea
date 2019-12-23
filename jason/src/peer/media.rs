@@ -114,6 +114,7 @@ impl MediaConnections {
         }))
     }
 
+    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Audio`].
     pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
         self.0.borrow_mut().enabled_audio = enabled;
         self.0
@@ -122,6 +123,7 @@ impl MediaConnections {
             .for_each(|s| s.set_track_enabled(enabled.0));
     }
 
+    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Video`].
     pub fn toggle_send_video(&self, enabled: EnabledVideo) {
         self.0.borrow_mut().enabled_video = enabled;
         self.0
@@ -130,6 +132,8 @@ impl MediaConnections {
             .for_each(|s| s.set_track_enabled(enabled.0));
     }
 
+    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
     pub fn is_send_audio_enabled(&self) -> EnabledAudio {
         self.0
             .borrow()
@@ -140,6 +144,8 @@ impl MediaConnections {
             .into()
     }
 
+    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
     pub fn is_send_video_enabled(&self) -> EnabledVideo {
         self.0
             .borrow()

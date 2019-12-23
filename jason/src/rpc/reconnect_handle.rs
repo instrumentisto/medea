@@ -1,17 +1,15 @@
 use std::{
-    cell::Cell,
     rc::{Rc, Weak},
     time::Duration,
 };
 
-use derive_more::{Deref, Display};
+use derive_more::Display;
 use js_sys::Promise;
-use tracerr::Traced;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::{websocket::State, ReconnectableRpcClient},
+    rpc::ReconnectableRpcClient,
     utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
 };
 
@@ -43,11 +41,6 @@ pub struct ReconnectorHandle(Weak<Inner>);
 enum ReconnectorError {
     /// [`RpcClient`] which will be reconnected is gone.
     RpcClientGone,
-
-    /// [`ReconnectHandle`] in detached state.
-    ///
-    /// Most likely [`RpcClient`] was closed.
-    Detached,
 }
 
 #[wasm_bindgen]

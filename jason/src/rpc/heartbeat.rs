@@ -66,7 +66,7 @@ struct Inner {
     ping_interval: PingInterval,
 }
 
-/// Service for ping pongs between client and server.
+/// Service for sending/receiving ping pongs between the client and server.
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
