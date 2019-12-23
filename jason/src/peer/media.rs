@@ -2,7 +2,7 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use derive_more::{Display, From, Not};
+use derive_more::{Display, From};
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -58,11 +58,11 @@ pub enum MediaConnectionsError {
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Newtype which indicates that audio is on or off.
-#[derive(Clone, Copy, Display, Debug, From, Not, PartialEq, Eq)]
+#[derive(Clone, Copy, Display, Debug, From, PartialEq, Eq)]
 pub struct EnabledAudio(pub bool);
 
 /// Newtype which indicates that video is on or off.
-#[derive(Clone, Copy, Display, Debug, From, Not, PartialEq, Eq)]
+#[derive(Clone, Copy, Display, Debug, From, PartialEq, Eq)]
 pub struct EnabledVideo(pub bool);
 
 /// Actual data of [`MediaConnections`] storage.
@@ -85,6 +85,7 @@ struct InnerMediaConnections {
 }
 
 impl InnerMediaConnections {
+    /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`].
     pub fn iter_senders_with_kind(
         &self,
         kind: TransceiverKind,
@@ -155,18 +156,6 @@ impl MediaConnections {
             .is_none()
             .into()
     }
-
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
-    /// [`TransceiverKind`] are enabled or `false` otherwise.
-    //    pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
-    //        let conn = self.0.borrow();
-    //        for s in conn.senders.values().filter(|s| s.kind() == kind) {
-    //            if !s.is_track_enabled() {
-    //                return false;
-    //            }
-    //        }
-    //        true
-    //    }
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].

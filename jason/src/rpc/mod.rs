@@ -1,5 +1,6 @@
 //! Abstraction over RPC transport.
 
+mod backoff_delayer;
 mod heartbeat;
 mod reconnect_handle;
 mod websocket;
@@ -7,6 +8,7 @@ mod websocket;
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
+    time::Duration,
     vec,
 };
 
@@ -16,19 +18,22 @@ use futures::{
     future::LocalBoxFuture,
     stream::{LocalBoxStream, StreamExt as _},
 };
-use js_sys::Promise;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
 };
 use serde::Serialize;
 use tracerr::Traced;
-use wasm_bindgen_futures::{spawn_local, JsFuture};
+use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, window, JsCaused, JsDuration, JsError};
+use crate::utils::{console_error, JsCaused, JsDuration, JsError};
 
-use self::heartbeat::{Heartbeat, HeartbeatError};
+use self::{
+    backoff_delayer::{BackoffDelayer, BackoffDelayerError},
+    heartbeat::{Heartbeat, HeartbeatError},
+    reconnect_handle::Reconnector,
+};
 
 #[doc(inline)]
 pub use self::{
@@ -36,8 +41,6 @@ pub use self::{
     reconnect_handle::ReconnectorHandle,
     websocket::{State, TransportError, WebSocketRpcTransport},
 };
-use crate::rpc::reconnect_handle::Reconnector;
-use std::time::Duration;
 
 /// Reasons of closing by client side and server side.
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
@@ -152,7 +155,7 @@ pub enum RpcClientError {
     NoSocket,
 
     /// Occurs if [`ProgressiveDelayer`] errored.
-    ProgressiveDelayer(#[js(cause)] ProgressiveDelayerError),
+    ProgressiveDelayer(#[js(cause)] BackoffDelayerError),
 
     /// Occurs if time frame in which we can reconnect was passed.
     #[display(fmt = "Reconnection deadline passed.")]
@@ -191,7 +194,6 @@ pub trait RpcClient {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
-    // TODO (evdokimovs): Candidate to deletion
     /// Returns [`Future`] which will be resolved with [`CloseReason`] on
     /// RPC connection close, caused by underlying transport close. Will not be
     /// invoked on [`RpcClient`] drop.
@@ -243,14 +245,14 @@ pub trait RpcTransport {
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
 
-    /// Returns [`websocket::State`] of underlying [`RpcTransport`]'s
+    /// Returns [`State`] of underlying [`RpcTransport`]'s
     /// connection.
-    fn get_state(&self) -> websocket::State;
+    fn get_state(&self) -> State;
 
     /// Subscribes to the [`State`] changes.
     ///
-    /// This function guarantees that two identical [`State`]s in a row will be
-    /// thrown.
+    /// This function guarantees that two identical [`State`]s in a row doesn't
+    /// will be thrown.
     fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
@@ -277,9 +279,6 @@ struct Inner {
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Indicates that this [`WebSocketRpcClient`] is closed.
-    is_closed: bool,
-
     /// Senders for [`RpcClient::on_connection_loss`].
     on_connection_loss_sub: Option<mpsc::UnboundedSender<ReconnectorHandle>>,
 
@@ -299,7 +298,6 @@ impl Inner {
                 PingInterval(Duration::from_secs(3).into()),
             ),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
-            is_closed: false,
             on_connection_loss_sub: None,
             reconnector: None,
         }))
@@ -319,89 +317,6 @@ impl WeakWebsocketRpcClient {
     /// Returns `Some(WebSocketRpcClient)` if it still exists.
     pub fn upgrade(&self) -> Option<WebSocketRpcClient> {
         self.0.upgrade().map(WebSocketRpcClient)
-    }
-}
-
-/// Errors which can occur in [`ProgressiveDelayer`].
-#[derive(Debug, From, Display, JsCaused)]
-pub enum ProgressiveDelayerError {
-    /// Error which can happen while setting JS timer.
-    #[display(fmt = "{}", _0)]
-    Js(JsError),
-}
-
-/// Delayer which will increase delay time in geometry progression after any
-/// `delay` calls.
-///
-/// Delay time increasing will be stopped when [`ProgressiveDelayer::max_delay`]
-/// milliseconds of `current_delay` will be reached. First delay will be
-/// [`ProgressiveDelayer::current_delay_ms`].
-struct ProgressiveDelayer {
-    /// Milliseconds of [`ProgressiveDelayer::delay`] call.
-    ///
-    /// Will be increased by [`ProgressiveDelayer::delay`] call.
-    current_delay: JsDuration,
-
-    /// Max delay for which this [`ProgressiveDelayer`] may delay.
-    max_delay: JsDuration,
-
-    /// The multiplier by which [`ProgressiveDelayer::current_delay`] will be
-    /// multiplied on [`ProgressiveDelayer::delay`].
-    multiplier: f32,
-}
-
-impl ProgressiveDelayer {
-    /// Returns new [`ProgressiveDelayer`].
-    pub fn new(
-        starting_delay_ms: JsDuration,
-        multiplier: f32,
-        max_delay_ms: JsDuration,
-    ) -> Self {
-        Self {
-            current_delay: starting_delay_ms,
-            max_delay: max_delay_ms,
-            multiplier,
-        }
-    }
-
-    /// Returns next step of delay.
-    fn get_delay(&mut self) -> JsDuration {
-        if self.is_max_delay_reached() {
-            self.max_delay
-        } else {
-            let delay = self.current_delay;
-            self.current_delay = self.current_delay * self.multiplier;
-            delay
-        }
-    }
-
-    /// Returns `true` when max delay ([`ProgressiveDelayer::max_delay_ms`]) is
-    /// reached.
-    fn is_max_delay_reached(&self) -> bool {
-        self.current_delay >= self.max_delay
-    }
-
-    /// Resolves after [`ProgressiveDelayer::current_delay`] milliseconds.
-    ///
-    /// Next call of this function will delay
-    /// [`ProgressiveDelayer::current_delay_ms`] *
-    /// [`ProgressiveDelayer::multiplier`] milliseconds.
-    pub async fn delay(
-        &mut self,
-    ) -> Result<(), Traced<ProgressiveDelayerError>> {
-        let delay_ms = self.get_delay();
-        JsFuture::from(Promise::new(&mut |yes, _| {
-            window()
-                .set_timeout_with_callback_and_timeout_and_arguments_0(
-                    &yes,
-                    delay_ms.into_js_duration(),
-                )
-                .unwrap();
-        }))
-        .await
-        .map(|_| ())
-        .map_err(JsError::from)
-        .map_err(tracerr::from_and_wrap!())
     }
 }
 
@@ -457,7 +372,7 @@ impl WebSocketRpcClient {
     ///
     /// This function will be called on every WebSocket close (normal and
     /// abnormal) regardless of the [`CloseReason`].
-    fn on_transport_close(self, close_msg: &CloseMsg) {
+    fn on_transport_close(&self, close_msg: &CloseMsg) {
         self.0.borrow_mut().heartbeat.stop();
 
         match &close_msg {
@@ -493,7 +408,6 @@ impl WebSocketRpcClient {
     }
 
     /// Handles messages from a remote server.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn on_transport_message(&self, msg: ServerMsg) {
         let inner = self.0.borrow();
         if let ServerMsg::Event(event) = msg {
@@ -651,7 +565,7 @@ impl RpcClient for WebSocketRpcClient {
             .update_settings(idle_timeout, ping_interval);
     }
 
-    /// Returns [`LocalBoxStream`] to which will be sended
+    /// Returns [`LocalBoxStream`] to which will be sent
     /// [`ReconnectionHandle`] on connection losing.
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle> {
         let (tx, rx) = mpsc::unbounded();
@@ -679,10 +593,14 @@ pub trait ReconnectableRpcClient {
     ///
     /// This function will consider state of [`RpcTransport`]. If
     /// [`RpcTransport`] already reconnecting, new reconnection will not be
-    /// performed in this step of loop. If already started reconnection
-    /// ended with [`State::Open`] then [`Future`] will simply resolve. If
-    /// already started reconnection ended with [`State::Close`] or
-    /// [`State::Closing`] then next step of loop will be preformed.
+    /// performed in this step of loop. If already
+    /// started reconnection ended with [`State::Open`] then [`Future`] will
+    /// simply resolve. If already started reconnection ended with
+    /// [`State::Close`] or [`State::Closing`] then next step of loop will
+    /// be preformed.
+    ///
+    /// If [`RpcTransport`] state is already [`State::Open`] then
+    /// [`Future`] will be resolved immediately after `starting_delay`.
     fn reconnect_with_backoff(
         &self,
         starting_delay: JsDuration,
@@ -752,11 +670,8 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
             let this = weak_this
                 .upgrade()
                 .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
-            let mut delayer = ProgressiveDelayer::new(
-                starting_delay,
-                multiplier,
-                max_delay_ms,
-            );
+            let mut delayer =
+                BackoffDelayer::new(starting_delay, multiplier, max_delay_ms);
             let sock = this
                 .0
                 .borrow()
@@ -793,7 +708,6 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
 impl Drop for Inner {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        self.is_closed = true;
         if let Some(socket) = self.sock.take() {
             socket.set_close_reason(self.close_reason.clone());
         }

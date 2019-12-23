@@ -47,8 +47,10 @@ pub struct WsSession {
     /// client.
     closed_by_server: bool,
 
+    /// Last number of [`ServerMsg::Ping`].
     last_ping_num: u64,
 
+    /// Interval of sending [`ServerMsg::Ping`]s to the client.
     ping_interval: Duration,
 }
 
@@ -96,9 +98,9 @@ impl WsSession {
         });
     }
 
+    /// Starts [`ServerMsg::Ping`] sending.
     fn start_pinger(&self, ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(self.ping_interval, |session, ctx| {
-            debug!("Send ping.");
             session.last_ping_num += 1;
             ctx.text(
                 serde_json::to_string(&ServerMsg::Ping(session.last_ping_num))
@@ -247,7 +249,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Pong(n)) => {
-                        debug!("Received ping: {}", n);
+                        debug!("Received pong: {}", n);
                     }
                     Ok(ClientMsg::Command(command)) => {
                         if let Err(err) =

@@ -180,15 +180,17 @@ struct InnerSocket {
     /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/close_event
     on_close_listener: Option<EventListener<SysWebSocket, CloseEvent>>,
 
-    /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_message`]'s
+    /// [`mpsc::UnboundedSender`]s for [`RpcTransport::on_message`]'s
     /// [`LocalBoxStream`].
-    on_message: Vec<mpsc::UnboundedSender<ServerMsg>>,
+    on_message_subs: Vec<mpsc::UnboundedSender<ServerMsg>>,
 
-    /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_close`]'s
+    /// [`mpsc::UnboundedSender`]s for [`RpcTransport::on_close`]'s
     /// [`LocalBoxStream`].
-    on_close: Vec<mpsc::UnboundedSender<CloseMsg>>,
+    on_close_subs: Vec<mpsc::UnboundedSender<CloseMsg>>,
 
-    on_state_change: Vec<mpsc::UnboundedSender<State>>,
+    /// [mpsc::UnboundedSender`]s for [`RpcTransport::on_state_change`]'s
+    /// [`LocalBoxStream`].
+    on_state_change_subs: Vec<mpsc::UnboundedSender<State>>,
 
     /// Reason of [`WebSocketRpcTransport`] closing. Will be sent in
     /// `WebSocket` [close frame].
@@ -227,44 +229,51 @@ impl InnerSocket {
             on_open_listener: None,
             on_message_listener: None,
             on_close_listener: None,
-            on_close: Vec::new(),
-            on_message: Vec::new(),
-            on_state_change: Vec::new(),
+            on_close_subs: Vec::new(),
+            on_message_subs: Vec::new(),
+            on_state_change_subs: Vec::new(),
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
             url: url.to_string(),
         })
     }
 
-    /// Checks underlying WebSocket state and updates `socket_state`.
-    fn update_state(&mut self) {
-        let current_socket_state = self.socket.ready_state().into();
-        if self.socket_state != current_socket_state {
-            self.socket_state = current_socket_state;
+    /// Updates `socket_state` with provided [`State`].
+    ///
+    /// Sends updated [`State`] to the `on_state_change` subscribers. But
+    /// if [`State`] is not changed, nothing will be sent.
+    fn update_socket_state(&mut self, new_state: State) {
+        if self.socket_state != new_state {
+            self.socket_state = new_state;
 
-            self.on_state_change = self
-                .on_state_change
+            self.on_state_change_subs = self
+                .on_state_change_subs
                 .drain(..)
                 .filter(|sub| !sub.is_closed())
                 .collect();
 
-            self.on_state_change.iter().for_each(|sub| {
-                sub.unbounded_send(current_socket_state).unwrap()
-            });
+            self.on_state_change_subs
+                .iter()
+                .for_each(|sub| sub.unbounded_send(new_state).unwrap());
         }
+    }
+
+    /// Checks underlying WebSocket state and updates `socket_state`.
+    fn sync_socket_state(&mut self) {
+        self.update_socket_state(self.socket.ready_state().into());
     }
 }
 
 impl RpcTransport for WebSocketRpcTransport {
     fn on_message(&self) -> Result<LocalBoxStream<'static, ServerMsg>> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_message.push(tx);
+        self.0.borrow_mut().on_message_subs.push(tx);
 
         Ok(Box::pin(rx))
     }
 
     fn on_close(&self) -> Result<LocalBoxStream<'static, CloseMsg>> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_close.push(tx);
+        self.0.borrow_mut().on_close_subs.push(tx);
 
         Ok(Box::pin(rx))
     }
@@ -293,26 +302,23 @@ impl RpcTransport for WebSocketRpcTransport {
     fn reconnect(&self) -> LocalBoxFuture<'static, Result<()>> {
         let this = Self(Rc::clone(&self.0));
         Box::pin(async move {
-            console_error("Reconnecting.");
             let url = this.0.borrow().url.clone();
-            // TODO (evdokimovs): This will not send state update. Maybe it
-            // should??
-            this.0.borrow_mut().socket_state = State::Connecting;
+            this.0.borrow_mut().update_socket_state(State::Connecting);
             let new_transport = match Self::new(&url).await {
                 Ok(transport) => transport,
                 Err(e) => {
-                    this.0.borrow_mut().update_state();
+                    this.0.borrow_mut().sync_socket_state();
                     return Err(e);
                 }
             };
 
             std::mem::swap(
-                &mut new_transport.0.borrow_mut().on_message,
-                &mut this.0.borrow_mut().on_message,
+                &mut new_transport.0.borrow_mut().on_message_subs,
+                &mut this.0.borrow_mut().on_message_subs,
             );
             std::mem::swap(
-                &mut new_transport.0.borrow_mut().on_close,
-                &mut this.0.borrow_mut().on_close,
+                &mut new_transport.0.borrow_mut().on_close_subs,
+                &mut this.0.borrow_mut().on_close_subs,
             );
 
             RefCell::swap(&this.0, &new_transport.0);
@@ -326,7 +332,7 @@ impl RpcTransport for WebSocketRpcTransport {
             this.set_on_close_listener()?;
             this.set_on_message_listener()?;
 
-            this.0.borrow_mut().update_state();
+            this.0.borrow_mut().sync_socket_state();
 
             Ok(())
         })
@@ -338,7 +344,7 @@ impl RpcTransport for WebSocketRpcTransport {
 
     fn on_state_change(&self) -> LocalBoxStream<'static, State> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_state_change.push(tx);
+        self.0.borrow_mut().on_state_change_subs.push(tx);
 
         Box::pin(rx)
     }
@@ -379,7 +385,7 @@ impl WebSocketRpcTransport {
                     "close",
                     move |_| {
                         if let Some(inner) = inner.upgrade() {
-                            inner.0.borrow_mut().update_state();
+                            inner.0.borrow_mut().sync_socket_state();
                         }
                         let _ = tx_close.send(());
                     },
@@ -394,7 +400,7 @@ impl WebSocketRpcTransport {
                     "open",
                     move |_| {
                         if let Some(inner) = inner.upgrade() {
-                            inner.0.borrow_mut().update_state();
+                            inner.0.borrow_mut().sync_socket_state();
                         }
                         let _ = tx_open.send(());
                     },
@@ -440,12 +446,12 @@ impl WebSocketRpcTransport {
                         return;
                     };
                 let mut transport_ref_mut = transport.0.borrow_mut();
-                transport_ref_mut.update_state();
+                transport_ref_mut.sync_socket_state();
                 transport_ref_mut
-                    .on_close
+                    .on_close_subs
                     .retain(|on_close| !on_close.is_closed());
 
-                transport_ref_mut.on_close.iter().for_each(|on_close| {
+                transport_ref_mut.on_close_subs.iter().for_each(|on_close| {
                     on_close.unbounded_send(close_msg.clone()).unwrap_or_else(
                         |e| {
                             console_error(format!(
@@ -493,9 +499,9 @@ impl WebSocketRpcTransport {
                     };
                 let mut transport_ref = transport.0.borrow_mut();
                 transport_ref
-                    .on_message
+                    .on_message_subs
                     .retain(|on_message| !on_message.is_closed());
-                transport_ref.on_message.iter().for_each(|on_message| {
+                transport_ref.on_message_subs.iter().for_each(|on_message| {
                     on_message.unbounded_send(parsed.clone()).unwrap_or_else(
                         |e| {
                             console_error(format!(

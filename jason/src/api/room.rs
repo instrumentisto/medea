@@ -22,20 +22,18 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
-        PeerRepository,
+        EnabledAudio, EnabledVideo, MediaStream, MediaStreamHandle, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ReconnectorHandle, RpcClient,
-        RpcClientError, TransportError, WebSocketRpcTransport,
+        ClientDisconnect, CloseReason, IdleTimeout, PingInterval,
+        ReconnectorHandle, RpcClient, RpcClientError, TransportError,
+        WebSocketRpcTransport,
     },
-    utils::{console_error, Callback, JasonError, JsCaused, JsError},
-};
-
-use crate::{
-    peer::{EnabledAudio, EnabledVideo},
-    rpc::{IdleTimeout, PingInterval},
-    utils::JasonWeakHandler as _,
+    utils::{
+        console_error, Callback, JasonError, JasonWeakHandler as _, JsCaused,
+        JsError,
+    },
 };
 
 use super::{connection::Connection, ConnectionHandle};

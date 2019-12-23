@@ -13,11 +13,21 @@ use crate::{
     utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
 };
 
+/// Errors which can occur while reconnecting with [`ReconnectorHandle`].
+#[derive(Debug, Display, JsCaused)]
+enum ReconnectorError {
+    /// [`RpcClient`] which will be reconnected is gone.
+    RpcClientGone,
+}
+
 struct Inner {
     /// Client which may be reconnected with this [`Reconnector`].
     rpc: Weak<dyn ReconnectableRpcClient>,
 }
 
+/// Object which responsible for [`ReconnectableRpcClient`] reconnecting.
+///
+/// Mainly used on JS side through [`ReconnectorHandle`].
 pub struct Reconnector(Rc<Inner>);
 
 impl Reconnector {
@@ -32,16 +42,10 @@ impl Reconnector {
     }
 }
 
-/// JS side handle for [`ReconnectorLock`].
+/// JS side handle for [`Reconnector`].
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct ReconnectorHandle(Weak<Inner>);
-
-#[derive(Debug, Display, JsCaused)]
-enum ReconnectorError {
-    /// [`RpcClient`] which will be reconnected is gone.
-    RpcClientGone,
-}
 
 #[wasm_bindgen]
 impl ReconnectorHandle {
@@ -69,8 +73,8 @@ impl ReconnectorHandle {
         })
     }
 
-    /// Tries to reconnect [`RpcTransport`] in a loop with delay until
-    /// it will not be reconnected or deadline not be reached.
+    /// Tries to reconnect [`ReconnectableRpcClient`] in a loop with growing
+    /// delay until it will not be reconnected.
     pub fn reconnect_with_backoff(
         &self,
         starting_delay: u32,

@@ -6,7 +6,11 @@ mod errors;
 mod callback;
 mod event_listener;
 
-use std::time::Duration;
+use std::{
+    ops::Mul,
+    rc::{Rc, Weak},
+    time::Duration,
+};
 
 use bigdecimal::{BigDecimal, ToPrimitive as _};
 use derive_more::{Add, From, Sub};
@@ -23,10 +27,6 @@ pub use self::{
     },
     event_listener::{EventListener, EventListenerBindError},
 };
-use std::{
-    ops::Mul,
-    rc::{Rc, Weak},
-};
 
 /// Returns [`Window`] object.
 ///
@@ -39,8 +39,8 @@ pub fn window() -> Window {
     web_sys::window().unwrap()
 }
 
-/// Wrapper around [`Duration`] which can be transformed into i32 for JS side
-/// timers.
+/// Wrapper around [`Duration`] which can be transformed into [`i32`] for JS
+/// side timers.
 ///
 /// Also [`JsDuration`] can be multiplied by [`f32`].
 #[derive(Debug, From, Copy, Clone, Add, Sub, PartialEq, Eq, PartialOrd, Ord)]
@@ -77,11 +77,11 @@ impl Mul<f32> for JsDuration {
     fn mul(self, rhs: f32) -> Self::Output {
         // Always positive.
         let duration_ms = BigDecimal::from(self.0.as_millis() as u64);
-        // Can be negative, but that will be fixed result of calculation will be
-        // transformed to 'u128' bellow.
+        // Can be negative, but that will be fixed in the result of calculation
+        // which will be transformed to 'u128' bellow.
         let multiplier = BigDecimal::from(rhs);
         // Theoretically we can get negative number here. But all negative
-        // numbers will be reduced to zero. This is default behavior of
+        // numbers will be reduced to zero. This is default behavior of the
         // JavaScript's 'setTimeout' and it's OK here.
         let multiplied_duration =
             (duration_ms * multiplier).to_u64().unwrap_or(0);
@@ -138,7 +138,7 @@ where
         .map_or_else(|| None, into)
 }
 
-/// Resolves after provided [`JsDuration`].
+/// [`Future`] which resolves after provided [`JsDuration`].
 pub async fn resolve_after(delay_ms: JsDuration) -> Result<(), JsValue> {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()

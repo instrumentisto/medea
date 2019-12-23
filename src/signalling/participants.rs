@@ -116,6 +116,7 @@ pub struct ParticipantService {
     /// the remote RPC client does not reconnect after it is idle.
     idle_timeout: Duration,
 
+    /// Interval of sending `Ping`s from the server to the client.
     ping_interval: Duration,
 }
 
@@ -269,7 +270,13 @@ impl ParticipantService {
                         ctx.spawn(wrap_future(
                             room.members
                                 .send_rpc_settings_to_member(member_id)
-                                .map_err(|e| error!("{:?}", e)),
+                                .map_err(|e| {
+                                    error!(
+                                        "Failed to send RPC settings to the \
+                                         'Member': {:?}",
+                                        e
+                                    )
+                                }),
                         ));
 
                         wrap_future(future::ok(member))
@@ -437,7 +444,7 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         self.send_event_to_member(
             id,
-            // The 'serde-json' doesn't support 'u128', so we are casting this
+            // 'serde-json' doesn't support 'u128', so we are casting this
             // timestamp to more reasonable 'u64', since it's
             // definitely enough.
             Event::RpcSettingsUpdated {
