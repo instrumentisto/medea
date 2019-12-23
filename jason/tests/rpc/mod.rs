@@ -474,12 +474,14 @@ mod transport_close_reason_on_drop {
 /// Tests which checks that on abnormal [`RpcTransport`] close, [`RpcClient`]
 /// tries to reconnect [`RpcTransport`].
 mod reconnect {
-    use medea_jason::rpc::{ReconnectableRpcClient, TransportError};
+    use medea_jason::{
+        rpc::{ReconnectableRpcClient, State, TransportError},
+        utils::JsDuration,
+    };
 
     use crate::await_with_timeout;
 
     use super::*;
-    use medea_jason::utils::JsDuration;
 
     /// Tests that [`RpcClient`] will reconnect [`RpcTransport`] if
     /// [`CloseMsg::Abnormal`] was received.
@@ -546,9 +548,13 @@ mod reconnect {
             .returning(|| Ok(stream::once(future::pending()).boxed()));
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
+        transport.expect_get_state().return_const(State::Closed);
         transport
             .expect_on_close()
             .return_once(|| Ok(stream::pending().boxed()));
+        transport.expect_on_state_change().returning(move || {
+            stream::once(async move { State::Open }).boxed()
+        });
 
         transport.expect_reconnect().returning(move || {
             let current_reconnection_count =

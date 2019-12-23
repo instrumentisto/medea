@@ -34,12 +34,9 @@ use self::heartbeat::{Heartbeat, HeartbeatError};
 pub use self::{
     heartbeat::{IdleTimeout, PingInterval},
     reconnect_handle::ReconnectorHandle,
-    websocket::{TransportError, WebSocketRpcTransport},
+    websocket::{State, TransportError, WebSocketRpcTransport},
 };
-use crate::{
-    peer::TransceiverKind,
-    rpc::{reconnect_handle::Reconnector, websocket::State},
-};
+use crate::{peer::TransceiverKind, rpc::reconnect_handle::Reconnector};
 use std::time::Duration;
 
 /// Reasons of closing by client side and server side.
