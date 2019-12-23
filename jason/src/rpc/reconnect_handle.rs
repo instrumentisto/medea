@@ -58,6 +58,7 @@ impl ReconnectorHandle {
     pub fn reconnect(&self, delay_ms: i32) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
+            let inner = this.0.upgrade_handler::<JsValue>()?;
             resolve_after(Duration::from_millis(delay_ms as u64).into())
                 .await?;
 

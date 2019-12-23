@@ -502,6 +502,26 @@ impl WebSocketRpcClient {
     fn downgrade(&self) -> WeakWebsocketRpcClient {
         WeakWebsocketRpcClient::new(self)
     }
+
+    async fn try_reconnect(
+        &self,
+        sock: &Rc<dyn RpcTransport>,
+    ) -> Result<(), Traced<RpcClientError>> {
+        sock.reconnect()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        let transport = self.0.borrow().sock.clone();
+        if let Some(transport) = transport {
+            self.0
+                .borrow_mut()
+                .heartbeat
+                .start(transport)
+                .map_err(tracerr::map_from_and_wrap!())?;
+        }
+
+        Ok(())
+    }
 }
 
 impl RpcClient for WebSocketRpcClient {
@@ -649,10 +669,15 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-        let inner = self.0.clone();
+        let weak_this = self.downgrade();
 
         Box::pin(async move {
-            let sock = inner
+            let this = weak_this
+                .upgrade()
+                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
+
+            let sock = this
+                .0
                 .borrow()
                 .sock
                 .as_ref()
@@ -677,18 +702,9 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                     }
                 }
                 State::Closing | State::Closed => {
-                    sock.reconnect()
+                    this.try_reconnect(&sock)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-
-                    let transport = inner.borrow().sock.clone();
-                    if let Some(transport) = transport {
-                        inner
-                            .borrow_mut()
-                            .heartbeat
-                            .start(transport)
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                    }
                     return Ok(());
                 }
                 State::Open => {
@@ -707,14 +723,15 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
         let weak_this = self.downgrade();
         Box::pin(async move {
+            let this = weak_this
+                .upgrade()
+                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
             let mut delayer = ProgressiveDelayer::new(
                 starting_delay,
                 multiplier,
                 max_delay_ms,
             );
-            let sock = weak_this
-                .upgrade()
-                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?
+            let sock = this
                 .0
                 .borrow()
                 .sock
@@ -730,33 +747,15 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                 match sock.get_state() {
                     State::Open => return Ok(()),
                     State::Closing | State::Closed => {
-                        if let Ok(_) = sock.reconnect().await {
-                            let this =
-                                weak_this.upgrade().ok_or_else(|| {
-                                    tracerr::new!(RpcClientError::RpcClientGone)
-                                })?;
-                            if let Some(transport) =
-                                this.0.borrow().sock.clone()
-                            {
-                                this.0
-                                    .borrow()
-                                    .heartbeat
-                                    .start(transport)
-                                    .map_err(tracerr::map_from_and_wrap!())?;
-                            }
+                        if let Ok(_) = this.try_reconnect(&sock).await {
                             return Ok(());
                         }
                     }
                     State::Connecting => {
-                        let mut state_change_stream = sock.on_state_change();
-                        while let Some(state) = state_change_stream.next().await
+                        if Some(State::Open)
+                            == sock.on_state_change().next().await
                         {
-                            match state {
-                                State::Open => {
-                                    return Ok(());
-                                }
-                                _ => (),
-                            }
+                            return Ok(());
                         }
                     }
                 }

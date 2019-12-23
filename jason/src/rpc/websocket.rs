@@ -215,17 +215,19 @@ impl InnerSocket {
     /// Checks underlying WebSocket state and updates `socket_state`.
     fn update_state(&mut self) {
         let current_socket_state = self.socket.ready_state().into();
-        self.socket_state = current_socket_state;
+        if self.socket_state != current_socket_state {
+            self.socket_state = current_socket_state;
 
-        self.on_state_change = self
-            .on_state_change
-            .drain(..)
-            .filter(|sub| !sub.is_closed())
-            .collect();
+            self.on_state_change = self
+                .on_state_change
+                .drain(..)
+                .filter(|sub| !sub.is_closed())
+                .collect();
 
-        self.on_state_change
-            .iter()
-            .for_each(|sub| sub.unbounded_send(current_socket_state).unwrap());
+            self.on_state_change.iter().for_each(|sub| {
+                sub.unbounded_send(current_socket_state).unwrap()
+            });
+        }
     }
 }
 
