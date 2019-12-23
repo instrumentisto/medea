@@ -29,12 +29,15 @@ use web_sys::CloseEvent;
 
 use crate::utils::{console_error, JsCaused, JsDuration, JsError};
 
+#[cfg(not(feature = "mockable"))]
+use self::heartbeat::{Heartbeat, HeartbeatError};
 use self::{
     backoff_delayer::{BackoffDelayer, BackoffDelayerError},
-    heartbeat::{Heartbeat, HeartbeatError},
     reconnect_handle::Reconnector,
 };
 
+#[cfg(feature = "mockable")]
+pub use self::heartbeat::{Heartbeat, HeartbeatError};
 #[doc(inline)]
 pub use self::{
     heartbeat::{IdleTimeout, PingInterval},

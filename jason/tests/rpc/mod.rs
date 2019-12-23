@@ -1,5 +1,6 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
+mod heartbeat;
 mod websocket;
 
 use std::{
@@ -68,46 +69,6 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
     ws.connect(Rc::new(transport)).await.unwrap();
     assert_eq!(stream.next().await.unwrap(), SRV_EVENT);
 }
-
-///// Tests that [`WebSocketRpcClient`] sends [`Event::Ping`] to a server.
-/////
-///// # Algorithm
-/////
-///// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`].
-/////
-///// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send.
-/////
-///// 3. Wait `600ms` for [`ClientMsg::Ping`].
-//#[wasm_bindgen_test]
-// async fn heartbeat() {
-//    let mut transport = MockRpcTransport::new();
-//    transport
-//        .expect_on_message()
-//        .return_once(move || Ok(stream::once(future::pending()).boxed()));
-//    transport
-//        .expect_on_close()
-//        .return_once(|| Ok(stream::once(future::pending()).boxed()));
-//    transport.expect_set_close_reason().return_const(());
-//
-//    let counter = Arc::new(AtomicU64::new(1));
-//    let counter_clone = counter.clone();
-//    transport
-//        .expect_send()
-//        .times(3)
-//        .withf(move |msg: &ClientMsg| {
-//            if let ClientMsg::Ping(id) = msg {
-//                assert_eq!(*id, counter.fetch_add(1, Ordering::Relaxed));
-//            };
-//            true
-//        })
-//        .returning(|_| Ok(()));
-//
-//    let ws = WebSocketRpcClient::new(50);
-//    ws.connect(Rc::new(transport)).await.unwrap();
-//
-//    resolve_after(120).await.unwrap();
-//    assert!(counter_clone.load(Ordering::Relaxed) > 2);
-//}
 
 /// Tests [`WebSocketRpcClient::unsub`] function.
 ///
