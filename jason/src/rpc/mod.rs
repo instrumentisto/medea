@@ -444,7 +444,7 @@ impl WebSocketRpcClient {
         {
             let handle =
                 self.0.borrow().reconnector.as_ref().unwrap().new_handle();
-            if let Err(_) = on_connection_loss.unbounded_send(handle) {
+            if on_connection_loss.unbounded_send(handle).is_err() {
                 console_error(
                     "RpcClient::on_connection_loss subscriber is unexpectedly \
                      gone.",
@@ -773,7 +773,7 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                 match sock.get_state() {
                     State::Open => return Ok(()),
                     State::Closing | State::Closed => {
-                        if let Ok(_) = this.try_reconnect(&sock).await {
+                        if this.try_reconnect(&sock).await.is_ok() {
                             return Ok(());
                         }
                     }

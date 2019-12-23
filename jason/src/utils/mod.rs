@@ -70,8 +70,9 @@ impl Mul<u32> for JsDuration {
 impl Mul<f32> for JsDuration {
     type Output = Self;
 
-    // Truncation here is normal, because we will still be limited in 'JsDuration::into_js_duration'
-    // to the 596 hours (which is less than 'u64' limit).
+    // Truncation here is normal, because we will still be limited in
+    // 'JsDuration::into_js_duration' to the 596 hours (which is less than
+    // 'u64' limit).
     #[allow(clippy::cast_possible_truncation)]
     fn mul(self, rhs: f32) -> Self::Output {
         // Always positive.
@@ -115,8 +116,9 @@ impl<I> JasonWeakHandler<I> for Weak<I> {
     where
         E: From<JasonError>,
     {
-        self.upgrade()
-            .ok_or(JasonError::from(tracerr::new!(HandlerDetachedError)).into())
+        self.upgrade().ok_or_else(|| {
+            JasonError::from(tracerr::new!(HandlerDetachedError)).into()
+        })
     }
 }
 

@@ -339,6 +339,7 @@ impl ParticipantService {
     }
 
     /// Deletes [`IceUser`] associated with provided [`Member`].
+    #[allow(clippy::option_map_unwrap_or_else)]
     fn delete_ice_user(
         &mut self,
         member_id: &MemberId,

@@ -111,7 +111,7 @@ impl Heartbeat {
                         .await
                         .unwrap();
                     if let Some(idle_sender) = &this.borrow().idle_sender {
-                        if let Err(_) = idle_sender.unbounded_send(()) {
+                        if idle_sender.unbounded_send(()).is_err() {
                             console_error(
                                 "Heartbeat::on_idle subscriber unexpectedly \
                                  gone.",
@@ -139,7 +139,7 @@ impl Heartbeat {
         self.update_idle_resolver();
         let (fut, pong_abort) = future::abortable(async move {
             while let Some(msg) = on_message_stream.next().await {
-                if let Some(this) = weak_this.upgrade().map(Heartbeat) {
+                if let Some(this) = weak_this.upgrade().map(Self) {
                     this.update_idle_resolver();
 
                     if let ServerMsg::Ping(num) = msg {

@@ -48,11 +48,11 @@ impl ReconnectorHandle {
     /// Tries to reconnect after provided delay.
     ///
     /// Delay is in milliseconds.
-    pub fn reconnect(&self, delay_ms: i32) -> Promise {
+    pub fn reconnect(&self, delay_ms: u32) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
             let inner = this.0.upgrade_handler::<JsValue>()?;
-            resolve_after(Duration::from_millis(delay_ms as u64).into())
+            resolve_after(Duration::from_millis(u64::from(delay_ms)).into())
                 .await?;
 
             Weak::upgrade(&inner.rpc)
@@ -73,9 +73,9 @@ impl ReconnectorHandle {
     /// it will not be reconnected or deadline not be reached.
     pub fn reconnect_with_backoff(
         &self,
-        starting_delay: i32,
+        starting_delay: u32,
         multiplier: f32,
-        max_delay_ms: i32,
+        max_delay_ms: u32,
     ) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
@@ -88,9 +88,9 @@ impl ReconnectorHandle {
             })?;
 
             rpc.reconnect_with_backoff(
-                Duration::from_millis(starting_delay as u64).into(),
+                Duration::from_millis(u64::from(starting_delay)).into(),
                 multiplier,
-                Duration::from_millis(max_delay_ms as u64).into(),
+                Duration::from_millis(u64::from(max_delay_ms)).into(),
             )
             .await
             .map_err(|e| JsValue::from(JasonError::from(e)))?;

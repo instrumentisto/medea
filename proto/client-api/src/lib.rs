@@ -1,5 +1,7 @@
 //! Client API protocol implementation for Medea media server.
 
+#![allow(clippy::must_use_candidate)]
+
 use std::collections::HashMap;
 
 use derive_more::{Constructor, Display};

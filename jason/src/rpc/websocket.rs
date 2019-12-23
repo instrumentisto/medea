@@ -126,7 +126,7 @@ pub enum State {
 
 impl State {
     /// Returns `true` if socket can be closed.
-    pub fn can_close(&self) -> bool {
+    pub fn can_close(self) -> bool {
         match self {
             Self::Connecting | Self::Open => true,
             _ => false,
