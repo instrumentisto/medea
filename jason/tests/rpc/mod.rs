@@ -1,5 +1,6 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
+mod backoff_delayer;
 mod heartbeat;
 mod websocket;
 
