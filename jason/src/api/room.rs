@@ -183,7 +183,6 @@ impl RoomHandle {
         &self,
         token: String,
     ) -> impl Future<Output = Result<(), JasonError>> + 'static {
-        let this = Self(Weak::clone(&self.0));
         let inner = self.0.upgrade_handler::<JasonError>();
 
         async move {
@@ -213,15 +212,22 @@ impl RoomHandle {
 
             let mut connection_loss_stream =
                 inner.borrow().rpc.on_connection_loss();
+            let weak_inner = Rc::downgrade(&inner);
             spawn_local(async move {
                 while let Some(reconnect_handle) =
                     connection_loss_stream.next().await
                 {
-                    let strong_inner = this.0.upgrade().unwrap();
-                    strong_inner
-                        .borrow()
-                        .on_connection_loss
-                        .call(reconnect_handle);
+                    match weak_inner.upgrade_handler::<JsValue>() {
+                        Ok(strong_inner) => {
+                            strong_inner
+                                .borrow()
+                                .on_connection_loss
+                                .call(reconnect_handle);
+                        }
+                        Err(e) => {
+                            console_error(e);
+                        }
+                    }
                 }
             });
 

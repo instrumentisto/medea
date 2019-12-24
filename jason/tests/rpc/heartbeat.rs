@@ -4,15 +4,15 @@ use std::{rc::Rc, time::Duration};
 
 use futures::{
     channel::{mpsc, oneshot},
-    future, stream, FutureExt, StreamExt,
+    stream, FutureExt, StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use medea_jason::rpc::{
-    Heartbeat, HeartbeatError, IdleTimeout, MockRpcTransport, PingInterval,
+    Heartbeat, IdleTimeout, MockRpcTransport, PingInterval,
 };
 use wasm_bindgen_test::*;
 
-use crate::{await_with_timeout, resolve_after};
+use crate::await_with_timeout;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -38,11 +38,11 @@ async fn sends_pong_on_received_ping() {
         .return_once(|| Ok(Box::pin(on_message_rx)));
     let (test_tx, test_rx) = oneshot::channel();
     transport.expect_send().return_once(move |msg| {
-        test_tx.send(msg.clone());
+        test_tx.send(msg.clone()).unwrap();
         Ok(())
     });
-    hb.start(Rc::new(transport));
-    on_message_tx.unbounded_send(ServerMsg::Ping(2));
+    hb.start(Rc::new(transport)).unwrap();
+    on_message_tx.unbounded_send(ServerMsg::Ping(2)).unwrap();
     await_with_timeout(
         Box::pin(async move {
             match test_rx.await.unwrap() {
@@ -78,7 +78,7 @@ async fn on_idle_works() {
     transport.expect_send().return_once(|_| Ok(()));
 
     let mut on_idle_stream = hb.on_idle();
-    hb.start(Rc::new(transport));
+    hb.start(Rc::new(transport)).unwrap();
 
     await_with_timeout(Box::pin(on_idle_stream.next()), 110)
         .await
@@ -87,7 +87,7 @@ async fn on_idle_works() {
 }
 
 /// Tests that [`Heartbeat`] will try send [`ClientMsg::Pong`] if
-/// no [`ServerMsg`]s received within `ping_interval * 2`.
+/// no [`ServerMsg::Ping`]s received within `ping_interval * 2`.
 ///
 /// # Algorithm
 ///
@@ -96,7 +96,7 @@ async fn on_idle_works() {
 /// 2. Mock [`RpcTransport::on_message`] to return infinite [`Stream`].
 ///
 /// 3. Mock [`RpcTransport::send`] and wait for [`ClientMsg::Pong`] (with 25
-/// milliseconds timeout).
+///    milliseconds timeout).
 #[wasm_bindgen_test]
 async fn pre_sends_pong() {
     let hb = Heartbeat::new(
@@ -109,11 +109,11 @@ async fn pre_sends_pong() {
         .return_once(|| Ok(stream::pending().boxed()));
     let (on_message_tx, mut on_message_rx) = mpsc::unbounded();
     transport.expect_send().return_once(move |msg| {
-        on_message_tx.unbounded_send(msg.clone());
+        on_message_tx.unbounded_send(msg.clone()).unwrap();
         Ok(())
     });
 
-    hb.start(Rc::new(transport));
+    hb.start(Rc::new(transport)).unwrap();
 
     match await_with_timeout(on_message_rx.next().boxed(), 25)
         .await

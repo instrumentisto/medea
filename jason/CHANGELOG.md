@@ -18,6 +18,7 @@ All user visible changes to this project will be documented in this file. This p
     - Remove error argument from `on_local_stream` callback ([#54]);
     - Room initialization ([#46]):
         - Remove `Jason.join_room()`.
+    - Respond with `Pong`s on server `Ping`s instead of sending `Ping`s ([#75]).
 
 ### Added
 
@@ -38,13 +39,14 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.join()`;
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
-        - `Room.on_close` callback for WebSocket close initiated by server ([#55]).
+        - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+        - `Room.on_connection_loss` callback with which JS side can start Jason reconnection on connection loss ([#75]).
 - RPC messaging:
     - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
-    - `RpcClient` and `RpcTransport` reconnection ([#75](/../../pull/75)).
+    - `RpcClient` and `RpcTransport` reconnection ([#75]).
 - Signalling:
     - Emitting of RPC commands:
-        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71)).
+        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71));
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -57,6 +59,7 @@ All user visible changes to this project will be documented in this file. This p
 [#46]: /../../pull/46
 [#54]: /../../pull/54
 [#55]: /../../pull/55
+[#75]: /../../pull/75
 
 
 

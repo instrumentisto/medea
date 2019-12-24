@@ -79,10 +79,6 @@ pub enum ClientDisconnect {
 
     /// [`RpcTransport`] was unexpectedly dropped.
     RpcTransportUnexpectedlyDropped,
-
-    /// Reconnection timeout was expired. Indicates that reconnection is
-    /// impossible now.
-    ReconnectTimeout,
 }
 
 impl ClientDisconnect {
@@ -91,8 +87,7 @@ impl ClientDisconnect {
         match self {
             Self::RoomUnexpectedlyDropped
             | Self::RpcClientUnexpectedlyDropped
-            | Self::RpcTransportUnexpectedlyDropped
-            | Self::ReconnectTimeout => true,
+            | Self::RpcTransportUnexpectedlyDropped => true,
             Self::RoomClosed => false,
         }
     }
@@ -152,20 +147,12 @@ pub enum RpcClientError {
     #[display(fmt = "Start heartbeat failed: {}", _0)]
     CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
 
-    /// Occurs if [`ProgressiveDelayer`] fails to set timeout.
-    #[display(fmt = "Failed to set JS timeout: {}", _0)]
-    SetTimeoutError(#[js(cause)] JsError),
-
     /// Occurs if `socket` of [`WebSocketRpcClient`] is unexpectedly `None`.
     #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
     NoSocket,
 
-    /// Occurs if [`ProgressiveDelayer`] errored.
-    ProgressiveDelayer(#[js(cause)] BackoffDelayerError),
-
-    /// Occurs if time frame in which we can reconnect was passed.
-    #[display(fmt = "Reconnection deadline passed.")]
-    Deadline,
+    /// Occurs if [`BackoffDelayer`] errored.
+    BackoffDelayer(#[js(cause)] BackoffDelayerError),
 
     /// Occurs if [`Weak`] pointer to the [`RpcClient`] can't be upgraded to
     /// [`Rc`].
@@ -258,7 +245,7 @@ pub trait RpcTransport {
     /// Subscribes to the [`State`] changes.
     ///
     /// This function guarantees that two identical [`State`]s in a row doesn't
-    /// will be thrown.
+    /// will be sent.
     fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
@@ -286,7 +273,7 @@ struct Inner {
     close_reason: ClientDisconnect,
 
     /// Senders for [`RpcClient::on_connection_loss`].
-    on_connection_loss_sub: Option<mpsc::UnboundedSender<ReconnectorHandle>>,
+    on_connection_loss_subs: Vec<mpsc::UnboundedSender<ReconnectorHandle>>,
 
     /// [`Reconnector`] with which this [`RpcClient`] will be reconnected (or
     /// not) on `on_connection_loss`.
@@ -304,7 +291,7 @@ impl Inner {
                 PingInterval(Duration::from_secs(3).into()),
             ),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
-            on_connection_loss_sub: None,
+            on_connection_loss_subs: Vec::new(),
             reconnector: None,
         }))
     }
@@ -360,12 +347,15 @@ impl WebSocketRpcClient {
     /// [`RpcClient::on_connection_loss`] subs
     fn send_connection_loss(&self) {
         self.0.borrow_mut().heartbeat.stop();
-        if let Some(on_connection_loss) =
-            &self.0.borrow().on_connection_loss_sub
-        {
-            let handle =
-                self.0.borrow().reconnector.as_ref().unwrap().new_handle();
-            if on_connection_loss.unbounded_send(handle).is_err() {
+        self.0
+            .borrow_mut()
+            .on_connection_loss_subs
+            .retain(|sub| !sub.is_closed());
+
+        let inner = self.0.borrow();
+        let reconnector = inner.reconnector.as_ref().unwrap();
+        for sub in &inner.on_connection_loss_subs {
+            if sub.unbounded_send(reconnector.new_handle()).is_err() {
                 console_error(
                     "RpcClient::on_connection_loss subscriber is unexpectedly \
                      gone.",
@@ -575,7 +565,7 @@ impl RpcClient for WebSocketRpcClient {
     /// [`ReconnectionHandle`] on connection losing.
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_connection_loss_sub = Some(tx);
+        self.0.borrow_mut().on_connection_loss_subs.push(tx);
 
         Box::pin(rx)
     }
@@ -586,7 +576,7 @@ pub trait ReconnectableRpcClient {
     /// Tries to reconnect a [`RpcClient`].
     ///
     /// If reconnection already performed on [`RpcTransport`], then
-    /// this function will simply subscribe on reconnection end.
+    /// this function will simply subscribe on reconnection result.
     ///
     /// If connection already opened in [`RpcTransport`], then [`Future`]
     /// will be instantly resolved.
@@ -601,9 +591,9 @@ pub trait ReconnectableRpcClient {
     /// [`RpcTransport`] already reconnecting, new reconnection will not be
     /// performed in this step of loop. If already
     /// started reconnection ended with [`State::Open`] then [`Future`] will
-    /// simply resolve. If already started reconnection ended with
+    /// simply resolved. If already started reconnection ended with
     /// [`State::Close`] or [`State::Closing`] then next step of loop will
-    /// be preformed.
+    /// be performed after delay.
     ///
     /// If [`RpcTransport`] state is already [`State::Open`] then
     /// [`Future`] will be resolved immediately after `starting_delay`.
@@ -616,6 +606,13 @@ pub trait ReconnectableRpcClient {
 }
 
 impl ReconnectableRpcClient for WebSocketRpcClient {
+    /// Tries to reconnect a [`RpcClient`].
+    ///
+    /// If reconnection already performed on [`RpcTransport`], then
+    /// this function will simply subscribe on reconnection result.
+    ///
+    /// If connection already opened in [`RpcTransport`], then [`Future`]
+    /// will be instantly resolved.
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
@@ -665,6 +662,19 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
         })
     }
 
+    /// Tries to reconnect [`RpcTransport`] in a loop with growing delay until
+    /// it will not be reconnected.
+    ///
+    /// This function will consider state of [`RpcTransport`]. If
+    /// [`RpcTransport`] already reconnecting, new reconnection will not be
+    /// performed in this step of loop. If already
+    /// started reconnection ended with [`State::Open`] then [`Future`] will
+    /// simply resolved. If already started reconnection ended with
+    /// [`State::Close`] or [`State::Closing`] then next step of loop will
+    /// be performed after delay.
+    ///
+    /// If [`RpcTransport`] state is already [`State::Open`] then
+    /// [`Future`] will be resolved immediately after `starting_delay`.
     fn reconnect_with_backoff(
         &self,
         starting_delay: JsDuration,

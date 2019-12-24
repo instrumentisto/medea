@@ -15,6 +15,8 @@ All user visible changes to this project will be documented in this file. This p
 
 - Configuration:
     - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]).
+- Signalling:
+    - Send `Ping` to a client instead of responding with `Pong` on client `Ping` ([#75]).
 
 ### Added
 
@@ -32,16 +34,18 @@ All user visible changes to this project will be documented in this file. This p
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58](/../../pull/58));
-    - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75](/../../pull/75)).
+    - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
-    - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]).
+    - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
+    - `rpc.ping_interval` option to configure `Ping` sending interval ([#75]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
 [#28]: /../../pull/28
 [#33]: /../../pull/33
 [#63]: /../../pull/63
+[#75]: /../../pull/75
 
 
 

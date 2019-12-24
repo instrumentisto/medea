@@ -7,16 +7,13 @@ mod websocket;
 use std::{
     collections::HashMap,
     rc::Rc,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, Either},
+    future::{self},
     stream, FutureExt as _, StreamExt as _,
 };
 use medea_client_api_proto::{
@@ -29,7 +26,7 @@ use medea_jason::rpc::{
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
-use crate::{await_with_timeout, resolve_after};
+use crate::await_with_timeout;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -290,20 +287,9 @@ mod on_close {
         let ws =
             get_client(CloseMsg::Normal(1000, CloseReason::Reconnected)).await;
 
-        match future::select(
-            Box::pin(ws.on_close()),
-            Box::pin(resolve_after(500)),
-        )
-        .await
-        {
-            Either::Left((msg, _)) => {
-                unreachable!(
-                    "Some CloseMsg was unexpectedly thrown: {:?}.",
-                    msg
-                );
-            }
-            Either::Right(_) => (),
-        }
+        await_with_timeout(Box::pin(ws.on_close()), 500)
+            .await
+            .unwrap_err();
     }
 
     /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] don't resolves
@@ -321,20 +307,9 @@ mod on_close {
     async fn dont_resolve_on_abnormal_close() {
         let ws = get_client(CloseMsg::Abnormal(1500)).await;
 
-        match future::select(
-            Box::pin(ws.on_close()),
-            Box::pin(resolve_after(500)),
-        )
-        .await
-        {
-            Either::Left((msg, _)) => {
-                unreachable!(
-                    "Some CloseMsg was unexpectedly thrown: {:?}.",
-                    msg
-                );
-            }
-            Either::Right(_) => (),
-        }
+        await_with_timeout(Box::pin(ws.on_close()), 500)
+            .await
+            .unwrap_err();
     }
 }
 
@@ -436,10 +411,7 @@ mod transport_close_reason_on_drop {
 /// Tests which checks that on abnormal [`RpcTransport`] close, [`RpcClient`]
 /// tries to reconnect [`RpcTransport`].
 mod reconnect {
-    use medea_jason::{
-        rpc::{ReconnectableRpcClient, State, TransportError},
-        utils::JsDuration,
-    };
+    use medea_jason::rpc::{ReconnectableRpcClient, State, TransportError};
 
     use crate::await_with_timeout;
 
@@ -454,28 +426,24 @@ mod reconnect {
     ///
     /// 2. Wait for [`RpcClient::on_connection_loss`] resolving (with 600
     ///    milliseconds timeout).
+    #[wasm_bindgen_test]
     async fn on_abnormal_transport_close() {
         let mut transport = MockRpcTransport::new();
-        let (on_close_tx, on_close_rx) = mpsc::unbounded();
         transport
             .expect_on_message()
             .times(2)
             .returning(|| Ok(stream::once(future::pending()).boxed()));
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
-        transport
-            .expect_on_close()
-            .return_once(move || Ok(on_close_rx.boxed()));
+        transport.expect_on_close().return_once(move || {
+            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
+        });
         let ws = WebSocketRpcClient::new();
         ws.update_settings(
             IdleTimeout(Duration::from_millis(125).into()),
             PingInterval(Duration::from_millis(250).into()),
         );
         ws.connect(Rc::new(transport)).await.unwrap();
-
-        on_close_tx
-            .unbounded_send(CloseMsg::Abnormal(1500))
-            .unwrap();
 
         await_with_timeout(Box::pin(ws.on_connection_loss().next()), 600)
             .await
@@ -499,21 +467,20 @@ mod reconnect {
     #[wasm_bindgen_test]
     async fn timeout() {
         let mut transport = MockRpcTransport::new();
-        let (test_tx, mut test_rx) = mpsc::unbounded();
-        let reconnection_count = AtomicU64::new(0);
         transport
             .expect_on_message()
             .returning(|| Ok(stream::once(future::pending()).boxed()));
-        transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
-        transport.expect_get_state().return_const(State::Closed);
         transport
             .expect_on_close()
             .return_once(|| Ok(stream::pending().boxed()));
+
+        transport.expect_get_state().return_const(State::Closed);
         transport.expect_on_state_change().returning(move || {
             stream::once(async move { State::Open }).boxed()
         });
-
+        let (test_tx, mut test_rx) = mpsc::unbounded();
+        let reconnection_count = AtomicU64::new(0);
         transport.expect_reconnect().returning(move || {
             let current_reconnection_count =
                 reconnection_count.load(Ordering::Relaxed);
@@ -533,23 +500,21 @@ mod reconnect {
             PingInterval(Duration::from_millis(500).into()),
         );
         ws.connect(Rc::new(transport)).await.unwrap();
+
         spawn_local(async move {
             ws.reconnect_with_backoff(
-                Duration::from_millis(500).into(),
+                Duration::from_millis(100).into(),
                 2.0,
                 Duration::from_secs(10).into(),
             )
-            .await;
+            .await
+            .unwrap();
         });
 
-        const TIMEOUT_FOR_TWO_RECONNECTIONS: i32 = 3800;
-        await_with_timeout(
-            Box::pin(test_rx.next()),
-            TIMEOUT_FOR_TWO_RECONNECTIONS,
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        await_with_timeout(Box::pin(test_rx.next()), 800)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }
 
@@ -557,7 +522,7 @@ mod reconnect {
 /// when reconnection already started.
 mod subscribe_to_state {
     use futures::{
-        channel::mpsc, future, stream, FutureExt as _, SinkExt, StreamExt as _,
+        channel::mpsc, future, stream, FutureExt as _, StreamExt as _,
     };
     use medea_jason::rpc::{
         CloseMsg, MockRpcTransport, ReconnectableRpcClient, State,
@@ -580,14 +545,6 @@ mod subscribe_to_state {
     #[wasm_bindgen_test]
     async fn closed_transport_state() {
         let mut transport = MockRpcTransport::new();
-        transport.expect_get_state().return_once(|| State::Closed);
-        let (on_state_change_tx, on_state_change_rx) = mpsc::unbounded();
-        transport
-            .expect_on_state_change()
-            .return_once(|| on_state_change_rx.boxed());
-        transport.expect_on_close().return_once(|| {
-            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
-        });
         transport
             .expect_on_message()
             .times(3)
@@ -596,11 +553,17 @@ mod subscribe_to_state {
             .expect_set_close_reason()
             .times(1)
             .returning(|_| ());
+
+        transport.expect_get_state().return_once(|| State::Closed);
+        transport.expect_on_close().return_once(|| {
+            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
+        });
         let (test_tx, test_rx) = oneshot::channel();
         transport.expect_reconnect().return_once(move || {
             test_tx.send(()).unwrap();
             future::ok(()).boxed()
         });
+
         let client = WebSocketRpcClient::new();
         client.connect(Rc::new(transport)).await.unwrap();
 
@@ -631,9 +594,6 @@ mod subscribe_to_state {
     async fn connecting_transport_state() {
         let mut transport = MockRpcTransport::new();
         transport
-            .expect_get_state()
-            .return_once(|| State::Connecting);
-        transport
             .expect_on_message()
             .times(2)
             .returning(|| Ok(stream::pending().boxed()));
@@ -641,6 +601,10 @@ mod subscribe_to_state {
             .expect_set_close_reason()
             .times(1)
             .returning(|_| ());
+
+        transport
+            .expect_get_state()
+            .return_once(|| State::Connecting);
         transport.expect_on_close().return_once(|| {
             Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
         });
@@ -648,10 +612,11 @@ mod subscribe_to_state {
         transport
             .expect_on_state_change()
             .return_once(|| on_state_change_rx.boxed());
+
         let client = WebSocketRpcClient::new();
         client.connect(Rc::new(transport)).await.unwrap();
 
-        on_state_change_tx.unbounded_send(State::Open);
+        on_state_change_tx.unbounded_send(State::Open).unwrap();
         client.reconnect().await.unwrap();
     }
 
@@ -668,17 +633,20 @@ mod subscribe_to_state {
     #[wasm_bindgen_test]
     async fn open_transport_state() {
         let mut transport = MockRpcTransport::new();
-        transport.expect_get_state().return_once(|| State::Open);
         transport
             .expect_on_message()
             .times(2)
             .returning(|| Ok(stream::pending().boxed()));
         transport.expect_set_close_reason().return_once(|_| ());
+
+        transport.expect_get_state().return_once(|| State::Open);
         transport.expect_on_close().return_once(|| {
             Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
         });
+
         let client = WebSocketRpcClient::new();
         client.connect(Rc::new(transport)).await.unwrap();
+
         client.reconnect().await.unwrap();
     }
 }

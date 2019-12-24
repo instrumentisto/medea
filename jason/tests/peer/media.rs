@@ -7,7 +7,7 @@ use medea_jason::{
     media::MediaManager,
     peer::{
         MediaConnections, RtcPeerConnection, SimpleStreamRequest,
-        TransceiverDirection, TransceiverKind,
+        TransceiverDirection,
     },
 };
 use wasm_bindgen_test::*;

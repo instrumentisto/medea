@@ -1,3 +1,5 @@
+//! Implementation of reconnector for the [`ReconnectableRpcClient`].
+
 use std::{
     rc::{Rc, Weak},
     time::Duration,
@@ -77,7 +79,7 @@ impl ReconnectorHandle {
     /// delay until it will not be reconnected.
     pub fn reconnect_with_backoff(
         &self,
-        starting_delay: u32,
+        starting_delay_ms: u32,
         multiplier: f32,
         max_delay_ms: u32,
     ) -> Promise {
@@ -92,7 +94,7 @@ impl ReconnectorHandle {
             })?;
 
             rpc.reconnect_with_backoff(
-                Duration::from_millis(u64::from(starting_delay)).into(),
+                Duration::from_millis(u64::from(starting_delay_ms)).into(),
                 multiplier,
                 Duration::from_millis(u64::from(max_delay_ms)).into(),
             )

@@ -2,11 +2,7 @@
 
 use std::time::Duration;
 
-use futures::FutureExt as _;
-use medea_jason::{
-    rpc::{BackoffDelayer, BackoffDelayerError},
-    utils::JsDuration,
-};
+use medea_jason::rpc::BackoffDelayer;
 use wasm_bindgen_test::*;
 
 use crate::await_with_timeout;

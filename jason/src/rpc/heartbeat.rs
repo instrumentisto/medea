@@ -50,8 +50,8 @@ struct Inner {
     /// [`ServerMsg::Ping`].
     pong_task_abort: Option<Abort>,
 
-    /// Sender for [`Heartbeat::on_idle`].
-    idle_sender: Option<mpsc::UnboundedSender<()>>,
+    /// [`mpsc::UnboundedSender`]s for a [`Heartbeat::on_idle`].
+    on_idle_subs: Vec<mpsc::UnboundedSender<()>>,
 
     /// [`Abort`] for IDLE resolved task.
     idle_resolver_abort: Option<Abort>,
@@ -76,7 +76,7 @@ impl Heartbeat {
             idle_timeout,
             transport: None,
             pong_task_abort: None,
-            idle_sender: None,
+            on_idle_subs: Vec::new(),
             idle_resolver_abort: None,
             ping_interval,
             last_ping_num: 1,
@@ -110,8 +110,11 @@ impl Heartbeat {
                     resolve_after(idle_timeout.0 - wait_for_ping)
                         .await
                         .unwrap();
-                    if let Some(idle_sender) = &this.borrow().idle_sender {
-                        if idle_sender.unbounded_send(()).is_err() {
+                    this.borrow_mut()
+                        .on_idle_subs
+                        .retain(|sub| !sub.is_closed());
+                    for sub in &this.borrow().on_idle_subs {
+                        if sub.unbounded_send(()).is_err() {
                             console_error(
                                 "Heartbeat::on_idle subscriber unexpectedly \
                                  gone.",
@@ -195,7 +198,7 @@ impl Heartbeat {
     /// [`Heartbeat`] considers that [`RpcTransport`] is IDLE.
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
-        self.0.borrow_mut().idle_sender = Some(on_idle_tx);
+        self.0.borrow_mut().on_idle_subs.push(on_idle_tx);
 
         Box::pin(on_idle_rx)
     }

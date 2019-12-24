@@ -1413,7 +1413,7 @@ dependencies = [
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-client-api-proto 0.1.1-dev",
+ "medea-client-api-proto 0.2.0-dev",
  "medea-control-api-proto 0.1.0-dev",
  "medea-macro 0.2.0-dev",
  "protobuf 2.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1441,7 +1441,7 @@ dependencies = [
 
 [[package]]
 name = "medea-client-api-proto"
-version = "0.1.1-dev"
+version = "0.2.0-dev"
 dependencies = [
  "derive_more 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0-dev",
@@ -1492,7 +1492,7 @@ dependencies = [
  "fragile 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-sys 0.3.32 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-client-api-proto 0.1.1-dev",
+ "medea-client-api-proto 0.2.0-dev",
  "medea-macro 0.2.0-dev",
  "mockall 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "predicates-tree 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
