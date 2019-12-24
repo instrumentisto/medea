@@ -2,7 +2,7 @@
 //!
 //! [Medea]: https://github.com/instrumentisto/medea
 
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 
@@ -27,7 +27,8 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 pub use self::{
     api::{ConnectionHandle, Jason, RoomHandle},
     media::{
-        AudioTrackConstraints, MediaStreamConstraints, VideoTrackConstraints,
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaStreamConstraints,
     },
 };
 
