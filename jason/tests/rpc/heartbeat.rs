@@ -22,7 +22,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 /// # Algorithm
 ///
 /// 1. Mock [`RpcClient::on_message`] and send to this [`Stream`]
-/// [`ServerMsg::Ping`].
+///    [`ServerMsg::Ping`].
 ///
 /// 2. Mock [`RpcClient::send`] and check that [`ClientMsg::Pong`] was sent.
 #[wasm_bindgen_test]

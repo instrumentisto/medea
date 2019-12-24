@@ -448,8 +448,8 @@ impl ParticipantService {
             // timestamp to more reasonable 'u64', since it's
             // definitely enough.
             Event::RpcSettingsUpdated {
-                idle_timeout: self.idle_timeout.as_millis() as u64,
-                ping_interval: self.ping_interval.as_millis() as u64,
+                idle_timeout_ms: self.idle_timeout.as_millis() as u64,
+                ping_interval_ms: self.ping_interval.as_millis() as u64,
             },
         )
     }

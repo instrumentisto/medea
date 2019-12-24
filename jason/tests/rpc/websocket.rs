@@ -9,7 +9,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn bad_url_err() {
     use TransportError::*;
 
-    match WebSocketRpcTransport::new("asd").await {
+    match WebSocketRpcTransport::new("asd".to_string()).await {
         Ok(_) => unreachable!(),
         Err(err) => match err.into_inner() {
             CreateSocket(err) => {
@@ -24,7 +24,7 @@ async fn bad_url_err() {
 async fn could_not_init_socket_err() {
     use TransportError::*;
 
-    match WebSocketRpcTransport::new("ws://0.0.0.0").await {
+    match WebSocketRpcTransport::new("ws://0.0.0.0".to_string()).await {
         Ok(_) => unreachable!(),
         Err(err) => match err.into_inner() {
             InitSocket => {}

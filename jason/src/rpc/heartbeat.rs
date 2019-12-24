@@ -177,7 +177,7 @@ impl Heartbeat {
         Ok(())
     }
 
-    /// Stops heartbeat.
+    /// Stops [`Heartbeat`].
     pub fn stop(&self) {
         self.0.borrow_mut().transport.take();
         self.0.borrow_mut().pong_task_abort.take();
@@ -194,7 +194,7 @@ impl Heartbeat {
         self.0.borrow_mut().ping_interval = ping_interval;
     }
 
-    /// Returns [`LocalBoxStream`] to which will be sent event when
+    /// Returns [`LocalBoxStream`] to which will be sent unit message when
     /// [`Heartbeat`] considers that [`RpcTransport`] is IDLE.
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();

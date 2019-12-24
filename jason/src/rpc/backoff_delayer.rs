@@ -13,6 +13,7 @@ pub enum BackoffDelayerError {
     #[display(fmt = "{}", _0)]
     Js(JsError),
 }
+
 /// Delayer which increases delay time by provided multiplier on every delay
 /// call
 ///

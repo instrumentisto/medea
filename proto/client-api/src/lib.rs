@@ -202,8 +202,16 @@ pub enum Event {
     /// The Media server notifies Web Client about necessity to update RPC
     /// settings.
     RpcSettingsUpdated {
-        idle_timeout: u64,
-        ping_interval: u64,
+        /// If server doesn't receive [`ClientMsg::Pong`] from a client during
+        /// this time, the client's connection will be considered as `Lost`.
+        ///
+        /// Unit: millisecond.
+        idle_timeout_ms: u64,
+
+        /// Interval between [`ServerMsg::Ping`] sending.
+        ///
+        /// Unit: millisecond.
+        ping_interval_ms: u64,
     },
 }
 

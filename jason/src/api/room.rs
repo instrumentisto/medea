@@ -200,7 +200,7 @@ impl RoomHandle {
                 )));
             }
 
-            let websocket = WebSocketRpcTransport::new(&token)
+            let websocket = WebSocketRpcTransport::new(token)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
             inner

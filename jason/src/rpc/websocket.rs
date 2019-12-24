@@ -97,28 +97,28 @@ type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 pub enum State {
     /// Socket has been created. The connection is not yet open.
     ///
-    /// Reflects `CONNECTING` state from JS side [`WebSocket.readyState`]
+    /// Reflects `CONNECTING` state from JS side [`WebSocket.readyState`].
     ///
     /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Connecting,
 
     /// The connection is open and ready to communicate.
     ///
-    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`]
+    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`].
     ///
     /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Open,
 
     /// The connection is in the process of closing.
     ///
-    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`]
+    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`].
     ///
     /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Closing,
 
     /// The connection is closed or couldn't be opened.
     ///
-    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`]
+    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`].
     ///
     /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
     Closed,
@@ -218,8 +218,8 @@ struct InnerSocket {
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
-    fn new(url: &str) -> Result<Self> {
-        let socket = SysWebSocket::new(url)
+    fn new(url: String) -> Result<Self> {
+        let socket = SysWebSocket::new(&url)
             .map_err(Into::into)
             .map_err(TransportError::CreateSocket)
             .map_err(tracerr::wrap!())?;
@@ -233,7 +233,7 @@ impl InnerSocket {
             on_message_subs: Vec::new(),
             on_state_change_subs: Vec::new(),
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
-            url: url.to_string(),
+            url,
         })
     }
 
@@ -245,15 +245,18 @@ impl InnerSocket {
         if self.socket_state != new_state {
             self.socket_state = new_state;
 
-            self.on_state_change_subs = self
-                .on_state_change_subs
-                .drain(..)
-                .filter(|sub| !sub.is_closed())
-                .collect();
+            self.on_state_change_subs.retain(|sub| !sub.is_closed());
 
             self.on_state_change_subs
                 .iter()
-                .for_each(|sub| sub.unbounded_send(new_state).unwrap());
+                .filter_map(|sub| sub.unbounded_send(new_state).err())
+                .for_each(|e| {
+                    console_error(format!(
+                        "'WebSocketRpcTransport::on_state_change' subscriber \
+                         unexpectedly gone. {:?}",
+                        e
+                    ));
+                });
         }
     }
 
@@ -304,13 +307,10 @@ impl RpcTransport for WebSocketRpcTransport {
         Box::pin(async move {
             let url = this.0.borrow().url.clone();
             this.0.borrow_mut().update_socket_state(State::Connecting);
-            let new_transport = match Self::new(&url).await {
-                Ok(transport) => transport,
-                Err(e) => {
-                    this.0.borrow_mut().sync_socket_state();
-                    return Err(e);
-                }
-            };
+            let new_transport = Self::new(url).await.map_err(|e| {
+                this.0.borrow_mut().sync_socket_state();
+                tracerr::new!(e)
+            })?;
 
             std::mem::swap(
                 &mut new_transport.0.borrow_mut().on_message_subs,
@@ -369,7 +369,7 @@ impl WeakWebSocketRpcTransport {
 impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
-    pub async fn new(url: &str) -> Result<Self> {
+    pub async fn new(url: String) -> Result<Self> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 
