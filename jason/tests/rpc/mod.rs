@@ -445,17 +445,15 @@ mod reconnect {
 
     use super::*;
 
-    /// Tests that [`RpcClient`] will reconnect [`RpcTransport`] if
-    /// [`CloseMsg::Abnormal`] was received.
+    /// Tests that [`WebSocketRpcClient`] will resolve
+    /// [`RpcClient::on_connection_loss`] on abnormal connection loss.
     ///
     /// # Algorithm
     ///
-    /// 1. Mock [`RpcTransport::reconnect`] and [`RpcTransport::on_close`].
+    /// 1. Mock [`RpcTransport`] to throw [`CloseMsg::Abnormal`].
     ///
-    /// 2. Send [`CloseMsg::Abnormal`] to [`RpcTransport::on_close`] [`Stream`].
-    ///
-    /// 3. Check [`RpcTransport::reconnect`] was called.
-    #[wasm_bindgen_test]
+    /// 2. Wait for [`RpcClient::on_connection_loss`] resolving (with 600
+    ///    milliseconds timeout).
     async fn on_abnormal_transport_close() {
         let mut transport = MockRpcTransport::new();
         let (on_close_tx, on_close_rx) = mpsc::unbounded();
@@ -465,9 +463,6 @@ mod reconnect {
             .returning(|| Ok(stream::once(future::pending()).boxed()));
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
-        transport.expect_reconnect().returning(move || {
-            future::err(tracerr::new!(TransportError::InitSocket)).boxed()
-        });
         transport
             .expect_on_close()
             .return_once(move || Ok(on_close_rx.boxed()));
@@ -488,8 +483,9 @@ mod reconnect {
             .unwrap();
     }
 
-    /// Tests that [`RpcClient`] will try to reconnect [`RpcTransport`] with
-    /// some delay on failed reconnection.
+    /// Tests that [`RpcClient::reconnect_with_backoff`] calls
+    /// [`RpcTransport::reconnect`] many times with some delay until
+    /// reconnection is not successful.
     ///
     /// # Algorithm
     ///
@@ -557,6 +553,8 @@ mod reconnect {
     }
 }
 
+/// Tests for mechanism of subscribing to the [`State`] of [`RpcTransport`]
+/// when reconnection already started.
 mod subscribe_to_state {
     use futures::{
         channel::mpsc, future, stream, FutureExt as _, SinkExt, StreamExt as _,
@@ -567,6 +565,18 @@ mod subscribe_to_state {
 
     use super::*;
 
+    /// Tests that [`RpcClient`] will start reconnection if [`RpcTransport`]'s
+    /// [`State`] is [`State::Closed`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcTransport`] to return [`State::Closed`] from
+    ///    [`RpcTransport::get_state`].
+    ///
+    /// 2. Mock [`RpcTransport::on_close`] to return [`CloseMsg::Abnormal`].
+    ///
+    /// 3. Try to call [`RpcClient::reconnect`] and check that
+    ///    [`RpcTransport::reconnect`]    was called one time.
     #[wasm_bindgen_test]
     async fn closed_transport_state() {
         let mut transport = MockRpcTransport::new();
@@ -604,6 +614,19 @@ mod subscribe_to_state {
             .unwrap();
     }
 
+    /// Tests that [`RpcClient`] will only subscibe to the [`RpcTransport`]
+    /// [`State`] updates if reconnection already started.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcTransport::get_state`] to return [`State::Connecting`].
+    ///
+    /// 2. Mock [`RpcTransport::on_close`] to return [`CloseMsg::Abnormal`].
+    ///
+    /// 3. Mock [`RpcTransport::on_state_change`] to throw [`State::Open`].
+    ///
+    /// 4. Call [`RpcClient::reconnect`] and check that
+    ///    [`RpcTransport::reconnect`] wasn't called.
     #[wasm_bindgen_test]
     async fn connecting_transport_state() {
         let mut transport = MockRpcTransport::new();
@@ -632,6 +655,16 @@ mod subscribe_to_state {
         client.reconnect().await.unwrap();
     }
 
+    /// Tests that on [`RpcTransport`] [`State::Open`] [`RpcClient::reconnect`]
+    /// will immediately resolved and [`RpcTransport::reconnect`] not
+    /// called.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcTransport::get_state`] to return [`State::Open`].
+    ///
+    /// 2. Call [`RpcClient::reconnect`] and check that
+    ///    [`RpcTransport::reconnect`] function wasn't called.
     #[wasm_bindgen_test]
     async fn open_transport_state() {
         let mut transport = MockRpcTransport::new();

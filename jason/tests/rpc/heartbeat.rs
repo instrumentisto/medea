@@ -1,3 +1,5 @@
+//! Tests for [`medea_jason::rpc::Heartbeat`].
+
 use std::{rc::Rc, time::Duration};
 
 use futures::{
@@ -14,6 +16,15 @@ use crate::{await_with_timeout, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+/// Tests that [`ClientMsg::Pong`] will be sent after received
+/// [`ServerMsg::Ping`].
+///
+/// # Algorithm
+///
+/// 1. Mock [`RpcClient::on_message`] and send to this [`Stream`]
+/// [`ServerMsg::Ping`].
+///
+/// 2. Mock [`RpcClient::send`] and check that [`ClientMsg::Pong`] was sent.
 #[wasm_bindgen_test]
 async fn sends_pong_on_received_ping() {
     let hb = Heartbeat::new(
@@ -36,7 +47,9 @@ async fn sends_pong_on_received_ping() {
         Box::pin(async move {
             match test_rx.await.unwrap() {
                 ClientMsg::Pong(_) => (),
-                _ => panic!("aksjdfklajds"),
+                ClientMsg::Command(cmd) => {
+                    panic!("Received not pong message! Command: {:?}", cmd)
+                }
             }
         }),
         100,
@@ -45,6 +58,13 @@ async fn sends_pong_on_received_ping() {
     .unwrap();
 }
 
+/// Tests that IDLE timeout works.
+///
+/// # Algorithm
+///
+/// 1. Mock [`RpcTransport::on_message`] to return infinite [`Stream`].
+///
+/// 2. Wait for [`Heartbeat::on_idle`] resolving.
 #[wasm_bindgen_test]
 async fn on_idle_works() {
     let hb = Heartbeat::new(
@@ -66,6 +86,17 @@ async fn on_idle_works() {
         .unwrap();
 }
 
+/// Tests that [`Heartbeat`] will try send [`ClientMsg::Pong`] if
+/// no [`ServerMsg`]s received within `ping_interval * 2`.
+///
+/// # Algorithm
+///
+/// 1. Create [`Heartbeat`] with 10 milliseconds `ping_interval`.
+///
+/// 2. Mock [`RpcTransport::on_message`] to return infinite [`Stream`].
+///
+/// 3. Mock [`RpcTransport::send`] and wait for [`ClientMsg::Pong`] (with 25
+/// milliseconds timeout).
 #[wasm_bindgen_test]
 async fn pre_sends_pong() {
     let hb = Heartbeat::new(
