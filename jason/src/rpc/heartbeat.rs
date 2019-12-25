@@ -72,13 +72,14 @@ impl Inner {
         self.transport
             .as_ref()
             .ok_or_else(|| {
-                tracerr::new!("RpcTransport from Heartbeat unexpectedly gone.")
-                    .trace()
-                    .to_string()
+                let e = tracerr::new!(
+                    "RpcTransport from Heartbeat unexpectedly gone."
+                );
+                format!("{}\n{}", e, e.trace())
             })
             .and_then(|t| {
                 t.send(&ClientMsg::Pong(n))
-                    .map_err(|e| e.trace().to_string())
+                    .map_err(|e| format!("{}\n{}", e, e.trace()))
             })
             .map_err(console_error)
             .ok();
