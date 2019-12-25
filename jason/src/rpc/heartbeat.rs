@@ -15,12 +15,14 @@ use crate::{
     rpc::{RpcTransport, TransportError},
     utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
 };
+use std::rc::Weak;
+use wasm_bindgen::JsValue;
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
 
-type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
+type HeartbeatResult<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
 /// Wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
 #[derive(Debug, From)]
@@ -51,7 +53,7 @@ struct Inner {
     /// [`mpsc::UnboundedSender`]s for a [`Heartbeat::on_idle`].
     on_idle_subs: Vec<mpsc::UnboundedSender<()>>,
 
-    /// [`Abort`] for IDLE resolved task.
+    /// [`Abort`] for idle resolver task.
     idle_resolver_abort: Option<Abort>,
 
     /// Number of last received [`ServerMsg::Ping`].
@@ -62,6 +64,27 @@ struct Inner {
 
     /// Ping interval of [`RpcClient`].
     ping_interval: PingInterval,
+}
+
+impl Inner {
+    /// Sends [`ClientMsg::Pong`] to a server.
+    ///
+    /// If some error happen then this will be printed with [`console_error`].
+    fn send_pong(&self, n: u64) {
+        self.transport
+            .as_ref()
+            .ok_or(
+                tracerr::new!("RpcTransport from Heartbeat unexpectedly gone.")
+                    .trace()
+                    .to_string(),
+            )
+            .and_then(|t| {
+                t.send(&ClientMsg::Pong(n))
+                    .map_err(|e| e.trace().to_string())
+            })
+            .map_err(console_error)
+            .ok();
+    }
 }
 
 /// Service for sending/receiving ping pongs between the client and server.
@@ -77,7 +100,7 @@ impl Heartbeat {
             on_idle_subs: Vec::new(),
             idle_resolver_abort: None,
             ping_interval,
-            last_ping_num: 1,
+            last_ping_num: 0,
         })))
     }
 
@@ -91,18 +114,9 @@ impl Heartbeat {
                 if let Some(this) = weak_this.upgrade() {
                     let wait_for_ping = this.borrow().ping_interval.0 * 2;
                     resolve_after(wait_for_ping).await;
+
                     let last_ping_num = this.borrow().last_ping_num;
-                    if let Some(transport) = &this.borrow().transport {
-                        if let Err(e) =
-                            transport.send(&ClientMsg::Pong(last_ping_num))
-                        {
-                            console_error(e.to_string());
-                        }
-                    } else {
-                        console_error(
-                            "RpcTransport from Heartbeat unexpectedly gone.",
-                        );
-                    }
+                    this.borrow().send_pong(last_ping_num + 1);
 
                     let idle_timeout = this.borrow().idle_timeout;
                     resolve_after(idle_timeout.0 - wait_for_ping).await;
@@ -129,7 +143,10 @@ impl Heartbeat {
     }
 
     /// Start heartbeats for provided [`RpcTransport`].
-    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<()> {
+    pub fn start(
+        &self,
+        transport: Rc<dyn RpcTransport>,
+    ) -> HeartbeatResult<()> {
         let weak_this = Rc::downgrade(&self.0);
         let mut on_message_stream = transport
             .on_message()
@@ -137,31 +154,20 @@ impl Heartbeat {
         self.0.borrow_mut().transport = Some(transport);
         self.update_idle_resolver();
         let (fut, pong_abort) = future::abortable(async move {
-            while let Some(msg) = on_message_stream.next().await {
-                if let Some(this) = weak_this.upgrade().map(Self) {
-                    this.update_idle_resolver();
+            while let Some((this, msg)) =
+                on_message_stream.next().await.and_then(|msg| {
+                    weak_this.upgrade().map(move |t| (Self(t), msg))
+                })
+            {
+                this.update_idle_resolver();
 
-                    if let ServerMsg::Ping(num) = msg {
-                        let last_ping_num = this.0.borrow().last_ping_num;
-                        if last_ping_num == num {
-                            continue;
-                        }
-                        this.0.borrow_mut().last_ping_num = num;
-                        if let Some(transport) = &this.0.borrow().transport {
-                            if let Err(e) =
-                                transport.send(&ClientMsg::Pong(num))
-                            {
-                                console_error(e.to_string());
-                            }
-                        } else {
-                            console_error(
-                                "RpcTransport from Heartbeat unexpectedly \
-                                 gone.",
-                            );
-                        }
+                if let ServerMsg::Ping(num) = msg {
+                    let last_ping_num = this.0.borrow().last_ping_num;
+                    if last_ping_num == num {
+                        continue;
                     }
-                } else {
-                    break;
+                    this.0.borrow_mut().last_ping_num = num;
+                    this.0.borrow().send_pong(num);
                 }
             }
         });
