@@ -267,17 +267,6 @@ impl ParticipantService {
                     move |ice: IceUser, room: &mut Room, ctx| {
                         room.members.insert_connection(member_id.clone(), conn);
                         member.replace_ice_user(ice);
-                        ctx.spawn(wrap_future(
-                            room.members
-                                .send_rpc_settings_to_member(member_id)
-                                .map_err(|e| {
-                                    error!(
-                                        "Failed to send RPC settings to the \
-                                         'Member': {:?}",
-                                        e
-                                    )
-                                }),
-                        ));
 
                         wrap_future(future::ok(member))
                     },
@@ -434,9 +423,6 @@ impl ParticipantService {
     pub fn insert_member(&mut self, id: MemberId, member: Member) {
         self.members.insert(id, member);
     }
-
-    // TODO: you sure we need this only for new connections? i believe it could
-    //       be sent in WsSession for every new connection.
 
     /// Sends RPC settings from server config to a [`Member`] with provided
     /// [`MemberId`].

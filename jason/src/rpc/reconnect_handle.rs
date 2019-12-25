@@ -73,13 +73,14 @@ impl ReconnectorHandle {
     /// Tries to reconnect [`ReconnectableRpcClient`] in a loop with growing
     /// delay until it will not be reconnected.
     ///
-    /// The first attempt to reconnect is guaranteed to happen no earlier than `starting_delay_ms`.
+    /// The first attempt to reconnect is guaranteed to happen no earlier than
+    /// `starting_delay_ms`.
     ///
-    /// Also this function guarantees that delay between reconnection attempts will be not greater
-    /// than `max_delay_ms`.
+    /// Also this function guarantees that delay between reconnection attempts
+    /// will be not greater than `max_delay_ms`.
     ///
-    /// After each reconnection try, delay between reconnections will be multiplied by `multiplier`
-    /// until it reaches `max_delay_ms`.
+    /// After each reconnection try, delay between reconnections will be
+    /// multiplied by `multiplier` until it reaches `max_delay_ms`.
     pub fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
