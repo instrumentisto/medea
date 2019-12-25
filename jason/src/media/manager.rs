@@ -209,7 +209,8 @@ impl InnerMediaManager {
         Some(stream)
     }
 
-    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and save its tracks to storage.
+    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and save
+    /// its tracks to storage.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/rnxcavf
@@ -252,7 +253,8 @@ impl InnerMediaManager {
         }
     }
 
-    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call and save its tracks to storage.
+    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call and save
+    /// its tracks to storage.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/wotjrns
@@ -277,10 +279,10 @@ impl InnerMediaManager {
                     .map_err(GetDisplayMediaFailed)
                     .map_err(tracerr::from_and_wrap!())?,
             )
-                .await
-                .map_err(JsError::from)
-                .map_err(GetUserMediaFailed)
-                .map_err(tracerr::from_and_wrap!())?;
+            .await
+            .map_err(JsError::from)
+            .map_err(GetUserMediaFailed)
+            .map_err(tracerr::from_and_wrap!())?;
 
             let stream = SysMediaStream::from(stream);
 
