@@ -701,6 +701,31 @@ It's recommended to cache `Peer` ID and `Member` ID relations in `Web Client`'s 
 ```
 </details>
 
+#### 10. RpcSettingsUpdated
+
+```rust
+struct RpcSettingsUpdated {
+    idle_timeout_ms: u64,
+    ping_interval_ms: u64,
+}
+```
+
+`Media server` notifies Web Client about necessity to update RPC
+settings.
+
+##### Examples
+
+<details>
+<summary>Media server notifies Web Client about necessity to set idle timeout to 10000 milliseconds and ping interval to 3000 milliseconds.</summary>
+
+```json
+{
+  "idle_timeout_ms": 10000,
+  "ping_interval_ms": 3000
+}
+```
+</details>
+
 
 ### Commands
 
