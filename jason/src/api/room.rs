@@ -102,15 +102,9 @@ impl RoomCloseReason {
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
 enum RoomError {
-    // TODO: just join these callback errors
-    /// Returned if the `on_failed_local_stream` callback was not set before
-    /// joining the room.
-    #[display(fmt = "`on_failed_local_stream` callback is not set")]
-    OnFailedLocalStreamCallbackNotSet,
-
-    /// Returned if the `on_connection_loss` callback wasn't set before
-    /// joining the room.
-    OnConnectionLossCallbackNotSet,
+    /// Returned if some mandatory callback wasn't set.
+    #[display(fmt = "`{}` callback isn't set.", _0)]
+    CallbackNotSet(&'static str),
 
     /// Returned if unable to init [`RpcTransport`].
     #[display(fmt = "Unable to init RPC transport: {}", _0)]
@@ -191,13 +185,13 @@ impl RoomHandle {
 
             if !inner.borrow().on_failed_local_stream.is_set() {
                 return Err(JasonError::from(tracerr::new!(
-                    RoomError::OnFailedLocalStreamCallbackNotSet
+                    RoomError::CallbackNotSet("on_failed_local_stream")
                 )));
             }
 
             if !inner.borrow().on_connection_loss.is_set() {
                 return Err(JasonError::from(tracerr::new!(
-                    RoomError::OnConnectionLossCallbackNotSet
+                    RoomError::CallbackNotSet("on_connection_loss")
                 )));
             }
 

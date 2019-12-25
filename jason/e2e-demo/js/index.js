@@ -351,8 +351,7 @@ window.onload = async function() {
       let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
       let connectionLossDefaultText = connectionLossMsg.textContent;
 
-      manualReconnectBtn.removeEventListener('click');
-      manualReconnectBtn.addEventListener('click', async () => {
+      manualReconnectBtn.onclick = async () => {
         try {
           connectionLossMsg.textContent = 'Trying to manually reconnect...';
           await reconnectHandle.reconnect_with_delay(0);
@@ -361,7 +360,7 @@ window.onload = async function() {
         } finally {
           connectionLossMsg.textContent = connectionLossDefaultText;
         }
-      });
+      };
       try {
         await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
       } catch (e) {

@@ -447,10 +447,13 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         self.send_event_to_member(
             id,
-            // TODO: https://github.com/serde-rs/json/pull/449
-            // 'serde-json' doesn't support 'u128', so we are casting this
+            // 'serde-json' doesn't support 'u128' deserialization in
+            // 'serde_json::from_value', so we are casting this
             // timestamp to more reasonable 'u64', since it's
             // definitely enough.
+            //
+            // Also 'Duration::from_millis' takes 'u64' on Jason side, so 'u64'
+            // can be considered quite correct the right type.
             Event::RpcSettingsUpdated {
                 idle_timeout_ms: self.idle_timeout.as_millis() as u64,
                 ping_interval_ms: self.ping_interval.as_millis() as u64,
