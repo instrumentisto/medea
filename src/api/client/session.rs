@@ -302,3 +302,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         }
     }
 }
+
+// TODO: adapt tests from instrumentisto/medea#76 when they will be
+//                    merged into master.

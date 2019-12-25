@@ -247,7 +247,7 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
-            self.connections.insert(member_id, conn);
+            self.insert_connection(member_id, conn);
             Box::new(wrap_future(
                 connection
                     .close(CloseDescription::new(CloseReason::Reconnected))
@@ -435,6 +435,9 @@ impl ParticipantService {
         self.members.insert(id, member);
     }
 
+    // TODO: you sure we need this only for new connections? i believe it could
+    //       be sent in WsSession for every new connection.
+
     /// Sends RPC settings from server config to a [`Member`] with provided
     /// [`MemberId`].
     #[allow(clippy::cast_possible_truncation)]
@@ -444,6 +447,7 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         self.send_event_to_member(
             id,
+            // TODO: https://github.com/serde-rs/json/pull/449
             // 'serde-json' doesn't support 'u128', so we are casting this
             // timestamp to more reasonable 'u64', since it's
             // definitely enough.

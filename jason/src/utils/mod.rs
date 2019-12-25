@@ -139,7 +139,7 @@ where
 }
 
 /// [`Future`] which resolves after provided [`JsDuration`].
-pub async fn resolve_after(delay_ms: JsDuration) -> Result<(), JsValue> {
+pub async fn resolve_after(delay_ms: JsDuration) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
             .set_timeout_with_callback_and_timeout_and_arguments_0(
@@ -148,6 +148,6 @@ pub async fn resolve_after(delay_ms: JsDuration) -> Result<(), JsValue> {
             )
             .unwrap();
     }))
-    .await?;
-    Ok(())
+    .await
+    .unwrap();
 }

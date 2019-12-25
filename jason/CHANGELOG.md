@@ -18,7 +18,9 @@ All user visible changes to this project will be documented in this file. This p
     - Remove error argument from `on_local_stream` callback ([#54]);
     - Room initialization ([#46]):
         - Remove `Jason.join_room()`.
-    - Respond with `Pong`s on server `Ping`s instead of sending `Ping`s ([#75]).
+        
+- Transport and messaging:
+    - Respond with `Pong`s to server `Ping`s instead of sending `Ping`s ([#75]).
 
 ### Added
 

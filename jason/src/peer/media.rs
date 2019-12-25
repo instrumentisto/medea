@@ -135,26 +135,24 @@ impl MediaConnections {
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
     /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
-    pub fn is_send_audio_enabled(&self) -> EnabledAudio {
+    pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
             .skip_while(|s| s.is_track_enabled())
             .next()
             .is_none()
-            .into()
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
     /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
-    pub fn is_send_video_enabled(&self) -> EnabledVideo {
+    pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
             .skip_while(|s| s.is_track_enabled())
             .next()
             .is_none()
-            .into()
     }
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of

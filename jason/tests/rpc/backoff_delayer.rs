@@ -21,15 +21,12 @@ async fn multiplier_works() {
     );
     await_with_timeout(Box::pin(delayer.delay()), 13)
         .await
-        .unwrap()
         .unwrap();
     await_with_timeout(Box::pin(delayer.delay()), 18)
         .await
-        .unwrap()
         .unwrap();
     await_with_timeout(Box::pin(delayer.delay()), 25)
         .await
-        .unwrap()
         .unwrap();
 }
 
@@ -43,15 +40,12 @@ async fn max_delay_works() {
     );
     await_with_timeout(Box::pin(delayer.delay()), 53)
         .await
-        .unwrap()
         .unwrap();
     await_with_timeout(Box::pin(delayer.delay()), 103)
         .await
-        .unwrap()
         .unwrap();
     await_with_timeout(Box::pin(delayer.delay()), 103)
         .await
-        .unwrap()
         .unwrap();
 }
 
@@ -67,14 +61,11 @@ async fn negative_multiplier() {
     );
     await_with_timeout(Box::pin(delayer.delay()), 13)
         .await
-        .unwrap()
         .unwrap();
     await_with_timeout(Box::pin(delayer.delay()), 3)
         .await
-        .unwrap()
         .unwrap();
     await_with_timeout(Box::pin(delayer.delay()), 3)
         .await
-        .unwrap()
         .unwrap();
 }

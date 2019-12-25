@@ -18,13 +18,11 @@ use crate::{
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
-pub enum HeartbeatError {
-    Transport(#[js(cause)] TransportError),
-}
+pub struct HeartbeatError(TransportError);
 
 type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
-/// Just wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
+/// Wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
 #[derive(Debug, From)]
 struct Abort(AbortHandle);
 
@@ -34,7 +32,7 @@ impl Drop for Abort {
     }
 }
 
-/// IDLE timeout of [`RpcClient`].
+/// Idle timeout of [`RpcClient`].
 #[derive(Debug, Copy, Clone)]
 pub struct IdleTimeout(pub JsDuration);
 
@@ -92,7 +90,7 @@ impl Heartbeat {
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
                     let wait_for_ping = this.borrow().ping_interval.0 * 2;
-                    resolve_after(wait_for_ping).await.unwrap();
+                    resolve_after(wait_for_ping).await;
                     let last_ping_num = this.borrow().last_ping_num;
                     if let Some(transport) = &this.borrow().transport {
                         if let Err(e) =
@@ -107,9 +105,7 @@ impl Heartbeat {
                     }
 
                     let idle_timeout = this.borrow().idle_timeout;
-                    resolve_after(idle_timeout.0 - wait_for_ping)
-                        .await
-                        .unwrap();
+                    resolve_after(idle_timeout.0 - wait_for_ping).await;
                     this.borrow_mut()
                         .on_idle_subs
                         .retain(|sub| !sub.is_closed());

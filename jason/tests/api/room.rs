@@ -64,9 +64,9 @@ async fn mute_unmute_audio() {
         .unwrap();
     let handle = room.new_handle();
     assert!(handle.mute_audio().is_ok());
-    assert!(!peer.is_send_audio_enabled().0);
+    assert!(!peer.is_send_audio_enabled());
     assert!(handle.unmute_audio().is_ok());
-    assert!(peer.is_send_audio_enabled().0);
+    assert!(peer.is_send_audio_enabled());
 }
 
 #[wasm_bindgen_test]
@@ -80,9 +80,9 @@ async fn mute_unmute_video() {
 
     let handle = room.new_handle();
     assert!(handle.mute_video().is_ok());
-    assert!(!peer.is_send_video_enabled().0);
+    assert!(!peer.is_send_video_enabled());
     assert!(handle.unmute_video().is_ok());
-    assert!(peer.is_send_video_enabled().0);
+    assert!(peer.is_send_video_enabled());
 }
 
 fn get_test_room_and_new_peer(
@@ -149,8 +149,8 @@ async fn mute_audio_room_before_init_peer() {
 
     resolve_after(500).await.unwrap();
 
-    assert!(peer.is_send_video_enabled().0);
-    assert!(!peer.is_send_audio_enabled().0);
+    assert!(peer.is_send_video_enabled());
+    assert!(!peer.is_send_audio_enabled());
 }
 
 #[wasm_bindgen_test]
@@ -172,8 +172,8 @@ async fn mute_video_room_before_init_peer() {
 
     resolve_after(500).await.unwrap();
 
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(!peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(!peer.is_send_video_enabled());
 }
 
 // Tests Room::inject_local_stream for create new PeerConnection.

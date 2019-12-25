@@ -697,10 +697,7 @@ impl ReconnectableRpcClient for WebSocketRpcClient {
                 .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
 
             loop {
-                delayer
-                    .delay()
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
+                delayer.delay().await;
                 match sock.get_state() {
                     State::Open => return Ok(()),
                     State::Closing | State::Closed => {

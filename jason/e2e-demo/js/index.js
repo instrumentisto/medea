@@ -316,31 +316,6 @@ window.onload = async function() {
     jason = new rust.Jason();
     room = await jason.init_room();
 
-    room.on_connection_loss( async (reconnectHandle) => {
-      let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
-      contentVisibility.show(connectionLossNotification);
-
-      let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
-      let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
-      let connectionLossDefaultText = connectionLossMsg.textContent;
-      manualReconnectBtn.addEventListener('click', async () => {
-        try {
-          connectionLossMsg.textContent = 'Trying to manually reconnect...';
-          await reconnectHandle.reconnect(0);
-          contentVisibility.hide(connectionLossNotification);
-        } catch (e) {
-        } finally {
-          connectionLossMsg.textContent = connectionLossDefaultText;
-        }
-      });
-      try {
-        await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
-      } catch (e) {
-        console.error('Error in reconnection with backoff:\n' + e.message());
-      }
-      contentVisibility.hide(connectionLossNotification);
-    });
-
     try {
       const stream = await getStream(audioSelect, videoSelect);
       await updateLocalVideo(stream);
@@ -366,6 +341,33 @@ window.onload = async function() {
 
     room.on_failed_local_stream((error) => {
       console.error(error);
+    });
+
+    room.on_connection_loss( async (reconnectHandle) => {
+      let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
+      contentVisibility.show(connectionLossNotification);
+
+      let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
+      let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
+      let connectionLossDefaultText = connectionLossMsg.textContent;
+
+      manualReconnectBtn.removeEventListener('click');
+      manualReconnectBtn.addEventListener('click', async () => {
+        try {
+          connectionLossMsg.textContent = 'Trying to manually reconnect...';
+          await reconnectHandle.reconnect_with_delay(0);
+          contentVisibility.hide(connectionLossNotification);
+        } catch (e) {
+        } finally {
+          connectionLossMsg.textContent = connectionLossDefaultText;
+        }
+      });
+      try {
+        await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
+      } catch (e) {
+        console.error('Error in reconnection with backoff:\n' + e.message());
+      }
+      contentVisibility.hide(connectionLossNotification);
     });
 
     room.on_close(function (on_closed) {

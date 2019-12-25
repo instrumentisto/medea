@@ -15,12 +15,9 @@ use crate::{
     utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
 };
 
-/// Errors which can occur while reconnecting with [`ReconnectorHandle`].
+/// [`RpcClient`] which will be reconnected is gone.
 #[derive(Debug, Display, JsCaused)]
-enum ReconnectorError {
-    /// [`RpcClient`] which will be reconnected is gone.
-    RpcClientGone,
-}
+struct RpcClientGoneError;
 
 struct Inner {
     /// Client which may be reconnected with this [`Reconnector`].
@@ -51,20 +48,18 @@ pub struct ReconnectorHandle(Weak<Inner>);
 
 #[wasm_bindgen]
 impl ReconnectorHandle {
-    /// Tries to reconnect after provided delay.
-    ///
-    /// Delay is in milliseconds.
-    pub fn reconnect(&self, delay_ms: u32) -> Promise {
+    /// Tries to reconnect after provided delay in milliseconds.
+    pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
         let this = self.clone();
         future_to_promise(async move {
             let inner = this.0.upgrade_handler::<JsValue>()?;
             resolve_after(Duration::from_millis(u64::from(delay_ms)).into())
-                .await?;
+                .await;
 
             Weak::upgrade(&inner.rpc)
                 .ok_or_else(|| {
                     JsValue::from(JasonError::from(tracerr::new!(
-                        ReconnectorError::RpcClientGone
+                        RpcClientGoneError
                     )))
                 })?
                 .reconnect()
@@ -74,6 +69,8 @@ impl ReconnectorHandle {
             Ok(JsValue::NULL)
         })
     }
+
+    // TODO: these docs will be exposed to js, so should be improved.
 
     /// Tries to reconnect [`ReconnectableRpcClient`] in a loop with growing
     /// delay until it will not be reconnected.
@@ -89,7 +86,7 @@ impl ReconnectorHandle {
 
             let rpc = Weak::upgrade(&inner.rpc).ok_or_else(|| {
                 JsValue::from(JasonError::from(tracerr::new!(
-                    ReconnectorError::RpcClientGone
+                    RpcClientGoneError
                 )))
             })?;
 

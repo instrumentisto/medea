@@ -35,16 +35,16 @@ async fn mute_unmute_audio() {
         .await
         .unwrap();
 
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled());
 
     peer.toggle_send_audio(false.into());
-    assert!(!peer.is_send_audio_enabled().0);
-    assert!(peer.is_send_video_enabled().0);
+    assert!(!peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled());
 
     peer.toggle_send_audio(true.into());
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled());
 }
 
 #[wasm_bindgen_test]
@@ -65,16 +65,16 @@ async fn mute_unmute_video() {
         .await
         .unwrap();
 
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled());
 
     peer.toggle_send_video(false.into());
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(!peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(!peer.is_send_video_enabled());
 
     peer.toggle_send_video(true.into());
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled());
 }
 
 #[wasm_bindgen_test]
@@ -95,9 +95,9 @@ async fn new_with_mute_audio() {
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
-    assert!(!peer.is_send_audio_enabled().0);
+    assert!(!peer.is_send_audio_enabled());
 
-    assert!(peer.is_send_video_enabled().0);
+    assert!(peer.is_send_video_enabled());
 }
 
 #[wasm_bindgen_test]
@@ -118,8 +118,8 @@ async fn new_with_mute_video() {
         .await
         .unwrap();
 
-    assert!(peer.is_send_audio_enabled().0);
-    assert!(!peer.is_send_video_enabled().0);
+    assert!(peer.is_send_audio_enabled());
+    assert!(!peer.is_send_video_enabled());
 }
 
 #[wasm_bindgen_test]

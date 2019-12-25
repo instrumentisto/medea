@@ -199,6 +199,7 @@ pub enum Event {
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
 
+    // TODO: update rfc
     /// The Media server notifies Web Client about necessity to update RPC
     /// settings.
     RpcSettingsUpdated {

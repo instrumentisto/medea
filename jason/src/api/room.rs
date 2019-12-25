@@ -102,6 +102,7 @@ impl RoomCloseReason {
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
 enum RoomError {
+    // TODO: just join these callback errors
     /// Returned if the `on_failed_local_stream` callback was not set before
     /// joining the room.
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
@@ -218,8 +219,8 @@ impl RoomHandle {
                     connection_loss_stream.next().await
                 {
                     match weak_inner.upgrade_handler::<JsValue>() {
-                        Ok(strong_inner) => {
-                            strong_inner
+                        Ok(inner) => {
+                            inner
                                 .borrow()
                                 .on_connection_loss
                                 .call(reconnect_handle);
