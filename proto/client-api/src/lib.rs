@@ -199,7 +199,7 @@ pub enum Event {
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
 
-    /// The Media server notifies Web Client about necessity to update RPC
+    /// Media server notifies Web Client about necessity to update RPC
     /// settings.
     RpcSettingsUpdated {
         /// If server doesn't receive [`ClientMsg::Pong`] from a client during

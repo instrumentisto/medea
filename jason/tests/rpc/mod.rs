@@ -465,7 +465,7 @@ mod reconnect {
     ///    is not called 3 times, result of reconnection will be
     ///    [`TransportError::InitSocket`]).
     #[wasm_bindgen_test]
-    async fn timeout() {
+    async fn reconnect_with_backoff() {
         let mut transport = MockRpcTransport::new();
         transport
             .expect_on_message()

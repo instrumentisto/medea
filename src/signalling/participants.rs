@@ -264,7 +264,7 @@ impl ParticipantService {
                     ParticipantServiceErr::from(err)
                 })
                 .and_then(
-                    move |ice: IceUser, room: &mut Room, ctx| {
+                    move |ice: IceUser, room: &mut Room, _| {
                         room.members.insert_connection(member_id.clone(), conn);
                         member.replace_ice_user(ice);
 
