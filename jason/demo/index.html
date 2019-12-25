@@ -14,9 +14,6 @@
       MediaStreamConstraints, AudioTrackConstraints, VideoTrackConstraints,
     } from './js/medea_jason.js';
 
-    //TODO: add reconnect with backoff, print connection state somewhere
-    //     [connected, reconnection, closed]
-
     let inited = false;
     const controlUrl = document.location.protocol + "//" +
                        document.location.host + "/control-api/";
