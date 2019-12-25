@@ -15,8 +15,6 @@ use crate::{
     rpc::{RpcTransport, TransportError},
     utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
 };
-use std::rc::Weak;
-use wasm_bindgen::JsValue;
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
@@ -73,11 +71,11 @@ impl Inner {
     fn send_pong(&self, n: u64) {
         self.transport
             .as_ref()
-            .ok_or(
+            .ok_or_else(|| {
                 tracerr::new!("RpcTransport from Heartbeat unexpectedly gone.")
                     .trace()
-                    .to_string(),
-            )
+                    .to_string()
+            })
             .and_then(|t| {
                 t.send(&ClientMsg::Pong(n))
                     .map_err(|e| e.trace().to_string())
