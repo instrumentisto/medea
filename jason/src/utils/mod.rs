@@ -83,6 +83,9 @@ impl Mul<f32> for JsDuration {
         // Theoretically we can get negative number here. But all negative
         // numbers will be reduced to zero. This is default behavior of the
         // JavaScript's 'setTimeout' and it's OK here.
+        //
+        // We can get 'Err' here only if value is less than zero (this can be
+        // proved by looking at the source code).
         let multiplied_duration =
             (duration_ms * multiplier).to_u64().unwrap_or(0);
         Self(Duration::from_millis(multiplied_duration))
