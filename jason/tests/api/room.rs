@@ -321,10 +321,10 @@ async fn error_join_room_without_failed_stream_callback() {
     match room_handle.inner_join(String::from("token")).await {
         Ok(_) => unreachable!(),
         Err(e) => {
-            assert_eq!(e.name(), "OnFailedLocalStreamCallbackNotSet");
+            assert_eq!(e.name(), "CallbackNotSet");
             assert_eq!(
                 e.message(),
-                "`on_failed_local_stream` callback is not set",
+                "`on_failed_local_stream` callback isn't set.",
             );
             assert!(!e.trace().is_empty());
         }
