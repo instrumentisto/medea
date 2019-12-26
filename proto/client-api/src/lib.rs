@@ -28,6 +28,7 @@ pub struct TrackId(pub u64);
 #[cfg(feature = "medea")]
 pub trait Incrementable {
     /// Returns current value + 1.
+    #[must_use]
     fn incr(&self) -> Self;
 }
 
@@ -35,6 +36,11 @@ pub trait Incrementable {
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {
+            // TODO: Remove `clippy::must_use_candidate` once the issue below is
+            //       resolved:
+            //       https://github.com/rust-lang/rust-clippy/issues/4779
+            #[allow(clippy::must_use_candidate)]
+            #[inline]
             fn incr(&self) -> Self {
                 Self(self.0 + 1)
             }
