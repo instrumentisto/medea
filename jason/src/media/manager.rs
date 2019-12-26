@@ -170,10 +170,11 @@ impl InnerMediaManager {
     }
 
     /// Tries to build new [MediaStream][1] from already owned tracks to avoid
-    /// redundant [getUserMedia()][2] requests.
+    /// redundant [getUserMedia()][2]/[getDisplayMedia()][3] calls.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://tinyurl.com/wotjrns
     fn get_from_storage(
         &self,
         caps: &MediaStreamConstraints,
@@ -209,7 +210,7 @@ impl InnerMediaManager {
         Some(stream)
     }
 
-    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and save
+    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and saves
     /// its tracks to storage.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
@@ -253,8 +254,8 @@ impl InnerMediaManager {
         }
     }
 
-    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call and save
-    /// its tracks to storage.
+    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call and
+    /// saves its tracks to storage.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/wotjrns

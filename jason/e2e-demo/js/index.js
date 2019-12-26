@@ -288,9 +288,7 @@ window.onload = async function() {
   }
 
   async function getStream(audio_select, video_select) {
-
     let constraints = new rust.MediaStreamConstraints();
-
     let audio = new rust.AudioTrackConstraints();
     let audioSource = audio_select.options[audio_select.selectedIndex];
     if (audioSource) {
