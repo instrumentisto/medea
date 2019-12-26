@@ -13,7 +13,7 @@ use std::{
 };
 
 use bigdecimal::{BigDecimal, ToPrimitive as _};
-use derive_more::{Add, From, Sub};
+use derive_more::{Add, Div, From, Sub};
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -43,7 +43,9 @@ pub fn window() -> Window {
 /// side timers.
 ///
 /// Also [`JsDuration`] can be multiplied by [`f32`].
-#[derive(Debug, From, Copy, Clone, Add, Sub, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, From, Copy, Clone, Add, Sub, PartialEq, Eq, PartialOrd, Ord, Div,
+)]
 pub struct JsDuration(Duration);
 
 impl JsDuration {

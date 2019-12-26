@@ -1,12 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
-use derive_more::{Display, From};
+use derive_more::{Add, Display, Div, From, Mul};
 use futures::{
     channel::mpsc,
     future::{self, AbortHandle},
     stream::LocalBoxStream,
     StreamExt as _,
 };
+use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -15,6 +16,7 @@ use crate::{
     rpc::{RpcTransport, TransportError},
     utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
 };
+use std::{cell::Cell, time::Duration};
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
@@ -37,7 +39,7 @@ impl Drop for Abort {
 pub struct IdleTimeout(pub JsDuration);
 
 /// Ping interval of [`RpcClient`].
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Mul, Add, Div, PartialEq, Eq, PartialOrd)]
 pub struct PingInterval(pub JsDuration);
 
 struct Inner {
@@ -62,6 +64,8 @@ struct Inner {
 
     /// [`mpsc::UnboundedSender`]s for a [`Heartbeat::on_idle`].
     on_idle_subs: Vec<mpsc::UnboundedSender<()>>,
+
+    max_ping_interval: Rc<Cell<PingInterval>>,
 }
 
 impl Inner {
@@ -108,6 +112,7 @@ impl Heartbeat {
             idle_watchdog_task: None,
             ping_interval,
             last_ping_num: 0,
+            max_ping_interval: Rc::new(Cell::new(ping_interval)),
         })))
     }
 
@@ -181,14 +186,17 @@ impl Heartbeat {
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
                     // TODO: perhaps idle_timeout / 2?
-                    let wait_for_ping = this.borrow().ping_interval.0 * 2;
-                    resolve_after(wait_for_ping).await;
+                    let wait_for_ping =
+                        this.borrow().max_ping_interval.get() * 1.5;
+
+                    resolve_after(wait_for_ping.0).await;
+                    console_error("We pre-pong now!");
 
                     let last_ping_num = this.borrow().last_ping_num;
                     this.borrow().send_pong(last_ping_num + 1);
 
                     let idle_timeout = this.borrow().idle_timeout;
-                    resolve_after(idle_timeout.0 - wait_for_ping).await;
+                    resolve_after(idle_timeout.0 - wait_for_ping.0).await;
                     this.borrow_mut()
                         .on_idle_subs
                         .retain(|sub| !sub.is_closed());
@@ -203,8 +211,27 @@ impl Heartbeat {
                 }
             });
 
+        let max_ping_interval = Rc::clone(&self.0.borrow().max_ping_interval);
         spawn_local(async move {
-            idle_watchdog.await.ok();
+            let watchdog_start_timestamp = Date::now() as u64;
+            if let Err(_) = idle_watchdog.await {
+                let watchdog_abort_timestamp = Date::now() as u64;
+                let real_ping_interval = PingInterval(
+                    Duration::from_millis(
+                        watchdog_abort_timestamp - watchdog_start_timestamp,
+                    )
+                    .into(),
+                );
+
+                if real_ping_interval > max_ping_interval.get() {
+                    max_ping_interval.set(real_ping_interval);
+                }
+
+                console_error(format!(
+                    "Current max ping interval: {:?}",
+                    max_ping_interval.get()
+                ));
+            }
         });
 
         self.0.borrow_mut().idle_watchdog_task =
