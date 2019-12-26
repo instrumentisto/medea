@@ -26,6 +26,7 @@ use crate::{
 enum InnerCloseReason {
     /// [`WsSession`] was closed by [`RpcServer`] or was considered idle.
     ByServer,
+
     /// [`WsSession`] was closed by remote client.
     ByClient(ClosedReason),
 }
