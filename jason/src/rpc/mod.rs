@@ -13,7 +13,12 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::{mpsc, oneshot}, future::LocalBoxFuture, stream::{LocalBoxStream, StreamExt as _}, Stream};
+use futures::{
+    channel::{mpsc, oneshot},
+    future::LocalBoxFuture,
+    stream::{LocalBoxStream, StreamExt as _},
+    Stream,
+};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
@@ -337,7 +342,11 @@ impl Inner {
             self.on_state_change_subs
                 .iter()
                 .filter_map(|sub| sub.unbounded_send(state).err())
-                .for_each(|e| console_error("RpcClient::on_state_change sub unexpectedly gone."));
+                .for_each(|e| {
+                    console_error(
+                        "RpcClient::on_state_change sub unexpectedly gone.",
+                    )
+                });
         }
     }
 }
@@ -511,10 +520,14 @@ impl WebSocketRpcClient {
         Ok(())
     }
 
-    async fn connect(&self, token: String) -> Result<(), Traced<RpcClientError>> {
+    async fn connect(
+        &self,
+        token: String,
+    ) -> Result<(), Traced<RpcClientError>> {
         self.0.borrow_mut().token = Some(token.clone());
         self.0.borrow_mut().update_state(State::Connecting);
-        let create_transport_fut = (self.0.borrow().rpc_transport_factory)(token);
+        let create_transport_fut =
+            (self.0.borrow().rpc_transport_factory)(token);
         let transport = create_transport_fut
             .await
             .map_err(tracerr::map_from_and_wrap!())
@@ -526,7 +539,9 @@ impl WebSocketRpcClient {
         let mut transport_on_state_change_stream = transport.on_state_change();
         let weak_inner = Rc::downgrade(&self.0);
         spawn_local(async move {
-            while let Some(state) = transport_on_state_change_stream.next().await {
+            while let Some(state) =
+                transport_on_state_change_stream.next().await
+            {
                 if let Some(inner) = weak_inner.upgrade() {
                     inner.borrow_mut().update_state(state);
                 }
@@ -590,48 +605,41 @@ impl RpcClient for WebSocketRpcClient {
         Box::pin(async move {
             let current_token = this.0.borrow().token.clone();
             if let Some(current_token) = current_token {
-               if current_token == token {
-                   let state = this.get_state();
-                   match state {
-                       State::Open => {
-                           Ok(())
-                           // `return Ok(())`
-                           // Just resolve it
-                       }
-                       State::Connecting => {
-                           console_error("Connecting");
-                           let mut transport_state_stream = this.on_state_change();
-                           while let Some(state) = transport_state_stream.next().await {
-                               match state {
-                                   State::Open => {
-                                       console_error("asdlaj");
-                                       return Ok(())
-                                   }
-                                   State::Closing | State::Closed => {
-                                       // Change error
-                                       return Err(tracerr::new!(RpcClientError::ReconnectionFailed))
-                                   }
-                                   State::Connecting => ()
-                               }
-                           }
-                           // TODO: PANIC
-                           panic!("RpcTransport unexpectedly gone.")
-                       }
-                       State::Closed | State::Closing => {
-                           this.connect(token).await
-                           // `connect`
-                           // We should create new 'RpcTransport'
-                       }
-                   }
-               } else {
-                   this.connect(token).await
-                   // `connect`
-                   // We should create new 'RpcTransport'
-               }
+                if current_token == token {
+                    let state = this.get_state();
+                    match state {
+                        State::Open => Ok(()),
+                        State::Connecting => {
+                            let mut transport_state_stream =
+                                this.on_state_change();
+                            while let Some(state) =
+                                transport_state_stream.next().await
+                            {
+                                match state {
+                                    State::Open => {
+                                        return Ok(());
+                                    }
+                                    State::Closing | State::Closed => {
+                                        // Change error
+                                        return Err(tracerr::new!(
+                                            RpcClientError::ReconnectionFailed
+                                        ));
+                                    }
+                                    State::Connecting => (),
+                                }
+                            }
+                            // TODO: PANIC
+                            panic!("RpcTransport unexpectedly gone.")
+                        }
+                        State::Closed | State::Closing => {
+                            this.connect(token).await
+                        }
+                    }
+                } else {
+                    this.connect(token).await
+                }
             } else {
                 this.connect(token).await
-                // `connect`
-                // This is new connection.
             }
         })
     }
@@ -718,157 +726,6 @@ impl RpcClient for WebSocketRpcClient {
         Box::pin(rx)
     }
 }
-
-///// RPC client which can reconnect.
-//pub trait ReconnectableRpcClient {
-//    // TODO: what is the purpose of reconnect method, when ther are already a
-//    //       connect method? Both methods goals is to change connection state to
-//    //      `connected`.
-//
-//    /// Tries to reconnect a [`RpcClient`].
-//    ///
-//    /// If reconnection already performed on [`RpcTransport`], then
-//    /// this function will simply subscribe on reconnection result.
-//    ///
-//    /// If connection already opened in [`RpcTransport`], then [`Future`]
-//    /// will be instantly resolved.
-//    fn reconnect(
-//        &self,
-//    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
-//
-//    /// Tries to reconnect [`RpcTransport`] in a loop with growing delay until
-//    /// it will not be reconnected.
-//    ///
-//    /// This function will consider state of [`RpcTransport`]. If
-//    /// [`RpcTransport`] already reconnecting, new reconnection will not be
-//    /// performed in this step of loop. If already
-//    /// started reconnection ended with [`State::Open`] then [`Future`] will
-//    /// simply resolved. If already started reconnection ended with
-//    /// [`State::Close`] or [`State::Closing`] then next step of loop will
-//    /// be performed after delay.
-//    ///
-//    /// If [`RpcTransport`] state is already [`State::Open`] then
-//    /// [`Future`] will be resolved immediately after `starting_delay`.
-//    fn reconnect_with_backoff(
-//        &self,
-//        starting_delay: JsDuration,
-//        multiplier: f32,
-//        max_delay_ms: JsDuration,
-//    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
-//}
-
-//impl ReconnectableRpcClient for WebSocketRpcClient {
-//    /// Tries to reconnect a [`RpcClient`].
-//    ///
-//    /// If reconnection already performed on [`RpcTransport`], then
-//    /// this function will simply subscribe on reconnection result.
-//    ///
-//    /// If connection already opened in [`RpcTransport`], then [`Future`]
-//    /// will be instantly resolved.
-//    fn reconnect(
-//        &self,
-//    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-//        let weak_this = self.downgrade();
-//
-//        Box::pin(async move {
-//            let this = weak_this
-//                .upgrade()
-//                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
-//
-//            let sock = this
-//                .0
-//                .borrow()
-//                .sock
-//                .as_ref()
-//                .map(Rc::clone)
-//                .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
-//
-//            match sock.get_state() {
-//                State::Connecting => {
-//                    let mut state_change_stream = sock.on_state_change();
-//                    while let Some(state) = state_change_stream.next().await {
-//                        match state {
-//                            State::Open => {
-//                                return Ok(());
-//                            }
-//                            State::Closed | State::Closing => {
-//                                return Err(tracerr::new!(
-//                                    RpcClientError::ReconnectionFailed
-//                                ));
-//                            }
-//                            _ => (),
-//                        }
-//                    }
-//                }
-//                State::Closing | State::Closed => {
-//                    this.try_reconnect(&sock)
-//                        .await
-//                        .map_err(tracerr::map_from_and_wrap!())?;
-//                    return Ok(());
-//                }
-//                State::Open => {
-//                    return Ok(());
-//                }
-//            };
-//            Ok(())
-//        })
-//    }
-//
-//    /// Tries to reconnect [`RpcTransport`] in a loop with growing delay until
-//    /// it will not be reconnected.
-//    ///
-//    /// This function will consider state of [`RpcTransport`]. If
-//    /// [`RpcTransport`] already reconnecting, new reconnection will not be
-//    /// performed in this step of loop. If already
-//    /// started reconnection ended with [`State::Open`] then [`Future`] will
-//    /// simply resolved. If already started reconnection ended with
-//    /// [`State::Close`] or [`State::Closing`] then next step of loop will
-//    /// be performed after delay.
-//    ///
-//    /// If [`RpcTransport`] state is already [`State::Open`] then
-//    /// [`Future`] will be resolved immediately after `starting_delay`.
-//    fn reconnect_with_backoff(
-//        &self,
-//        starting_delay: JsDuration,
-//        multiplier: f32,
-//        max_delay_ms: JsDuration,
-//    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-//        let weak_this = self.downgrade();
-//        Box::pin(async move {
-//            let this = weak_this
-//                .upgrade()
-//                .ok_or_else(|| tracerr::new!(RpcClientError::RpcClientGone))?;
-//            let mut delayer =
-//                BackoffDelayer::new(starting_delay, multiplier, max_delay_ms);
-//            let sock = this
-//                .0
-//                .borrow()
-//                .sock
-//                .as_ref()
-//                .cloned()
-//                .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
-//
-//            loop {
-//                delayer.delay().await;
-//                match sock.get_state() {
-//                    State::Open => return Ok(()),
-//                    State::Closing | State::Closed => {
-//                        if this.try_reconnect(&sock).await.is_ok() {
-//                            return Ok(());
-//                        }
-//                    }
-//                    State::Connecting => {
-//                        if Some(State::Open)
-//                            == sock.on_state_change().next().await
-//                        {
-//                            return Ok(());
-//                        }
-//                    }
-//                }
-//            }
-//        })
-//    }
-//}
 
 impl Drop for Inner {
     /// Drops related connection and its [`Heartbeat`].

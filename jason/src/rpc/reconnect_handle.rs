@@ -8,9 +8,12 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::RpcClient,
-    utils::{resolve_after, JasonError, JsCaused, JsError},
+    rpc::{BackoffDelayer, RpcClient, RpcClientError},
+    utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
 };
+use js_sys::Math::max;
+use std::rc::Rc;
+use tracerr::Traced;
 
 // TODO: why not reuse DetachedState error?
 
@@ -39,6 +42,14 @@ impl Reconnector {
     }
 }
 
+async fn reconnect(
+    rpc: Rc<dyn RpcClient>,
+) -> Result<(), Traced<RpcClientError>> {
+    // TODO: PANIC
+    let token = rpc.get_token().unwrap();
+    rpc.connect(token).await.map_err(|e| tracerr::new!(e))
+}
+
 /// JS side handle for [`Reconnector`].
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -53,15 +64,13 @@ impl ReconnectorHandle {
             resolve_after(Duration::from_millis(u64::from(delay_ms)).into())
                 .await;
 
-            let rpc = Weak::upgrade(&rpc)
-                .ok_or_else(|| {
-                    JsValue::from(JasonError::from(tracerr::new!(
-                        RpcClientGoneError
-                    )))
-                })?;
+            let rpc = Weak::upgrade(&rpc).ok_or_else(|| {
+                JsValue::from(JasonError::from(tracerr::new!(
+                    RpcClientGoneError
+                )))
+            })?;
             let token = rpc.get_token().unwrap();
-            rpc
-                .connect(token)
+            rpc.connect(token)
                 .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
@@ -69,48 +78,38 @@ impl ReconnectorHandle {
         })
     }
 
-//    /// Tries to reconnect [`ReconnectableRpcClient`] in a loop with growing
-//    /// delay until it will not be reconnected.
-//    ///
-//    /// The first attempt to reconnect is guaranteed to happen no earlier than
-//    /// `starting_delay_ms`.
-//    ///
-//    /// Also this function guarantees that delay between reconnection attempts
-//    /// will be not greater than `max_delay_ms`.
-//    ///
-//    /// After each reconnection try, delay between reconnections will be
-//    /// multiplied by `multiplier` until it reaches `max_delay_ms`.
-//    pub fn reconnect_with_backoff(
-//        &self,
-//        starting_delay_ms: u32,
-//        multiplier: f32,
-//        max_delay_ms: u32,
-//    ) -> Promise {
-//        // TODO: we discussed that it should work in different way
-//        //      backoff should be handled here, and not in rpc-connection,
-//        //      reconnector makes request to change states,
-//        //      like: "rpc connection, i heard that you are disconnected
-//        //      atm, change you state to connected, pls". Calling
-//        //      rpc.reconnect_with_backoff(), you are changing rpc state
-//        //      to some "reconnection with backoff" state.
-//
-//        let rpc = Clone::clone(&self.0);
-//        future_to_promise(async move {
-//            let rpc = Weak::upgrade(&rpc).ok_or_else(|| {
-//                JsValue::from(JasonError::from(tracerr::new!(
-//                    RpcClientGoneError
-//                )))
-//            })?;
-//
-//            rpc.reconnect_with_backoff(
-//                Duration::from_millis(u64::from(starting_delay_ms)).into(),
-//                multiplier,
-//                Duration::from_millis(u64::from(max_delay_ms)).into(),
-//            )
-//            .await
-//            .map_err(|e| JsValue::from(JasonError::from(e)))?;
-//
-//            Ok(JsValue::NULL)
-//        })
-//    }
+    /// Tries to reconnect [`ReconnectableRpcClient`] in a loop with growing
+    /// delay until it will not be reconnected.
+    ///
+    /// The first attempt to reconnect is guaranteed to happen no earlier than
+    /// `starting_delay_ms`.
+    ///
+    /// Also this function guarantees that delay between reconnection attempts
+    /// will be not greater than `max_delay_ms`.
+    ///
+    /// After each reconnection try, delay between reconnections will be
+    /// multiplied by `multiplier` until it reaches `max_delay_ms`.
+    pub fn reconnect_with_backoff(
+        &self,
+        starting_delay_ms: u32,
+        multiplier: f32,
+        max_delay: u32,
+    ) -> Promise {
+        let rpc = self.0.clone();
+        future_to_promise(async move {
+            let mut backoff_delayer = BackoffDelayer::new(
+                Duration::from_millis(u64::from(starting_delay_ms)).into(),
+                multiplier,
+                Duration::from_millis(u64::from(max_delay)).into(),
+            );
+
+            while let Err(e) =
+                reconnect(rpc.upgrade().ok_or_else(|| JsValue::NULL)?).await
+            {
+                backoff_delayer.delay().await;
+            }
+
+            Ok(JsValue::NULL)
+        })
+    }
 }
