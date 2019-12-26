@@ -273,7 +273,7 @@ struct Inner {
     sock: Option<Rc<dyn RpcTransport>>,
 
     /// Service for sending/receiving ping pongs between the client and server.
-    heartbeat: Heartbeat,
+    heartbeat: Option<Heartbeat>,
 
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
@@ -321,10 +321,7 @@ impl Inner {
             sock: None,
             on_close_subscribers: Vec::new(),
             subs: vec![],
-            heartbeat: Heartbeat::new(
-                IdleTimeout(Duration::from_secs(10).into()),
-                PingInterval(Duration::from_secs(3).into()),
-            ),
+            heartbeat: None,
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             on_connection_loss_subs: Vec::new(),
             reconnector: None,
@@ -405,7 +402,10 @@ impl WebSocketRpcClient {
     /// Stops [`Heartbeat`], sends [`ReconnectHandle`] to all
     /// [`RpcClient::on_connection_loss`] subs
     fn send_connection_loss(&self) {
-        self.0.borrow_mut().heartbeat.stop();
+        // TODO: Maybe just 'take()'??
+        if let Some(hb) = &self.0.borrow_mut().heartbeat {
+            hb.stop();
+        };
         self.0
             .borrow_mut()
             .on_connection_loss_subs
@@ -428,7 +428,10 @@ impl WebSocketRpcClient {
     /// This function will be called on every WebSocket close (normal and
     /// abnormal) regardless of the [`CloseReason`].
     fn on_transport_close(&self, close_msg: &CloseMsg) {
-        self.0.borrow_mut().heartbeat.stop();
+        // TODO: maybe 'take()'??
+        if let Some(hb) = &self.0.borrow_mut().heartbeat {
+            hb.stop();
+        }
 
         match &close_msg {
             CloseMsg::Normal(_, reason) => match reason {
@@ -496,30 +499,6 @@ impl WebSocketRpcClient {
         WeakWebsocketRpcClient::new(self)
     }
 
-    /// Tries to reconnect [`RpcTransport`].
-    ///
-    /// If reconnection is successful then [`Heartbeat`] of this [`RpcClient`]
-    /// will be started again with reconnected [`RpcTransport`].
-    async fn try_reconnect(
-        &self,
-        sock: &Rc<dyn RpcTransport>,
-    ) -> Result<(), Traced<RpcClientError>> {
-        sock.reconnect()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        let transport = self.0.borrow().sock.clone();
-        if let Some(transport) = transport {
-            self.0
-                .borrow_mut()
-                .heartbeat
-                .start(transport)
-                .map_err(tracerr::map_from_and_wrap!())?;
-        }
-
-        Ok(())
-    }
-
     async fn connect(
         &self,
         token: String,
@@ -535,6 +514,46 @@ impl WebSocketRpcClient {
                 self.0.borrow_mut().update_state(State::Closed);
                 e
             })?;
+
+        if let Some(msg) = transport
+            .on_message()
+            .map_err(tracerr::map_from_and_wrap!())?
+            .next()
+            .await
+        {
+            if let ServerMsg::RpcSettingsUpdated(rpc_settings) = msg {
+                let heartbeat = Heartbeat::new(
+                    IdleTimeout(
+                        Duration::from_millis(rpc_settings.idle_timeout_ms)
+                            .into(),
+                    ),
+                    PingInterval(
+                        Duration::from_millis(rpc_settings.ping_interval_ms)
+                            .into(),
+                    ),
+                );
+                heartbeat
+                    .start(Rc::clone(&transport))
+                    .map_err(tracerr::map_from_and_wrap!())?;
+                let mut on_idle = heartbeat.on_idle();
+                let weak_this = self.downgrade();
+                spawn_local(async move {
+                    while let Some(_) = on_idle.next().await {
+                        if let Some(this) = weak_this.upgrade() {
+                            this.send_connection_loss();
+                        }
+                    }
+                });
+                self.0.borrow_mut().heartbeat = Some(heartbeat);
+            } else {
+                // TODO: panic
+                panic!("slkjfd")
+            }
+        } else {
+            // TODO: PANIC
+            panic!("???")
+        }
+
         self.0.borrow_mut().update_state(State::Open);
         let mut transport_on_state_change_stream = transport.on_state_change();
         let weak_inner = Rc::downgrade(&self.0);
@@ -548,12 +567,6 @@ impl WebSocketRpcClient {
             }
         });
 
-        self.0
-            .borrow_mut()
-            .heartbeat
-            .start(Rc::clone(&transport))
-            .map_err(tracerr::map_from_and_wrap!())?;
-
         let this_clone = self.downgrade();
         let mut on_socket_message = transport
             .on_message()
@@ -562,16 +575,6 @@ impl WebSocketRpcClient {
             while let Some(msg) = on_socket_message.next().await {
                 if let Some(this) = this_clone.upgrade() {
                     this.on_transport_message(msg)
-                }
-            }
-        });
-
-        let mut on_idle = self.0.borrow_mut().heartbeat.on_idle();
-        let weak_this = self.downgrade();
-        spawn_local(async move {
-            while let Some(_) = on_idle.next().await {
-                if let Some(this) = weak_this.upgrade() {
-                    this.send_connection_loss();
                 }
             }
         });
@@ -695,11 +698,9 @@ impl RpcClient for WebSocketRpcClient {
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
     ) {
-        console_error("Update settings");
-        self.0
-            .borrow_mut()
-            .heartbeat
-            .update_settings(idle_timeout, ping_interval);
+        if let Some(hb) = &mut self.0.borrow_mut().heartbeat {
+            hb.update_settings(idle_timeout, ping_interval);
+        }
     }
 
     /// Returns [`LocalBoxStream`] to which will be sent
@@ -733,6 +734,9 @@ impl Drop for Inner {
         if let Some(socket) = self.sock.take() {
             socket.set_close_reason(self.close_reason.clone());
         }
-        self.heartbeat.stop();
+        // TODO: maybe 'take()'??
+        if let Some(hb) = &self.heartbeat {
+            hb.stop();
+        }
     }
 }
