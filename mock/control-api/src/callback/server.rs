@@ -48,6 +48,7 @@ pub struct GrpcCallbackService {
 impl GrpcCallbackService {
     /// Returns [`GrpcCallbackService`] with provided pointer to [`Vec`] of
     /// [`CallbackItem`]s.
+    #[must_use]
     pub fn new(events: CallbackItems) -> Self {
         Self { events }
     }
@@ -88,6 +89,7 @@ impl Handler<GetCallbackItems> for GrpcCallbackServer {
 }
 
 /// Run [`GrpcCallbackServer`].
+#[must_use]
 pub fn run(args: &ArgMatches) -> Addr<GrpcCallbackServer> {
     let host = args.value_of("callback_host").unwrap();
     let port = args.value_of("callback_port").unwrap().parse().unwrap();

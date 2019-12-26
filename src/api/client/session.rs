@@ -3,26 +3,33 @@
 use std::time::{Duration, Instant};
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
-    Handler, Message, StreamHandler,
+    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
+    AsyncContext, Handler, Message, Running, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, ServerMsg,
 };
 
 use crate::{
     api::{
-        client::rpc_connection::{
-            ClosedReason, CommandMessage, EventMessage, RpcConnection,
-            RpcConnectionClosed, RpcConnectionEstablished,
-        },
+        client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
         control::MemberId,
+        RpcServer,
     },
     log::prelude::*,
-    signalling::Room,
 };
+
+/// [`WsSession`] closed reason.
+#[derive(Debug)]
+enum InnerCloseReason {
+    /// [`WsSession`] was closed by [`RpcServer`] or was considered idle.
+    ByServer,
+
+    /// [`WsSession`] was closed by remote client.
+    ByClient(ClosedReason),
+}
 
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
@@ -31,7 +38,7 @@ pub struct WsSession {
     member_id: MemberId,
 
     /// [`Room`] that [`Member`] is associated with.
-    room: Addr<Room>,
+    room: Box<dyn RpcServer>,
 
     /// Timeout of receiving any messages from client.
     idle_timeout: Duration,
@@ -43,16 +50,16 @@ pub struct WsSession {
     /// from client.
     last_activity: Instant,
 
-    /// Indicates whether WebSocket connection is closed by server ot by
-    /// client.
-    closed_by_server: bool,
+    /// [`WsSession`] closed reason. Should be set by the moment
+    /// `Actor::stopped()` for this [`WsSession`] is called.
+    close_reason: Option<InnerCloseReason>,
 }
 
 impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
     pub fn new(
         member_id: MemberId,
-        room: Addr<Room>,
+        room: Box<dyn RpcServer>,
         idle_timeout: Duration,
     ) -> Self {
         Self {
@@ -60,7 +67,7 @@ impl WsSession {
             room,
             idle_timeout,
             last_activity: Instant::now(),
-            closed_by_server: false,
+            close_reason: None,
         }
     }
 
@@ -72,16 +79,12 @@ impl WsSession {
                 > session.idle_timeout
             {
                 info!("WsSession of member {} is idle", session.member_id);
-                if let Err(err) = session.room.try_send(RpcConnectionClosed {
-                    member_id: session.member_id.clone(),
-                    reason: ClosedReason::Lost,
-                }) {
-                    error!(
-                        "WsSession of member {} failed to remove from Room, \
-                         because: {:?}",
-                        session.member_id, err,
-                    )
-                }
+
+                Arbiter::spawn(session.room.connection_closed(
+                    session.member_id.clone(),
+                    ClosedReason::Lost,
+                ));
+
                 ctx.notify(Close::with_normal_code(&CloseDescription::new(
                     CloseReason::Idle,
                 )))
@@ -103,34 +106,18 @@ impl Actor for WsSession {
         Self::start_watchdog(ctx);
 
         ctx.wait(
-            wrap_future(self.room.send(RpcConnectionEstablished {
-                member_id: self.member_id.clone(),
-                connection: Box::new(ctx.address()),
-            }))
-            .map(
-                move |auth_result,
-                      session: &mut Self,
-                      ctx: &mut ws::WebsocketContext<Self>| {
-                    if let Err(e) = auth_result {
-                        error!(
-                            "Room rejected Established for member {}, cause \
-                             {:?}",
-                            session.member_id, e
-                        );
-                        ctx.notify(Close::with_normal_code(
-                            &CloseDescription::new(CloseReason::Rejected),
-                        ));
-                    }
-                },
-            )
+            wrap_future(self.room.connection_established(
+                self.member_id.clone(),
+                Box::new(ctx.address()),
+            ))
             .map_err(
-                move |send_err,
+                move |err,
                       session: &mut Self,
                       ctx: &mut ws::WebsocketContext<Self>| {
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
-                        session.member_id, send_err,
+                        session.member_id, err,
                     );
                     ctx.notify(Close::with_normal_code(
                         &CloseDescription::new(CloseReason::InternalError),
@@ -140,8 +127,31 @@ impl Actor for WsSession {
         );
     }
 
+    /// Invokes `RpcServer::connection_closed()` with `ClosedReason::Lost` if
+    /// `WsSession.close_reason` is `None`, with [`ClosedReason`] defined in
+    /// `WsSession.close_reason` if it is `Some(InnerCloseReason::ByClient)`,
+    /// does nothing if `WsSession.close_reason` is
+    /// `Some(InnerCloseReason::ByServer)`.
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         debug!("Stopped WsSession for member {}", self.member_id);
+        match self.close_reason.take() {
+            None => {
+                error!(
+                    "WsSession of Member [{}] was unexpectedly dropped",
+                    self.member_id
+                );
+                Arbiter::spawn(self.room.connection_closed(
+                    self.member_id.clone(),
+                    ClosedReason::Lost,
+                ));
+            }
+            Some(InnerCloseReason::ByClient(reason)) => Arbiter::spawn(
+                self.room.connection_closed(self.member_id.clone(), reason),
+            ),
+            Some(InnerCloseReason::ByServer) => {
+                // do nothing
+            }
+        }
     }
 }
 
@@ -166,13 +176,10 @@ impl RpcConnection for Addr<WsSession> {
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(
-        &self,
-        msg: EventMessage,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
-        let fut = self
-            .send(msg)
-            .map_err(|err| warn!("Failed send event {:?} ", err));
+    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>> {
+        let fut = self.send(EventMessage::from(msg)).map_err(|err| {
+            warn!("Failed send Event to RpcConnection: {:?} ", err)
+        });
         Box::new(fut)
     }
 }
@@ -198,7 +205,7 @@ impl Handler<Close> for WsSession {
     /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
         debug!("Closing WsSession for member {}", self.member_id);
-        self.closed_by_server = true;
+        self.close_reason = Some(InnerCloseReason::ByServer);
         ctx.close(Some(close.0));
         ctx.stop();
     }
@@ -228,21 +235,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Ping(n)) => {
-                        debug!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
                         ctx.text(
                             serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
                         );
                     }
                     Ok(ClientMsg::Command(command)) => {
-                        if let Err(err) =
-                            self.room.try_send(CommandMessage::from(command))
-                        {
-                            error!(
-                                "Cannot send Command to Room {}, because {}",
-                                self.member_id, err
-                            )
-                        }
+                        ctx.spawn(wrap_future(self.room.send_command(command)));
                     }
                     Err(err) => error!(
                         "Error [{:?}] parsing client message [{}]",
@@ -251,7 +250,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
             }
             ws::Message::Close(reason) => {
-                if !self.closed_by_server {
+                if self.close_reason.is_none() {
                     let closed_reason = if let Some(reason) = &reason {
                         if reason.code == CloseCode::Normal
                             || reason.code == CloseCode::Away
@@ -264,16 +263,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         ClosedReason::Lost
                     };
 
-                    if let Err(err) = self.room.try_send(RpcConnectionClosed {
-                        member_id: self.member_id.clone(),
-                        reason: closed_reason,
-                    }) {
-                        error!(
-                            "WsSession of member {} failed to remove from \
-                             Room, because: {:?}",
-                            self.member_id, err,
-                        )
-                    };
+                    self.close_reason =
+                        Some(InnerCloseReason::ByClient(closed_reason));
                     ctx.close(reason);
                     ctx.stop();
                 }
@@ -283,5 +274,365 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.member_id
             ),
         }
+    }
+
+    /// Method is called when stream emits error. Stops stream processing.
+    fn error(
+        &mut self,
+        err: ws::ProtocolError,
+        _: &mut Self::Context,
+    ) -> Running {
+        error!(
+            "Error in WsSession StreamHandler for Member [{}]: {:?}",
+            self.member_id, err
+        );
+        Running::Stop
+    }
+
+    /// Method is called when stream finishes. Stops [`WsSession`] actor
+    /// execution.
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        debug!(
+            "WsSession message stream for Member [{}] is finished",
+            self.member_id
+        );
+        ctx.stop()
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use std::{sync::Mutex, time::Duration};
+
+    use actix_http::HttpService;
+    use actix_http_test::{TestServer, TestServerRuntime};
+    use actix_web::{web, App, HttpRequest};
+    use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
+    use medea_client_api_proto::{
+        CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
+        PeerId,
+    };
+
+    use futures::{
+        future::{self, Future, IntoFuture},
+        sync::oneshot::{self, Receiver, Sender},
+        Sink, Stream,
+    };
+
+    use crate::api::{
+        client::rpc_connection::{ClosedReason, RpcConnection},
+        control::MemberId,
+        MockRpcServer,
+    };
+
+    use super::WsSession;
+
+    type SharedChan<T> = (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
+
+    fn test_server(factory: fn() -> WsSession) -> TestServerRuntime {
+        TestServer::new(move || {
+            HttpService::new(App::new().service(web::resource("/").to(
+                move |req: HttpRequest, stream: web::Payload| {
+                    start(factory(), &req, stream)
+                },
+            )))
+        })
+    }
+
+    // WsSession is dropped and WebSocket connection is closed when RpcServer
+    // errors on RpcConnectionEstablished.
+    #[test]
+    fn close_if_rpc_established_failed() {
+        fn factory() -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            let expected_member_id = member_id.clone();
+            rpc_server
+                .expect_connection_established()
+                .withf(move |member_id, _| *member_id == expected_member_id)
+                .return_once(|_, _| Box::new(future::err(())));
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        }
+
+        let mut serv = test_server(factory);
+
+        let client = serv.ws().unwrap();
+
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+
+        let close_frame = Frame::Close(Some(CloseReason {
+            code: CloseCode::Normal,
+            description: Some(String::from(r#"{"reason":"InternalError"}"#)),
+        }));
+
+        assert_eq!(item, Some(close_frame));
+    }
+
+    // WsSession handles ping requests and answers with pong.
+    #[test]
+    fn answers_ping_with_pong() {
+        let mut serv = test_server(|| -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server
+                .expect_connection_established()
+                .return_once(|_, _| Box::new(future::ok(())));
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        });
+
+        let client = serv.ws().unwrap();
+
+        let client = serv
+            .block_on(
+                client.send(Message::Text(String::from(r#"{"ping":25}"#))),
+            )
+            .unwrap();
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        assert_eq!(
+            item,
+            Some(Frame::Text(Some(String::from(r#"{"pong":25}"#).into())))
+        );
+    }
+
+    // WsSession is dropped and WebSocket connection is closed if no pings
+    // received for idle_timeout.
+    #[test]
+    fn dropped_if_idle() {
+        let mut serv = test_server(|| -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server
+                .expect_connection_established()
+                .return_once(|_, _| Box::new(future::ok(())));
+
+            let expected_member_id = member_id.clone();
+            rpc_server
+                .expect_connection_closed()
+                .withf(move |member_id, reason| {
+                    *member_id == expected_member_id
+                        && *reason == ClosedReason::Lost
+                })
+                .return_once(|_, _| Box::new(future::ok(())));
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_millis(100),
+            )
+        });
+
+        let client = serv.ws().unwrap();
+
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+
+        let close_frame = Frame::Close(Some(CloseReason {
+            code: CloseCode::Normal,
+            description: Some(String::from(r#"{"reason":"Idle"}"#)),
+        }));
+
+        assert_eq!(item, Some(close_frame));
+    }
+
+    // Make sure that WsSession redirects all Commands it receives to RpcServer.
+    #[test]
+    fn passes_commands_to_rpc_server() {
+        lazy_static::lazy_static! {
+            static ref CHAN: SharedChan<Command> = {
+                let (tx, rx) = oneshot::channel();
+                (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
+            };
+        }
+
+        let mut serv = test_server(|| -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server
+                .expect_connection_established()
+                .return_once(|_, _| Box::new(future::ok(())));
+
+            rpc_server.expect_send_command().return_once(|command| {
+                let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
+                Box::new(future::ok(()))
+            });
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        });
+
+        let client = serv.ws().unwrap();
+
+        let command = r#"{
+                            "command":"SetIceCandidate",
+                                "data":{
+                                    "peer_id":15,
+                                    "candidate":{
+                                        "candidate":"asd",
+                                        "sdp_m_line_index":1,
+                                        "sdp_mid":"2"
+                                    }
+                                }
+                            }"#;
+
+        serv.block_on(client.send(Message::Text(String::from(command))))
+            .unwrap();
+
+        let command = CHAN
+            .1
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap()
+            .into_future()
+            .wait()
+            .unwrap();
+        match command {
+            Command::SetIceCandidate { peer_id, candidate } => {
+                assert_eq!(peer_id.0, 15);
+                assert_eq!(candidate.candidate, "asd");
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    // WsSession is dropped and WebSocket connection is closed when
+    // RpcConnection::close is called.
+    #[test]
+    fn close_when_rpc_connection_close() {
+        lazy_static::lazy_static! {
+            static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
+                let (tx, rx) = oneshot::channel();
+                (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
+            };
+        }
+
+        let mut serv = test_server(|| -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server.expect_connection_established().return_once(
+                |_, connection| {
+                    let _ =
+                        CHAN.0.lock().unwrap().take().unwrap().send(connection);
+                    Box::new(future::ok(()))
+                },
+            );
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        });
+
+        let client = serv.ws().unwrap();
+
+        let mut rpc_connection: Box<dyn RpcConnection> = CHAN
+            .1
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap()
+            .into_future()
+            .wait()
+            .unwrap();
+
+        rpc_connection
+            .close(CloseDescription {
+                reason: ProtoCloseReason::Evicted,
+            })
+            .wait()
+            .unwrap();
+
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+
+        let close_frame = Frame::Close(Some(CloseReason {
+            code: CloseCode::Normal,
+            description: Some(String::from(r#"{"reason":"Evicted"}"#)),
+        }));
+
+        assert_eq!(item, Some(close_frame));
+    }
+
+    // WsSession transmits Events to WebSocket client when
+    // RpcConnection::send_event is called.
+    #[test]
+    fn send_text_message_when_rpc_connection_send_event() {
+        lazy_static::lazy_static! {
+            static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
+                let (tx, rx) = oneshot::channel();
+                (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
+            };
+        }
+
+        let mut serv = test_server(|| -> WsSession {
+            let member_id = MemberId::from(String::from("test_member"));
+            let mut rpc_server = MockRpcServer::new();
+
+            rpc_server.expect_connection_established().return_once(
+                |_, connection| {
+                    let _ =
+                        CHAN.0.lock().unwrap().take().unwrap().send(connection);
+                    Box::new(future::ok(()))
+                },
+            );
+
+            WsSession::new(
+                member_id,
+                Box::new(rpc_server),
+                Duration::from_secs(5),
+            )
+        });
+
+        let client = serv.ws().unwrap();
+
+        let rpc_connection: Box<dyn RpcConnection> = CHAN
+            .1
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap()
+            .into_future()
+            .wait()
+            .unwrap();
+
+        rpc_connection
+            .send_event(Event::SdpAnswerMade {
+                peer_id: PeerId(77),
+                sdp_answer: String::from("sdp_answer"),
+            })
+            .wait()
+            .unwrap();
+
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+
+        let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
+                     sdp_answer\":\"sdp_answer\"}}";
+
+        let event = Frame::Text(Some(event.into()));
+
+        assert_eq!(item, Some(event));
     }
 }
