@@ -361,12 +361,12 @@ window.onload = async function() {
           connectionLossMsg.textContent = connectionLossDefaultText;
         }
       };
-      try {
-        await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
-      } catch (e) {
-        console.error('Error in reconnection with backoff:\n' + e.message());
-      }
-      contentVisibility.hide(connectionLossNotification);
+      // try {
+      //   await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
+      // } catch (e) {
+      //   console.error('Error in reconnection with backoff:\n' + e.message());
+      // }
+      // contentVisibility.hide(connectionLossNotification);
     });
 
     room.on_close(function (on_closed) {
