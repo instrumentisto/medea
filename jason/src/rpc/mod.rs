@@ -492,6 +492,56 @@ impl WebSocketRpcClient {
 
         Ok(())
     }
+
+    async fn connect(&self, token: String) -> Result<(), Traced<RpcClientError>> {
+        self.0.borrow_mut().token = Some(token.clone());
+        let transport = (self.0.borrow().rpc_transport_factory)(token)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        self.0
+            .borrow_mut()
+            .heartbeat
+            .start(Rc::clone(&transport))
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        let this_clone = self.downgrade();
+        let mut on_socket_message = transport
+            .on_message()
+            .map_err(tracerr::map_from_and_wrap!())?;
+        spawn_local(async move {
+            while let Some(msg) = on_socket_message.next().await {
+                if let Some(this) = this_clone.upgrade() {
+                    this.on_transport_message(msg)
+                }
+            }
+        });
+
+        let mut on_idle = self.0.borrow_mut().heartbeat.on_idle();
+        let weak_this = self.downgrade();
+        spawn_local(async move {
+            while let Some(_) = on_idle.next().await {
+                if let Some(this) = weak_this.upgrade() {
+                    this.send_connection_loss();
+                }
+            }
+        });
+
+        let this_clone = self.downgrade();
+        let mut on_socket_close = transport
+            .on_close()
+            .map_err(tracerr::map_from_and_wrap!())?;
+        spawn_local(async move {
+            while let Some(msg) = on_socket_close.next().await {
+                if let Some(this) = this_clone.upgrade() {
+                    this.on_transport_close(&msg);
+                }
+            }
+        });
+
+        self.0.borrow_mut().sock.replace(transport);
+        Ok(())
+    }
 }
 
 impl RpcClient for WebSocketRpcClient {
@@ -504,53 +554,59 @@ impl RpcClient for WebSocketRpcClient {
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
         let this = Self(Rc::clone(&self.0));
         Box::pin(async move {
-            this.0.borrow_mut().token = Some(token.clone());
-            let transport = (this.0.borrow().rpc_transport_factory)(token)
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?;
-
-            this.0
-                .borrow_mut()
-                .heartbeat
-                .start(Rc::clone(&transport))
-                .map_err(tracerr::map_from_and_wrap!())?;
-
-            let this_clone = this.downgrade();
-            let mut on_socket_message = transport
-                .on_message()
-                .map_err(tracerr::map_from_and_wrap!())?;
-            spawn_local(async move {
-                while let Some(msg) = on_socket_message.next().await {
-                    if let Some(this) = this_clone.upgrade() {
-                        this.on_transport_message(msg)
-                    }
-                }
-            });
-
-            let mut on_idle = this.0.borrow_mut().heartbeat.on_idle();
-            let weak_this = this.downgrade();
-            spawn_local(async move {
-                while let Some(_) = on_idle.next().await {
-                    if let Some(this) = weak_this.upgrade() {
-                        this.send_connection_loss();
-                    }
-                }
-            });
-
-            let this_clone = this.downgrade();
-            let mut on_socket_close = transport
-                .on_close()
-                .map_err(tracerr::map_from_and_wrap!())?;
-            spawn_local(async move {
-                while let Some(msg) = on_socket_close.next().await {
-                    if let Some(this) = this_clone.upgrade() {
-                        this.on_transport_close(&msg);
-                    }
-                }
-            });
-
-            this.0.borrow_mut().sock.replace(transport);
-            Ok(())
+            let current_token = this.0.borrow().token.clone();
+            if let Some(current_token) = current_token {
+               if current_token == token {
+                   let transport = this.0.borrow().sock.clone();
+                   if let Some(transport) = transport {
+                       let state = transport.get_state();
+                       match state {
+                           State::Open => {
+                               Ok(())
+                               // `return Ok(())`
+                               // Just resolve it
+                           }
+                           State::Connecting => {
+                               let mut transport_state_stream = transport.on_state_change();
+                               while let Some(state) = transport_state_stream.next().await {
+                                   match state {
+                                       State::Open => {
+                                           return Ok(())
+                                       }
+                                       State::Closing | State::Closed => {
+                                           // Change error
+                                           return Err(tracerr::new!(RpcClientError::ReconnectionFailed))
+                                       }
+                                       State::Connecting => ()
+                                   }
+                               }
+                               // TODO: PANIC
+                               panic!("RpcTransport unexpectedly gone.")
+                           }
+                           State::Closed | State::Closing => {
+                               // TODO: this is just crutch
+                               std::mem::drop(transport);
+                               this.connect(token).await
+                               // `connect`
+                               // We should create new 'RpcTransport'
+                           }
+                       }
+                   } else {
+                       this.connect(token).await
+                       // `connect`
+                       // We should create new 'RpcTransport'.
+                       // But it is unlikely that this will ever happen.
+                   }
+               } else {
+                   this.connect(token).await
+                   // `connect`
+                   // We should create new 'RpcTransport'
+               }
+            } else {
+                this.connect(token).await
+                // `connect`
+                // This is new connection.
+            }
         })
     }
 
