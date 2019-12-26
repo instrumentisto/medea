@@ -347,7 +347,7 @@ impl VideoTrackConstraints {
     }
 
     /// Detect is video track captured from display searching [specific
-    /// fields][1] in its settings. Only works fo Chrome atm.
+    /// fields][1] in its settings. Only works in Chrome atm.
     ///
     /// [1]: https://tinyurl.com/ufx7mcw
     fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {

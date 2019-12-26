@@ -27,9 +27,9 @@ use crate::{
 
 use super::InputDeviceInfo;
 
-// TODO: screen-capture API (https://www.w3.org/TR/screen-capture/) is in draft
-//     stage atm, so there is no web-sys bindings for it
-//     discussion https://github.com/rustwasm/wasm-bindgen/pull/1896
+// TODO: Screen capture API (https://www.w3.org/TR/screen-capture/) is in draft
+//       stage atm, so there is no web-sys bindings for it.
+//       Discussion https://github.com/rustwasm/wasm-bindgen/pull/1896
 #[wasm_bindgen(inline_js = "export function get_display_media(media_devices, \
                             constraints) { return \
                             media_devices.getDisplayMedia(constraints) }")]
