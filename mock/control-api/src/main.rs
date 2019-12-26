@@ -3,6 +3,8 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+// TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
+//       https://github.com/rust-lang/rust-clippy/issues/4779
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 pub mod api;

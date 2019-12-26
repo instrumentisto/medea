@@ -27,7 +27,7 @@ use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, ClosedReason, EventMessage, RpcConnection,
+            AuthorizationError, ClosedReason, RpcConnection,
             RpcConnectionClosed,
         },
         control::{
@@ -209,7 +209,7 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         if let Some(conn) = self.connections.get(&member_id) {
             Either::A(
-                conn.send_event(EventMessage::from(event))
+                conn.send_event(event)
                     .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
             )
         } else {
@@ -313,22 +313,16 @@ impl ParticipantService {
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
                     member_id.clone(),
-                    ctx.run_later(
-                        self.rpc_reconnect_timeout,
-                        move |room, ctx| {
-                            info!(
-                                "Member [id = {}] connection lost at {:?}. \
-                                 Room [id = {}] will be be stopped.",
-                                member_id,
-                                closed_at,
-                                room.id()
-                            );
-                            ctx.notify(RpcConnectionClosed {
-                                member_id,
-                                reason: ClosedReason::Closed { normal: false },
-                            })
-                        },
-                    ),
+                    ctx.run_later(self.rpc_reconnect_timeout, move |_, ctx| {
+                        info!(
+                            "Member [id = {}] connection lost at {:?}.",
+                            member_id, closed_at,
+                        );
+                        ctx.notify(RpcConnectionClosed {
+                            member_id,
+                            reason: ClosedReason::Closed { normal: false },
+                        })
+                    }),
                 );
             }
         }

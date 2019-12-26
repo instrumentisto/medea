@@ -329,6 +329,7 @@ pub enum Element {
 }
 
 impl Element {
+    #[must_use]
     pub fn into_proto(self, id: String) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         match self {
