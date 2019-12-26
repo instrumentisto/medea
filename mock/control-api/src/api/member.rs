@@ -39,6 +39,7 @@ pub struct Member {
 
 impl Member {
     /// Converts [`Member`] into protobuf [`MemberProto`].
+    #[must_use]
     pub fn into_proto(self, id: String) -> MemberProto {
         let mut proto = MemberProto::new();
         let mut members_elements = HashMap::new();
@@ -62,6 +63,7 @@ impl Member {
     }
 
     /// Converts [`Member`] into protobuf [`RoomElementProto`].
+    #[must_use]
     pub fn into_room_el_proto(self, id: String) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         proto.set_member(self.into_proto(id));

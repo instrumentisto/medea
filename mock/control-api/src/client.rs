@@ -72,6 +72,7 @@ impl ControlClient {
     /// __Note that call of this function doesn't checks availability of Control
     /// API gRPC server. Availability will be checked only on sending request to
     /// gRPC server.__
+    #[must_use]
     pub fn new(medea_addr: &str) -> Self {
         Self {
             grpc_client: new_grpcio_control_api_client(medea_addr),
