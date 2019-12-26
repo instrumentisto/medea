@@ -41,10 +41,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Sends [`Event`] to remote [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_event(
-        &self,
-        msg: EventMessage,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>>;
 }
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.
@@ -101,7 +98,7 @@ pub struct RpcConnectionClosed {
 }
 
 /// Reasons of why [`RpcConnection`] may be closed.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ClosedReason {
     /// [`RpcConnection`] was irrevocably closed.
     Closed {

@@ -212,9 +212,12 @@ impl Into<GrpcMember> for Member {
 
         grpc_member.set_pipeline(pipeline);
         grpc_member.set_id(self.id);
-        self.on_join.map(|on_join| grpc_member.set_on_join(on_join));
-        self.on_leave
-            .map(|on_leave| grpc_member.set_on_leave(on_leave));
+        if let Some(on_join) = self.on_join {
+            grpc_member.set_on_join(on_join)
+        }
+        if let Some(on_leave) = self.on_leave {
+            grpc_member.set_on_leave(on_leave)
+        }
 
         grpc_member
     }

@@ -6,7 +6,7 @@ use actix::{Actor, Addr, Handler, ResponseFuture};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
-    web::{resource, Data, Path, Payload},
+    web::{resource, Data, Path, Payload, ServiceConfig},
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
@@ -65,7 +65,11 @@ fn ws_index(
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    WsSession::new(member_id, room, state.config.idle_timeout),
+                    WsSession::new(
+                        member_id,
+                        Box::new(room),
+                        state.config.idle_timeout,
+                    ),
                     &request,
                     payload,
                 ),
@@ -102,15 +106,12 @@ impl Server {
 
         let server = HttpServer::new(move || {
             App::new()
-                .data(Context {
-                    rooms: rooms.clone(),
-                    config: config.rpc.clone(),
-                })
+                .register_data(Self::register_data(
+                    rooms.clone(),
+                    config.rpc.clone(),
+                ))
+                .configure(Self::configure)
                 .wrap(middleware::Logger::default())
-                .service(
-                    resource("/ws/{room_id}/{member_id}/{credentials}")
-                        .route(actix_web::web::get().to_async(ws_index)),
-                )
         })
         .disable_signals()
         .bind(server_addr)?
@@ -119,6 +120,20 @@ impl Server {
         info!("Started Client API HTTP server on {}", server_addr);
 
         Ok(Self(server).start())
+    }
+
+    /// Set application data.
+    fn register_data(rooms: RoomRepository, config: Rpc) -> Data<Context> {
+        Data::new(Context { rooms, config })
+    }
+
+    /// Run external configuration as part of the application building
+    /// process
+    fn configure(cfg: &mut ServiceConfig) {
+        cfg.service(
+            resource("/ws/{room_id}/{member_id}/{credentials}")
+                .route(actix_web::web::get().to_async(ws_index)),
+        );
     }
 }
 
@@ -141,12 +156,11 @@ impl Handler<ShutdownGracefully> for Server {
 
 #[cfg(test)]
 mod test {
-    use std::{ops::Add, thread, time::Duration};
+    use std::time::Duration;
 
-    use actix_http::{ws::Message, HttpService};
+    use actix_http::HttpService;
     use actix_http_test::{TestServer, TestServerRuntime};
-    use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
-    use medea_client_api_proto::{CloseDescription, CloseReason};
+    use awc::error::WsClientError;
 
     use crate::{
         api::control, conf::Conf, signalling::Room,
@@ -156,7 +170,7 @@ mod test {
     use super::*;
 
     /// Creates [`RoomRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Conf) -> RoomRepository {
+    fn build_room_repo(conf: Conf) -> RoomRepository {
         let room_spec =
             control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
@@ -177,82 +191,74 @@ mod test {
         TestServer::new(move || {
             HttpService::new(
                 App::new()
-                    .data(Context {
-                        config: conf.rpc.clone(),
-                        rooms: room(conf.clone()),
-                    })
-                    .service(
-                        resource("/ws/{room_id}/{member_id}/{credentials}")
-                            .route(actix_web::web::get().to_async(ws_index)),
-                    ),
+                    .register_data(Server::register_data(
+                        build_room_repo(conf.clone()),
+                        conf.rpc.clone(),
+                    ))
+                    .configure(Server::configure),
             )
         })
     }
 
     #[test]
-    fn ping_pong_and_disconnects_on_idle() {
+    fn forbidden_if_bad_credentials() {
         let conf = Conf {
             rpc: Rpc {
-                idle_timeout: Duration::new(2, 0),
+                idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()
         };
 
         let mut server = ws_server(conf.clone());
-        let socket =
-            server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
 
-        server
-            .block_on(
-                socket
-                    .send(Message::Text(r#"{"ping": 33}"#.into()))
-                    .into_future()
-                    .map_err(|e| panic!("{:?}", e))
-                    .and_then(|socket| {
-                        socket
-                            .into_future()
-                            .map_err(|(e, _)| panic!("{:?}", e))
-                            .and_then(|(item, read)| {
-                                assert_eq!(
-                                    Some(ws::Frame::Text(Some(
-                                        r#"{"pong":33}"#.into()
-                                    ))),
-                                    item
-                                );
+        match server.ws_at("/ws/pub-sub-video-call/caller/bad_credentials") {
+            Err(WsClientError::InvalidResponseStatus(code)) => {
+                assert_eq!(code, 403);
+            }
+            _ => unreachable!(),
+        }
+    }
 
-                                thread::sleep(
-                                    conf.rpc
-                                        .idle_timeout
-                                        .add(Duration::from_secs(1)),
-                                );
+    #[test]
+    fn not_found_if_bad_url() {
+        let conf = Conf {
+            rpc: Rpc {
+                idle_timeout: Duration::new(1, 0),
+                ..Rpc::default()
+            },
+            ..Conf::default()
+        };
 
-                                read.into_future()
-                                    .map_err(|(e, _)| panic!("{:?}", e))
-                                    .map(|(item, _)| {
-                                        let description = CloseDescription::new(
-                                            CloseReason::Idle,
-                                        );
-                                        let close_reason = ws::CloseReason {
-                                            code: ws::CloseCode::Normal,
-                                            description: Some(
-                                                serde_json::to_string(
-                                                    &description,
-                                                )
-                                                .unwrap(),
-                                            ),
-                                        };
+        let mut server = ws_server(conf.clone());
 
-                                        assert_eq!(
-                                            Some(ws::Frame::Close(Some(
-                                                close_reason
-                                            ))),
-                                            item
-                                        );
-                                    })
-                            })
-                    }),
-            )
-            .unwrap();
+        match server.ws_at("/ws/bad_room/caller/test") {
+            Err(WsClientError::InvalidResponseStatus(code)) => {
+                assert_eq!(code, 404);
+            }
+            _ => unreachable!(),
+        };
+
+        match server.ws_at("/ws/pub-sub-video-call/bad_member/test") {
+            Err(WsClientError::InvalidResponseStatus(code)) => {
+                assert_eq!(code, 404);
+            }
+            _ => unreachable!(),
+        };
+    }
+
+    #[test]
+    fn established() {
+        let conf = Conf {
+            rpc: Rpc {
+                idle_timeout: Duration::new(1, 0),
+                ..Rpc::default()
+            },
+            ..Conf::default()
+        };
+
+        let mut server = ws_server(conf.clone());
+
+        server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
     }
 }

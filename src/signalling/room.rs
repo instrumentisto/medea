@@ -6,12 +6,12 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
     Message, ResponseActFuture, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future;
+use futures::future::{self, Future};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
@@ -23,7 +23,7 @@ use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
-            RpcConnectionClosed, RpcConnectionEstablished,
+            RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
             callback::{
@@ -39,6 +39,7 @@ use crate::{
             EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
         },
+        RpcServer,
     },
     log::prelude::*,
     media::{
@@ -718,6 +719,63 @@ impl Room {
         self.members.insert_member(id, signalling_member);
 
         Ok(())
+    }
+}
+
+impl RpcServer for Addr<Room> {
+    /// Sends [`RpcConnectionEstablished`] message to [`Room`] actor propagating
+    /// errors.
+    fn connection_established(
+        &self,
+        member_id: MemberId,
+        connection: Box<dyn RpcConnection>,
+    ) -> Box<dyn Future<Item = (), Error = ()>> {
+        Box::new(
+            self.send(RpcConnectionEstablished {
+                member_id,
+                connection,
+            })
+            .map_err(|err| {
+                error!(
+                    "Failed to send RpcConnectionEstablished cause {:?}",
+                    err,
+                );
+            })
+            .and_then(|result| result),
+        )
+    }
+
+    /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
+    /// errors.
+    fn connection_closed(
+        &self,
+        member_id: MemberId,
+        reason: ClosedReason,
+    ) -> Box<dyn Future<Item = (), Error = ()>> {
+        Box::new(
+            self.send(RpcConnectionClosed { member_id, reason })
+                .map_err(|err| {
+                    error!(
+                        "Failed to send RpcConnectionClosed cause {:?}",
+                        err,
+                    );
+                })
+                .then(|_| Ok(())),
+        )
+    }
+
+    /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
+    fn send_command(
+        &self,
+        msg: Command,
+    ) -> Box<dyn Future<Item = (), Error = ()>> {
+        Box::new(
+            self.send(CommandMessage::from(msg))
+                .map_err(|err| {
+                    error!("Failed to send CommandMessage cause {:?}", err,);
+                })
+                .then(|_| Ok(())),
+        )
     }
 }
 
