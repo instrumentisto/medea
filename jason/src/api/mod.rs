@@ -18,6 +18,7 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
+use crate::rpc::{RpcTransport, WebSocketRpcTransport};
 
 /// General library interface.
 ///
@@ -44,7 +45,14 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = WebSocketRpcClient::new();
+        let rpc = WebSocketRpcClient::new(Box::new(|token| {
+            Box::pin(async move {
+                let ws = WebSocketRpcTransport::new(token)
+                    .await
+                    .map_err(|e| tracerr::new!(e))?;
+                Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
+            })
+        }));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));

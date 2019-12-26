@@ -173,7 +173,7 @@ pub trait RpcClient {
     /// Establishes connection with RPC server.
     fn connect(
         &self,
-        transport: Rc<dyn RpcTransport>,
+        token: String,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
@@ -288,10 +288,21 @@ struct Inner {
     /// [`Reconnector`] with which this [`RpcClient`] will be reconnected (or
     /// not) on `on_connection_loss`.
     reconnector: Option<Reconnector>,
+
+    rpc_transport_factory: RpcTransportFactory,
 }
 
+type RpcTransportFactory = Box<
+    dyn Fn(
+        String,
+    ) -> LocalBoxFuture<
+        'static,
+        Result<Rc<dyn RpcTransport>, Traced<TransportError>>,
+    >,
+>;
+
 impl Inner {
-    fn new() -> Rc<RefCell<Self>> {
+    fn new(rpc_transport_factory: RpcTransportFactory) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
             on_close_subscribers: Vec::new(),
@@ -303,6 +314,7 @@ impl Inner {
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             on_connection_loss_subs: Vec::new(),
             reconnector: None,
+            rpc_transport_factory,
         }))
     }
 }
@@ -350,8 +362,8 @@ pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 impl WebSocketRpcClient {
     /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
     /// milliseconds.
-    pub fn new() -> Rc<Self> {
-        let rc_this = Rc::new(Self(Inner::new()));
+    pub fn new(rpc_transport_factory: RpcTransportFactory) -> Rc<Self> {
+        let rc_this = Rc::new(Self(Inner::new(rpc_transport_factory)));
         let weak_this = Rc::downgrade(&rc_this);
         rc_this.0.borrow_mut().reconnector = Some(Reconnector::new(weak_this));
 
@@ -483,10 +495,14 @@ impl RpcClient for WebSocketRpcClient {
     /// on receiving messages from a server and closing socket.
     fn connect(
         &self,
-        transport: Rc<dyn RpcTransport>,
+        token: String,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
         let this = Self(Rc::clone(&self.0));
         Box::pin(async move {
+            let transport = (this.0.borrow().rpc_transport_factory)(token)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
+
             this.0
                 .borrow_mut()
                 .heartbeat
