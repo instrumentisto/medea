@@ -13,11 +13,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{
-    channel::{mpsc, oneshot},
-    future::LocalBoxFuture,
-    stream::{LocalBoxStream, StreamExt as _},
-};
+use futures::{channel::{mpsc, oneshot}, future::LocalBoxFuture, stream::{LocalBoxStream, StreamExt as _}, Stream};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
@@ -47,6 +43,7 @@ pub use self::{
     reconnect_handle::ReconnectorHandle,
     websocket::{State, TransportError, WebSocketRpcTransport},
 };
+use wasm_bindgen::__rt::core::pin::Pin;
 
 /// Reasons of closing by client side and server side.
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
@@ -215,6 +212,10 @@ pub trait RpcClient {
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle>;
 
     fn get_token(&self) -> Option<String>;
+
+    fn get_state(&self) -> State;
+
+    fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
 /// RPC transport between a client and server.
@@ -294,6 +295,10 @@ struct Inner {
     rpc_transport_factory: RpcTransportFactory,
 
     token: Option<String>,
+
+    on_state_change_subs: Vec<mpsc::UnboundedSender<State>>,
+
+    state: State,
 }
 
 type RpcTransportFactory = Box<
@@ -320,7 +325,20 @@ impl Inner {
             reconnector: None,
             rpc_transport_factory,
             token: None,
+            on_state_change_subs: Vec::new(),
+            state: State::Closed,
         }))
+    }
+
+    fn update_state(&mut self, state: State) {
+        if self.state != state {
+            self.state = state;
+            self.on_state_change_subs.retain(|sub| !sub.is_closed());
+            self.on_state_change_subs
+                .iter()
+                .filter_map(|sub| sub.unbounded_send(state).err())
+                .for_each(|e| console_error("RpcClient::on_state_change sub unexpectedly gone."));
+        }
     }
 }
 
@@ -495,9 +513,25 @@ impl WebSocketRpcClient {
 
     async fn connect(&self, token: String) -> Result<(), Traced<RpcClientError>> {
         self.0.borrow_mut().token = Some(token.clone());
-        let transport = (self.0.borrow().rpc_transport_factory)(token)
+        self.0.borrow_mut().update_state(State::Connecting);
+        let create_transport_fut = (self.0.borrow().rpc_transport_factory)(token);
+        let transport = create_transport_fut
             .await
-            .map_err(tracerr::map_from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())
+            .map_err(|e| {
+                self.0.borrow_mut().update_state(State::Closed);
+                e
+            })?;
+        self.0.borrow_mut().update_state(State::Open);
+        let mut transport_on_state_change_stream = transport.on_state_change();
+        let weak_inner = Rc::downgrade(&self.0);
+        spawn_local(async move {
+            while let Some(state) = transport_on_state_change_stream.next().await {
+                if let Some(inner) = weak_inner.upgrade() {
+                    inner.borrow_mut().update_state(state);
+                }
+            }
+        });
 
         self.0
             .borrow_mut()
@@ -557,45 +591,37 @@ impl RpcClient for WebSocketRpcClient {
             let current_token = this.0.borrow().token.clone();
             if let Some(current_token) = current_token {
                if current_token == token {
-                   let transport = this.0.borrow().sock.clone();
-                   if let Some(transport) = transport {
-                       let state = transport.get_state();
-                       match state {
-                           State::Open => {
-                               Ok(())
-                               // `return Ok(())`
-                               // Just resolve it
-                           }
-                           State::Connecting => {
-                               let mut transport_state_stream = transport.on_state_change();
-                               while let Some(state) = transport_state_stream.next().await {
-                                   match state {
-                                       State::Open => {
-                                           return Ok(())
-                                       }
-                                       State::Closing | State::Closed => {
-                                           // Change error
-                                           return Err(tracerr::new!(RpcClientError::ReconnectionFailed))
-                                       }
-                                       State::Connecting => ()
-                                   }
-                               }
-                               // TODO: PANIC
-                               panic!("RpcTransport unexpectedly gone.")
-                           }
-                           State::Closed | State::Closing => {
-                               // TODO: this is just crutch
-                               std::mem::drop(transport);
-                               this.connect(token).await
-                               // `connect`
-                               // We should create new 'RpcTransport'
-                           }
+                   let state = this.get_state();
+                   match state {
+                       State::Open => {
+                           Ok(())
+                           // `return Ok(())`
+                           // Just resolve it
                        }
-                   } else {
-                       this.connect(token).await
-                       // `connect`
-                       // We should create new 'RpcTransport'.
-                       // But it is unlikely that this will ever happen.
+                       State::Connecting => {
+                           console_error("Connecting");
+                           let mut transport_state_stream = this.on_state_change();
+                           while let Some(state) = transport_state_stream.next().await {
+                               match state {
+                                   State::Open => {
+                                       console_error("asdlaj");
+                                       return Ok(())
+                                   }
+                                   State::Closing | State::Closed => {
+                                       // Change error
+                                       return Err(tracerr::new!(RpcClientError::ReconnectionFailed))
+                                   }
+                                   State::Connecting => ()
+                               }
+                           }
+                           // TODO: PANIC
+                           panic!("RpcTransport unexpectedly gone.")
+                       }
+                       State::Closed | State::Closing => {
+                           this.connect(token).await
+                           // `connect`
+                           // We should create new 'RpcTransport'
+                       }
                    }
                } else {
                    this.connect(token).await
@@ -679,6 +705,17 @@ impl RpcClient for WebSocketRpcClient {
 
     fn get_token(&self) -> Option<String> {
         self.0.borrow().token.clone()
+    }
+
+    fn get_state(&self) -> State {
+        self.0.borrow().state
+    }
+
+    fn on_state_change(&self) -> LocalBoxStream<'static, State> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_state_change_subs.push(tx);
+
+        Box::pin(rx)
     }
 }
 
