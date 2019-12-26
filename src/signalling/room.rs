@@ -1075,17 +1075,6 @@ impl Handler<RpcConnectionEstablished> for Room {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
             .map(|member, room, ctx| {
-                ctx.spawn(wrap_future(
-                    room.members
-                        .send_rpc_settings_to_member(member.id())
-                        .map_err(|e| {
-                            error!(
-                                "Failed to send RPC settings to the 'Member': \
-                                 {:?}",
-                                e
-                            )
-                        }),
-                ));
                 room.init_member_connections(&member, ctx);
                 if let Some(callback_url) = member.get_on_join() {
                     room.callbacks.send_callback(

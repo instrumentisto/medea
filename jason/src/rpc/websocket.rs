@@ -186,7 +186,6 @@ struct InnerSocket {
 
     // TODO: this already looks kinda wrong, if we have `on_state_change`,
     //       then why we need explicit `on_close`?
-
     /// [`mpsc::UnboundedSender`]s for [`RpcTransport::on_close`]'s
     /// [`LocalBoxStream`].
     on_close_subs: Vec<mpsc::UnboundedSender<CloseMsg>>,

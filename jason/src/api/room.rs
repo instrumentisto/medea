@@ -722,21 +722,6 @@ impl EventHandler for InnerRoom {
             self.peers.remove(*id);
         })
     }
-
-    // TODO: so we receive event from RpcClient to, basically,
-    //       return it to RpcClient?
-
-    /// Updates [`RpcClient`] settings.
-    fn on_rpc_settings_updated(
-        &mut self,
-        idle_timeout: u64,
-        ping_interval: u64,
-    ) {
-        self.rpc.update_settings(
-            IdleTimeout(Duration::from_millis(idle_timeout).into()),
-            PingInterval(Duration::from_millis(ping_interval).into()),
-        );
-    }
 }
 
 /// [`PeerEvent`]s handling.

@@ -12,12 +12,11 @@ use crate::{
     utils::{resolve_after, JasonError, JsCaused, JsError},
 };
 
-//TODO: why not reuse DetachedState error?
+// TODO: why not reuse DetachedState error?
 
 /// [`RpcClient`] which will be reconnected is gone.
 #[derive(Debug, Display, JsCaused)]
 struct RpcClientGoneError;
-
 
 // TODO: how is this object responsible for ReconnectableRpcClient reconnecting?
 //       what is the difference between this object and a raw RpcClient weak

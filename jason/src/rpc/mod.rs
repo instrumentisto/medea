@@ -420,16 +420,29 @@ impl WebSocketRpcClient {
 
     /// Handles messages from a remote server.
     fn on_transport_message(&self, msg: ServerMsg) {
-        let inner = self.0.borrow();
-        if let ServerMsg::Event(event) = msg {
-            // TODO: many subs, filter messages by session
-            if let Some(sub) = inner.subs.iter().next() {
-                if let Err(err) = sub.unbounded_send(event) {
-                    // TODO: receiver is gone, should delete
-                    //       this subs tx
-                    console_error(err.to_string());
+        match msg {
+            ServerMsg::Event(event) => {
+                let inner = self.0.borrow();
+                // TODO: many subs, filter messages by session
+                if let Some(sub) = inner.subs.iter().next() {
+                    if let Err(err) = sub.unbounded_send(event) {
+                        // TODO: receiver is gone, should delete
+                        //       this subs tx
+                        console_error(err.to_string());
+                    }
                 }
             }
+            ServerMsg::RpcSettingsUpdated(settings) => {
+                self.update_settings(
+                    IdleTimeout(
+                        Duration::from_millis(settings.idle_timeout_ms).into(),
+                    ),
+                    PingInterval(
+                        Duration::from_millis(settings.ping_interval_ms).into(),
+                    ),
+                );
+            }
+            _ => (),
         }
     }
 
@@ -570,6 +583,7 @@ impl RpcClient for WebSocketRpcClient {
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
     ) {
+        console_error("Update settings");
         self.0
             .borrow_mut()
             .heartbeat
@@ -588,7 +602,6 @@ impl RpcClient for WebSocketRpcClient {
 
 /// RPC client which can reconnect.
 pub trait ReconnectableRpcClient {
-
     // TODO: what is the purpose of reconnect method, when ther are already a
     //       connect method? Both methods goals is to change connection state to
     //      `connected`.

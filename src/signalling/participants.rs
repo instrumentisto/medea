@@ -418,29 +418,6 @@ impl ParticipantService {
         self.members.insert(id, member);
     }
 
-    /// Sends RPC settings from server config to a [`Member`] with provided
-    /// [`MemberId`].
-    #[allow(clippy::cast_possible_truncation)]
-    pub fn send_rpc_settings_to_member(
-        &mut self,
-        id: MemberId,
-    ) -> impl Future<Item = (), Error = RoomError> {
-        self.send_event_to_member(
-            id,
-            // 'serde-json' doesn't support 'u128' deserialization in
-            // 'serde_json::from_value', so we are casting this
-            // timestamp to more reasonable 'u64', since it's
-            // definitely enough.
-            //
-            // Also 'Duration::from_millis' takes 'u64' on Jason side, so 'u64'
-            // can be considered quite correct the right type.
-            Event::RpcSettingsUpdated {
-                idle_timeout_ms: self.idle_timeout.as_millis() as u64,
-                ping_interval_ms: self.ping_interval.as_millis() as u64,
-            },
-        )
-    }
-
     /// Returns [`Iterator`] over [`MemberId`] and [`Member`] which this
     /// [`ParticipantRepository`] stores.
     pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {

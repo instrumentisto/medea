@@ -66,6 +66,25 @@ pub enum ServerMsg {
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
     Event(Event),
+    /// Media server notifies Web Client about necessity to update RPC
+    /// settings.
+    RpcSettingsUpdated(RpcSettingsUpdated),
+}
+
+/// Media server notifies Web Client about necessity to update RPC
+/// settings.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RpcSettingsUpdated {
+    /// If server doesn't receive [`ClientMsg::Pong`] from a client during
+    /// this time, the client's connection will be considered as `Lost`.
+    ///
+    /// Unit: millisecond.
+    pub idle_timeout_ms: u64,
+
+    /// Interval between [`ServerMsg::Ping`] sending.
+    ///
+    /// Unit: millisecond.
+    pub ping_interval_ms: u64,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -204,21 +223,6 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
-
-    /// Media server notifies Web Client about necessity to update RPC
-    /// settings.
-    RpcSettingsUpdated {
-        /// If server doesn't receive [`ClientMsg::Pong`] from a client during
-        /// this time, the client's connection will be considered as `Lost`.
-        ///
-        /// Unit: millisecond.
-        idle_timeout_ms: u64,
-
-        /// Interval between [`ServerMsg::Ping`] sending.
-        ///
-        /// Unit: millisecond.
-        ping_interval_ms: u64,
-    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -356,6 +360,9 @@ impl Serialize for ServerMsg {
                 ping.end()
             }
             Self::Event(command) => command.serialize(serializer),
+            Self::RpcSettingsUpdated(rpc_settings_updated) => {
+                rpc_settings_updated.serialize(serializer)
+            }
         }
     }
 }
@@ -383,13 +390,22 @@ impl<'de> Deserialize<'de> for ServerMsg {
 
             Ok(Self::Ping(n))
         } else {
-            let event = serde_json::from_value::<Event>(ev).map_err(|e| {
-                Error::custom(format!(
-                    "unable to deser ServerMsg::Event [{:?}]",
-                    e
-                ))
-            })?;
-            Ok(Self::Event(event))
+            let msg = serde_json::from_value::<Event>(ev.clone())
+                .map(|e| Self::Event(e))
+                .or_else(move |_| {
+                    serde_json::from_value::<RpcSettingsUpdated>(ev)
+                        .map(|e| Self::RpcSettingsUpdated(e))
+                })
+                .map_err(|e| {
+                    Error::custom(format!(
+                        "unable to deser ServerMsg [{:?}]",
+                        e
+                    ))
+                })?;
+            //            let event =
+            // serde_json::from_value::<Event>(ev).map_err(|e| {
+            //            })?;
+            Ok(msg)
         }
     }
 }

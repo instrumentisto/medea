@@ -9,7 +9,8 @@ use actix::{
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, RpcSettingsUpdated,
+    ServerMsg,
 };
 
 use crate::{
@@ -19,6 +20,7 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
+    signalling::room::RoomError::ClientError,
 };
 
 /// [`WsSession`] closed reason.
@@ -111,6 +113,13 @@ impl WsSession {
             );
         });
     }
+
+    fn get_rpc_settings(&self) -> RpcSettingsUpdated {
+        RpcSettingsUpdated {
+            idle_timeout_ms: self.idle_timeout.as_millis() as u64,
+            ping_interval_ms: self.ping_interval.as_millis() as u64,
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way to deal with
@@ -131,6 +140,16 @@ impl Actor for WsSession {
                 self.member_id.clone(),
                 Box::new(ctx.address()),
             ))
+            .map(
+                |_,
+                 session: &mut Self,
+                 ctx: &mut ws::WebsocketContext<Self>| {
+                    let msg =
+                        serde_json::to_string(&session.get_rpc_settings())
+                            .unwrap();
+                    ctx.text(msg);
+                },
+            )
             .map_err(
                 move |err,
                       session: &mut Self,
