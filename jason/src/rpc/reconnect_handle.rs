@@ -1,9 +1,6 @@
 //! Implementation of reconnector for the [`ReconnectableRpcClient`].
 
-use std::{
-    rc::{Rc, Weak},
-    time::Duration,
-};
+use std::{rc::Weak, time::Duration};
 
 use derive_more::Display;
 use js_sys::Promise;
@@ -12,51 +9,52 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::ReconnectableRpcClient,
-    utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
+    utils::{resolve_after, JasonError, JsCaused, JsError},
 };
+
+//TODO: why not reuse DetachedState error?
 
 /// [`RpcClient`] which will be reconnected is gone.
 #[derive(Debug, Display, JsCaused)]
 struct RpcClientGoneError;
 
-struct Inner {
-    /// Client which may be reconnected with this [`Reconnector`].
-    rpc: Weak<dyn ReconnectableRpcClient>,
-}
+
+// TODO: how is this object responsible for ReconnectableRpcClient reconnecting?
+//       what is the difference between this object and a raw RpcClient weak
+//       reference?
 
 /// Object which responsible for [`ReconnectableRpcClient`] reconnecting.
 ///
 /// Mainly used on JS side through [`ReconnectorHandle`].
-pub struct Reconnector(Rc<Inner>);
+pub struct Reconnector(Weak<dyn ReconnectableRpcClient>);
 
 impl Reconnector {
     /// Returns new [`Reconnector`] for provided [`ReconnectableRpcClient`].
     pub fn new(rpc: Weak<dyn ReconnectableRpcClient>) -> Self {
-        Self(Rc::new(Inner { rpc }))
+        Self(rpc)
     }
 
     /// Returns new [`ReconnectorHandle`] which points to this [`Reconnector`].
     pub fn new_handle(&self) -> ReconnectorHandle {
-        ReconnectorHandle(Rc::downgrade(&self.0))
+        ReconnectorHandle(Clone::clone(&self.0))
     }
 }
 
 /// JS side handle for [`Reconnector`].
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectorHandle(Weak<Inner>);
+pub struct ReconnectorHandle(Weak<dyn ReconnectableRpcClient>);
 
 #[wasm_bindgen]
 impl ReconnectorHandle {
     /// Tries to reconnect after provided delay in milliseconds.
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
-        let this = self.clone();
+        let rpc = Clone::clone(&self.0);
         future_to_promise(async move {
-            let inner = this.0.upgrade_handler::<JsValue>()?;
             resolve_after(Duration::from_millis(u64::from(delay_ms)).into())
                 .await;
 
-            Weak::upgrade(&inner.rpc)
+            Weak::upgrade(&rpc)
                 .ok_or_else(|| {
                     JsValue::from(JasonError::from(tracerr::new!(
                         RpcClientGoneError
@@ -87,11 +85,17 @@ impl ReconnectorHandle {
         multiplier: f32,
         max_delay_ms: u32,
     ) -> Promise {
-        let this = self.clone();
-        future_to_promise(async move {
-            let inner = this.0.upgrade_handler::<JsValue>()?;
+        // TODO: we discussed that it should work in different way
+        //      backoff should be handled here, and not in rpc-connection,
+        //      reconnector makes request to change states,
+        //      like: "rpc connection, i heard that you are disconnected
+        //      atm, change you state to connected, pls". Calling
+        //      rpc.reconnect_with_backoff(), you are changing rpc state
+        //      to some "reconnection with backoff" state.
 
-            let rpc = Weak::upgrade(&inner.rpc).ok_or_else(|| {
+        let rpc = Clone::clone(&self.0);
+        future_to_promise(async move {
+            let rpc = Weak::upgrade(&rpc).ok_or_else(|| {
                 JsValue::from(JasonError::from(tracerr::new!(
                     RpcClientGoneError
                 )))
