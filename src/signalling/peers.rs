@@ -87,12 +87,13 @@ impl PeerRepository {
         let first_member_id = first_member.id();
         let second_member_id = second_member.id();
 
-        debug!(
-            "Created peer between {} and {}.",
-            first_member_id, second_member_id
-        );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
+
+        debug!(
+            "Created Peers pair between {} and {}: [{}, {}].",
+            first_member_id, second_member_id, first_peer_id, second_peer_id
+        );
 
         let first_peer = Peer::new(
             first_peer_id,

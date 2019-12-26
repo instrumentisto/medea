@@ -12,9 +12,16 @@ use crate::{
     utils::{resolve_after, JasonError, JsCaused, JsError},
 };
 
+//TODO: why not reuse DetachedState error?
+
 /// [`RpcClient`] which will be reconnected is gone.
 #[derive(Debug, Display, JsCaused)]
 struct RpcClientGoneError;
+
+
+// TODO: how is this object responsible for ReconnectableRpcClient reconnecting?
+//       what is the difference between this object and a raw RpcClient weak
+//       reference?
 
 /// Object which responsible for [`ReconnectableRpcClient`] reconnecting.
 ///
@@ -78,6 +85,14 @@ impl ReconnectorHandle {
         multiplier: f32,
         max_delay_ms: u32,
     ) -> Promise {
+        // TODO: we discussed that it should work in different way
+        //      backoff should be handled here, and not in rpc-connection,
+        //      reconnector makes request to change states,
+        //      like: "rpc connection, i heard that you are disconnected
+        //      atm, change you state to connected, pls". Calling
+        //      rpc.reconnect_with_backoff(), you are changing rpc state
+        //      to some "reconnection with backoff" state.
+
         let rpc = Clone::clone(&self.0);
         future_to_promise(async move {
             let rpc = Weak::upgrade(&rpc).ok_or_else(|| {

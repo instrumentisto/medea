@@ -723,6 +723,9 @@ impl EventHandler for InnerRoom {
         })
     }
 
+    // TODO: so we receive event from RpcClient to, basically,
+    //       return it to RpcClient?
+
     /// Updates [`RpcClient`] settings.
     fn on_rpc_settings_updated(
         &mut self,

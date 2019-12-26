@@ -198,12 +198,17 @@ pub trait RpcClient {
     /// client will be dropped.
     fn set_close_reason(&self, close_reason: ClientDisconnect);
 
+    // TODO: it seems more convenient to handle settings update internally.
+
     /// Updates RPC settings of this [`RpcClient`].
     fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
     );
+
+    // TODO: whats the difference between this and on_close?
+    //       requires better naming and documentation
 
     /// Returns [`Stream`] to which will be sent [`ReconnectHandle`] (with which
     /// JS side can perform reconnection) on all connection losses.
@@ -232,6 +237,11 @@ pub trait RpcTransport {
 
     /// Sends a message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
+
+    // TODO: why does rpc transport has reconnect method? rpc transport is a
+    //       wrapper around weboscket, weboscket is not reusable after it was
+    //       closed, so expected way to reestablish connection is to create
+    //       new RpcTransport.
 
     /// Tries to reconnect this [`RpcTransport`].
     fn reconnect(
@@ -296,6 +306,11 @@ impl Inner {
         }))
     }
 }
+
+// TODO: why is this pub? do not expose implementation details.
+//       Also, i dont think that we need this wrapper or an
+//       WebSocketRpcClient::downgrade method, what is puprose of having
+//       explicit wrapper to weak inner?
 
 /// [`Weak`] pointer which can be upgraded to [`WebSocketRpcClient`].
 pub struct WeakWebsocketRpcClient(Weak<RefCell<Inner>>);
@@ -573,6 +588,11 @@ impl RpcClient for WebSocketRpcClient {
 
 /// RPC client which can reconnect.
 pub trait ReconnectableRpcClient {
+
+    // TODO: what is the purpose of reconnect method, when ther are already a
+    //       connect method? Both methods goals is to change connection state to
+    //      `connected`.
+
     /// Tries to reconnect a [`RpcClient`].
     ///
     /// If reconnection already performed on [`RpcTransport`], then
