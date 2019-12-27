@@ -8,14 +8,11 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::{BackoffDelayer, RpcClient, RpcClientError},
+    rpc::{BackoffDelayer, RpcClient},
     utils::{
         resolve_after, HandlerDetachedError, JasonError, JsCaused, JsError,
     },
 };
-use js_sys::Math::max;
-use std::rc::Rc;
-use tracerr::Traced;
 
 #[derive(Debug, Display, JsCaused)]
 struct NoTokenError;
@@ -85,7 +82,7 @@ impl ReconnectorHandle {
                 multiplier,
                 Duration::from_millis(u64::from(max_delay)).into(),
             );
-            while let Err(e) = rpc
+            while let Err(_) = rpc
                 .upgrade()
                 .ok_or_else(|| new_js_error!(HandlerDetachedError => JsValue))?
                 .connect(token.clone())

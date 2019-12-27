@@ -2,17 +2,12 @@
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    convert::TryFrom,
-    rc::{Rc, Weak},
-};
+use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From, Into};
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, LocalBoxFuture},
+    future::{self},
     stream::LocalBoxStream,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};

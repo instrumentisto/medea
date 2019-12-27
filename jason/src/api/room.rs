@@ -5,7 +5,6 @@ use std::{
     collections::HashMap,
     ops::DerefMut as _,
     rc::{Rc, Weak},
-    time::Duration,
 };
 
 use derive_more::Display;
@@ -26,9 +25,8 @@ use crate::{
         PeerEvent, PeerEventHandler, PeerRepository,
     },
     rpc::{
-        ClientDisconnect, CloseReason, IdleTimeout, PingInterval,
-        ReconnectorHandle, RpcClient, RpcClientError, TransportError,
-        WebSocketRpcTransport,
+        ClientDisconnect, CloseReason, ReconnectorHandle, RpcClient,
+        RpcClientError, TransportError,
     },
     utils::{
         console_error, Callback, HandlerDetachedError, JasonError, JsCaused,

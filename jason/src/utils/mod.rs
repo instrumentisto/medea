@@ -6,11 +6,7 @@ mod errors;
 mod callback;
 mod event_listener;
 
-use std::{
-    ops::Mul,
-    rc::{Rc, Weak},
-    time::Duration,
-};
+use std::{ops::Mul, time::Duration};
 
 use bigdecimal::{BigDecimal, ToPrimitive as _};
 use derive_more::{Add, Div, From, Sub};
@@ -27,8 +23,6 @@ pub use self::{
     },
     event_listener::{EventListener, EventListenerBindError},
 };
-use crate::rpc::RpcClient;
-use tracerr::WrapTraced;
 
 /// Returns [`Window`] object.
 ///

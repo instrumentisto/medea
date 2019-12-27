@@ -5,19 +5,13 @@ mod heartbeat;
 mod reconnect_handle;
 mod websocket;
 
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-    time::Duration,
-    vec,
-};
+use std::{cell::RefCell, rc::Rc, time::Duration, vec};
 
 use derive_more::{Display, From};
 use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
     stream::{LocalBoxStream, StreamExt as _},
-    Stream,
 };
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
@@ -28,7 +22,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, JsCaused, JsDuration, JsError};
+use crate::utils::{console_error, JsCaused, JsError};
 
 #[cfg(not(feature = "mockable"))]
 use self::{
@@ -164,6 +158,8 @@ pub enum RpcClientError {
     /// [`RpcTransport::on_state_change`].
     #[display(fmt = "Reconnection failed.")]
     ReconnectionFailed,
+
+    FirstServerMsgIsNotRpcSettings,
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
@@ -197,15 +193,6 @@ pub trait RpcClient {
     /// Sets reason, that will be passed to underlying transport when this
     /// client will be dropped.
     fn set_close_reason(&self, close_reason: ClientDisconnect);
-
-    // TODO: it seems more convenient to handle settings update internally.
-
-    /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(
-        &self,
-        idle_timeout: IdleTimeout,
-        ping_interval: PingInterval,
-    );
 
     // TODO: whats the difference between this and on_close?
     //       requires better naming and documentation
@@ -322,7 +309,7 @@ impl Inner {
             self.on_state_change_subs
                 .iter()
                 .filter_map(|sub| sub.unbounded_send(state).err())
-                .for_each(|e| {
+                .for_each(|_| {
                     console_error(
                         "RpcClient::on_state_change sub unexpectedly gone.",
                     )
@@ -473,11 +460,11 @@ impl WebSocketRpcClient {
                 let ping_interval = PingInterval(
                     Duration::from_millis(rpc_settings.ping_interval_ms).into(),
                 );
-                self.0.borrow_mut().heartbeat.start(
-                    idle_timeout,
-                    ping_interval,
-                    Rc::clone(&transport),
-                );
+                self.0
+                    .borrow_mut()
+                    .heartbeat
+                    .start(idle_timeout, ping_interval, Rc::clone(&transport))
+                    .map_err(tracerr::map_from_and_wrap!())?;
                 let mut on_idle = self.0.borrow().heartbeat.on_idle();
                 let weak_this = Rc::downgrade(&self.0);
                 spawn_local(async move {
@@ -488,12 +475,12 @@ impl WebSocketRpcClient {
                     }
                 });
             } else {
-                // TODO: panic
-                panic!("slkjfd")
+                return Err(tracerr::new!(
+                    RpcClientError::FirstServerMsgIsNotRpcSettings
+                ));
             }
         } else {
-            // TODO: PANIC
-            panic!("???")
+            return Err(tracerr::new!(RpcClientError::NoSocket));
         }
 
         self.0.borrow_mut().update_state(State::Open);
@@ -535,6 +522,18 @@ impl WebSocketRpcClient {
 
         self.0.borrow_mut().sock.replace(transport);
         Ok(())
+    }
+
+    /// Updates RPC settings of this [`RpcClient`].
+    fn update_settings(
+        &self,
+        idle_timeout: IdleTimeout,
+        ping_interval: PingInterval,
+    ) {
+        self.0
+            .borrow_mut()
+            .heartbeat
+            .update_settings(idle_timeout, ping_interval);
     }
 }
 
@@ -632,18 +631,6 @@ impl RpcClient for WebSocketRpcClient {
     /// client will be dropped.
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason
-    }
-
-    /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(
-        &self,
-        idle_timeout: IdleTimeout,
-        ping_interval: PingInterval,
-    ) {
-        self.0
-            .borrow_mut()
-            .heartbeat
-            .update_settings(idle_timeout, ping_interval);
     }
 
     /// Returns [`LocalBoxStream`] to which will be sent
