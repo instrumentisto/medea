@@ -381,7 +381,7 @@ impl MediaManagerHandle {
     }
 }
 
-/// Builds new stream from tracks in provided streams.
+/// Builds new [`SysMediaStream`] from tracks in provided [`SysMediaStream`]s.
 fn merge_streams(
     left: &SysMediaStream,
     right: &SysMediaStream,
