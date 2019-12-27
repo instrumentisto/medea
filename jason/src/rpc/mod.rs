@@ -342,27 +342,6 @@ impl Inner {
     }
 }
 
-// TODO: why is this pub? do not expose implementation details.
-//       Also, i dont think that we need this wrapper or an
-//       WebSocketRpcClient::downgrade method, what is puprose of having
-//       explicit wrapper to weak inner?
-
-/// [`Weak`] pointer which can be upgraded to [`WebSocketRpcClient`].
-pub struct WeakWebsocketRpcClient(Weak<RefCell<Inner>>);
-
-impl WeakWebsocketRpcClient {
-    /// Returns [`WeakWebSocketRpcClient`] with [`Weak`] pointer to a provided
-    /// [`WebSocketRpcClient`].
-    pub fn new(strong: &WebSocketRpcClient) -> Self {
-        Self(Rc::downgrade(&strong.0))
-    }
-
-    /// Returns `Some(WebSocketRpcClient)` if it still exists.
-    pub fn upgrade(&self) -> Option<WebSocketRpcClient> {
-        self.0.upgrade().map(WebSocketRpcClient)
-    }
-}
-
 // TODO:
 // 1. Proper sub registry.
 // 2. Reconnect.
@@ -476,12 +455,6 @@ impl WebSocketRpcClient {
         }
     }
 
-    /// Downgrades strong ([`Rc`]) pointed [`WebSocketRpcClient`] to a [`Weak`]
-    /// pointed [`WeakWebSocketRpcClient`].
-    fn downgrade(&self) -> WeakWebsocketRpcClient {
-        WeakWebsocketRpcClient::new(self)
-    }
-
     async fn connect(
         &self,
         token: String,
@@ -517,10 +490,10 @@ impl WebSocketRpcClient {
                     Rc::clone(&transport),
                 );
                 let mut on_idle = self.0.borrow().heartbeat.on_idle();
-                let weak_this = self.downgrade();
+                let weak_this = Rc::downgrade(&self.0);
                 spawn_local(async move {
                     while let Some(_) = on_idle.next().await {
-                        if let Some(this) = weak_this.upgrade() {
+                        if let Some(this) = weak_this.upgrade().map(Self) {
                             this.send_connection_loss();
                         }
                     }
@@ -547,25 +520,25 @@ impl WebSocketRpcClient {
             }
         });
 
-        let this_clone = self.downgrade();
+        let this_clone = Rc::downgrade(&self.0);
         let mut on_socket_message = transport
             .on_message()
             .map_err(tracerr::map_from_and_wrap!())?;
         spawn_local(async move {
             while let Some(msg) = on_socket_message.next().await {
-                if let Some(this) = this_clone.upgrade() {
+                if let Some(this) = this_clone.upgrade().map(Self) {
                     this.on_transport_message(msg)
                 }
             }
         });
 
-        let this_clone = self.downgrade();
+        let this_clone = Rc::downgrade(&self.0);
         let mut on_socket_close = transport
             .on_close()
             .map_err(tracerr::map_from_and_wrap!())?;
         spawn_local(async move {
             while let Some(msg) = on_socket_close.next().await {
-                if let Some(this) = this_clone.upgrade() {
+                if let Some(this) = this_clone.upgrade().map(Self) {
                     this.on_transport_close(&msg);
                 }
             }

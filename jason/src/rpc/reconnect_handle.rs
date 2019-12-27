@@ -21,12 +21,9 @@ use tracerr::Traced;
 #[derive(Debug, Display, JsCaused)]
 struct RpcClientGoneError;
 
-async fn reconnect(
-    rpc: Rc<dyn RpcClient>,
-) -> Result<(), Traced<RpcClientError>> {
-    // TODO: PANIC
-    let token = rpc.get_token().unwrap();
-    rpc.connect(token).await.map_err(|e| tracerr::new!(e))
+enum ReconnectorError {
+    RpcClient(RpcClientError),
+    NoToken,
 }
 
 /// JS side handle for [`Reconnector`].
@@ -87,9 +84,18 @@ impl ReconnectorHandle {
                 multiplier,
                 Duration::from_millis(u64::from(max_delay)).into(),
             );
+            // TODO: return JasonError
+            let token = rpc
+                .upgrade()
+                .ok_or_else(|| JsValue::NULL)?
+                .get_token()
+                .ok_or_else(|| JsValue::NULL)?;
 
-            while let Err(e) =
-                reconnect(rpc.upgrade().ok_or_else(|| JsValue::NULL)?).await
+            while let Err(e) = rpc
+                .upgrade()
+                .ok_or_else(|| JsValue::NULL)?
+                .connect(token.clone())
+                .await
             {
                 backoff_delayer.delay().await;
             }

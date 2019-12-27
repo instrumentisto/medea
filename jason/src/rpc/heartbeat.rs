@@ -141,7 +141,7 @@ impl Heartbeat {
                     weak_this.upgrade().map(move |t| (Self(t), msg))
                 })
             {
-                this.reset_idle_resolver();
+                this.reset_idle_watchdog();
 
                 if let ServerMsg::Ping(num) = msg {
                     this.0.borrow_mut().last_ping_num = num;
