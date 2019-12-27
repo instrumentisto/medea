@@ -200,9 +200,6 @@ struct InnerSocket {
     /// [close frame]:
     /// https://tools.ietf.org/html/rfc6455#section-5.5.1
     close_reason: ClientDisconnect,
-
-    /// URL to which this [`WebSocketRpcTransport`] is connected.
-    url: String,
 }
 
 /// WebSocket [`RpcTransport`] between a client and server.
@@ -220,7 +217,7 @@ struct InnerSocket {
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
-    fn new(url: String) -> Result<Self> {
+    fn new(url: &str) -> Result<Self> {
         let socket = SysWebSocket::new(&url)
             .map_err(Into::into)
             .map_err(TransportError::CreateSocket)
@@ -235,7 +232,6 @@ impl InnerSocket {
             on_message_subs: Vec::new(),
             on_state_change_subs: Vec::new(),
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
-            url,
         })
     }
 
@@ -304,42 +300,6 @@ impl RpcTransport for WebSocketRpcTransport {
         self.0.borrow_mut().close_reason = close_reason;
     }
 
-    fn reconnect(&self) -> LocalBoxFuture<'static, Result<()>> {
-        let this = Self(Rc::clone(&self.0));
-        Box::pin(async move {
-            let url = this.0.borrow().url.clone();
-            this.0.borrow_mut().update_socket_state(State::Connecting);
-            let new_transport = Self::new(url).await.map_err(|e| {
-                this.0.borrow_mut().sync_socket_state();
-                tracerr::new!(e)
-            })?;
-
-            std::mem::swap(
-                &mut new_transport.0.borrow_mut().on_message_subs,
-                &mut this.0.borrow_mut().on_message_subs,
-            );
-            std::mem::swap(
-                &mut new_transport.0.borrow_mut().on_close_subs,
-                &mut this.0.borrow_mut().on_close_subs,
-            );
-
-            RefCell::swap(&this.0, &new_transport.0);
-
-            std::mem::drop(new_transport);
-
-            // Set listeners again for an update Rc in a listener.
-            //
-            // If we don't do this then in a listener we will have
-            // pointer to old WebSocketRpcTransport.
-            this.set_on_close_listener()?;
-            this.set_on_message_listener()?;
-
-            this.0.borrow_mut().sync_socket_state();
-
-            Ok(())
-        })
-    }
-
     fn get_state(&self) -> State {
         self.0.borrow().socket_state
     }
@@ -355,7 +315,7 @@ impl RpcTransport for WebSocketRpcTransport {
 impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
-    pub async fn new(url: String) -> Result<Self> {
+    pub async fn new(url: &str) -> Result<Self> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 

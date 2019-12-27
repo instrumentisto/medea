@@ -47,7 +47,6 @@ pub use self::{
     reconnect_handle::ReconnectorHandle,
     websocket::{State, TransportError, WebSocketRpcTransport},
 };
-use wasm_bindgen::__rt::core::pin::Pin;
 
 /// Reasons of closing by client side and server side.
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
@@ -244,16 +243,6 @@ pub trait RpcTransport {
 
     /// Sends a message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
-
-    // TODO: why does rpc transport has reconnect method? rpc transport is a
-    //       wrapper around weboscket, weboscket is not reusable after it was
-    //       closed, so expected way to reestablish connection is to create
-    //       new RpcTransport.
-
-    /// Tries to reconnect this [`RpcTransport`].
-    fn reconnect(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
 
     /// Returns [`State`] of underlying [`RpcTransport`]'s
     /// connection.

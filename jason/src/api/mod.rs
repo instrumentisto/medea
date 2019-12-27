@@ -47,7 +47,7 @@ impl Jason {
     pub fn init_room(&self) -> RoomHandle {
         let rpc = WebSocketRpcClient::new(Box::new(|token| {
             Box::pin(async move {
-                let ws = WebSocketRpcTransport::new(token)
+                let ws = WebSocketRpcTransport::new(&token)
                     .await
                     .map_err(|e| tracerr::new!(e))?;
                 Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
