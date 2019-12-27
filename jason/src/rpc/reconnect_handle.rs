@@ -21,27 +21,6 @@ use tracerr::Traced;
 #[derive(Debug, Display, JsCaused)]
 struct RpcClientGoneError;
 
-// TODO: how is this object responsible for ReconnectableRpcClient reconnecting?
-//       what is the difference between this object and a raw RpcClient weak
-//       reference?
-
-/// Object which responsible for [`ReconnectableRpcClient`] reconnecting.
-///
-/// Mainly used on JS side through [`ReconnectorHandle`].
-pub struct Reconnector(Weak<dyn RpcClient>);
-
-impl Reconnector {
-    /// Returns new [`Reconnector`] for provided [`ReconnectableRpcClient`].
-    pub fn new(rpc: Weak<dyn RpcClient>) -> Self {
-        Self(rpc)
-    }
-
-    /// Returns new [`ReconnectorHandle`] which points to this [`Reconnector`].
-    pub fn new_handle(&self) -> ReconnectorHandle {
-        ReconnectorHandle(Clone::clone(&self.0))
-    }
-}
-
 async fn reconnect(
     rpc: Rc<dyn RpcClient>,
 ) -> Result<(), Traced<RpcClientError>> {
@@ -54,6 +33,12 @@ async fn reconnect(
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct ReconnectorHandle(Weak<dyn RpcClient>);
+
+impl ReconnectorHandle {
+    pub fn new(rpc: Weak<dyn RpcClient>) -> Self {
+        Self(rpc)
+    }
+}
 
 #[wasm_bindgen]
 impl ReconnectorHandle {

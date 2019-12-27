@@ -103,14 +103,15 @@ impl Heartbeat {
     //       that RpcSettingsUpdated should be moved from Events to ServerMsg.
 
     /// Creates new [`Heartbeat`] with provided config.
-    pub fn new(idle_timeout: IdleTimeout, ping_interval: PingInterval) -> Self {
+    pub fn new() -> Self {
+        let ping_interval = PingInterval(Duration::from_secs(3).into());
         Self(Rc::new(RefCell::new(Inner {
-            idle_timeout,
+            idle_timeout: IdleTimeout(Duration::from_secs(10).into()),
+            ping_interval,
             transport: None,
             handle_ping_task: None,
             on_idle_subs: Vec::new(),
             idle_watchdog_task: None,
-            ping_interval,
             last_ping_num: 0,
             max_ping_interval: Rc::new(Cell::new(ping_interval)),
         })))
@@ -119,14 +120,21 @@ impl Heartbeat {
     /// Start heartbeats for provided [`RpcTransport`].
     pub fn start(
         &self,
+        idle_timeout: IdleTimeout,
+        ping_interval: PingInterval,
         transport: Rc<dyn RpcTransport>,
     ) -> HeartbeatResult<()> {
-        let weak_this = Rc::downgrade(&self.0);
         let mut on_message_stream = transport
             .on_message()
             .map_err(tracerr::map_from_and_wrap!())?;
         self.0.borrow_mut().transport = Some(transport);
-        self.reset_idle_resolver();
+        self.0.borrow_mut().ping_interval = ping_interval;
+        self.0.borrow_mut().idle_timeout = idle_timeout;
+        self.0.borrow_mut().max_ping_interval.set(ping_interval);
+
+        self.reset_idle_watchdog();
+
+        let weak_this = Rc::downgrade(&self.0);
         let (fut, pong_abort) = future::abortable(async move {
             while let Some((this, msg)) =
                 on_message_stream.next().await.and_then(|msg| {
@@ -176,7 +184,7 @@ impl Heartbeat {
     }
 
     /// Aborts idle resolver and sets new one.
-    fn reset_idle_resolver(&self) {
+    fn reset_idle_watchdog(&self) {
         // TODO: perhaps, using window.set_interval with some ping_at will be
         //       more convenient?
         self.0.borrow_mut().idle_watchdog_task.take();
@@ -188,6 +196,12 @@ impl Heartbeat {
                     // TODO: perhaps idle_timeout / 2?
                     let wait_for_ping =
                         this.borrow().max_ping_interval.get() * 1.5;
+                    let idle_timeout = this.borrow().idle_timeout.0;
+                    let wait_for_ping = if wait_for_ping.0 > idle_timeout {
+                        PingInterval(Duration::from_millis(0).into())
+                    } else {
+                        wait_for_ping
+                    };
 
                     resolve_after(wait_for_ping.0).await;
                     console_error("We pre-pong now!");

@@ -210,11 +210,12 @@ impl RoomHandle {
                 inner.borrow().rpc.on_connection_loss();
             let weak_inner = Rc::downgrade(&inner);
             spawn_local(async move {
-                while let Some(reconnect_handle) =
-                    connection_loss_stream.next().await
-                {
+                while let Some(_) = connection_loss_stream.next().await {
                     match weak_inner.upgrade_handler::<JsValue>() {
                         Ok(inner) => {
+                            let reconnect_handle = ReconnectorHandle::new(
+                                Rc::downgrade(&inner.borrow().rpc),
+                            );
                             inner
                                 .borrow()
                                 .on_connection_loss

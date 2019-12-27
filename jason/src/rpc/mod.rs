@@ -30,7 +30,6 @@ use web_sys::CloseEvent;
 
 use crate::utils::{console_error, JsCaused, JsDuration, JsError};
 
-use self::reconnect_handle::Reconnector;
 #[cfg(not(feature = "mockable"))]
 use self::{
     backoff_delayer::{BackoffDelayer, BackoffDelayerError},
@@ -214,7 +213,7 @@ pub trait RpcClient {
 
     /// Returns [`Stream`] to which will be sent [`ReconnectHandle`] (with which
     /// JS side can perform reconnection) on all connection losses.
-    fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle>;
+    fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
     fn get_token(&self) -> Option<String>;
 
@@ -273,7 +272,7 @@ struct Inner {
     sock: Option<Rc<dyn RpcTransport>>,
 
     /// Service for sending/receiving ping pongs between the client and server.
-    heartbeat: Option<Heartbeat>,
+    heartbeat: Heartbeat,
 
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
@@ -291,11 +290,7 @@ struct Inner {
     close_reason: ClientDisconnect,
 
     /// Senders for [`RpcClient::on_connection_loss`].
-    on_connection_loss_subs: Vec<mpsc::UnboundedSender<ReconnectorHandle>>,
-
-    /// [`Reconnector`] with which this [`RpcClient`] will be reconnected (or
-    /// not) on `on_connection_loss`.
-    reconnector: Option<Reconnector>,
+    on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
     rpc_transport_factory: RpcTransportFactory,
 
@@ -321,10 +316,9 @@ impl Inner {
             sock: None,
             on_close_subscribers: Vec::new(),
             subs: vec![],
-            heartbeat: None,
+            heartbeat: Heartbeat::new(),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             on_connection_loss_subs: Vec::new(),
-            reconnector: None,
             rpc_transport_factory,
             token: None,
             on_state_change_subs: Vec::new(),
@@ -391,30 +385,22 @@ pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 impl WebSocketRpcClient {
     /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
     /// milliseconds.
-    pub fn new(rpc_transport_factory: RpcTransportFactory) -> Rc<Self> {
-        let rc_this = Rc::new(Self(Inner::new(rpc_transport_factory)));
-        let weak_this = Rc::downgrade(&rc_this);
-        rc_this.0.borrow_mut().reconnector = Some(Reconnector::new(weak_this));
-
-        rc_this
+    pub fn new(rpc_transport_factory: RpcTransportFactory) -> Self {
+        Self(Inner::new(rpc_transport_factory))
     }
 
     /// Stops [`Heartbeat`], sends [`ReconnectHandle`] to all
     /// [`RpcClient::on_connection_loss`] subs
     fn send_connection_loss(&self) {
-        // TODO: Maybe just 'take()'??
-        if let Some(hb) = &self.0.borrow_mut().heartbeat {
-            hb.stop();
-        };
+        self.0.borrow_mut().heartbeat.stop();
         self.0
             .borrow_mut()
             .on_connection_loss_subs
             .retain(|sub| !sub.is_closed());
 
         let inner = self.0.borrow();
-        let reconnector = inner.reconnector.as_ref().unwrap();
         for sub in &inner.on_connection_loss_subs {
-            if sub.unbounded_send(reconnector.new_handle()).is_err() {
+            if sub.unbounded_send(()).is_err() {
                 console_error(
                     "RpcClient::on_connection_loss subscriber is unexpectedly \
                      gone.",
@@ -428,10 +414,7 @@ impl WebSocketRpcClient {
     /// This function will be called on every WebSocket close (normal and
     /// abnormal) regardless of the [`CloseReason`].
     fn on_transport_close(&self, close_msg: &CloseMsg) {
-        // TODO: maybe 'take()'??
-        if let Some(hb) = &self.0.borrow_mut().heartbeat {
-            hb.stop();
-        }
+        self.0.borrow_mut().heartbeat.stop();
 
         match &close_msg {
             CloseMsg::Normal(_, reason) => match reason {
@@ -522,20 +505,18 @@ impl WebSocketRpcClient {
             .await
         {
             if let ServerMsg::RpcSettingsUpdated(rpc_settings) = msg {
-                let heartbeat = Heartbeat::new(
-                    IdleTimeout(
-                        Duration::from_millis(rpc_settings.idle_timeout_ms)
-                            .into(),
-                    ),
-                    PingInterval(
-                        Duration::from_millis(rpc_settings.ping_interval_ms)
-                            .into(),
-                    ),
+                let idle_timeout = IdleTimeout(
+                    Duration::from_millis(rpc_settings.idle_timeout_ms).into(),
                 );
-                heartbeat
-                    .start(Rc::clone(&transport))
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                let mut on_idle = heartbeat.on_idle();
+                let ping_interval = PingInterval(
+                    Duration::from_millis(rpc_settings.ping_interval_ms).into(),
+                );
+                self.0.borrow_mut().heartbeat.start(
+                    idle_timeout,
+                    ping_interval,
+                    Rc::clone(&transport),
+                );
+                let mut on_idle = self.0.borrow().heartbeat.on_idle();
                 let weak_this = self.downgrade();
                 spawn_local(async move {
                     while let Some(_) = on_idle.next().await {
@@ -544,7 +525,6 @@ impl WebSocketRpcClient {
                         }
                     }
                 });
-                self.0.borrow_mut().heartbeat = Some(heartbeat);
             } else {
                 // TODO: panic
                 panic!("slkjfd")
@@ -698,14 +678,15 @@ impl RpcClient for WebSocketRpcClient {
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
     ) {
-        if let Some(hb) = &mut self.0.borrow_mut().heartbeat {
-            hb.update_settings(idle_timeout, ping_interval);
-        }
+        self.0
+            .borrow_mut()
+            .heartbeat
+            .update_settings(idle_timeout, ping_interval);
     }
 
     /// Returns [`LocalBoxStream`] to which will be sent
     /// [`ReconnectionHandle`] on connection losing.
-    fn on_connection_loss(&self) -> LocalBoxStream<'static, ReconnectorHandle> {
+    fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_subs.push(tx);
 
@@ -734,9 +715,6 @@ impl Drop for Inner {
         if let Some(socket) = self.sock.take() {
             socket.set_close_reason(self.close_reason.clone());
         }
-        // TODO: maybe 'take()'??
-        if let Some(hb) = &self.heartbeat {
-            hb.stop();
-        }
+        self.heartbeat.stop();
     }
 }
