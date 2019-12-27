@@ -9,22 +9,17 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     rpc::{BackoffDelayer, RpcClient, RpcClientError},
-    utils::{resolve_after, JasonError, JasonWeakHandler, JsCaused, JsError},
+    utils::{
+        resolve_after, upgrade_handler_map_err, JasonError, JasonWeakHandler,
+        JsCaused, JsError,
+    },
 };
 use js_sys::Math::max;
 use std::rc::Rc;
 use tracerr::Traced;
 
-// TODO: why not reuse DetachedState error?
-
-/// [`RpcClient`] which will be reconnected is gone.
 #[derive(Debug, Display, JsCaused)]
-struct RpcClientGoneError;
-
-enum ReconnectorError {
-    RpcClient(RpcClientError),
-    NoToken,
-}
+struct NoTokenError;
 
 /// JS side handle for [`Reconnector`].
 #[wasm_bindgen]
@@ -46,12 +41,13 @@ impl ReconnectorHandle {
             resolve_after(Duration::from_millis(u64::from(delay_ms)).into())
                 .await;
 
-            let rpc = Weak::upgrade(&rpc).ok_or_else(|| {
-                JsValue::from(JasonError::from(tracerr::new!(
-                    RpcClientGoneError
-                )))
+            let rpc = rpc
+                .upgrade()
+                .ok_or_else(upgrade_handler_map_err::<JsValue>)?;
+
+            let token = rpc.get_token().ok_or_else(|| {
+                JsValue::from(JasonError::from(tracerr::new!(NoTokenError)))
             })?;
-            let token = rpc.get_token().unwrap();
             rpc.connect(token)
                 .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
@@ -79,18 +75,19 @@ impl ReconnectorHandle {
     ) -> Promise {
         let rpc = self.0.clone();
         future_to_promise(async move {
+            let token = rpc
+                .upgrade()
+                .ok_or_else(upgrade_handler_map_err::<JsValue>)?
+                .get_token()
+                .ok_or_else(|| {
+                    JsValue::from(JasonError::from(tracerr::new!(NoTokenError)))
+                })?;
+
             let mut backoff_delayer = BackoffDelayer::new(
                 Duration::from_millis(u64::from(starting_delay_ms)).into(),
                 multiplier,
                 Duration::from_millis(u64::from(max_delay)).into(),
             );
-            // TODO: return JasonError
-            let token = rpc
-                .upgrade()
-                .ok_or_else(|| JsValue::NULL)?
-                .get_token()
-                .ok_or_else(|| JsValue::NULL)?;
-
             while let Err(e) = rpc
                 .upgrade()
                 .ok_or_else(|| JsValue::NULL)?

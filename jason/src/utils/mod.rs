@@ -27,6 +27,7 @@ pub use self::{
     },
     event_listener::{EventListener, EventListenerBindError},
 };
+use crate::rpc::RpcClient;
 
 /// Returns [`Window`] object.
 ///
@@ -121,10 +122,12 @@ impl<I> JasonWeakHandler<I> for Weak<I> {
     where
         E: From<JasonError>,
     {
-        self.upgrade().ok_or_else(|| {
-            JasonError::from(tracerr::new!(HandlerDetachedError)).into()
-        })
+        self.upgrade().ok_or_else(upgrade_handler_map_err)
     }
+}
+
+pub fn upgrade_handler_map_err<E: From<JasonError>>() -> E {
+    JasonError::from(tracerr::new!(HandlerDetachedError)).into()
 }
 
 /// Returns property of JS object by name if its defined.
