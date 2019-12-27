@@ -7,7 +7,7 @@ use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
 use derive_more::{Display, From, Into};
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self},
+    future,
     stream::LocalBoxStream,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};

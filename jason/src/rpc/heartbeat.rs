@@ -1,4 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
+use std::{cell::Cell, time::Duration};
 
 use derive_more::{Add, Display, Div, From, Mul};
 use futures::{
@@ -16,7 +17,6 @@ use crate::{
     rpc::{RpcTransport, TransportError},
     utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
 };
-use std::{cell::Cell, time::Duration};
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
@@ -94,16 +94,10 @@ impl Inner {
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
-    // TODO: i dont like default-random values for IdleTimeout and PingInterval.
-    //       if RpcSettingsUpdated is sent each time new ws-connection is
-    //       established, then it makes sense to resolve RpcTransport
-    //       creation on this message receival, this way we will have latest
-    //       rpc-settings known when RpcTransport will be connected and we
-    //       can pass those settings to start() function. Also, it seems
-    //       that RpcSettingsUpdated should be moved from Events to ServerMsg.
-
     /// Creates new [`Heartbeat`] with provided config.
     pub fn new() -> Self {
+        // This default values will be not used anywhere. This is used
+        // only to avoid 'Option' usage.
         let ping_interval = PingInterval(Duration::from_secs(3).into());
         Self(Rc::new(RefCell::new(Inner {
             idle_timeout: IdleTimeout(Duration::from_secs(10).into()),
@@ -193,7 +187,6 @@ impl Heartbeat {
         let (idle_watchdog, idle_watchdog_handle) =
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
-                    // TODO: perhaps idle_timeout / 2?
                     let wait_for_ping =
                         this.borrow().max_ping_interval.get() * 1.5;
                     let idle_timeout = this.borrow().idle_timeout.0;

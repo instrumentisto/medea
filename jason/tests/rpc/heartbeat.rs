@@ -27,10 +27,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 /// 2. Mock [`RpcClient::send`] and check that [`ClientMsg::Pong`] was sent.
 #[wasm_bindgen_test]
 async fn sends_pong_on_received_ping() {
-    let hb = Heartbeat::new(
-        IdleTimeout(Duration::from_secs(3).into()),
-        PingInterval(Duration::from_secs(3).into()),
-    );
+    let hb = Heartbeat::new();
     let mut transport = MockRpcTransport::new();
     let (on_message_tx, on_message_rx) = mpsc::unbounded();
     transport
@@ -41,7 +38,7 @@ async fn sends_pong_on_received_ping() {
         test_tx.send(msg.clone()).unwrap();
         Ok(())
     });
-    hb.start(Rc::new(transport)).unwrap();
+    hb.start(IdleTimeout(Duration::from_secs(3).into()), PingInterval(Duration::from_secs(3).into()), Rc::new(transport)).unwrap();
     on_message_tx.unbounded_send(ServerMsg::Ping(2)).unwrap();
     await_with_timeout(
         Box::pin(async move {
@@ -67,10 +64,7 @@ async fn sends_pong_on_received_ping() {
 /// 2. Wait for [`Heartbeat::on_idle`] resolving.
 #[wasm_bindgen_test]
 async fn on_idle_works() {
-    let hb = Heartbeat::new(
-        IdleTimeout(Duration::from_millis(100).into()),
-        PingInterval(Duration::from_millis(50).into()),
-    );
+    let hb = Heartbeat::new();
     let mut transport = MockRpcTransport::new();
     transport
         .expect_on_message()
@@ -78,7 +72,11 @@ async fn on_idle_works() {
     transport.expect_send().return_once(|_| Ok(()));
 
     let mut on_idle_stream = hb.on_idle();
-    hb.start(Rc::new(transport)).unwrap();
+    hb.start(
+        IdleTimeout(Duration::from_millis(100).into()),
+        PingInterval(Duration::from_millis(50).into()),
+        Rc::new(transport)
+    ).unwrap();
 
     await_with_timeout(Box::pin(on_idle_stream.next()), 110)
         .await
@@ -99,10 +97,7 @@ async fn on_idle_works() {
 ///    milliseconds timeout).
 #[wasm_bindgen_test]
 async fn pre_sends_pong() {
-    let hb = Heartbeat::new(
-        IdleTimeout(Duration::from_millis(100).into()),
-        PingInterval(Duration::from_millis(10).into()),
-    );
+    let hb = Heartbeat::new();
     let mut transport = MockRpcTransport::new();
     transport
         .expect_on_message()
@@ -113,7 +108,11 @@ async fn pre_sends_pong() {
         Ok(())
     });
 
-    hb.start(Rc::new(transport)).unwrap();
+    hb.start(
+        IdleTimeout(Duration::from_millis(100).into()),
+        PingInterval(Duration::from_millis(10).into()),
+        Rc::new(transport)
+    ).unwrap();
 
     match await_with_timeout(on_message_rx.next().boxed(), 25)
         .await

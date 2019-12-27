@@ -15,10 +15,10 @@ use crate::{
     rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
 };
+use crate::rpc::{RpcTransport, WebSocketRpcTransport};
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
-use crate::rpc::{RpcTransport, WebSocketRpcTransport};
 
 /// General library interface.
 ///

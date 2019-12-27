@@ -525,7 +525,8 @@ impl WebSocketRpcClient {
     }
 
     /// Updates RPC settings of this [`RpcClient`].
-    fn update_settings(
+    // TODO: make it 'pub' only for tests
+    pub fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
@@ -572,8 +573,7 @@ impl RpcClient for WebSocketRpcClient {
                                     State::Connecting => (),
                                 }
                             }
-                            // TODO: PANIC
-                            panic!("RpcTransport unexpectedly gone.")
+                            return Err(tracerr::new!(RpcClientError::RpcClientGone))
                         }
                         State::Closed | State::Closing => {
                             this.connect(token).await
