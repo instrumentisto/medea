@@ -84,8 +84,11 @@ impl WsSession {
 
     /// Starts watchdog which will drop connection if `now`-`last_activity` >
     /// `idle_timeout`.
-    fn start_watchdog(ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(Duration::new(1, 0), |session, ctx| {
+    fn start_watchdog(
+        idle_timeout: Duration,
+        ctx: &mut <Self as Actor>::Context,
+    ) {
+        ctx.run_interval(idle_timeout, |session, ctx| {
             if Instant::now().duration_since(session.last_activity)
                 > session.idle_timeout
             {
@@ -132,7 +135,7 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        Self::start_watchdog(ctx);
+        Self::start_watchdog(self.idle_timeout, ctx);
         self.start_pinger(ctx);
 
         ctx.wait(
@@ -395,6 +398,7 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         }
 
@@ -428,21 +432,19 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_secs(5),
+                Duration::from_millis(50),
             )
         });
 
         let client = serv.ws().unwrap();
 
-        let client = serv
-            .block_on(
-                client.send(Message::Text(String::from(r#"{"ping":25}"#))),
-            )
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
             .unwrap();
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
         assert_eq!(
             item,
-            Some(Frame::Text(Some(String::from(r#"{"pong":25}"#).into())))
+            Some(Frame::Text(Some(String::from(r#"{"ping":1}"#).into())))
         );
     }
 
@@ -471,13 +473,16 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_millis(100),
+                Duration::from_millis(120),
             )
         });
 
         let client = serv.ws().unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
+            .unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -513,6 +518,7 @@ mod test {
             WsSession::new(
                 member_id,
                 Box::new(rpc_server),
+                Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         });
@@ -579,6 +585,7 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         });
 
@@ -601,8 +608,10 @@ mod test {
             .wait()
             .unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
+            .unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -639,6 +648,7 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         });
 
@@ -662,8 +672,10 @@ mod test {
             .wait()
             .unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
+            .unwrap();
 
         let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
                      sdp_answer\":\"sdp_answer\"}}";

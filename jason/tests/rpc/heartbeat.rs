@@ -38,7 +38,12 @@ async fn sends_pong_on_received_ping() {
         test_tx.send(msg.clone()).unwrap();
         Ok(())
     });
-    hb.start(IdleTimeout(Duration::from_secs(3).into()), PingInterval(Duration::from_secs(3).into()), Rc::new(transport)).unwrap();
+    hb.start(
+        IdleTimeout(Duration::from_secs(3).into()),
+        PingInterval(Duration::from_secs(3).into()),
+        Rc::new(transport),
+    )
+    .unwrap();
     on_message_tx.unbounded_send(ServerMsg::Ping(2)).unwrap();
     await_with_timeout(
         Box::pin(async move {
@@ -75,8 +80,9 @@ async fn on_idle_works() {
     hb.start(
         IdleTimeout(Duration::from_millis(100).into()),
         PingInterval(Duration::from_millis(50).into()),
-        Rc::new(transport)
-    ).unwrap();
+        Rc::new(transport),
+    )
+    .unwrap();
 
     await_with_timeout(Box::pin(on_idle_stream.next()), 110)
         .await
@@ -111,8 +117,9 @@ async fn pre_sends_pong() {
     hb.start(
         IdleTimeout(Duration::from_millis(100).into()),
         PingInterval(Duration::from_millis(10).into()),
-        Rc::new(transport)
-    ).unwrap();
+        Rc::new(transport),
+    )
+    .unwrap();
 
     match await_with_timeout(on_message_rx.next().boxed(), 25)
         .await

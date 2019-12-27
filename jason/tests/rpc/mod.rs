@@ -19,7 +19,10 @@ use futures::{
 use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, ServerMsg,
 };
-use medea_jason::rpc::{ClientDisconnect, CloseMsg, IdleTimeout, MockRpcTransport, PingInterval, RpcClient, WebSocketRpcClient, RpcTransport};
+use medea_jason::rpc::{
+    ClientDisconnect, CloseMsg, IdleTimeout, MockRpcTransport, PingInterval,
+    RpcClient, RpcTransport, WebSocketRpcClient,
+};
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
@@ -409,50 +412,49 @@ mod transport_close_reason_on_drop {
     }
 }
 
-/*
-/// Tests which checks that on abnormal [`RpcTransport`] close, [`RpcClient`]
-/// tries to reconnect [`RpcTransport`].
-mod reconnect {
-    use medea_jason::rpc::{State, TransportError};
-
-    use crate::await_with_timeout;
-
-    use super::*;
-
-    /// Tests that [`WebSocketRpcClient`] will resolve
-    /// [`RpcClient::on_connection_loss`] on abnormal connection loss.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Mock [`RpcTransport`] to throw [`CloseMsg::Abnormal`].
-    ///
-    /// 2. Wait for [`RpcClient::on_connection_loss`] resolving (with 600
-    ///    milliseconds timeout).
-    #[wasm_bindgen_test]
-    async fn on_abnormal_transport_close() {
-        let mut transport = MockRpcTransport::new();
-        transport
-            .expect_on_message()
-            .times(2)
-            .returning(|| Ok(stream::once(future::pending()).boxed()));
-        transport.expect_send().returning(|_| Ok(()));
-        transport.expect_set_close_reason().return_const(());
-        transport.expect_on_close().return_once(move || {
-            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
-        });
-        let ws = new_client(Rc::new(transport));
-        ws.update_settings(
-            IdleTimeout(Duration::from_millis(125).into()),
-            PingInterval(Duration::from_millis(250).into()),
-        );
-        ws.connect(String::new()).await.unwrap();
-
-        await_with_timeout(Box::pin(ws.on_connection_loss().next()), 600)
-            .await
-            .unwrap()
-            .unwrap();
-    }
-
+// Tests which checks that on abnormal [`RpcTransport`] close, [`RpcClient`]
+// tries to reconnect [`RpcTransport`].
+// mod reconnect {
+// use medea_jason::rpc::{State, TransportError};
+//
+// use crate::await_with_timeout;
+//
+// use super::*;
+//
+// Tests that [`WebSocketRpcClient`] will resolve
+// [`RpcClient::on_connection_loss`] on abnormal connection loss.
+//
+// # Algorithm
+//
+// 1. Mock [`RpcTransport`] to throw [`CloseMsg::Abnormal`].
+//
+// 2. Wait for [`RpcClient::on_connection_loss`] resolving (with 600
+//    milliseconds timeout).
+// #[wasm_bindgen_test]
+// async fn on_abnormal_transport_close() {
+// let mut transport = MockRpcTransport::new();
+// transport
+// .expect_on_message()
+// .times(2)
+// .returning(|| Ok(stream::once(future::pending()).boxed()));
+// transport.expect_send().returning(|_| Ok(()));
+// transport.expect_set_close_reason().return_const(());
+// transport.expect_on_close().return_once(move || {
+// Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
+// });
+// let ws = new_client(Rc::new(transport));
+// ws.update_settings(
+// IdleTimeout(Duration::from_millis(125).into()),
+// PingInterval(Duration::from_millis(250).into()),
+// );
+// ws.connect(String::new()).await.unwrap();
+//
+// await_with_timeout(Box::pin(ws.on_connection_loss().next()), 600)
+// .await
+// .unwrap()
+// .unwrap();
+// }
+//
 //    /// Tests that [`RpcClient::reconnect_with_backoff`] calls
 //    /// [`RpcTransport::reconnect`] many times with some delay until
 //    /// reconnection is not successful.
@@ -461,10 +463,10 @@ mod reconnect {
 //    ///
 //    /// 1. Mock [`RpcTransport::reconnect`] and [`RpcTransport::on_close`].
 //    ///
-//    /// 2. Send [`CloseMsg::Abnormal`] to [`RpcTransport::on_close`] [`Stream`].
-//    ///
-//    /// 3. Wait for 3 calls of [`RpcTransport::reconnect`] (while this function
-//    ///    is not called 3 times, result of reconnection will be
+//    /// 2. Send [`CloseMsg::Abnormal`] to [`RpcTransport::on_close`]
+// [`Stream`].    ///
+//    /// 3. Wait for 3 calls of [`RpcTransport::reconnect`] (while this
+// function    ///    is not called 3 times, result of reconnection will be
 //    ///    [`TransportError::InitSocket`]).
 //    #[wasm_bindgen_test]
 //    async fn reconnect_with_backoff() {
@@ -518,144 +520,141 @@ mod reconnect {
 //            .unwrap()
 //            .unwrap();
 //    }
-}
-*/
+// }
 
-/*
-/// Tests for mechanism of subscribing to the [`State`] of [`RpcTransport`]
-/// when reconnection already started.
-mod subscribe_to_state {
-    use futures::{
-        channel::mpsc, future, stream, FutureExt as _, StreamExt as _,
-    };
-    use medea_jason::rpc::{
-        CloseMsg, MockRpcTransport, State,
-    };
-
-    use super::*;
-
-    /// Tests that [`RpcClient`] will start reconnection if [`RpcTransport`]'s
-    /// [`State`] is [`State::Closed`].
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Mock [`RpcTransport`] to return [`State::Closed`] from
-    ///    [`RpcTransport::get_state`].
-    ///
-    /// 2. Mock [`RpcTransport::on_close`] to return [`CloseMsg::Abnormal`].
-    ///
-    /// 3. Try to call [`RpcClient::reconnect`] and check that
-    ///    [`RpcTransport::reconnect`]    was called one time.
-    #[wasm_bindgen_test]
-    async fn closed_transport_state() {
-        let mut transport = MockRpcTransport::new();
-        transport
-            .expect_on_message()
-            .times(3)
-            .returning(|| Ok(stream::pending().boxed()));
-        transport
-            .expect_set_close_reason()
-            .times(1)
-            .returning(|_| ());
-
-        transport.expect_get_state().return_once(|| State::Closed);
-        transport.expect_on_close().return_once(|| {
-            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
-        });
-        let (test_tx, test_rx) = oneshot::channel();
+// Tests for mechanism of subscribing to the [`State`] of [`RpcTransport`]
+// when reconnection already started.
+// mod subscribe_to_state {
+// use futures::{
+// channel::mpsc, future, stream, FutureExt as _, StreamExt as _,
+// };
+// use medea_jason::rpc::{
+// CloseMsg, MockRpcTransport, State,
+// };
+//
+// use super::*;
+//
+// Tests that [`RpcClient`] will start reconnection if [`RpcTransport`]'s
+// [`State`] is [`State::Closed`].
+//
+// # Algorithm
+//
+// 1. Mock [`RpcTransport`] to return [`State::Closed`] from
+//    [`RpcTransport::get_state`].
+//
+// 2. Mock [`RpcTransport::on_close`] to return [`CloseMsg::Abnormal`].
+//
+// 3. Try to call [`RpcClient::reconnect`] and check that
+//    [`RpcTransport::reconnect`]    was called one time.
+// #[wasm_bindgen_test]
+// async fn closed_transport_state() {
+// let mut transport = MockRpcTransport::new();
+// transport
+// .expect_on_message()
+// .times(3)
+// .returning(|| Ok(stream::pending().boxed()));
+// transport
+// .expect_set_close_reason()
+// .times(1)
+// .returning(|_| ());
+//
+// transport.expect_get_state().return_once(|| State::Closed);
+// transport.expect_on_close().return_once(|| {
+// Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
+// });
+// let (test_tx, test_rx) = oneshot::channel();
 //        transport.expect_reconnect().return_once(move || {
 //            test_tx.send(()).unwrap();
 //            future::ok(()).boxed()
 //        });
-
-        let transport = Rc::new(transport);
-        let client = WebSocketRpcClient::new(Box::new(move |token| {
-            test_tx.send(()).unwrap();
-            Box::pin(future::ok(transport.clone() as Rc<dyn RpcTransport>))
-        }));
-        client.connect(String::new()).await.unwrap();
-
-        spawn_local(async move {
-            client.connect(String::new()).await.unwrap();
-        });
-
-        await_with_timeout(Box::pin(test_rx), 500)
-            .await
-            .unwrap()
-            .unwrap();
-    }
-
-    /// Tests that [`RpcClient`] will only subscibe to the [`RpcTransport`]
-    /// [`State`] updates if reconnection already started.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Mock [`RpcTransport::get_state`] to return [`State::Connecting`].
-    ///
-    /// 2. Mock [`RpcTransport::on_close`] to return [`CloseMsg::Abnormal`].
-    ///
-    /// 3. Mock [`RpcTransport::on_state_change`] to throw [`State::Open`].
-    ///
-    /// 4. Call [`RpcClient::reconnect`] and check that
-    ///    [`RpcTransport::reconnect`] wasn't called.
-    #[wasm_bindgen_test]
-    async fn connecting_transport_state() {
-        let mut transport = MockRpcTransport::new();
-        transport
-            .expect_on_message()
-            .times(2)
-            .returning(|| Ok(stream::pending().boxed()));
-        transport
-            .expect_set_close_reason()
-            .times(1)
-            .returning(|_| ());
-
-        transport
-            .expect_get_state()
-            .return_once(|| State::Connecting);
-        transport.expect_on_close().return_once(|| {
-            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
-        });
-        let (on_state_change_tx, on_state_change_rx) = mpsc::unbounded();
-        transport
-            .expect_on_state_change()
-            .return_once(|| on_state_change_rx.boxed());
-
-        let client = new_client(Rc::new(transport));
-        client.connect(String::new()).await.unwrap();
-
-        on_state_change_tx.unbounded_send(State::Open).unwrap();
-        client.connect(String::new()).await.unwrap();
-    }
-
-    /// Tests that on [`RpcTransport`] [`State::Open`] [`RpcClient::reconnect`]
-    /// will immediately resolved and [`RpcTransport::reconnect`] not
-    /// called.
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Mock [`RpcTransport::get_state`] to return [`State::Open`].
-    ///
-    /// 2. Call [`RpcClient::reconnect`] and check that
-    ///    [`RpcTransport::reconnect`] function wasn't called.
-    #[wasm_bindgen_test]
-    async fn open_transport_state() {
-        let mut transport = MockRpcTransport::new();
-        transport
-            .expect_on_message()
-            .times(2)
-            .returning(|| Ok(stream::pending().boxed()));
-        transport.expect_set_close_reason().return_once(|_| ());
-
-        transport.expect_get_state().return_once(|| State::Open);
-        transport.expect_on_close().return_once(|| {
-            Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
-        });
-
-        let client = new_client(Rc::new(transport));
-        client.connect(String::new()).await.unwrap();
-
-        client.connect(String::new()).await.unwrap();
-    }
-}
-*/
+//
+// let transport = Rc::new(transport);
+// let client = WebSocketRpcClient::new(Box::new(move |token| {
+// test_tx.send(()).unwrap();
+// Box::pin(future::ok(transport.clone() as Rc<dyn RpcTransport>))
+// }));
+// client.connect(String::new()).await.unwrap();
+//
+// spawn_local(async move {
+// client.connect(String::new()).await.unwrap();
+// });
+//
+// await_with_timeout(Box::pin(test_rx), 500)
+// .await
+// .unwrap()
+// .unwrap();
+// }
+//
+// Tests that [`RpcClient`] will only subscibe to the [`RpcTransport`]
+// [`State`] updates if reconnection already started.
+//
+// # Algorithm
+//
+// 1. Mock [`RpcTransport::get_state`] to return [`State::Connecting`].
+//
+// 2. Mock [`RpcTransport::on_close`] to return [`CloseMsg::Abnormal`].
+//
+// 3. Mock [`RpcTransport::on_state_change`] to throw [`State::Open`].
+//
+// 4. Call [`RpcClient::reconnect`] and check that
+//    [`RpcTransport::reconnect`] wasn't called.
+// #[wasm_bindgen_test]
+// async fn connecting_transport_state() {
+// let mut transport = MockRpcTransport::new();
+// transport
+// .expect_on_message()
+// .times(2)
+// .returning(|| Ok(stream::pending().boxed()));
+// transport
+// .expect_set_close_reason()
+// .times(1)
+// .returning(|_| ());
+//
+// transport
+// .expect_get_state()
+// .return_once(|| State::Connecting);
+// transport.expect_on_close().return_once(|| {
+// Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
+// });
+// let (on_state_change_tx, on_state_change_rx) = mpsc::unbounded();
+// transport
+// .expect_on_state_change()
+// .return_once(|| on_state_change_rx.boxed());
+//
+// let client = new_client(Rc::new(transport));
+// client.connect(String::new()).await.unwrap();
+//
+// on_state_change_tx.unbounded_send(State::Open).unwrap();
+// client.connect(String::new()).await.unwrap();
+// }
+//
+// Tests that on [`RpcTransport`] [`State::Open`] [`RpcClient::reconnect`]
+// will immediately resolved and [`RpcTransport::reconnect`] not
+// called.
+//
+// # Algorithm
+//
+// 1. Mock [`RpcTransport::get_state`] to return [`State::Open`].
+//
+// 2. Call [`RpcClient::reconnect`] and check that
+//    [`RpcTransport::reconnect`] function wasn't called.
+// #[wasm_bindgen_test]
+// async fn open_transport_state() {
+// let mut transport = MockRpcTransport::new();
+// transport
+// .expect_on_message()
+// .times(2)
+// .returning(|| Ok(stream::pending().boxed()));
+// transport.expect_set_close_reason().return_once(|_| ());
+//
+// transport.expect_get_state().return_once(|| State::Open);
+// transport.expect_on_close().return_once(|| {
+// Ok(stream::once(async { CloseMsg::Abnormal(1500) }).boxed())
+// });
+//
+// let client = new_client(Rc::new(transport));
+// client.connect(String::new()).await.unwrap();
+//
+// client.connect(String::new()).await.unwrap();
+// }
+// }

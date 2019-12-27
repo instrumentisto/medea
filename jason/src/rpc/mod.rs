@@ -573,7 +573,9 @@ impl RpcClient for WebSocketRpcClient {
                                     State::Connecting => (),
                                 }
                             }
-                            return Err(tracerr::new!(RpcClientError::RpcClientGone))
+                            return Err(tracerr::new!(
+                                RpcClientError::RpcClientGone
+                            ));
                         }
                         State::Closed | State::Closing => {
                             this.connect(token).await

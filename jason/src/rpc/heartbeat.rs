@@ -1,5 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
-use std::{cell::Cell, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use derive_more::{Add, Display, Div, From, Mul};
 use futures::{
@@ -183,8 +186,7 @@ impl Heartbeat {
         let (idle_watchdog, idle_watchdog_handle) =
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
-                    let wait_for_ping =
-                        this.borrow().ping_interval * 2;
+                    let wait_for_ping = this.borrow().ping_interval * 2;
                     let idle_timeout = this.borrow().idle_timeout.0;
 
                     resolve_after(wait_for_ping.0).await;

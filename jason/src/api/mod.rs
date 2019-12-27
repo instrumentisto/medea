@@ -12,10 +12,12 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
+    rpc::{
+        ClientDisconnect, RpcClient as _, RpcTransport, WebSocketRpcClient,
+        WebSocketRpcTransport,
+    },
     set_panic_hook,
 };
-use crate::rpc::{RpcTransport, WebSocketRpcTransport};
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
