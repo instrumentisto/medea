@@ -64,8 +64,6 @@ struct Inner {
 
     /// [`mpsc::UnboundedSender`]s for a [`Heartbeat::on_idle`].
     on_idle_subs: Vec<mpsc::UnboundedSender<()>>,
-
-    max_ping_interval: Rc<Cell<PingInterval>>,
 }
 
 impl Inner {
@@ -107,7 +105,6 @@ impl Heartbeat {
             on_idle_subs: Vec::new(),
             idle_watchdog_task: None,
             last_ping_num: 0,
-            max_ping_interval: Rc::new(Cell::new(ping_interval)),
         })))
     }
 
@@ -124,7 +121,6 @@ impl Heartbeat {
         self.0.borrow_mut().transport = Some(transport);
         self.0.borrow_mut().ping_interval = ping_interval;
         self.0.borrow_mut().idle_timeout = idle_timeout;
-        self.0.borrow_mut().max_ping_interval.set(ping_interval);
 
         self.reset_idle_watchdog();
 
@@ -188,16 +184,10 @@ impl Heartbeat {
             future::abortable(async move {
                 if let Some(this) = weak_this.upgrade() {
                     let wait_for_ping =
-                        this.borrow().max_ping_interval.get() * 1.5;
+                        this.borrow().ping_interval * 2;
                     let idle_timeout = this.borrow().idle_timeout.0;
-                    let wait_for_ping = if wait_for_ping.0 > idle_timeout {
-                        PingInterval(Duration::from_millis(0).into())
-                    } else {
-                        wait_for_ping
-                    };
 
                     resolve_after(wait_for_ping.0).await;
-                    console_error("We pre-pong now!");
 
                     let last_ping_num = this.borrow().last_ping_num;
                     this.borrow().send_pong(last_ping_num + 1);
@@ -218,27 +208,8 @@ impl Heartbeat {
                 }
             });
 
-        let max_ping_interval = Rc::clone(&self.0.borrow().max_ping_interval);
         spawn_local(async move {
-            let watchdog_start_timestamp = Date::now() as u64;
-            if let Err(_) = idle_watchdog.await {
-                let watchdog_abort_timestamp = Date::now() as u64;
-                let real_ping_interval = PingInterval(
-                    Duration::from_millis(
-                        watchdog_abort_timestamp - watchdog_start_timestamp,
-                    )
-                    .into(),
-                );
-
-                if real_ping_interval > max_ping_interval.get() {
-                    max_ping_interval.set(real_ping_interval);
-                }
-
-                console_error(format!(
-                    "Current max ping interval: {:?}",
-                    max_ping_interval.get()
-                ));
-            }
+            idle_watchdog.await.ok();
         });
 
         self.0.borrow_mut().idle_watchdog_task =
