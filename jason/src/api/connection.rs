@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     peer::MediaStreamHandle,
-    utils::{Callback, JasonWeakHandler},
+    utils::{Callback, HandlerDetachedError},
 };
 
 /// Actual data of a connection with a specific remote [`Member`].
@@ -35,7 +35,8 @@ impl ConnectionHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().on_remote_stream.set_func(f))
     }
 }

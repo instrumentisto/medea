@@ -22,7 +22,7 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, JasonError, JasonWeakHandler, JsCaused, JsError},
+    utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
@@ -250,7 +250,8 @@ impl MediaManagerHandle {
     pub fn enumerate_devices(&self) -> Promise {
         match self
             .0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|_| InnerMediaManager::enumerate_devices())
         {
             Ok(devices) => future_to_promise(async {
@@ -276,7 +277,12 @@ impl MediaManagerHandle {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
-        match self.0.upgrade_handler().map(|inner| inner.get_stream(caps)) {
+        match self
+            .0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .map(|inner| inner.get_stream(caps))
+        {
             Ok(stream) => future_to_promise(async {
                 stream
                     .await

@@ -10,8 +10,7 @@ use wasm_bindgen_futures::future_to_promise;
 use crate::{
     rpc::{BackoffDelayer, RpcClient, RpcClientError},
     utils::{
-        resolve_after, upgrade_handler_map_err, JasonError, JasonWeakHandler,
-        JsCaused, JsError,
+        resolve_after, HandlerDetachedError, JasonError, JsCaused, JsError,
     },
 };
 use js_sys::Math::max;
@@ -41,13 +40,13 @@ impl ReconnectorHandle {
             resolve_after(Duration::from_millis(u64::from(delay_ms)).into())
                 .await;
 
-            let rpc = rpc
-                .upgrade()
-                .ok_or_else(upgrade_handler_map_err::<JsValue>)?;
+            let rpc = rpc.upgrade().ok_or_else(
+                || new_js_error!(HandlerDetachedError => JsValue),
+            )?;
 
-            let token = rpc.get_token().ok_or_else(|| {
-                JsValue::from(JasonError::from(tracerr::new!(NoTokenError)))
-            })?;
+            let token = rpc
+                .get_token()
+                .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
             rpc.connect(token)
                 .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
@@ -77,11 +76,9 @@ impl ReconnectorHandle {
         future_to_promise(async move {
             let token = rpc
                 .upgrade()
-                .ok_or_else(upgrade_handler_map_err::<JsValue>)?
+                .ok_or_else(|| new_js_error!(HandlerDetachedError => JsValue))?
                 .get_token()
-                .ok_or_else(|| {
-                    JsValue::from(JasonError::from(tracerr::new!(NoTokenError)))
-                })?;
+                .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
 
             let mut backoff_delayer = BackoffDelayer::new(
                 Duration::from_millis(u64::from(starting_delay_ms)).into(),
@@ -90,7 +87,7 @@ impl ReconnectorHandle {
             );
             while let Err(e) = rpc
                 .upgrade()
-                .ok_or_else(|| JsValue::NULL)?
+                .ok_or_else(|| new_js_error!(HandlerDetachedError => JsValue))?
                 .connect(token.clone())
                 .await
             {

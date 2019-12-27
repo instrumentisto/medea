@@ -14,7 +14,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     media::TrackConstraints,
     peer::media::{EnabledAudio, EnabledVideo},
-    utils::JasonWeakHandler as _,
+    utils::HandlerDetachedError,
 };
 
 use super::MediaTrack;
@@ -139,6 +139,9 @@ pub struct MediaStreamHandle(Weak<InnerStream>);
 impl MediaStreamHandle {
     /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        self.0.upgrade_handler().map(|inner| inner.stream.clone())
+        self.0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .map(|inner| inner.stream.clone())
     }
 }

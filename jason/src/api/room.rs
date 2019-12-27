@@ -31,7 +31,7 @@ use crate::{
         WebSocketRpcTransport,
     },
     utils::{
-        console_error, Callback, JasonError, JasonWeakHandler as _, JsCaused,
+        console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
         JsError,
     },
 };
@@ -178,7 +178,10 @@ impl RoomHandle {
         &self,
         token: String,
     ) -> impl Future<Output = Result<(), JasonError>> + 'static {
-        let inner = self.0.upgrade_handler::<JasonError>();
+        let inner = self
+            .0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError => JasonError));
 
         async move {
             let inner = inner?;
@@ -211,7 +214,9 @@ impl RoomHandle {
             let weak_inner = Rc::downgrade(&inner);
             spawn_local(async move {
                 while let Some(_) = connection_loss_stream.next().await {
-                    match weak_inner.upgrade_handler::<JsValue>() {
+                    match weak_inner.upgrade().ok_or_else(
+                        || new_js_error!(HandlerDetachedError => JsValue),
+                    ) {
                         Ok(inner) => {
                             let reconnect_handle = ReconnectorHandle::new(
                                 Rc::downgrade(&inner.borrow().rpc),
@@ -241,7 +246,8 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().on_new_connection.set_func(f))
     }
 
@@ -249,7 +255,8 @@ impl RoomHandle {
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().on_close.set_func(f))
     }
 
@@ -258,7 +265,8 @@ impl RoomHandle {
     /// request was initiated by media server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
@@ -269,7 +277,8 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
     }
 
@@ -280,7 +289,8 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().on_connection_loss.set_func(f))
     }
 
@@ -308,36 +318,49 @@ impl RoomHandle {
         stream: SysMediaStream,
     ) -> Result<(), JsValue> {
         self.0
-            .upgrade_handler()
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
             .map(|inner| inner.borrow_mut().inject_local_stream(stream))
     }
 
     /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        self.0.upgrade_handler().map(|inner| {
-            inner.borrow_mut().toggle_send_audio(EnabledAudio(false))
-        })
+        self.0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .map(|inner| {
+                inner.borrow_mut().toggle_send_audio(EnabledAudio(false))
+            })
     }
 
     /// Unmutes outbound audio in this room.
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        self.0.upgrade_handler().map(|inner| {
-            inner.borrow_mut().toggle_send_audio(EnabledAudio(true))
-        })
+        self.0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .map(|inner| {
+                inner.borrow_mut().toggle_send_audio(EnabledAudio(true))
+            })
     }
 
     /// Mutes outbound video in this room.
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        self.0.upgrade_handler().map(|inner| {
-            inner.borrow_mut().toggle_send_video(EnabledVideo(false))
-        })
+        self.0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .map(|inner| {
+                inner.borrow_mut().toggle_send_video(EnabledVideo(false))
+            })
     }
 
     /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        self.0.upgrade_handler().map(|inner| {
-            inner.borrow_mut().toggle_send_video(EnabledVideo(true))
-        })
+        self.0
+            .upgrade()
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .map(|inner| {
+                inner.borrow_mut().toggle_send_video(EnabledVideo(true))
+            })
     }
 }
 

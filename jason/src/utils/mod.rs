@@ -28,6 +28,7 @@ pub use self::{
     event_listener::{EventListener, EventListenerBindError},
 };
 use crate::rpc::RpcClient;
+use tracerr::WrapTraced;
 
 /// Returns [`Window`] object.
 ///
@@ -105,29 +106,13 @@ impl Drop for IntervalHandle {
     }
 }
 
-/// Trait which adds ability to upgrade [`Weak`]'s of Jason handlers
-/// and returns [`HandlerDetachedError`] transformed into something which
-/// can be transformed [`From`] [`JasonError`] if handler considered as
-/// detached.
-pub trait JasonWeakHandler<I> {
-    /// Tries to upgrade handler and if it considered as detached - returns
-    /// [`HandlerDetachedError`] transformed into required error.
-    fn upgrade_handler<E>(&self) -> Result<Rc<I>, E>
-    where
-        E: From<JasonError>;
-}
-
-impl<I> JasonWeakHandler<I> for Weak<I> {
-    fn upgrade_handler<E>(&self) -> Result<Rc<I>, E>
-    where
-        E: From<JasonError>,
-    {
-        self.upgrade().ok_or_else(upgrade_handler_map_err)
-    }
-}
-
-pub fn upgrade_handler_map_err<E: From<JasonError>>() -> E {
-    JasonError::from(tracerr::new!(HandlerDetachedError)).into()
+macro_rules! new_js_error {
+    ($e:expr) => {
+        $crate::utils::JasonError::from(tracerr::new!($e)).into()
+    };
+    ($e:expr => $o:ty) => {
+        <$o>::from($crate::utils::JasonError::from(tracerr::new!($e)))
+    };
 }
 
 /// Returns property of JS object by name if its defined.
