@@ -43,12 +43,12 @@ struct RequestParams {
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
-fn ws_index(
+async fn ws_index(
     request: HttpRequest,
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> impl Future<Output = Result<HttpResponse,actix_web::Error>> {
+) -> Result<HttpResponse, actix_web::Error> {
     debug!("Request params: {:?}", info);
     let RequestParams {
         room_id,
@@ -57,13 +57,15 @@ fn ws_index(
     } = info.into_inner();
 
     match state.rooms.get(&room_id) {
-        Some(room) => Either::A(
-            room.send(Authorize {
-                member_id: member_id.clone(),
-                credentials,
-            })
-            .from_err()
-            .and_then(move |res| match res {
+        Some(room) => {
+            let auth = room
+                .send(Authorize {
+                    member_id: member_id.clone(),
+                    credentials,
+                })
+                .await?;
+
+            match auth {
                 Ok(_) => ws::start(
                     WsSession::new(
                         member_id,
@@ -79,9 +81,9 @@ fn ws_index(
                 Err(AuthorizationError::InvalidCredentials) => {
                     Ok(HttpResponse::Forbidden().into())
                 }
-            }),
-        ),
-        None => Either::B(future::ok(HttpResponse::NotFound().into())),
+            }
+        }
+        None => Ok(HttpResponse::NotFound().into()),
     }
 }
 
@@ -106,7 +108,7 @@ impl Server {
 
         let server = HttpServer::new(move || {
             App::new()
-                .register_data(Self::register_data(
+                .app_data(Self::app_data(
                     rooms.clone(),
                     config.rpc.clone(),
                 ))
@@ -115,7 +117,7 @@ impl Server {
         })
         .disable_signals()
         .bind(server_addr)?
-        .start();
+        .run();
 
         info!("Started Client API HTTP server on {}", server_addr);
 
@@ -123,7 +125,7 @@ impl Server {
     }
 
     /// Set application data.
-    fn register_data(rooms: RoomRepository, config: Rpc) -> Data<Context> {
+    fn app_data(rooms: RoomRepository, config: Rpc) -> Data<Context> {
         Data::new(Context { rooms, config })
     }
 
@@ -132,7 +134,7 @@ impl Server {
     fn configure(cfg: &mut ServiceConfig) {
         cfg.service(
             resource("/ws/{room_id}/{member_id}/{credentials}")
-                .route(actix_web::web::get().to_async(ws_index)),
+                .route(actix_web::web::get().to(ws_index)),
         );
     }
 }

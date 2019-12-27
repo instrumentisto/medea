@@ -12,7 +12,7 @@ use actix::{
 use bb8::RunError;
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{err, ok, Future};
+use futures::future::{err, ok, Future, LocalBoxFuture};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
@@ -33,13 +33,13 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
         member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<dyn Future<Output = Result<IceUser,TurnServiceErr>>>;
+    ) -> LocalBoxFuture<Result<IceUser, TurnServiceErr>>;
 
     /// Deletes batch of [`IceUser`]s.
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Output = Result<(),TurnServiceErr>>>;
+    ) -> LocalBoxFuture<Result<(), TurnServiceErr>>;
 }
 
 impl TurnAuthService for Addr<Service> {
@@ -49,7 +49,7 @@ impl TurnAuthService for Addr<Service> {
         member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<dyn Future<Output = Result<IceUser,TurnServiceErr>>> {
+    ) -> LocalBoxFuture<Result<IceUser, TurnServiceErr>> {
         Box::new(
             self.send(CreateIceUser {
                 member_id,
@@ -72,7 +72,7 @@ impl TurnAuthService for Addr<Service> {
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Output = Result<(),TurnServiceErr>>> {
+    ) -> LocalBoxFuture<Result<(), TurnServiceErr>> {
         // leave only non static users
         let users: Vec<IceUser> =
             users.into_iter().filter(|u| !u.is_static()).collect();
@@ -92,8 +92,7 @@ impl TurnAuthService for Addr<Service> {
 }
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`AuthService`].
-type ActFuture<T> =
-    Box<dyn ActorFuture<Actor = Service, Output = T>>;
+type ActFuture<T> = Box<dyn ActorFuture<Actor = Service, Output = T>>;
 
 /// Error which can happen in [`TurnAuthService`].
 #[derive(Display, Debug, Fail)]
@@ -157,37 +156,44 @@ struct Service {
 
 /// Create new instance [`TurnAuthService`].
 pub fn new_turn_auth_service<'a>(
-    cf: &conf::Turn,
-) -> impl Future<Item = Arc<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
+    cf: &'a conf::Turn,
+) -> impl Future<Output = Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr>>
+{
     let db_pass = cf.db.redis.pass.clone();
     let turn_address = cf.addr();
     let turn_username = cf.user.clone();
     let turn_password = cf.pass.clone();
-    TurnDatabase::new(
-        cf.db.redis.connection_timeout,
-        ConnectionInfo {
-            addr: Box::new(redis::ConnectionAddr::Tcp(
-                cf.db.redis.ip.to_string(),
-                cf.db.redis.port,
-            )),
-            db: cf.db.redis.db_number,
-            passwd: if cf.db.redis.pass.is_empty() {
-                None
-            } else {
-                Some(cf.db.redis.pass.clone())
+
+    async {
+        let turn_db = TurnDatabase::new(
+            cf.db.redis.connection_timeout,
+            ConnectionInfo {
+                addr: Box::new(redis::ConnectionAddr::Tcp(
+                    cf.db.redis.ip.to_string(),
+                    cf.db.redis.port,
+                )),
+                db: cf.db.redis.db_number,
+                passwd: if cf.db.redis.pass.is_empty() {
+                    None
+                } else {
+                    Some(cf.db.redis.pass.clone())
+                },
             },
-        },
-    )
-    .map(move |turn_db| Service {
-        turn_db,
-        db_pass,
-        turn_address,
-        turn_username,
-        turn_password,
-        static_user: None,
-    })
-    .map::<_, Arc<dyn TurnAuthService>>(|service| Arc::new(service.start()))
-    .map_err(TurnServiceErr::from)
+        )
+        .await?;
+
+        let service = Service {
+            turn_db,
+            db_pass,
+            turn_address,
+            turn_username,
+            turn_password,
+            static_user: None,
+        };
+
+        let result: Arc<dyn TurnAuthService> = Arc::new(service.start());
+        Ok(result)
+    }
 }
 
 impl Service {

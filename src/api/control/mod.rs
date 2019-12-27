@@ -206,11 +206,12 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Room`]: crate::signalling::room::Room
-pub fn start_static_rooms(
+pub async fn start_static_rooms(
     room_service: &Addr<RoomService>,
-) -> impl Future<Item = (), Error = ()> {
+) -> Result<(), ()> {
     room_service
         .send(StartStaticRooms)
+        .await
         .map_err(|e| error!("StartStaticRooms mailbox error: {:?}", e))
         .map(|result| {
             if let Err(e) = result {

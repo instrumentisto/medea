@@ -141,7 +141,7 @@ impl RoomService {
     fn close_room(
         &self,
         id: RoomId,
-    ) -> Box<dyn Future<Output = Result<(),MailboxError>>> {
+    ) -> Box<dyn Future<Output = Result<(), MailboxError>>> {
         if let Some(room) = self.room_repo.get(&id) {
             shutdown::unsubscribe(
                 &self.graceful_shutdown,

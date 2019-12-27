@@ -19,7 +19,7 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::{
-    future::{self, join_all, Either},
+    future::{self, join_all, TryFutureExt},
     Future,
 };
 use medea_client_api_proto::{CloseDescription, CloseReason, Event};
@@ -195,19 +195,17 @@ impl ParticipantService {
     }
 
     /// Sends [`Event`] to specified remote [`Member`].
-    pub fn send_event_to_member(
+    pub async fn send_event_to_member(
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> impl Future<Item = (), Error = RoomError> {
+    ) -> Result<(), RoomError> {
         match self.connections.get(&member_id) {
-            Some(conn) => Either::A(
-                conn.send_event(event)
-                    .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
-            ),
-            None => Either::B(future::err(RoomError::ConnectionNotExists(
-                member_id,
-            ))),
+            Some(conn) => conn
+                .send_event(event)
+                .await
+                .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
+            None => Err(RoomError::ConnectionNotExists(member_id)),
         }
     }
 
@@ -325,7 +323,7 @@ impl ParticipantService {
     fn delete_ice_user(
         &mut self,
         member_id: &MemberId,
-    ) -> Box<dyn Future<Output = Result<(),TurnServiceErr>>> {
+    ) -> Box<dyn Future<Output = Result<(), TurnServiceErr>>> {
         // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
@@ -338,17 +336,14 @@ impl ParticipantService {
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
     /// deletes all [`IceUser`]s.
-    pub fn drop_connections(
-        &mut self,
-        ctx: &mut Context<Room>,
-    ) -> impl Future<Item = (), Error = ()> {
+    pub async fn drop_connections(&mut self, ctx: &mut Context<Room>) {
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);
         });
 
         // closing all RpcConnection's
-        let mut close_fut = self.connections.drain().fold(
+        let close_connections = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
                 futures.push(
@@ -358,23 +353,19 @@ impl ParticipantService {
                 futures
             },
         );
+        future::join_all(close_connections).await;
 
         // deleting all IceUsers
-        let remove_ice_users = Box::new({
-            let mut room_users = Vec::with_capacity(self.members.len());
+        let ice_users = self
+            .members
+            .values()
+            .filter_map(|member| member.take_ice_user())
+            .collect();
 
-            self.members.values().for_each(|data| {
-                if let Some(ice_user) = data.take_ice_user() {
-                    room_users.push(ice_user);
-                }
-            });
-            self.turn_service
-                .delete(room_users)
-                .map_err(|err| error!("Error removing IceUsers {:?}", err))
-        });
-        close_fut.push(remove_ice_users);
-
-        join_all(close_fut).map(|_| ())
+        self.turn_service
+            .delete(ice_users)
+            .map_err(|err| error!("Error removing IceUsers {:?}", err))
+            .await;
     }
 
     /// Deletes [`Member`] from [`ParticipantService`], removes this user from

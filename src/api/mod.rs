@@ -12,6 +12,7 @@ use crate::api::{
     client::rpc_connection::{ClosedReason, RpcConnection},
     control::MemberId,
 };
+use futures::future::LocalBoxFuture;
 
 /// Server side of Medea RPC protocol.
 #[cfg_attr(test, mockall::automock)]
@@ -25,25 +26,22 @@ pub trait RpcServer: Debug + Send {
         &self,
         member_id: MemberId,
         connection: Box<dyn RpcConnection>,
-    ) -> Box<dyn Future<Output=Result<(),()>>>;
+    ) -> LocalBoxFuture<'static, Result<(), ()>>;
 
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
-    /// closed. Cannot fail.
+    /// closed.
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     fn connection_closed(
         &self,
         member_id: MemberId,
         reason: ClosedReason,
-    ) -> Box<dyn Future<Output=()>>;
+    ) -> LocalBoxFuture<'static, ()>;
 
-    /// Sends [`Command`]. Cannot fail
+    /// Sends [`Command`].
     ///
     /// [`Command`]:
-    fn send_command(
-        &self,
-        msg: Command,
-    ) -> Box<dyn Future<Output=()>>;
+    fn send_command(&self, msg: Command) -> LocalBoxFuture<'static, ()>;
 }
 
 #[cfg(test)]

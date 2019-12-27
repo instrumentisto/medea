@@ -3,11 +3,11 @@
 use std::time::{Duration, Instant};
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
-    AsyncContext, Handler, Message, Running, StreamHandler,
+    fut::WrapFuture, prelude::*, Actor, ActorContext, ActorFuture, Addr,
+    Arbiter, AsyncContext, Handler, Message, Running, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
-use futures::future::Future;
+use futures::future::{Future, FutureExt, LocalBoxFuture, TryFutureExt};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Event, ServerMsg,
 };
@@ -105,26 +105,30 @@ impl Actor for WsSession {
 
         Self::start_watchdog(ctx);
 
-        ctx.wait(
-            wrap_future(self.room.connection_established(
+        self.room
+            .connection_established(
                 self.member_id.clone(),
                 Box::new(ctx.address()),
-            ))
-            .map_err(
-                move |err,
+            )
+            .into_actor(self)
+            .then(
+                move |result,
                       session: &mut Self,
                       ctx: &mut ws::WebsocketContext<Self>| {
-                    error!(
-                        "WsSession of member {} failed to join Room, because: \
-                         {:?}",
-                        session.member_id, err,
-                    );
-                    ctx.notify(Close::with_normal_code(
-                        &CloseDescription::new(CloseReason::InternalError),
-                    ));
+                    if let Err(err) = result {
+                        error!(
+                            "WsSession of member {} failed to join Room, \
+                             because: {:?}",
+                            session.member_id, err,
+                        );
+                        ctx.notify(Close::with_normal_code(
+                            &CloseDescription::new(CloseReason::InternalError),
+                        ));
+                    };
+                    async {}.into_actor(session)
                 },
-            ),
-        );
+            )
+            .wait(ctx);
     }
 
     /// Invokes `RpcServer::connection_closed()` with `ClosedReason::Lost` if
@@ -163,22 +167,20 @@ impl RpcConnection for Addr<WsSession> {
     fn close(
         &mut self,
         close_description: CloseDescription,
-    ) -> Box<dyn Future<Output=()>> {
-        let fut = self
-            .send(Close::with_normal_code(&close_description))
-            .or_else(|_| Ok(()));
-
-        Box::new(fut)
+    ) -> LocalBoxFuture<()> {
+        async {
+            self.send(Close::with_normal_code(&close_description)).await;
+        }
+        .boxed_local()
     }
 
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(&self, msg: Event) -> Box<dyn Future<Output=Result<(),()>>> {
-        let fut = self.send(EventMessage::from(msg)).map_err(|err| {
+    fn send_event(&self, msg: Event) -> LocalBoxFuture<Result<(), ()>> {
+        self.send(EventMessage::from(msg)).map_err(|err| {
             warn!("Failed send Event to RpcConnection: {:?} ", err)
-        });
-        Box::new(fut)
+        }).boxed_local()
     }
 }
 
@@ -224,7 +226,11 @@ impl Handler<EventMessage> for WsSession {
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+    fn handle(
+        &mut self,
+        msg: Result<ws::Message, ws::ProtocolError>,
+        ctx: &mut Self::Context,
+    ) {
         debug!(
             "Received WS message: {:?} from member {}",
             msg, self.member_id
@@ -237,11 +243,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         Ok(ClientMsg::Ping(n)) => {
                             // Answer with Heartbeat::Pong.
                             ctx.text(
-                                serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
+                                serde_json::to_string(&ServerMsg::Pong(n))
+                                    .unwrap(),
                             );
                         }
                         Ok(ClientMsg::Command(command)) => {
-                            ctx.spawn(wrap_future(self.room.send_command(command)));
+                            ctx.spawn(
+                                self.room
+                                    .send_command(command)
+                                    .into_actor(self),
+                            );
                         }
                         Err(err) => error!(
                             "Error [{:?}] parsing client message [{}]",
@@ -279,10 +290,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                     "Error in WsSession StreamHandler for Member [{}]: {:?}",
                     self.member_id, err
                 );
-
-            },
+            }
         };
-
     }
 
     /// Method is called when stream finishes. Stops [`WsSession`] actor
