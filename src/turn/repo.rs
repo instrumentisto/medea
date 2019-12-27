@@ -38,16 +38,17 @@ impl TurnDatabase {
         conn_timeout: Duration,
         conn_info: S,
     ) -> impl Future<Item = Self, Error = TurnDatabaseErr> {
-        future::lazy(move || redis::Client::open(conn_info.into()))
-            .and_then(RedisConnectionManager::new)
-            .and_then(move |conn_mngr| {
-                Pool::builder()
-                    .connection_timeout(conn_timeout)
-                    .build(conn_mngr)
-            })
-            .map(RedisPool::new)
-            .map(|pool| Self { pool })
-            .map_err(TurnDatabaseErr::from)
+//        future::lazy(move || redis::Client::open(conn_info.into()))
+//            .and_then(RedisConnectionManager::new)
+//            .and_then(move |conn_mngr| {
+//                Pool::builder()
+//                    .connection_timeout(conn_timeout)
+//                    .build(conn_mngr)
+//            })
+//            .map(RedisPool::new)
+//            .map(|pool| Self { pool })
+//            .map_err(TurnDatabaseErr::from)
+        unimplemented!()
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.

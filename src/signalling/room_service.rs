@@ -141,7 +141,7 @@ impl RoomService {
     fn close_room(
         &self,
         id: RoomId,
-    ) -> Box<dyn Future<Item = (), Error = MailboxError>> {
+    ) -> Box<dyn Future<Output = Result<(),MailboxError>>> {
         if let Some(room) = self.room_repo.get(&id) {
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
@@ -287,7 +287,7 @@ pub struct CreateMemberInRoom {
 }
 
 impl Handler<CreateMemberInRoom> for RoomService {
-    type Result = ResponseFuture<Sids, RoomServiceError>;
+    type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
 
     fn handle(
         &mut self,
@@ -327,7 +327,7 @@ pub struct CreateEndpointInRoom {
 }
 
 impl Handler<CreateEndpointInRoom> for RoomService {
-    type Result = ResponseFuture<Sids, RoomServiceError>;
+    type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
 
     fn handle(
         &mut self,
@@ -432,7 +432,7 @@ pub struct DeleteElements<T> {
 }
 
 impl Handler<DeleteElements<Validated>> for RoomService {
-    type Result = ResponseFuture<(), RoomServiceError>;
+    type Result = ResponseFuture<Result<(), RoomServiceError>>;
 
     // TODO: delete 'clippy::unnecessary_filter_map` when drain_filter TODO will
     //       be resolved.
@@ -493,7 +493,7 @@ type SerializedElements = HashMap<StatefulFid, ElementProto>;
 pub struct Get(pub Vec<StatefulFid>);
 
 impl Handler<Get> for RoomService {
-    type Result = ResponseFuture<SerializedElements, RoomServiceError>;
+    type Result = ResponseFuture<Result<SerializedElements, RoomServiceError>>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();

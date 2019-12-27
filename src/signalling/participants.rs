@@ -325,7 +325,7 @@ impl ParticipantService {
     fn delete_ice_user(
         &mut self,
         member_id: &MemberId,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+    ) -> Box<dyn Future<Output = Result<(),TurnServiceErr>>> {
         // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {

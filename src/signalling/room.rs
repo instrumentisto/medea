@@ -61,7 +61,7 @@ use crate::{
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
-    Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
+    Box<dyn ActorFuture<Actor = Room, Output = Result<I,E>>>;
 
 #[derive(Debug, Fail, Display)]
 pub enum RoomError {
@@ -365,7 +365,7 @@ impl Room {
     fn close_gracefully(
         &mut self,
         ctx: &mut Context<Self>,
-    ) -> ResponseActFuture<Self, (), ()> {
+    ) -> ResponseActFuture<Self, Result<(),()>> {
         info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
 
@@ -729,7 +729,7 @@ impl RpcServer for Addr<Room> {
         &self,
         member_id: MemberId,
         connection: Box<dyn RpcConnection>,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
+    ) -> Box<dyn Future<Output = Result<(),()>>> {
         Box::new(
             self.send(RpcConnectionEstablished {
                 member_id,
@@ -751,7 +751,7 @@ impl RpcServer for Addr<Room> {
         &self,
         member_id: MemberId,
         reason: ClosedReason,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
+    ) -> Box<dyn Future<Output = Result<(),()>>> {
         Box::new(
             self.send(RpcConnectionClosed { member_id, reason })
                 .map_err(|err| {
@@ -768,7 +768,7 @@ impl RpcServer for Addr<Room> {
     fn send_command(
         &self,
         msg: Command,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
+    ) -> Box<dyn Future<Output = ()>> {
         Box::new(
             self.send(CommandMessage::from(msg))
                 .map_err(|err| {
@@ -1089,7 +1089,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 }
 
 impl Handler<ShutdownGracefully> for Room {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseActFuture<Self, Result<(),()>>;
 
     fn handle(
         &mut self,

@@ -25,7 +25,7 @@ pub trait RpcServer: Debug + Send {
         &self,
         member_id: MemberId,
         connection: Box<dyn RpcConnection>,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    ) -> Box<dyn Future<Output=Result<(),()>>>;
 
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
     /// closed. Cannot fail.
@@ -35,7 +35,7 @@ pub trait RpcServer: Debug + Send {
         &self,
         member_id: MemberId,
         reason: ClosedReason,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    ) -> Box<dyn Future<Output=()>>;
 
     /// Sends [`Command`]. Cannot fail
     ///
@@ -43,7 +43,7 @@ pub trait RpcServer: Debug + Send {
     fn send_command(
         &self,
         msg: Command,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    ) -> Box<dyn Future<Output=()>>;
 }
 
 #[cfg(test)]

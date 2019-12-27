@@ -159,13 +159,11 @@ impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsSession`] by sending itself "normal closure" close message
     /// with [`CloseDescription`] as description of [Close] frame.
     ///
-    /// Never returns error.
-    ///
     /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
+    ) -> Box<dyn Future<Output=()>> {
         let fut = self
             .send(Close::with_normal_code(&close_description))
             .or_else(|_| Ok(()));
@@ -176,7 +174,7 @@ impl RpcConnection for Addr<WsSession> {
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>> {
+    fn send_event(&self, msg: Event) -> Box<dyn Future<Output=Result<(),()>>> {
         let fut = self.send(EventMessage::from(msg)).map_err(|err| {
             warn!("Failed send Event to RpcConnection: {:?} ", err)
         });
@@ -186,6 +184,7 @@ impl RpcConnection for Addr<WsSession> {
 
 /// Message for closing [`WsSession`].
 #[derive(Message)]
+#[rtype(result = "()")]
 pub struct Close(ws::CloseReason);
 
 impl Close {
@@ -223,70 +222,67 @@ impl Handler<EventMessage> for WsSession {
     }
 }
 
-impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
-    fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         debug!(
             "Received WS message: {:?} from member {}",
             msg, self.member_id
         );
         match msg {
-            ws::Message::Text(text) => {
-                self.last_activity = Instant::now();
-                match serde_json::from_str::<ClientMsg>(&text) {
-                    Ok(ClientMsg::Ping(n)) => {
-                        // Answer with Heartbeat::Pong.
-                        ctx.text(
-                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
-                        );
+            Ok(msg) => match msg {
+                ws::Message::Text(text) => {
+                    self.last_activity = Instant::now();
+                    match serde_json::from_str::<ClientMsg>(&text) {
+                        Ok(ClientMsg::Ping(n)) => {
+                            // Answer with Heartbeat::Pong.
+                            ctx.text(
+                                serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
+                            );
+                        }
+                        Ok(ClientMsg::Command(command)) => {
+                            ctx.spawn(wrap_future(self.room.send_command(command)));
+                        }
+                        Err(err) => error!(
+                            "Error [{:?}] parsing client message [{}]",
+                            err, &text
+                        ),
                     }
-                    Ok(ClientMsg::Command(command)) => {
-                        ctx.spawn(wrap_future(self.room.send_command(command)));
-                    }
-                    Err(err) => error!(
-                        "Error [{:?}] parsing client message [{}]",
-                        err, &text
-                    ),
                 }
-            }
-            ws::Message::Close(reason) => {
-                if self.close_reason.is_none() {
-                    let closed_reason = if let Some(reason) = &reason {
-                        if reason.code == CloseCode::Normal
-                            || reason.code == CloseCode::Away
-                        {
-                            ClosedReason::Closed { normal: true }
+                ws::Message::Close(reason) => {
+                    if self.close_reason.is_none() {
+                        let closed_reason = if let Some(reason) = &reason {
+                            if reason.code == CloseCode::Normal
+                                || reason.code == CloseCode::Away
+                            {
+                                ClosedReason::Closed { normal: true }
+                            } else {
+                                ClosedReason::Lost
+                            }
                         } else {
                             ClosedReason::Lost
-                        }
-                    } else {
-                        ClosedReason::Lost
-                    };
+                        };
 
-                    self.close_reason =
-                        Some(InnerCloseReason::ByClient(closed_reason));
-                    ctx.close(reason);
-                    ctx.stop();
+                        self.close_reason =
+                            Some(InnerCloseReason::ByClient(closed_reason));
+                        ctx.close(reason);
+                        ctx.stop();
+                    }
                 }
-            }
-            _ => error!(
-                "Unsupported client message from member {}",
-                self.member_id
-            ),
-        }
-    }
+                _ => error!(
+                    "Unsupported client message from member {}",
+                    self.member_id
+                ),
+            },
+            Err(err) => {
+                error!(
+                    "Error in WsSession StreamHandler for Member [{}]: {:?}",
+                    self.member_id, err
+                );
 
-    /// Method is called when stream emits error. Stops stream processing.
-    fn error(
-        &mut self,
-        err: ws::ProtocolError,
-        _: &mut Self::Context,
-    ) -> Running {
-        error!(
-            "Error in WsSession StreamHandler for Member [{}]: {:?}",
-            self.member_id, err
-        );
-        Running::Stop
+            },
+        };
+
     }
 
     /// Method is called when stream finishes. Stops [`WsSession`] actor

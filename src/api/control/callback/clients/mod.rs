@@ -18,7 +18,7 @@ pub trait CallbackClient: Debug + Send + Sync {
     fn send(
         &self,
         request: CallbackRequest,
-    ) -> Box<dyn Future<Item = (), Error = CallbackClientError>>;
+    ) -> Box<dyn Future<Output = Result<(),CallbackClientError>>>;
 }
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].

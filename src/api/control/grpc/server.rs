@@ -97,7 +97,7 @@ impl ControlApiService {
         id: MemberId,
         parent_fid: Fid<ToRoom>,
         spec: MemberSpec,
-    ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
+    ) -> impl Future<Output = Result<Sids, GrpcControlApiError>> {
         self.room_service
             .send(CreateMemberInRoom {
                 id,
@@ -114,7 +114,7 @@ impl ControlApiService {
         id: EndpointId,
         parent_fid: Fid<ToMember>,
         spec: EndpointSpec,
-    ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
+    ) -> impl Future<Output = Result<Sids, GrpcControlApiError>> {
         self.room_service
             .send(CreateEndpointInRoom {
                 id,
@@ -129,7 +129,7 @@ impl ControlApiService {
     pub fn create_element(
         &self,
         mut req: CreateRequest,
-    ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
+    ) -> Box<dyn Future<Output = Result<Sids, ErrorResponse>> + Send> {
         let unparsed_parent_fid = req.take_parent_fid();
         let elem = if let Some(elem) = req.el {
             elem
@@ -392,7 +392,7 @@ impl Actor for GrpcServer {
 }
 
 impl Handler<ShutdownGracefully> for GrpcServer {
-    type Result = ResponseFuture<(), ()>;
+    type Result = ResponseFuture<Result<(),()>>;
 
     fn handle(
         &mut self,

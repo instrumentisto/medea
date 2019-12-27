@@ -48,7 +48,7 @@ impl CallbackClient for GrpcCallbackClient {
     fn send(
         &self,
         request: CallbackRequest,
-    ) -> Box<dyn Future<Item = (), Error = CallbackClientError>> {
+    ) -> Box<dyn Future<Output = Result<(),CallbackClientError>>> {
         Box::new(
             self.client
                 .on_event_async(&request.into())

@@ -33,13 +33,13 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
         member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>>;
+    ) -> Box<dyn Future<Output = Result<IceUser,TurnServiceErr>>>;
 
     /// Deletes batch of [`IceUser`]s.
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
+    ) -> Box<dyn Future<Output = Result<(),TurnServiceErr>>>;
 }
 
 impl TurnAuthService for Addr<Service> {
@@ -49,7 +49,7 @@ impl TurnAuthService for Addr<Service> {
         member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
+    ) -> Box<dyn Future<Output = Result<IceUser,TurnServiceErr>>> {
         Box::new(
             self.send(CreateIceUser {
                 member_id,
@@ -72,7 +72,7 @@ impl TurnAuthService for Addr<Service> {
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+    ) -> Box<dyn Future<Output = Result<(),TurnServiceErr>>> {
         // leave only non static users
         let users: Vec<IceUser> =
             users.into_iter().filter(|u| !u.is_static()).collect();
@@ -92,8 +92,8 @@ impl TurnAuthService for Addr<Service> {
 }
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`AuthService`].
-type ActFuture<I, E> =
-    Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
+type ActFuture<T> =
+    Box<dyn ActorFuture<Actor = Service, Output = T>>;
 
 /// Error which can happen in [`TurnAuthService`].
 #[derive(Display, Debug, Fail)]
@@ -227,7 +227,7 @@ struct CreateIceUser {
 }
 
 impl Handler<CreateIceUser> for Service {
-    type Result = ActFuture<IceUser, TurnServiceErr>;
+    type Result = ActFuture<Result<IceUser, TurnServiceErr>>;
 
     /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
     /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
@@ -265,7 +265,7 @@ impl Handler<CreateIceUser> for Service {
 struct DeleteIceUsers(Vec<IceUser>);
 
 impl Handler<DeleteIceUsers> for Service {
-    type Result = ActFuture<(), TurnServiceErr>;
+    type Result = ActFuture<Result<(), TurnServiceErr>>;
 
     /// Deletes all users with provided [`RoomId`]
     fn handle(

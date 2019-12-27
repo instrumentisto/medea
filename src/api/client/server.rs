@@ -48,7 +48,7 @@ fn ws_index(
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> impl Future<Output = Result<HttpResponse,actix_web::Error>> {
     debug!("Request params: {:?}", info);
     let RequestParams {
         room_id,
@@ -142,7 +142,7 @@ impl Actor for Server {
 }
 
 impl Handler<ShutdownGracefully> for Server {
-    type Result = ResponseFuture<(), ()>;
+    type Result = ResponseFuture<Result<(), ()>>;
 
     fn handle(
         &mut self,
