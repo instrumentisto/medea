@@ -201,10 +201,18 @@ pub trait RpcClient {
     /// JS side can perform reconnection) on all connection losses.
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
+    /// Returns current token with which this [`RpcClient`] was connected.
+    ///
+    /// If token is `None` then [`RpcClient`] never was connected to a server.
     fn get_token(&self) -> Option<String>;
 
+    /// Returns current state of this [`RpcClient`].
     fn get_state(&self) -> State;
 
+    /// Subscibes to the [`RpcClient`] [`State`] changes.
+    ///
+    /// This function guarantees that two identical [`State`]s in a row doesn't
+    /// will be sent.
     fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
@@ -268,12 +276,19 @@ struct Inner {
     /// Senders for [`RpcClient::on_connection_loss`].
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
+    /// Closure which will create new [`RpcTransport`] for this [`RpcClient`]
+    /// on every [`RpcClient::connect`] call.
     rpc_transport_factory: RpcTransportFactory,
 
+    /// Token with which this [`RpcClient`] was connected.
+    ///
+    /// Will be `None` if this [`RpcClient`] was never conneted to a sever.
     token: Option<String>,
 
+    /// Subscibers on [`State`] changes of this [`RpcClient`].
     on_state_change_subs: Vec<mpsc::UnboundedSender<State>>,
 
+    /// Current [`State`] of this [`RpcClient`].
     state: State,
 }
 

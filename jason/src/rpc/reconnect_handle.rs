@@ -17,12 +17,17 @@ use crate::{
 #[derive(Debug, Display, JsCaused)]
 struct NoTokenError;
 
-/// JS side handle for [`Reconnector`].
+/// Object with which JS side can reconnect to the Medea media server on
+/// connection loss.
+///
+/// This object will be provided into `Room.on_connection_loss` callback.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct ReconnectorHandle(Weak<dyn RpcClient>);
 
 impl ReconnectorHandle {
+    /// Creates new [`ReconnectorHandle`] with which JS side can reconnect
+    /// provided [`RpcClient`] on connection loss.
     pub fn new(rpc: Weak<dyn RpcClient>) -> Self {
         Self(rpc)
     }

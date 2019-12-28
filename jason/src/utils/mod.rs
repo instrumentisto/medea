@@ -100,6 +100,16 @@ impl Drop for IntervalHandle {
     }
 }
 
+/// Adds [`tracerr`] information to the provided error, wraps
+/// it into [`JasonError`] and converts it into needed error.
+///
+/// This macro have two syntaxes:
+///
+/// `new_js_error!(DetachedStateError)` - which will convert provided error
+/// wrapped into [`JasonError`] with `into()` automatically.
+///
+/// Or you can use `new_js_error!(DetachedStateError => JsError)` if compiler
+/// can't determine which type you want.
 macro_rules! new_js_error {
     ($e:expr) => {
         $crate::utils::JasonError::from(tracerr::new!($e)).into()

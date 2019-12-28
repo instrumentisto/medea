@@ -168,7 +168,7 @@ impl Heartbeat {
     }
 
     /// Returns [`LocalBoxStream`] to which will be sent unit message when
-    /// [`Heartbeat`] considers that [`RpcTransport`] is IDLE.
+    /// [`Heartbeat`] considers that [`RpcTransport`] is idle.
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().on_idle_subs.push(on_idle_tx);
@@ -176,7 +176,8 @@ impl Heartbeat {
         Box::pin(on_idle_rx)
     }
 
-    /// Aborts idle resolver and sets new one.
+    /// Resets `idle_watchdog` task and sets new one.
+    // TODO (evdokimovs): more explanation about idle_watchdog.
     fn reset_idle_watchdog(&self) {
         // TODO: perhaps, using window.set_interval with some ping_at will be
         //       more convenient?
@@ -185,29 +186,35 @@ impl Heartbeat {
         let weak_this = Rc::downgrade(&self.0);
         let (idle_watchdog, idle_watchdog_handle) =
             future::abortable(async move {
-                if let Some(this) = weak_this.upgrade() {
-                    let wait_for_ping = this.borrow().ping_interval * 2;
-                    let idle_timeout = this.borrow().idle_timeout.0;
+                let this = if let Some(this) = weak_this.upgrade() {
+                    this
+                } else {
+                    return;
+                };
+                let wait_for_ping = this.borrow().ping_interval * 2;
+                let idle_timeout = this.borrow().idle_timeout.0;
 
-                    resolve_after(wait_for_ping.0).await;
+                resolve_after(wait_for_ping.0).await;
 
-                    let last_ping_num = this.borrow().last_ping_num;
-                    this.borrow().send_pong(last_ping_num + 1);
+                let last_ping_num = this.borrow().last_ping_num;
+                this.borrow().send_pong(last_ping_num + 1);
 
-                    let idle_timeout = this.borrow().idle_timeout;
-                    resolve_after(idle_timeout.0 - wait_for_ping.0).await;
-                    this.borrow_mut()
-                        .on_idle_subs
-                        .retain(|sub| !sub.is_closed());
-                    for sub in &this.borrow().on_idle_subs {
-                        if sub.unbounded_send(()).is_err() {
-                            console_error(
-                                "Heartbeat::on_idle subscriber unexpectedly \
-                                 gone.",
-                            );
-                        }
-                    }
-                }
+                let idle_timeout = this.borrow().idle_timeout;
+                resolve_after(idle_timeout.0 - wait_for_ping.0).await;
+                this.borrow_mut()
+                    .on_idle_subs
+                    .retain(|sub| !sub.is_closed());
+                this.borrow()
+                    .on_idle_subs
+                    .iter()
+                    .filter_map(|sub| sub.unbounded_send(()).err())
+                    .for_each(|err| {
+                        console_error(format!(
+                            "Heartbeat::on_idle subscriber unexpectedly gone. \
+                             {:?}",
+                            err
+                        ))
+                    });
             });
 
         spawn_local(async move {
