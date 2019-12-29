@@ -23,7 +23,6 @@ use super::{
 };
 
 /// Service which stores and lazily creates [`CallbackRequest`] clients.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Default)]
 pub struct CallbackService(
     // TODO: Hashmap entries are not dropped anywhere. some kind of

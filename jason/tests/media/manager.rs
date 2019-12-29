@@ -5,8 +5,8 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use medea_jason::{
-    media::MediaManager, AudioTrackConstraints, MediaStreamConstraints,
-    VideoTrackConstraints,
+    media::MediaManager, AudioTrackConstraints, DeviceVideoTrackConstraints,
+    MediaStreamConstraints,
 };
 
 use crate::{get_jason_error, MockNavigator};
@@ -56,10 +56,10 @@ async fn failed_get_user_media() {
     let constraints = {
         let mut constraints = MediaStreamConstraints::new();
         let audio_constraints = AudioTrackConstraints::new();
-        let video_constraints = VideoTrackConstraints::new();
+        let video_constraints = DeviceVideoTrackConstraints::new();
 
         constraints.audio(audio_constraints);
-        constraints.video(video_constraints);
+        constraints.device_video(video_constraints);
 
         constraints
     };
@@ -94,10 +94,10 @@ async fn failed_get_user_media2() {
     let constraints = {
         let mut constraints = MediaStreamConstraints::new();
         let audio_constraints = AudioTrackConstraints::new();
-        let video_constraints = VideoTrackConstraints::new();
+        let video_constraints = DeviceVideoTrackConstraints::new();
 
         constraints.audio(audio_constraints);
-        constraints.video(video_constraints);
+        constraints.device_video(video_constraints);
 
         constraints
     };
