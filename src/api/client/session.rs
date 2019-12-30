@@ -393,6 +393,9 @@ mod test {
                 .expect_connection_established()
                 .withf(move |member_id, _| *member_id == expected_member_id)
                 .return_once(|_, _| Box::new(future::err(())));
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
@@ -427,6 +430,9 @@ mod test {
             rpc_server
                 .expect_connection_established()
                 .return_once(|_, _| Box::new(future::ok(())));
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
@@ -509,6 +515,9 @@ mod test {
             rpc_server
                 .expect_connection_established()
                 .return_once(|_, _| Box::new(future::ok(())));
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             rpc_server.expect_send_command().return_once(|command| {
                 let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
@@ -580,6 +589,9 @@ mod test {
                     Box::new(future::ok(()))
                 },
             );
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
@@ -643,6 +655,9 @@ mod test {
                     Box::new(future::ok(()))
                 },
             );
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
