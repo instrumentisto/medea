@@ -17,11 +17,12 @@ use futures::{
     stream, FutureExt as _, StreamExt as _,
 };
 use medea_client_api_proto::{
-    ClientMsg, CloseReason, Command, Event, PeerId, ServerMsg,
+    ClientMsg, CloseReason, Command, Event, PeerId, RpcSettingsUpdated,
+    ServerMsg,
 };
 use medea_jason::rpc::{
     ClientDisconnect, CloseMsg, IdleTimeout, MockRpcTransport, PingInterval,
-    RpcClient, RpcTransport, WebSocketRpcClient,
+    RpcClient, RpcTransport, State, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -55,8 +56,19 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 
     let ws = WebSocketRpcClient::new(Box::new(|token| {
         let mut transport = MockRpcTransport::new();
+        transport
+            .expect_on_state_change()
+            .return_once(|| stream::once(async { State::Open }).boxed());
         transport.expect_on_message().returning(|| {
-            Ok(stream::once(async { ServerMsg::Event(SRV_EVENT) }).boxed())
+            let (tx, rx) = mpsc::unbounded();
+            tx.unbounded_send(ServerMsg::RpcSettingsUpdated(
+                RpcSettingsUpdated {
+                    idle_timeout_ms: 100,
+                    ping_interval_ms: 100,
+                },
+            ));
+            tx.unbounded_send(ServerMsg::Event(SRV_EVENT));
+            Ok(rx.boxed())
         });
         transport.expect_send().returning(|_| Ok(()));
         transport
@@ -129,13 +141,21 @@ async fn unsub_drops_subs() {
 async fn transport_is_dropped_when_client_is_dropped() {
     let mut transport = MockRpcTransport::new();
     transport
-        .expect_on_message()
-        .returning(|| Ok(stream::once(future::pending()).boxed()));
-    transport
         .expect_on_close()
         .return_once(|| Ok(stream::once(future::pending()).boxed()));
     transport.expect_send().returning(|_| Ok(()));
     transport.expect_set_close_reason().return_const(());
+    transport
+        .expect_on_state_change()
+        .return_once(|| stream::once(async { State::Open }).boxed());
+    transport.expect_on_message().returning(|| {
+        let (tx, rx) = mpsc::unbounded();
+        tx.unbounded_send(ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
+            idle_timeout_ms: 100,
+            ping_interval_ms: 100,
+        }));
+        Ok(rx.boxed())
+    });
     let rpc_transport = Rc::new(transport);
 
     let ws = new_client(rpc_transport.clone());
@@ -168,9 +188,16 @@ async fn send_goes_to_transport() {
     // (but we can't do this).
     let (on_send_tx, mut on_send_rx) = mpsc::unbounded();
     transport
-        .expect_on_message()
-        .times(2)
-        .returning(|| Ok(stream::once(future::pending()).boxed()));
+        .expect_on_state_change()
+        .return_once(|| stream::once(async { State::Open }).boxed());
+    transport.expect_on_message().returning(|| {
+        let (tx, rx) = mpsc::unbounded();
+        tx.unbounded_send(ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
+            idle_timeout_ms: 100,
+            ping_interval_ms: 100,
+        }));
+        Ok(rx.boxed())
+    });
     transport
         .expect_on_close()
         .return_once(move || Ok(stream::pending().boxed()));
@@ -234,8 +261,18 @@ mod on_close {
     async fn get_client(close_msg: CloseMsg) -> WebSocketRpcClient {
         let mut transport = MockRpcTransport::new();
         transport
-            .expect_on_message()
-            .returning(|| Ok(stream::once(future::pending()).boxed()));
+            .expect_on_state_change()
+            .return_once(|| stream::once(async { State::Open }).boxed());
+        transport.expect_on_message().returning(|| {
+            let (tx, rx) = mpsc::unbounded();
+            tx.unbounded_send(ServerMsg::RpcSettingsUpdated(
+                RpcSettingsUpdated {
+                    idle_timeout_ms: 500,
+                    ping_interval_ms: 500,
+                },
+            ));
+            Ok(rx.boxed())
+        });
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
         transport.expect_on_close().return_once(move || {
@@ -247,6 +284,7 @@ mod on_close {
             IdleTimeout(Duration::from_secs(10).into()),
             PingInterval(Duration::from_millis(500).into()),
         );
+        ws.connect(String::new()).await.unwrap();
 
         ws
     }
@@ -329,9 +367,18 @@ mod transport_close_reason_on_drop {
     ) -> (WebSocketRpcClient, oneshot::Receiver<ClientDisconnect>) {
         let mut transport = MockRpcTransport::new();
         transport
-            .expect_on_message()
-            .times(2)
-            .returning(|| Ok(stream::once(future::pending()).boxed()));
+            .expect_on_state_change()
+            .return_once(|| stream::once(async { State::Open }).boxed());
+        transport.expect_on_message().returning(|| {
+            let (tx, rx) = mpsc::unbounded();
+            tx.unbounded_send(ServerMsg::RpcSettingsUpdated(
+                RpcSettingsUpdated {
+                    idle_timeout_ms: 500,
+                    ping_interval_ms: 500,
+                },
+            ));
+            Ok(rx.boxed())
+        });
         transport.expect_send().return_once(|_| Ok(()));
         transport
             .expect_on_close()
@@ -424,10 +471,15 @@ mod connect {
         let ws = WebSocketRpcClient::new(Box::new(move |_| {
             test_tx.unbounded_send(());
             let mut transport = MockRpcTransport::new();
-            transport
-                .expect_on_message()
-                .times(3)
-                .returning(|| Ok(stream::once(future::pending()).boxed()));
+            transport.expect_on_message().times(3).returning(|| {
+                Ok(stream::once(async move {
+                    ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
+                        idle_timeout_ms: 3000,
+                        ping_interval_ms: 3000,
+                    })
+                })
+                .boxed())
+            });
             transport.expect_send().return_once(|_| Ok(()));
             transport
                 .expect_on_close()
