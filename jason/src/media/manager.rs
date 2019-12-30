@@ -16,16 +16,31 @@ use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
-    MediaStream as SysMediaStream,
+    MediaDevices, MediaStream as SysMediaStream,
     MediaStreamConstraints as SysMediaStreamConstraints, MediaStreamTrack,
 };
 
 use crate::{
-    media::MediaStreamConstraints,
+    media::{MediaStreamConstraints, MultiSourceMediaStreamConstraints},
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
+
+// TODO: Screen capture API (https://www.w3.org/TR/screen-capture/) is in draft
+//       stage atm, so there is no web-sys bindings for it.
+//       Discussion https://github.com/rustwasm/wasm-bindgen/pull/1896
+#[wasm_bindgen(inline_js = "export function get_display_media(media_devices, \
+                            constraints) { return \
+                            media_devices.getDisplayMedia(constraints) }")]
+extern "C" {
+    #[allow(clippy::needless_pass_by_value)]
+    #[wasm_bindgen(catch)]
+    fn get_display_media(
+        media_devices: &MediaDevices,
+        constraints: &SysMediaStreamConstraints,
+    ) -> std::result::Result<Promise, JsValue>;
+}
 
 /// Errors that may occur in a [`MediaManager`].
 #[derive(Debug, Display, JsCaused)]
@@ -36,11 +51,17 @@ pub enum MediaManagerError {
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
     CouldNotGetMediaDevices(JsError),
 
-    /// Occurs if the requested [MediaStream][1] could not be received.
+    /// Occurs if the [getUserMedia][1] request failed.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://tinyurl.com/rnxcavf
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
     GetUserMediaFailed(JsError),
+
+    /// Occurs if the [getDisplayMedia][1] request failed.
+    ///
+    /// [1]: https://tinyurl.com/wotjrns
+    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
+    GetDisplayMediaFailed(JsError),
 
     /// Occurs when cannot get info about connected [MediaDevices][1].
     ///
@@ -104,25 +125,56 @@ impl InnerMediaManager {
     /// build from already owned tracks.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://bit.ly/2MHnEj5
+    /// [2]: https://tinyurl.com/rnxcavf
     fn get_stream(
         &self,
         caps: MediaStreamConstraints,
     ) -> impl Future<Output = Result<(SysMediaStream, bool)>> {
         if let Some(stream) = self.get_from_storage(&caps) {
-            future::ok((stream, false)).left_future()
+            future::ok((stream, false)).left_future().left_future()
         } else {
-            self.get_user_media(caps)
-                .and_then(|stream| future::ok((stream, true)))
-                .right_future()
+            let caps: MultiSourceMediaStreamConstraints = caps.into();
+            match caps {
+                MultiSourceMediaStreamConstraints::Display(caps) => self
+                    .get_display_media(caps)
+                    .and_then(|stream| future::ok((stream, true)))
+                    .left_future()
+                    .right_future(),
+                MultiSourceMediaStreamConstraints::Device(caps) => self
+                    .get_user_media(caps)
+                    .and_then(|stream| future::ok((stream, true)))
+                    .right_future()
+                    .left_future(),
+                MultiSourceMediaStreamConstraints::DeviceAndDisplay(
+                    device_caps,
+                    display_caps,
+                ) => {
+                    let get_user_media = self.get_user_media(device_caps);
+                    let get_display_media =
+                        self.get_display_media(display_caps);
+
+                    async move {
+                        let get_user_media = get_user_media.await?;
+                        let get_display_media = get_display_media.await?;
+
+                        let merged =
+                            merge_streams(&get_user_media, &get_display_media);
+
+                        Ok((merged, true))
+                    }
+                    .right_future()
+                    .right_future()
+                }
+            }
         }
     }
 
     /// Tries to build new [MediaStream][1] from already owned tracks to avoid
-    /// redundant [getUserMedia()][2] requests.
+    /// redundant [getUserMedia()][2]/[getDisplayMedia()][3] calls.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://bit.ly/2MHnEj5
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://tinyurl.com/wotjrns
     fn get_from_storage(
         &self,
         caps: &MediaStreamConstraints,
@@ -158,12 +210,14 @@ impl InnerMediaManager {
         Some(stream)
     }
 
-    /// Obtains new [MediaStream][1] and save its tracks to storage.
+    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and saves
+    /// its tracks to storage.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://tinyurl.com/rnxcavf
     fn get_user_media(
         &self,
-        caps: MediaStreamConstraints,
+        caps: SysMediaStreamConstraints,
     ) -> impl Future<Output = Result<SysMediaStream>> {
         use MediaManagerError::*;
         let storage = Rc::clone(&self.tracks);
@@ -176,7 +230,6 @@ impl InnerMediaManager {
                 .map_err(CouldNotGetMediaDevices)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            let caps: SysMediaStreamConstraints = caps.into();
             let stream = JsFuture::from(
                 media_devices
                     .get_user_media_with_constraints(&caps)
@@ -194,7 +247,50 @@ impl InnerMediaManager {
             js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
-                .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
+                .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+                .for_each(|track| storage.borrow_mut().push(track));
+
+            Ok(stream)
+        }
+    }
+
+    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call and
+    /// saves its tracks to storage.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://tinyurl.com/wotjrns
+    fn get_display_media(
+        &self,
+        caps: SysMediaStreamConstraints,
+    ) -> impl Future<Output = Result<SysMediaStream>> {
+        use MediaManagerError::*;
+        let storage = Rc::clone(&self.tracks);
+
+        async move {
+            let media_devices = window()
+                .navigator()
+                .media_devices()
+                .map_err(JsError::from)
+                .map_err(CouldNotGetMediaDevices)
+                .map_err(tracerr::from_and_wrap!())?;
+
+            let stream = JsFuture::from(
+                get_display_media(&media_devices, &caps)
+                    .map_err(JsError::from)
+                    .map_err(GetDisplayMediaFailed)
+                    .map_err(tracerr::from_and_wrap!())?,
+            )
+            .await
+            .map_err(JsError::from)
+            .map_err(GetUserMediaFailed)
+            .map_err(tracerr::from_and_wrap!())?;
+
+            let stream = SysMediaStream::from(stream);
+
+            js_sys::try_iter(&stream.get_tracks())
+                .unwrap()
+                .unwrap()
+                .map(|tr| MediaStreamTrack::from(tr.unwrap()))
                 .for_each(|track| storage.borrow_mut().push(track));
 
             Ok(stream)
@@ -293,4 +389,26 @@ impl MediaManagerHandle {
             Err(err) => future_to_promise(future::err(err)),
         }
     }
+}
+
+/// Builds new [`SysMediaStream`] from tracks in provided [`SysMediaStream`]s.
+fn merge_streams(
+    left: &SysMediaStream,
+    right: &SysMediaStream,
+) -> SysMediaStream {
+    let stream = SysMediaStream::new().unwrap();
+
+    js_sys::try_iter(&left.get_tracks())
+        .unwrap()
+        .unwrap()
+        .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+        .for_each(|track| stream.add_track(&track));
+
+    js_sys::try_iter(&right.get_tracks())
+        .unwrap()
+        .unwrap()
+        .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+        .for_each(|track| stream.add_track(&track));
+
+    stream
 }

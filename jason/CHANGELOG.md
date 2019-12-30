@@ -35,7 +35,9 @@ All user visible changes to this project will be documented in this file. This p
         - `MediaManager` class obtainable via `Jason.media_manager()` ([#46]):
             - `MediaManager.enumerate_devices()`;
             - `MediaManager.init_local_stream()`.
-        - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46]);
+        - Local media stream constraints:
+            - `MediaStreamConstraints`, `AudioTrackConstraints` classes ([#46]);
+            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78](/../../pull/78)).
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`;

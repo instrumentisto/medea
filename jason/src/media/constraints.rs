@@ -12,6 +12,14 @@ use web_sys::{
 
 use crate::utils::get_property_by_name;
 
+/// Helper to distinguish objects related to media captured from device and
+/// media captured from display.
+#[derive(Clone)]
+enum StreamSource<D, S> {
+    Device(D),
+    Display(S),
+}
+
 /// [MediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
@@ -37,11 +45,16 @@ impl MediaStreamConstraints {
         self.audio.replace(constraints);
     }
 
-    /// Specifies the nature and settings of the video [MediaStreamTrack][1].
-    ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn video(&mut self, constraints: VideoTrackConstraints) {
-        self.video.replace(constraints);
+    /// Set constraints that will be used to obtain local video sourced from
+    /// media device.
+    pub fn device_video(&mut self, constraints: DeviceVideoTrackConstraints) {
+        self.video.replace(constraints.into());
+    }
+
+    /// Set constraints that will be used to capture local video from user
+    /// display.
+    pub fn display_video(&mut self, constraints: DisplayVideoTrackConstraints) {
+        self.video.replace(constraints.into());
     }
 }
 
@@ -55,23 +68,80 @@ impl MediaStreamConstraints {
     pub fn get_video(&self) -> &Option<VideoTrackConstraints> {
         &self.video
     }
+
+    /// Set [`VideoTrackConstraints`].
+    pub fn video(&mut self, constraints: VideoTrackConstraints) {
+        self.video.replace(constraints);
+    }
 }
 
-impl From<MediaStreamConstraints> for SysMediaStreamConstraints {
+// TODO: DisplayMediaStreamConstraints should be used when it will be
+//       implemented.
+
+/// Wrapper around [MediaStreamConstraints][1] that specifies concrete media
+/// source (device or display), and allows to group two requests with different
+/// sources.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamconstraints
+pub enum MultiSourceMediaStreamConstraints {
+    /// Only [getUserMedia()][1] request is required.
+    ///
+    /// [1]: https://tinyurl.com/rnxcavf
+    Device(SysMediaStreamConstraints),
+
+    /// Only [getDisplayMedia()][1] request is required.
+    ///
+    /// [1]: https://tinyurl.com/wotjrns
+    Display(SysMediaStreamConstraints),
+
+    /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
+    ///
+    /// [1]: https://tinyurl.com/rnxcavf
+    /// [2]: https://tinyurl.com/wotjrns
+    DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
+}
+
+impl From<MediaStreamConstraints> for MultiSourceMediaStreamConstraints {
     fn from(constraints: MediaStreamConstraints) -> Self {
-        let mut sys_constraints = Self::new();
+        use MultiSourceMediaStreamConstraints::*;
 
-        if let Some(video) = constraints.video {
-            let video: SysMediaTrackConstraints = video.into();
-            sys_constraints.video(&video.into());
+        let mut sys_constraints = SysMediaStreamConstraints::new();
+        let video = match constraints.video {
+            Some(video) => match video.0 {
+                Some(StreamSource::Device(device)) => {
+                    sys_constraints
+                        .video(&SysMediaTrackConstraints::from(device).into());
+                    StreamSource::Device(sys_constraints)
+                }
+                Some(StreamSource::Display(display)) => {
+                    sys_constraints
+                        .video(&SysMediaTrackConstraints::from(display).into());
+                    StreamSource::Display(sys_constraints)
+                }
+                None => {
+                    // defaults to device video
+                    sys_constraints
+                        .video(&SysMediaTrackConstraints::new().into());
+                    StreamSource::Device(sys_constraints)
+                }
+            },
+            None => StreamSource::Device(sys_constraints),
+        };
+
+        match (constraints.audio, video) {
+            (Some(audio), StreamSource::Device(mut caps)) => {
+                caps.audio(&SysMediaTrackConstraints::from(audio).into());
+                Device(caps)
+            }
+            (Some(audio), StreamSource::Display(caps)) => {
+                let mut audio_caps = SysMediaStreamConstraints::new();
+                audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
+
+                DeviceAndDisplay(audio_caps, caps)
+            }
+            (None, StreamSource::Device(caps)) => Device(caps),
+            (None, StreamSource::Display(caps)) => Display(caps),
         }
-
-        if let Some(audio) = constraints.audio {
-            let audio: SysMediaTrackConstraints = audio.into();
-            sys_constraints.audio(&audio.into());
-        }
-
-        sys_constraints
     }
 }
 
@@ -201,17 +271,28 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
 }
 
 /// Constraints applicable to video tracks.
+#[derive(Clone)]
+pub struct VideoTrackConstraints(
+    Option<
+        StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints>,
+    >,
+);
+
+/// Constraints applicable to video tracks that are sourced from some media
+/// device.
 #[wasm_bindgen]
 #[derive(Clone, Default)]
-pub struct VideoTrackConstraints {
+pub struct DeviceVideoTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
     device_id: Option<String>,
 }
 
+/// Constraints applicable to video tracks that are sourced from screen-capture.
 #[wasm_bindgen]
-impl VideoTrackConstraints {
-    /// Creates new [`VideoTrackConstraints`] with none constraints configured.
+impl DeviceVideoTrackConstraints {
+    /// Creates new [`DeviceVideoTrackConstraints`] with none constraints
+    /// configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
@@ -222,6 +303,21 @@ impl VideoTrackConstraints {
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(device_id);
+    }
+}
+
+/// Constraints applicable to video tracks sourced from screen capture.
+#[wasm_bindgen]
+#[derive(Clone, Default)]
+pub struct DisplayVideoTrackConstraints {}
+
+#[wasm_bindgen]
+impl DisplayVideoTrackConstraints {
+    /// Creates new [`DisplayVideoTrackConstraints`] with none constraints
+    /// configured.
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -239,18 +335,50 @@ impl VideoTrackConstraints {
             return false;
         }
 
-        satisfies_by_device_id(&self.device_id, track)
+        match &self.0 {
+            None => true,
+            Some(StreamSource::Device(constraints)) => {
+                satisfies_by_device_id(&constraints.device_id, track)
+                    && !Self::guess_is_from_display(&track)
+            }
+            Some(StreamSource::Display(_)) => {
+                Self::guess_is_from_display(&track)
+            }
+        }
+    }
+
+    /// Detect is video track captured from display searching [specific
+    /// fields][1] in its settings. Only works in Chrome atm.
+    ///
+    /// [1]: https://tinyurl.com/ufx7mcw
+    fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {
+        let settings = track.get_settings();
+
+        let has_display_surface =
+            get_property_by_name(&settings, "displaySurface", |val| {
+                val.as_string()
+            })
+            .is_some();
+
+        if has_display_surface {
+            true
+        } else {
+            get_property_by_name(&settings, "logicalSurface", |val| {
+                val.as_string()
+            })
+            .is_some()
+        }
     }
 }
 
 impl From<ProtoVideoConstraints> for VideoTrackConstraints {
     fn from(_caps: ProtoVideoConstraints) -> Self {
-        Self::new()
+        Self(None)
     }
 }
 
-impl From<VideoTrackConstraints> for SysMediaTrackConstraints {
-    fn from(track_constraints: VideoTrackConstraints) -> Self {
+impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
+    fn from(track_constraints: DeviceVideoTrackConstraints) -> Self {
         let mut constraints = Self::new();
 
         if let Some(device_id) = track_constraints.device_id {
@@ -260,5 +388,23 @@ impl From<VideoTrackConstraints> for SysMediaTrackConstraints {
         }
 
         constraints
+    }
+}
+
+impl From<DisplayVideoTrackConstraints> for SysMediaTrackConstraints {
+    fn from(_: DisplayVideoTrackConstraints) -> Self {
+        Self::new()
+    }
+}
+
+impl From<DeviceVideoTrackConstraints> for VideoTrackConstraints {
+    fn from(constraints: DeviceVideoTrackConstraints) -> Self {
+        Self(Some(StreamSource::Device(constraints)))
+    }
+}
+
+impl From<DisplayVideoTrackConstraints> for VideoTrackConstraints {
+    fn from(constraints: DisplayVideoTrackConstraints) -> Self {
+        Self(Some(StreamSource::Display(constraints)))
     }
 }

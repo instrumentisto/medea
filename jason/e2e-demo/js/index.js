@@ -281,6 +281,10 @@ window.onload = async function() {
         video_select.append(option);
       }
     }
+    const option = document.createElement('option');
+    option.value = "screen";
+    option.text = "screen";
+    video_select.append(option);
   }
 
   async function getStream(audio_select, video_select) {
@@ -291,12 +295,21 @@ window.onload = async function() {
       audio.device_id(audioSource.value);
     }
     constraints.audio(audio);
-    let video = new rust.VideoTrackConstraints();
+
     let videoSource = video_select.options[video_select.selectedIndex];
     if (videoSource) {
-      video.device_id(videoSource.value);
+      if (videoSource.value === "screen") {
+        let video = new rust.DisplayVideoTrackConstraints();
+        constraints.display_video(video);
+      } else {
+        let video = new rust.DeviceVideoTrackConstraints();
+        video.device_id(videoSource.value);
+        constraints.device_video(video);
+      }
+    } else {
+      constraints.device_video(new rust.DeviceVideoTrackConstraints());
     }
-    constraints.video(video);
+
     return await jason.media_manager().init_local_stream(constraints);
   }
 
