@@ -115,6 +115,7 @@ impl WsSession {
         });
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn get_rpc_settings(&self) -> RpcSettings {
         RpcSettings {
             idle_timeout_ms: self.idle_timeout.as_millis() as u64,

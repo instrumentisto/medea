@@ -392,10 +392,10 @@ impl<'de> Deserialize<'de> for ServerMsg {
             Ok(Self::Ping(n))
         } else {
             let msg = serde_json::from_value::<Event>(ev.clone())
-                .map(|e| Self::Event(e))
+                .map(Self::Event)
                 .or_else(move |_| {
                     serde_json::from_value::<RpcSettings>(ev)
-                        .map(|e| Self::RpcSettings(e))
+                        .map(Self::RpcSettings)
                 })
                 .map_err(|e| {
                     Error::custom(format!(
