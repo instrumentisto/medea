@@ -4,25 +4,19 @@ mod backoff_delayer;
 mod heartbeat;
 mod websocket;
 
-use std::{
-    collections::HashMap,
-    rc::Rc,
-    sync::atomic::{AtomicU64, Ordering},
-    time::Duration,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use futures::{
     channel::{mpsc, oneshot},
     future::{self},
-    stream, FutureExt as _, StreamExt as _,
+    stream, StreamExt as _,
 };
 use medea_client_api_proto::{
-    ClientMsg, CloseReason, Command, Event, PeerId, RpcSettingsUpdated,
-    ServerMsg,
+    ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
 use medea_jason::rpc::{
-    ClientDisconnect, CloseMsg, IdleTimeout, MockRpcTransport, PingInterval,
-    RpcClient, RpcTransport, State, WebSocketRpcClient,
+    ClientDisconnect, CloseMsg, MockRpcTransport, RpcClient, RpcTransport,
+    State, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -32,7 +26,7 @@ use crate::await_with_timeout;
 wasm_bindgen_test_configure!(run_in_browser);
 
 fn new_client(transport: Rc<MockRpcTransport>) -> WebSocketRpcClient {
-    WebSocketRpcClient::new(Box::new(move |token| {
+    WebSocketRpcClient::new(Box::new(move |_| {
         Box::pin(future::ok(transport.clone() as Rc<dyn RpcTransport>))
     }))
 }
@@ -54,20 +48,19 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
         peer_ids: Vec::new(),
     };
 
-    let ws = WebSocketRpcClient::new(Box::new(|token| {
+    let ws = WebSocketRpcClient::new(Box::new(|_| {
         let mut transport = MockRpcTransport::new();
         transport
             .expect_on_state_change()
             .return_once(|| stream::once(async { State::Open }).boxed());
         transport.expect_on_message().returning(|| {
             let (tx, rx) = mpsc::unbounded();
-            tx.unbounded_send(ServerMsg::RpcSettingsUpdated(
-                RpcSettingsUpdated {
-                    idle_timeout_ms: 100,
-                    ping_interval_ms: 100,
-                },
-            ));
-            tx.unbounded_send(ServerMsg::Event(SRV_EVENT));
+            tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 10000,
+                ping_interval_ms: 10000,
+            }))
+            .unwrap();
+            tx.unbounded_send(ServerMsg::Event(SRV_EVENT)).unwrap();
             Ok(rx.boxed())
         });
         transport.expect_send().returning(|_| Ok(()));
@@ -78,13 +71,9 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 
         Box::pin(future::ok(Rc::new(transport) as Rc<dyn RpcTransport>))
     }));
-    ws.update_settings(
-        IdleTimeout(Duration::from_secs(10).into()),
-        PingInterval(Duration::from_millis(10).into()),
-    );
 
     let mut stream = ws.subscribe();
-    ws.connect("sdf".to_string()).await.unwrap();
+    ws.connect(String::new()).await.unwrap();
     assert_eq!(stream.next().await.unwrap(), SRV_EVENT);
 }
 
@@ -101,10 +90,6 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 #[wasm_bindgen_test]
 async fn unsub_drops_subs() {
     let ws = new_client(Rc::new(MockRpcTransport::new()));
-    ws.update_settings(
-        IdleTimeout(Duration::from_secs(10).into()),
-        PingInterval(Duration::from_millis(500).into()),
-    );
     let (test_tx, test_rx) = oneshot::channel();
     let mut subscriber_stream = ws.subscribe();
     spawn_local(async move {
@@ -150,19 +135,16 @@ async fn transport_is_dropped_when_client_is_dropped() {
         .return_once(|| stream::once(async { State::Open }).boxed());
     transport.expect_on_message().returning(|| {
         let (tx, rx) = mpsc::unbounded();
-        tx.unbounded_send(ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
-            idle_timeout_ms: 100,
-            ping_interval_ms: 100,
-        }));
+        tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+            idle_timeout_ms: 10000,
+            ping_interval_ms: 500,
+        }))
+        .unwrap();
         Ok(rx.boxed())
     });
     let rpc_transport = Rc::new(transport);
 
     let ws = new_client(rpc_transport.clone());
-    ws.update_settings(
-        IdleTimeout(Duration::from_secs(10).into()),
-        PingInterval(Duration::from_millis(500).into()),
-    );
     ws.connect(String::new()).await.unwrap();
     ws.set_close_reason(ClientDisconnect::RoomClosed);
     std::mem::drop(ws);
@@ -192,10 +174,11 @@ async fn send_goes_to_transport() {
         .return_once(|| stream::once(async { State::Open }).boxed());
     transport.expect_on_message().returning(|| {
         let (tx, rx) = mpsc::unbounded();
-        tx.unbounded_send(ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
-            idle_timeout_ms: 100,
-            ping_interval_ms: 100,
-        }));
+        tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+            idle_timeout_ms: 10000,
+            ping_interval_ms: 500,
+        }))
+        .unwrap();
         Ok(rx.boxed())
     });
     transport
@@ -208,10 +191,6 @@ async fn send_goes_to_transport() {
     transport.expect_set_close_reason().return_const(());
 
     let ws = new_client(Rc::new(transport));
-    ws.update_settings(
-        IdleTimeout(Duration::from_secs(10).into()),
-        PingInterval(Duration::from_millis(500).into()),
-    );
     ws.connect(String::new()).await.unwrap();
     let (test_tx, test_rx) = oneshot::channel();
     let test_peer_id = PeerId(9999);
@@ -265,12 +244,11 @@ mod on_close {
             .return_once(|| stream::once(async { State::Open }).boxed());
         transport.expect_on_message().returning(|| {
             let (tx, rx) = mpsc::unbounded();
-            tx.unbounded_send(ServerMsg::RpcSettingsUpdated(
-                RpcSettingsUpdated {
-                    idle_timeout_ms: 500,
-                    ping_interval_ms: 500,
-                },
-            ));
+            tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 10000,
+                ping_interval_ms: 500,
+            }))
+            .unwrap();
             Ok(rx.boxed())
         });
         transport.expect_send().returning(|_| Ok(()));
@@ -280,10 +258,6 @@ mod on_close {
         });
 
         let ws = new_client(Rc::new(transport));
-        ws.update_settings(
-            IdleTimeout(Duration::from_secs(10).into()),
-            PingInterval(Duration::from_millis(500).into()),
-        );
         ws.connect(String::new()).await.unwrap();
 
         ws
@@ -371,12 +345,11 @@ mod transport_close_reason_on_drop {
             .return_once(|| stream::once(async { State::Open }).boxed());
         transport.expect_on_message().returning(|| {
             let (tx, rx) = mpsc::unbounded();
-            tx.unbounded_send(ServerMsg::RpcSettingsUpdated(
-                RpcSettingsUpdated {
-                    idle_timeout_ms: 500,
-                    ping_interval_ms: 500,
-                },
-            ));
+            tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 10000,
+                ping_interval_ms: 500,
+            }))
+            .unwrap();
             Ok(rx.boxed())
         });
         transport.expect_send().return_once(|_| Ok(()));
@@ -391,10 +364,6 @@ mod transport_close_reason_on_drop {
             });
 
         let ws = new_client(Rc::new(transport));
-        ws.update_settings(
-            IdleTimeout(Duration::from_secs(10).into()),
-            PingInterval(Duration::from_millis(500).into()),
-        );
         ws.connect(String::new()).await.unwrap();
 
         (ws, test_rx)
@@ -459,21 +428,24 @@ mod transport_close_reason_on_drop {
     }
 }
 
+/// Tests for [`RpcClient::connect`].
 mod connect {
-    use super::*;
-    use crate::resolve_after;
-    use medea_client_api_proto::RpcSettingsUpdated;
+    use medea_client_api_proto::RpcSettings;
     use medea_jason::rpc::State;
+
+    use crate::resolve_after;
+
+    use super::*;
 
     #[wasm_bindgen_test]
     async fn closed() {
         let (test_tx, mut test_rx) = mpsc::unbounded();
         let ws = WebSocketRpcClient::new(Box::new(move |_| {
-            test_tx.unbounded_send(());
+            test_tx.unbounded_send(()).unwrap();
             let mut transport = MockRpcTransport::new();
             transport.expect_on_message().times(3).returning(|| {
                 Ok(stream::once(async move {
-                    ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
+                    ServerMsg::RpcSettings(RpcSettings {
                         idle_timeout_ms: 3000,
                         ping_interval_ms: 3000,
                     })
@@ -491,7 +463,7 @@ mod connect {
             let transport = Rc::new(transport);
             Box::pin(future::ok(transport as Rc<dyn RpcTransport>))
         }));
-        ws.connect("qwe".to_string()).await.unwrap();
+        ws.connect(String::new()).await.unwrap();
 
         await_with_timeout(Box::pin(test_rx.next()), 500)
             .await
@@ -507,7 +479,7 @@ mod connect {
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().times(3).returning(|| {
                     Ok(stream::once(async move {
-                        ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
+                        ServerMsg::RpcSettings(RpcSettings {
                             idle_timeout_ms: 3000,
                             ping_interval_ms: 3000,
                         })
@@ -527,7 +499,7 @@ mod connect {
                 if connecting_count > 1 {
                     Ok(Rc::clone(&transport) as Rc<dyn RpcTransport>)
                 } else {
-                    resolve_after(500).await;
+                    resolve_after(500).await.unwrap();
                     Ok(Rc::clone(&transport) as Rc<dyn RpcTransport>)
                 }
             })
@@ -555,7 +527,7 @@ mod connect {
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().times(3).returning(|| {
                     Ok(stream::once(async move {
-                        ServerMsg::RpcSettingsUpdated(RpcSettingsUpdated {
+                        ServerMsg::RpcSettings(RpcSettings {
                             idle_timeout_ms: 3000,
                             ping_interval_ms: 3000,
                         })
@@ -578,6 +550,7 @@ mod connect {
 
         await_with_timeout(Box::pin(ws.connect(String::new())), 50)
             .await
+            .unwrap()
             .unwrap();
     }
 }

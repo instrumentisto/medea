@@ -1,4 +1,4 @@
-//! Implementation of reconnector for the [`ReconnectableRpcClient`].
+//! Implementation of reconnector for the [`RpcClient`].
 
 use std::{rc::Weak, time::Duration};
 
@@ -14,6 +14,8 @@ use crate::{
     },
 };
 
+/// Error which indicates that [`RpcClient`]'s (which this [`ReconnectHandle`]
+/// tries to reconnect) token is `None`.
 #[derive(Debug, Display, JsCaused)]
 struct NoTokenError;
 
@@ -57,7 +59,7 @@ impl ReconnectorHandle {
         })
     }
 
-    /// Tries to reconnect [`ReconnectableRpcClient`] in a loop with growing
+    /// Tries to reconnect [`RpcClient`] in a loop with growing
     /// delay until it will not be reconnected.
     ///
     /// The first attempt to reconnect is guaranteed to happen no earlier than

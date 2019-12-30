@@ -135,6 +135,7 @@ impl MediaConnections {
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
     /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -146,6 +147,7 @@ impl MediaConnections {
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
     /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -428,6 +430,7 @@ impl Sender {
     }
 
     /// Checks is sender has track and it is enabled.
+    #[cfg(feature = "mockable")]
     fn is_track_enabled(&self) -> bool {
         match self.track.borrow().as_ref() {
             None => false,

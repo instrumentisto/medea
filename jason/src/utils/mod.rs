@@ -9,7 +9,7 @@ mod event_listener;
 use std::{ops::Mul, time::Duration};
 
 use bigdecimal::{BigDecimal, ToPrimitive as _};
-use derive_more::{Add, Div, From, Sub};
+use derive_more::{From, Sub};
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -39,9 +39,7 @@ pub fn window() -> Window {
 /// side timers.
 ///
 /// Also [`JsDuration`] can be multiplied by [`f32`].
-#[derive(
-    Debug, From, Copy, Clone, Add, Sub, PartialEq, Eq, PartialOrd, Ord, Div,
-)]
+#[derive(Debug, From, Copy, Clone, Sub, PartialEq, PartialOrd)]
 pub struct JsDuration(Duration);
 
 impl JsDuration {

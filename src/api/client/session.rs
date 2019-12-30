@@ -9,8 +9,7 @@ use actix::{
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, RpcSettingsUpdated,
-    ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
 };
 
 use crate::{
@@ -20,7 +19,6 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
-    signalling::room::RoomError::ClientError,
 };
 
 /// [`WsSession`] closed reason.
@@ -117,8 +115,8 @@ impl WsSession {
         });
     }
 
-    fn get_rpc_settings(&self) -> RpcSettingsUpdated {
-        RpcSettingsUpdated {
+    fn get_rpc_settings(&self) -> RpcSettings {
+        RpcSettings {
             idle_timeout_ms: self.idle_timeout.as_millis() as u64,
             ping_interval_ms: self.ping_interval.as_millis() as u64,
         }

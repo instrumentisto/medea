@@ -1,17 +1,12 @@
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    time::Duration,
-};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use derive_more::{Add, Display, Div, From, Mul};
+use derive_more::{Display, From, Mul};
 use futures::{
     channel::mpsc,
     future::{self, AbortHandle},
     stream::LocalBoxStream,
     StreamExt as _,
 };
-use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -42,7 +37,7 @@ impl Drop for Abort {
 pub struct IdleTimeout(pub JsDuration);
 
 /// Ping interval of [`RpcClient`].
-#[derive(Debug, Copy, Clone, Mul, Add, Div, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Copy, Clone, Mul)]
 pub struct PingInterval(pub JsDuration);
 
 struct Inner {
@@ -192,8 +187,6 @@ impl Heartbeat {
                     return;
                 };
                 let wait_for_ping = this.borrow().ping_interval * 2;
-                let idle_timeout = this.borrow().idle_timeout.0;
-
                 resolve_after(wait_for_ping.0).await;
 
                 let last_ping_num = this.borrow().last_ping_num;

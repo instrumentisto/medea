@@ -159,6 +159,8 @@ pub enum RpcClientError {
     #[display(fmt = "Reconnection failed.")]
     ReconnectionFailed,
 
+    /// First received [`ServerMsg`] after [`RpcClient::connect`] is not
+    /// [`ServerMsg::RpcSettings`].
     FirstServerMsgIsNotRpcSettings,
 }
 
@@ -432,7 +434,7 @@ impl WebSocketRpcClient {
                     }
                 }
             }
-            ServerMsg::RpcSettingsUpdated(settings) => {
+            ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
                     IdleTimeout(
                         Duration::from_millis(settings.idle_timeout_ms).into(),
@@ -468,7 +470,7 @@ impl WebSocketRpcClient {
             .next()
             .await
         {
-            if let ServerMsg::RpcSettingsUpdated(rpc_settings) = msg {
+            if let ServerMsg::RpcSettings(rpc_settings) = msg {
                 let idle_timeout = IdleTimeout(
                     Duration::from_millis(rpc_settings.idle_timeout_ms).into(),
                 );
@@ -540,8 +542,7 @@ impl WebSocketRpcClient {
     }
 
     /// Updates RPC settings of this [`RpcClient`].
-    // TODO: make it 'pub' only for tests
-    pub fn update_settings(
+    fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,

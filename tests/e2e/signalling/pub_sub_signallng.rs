@@ -13,16 +13,6 @@ fn pub_sub_video_call() {
         let test_fn = move |event: &Event,
                             _: &mut Context<TestMember>,
                             events: Vec<&Event>| {
-            let events: Vec<_> = events
-                .into_iter()
-                .filter(|event| {
-                    if let Event::RpcSettingsUpdated { .. } = event {
-                        false
-                    } else {
-                        true
-                    }
-                })
-                .collect();
             // Start checking result of test.
             if let Event::IceCandidateDiscovered { .. } = event {
                 let peers_count = events

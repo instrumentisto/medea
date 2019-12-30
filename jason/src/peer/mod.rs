@@ -334,11 +334,13 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
+    #[cfg(feature = "mockable")]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()
     }
 
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
+    #[cfg(feature = "mockable")]
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
     }
