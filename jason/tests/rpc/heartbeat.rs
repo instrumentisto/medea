@@ -39,8 +39,8 @@ async fn sends_pong_on_received_ping() {
         Ok(())
     });
     hb.start(
-        IdleTimeout(Duration::from_secs(3).into()),
-        PingInterval(Duration::from_secs(3).into()),
+        IdleTimeout(Duration::from_secs(10).into()),
+        PingInterval(Duration::from_secs(10).into()),
         Rc::new(transport),
     )
     .unwrap();
