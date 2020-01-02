@@ -89,6 +89,7 @@ impl ReconnectorHandle {
                 multiplier,
                 Duration::from_millis(u64::from(max_delay)).into(),
             );
+            backoff_delayer.delay().await;
             while let Err(_) = rpc
                 .upgrade()
                 .ok_or_else(|| new_js_error!(HandlerDetachedError => JsValue))?

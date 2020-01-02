@@ -1,3 +1,5 @@
+//! Implementation of connection loss detection through Ping/Pong mechanism.
+
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use derive_more::{Display, From, Mul};
@@ -44,7 +46,7 @@ struct Inner {
     /// [`RpcTransport`] which heartbeats.
     transport: Option<Rc<dyn RpcTransport>>,
 
-    /// IDLE timeout of [`RpcClient`].
+    /// Idle timeout of [`RpcClient`].
     idle_timeout: IdleTimeout,
 
     /// Ping interval of [`RpcClient`].
@@ -86,7 +88,7 @@ impl Inner {
     }
 }
 
-/// Service for sending/receiving ping pongs between the client and server.
+/// Service for sending/receiving ping/pongs between the client and server.
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
@@ -138,6 +140,8 @@ impl Heartbeat {
             }
         });
         spawn_local(async move {
+            // Ignore this Abort error because aborting is normal behavior of
+            // Future.
             fut.await.ok();
         });
         self.0.borrow_mut().handle_ping_task = Some(pong_abort.into());
@@ -152,7 +156,7 @@ impl Heartbeat {
         self.0.borrow_mut().idle_watchdog_task.take();
     }
 
-    /// Update [`RpcTransport`] settings.
+    /// Updates [`Heartbeat`] settings.
     pub fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
@@ -172,10 +176,13 @@ impl Heartbeat {
     }
 
     /// Resets `idle_watchdog` task and sets new one.
-    // TODO (evdokimovs): more explanation about idle_watchdog.
+    ///
+    /// This watchdog is responsible for throwing [`Heartbeat::on_idle`] when
+    /// [`ServerMsg::Ping`] isn't received withing `idle_timeout`.
+    ///
+    /// Also this watchdog will try send [`ClientMsg::Pong`] if
+    /// [`ServerMsg::Ping`] wasn't received within `ping_interval * 2`.
     fn reset_idle_watchdog(&self) {
-        // TODO: perhaps, using window.set_interval with some ping_at will be
-        //       more convenient?
         self.0.borrow_mut().idle_watchdog_task.take();
 
         let weak_this = Rc::downgrade(&self.0);
@@ -211,6 +218,8 @@ impl Heartbeat {
             });
 
         spawn_local(async move {
+            // Ignore this Abort error because aborting is normal behavior of
+            // watchdog.
             idle_watchdog.await.ok();
         });
 

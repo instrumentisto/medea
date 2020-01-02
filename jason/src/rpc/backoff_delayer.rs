@@ -5,10 +5,6 @@ use derive_more::{Display, From};
 
 use crate::utils::{resolve_after, JsCaused, JsDuration, JsError};
 
-/// Errors which can occur in [`BackoffDelayer`].
-#[derive(Debug, From, Display, JsCaused)]
-pub struct BackoffDelayerError(JsError);
-
 /// Delayer which increases delay time by provided multiplier on every delay
 /// call
 ///

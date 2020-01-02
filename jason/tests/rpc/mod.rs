@@ -16,7 +16,7 @@ use medea_client_api_proto::{
 };
 use medea_jason::rpc::{
     ClientDisconnect, CloseMsg, MockRpcTransport, RpcClient, RpcTransport,
-    State, WebSocketRpcClient,
+    State, StateCloseReason, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -64,9 +64,6 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
             Ok(rx.boxed())
         });
         transport.expect_send().returning(|_| Ok(()));
-        transport
-            .expect_on_close()
-            .return_once(|| Ok(stream::pending().boxed()));
         transport.expect_set_close_reason().return_const(());
 
         Box::pin(future::ok(Rc::new(transport) as Rc<dyn RpcTransport>))
@@ -125,9 +122,6 @@ async fn unsub_drops_subs() {
 #[wasm_bindgen_test]
 async fn transport_is_dropped_when_client_is_dropped() {
     let mut transport = MockRpcTransport::new();
-    transport
-        .expect_on_close()
-        .return_once(|| Ok(stream::once(future::pending()).boxed()));
     transport.expect_send().returning(|_| Ok(()));
     transport.expect_set_close_reason().return_const(());
     transport
@@ -181,9 +175,6 @@ async fn send_goes_to_transport() {
         .unwrap();
         Ok(rx.boxed())
     });
-    transport
-        .expect_on_close()
-        .return_once(move || Ok(stream::pending().boxed()));
     transport.expect_send().returning(move |e| {
         on_send_tx.unbounded_send(e.clone()).unwrap();
         Ok(())
@@ -239,9 +230,15 @@ mod on_close {
     /// [`CloseMsg`].
     async fn get_client(close_msg: CloseMsg) -> WebSocketRpcClient {
         let mut transport = MockRpcTransport::new();
-        transport
-            .expect_on_state_change()
-            .return_once(|| stream::once(async { State::Open }).boxed());
+        transport.expect_on_state_change().return_once(|| {
+            let (tx, rx) = mpsc::unbounded();
+            tx.unbounded_send(State::Open).unwrap();
+            tx.unbounded_send(State::Closed(StateCloseReason::ConnectionLost(
+                close_msg,
+            )))
+            .unwrap();
+            rx.boxed()
+        });
         transport.expect_on_message().returning(|| {
             let (tx, rx) = mpsc::unbounded();
             tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
@@ -253,9 +250,6 @@ mod on_close {
         });
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
-        transport.expect_on_close().return_once(move || {
-            Ok(stream::once(async move { close_msg }).boxed())
-        });
 
         let ws = new_client(Rc::new(transport));
         ws.connect(String::new()).await.unwrap();
@@ -353,9 +347,6 @@ mod transport_close_reason_on_drop {
             Ok(rx.boxed())
         });
         transport.expect_send().return_once(|_| Ok(()));
-        transport
-            .expect_on_close()
-            .return_once(|| Ok(stream::pending().boxed()));
         let (test_tx, test_rx) = oneshot::channel();
         transport
             .expect_set_close_reason()
@@ -453,9 +444,6 @@ mod connect {
                 .boxed())
             });
             transport.expect_send().return_once(|_| Ok(()));
-            transport
-                .expect_on_close()
-                .return_once(|| Ok(stream::pending().boxed()));
             transport.expect_set_close_reason().return_once(|_| ());
             transport
                 .expect_on_state_change()
@@ -487,9 +475,6 @@ mod connect {
                     .boxed())
                 });
                 transport.expect_send().return_once(|_| Ok(()));
-                transport
-                    .expect_on_close()
-                    .return_once(|| Ok(stream::pending().boxed()));
                 transport.expect_set_close_reason().return_once(|_| ());
                 transport.expect_on_state_change().return_once(|| {
                     stream::once(async { State::Open }).boxed()
@@ -535,9 +520,6 @@ mod connect {
                     .boxed())
                 });
                 transport.expect_send().return_once(|_| Ok(()));
-                transport
-                    .expect_on_close()
-                    .return_once(|| Ok(stream::pending().boxed()));
                 transport.expect_set_close_reason().return_once(|_| ());
                 transport.expect_on_state_change().return_once(|| {
                     stream::once(async { State::Open }).boxed()

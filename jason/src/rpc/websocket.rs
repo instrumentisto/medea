@@ -14,12 +14,13 @@ use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
-use crate::{
-    rpc::{ClientDisconnect, CloseMsg, RpcTransport},
-    utils::{
-        console_error, EventListener, EventListenerBindError, JasonError,
-        JsCaused, JsError,
-    },
+use crate::utils::{
+    console_error, EventListener, EventListenerBindError, JasonError, JsCaused,
+    JsError,
+};
+
+use super::{
+    ClientDisconnect, CloseMsg, ClosedStateReason, RpcTransport, State,
 };
 
 /// Errors that may occur when working with [`WebSocket`].
@@ -87,78 +88,6 @@ impl From<EventListenerBindError> for TransportError {
 }
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
-
-/// State of WebSocket.
-#[derive(Clone, Debug)]
-pub enum State {
-    /// Socket has been created. The connection is not yet open.
-    ///
-    /// Reflects `CONNECTING` state from JS side [`WebSocket.readyState`].
-    ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
-    Connecting,
-
-    /// The connection is open and ready to communicate.
-    ///
-    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`].
-    ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
-    Open,
-
-    /// The connection is in the process of closing.
-    ///
-    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`].
-    ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
-    Closing,
-
-    /// The connection is closed or couldn't be opened.
-    ///
-    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`].
-    ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
-    Closed(RpcTransportCloseReason),
-}
-
-impl State {
-    pub fn id(&self) -> u8 {
-        match self {
-            State::Connecting => 1,
-            State::Open => 2,
-            State::Closing => 3,
-            State::Closed(_) => 4,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum RpcTransportCloseReason {
-    ConnectionLost(CloseMsg),
-    CreateSocket(TransportError),
-    Unknown,
-}
-
-impl State {
-    /// Returns `true` if socket can be closed.
-    pub fn can_close(&self) -> bool {
-        match self {
-            Self::Connecting | Self::Open => true,
-            _ => false,
-        }
-    }
-}
-
-impl From<u16> for State {
-    fn from(value: u16) -> Self {
-        match value {
-            0 => Self::Connecting,
-            1 => Self::Open,
-            2 => Self::Closing,
-            3 => Self::Closed(RpcTransportCloseReason::Unknown),
-            _ => unreachable!(),
-        }
-    }
-}
 
 struct InnerSocket {
     /// JS side [`WebSocket`].
@@ -266,10 +195,7 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates `socket_state`.
     fn sync_socket_state(&mut self) {
-        if let State::Closed(_) = &self.socket_state {
-        } else {
-            self.update_socket_state(self.socket.ready_state().into());
-        }
+        self.update_socket_state(self.socket.ready_state().into());
     }
 }
 
@@ -301,10 +227,6 @@ impl RpcTransport for WebSocketRpcTransport {
 
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason;
-    }
-
-    fn get_state(&self) -> State {
-        self.0.borrow().socket_state.clone()
     }
 
     fn on_state_change(&self) -> LocalBoxStream<'static, State> {
@@ -395,9 +317,8 @@ impl WebSocketRpcTransport {
                     );
                     return;
                 };
-                let mut transport_ref_mut = transport.0.borrow_mut();
-                transport_ref_mut.update_socket_state(State::Closed(
-                    RpcTransportCloseReason::ConnectionLost(close_msg),
+                transport.0.borrow_mut().update_socket_state(State::Closed(
+                    ClosedStateReason::ConnectionLost(close_msg),
                 ));
             },
         )
