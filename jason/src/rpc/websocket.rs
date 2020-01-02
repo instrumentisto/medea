@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// Errors that may occur when working with [`WebSocket`].
-#[derive(Debug, Display, JsCaused)]
+#[derive(Clone, Debug, Display, JsCaused)]
 pub enum TransportError {
     /// Occurs when the port to which the connection is being attempted
     /// is being blocked.
@@ -36,11 +36,11 @@ pub enum TransportError {
 
     /// Occurs when [`ClientMessage`] cannot be parsed.
     #[display(fmt = "Failed to parse client message: {}", _0)]
-    ParseClientMessage(serde_json::error::Error),
+    ParseClientMessage(String),
 
     /// Occurs when [`ServerMessage`] cannot be parsed.
     #[display(fmt = "Failed to parse server message: {}", _0)]
-    ParseServerMessage(serde_json::error::Error),
+    ParseServerMessage(String),
 
     /// Occurs if the parsed message is not string.
     #[display(fmt = "Message is not a string")]
@@ -74,6 +74,7 @@ impl TryFrom<&MessageEvent> for ServerMessage {
         let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
+            .map_err(|e| e.to_string())
             .map_err(ParseServerMessage)
             .map(Self::from)
     }
@@ -88,7 +89,7 @@ impl From<EventListenerBindError> for TransportError {
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
 /// State of WebSocket.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum State {
     /// Socket has been created. The connection is not yet open.
     ///
@@ -116,12 +117,30 @@ pub enum State {
     /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`].
     ///
     /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
-    Closed,
+    Closed(RpcTransportCloseReason),
+}
+
+impl State {
+    pub fn id(&self) -> u8 {
+        match self {
+            State::Connecting => 1,
+            State::Open => 2,
+            State::Closing => 3,
+            State::Closed(_) => 4,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum RpcTransportCloseReason {
+    ConnectionLost(CloseMsg),
+    CreateSocket(TransportError),
+    Unknown,
 }
 
 impl State {
     /// Returns `true` if socket can be closed.
-    pub fn can_close(self) -> bool {
+    pub fn can_close(&self) -> bool {
         match self {
             Self::Connecting | Self::Open => true,
             _ => false,
@@ -135,7 +154,7 @@ impl From<u16> for State {
             0 => Self::Connecting,
             1 => Self::Open,
             2 => Self::Closing,
-            3 => Self::Closed,
+            3 => Self::Closed(RpcTransportCloseReason::Unknown),
             _ => unreachable!(),
         }
     }
@@ -179,12 +198,6 @@ struct InnerSocket {
     /// [`LocalBoxStream`].
     on_message_subs: Vec<mpsc::UnboundedSender<ServerMsg>>,
 
-    // TODO: this already looks kinda wrong, if we have `on_state_change`,
-    //       then why we need explicit `on_close`?
-    /// [`mpsc::UnboundedSender`]s for [`RpcTransport::on_close`]'s
-    /// [`LocalBoxStream`].
-    on_close_subs: Vec<mpsc::UnboundedSender<CloseMsg>>,
-
     /// [mpsc::UnboundedSender`]s for [`RpcTransport::on_state_change`]'s
     /// [`LocalBoxStream`].
     on_state_change_subs: Vec<mpsc::UnboundedSender<State>>,
@@ -223,7 +236,6 @@ impl InnerSocket {
             on_open_listener: None,
             on_message_listener: None,
             on_close_listener: None,
-            on_close_subs: Vec::new(),
             on_message_subs: Vec::new(),
             on_state_change_subs: Vec::new(),
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
@@ -235,14 +247,13 @@ impl InnerSocket {
     /// Sends updated [`State`] to the `on_state_change` subscribers. But
     /// if [`State`] is not changed, nothing will be sent.
     fn update_socket_state(&mut self, new_state: State) {
-        if self.socket_state != new_state {
-            self.socket_state = new_state;
-
+        if self.socket_state.id() != new_state.id() {
+            self.socket_state = new_state.clone();
             self.on_state_change_subs.retain(|sub| !sub.is_closed());
 
             self.on_state_change_subs
                 .iter()
-                .filter_map(|sub| sub.unbounded_send(new_state).err())
+                .filter_map(|sub| sub.unbounded_send(new_state.clone()).err())
                 .for_each(|e| {
                     console_error(format!(
                         "'WebSocketRpcTransport::on_state_change' subscriber \
@@ -255,7 +266,10 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates `socket_state`.
     fn sync_socket_state(&mut self) {
-        self.update_socket_state(self.socket.ready_state().into());
+        if let State::Closed(_) = &self.socket_state {
+        } else {
+            self.update_socket_state(self.socket.ready_state().into());
+        }
     }
 }
 
@@ -267,16 +281,10 @@ impl RpcTransport for WebSocketRpcTransport {
         Ok(Box::pin(rx))
     }
 
-    fn on_close(&self) -> Result<LocalBoxStream<'static, CloseMsg>> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_close_subs.push(tx);
-
-        Ok(Box::pin(rx))
-    }
-
     fn send(&self, msg: &ClientMsg) -> Result<()> {
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
+            .map_err(|e| e.to_string())
             .map_err(TransportError::ParseClientMessage)
             .map_err(tracerr::wrap!())?;
 
@@ -296,7 +304,7 @@ impl RpcTransport for WebSocketRpcTransport {
     }
 
     fn get_state(&self) -> State {
-        self.0.borrow().socket_state
+        self.0.borrow().socket_state.clone()
     }
 
     fn on_state_change(&self) -> LocalBoxStream<'static, State> {
@@ -388,22 +396,9 @@ impl WebSocketRpcTransport {
                     return;
                 };
                 let mut transport_ref_mut = transport.0.borrow_mut();
-                transport_ref_mut.sync_socket_state();
-                transport_ref_mut
-                    .on_close_subs
-                    .retain(|on_close| !on_close.is_closed());
-
-                transport_ref_mut.on_close_subs.iter().for_each(|on_close| {
-                    on_close.unbounded_send(close_msg.clone()).unwrap_or_else(
-                        |e| {
-                            console_error(format!(
-                                "WebSocket's 'on_close' callback receiver \
-                                 unexpectedly gone. {:?}",
-                                e
-                            ))
-                        },
-                    );
-                })
+                transport_ref_mut.update_socket_state(State::Closed(
+                    RpcTransportCloseReason::ConnectionLost(close_msg),
+                ));
             },
         )
         .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;

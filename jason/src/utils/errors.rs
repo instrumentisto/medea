@@ -31,7 +31,7 @@ pub trait JsCaused {
 }
 
 /// Wrapper for JS value which returned from JS side as error.
-#[derive(Debug, Display)]
+#[derive(Clone, Debug, Display)]
 #[display(fmt = "{}: {}", name, message)]
 pub struct JsError {
     /// Name of JS error.

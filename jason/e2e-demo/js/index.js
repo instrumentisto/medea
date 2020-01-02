@@ -371,6 +371,7 @@ window.onload = async function() {
           contentVisibility.hide(connectionLossNotification);
           console.error("Reconnected!");
         } catch (e) {
+          console.error("Failed to manually reconnect: " + e.message());
         } finally {
           connectionLossMsg.textContent = connectionLossDefaultText;
         }
