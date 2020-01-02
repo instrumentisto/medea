@@ -15,8 +15,8 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
 use medea_jason::rpc::{
-    ClientDisconnect, CloseMsg, MockRpcTransport, RpcClient, RpcTransport,
-    State, StateCloseReason, WebSocketRpcClient,
+    ClientDisconnect, CloseMsg, ClosedStateReason, MockRpcTransport, RpcClient,
+    RpcTransport, State, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -233,9 +233,9 @@ mod on_close {
         transport.expect_on_state_change().return_once(|| {
             let (tx, rx) = mpsc::unbounded();
             tx.unbounded_send(State::Open).unwrap();
-            tx.unbounded_send(State::Closed(StateCloseReason::ConnectionLost(
-                close_msg,
-            )))
+            tx.unbounded_send(State::Closed(
+                ClosedStateReason::ConnectionLost(close_msg),
+            ))
             .unwrap();
             rx.boxed()
         });
@@ -276,7 +276,7 @@ mod on_close {
             get_client(CloseMsg::Normal(1000, CloseReason::Finished)).await;
 
         assert_eq!(
-            ws.on_close().await.unwrap(),
+            ws.on_normal_close().await.unwrap(),
             medea_jason::rpc::CloseReason::ByServer(CloseReason::Finished)
         );
     }
@@ -297,7 +297,7 @@ mod on_close {
         let ws =
             get_client(CloseMsg::Normal(1000, CloseReason::Reconnected)).await;
 
-        await_with_timeout(Box::pin(ws.on_close()), 500)
+        await_with_timeout(Box::pin(ws.on_normal_close()), 500)
             .await
             .unwrap_err();
     }
@@ -317,7 +317,7 @@ mod on_close {
     async fn dont_resolve_on_abnormal_close() {
         let ws = get_client(CloseMsg::Abnormal(1500)).await;
 
-        await_with_timeout(Box::pin(ws.on_close()), 500)
+        await_with_timeout(Box::pin(ws.on_normal_close()), 500)
             .await
             .unwrap_err();
     }

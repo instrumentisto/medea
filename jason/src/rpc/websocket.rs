@@ -175,7 +175,7 @@ impl InnerSocket {
     ///
     /// Sends updated [`State`] to the `on_state_change` subscribers. But
     /// if [`State`] is not changed, nothing will be sent.
-    fn update_socket_state(&mut self, new_state: State) {
+    fn update_socket_state(&mut self, new_state: &State) {
         if self.socket_state.id() != new_state.id() {
             self.socket_state = new_state.clone();
             self.on_state_change_subs.retain(|sub| !sub.is_closed());
@@ -195,7 +195,7 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates `socket_state`.
     fn sync_socket_state(&mut self) {
-        self.update_socket_state(self.socket.ready_state().into());
+        self.update_socket_state(&self.socket.ready_state().into());
     }
 }
 
@@ -317,7 +317,7 @@ impl WebSocketRpcTransport {
                     );
                     return;
                 };
-                transport.0.borrow_mut().update_socket_state(State::Closed(
+                transport.0.borrow_mut().update_socket_state(&State::Closed(
                     ClosedStateReason::ConnectionLost(close_msg),
                 ));
             },

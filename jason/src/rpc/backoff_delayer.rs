@@ -1,9 +1,7 @@
 //! Implementation of delayer which increases delay time by provided multiplier
 //! on every delay call.
 
-use derive_more::{Display, From};
-
-use crate::utils::{resolve_after, JsCaused, JsDuration, JsError};
+use crate::utils::{resolve_after, JsDuration};
 
 /// Delayer which increases delay time by provided multiplier on every delay
 /// call
