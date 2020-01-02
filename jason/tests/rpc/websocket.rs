@@ -24,7 +24,7 @@ async fn bad_url_err() {
 async fn could_not_init_socket_err() {
     use TransportError::*;
 
-    match WebSocketRpcTransport::new("ws://example.com").await {
+    match WebSocketRpcTransport::new("ws://0.0.0.0:60000").await {
         Ok(_) => unreachable!(),
         Err(err) => match err.into_inner() {
             InitSocket => {}

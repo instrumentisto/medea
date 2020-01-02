@@ -115,6 +115,8 @@ impl WsSession {
         });
     }
 
+    /// Returns [`RpcSettings`] based on `idle_timeout` and `ping_interval`
+    /// setted for this [`WsSession`].
     #[allow(clippy::cast_possible_truncation)]
     fn get_rpc_settings(&self) -> RpcSettings {
         RpcSettings {

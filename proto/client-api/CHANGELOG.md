@@ -23,7 +23,7 @@ All user visible changes to this project will be documented in this file. This p
 - `Incrementable` trait ([#28]);
 - `CloseReason` and `CloseDescription` types ([#58](/../../pull/58));
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71));
-- `RpcSettingsUpdated` event ([#75](/../../pull/75)).
+- `RpcSettings` server message ([#75](/../../pull/75)).
 
 [#28]: /../../pull/28
 

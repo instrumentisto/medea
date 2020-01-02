@@ -260,13 +260,13 @@ pub trait RpcClient {
     /// If [`RpcClient`] is closed than this function will try to establish
     /// new RPC connection.
     ///
-    /// If [`RpcClient`] already connecting then this function will not perform
-    /// one more connection try. It will subsribe to [`State`] changes and wait
-    /// for first connection result. And based on this result - this function
-    /// will be resolved.
+    /// If [`RpcClient`] already in [`State::Connecting`] then this function
+    /// will not perform one more connection try. It will subsribe to
+    /// [`State`] changes and wait for first connection result. And based on
+    /// this result - this function will be resolved.
     ///
-    /// If [`RpcClient`] already connected then this function will instantly
-    /// resolved.
+    /// If [`RpcClient`] already in [`State::Open`] then this function will be
+    /// instantly resolved.
     fn connect(
         &self,
         token: String,
@@ -284,7 +284,9 @@ pub trait RpcClient {
     fn send_command(&self, command: Command);
 
     /// [`Future`] which will be resolved on normal [`RpcClient`] connection
-    /// closing. This [`Future`] wouldn't be resolved on abnormal closes. On
+    /// closing.
+    ///
+    /// This [`Future`] wouldn't be resolved on abnormal closes. On
     /// abnormal close [`RpcClient::on_connection_loss`] will be throwed.
     fn on_normal_close(
         &self,
@@ -361,11 +363,11 @@ struct Inner {
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Senders for [`RpcClient::on_connection_loss`].
+    /// Senders for [`RpcClient::on_connection_loss`] subs.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
-    /// Closure which will create new [`RpcTransport`] for this [`RpcClient`]
-    /// on every [`RpcClient::connect`] call.
+    /// Closure which will create new [`RpcTransport`]s for this [`RpcClient`]
+    /// on every [`WebSocketRpcClient::establish_connection`] call.
     rpc_transport_factory: RpcTransportFactory,
 
     /// Token with which this [`RpcClient`] was connected.
@@ -408,12 +410,12 @@ impl Inner {
     }
 
     /// Updates [`State`] of this [`WebSocketRpcClient`] and sends
-    /// update to all subs.
+    /// update to all [`RpcClient::on_state_change`] subs.
     ///
     /// Guarantees that two identical [`State`]s in a row doesn't
     /// will be sent.
     ///
-    /// Also, outdated [`State`] change subs will be cleaned here.
+    /// Also, outdated subs will be cleaned here.
     fn update_state(&mut self, state: &State) {
         if self.state.id() != state.id() {
             self.state = state.clone();
@@ -450,13 +452,13 @@ impl Inner {
 pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 impl WebSocketRpcClient {
-    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
-    /// milliseconds.
+    /// Creates new [`WebSocketRpcClient`] with provided [`RpcTransportFactory`]
+    /// closure.
     pub fn new(rpc_transport_factory: RpcTransportFactory) -> Self {
         Self(Inner::new(rpc_transport_factory))
     }
 
-    /// Function which will be called when [`RpcClient`] connection is
+    /// Will be called when [`RpcClient`] connection is
     /// considered as lost.
     ///
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
@@ -654,7 +656,7 @@ impl WebSocketRpcClient {
         Ok(())
     }
 
-    /// Subscribes to [`RpcClient`] [`State`] changes and when
+    /// Subscribes to [`RpcClient`]'s [`State`] changes and when
     /// [`State::Connecting`] will be changed to something else, then this
     /// [`Future`] will be resolved and based on new [`State`] [`Result`]
     /// will be returned.

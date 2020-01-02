@@ -22,8 +22,6 @@ use crate::{
 #[derive(Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
 
-type HeartbeatResult<T> = std::result::Result<T, Traced<HeartbeatError>>;
-
 /// Wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
 #[derive(Debug, From)]
 struct Abort(AbortHandle);
@@ -56,7 +54,7 @@ struct Inner {
     /// [`ServerMsg::Ping`].
     handle_ping_task: Option<Abort>,
 
-    /// [`Abort`] for idle resolver task.
+    /// [`Abort`] for idle watchdog.
     idle_watchdog_task: Option<Abort>,
 
     /// Number of last received [`ServerMsg::Ping`].
@@ -69,7 +67,7 @@ struct Inner {
 impl Inner {
     /// Sends [`ClientMsg::Pong`] to a server.
     ///
-    /// If some error happen then this will be printed with [`console_error`].
+    /// If some error happen then it will be printed with [`console_error`].
     fn send_pong(&self, n: u64) {
         self.transport
             .as_ref()
@@ -88,18 +86,19 @@ impl Inner {
     }
 }
 
-/// Service for sending/receiving ping/pongs between the client and server.
+/// Service for detecting connection loss through ping/pong mechanism.
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
-    /// Creates new [`Heartbeat`] with provided config.
+    /// Creates new [`Heartbeat`].
+    ///
+    /// By default `idle_timeout` will be set to 10 seconds and `ping_interval`
+    /// to 3 seconds. But this default values wouldn't be used anywhere. This
+    /// defaults is used only to avoid useless [`Option`] usage.
     pub fn new() -> Self {
-        // This default values will be not used anywhere. This is used
-        // only to avoid 'Option' usage.
-        let ping_interval = PingInterval(Duration::from_secs(3).into());
         Self(Rc::new(RefCell::new(Inner {
             idle_timeout: IdleTimeout(Duration::from_secs(10).into()),
-            ping_interval,
+            ping_interval: PingInterval(Duration::from_secs(3).into()),
             transport: None,
             handle_ping_task: None,
             on_idle_subs: Vec::new(),
@@ -108,13 +107,17 @@ impl Heartbeat {
         })))
     }
 
-    /// Start heartbeats for provided [`RpcTransport`].
+    /// Start heartbeating for provided [`RpcTransport`] with provided
+    /// `idle_timeout` and `ping_interval`.
+    ///
+    /// If heartbeating is already started then old settings, idle watchdog and
+    /// ponger will be cancelled.
     pub fn start(
         &self,
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
         transport: Rc<dyn RpcTransport>,
-    ) -> HeartbeatResult<()> {
+    ) -> Result<(), Traced<HeartbeatError>> {
         let mut on_message_stream = transport
             .on_message()
             .map_err(tracerr::map_from_and_wrap!())?;
@@ -141,7 +144,7 @@ impl Heartbeat {
         });
         spawn_local(async move {
             // Ignore this Abort error because aborting is normal behavior of
-            // Future.
+            // this Future.
             fut.await.ok();
         });
         self.0.borrow_mut().handle_ping_task = Some(pong_abort.into());
@@ -178,7 +181,7 @@ impl Heartbeat {
     /// Resets `idle_watchdog` task and sets new one.
     ///
     /// This watchdog is responsible for throwing [`Heartbeat::on_idle`] when
-    /// [`ServerMsg::Ping`] isn't received within `idle_timeout`.
+    /// [`ServerMsg`] isn't received within `idle_timeout`.
     ///
     /// Also this watchdog will try to send [`ClientMsg::Pong`] if
     /// [`ServerMsg::Ping`] wasn't received within `ping_interval * 2`.

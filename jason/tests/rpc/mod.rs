@@ -177,7 +177,7 @@ async fn send_goes_to_transport() {
         .return_once(|| stream::once(async { State::Open }).boxed());
     transport.expect_on_message().returning(|| {
         on_message_mock(RpcSettings {
-            idle_timeout_ms: 10000,
+            idle_timeout_ms: 10_000,
             ping_interval_ms: 500,
         })
     });
@@ -436,7 +436,7 @@ mod connect {
     /// 1. Create new [`WebSocketRpcClient`].
     ///
     /// 2. Call [`WebSocketRpcClient::connect`] and check that it successfully
-    /// resolved.
+    ///    resolved.
     #[wasm_bindgen_test]
     async fn closed() {
         let (test_tx, mut test_rx) = mpsc::unbounded();
@@ -471,7 +471,7 @@ mod connect {
     /// # Algorithm
     ///
     /// 1. Create new [`WebSocketRpcClient`] with [`RpcTransport`] factory which
-    /// will be resolved after 500 milliseconds.
+    ///    will be resolved after 500 milliseconds.
     ///
     /// 2. Call [`WebSocketRpcClient::connect`] in [`spawn_local`].
     ///

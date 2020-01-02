@@ -8,8 +8,9 @@ use crate::utils::{resolve_after, JsDuration};
 ///
 /// Delay time increasing will be stopped when
 /// [`BackoffDelayer::current_interval`] reaches
-/// [`BackoffDelayer::max_interval`]. First delay will be
-/// [`BackoffDelayer::current_interval`].
+/// [`BackoffDelayer::max_interval`].
+///
+/// First delay will be [`BackoffDelayer::current_interval`].
 pub struct BackoffDelayer {
     /// Delay of next [`BackoffDelayer::delay`] call.
     ///

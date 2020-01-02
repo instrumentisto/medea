@@ -296,8 +296,9 @@ impl WebSocketRpcTransport {
         }
     }
 
-    /// Sets [`WebSocketRpcTransport::on_close_listener`] which will send
-    /// [`CloseMsg`]s to [`WebSocketRpcTransport::on_close`].
+    /// Sets [`WebSocketRpcTransport::on_close_listener`] which.will update
+    /// [`RpcTransport`] [`State`] to [`State::Closed`] with
+    /// [`ClosedStateReason::ConnectionLoss`] with [`CloseMsg`].
     fn set_on_close_listener(&self) -> Result<()> {
         let weak_transport = Rc::downgrade(&self.0);
         let on_close = EventListener::new_once(
@@ -327,7 +328,7 @@ impl WebSocketRpcTransport {
     }
 
     /// Sets [`WebSocketRpcTransport::on_message_listener`] which will send
-    /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`].
+    /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subs.
     fn set_on_message_listener(&self) -> Result<()> {
         let weak_transport = Rc::downgrade(&self.0);
         let on_message = EventListener::new_mut(

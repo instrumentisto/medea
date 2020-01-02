@@ -476,7 +476,7 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_stream: Rc<Callback<JasonError>>,
 
-    /// Callback to be invoked when [`RpcClient`] loss connection.
+    /// Callback to be invoked when [`RpcClient`] loses connection.
     on_connection_loss: Callback<ReconnectorHandle>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
