@@ -60,7 +60,7 @@ async fn sends_pong_on_received_ping() {
     .unwrap();
 }
 
-/// Tests that IDLE timeout works.
+/// Tests that idle timeout works.
 ///
 /// # Algorithm
 ///

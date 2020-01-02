@@ -9,7 +9,9 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 pub use medea_macro::JsCaused;
 
-/// Prints provided argument with `console.error()`.
+/// Prints provided message with [`Console.error()`].
+///
+/// [`Console.error()`]: https://tinyurl.com/psv3wqw
 pub fn console_error<M>(msg: M)
 where
     M: Into<JsValue>,

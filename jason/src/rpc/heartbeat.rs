@@ -166,7 +166,7 @@ impl Heartbeat {
         self.0.borrow_mut().ping_interval = ping_interval;
     }
 
-    /// Returns [`LocalBoxStream`] to which will be sent unit message when
+    /// Returns [`LocalBoxStream`] to which will be sent `()` when
     /// [`Heartbeat`] considers that [`RpcTransport`] is idle.
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
@@ -178,9 +178,9 @@ impl Heartbeat {
     /// Resets `idle_watchdog` task and sets new one.
     ///
     /// This watchdog is responsible for throwing [`Heartbeat::on_idle`] when
-    /// [`ServerMsg::Ping`] isn't received withing `idle_timeout`.
+    /// [`ServerMsg::Ping`] isn't received within `idle_timeout`.
     ///
-    /// Also this watchdog will try send [`ClientMsg::Pong`] if
+    /// Also this watchdog will try to send [`ClientMsg::Pong`] if
     /// [`ServerMsg::Ping`] wasn't received within `ping_interval * 2`.
     fn reset_idle_watchdog(&self) {
         self.0.borrow_mut().idle_watchdog_task.take();

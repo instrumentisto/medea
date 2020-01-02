@@ -75,8 +75,7 @@ impl TryFrom<&MessageEvent> for ServerMessage {
         let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(|e| e.to_string())
-            .map_err(ParseServerMessage)
+            .map_err(|e| ParseServerMessage(e.to_string()))
             .map(Self::from)
     }
 }
@@ -173,7 +172,7 @@ impl InnerSocket {
 
     /// Updates `socket_state` with provided [`State`].
     ///
-    /// Sends updated [`State`] to the `on_state_change` subscribers. But
+    /// Sends updated [`State`] to a `on_state_change` subscribers. But
     /// if [`State`] is not changed, nothing will be sent.
     fn update_socket_state(&mut self, new_state: &State) {
         if self.socket_state.id() != new_state.id() {
@@ -210,8 +209,7 @@ impl RpcTransport for WebSocketRpcTransport {
     fn send(&self, msg: &ClientMsg) -> Result<()> {
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
-            .map_err(|e| e.to_string())
-            .map_err(TransportError::ParseClientMessage)
+            .map_err(|e| TransportError::ParseClientMessage(e.to_string()))
             .map_err(tracerr::wrap!())?;
 
         match inner.socket_state {

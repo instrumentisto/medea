@@ -9,7 +9,9 @@ use std::{collections::HashMap, rc::Rc};
 use futures::{
     channel::{mpsc, oneshot},
     future::{self},
-    stream, StreamExt as _,
+    stream,
+    stream::LocalBoxStream,
+    StreamExt as _,
 };
 use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
@@ -25,10 +27,20 @@ use crate::await_with_timeout;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+/// Creates [`WebSocketRpcClient`] with provided [`MockRpcTransport`] [`Rc`].
 fn new_client(transport: Rc<MockRpcTransport>) -> WebSocketRpcClient {
     WebSocketRpcClient::new(Box::new(move |_| {
         Box::pin(future::ok(transport.clone() as Rc<dyn RpcTransport>))
     }))
+}
+
+/// Returns result for [`RpcTransport::on_message`] with [`LocalBoxStream`]
+/// which will only send [`ServerMsg::RpcSettings`] with provided
+/// [`RpcSettings`].
+fn on_message_mock<E>(
+    settings: RpcSettings,
+) -> Result<LocalBoxStream<'static, ServerMsg>, E> {
+    Ok(stream::once(async move { ServerMsg::RpcSettings(settings) }).boxed())
 }
 
 /// Tests [`WebSocketRpcClient::subscribe`] function.
@@ -56,8 +68,8 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
         transport.expect_on_message().returning(|| {
             let (tx, rx) = mpsc::unbounded();
             tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
-                idle_timeout_ms: 10000,
-                ping_interval_ms: 10000,
+                idle_timeout_ms: 10_000,
+                ping_interval_ms: 10_000,
             }))
             .unwrap();
             tx.unbounded_send(ServerMsg::Event(SRV_EVENT)).unwrap();
@@ -128,13 +140,10 @@ async fn transport_is_dropped_when_client_is_dropped() {
         .expect_on_state_change()
         .return_once(|| stream::once(async { State::Open }).boxed());
     transport.expect_on_message().returning(|| {
-        let (tx, rx) = mpsc::unbounded();
-        tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
-            idle_timeout_ms: 10000,
+        on_message_mock(RpcSettings {
+            idle_timeout_ms: 10_000,
             ping_interval_ms: 500,
-        }))
-        .unwrap();
-        Ok(rx.boxed())
+        })
     });
     let rpc_transport = Rc::new(transport);
 
@@ -167,13 +176,10 @@ async fn send_goes_to_transport() {
         .expect_on_state_change()
         .return_once(|| stream::once(async { State::Open }).boxed());
     transport.expect_on_message().returning(|| {
-        let (tx, rx) = mpsc::unbounded();
-        tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+        on_message_mock(RpcSettings {
             idle_timeout_ms: 10000,
             ping_interval_ms: 500,
-        }))
-        .unwrap();
-        Ok(rx.boxed())
+        })
     });
     transport.expect_send().returning(move |e| {
         on_send_tx.unbounded_send(e.clone()).unwrap();
@@ -240,13 +246,10 @@ mod on_close {
             rx.boxed()
         });
         transport.expect_on_message().returning(|| {
-            let (tx, rx) = mpsc::unbounded();
-            tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
-                idle_timeout_ms: 10000,
+            on_message_mock(RpcSettings {
+                idle_timeout_ms: 10_000,
                 ping_interval_ms: 500,
-            }))
-            .unwrap();
-            Ok(rx.boxed())
+            })
         });
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
@@ -338,13 +341,10 @@ mod transport_close_reason_on_drop {
             .expect_on_state_change()
             .return_once(|| stream::once(async { State::Open }).boxed());
         transport.expect_on_message().returning(|| {
-            let (tx, rx) = mpsc::unbounded();
-            tx.unbounded_send(ServerMsg::RpcSettings(RpcSettings {
+            on_message_mock(RpcSettings {
                 idle_timeout_ms: 10000,
                 ping_interval_ms: 500,
-            }))
-            .unwrap();
-            Ok(rx.boxed())
+            })
         });
         transport.expect_send().return_once(|_| Ok(()));
         let (test_tx, test_rx) = oneshot::channel();
@@ -428,6 +428,15 @@ mod connect {
 
     use super::*;
 
+    /// Tests that new connection will be created if [`RpcClient`] is in
+    /// [`State::Closed`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create new [`WebSocketRpcClient`].
+    ///
+    /// 2. Call [`WebSocketRpcClient::connect`] and check that it successfully
+    /// resolved.
     #[wasm_bindgen_test]
     async fn closed() {
         let (test_tx, mut test_rx) = mpsc::unbounded();
@@ -435,13 +444,10 @@ mod connect {
             test_tx.unbounded_send(()).unwrap();
             let mut transport = MockRpcTransport::new();
             transport.expect_on_message().times(3).returning(|| {
-                Ok(stream::once(async move {
-                    ServerMsg::RpcSettings(RpcSettings {
-                        idle_timeout_ms: 3000,
-                        ping_interval_ms: 3000,
-                    })
+                on_message_mock(RpcSettings {
+                    idle_timeout_ms: 3_000,
+                    ping_interval_ms: 3_000,
                 })
-                .boxed())
             });
             transport.expect_send().return_once(|_| Ok(()));
             transport.expect_set_close_reason().return_once(|_| ());
@@ -459,6 +465,19 @@ mod connect {
             .unwrap();
     }
 
+    /// Tests that new connection try will be not started if
+    /// [`WebSocketRpcClient`] is already in [`State::Connecting`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create new [`WebSocketRpcClient`] with [`RpcTransport`] factory which
+    /// will be resolved after 500 milliseconds.
+    ///
+    /// 2. Call [`WebSocketRpcClient::connect`] in [`spawn_local`].
+    ///
+    /// 3. Simultaneously with it call another [`WebSocketRpcClient::connect`].
+    ///
+    /// 4. Check that only one [`RpcTransport`] was created.
     #[wasm_bindgen_test]
     async fn connecting() {
         let mut connecting_count: i32 = 0;
@@ -466,13 +485,10 @@ mod connect {
             Box::pin(async move {
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().times(3).returning(|| {
-                    Ok(stream::once(async move {
-                        ServerMsg::RpcSettings(RpcSettings {
-                            idle_timeout_ms: 3000,
-                            ping_interval_ms: 3000,
-                        })
+                    on_message_mock(RpcSettings {
+                        idle_timeout_ms: 3_000,
+                        ping_interval_ms: 3_000,
                     })
-                    .boxed())
                 });
                 transport.expect_send().return_once(|_| Ok(()));
                 transport.expect_set_close_reason().return_once(|_| ());
@@ -482,14 +498,14 @@ mod connect {
                 let transport = Rc::new(transport);
                 connecting_count += 1;
                 if connecting_count > 1 {
-                    Ok(Rc::clone(&transport) as Rc<dyn RpcTransport>)
+                    unreachable!("New connection try was performed!");
                 } else {
                     resolve_after(500).await.unwrap();
                     Ok(Rc::clone(&transport) as Rc<dyn RpcTransport>)
                 }
             })
         }));
-        let first_connect_fut = ws.connect("asdf".to_string());
+        let first_connect_fut = ws.connect(String::new());
         spawn_local(async move {
             first_connect_fut.await.unwrap();
         });
@@ -500,6 +516,16 @@ mod connect {
             .unwrap();
     }
 
+    /// Tests that [`WebSocketRpcClient::connect`] will be instantly resolved
+    /// if [`State`] is already [`State::Open`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Normally connect [`WebSocketRpcClient`].
+    ///
+    /// 2. Call [`WebSocketRpcClient::connect`] again.
+    ///
+    /// 3. Check that only one [`RpcTransport`] was created.
     #[wasm_bindgen_test]
     async fn open() {
         let mut connection_count = 0;
@@ -507,17 +533,14 @@ mod connect {
             Box::pin(async move {
                 connection_count += 1;
                 if connection_count > 1 {
-                    panic!();
+                    unreachable!("Only one connection should be performed!");
                 }
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().times(3).returning(|| {
-                    Ok(stream::once(async move {
-                        ServerMsg::RpcSettings(RpcSettings {
-                            idle_timeout_ms: 3000,
-                            ping_interval_ms: 3000,
-                        })
+                    on_message_mock(RpcSettings {
+                        idle_timeout_ms: 3_000,
+                        ping_interval_ms: 3_000,
                     })
-                    .boxed())
                 });
                 transport.expect_send().return_once(|_| Ok(()));
                 transport.expect_set_close_reason().return_once(|_| ());

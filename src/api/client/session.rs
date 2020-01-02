@@ -699,6 +699,3 @@ mod test {
         assert_eq!(item, Some(event));
     }
 }
-
-// TODO: adapt tests from instrumentisto/medea#76 when they will be
-//                    merged into master.

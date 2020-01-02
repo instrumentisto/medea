@@ -6,8 +6,9 @@ use crate::utils::{resolve_after, JsDuration};
 /// Delayer which increases delay time by provided multiplier on every delay
 /// call
 ///
-/// Delay time increasing will be stopped when [`BackoffDelayer::max_interval`]
-/// milliseconds of `current_delay` will be reached. First delay will be
+/// Delay time increasing will be stopped when
+/// [`BackoffDelayer::current_interval`] reaches
+/// [`BackoffDelayer::max_interval`]. First delay will be
 /// [`BackoffDelayer::current_interval`].
 pub struct BackoffDelayer {
     /// Delay of next [`BackoffDelayer::delay`] call.

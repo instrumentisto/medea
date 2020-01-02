@@ -1,4 +1,4 @@
-//! Implementation of reconnector for the [`RpcClient`].
+//! Implementation of reconnector for a [`RpcClient`].
 
 use std::{rc::Weak, time::Duration};
 
@@ -38,6 +38,10 @@ impl ReconnectorHandle {
 #[wasm_bindgen]
 impl ReconnectorHandle {
     /// Tries to reconnect after provided delay in milliseconds.
+    ///
+    /// If [`RpcClient`] is already reconnecting then new reconenction try
+    /// wouldn't be performed. Instead of this, this function will wait for
+    /// first reconnection try result and use it here.
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
         let rpc = Clone::clone(&self.0);
         future_to_promise(async move {
@@ -70,6 +74,10 @@ impl ReconnectorHandle {
     ///
     /// After each reconnection try, delay between reconnections will be
     /// multiplied by `multiplier` until it reaches `max_delay_ms`.
+    ///
+    /// If [`RpcClient`] is already reconnecting then new reconenction try
+    /// wouldn't be performed. Instead of this, this function will wait for
+    /// first reconnection try result and use it here.
     pub fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
