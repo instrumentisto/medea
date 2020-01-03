@@ -173,6 +173,12 @@ pub struct CloseDescription {
     pub reason: CloseReason,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
+pub enum IceTransportPolicy {
+    All,
+    Relay,
+}
+
 /// WebSocket message from Medea to Jason.
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
@@ -186,6 +192,7 @@ pub enum Event {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
+        ice_transport_policy: IceTransportPolicy,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.

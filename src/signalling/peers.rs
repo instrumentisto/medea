@@ -9,7 +9,9 @@ use std::{
 };
 
 use derive_more::Display;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use medea_client_api_proto::{
+    IceTransportPolicy, Incrementable, PeerId, TrackId,
+};
 
 use crate::{
     api::control::MemberId,
@@ -83,6 +85,7 @@ impl PeerRepository {
         &mut self,
         first_member: &Member,
         second_member: &Member,
+        ice_transport_policy: IceTransportPolicy,
     ) -> (Peer<New>, Peer<New>) {
         let first_member_id = first_member.id();
         let second_member_id = second_member.id();
@@ -99,12 +102,14 @@ impl PeerRepository {
             first_member_id.clone(),
             second_peer_id,
             second_member_id.clone(),
+            ice_transport_policy,
         );
         let second_peer = Peer::new(
             second_peer_id,
             second_member_id,
             first_peer_id,
             first_member_id,
+            ice_transport_policy,
         );
 
         (first_peer, second_peer)
@@ -311,7 +316,7 @@ impl PeerRepository {
             self.add_peer(sink_peer);
         } else {
             let (mut src_peer, mut sink_peer) =
-                self.create_peers(&src_owner, &sink_owner);
+                self.create_peers(&src_owner, &sink_owner, src.p2p().into());
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 

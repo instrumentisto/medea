@@ -1,15 +1,15 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, IceTransportPolicy};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
-    RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
-    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
-    RtcTrackEvent,
+    RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
+    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
+    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
+    RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
@@ -211,12 +211,20 @@ pub struct RtcPeerConnection {
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
-    pub fn new<I>(ice_servers: I) -> Result<Self>
+    pub fn new<I>(
+        ice_servers: I,
+        ice_transport_policy: IceTransportPolicy,
+    ) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
         // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
+        let ice_transport_policy = match ice_transport_policy {
+            IceTransportPolicy::All => RtcIceTransportPolicy::All,
+            IceTransportPolicy::Relay => RtcIceTransportPolicy::Relay,
+        };
+        peer_conf.ice_transport_policy(ice_transport_policy);
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
             .map_err(Into::into)

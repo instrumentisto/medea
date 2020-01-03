@@ -248,6 +248,7 @@ impl Room {
             sdp_offer: None,
             tracks: sender.tracks(),
             ice_servers,
+            ice_transport_policy: sender.ice_transport_policy(),
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
@@ -816,6 +817,7 @@ impl CommandHandler for Room {
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
+            ice_transport_policy: to_peer.ice_transport_policy(),
         };
 
         self.peers.add_peer(from_peer);

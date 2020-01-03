@@ -12,7 +12,8 @@ use futures::{channel::mpsc, stream, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
+    IceConnectionState, IceServer, IceTransportPolicy, PeerId, PeerMetrics,
+    Track,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -540,6 +541,7 @@ impl EventHandler for InnerRoom {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
+        ice_transport_policy: IceTransportPolicy,
     ) {
         let peer = match self
             .peers
@@ -549,6 +551,7 @@ impl EventHandler for InnerRoom {
                 self.peer_event_sender.clone(),
                 self.enabled_audio,
                 self.enabled_video,
+                ice_transport_policy,
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {

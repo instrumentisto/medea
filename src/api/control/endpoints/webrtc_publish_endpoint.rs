@@ -5,6 +5,7 @@
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
+use medea_client_api_proto::IceTransportPolicy;
 use medea_control_api_proto::grpc::api::{
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
@@ -45,6 +46,15 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
             Self::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
             Self::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
             Self::Never => WebRtcPublishEndpointP2pProto::NEVER,
+        }
+    }
+}
+
+impl Into<IceTransportPolicy> for P2pMode {
+    fn into(self) -> IceTransportPolicy {
+        match self {
+            Self::Always | Self::IfPossible => IceTransportPolicy::All,
+            Self::Never => IceTransportPolicy::Relay,
         }
     }
 }

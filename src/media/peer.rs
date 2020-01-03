@@ -9,8 +9,8 @@ use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
-    VideoSettings,
+    AudioSettings, Direction, IceTransportPolicy, MediaType, PeerId as Id,
+    Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -70,6 +70,7 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn ice_transport_policy(&self) -> IceTransportPolicy)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -151,6 +152,7 @@ pub struct Context {
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
+    ice_transport_policy: IceTransportPolicy,
 }
 
 /// [RTCPeerConnection] representation.
@@ -223,6 +225,10 @@ impl<T> Peer<T> {
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
+
+    pub fn ice_transport_policy(&self) -> IceTransportPolicy {
+        self.context.ice_transport_policy
+    }
 }
 
 impl Peer<New> {
@@ -234,6 +240,7 @@ impl Peer<New> {
         member_id: MemberId,
         partner_peer: Id,
         partner_member: MemberId,
+        ice_transport_policy: IceTransportPolicy,
     ) -> Self {
         let context = Context {
             id,
@@ -244,6 +251,7 @@ impl Peer<New> {
             sdp_answer: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
+            ice_transport_policy,
         };
         Self {
             context,
