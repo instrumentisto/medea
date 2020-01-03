@@ -1,5 +1,10 @@
 //! Helper utils used in project.
 
+use std::pin::Pin;
+
+use futures::Future;
+use actix::{prelude::*, prelude::dev::*};
+
 /// Creates new [`HashMap`] from a list of key-value pairs.
 ///
 /// # Example
@@ -32,4 +37,23 @@ macro_rules! hashmap {
             _map
         }
     };
+}
+
+#[derive(derive_more::From)]
+pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
+
+impl<A, M, T: 'static> MessageResponse<A, M> for ResponseAnyFuture<T>
+    where
+        A: Actor,
+        M::Result: Send,
+        M: Message<Result = T>,
+        A::Context: AsyncContext<A>,
+{
+    fn handle<R: ResponseChannel<M>>(self, _: &mut A::Context, tx: Option<R>) {
+        Arbiter::spawn(async move {
+            if let Some(tx) = tx {
+                tx.send(self.0.await)
+            }
+        });
+    }
 }

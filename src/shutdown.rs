@@ -69,7 +69,7 @@ impl Actor for GracefulShutdown {
     fn started(&mut self, _: &mut Self::Context) {
         warn!(
             "Graceful shutdown is disabled: only UNIX signals are supported, \
-             and current playform is not UNIX"
+             and current platform is not UNIX"
         );
     }
 
@@ -125,12 +125,12 @@ impl Handler<OsSignal> for GracefulShutdown {
             return;
         }
 
-        let ordered_subs: Vec<_> = self
+        let ordered_subs: Vec<Vec<_>> = self
             .subs
             .values()
             .rev()
             .map(|addrs| {
-                let addrs: Vec<_> = addrs
+                let addrs = addrs
                     .iter()
                     .map(|addr| async {
                         let send_result = addr.send(ShutdownGracefully).await;
@@ -148,7 +148,7 @@ impl Handler<OsSignal> for GracefulShutdown {
             .collect();
 
         Box::new(
-            iter_ok::<_, ()>(by_priority)
+            stream::iter(ordered_subs)
                 .for_each(|row| row.map(|_| ()))
                 .timeout(self.timeout)
                 .map_err(|_| {
