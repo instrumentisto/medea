@@ -1,5 +1,5 @@
 use actix::{Context, System};
-use medea_client_api_proto::{Direction, Event};
+use medea_client_api_proto::{Direction, Event, IceTransportPolicy};
 
 use crate::signalling::TestMember;
 
@@ -30,6 +30,7 @@ fn pub_sub_video_call() {
                     sdp_offer,
                     tracks,
                     ice_servers,
+                    ice_transport_policy,
                 } = &events[0]
                 {
                     assert_eq!(ice_servers.len(), 2);
@@ -44,6 +45,10 @@ fn pub_sub_video_call() {
                     assert_eq!(
                         ice_servers[1].urls[1],
                         "turn:localhost:3478?transport=tcp".to_string()
+                    );
+                    assert_eq!(
+                        ice_transport_policy,
+                        &IceTransportPolicy::Relay
                     );
 
                     if sdp_offer.is_some() {

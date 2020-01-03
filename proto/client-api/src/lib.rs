@@ -173,7 +173,7 @@ pub struct CloseDescription {
     pub reason: CloseReason,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy, Eq)]
 pub enum IceTransportPolicy {
     All,
     Relay,

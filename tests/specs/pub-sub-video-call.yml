@@ -10,7 +10,7 @@ spec:
           publish:
             kind: WebRtcPublishEndpoint
             spec:
-              p2p: Always
+              p2p: Never
     responder:
       kind: Member
       credentials: test
