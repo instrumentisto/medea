@@ -14,7 +14,8 @@ All user visible changes to this project will be documented in this file. This p
 - `TrackId` and `PeerId` types ([#28]);
 - `Incrementable` trait ([#28]);
 - `CloseReason` and `CloseDescription` types ([#58](/../../pull/58));
-- `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71)).
+- `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71));
+- `is_relay` into `Event::PeerCreated` ([#78](/../../pull/78)).
 
 [#28]: /../../pull/28
 
