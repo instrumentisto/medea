@@ -32,7 +32,7 @@ All user visible changes to this project will be documented in this file. This p
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58](/../../pull/58));
-    - Send relay mode in `Event::PeerCreated` which will be used in client side's `RtcIceTransportPolicy` ([#78](/../../pull/78)).
+    - Send relay mode in `Event::PeerCreated` which will be used in client side's `RtcIceTransportPolicy` ([#79](/../../pull/79)).
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]).
