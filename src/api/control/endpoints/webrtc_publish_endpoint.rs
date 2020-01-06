@@ -56,6 +56,7 @@ pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
 
+    /// If 'true' then all media will be relayed through TURN server.
     #[serde(default)]
     pub is_relay: bool,
 }

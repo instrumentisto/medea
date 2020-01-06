@@ -163,6 +163,7 @@ message WebRtcPublishEndpoint {
   string on_start = 3;
   // Callback which fires when a client stops publishing media data.
   string on_stop = 4;
+  // If 'true' then all media will be relayed through TURN server.
   bool is_relay = 5;
 
   // P2P mode of WebRTC interaction.

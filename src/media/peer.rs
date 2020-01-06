@@ -226,6 +226,7 @@ impl<T> Peer<T> {
         !self.context.senders.is_empty()
     }
 
+    /// If 'true' is returned then all media should be relayed through TURN server.
     pub fn is_relay(&self) -> bool {
         self.context.is_relay
     }

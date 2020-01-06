@@ -32,6 +32,7 @@ struct WebRtcPublishEndpointInner {
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 
+    /// If 'true' then all media will be relayed through TURN server.
     is_relay: bool,
 
     /// All sinks of this [`WebRtcPublishEndpoint`].
