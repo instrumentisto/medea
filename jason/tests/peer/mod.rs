@@ -5,7 +5,7 @@ mod media;
 use std::rc::Rc;
 
 use futures::{channel::mpsc, StreamExt as _};
-use medea_client_api_proto::{IceConnectionState, IceTransportPolicy, PeerId};
+use medea_client_api_proto::{IceConnectionState, PeerId};
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent},
@@ -28,7 +28,7 @@ async fn mute_unmute_audio() {
         manager,
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
 
@@ -60,7 +60,7 @@ async fn mute_unmute_video() {
         manager,
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -91,7 +91,7 @@ async fn new_with_mute_audio() {
         manager,
         false,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
 
@@ -115,7 +115,7 @@ async fn new_with_mute_video() {
         manager,
         true,
         false,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -139,7 +139,7 @@ async fn add_candidates_to_answerer_before_offer() {
         Rc::clone(&manager),
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
 
@@ -150,7 +150,7 @@ async fn add_candidates_to_answerer_before_offer() {
         manager,
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     let (audio_track, video_track) = get_test_tracks();
@@ -183,7 +183,7 @@ async fn add_candidates_to_offerer_before_answer() {
             Rc::clone(&manager),
             true,
             true,
-            IceTransportPolicy::All,
+            false,
         )
         .unwrap(),
     );
@@ -195,7 +195,7 @@ async fn add_candidates_to_offerer_before_answer() {
             manager,
             true,
             true,
-            IceTransportPolicy::All,
+            false,
         )
         .unwrap(),
     );
@@ -229,7 +229,7 @@ async fn normal_exchange_of_candidates() {
         Rc::clone(&manager),
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -239,7 +239,7 @@ async fn normal_exchange_of_candidates() {
         manager,
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     let (audio_track, video_track) = get_test_tracks();
@@ -303,7 +303,7 @@ async fn send_event_on_new_local_stream() {
         manager,
         true,
         false,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -337,7 +337,7 @@ async fn ice_connection_state_changed_is_emitted() {
         Rc::clone(&manager),
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -347,7 +347,7 @@ async fn ice_connection_state_changed_is_emitted() {
         manager,
         true,
         true,
-        IceTransportPolicy::All,
+        false,
     )
     .unwrap();
     let (audio_track, video_track) = get_test_tracks();

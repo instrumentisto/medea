@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{Event, IceServer, IceTransportPolicy, PeerId};
+use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
@@ -33,7 +33,7 @@ fn get_test_room_and_exist_peer(
             Rc::new(MediaManager::default()),
             true,
             true,
-            IceTransportPolicy::All,
+            false,
         )
         .unwrap(),
     );
@@ -103,7 +103,7 @@ fn get_test_room_and_new_peer(
             Rc::new(MediaManager::default()),
             with_enabled_audio,
             with_enabled_video,
-            IceTransportPolicy::All,
+            false,
         )
         .unwrap(),
     );
@@ -115,7 +115,7 @@ fn get_test_room_and_new_peer(
                   _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
                   enabled_audio: &bool,
                   enabled_video: &bool,
-                  _ice_transport_policy: &IceTransportPolicy| {
+                  _is_relay: &bool| {
                 *id == PeerId(1)
                     && *enabled_audio == with_enabled_audio
                     && *enabled_video == with_enabled_video
@@ -143,7 +143,7 @@ async fn mute_audio_room_before_init_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            ice_transport_policy: IceTransportPolicy::All,
+            is_relay: false,
         })
         .unwrap();
 
@@ -166,7 +166,7 @@ async fn mute_video_room_before_init_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            ice_transport_policy: IceTransportPolicy::All,
+            is_relay: false,
         })
         .unwrap();
 
@@ -218,7 +218,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            ice_transport_policy: IceTransportPolicy::All,
+            is_relay: false,
         })
         .unwrap();
 
@@ -291,7 +291,7 @@ async fn error_get_local_stream_on_new_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            ice_transport_policy: IceTransportPolicy::All,
+            is_relay: false,
         })
         .unwrap();
 

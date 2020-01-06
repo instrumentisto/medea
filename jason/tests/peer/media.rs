@@ -2,7 +2,7 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use medea_client_api_proto::{IceTransportPolicy, TrackId};
+use medea_client_api_proto::{TrackId};
 use medea_jason::{
     media::MediaManager,
     peer::{
@@ -22,7 +22,7 @@ async fn get_test_media_connections(
 ) -> (MediaConnections, TrackId, TrackId) {
     let media_connections = MediaConnections::new(
         Rc::new(
-            RtcPeerConnection::new(vec![], IceTransportPolicy::All).unwrap(),
+            RtcPeerConnection::new(vec![], false).unwrap(),
         ),
         enabled_audio,
         enabled_video,
@@ -50,7 +50,7 @@ async fn get_test_media_connections(
 fn get_stream_request() {
     let media_connections = MediaConnections::new(
         Rc::new(
-            RtcPeerConnection::new(vec![], IceTransportPolicy::All).unwrap(),
+            RtcPeerConnection::new(vec![], false).unwrap(),
         ),
         true,
         true,
@@ -64,7 +64,7 @@ fn get_stream_request() {
 
     let media_connections = MediaConnections::new(
         Rc::new(
-            RtcPeerConnection::new(vec![], IceTransportPolicy::All).unwrap(),
+            RtcPeerConnection::new(vec![], false).unwrap(),
         ),
         true,
         true,
