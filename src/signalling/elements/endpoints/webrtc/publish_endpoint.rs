@@ -199,6 +199,8 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().p2p
     }
 
+    /// If 'true' is returned then all media should be relayed through TURN
+    /// server.
     pub fn is_relay(&self) -> bool {
         self.0.borrow().is_relay
     }

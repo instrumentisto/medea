@@ -553,7 +553,7 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         publish_id: WebRtcPublishId,
-        spec: WebRtcPublishEndpointSpec,
+        spec: &WebRtcPublishEndpointSpec,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -1273,7 +1273,7 @@ impl Handler<CreateEndpoint> for Room {
                 self.create_src_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
-                    endpoint,
+                    &endpoint,
                 )?;
             }
         }

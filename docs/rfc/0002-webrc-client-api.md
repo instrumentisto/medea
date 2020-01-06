@@ -1099,84 +1099,84 @@ Metrics list will be extended as needed.
 
 1. `Media Server` sends `PeerCreated` event to `user1`:
 
-  ```json
-  {
-    "event": "PeerCreated",
-    "data": {
-      "peer_id": 1,
-      "tracks": [
-        {
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [
-                2
-              ],
-              "mid": null
+    ```json
+    {
+      "event": "PeerCreated",
+      "data": {
+        "peer_id": 1,
+        "tracks": [
+          {
+            "id": 1,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": [
+                  2
+                ],
+                "mid": null
+              }
             }
-          }
-        },
-        {
-          "id": 2,
-          "media_type": {
-            "Video": {
+          },
+          {
+            "id": 2,
+            "media_type": {
+              "Video": {
 
+              }
+            },
+            "direction": {
+              "Send": {
+                "receivers": [
+                  2
+                ],
+                "mid": null
+              }
             }
           },
-          "direction": {
-            "Send": {
-              "receivers": [
-                2
-              ],
-              "mid": null
-            }
-          }
-        },
-        {
-          "id": 3,
-          "media_type": {
-            "Audio": {
+          {
+            "id": 3,
+            "media_type": {
+              "Audio": {
 
+              }
+            },
+            "direction": {
+              "Recv": {
+                "sender": 2,
+                "mid": null
+              }
             }
           },
-          "direction": {
-            "Recv": {
-              "sender": 2,
-              "mid": null
+          {
+            "id": 4,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 2,
+                "mid": null
+              }
             }
           }
-        },
-        {
-          "id": 4,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 2,
-              "mid": null
-            }
+        ],
+        "sdp_offer": null,
+        "ice_servers": [
+          {
+            "urls": [
+              "turn:turnserver.com:3478",
+              "turn:turnserver.com:3478?transport=tcp"
+            ],
+            "username": "turn_user",
+            "credential": "turn_credential"
           }
-        }
-      ],
-      "sdp_offer": null,
-      "ice_servers": [
-        {
-          "urls": [
-            "turn:turnserver.com:3478",
-            "turn:turnserver.com:3478?transport=tcp"
-          ],
-          "username": "turn_user",
-          "credential": "turn_credential"
-        }
-      ],
-      "is_relay": false
+        ],
+        "is_relay": false
+      }
     }
-  }
-  ```
+    ```
  
 2. `user1` answers with [SDP Offer]:
 
@@ -1496,6 +1496,35 @@ Metrics list will be extended as needed.
 
 15. `Media Server` updates `user1` `Track`s:
 
+    ```json
+    {
+      "event": "TracksApplied",
+      "data": {
+        "peer_id": 1,
+        "tracks": [{
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2]
+            }
+          }
+        }, {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2]
+            }
+          }
+        }]
+      }
+    }
+    ```
 
 16. SDP re-negotiation: 
 

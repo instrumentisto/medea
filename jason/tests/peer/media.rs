@@ -2,7 +2,7 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use medea_client_api_proto::{TrackId};
+use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
     peer::{
@@ -21,9 +21,7 @@ async fn get_test_media_connections(
     enabled_video: bool,
 ) -> (MediaConnections, TrackId, TrackId) {
     let media_connections = MediaConnections::new(
-        Rc::new(
-            RtcPeerConnection::new(vec![], false).unwrap(),
-        ),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
         enabled_audio,
         enabled_video,
     );
@@ -49,9 +47,7 @@ async fn get_test_media_connections(
 #[wasm_bindgen_test]
 fn get_stream_request() {
     let media_connections = MediaConnections::new(
-        Rc::new(
-            RtcPeerConnection::new(vec![], false).unwrap(),
-        ),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
         true,
         true,
     );
@@ -63,9 +59,7 @@ fn get_stream_request() {
     assert!(request.is_some());
 
     let media_connections = MediaConnections::new(
-        Rc::new(
-            RtcPeerConnection::new(vec![], false).unwrap(),
-        ),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
         true,
         true,
     );

@@ -140,7 +140,6 @@ const controlDebugWindows = {
         case 'WebRtcPublishEndpoint':
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
           let isRelay = container.getElementsByClassName('webrtc-publish-endpoint-spec__is-relay')[0].value === 'true';
-          console.log(isRelay);
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             p2p: p2pMode,
