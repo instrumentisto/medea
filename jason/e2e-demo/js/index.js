@@ -17,7 +17,8 @@ async function createRoom(roomId, memberId) {
           pipeline: {
             publish: {
               kind: 'WebRtcPublishEndpoint',
-              p2p: 'Always'
+              p2p: 'Always',
+              is_relay: false
             },
           },
           on_join: "grpc://127.0.0.1:9099",
@@ -36,7 +37,8 @@ async function createMember(roomId, memberId) {
   let pipeline = {
     publish: {
       kind: 'WebRtcPublishEndpoint',
-      p2p: 'Always'
+      p2p: 'Always',
+      is_relay: false
     }
   };
 
@@ -137,9 +139,12 @@ const controlDebugWindows = {
       switch (endpointType) {
         case 'WebRtcPublishEndpoint':
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
+          let isRelay = container.getElementsByClassName('webrtc-publish-endpoint-spec__is-relay')[0].value === 'true';
+          console.log(isRelay);
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             p2p: p2pMode,
+            is_relay: isRelay,
           });
           break;
         case 'WebRtcPlayEndpoint':

@@ -248,7 +248,7 @@ impl Room {
             sdp_offer: None,
             tracks: sender.tracks(),
             ice_servers,
-            ice_transport_policy: sender.ice_transport_policy(),
+            is_relay: sender.is_relay(),
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
@@ -574,6 +574,7 @@ impl Room {
             String::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
+            spec.is_relay,
         );
 
         debug!(
@@ -682,8 +683,9 @@ impl Room {
         for (id, publish) in spec.publish_endpoints() {
             let signalling_publish = WebRtcPublishEndpoint::new(
                 id.clone(),
-                publish.p2p.clone(),
+                publish.p2p,
                 signalling_member.downgrade(),
+                publish.is_relay,
             );
             signalling_member.insert_src(signalling_publish);
         }
@@ -817,7 +819,7 @@ impl CommandHandler for Room {
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
-            ice_transport_policy: to_peer.ice_transport_policy(),
+            is_relay: to_peer.is_relay(),
         };
 
         self.peers.add_peer(from_peer);

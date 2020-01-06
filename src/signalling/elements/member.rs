@@ -201,8 +201,9 @@ impl Member {
                 let new_publish_id = spec_play_endpoint.src.endpoint_id.clone();
                 let new_publish = WebRtcPublishEndpoint::new(
                     new_publish_id,
-                    publisher_endpoint.p2p.clone(),
+                    publisher_endpoint.p2p,
                     publisher_member.downgrade(),
+                    publisher_endpoint.is_relay,
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -228,8 +229,9 @@ impl Member {
             .for_each(|(endpoint_id, e)| {
                 self.insert_src(WebRtcPublishEndpoint::new(
                     endpoint_id,
-                    e.p2p.clone(),
+                    e.p2p,
                     this_member.downgrade(),
+                    e.is_relay,
                 ));
             });
 

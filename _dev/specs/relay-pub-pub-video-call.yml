@@ -12,7 +12,8 @@ spec:
           publish:
             kind: WebRtcPublishEndpoint
             spec:
-              p2p: Never
+              p2p: Always
+              is_relay: true
           play-responder:
             kind: WebRtcPlayEndpoint
             spec:
@@ -27,7 +28,8 @@ spec:
           publish:
             kind: WebRtcPublishEndpoint
             spec:
-              p2p: Never
+              p2p: Always
+              is_relay: true
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:

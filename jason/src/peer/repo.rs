@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{IceServer, IceTransportPolicy, PeerId};
+use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 
 use crate::media::MediaManager;
@@ -22,7 +22,7 @@ pub trait PeerRepository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-        ice_transport_policy: IceTransportPolicy,
+        is_relay: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -65,7 +65,7 @@ impl PeerRepository for Repository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-        ice_transport_policy: IceTransportPolicy,
+        is_relay: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = Rc::new(
             PeerConnection::new(
@@ -75,7 +75,7 @@ impl PeerRepository for Repository {
                 Rc::clone(&self.media_manager),
                 enabled_audio,
                 enabled_video,
-                ice_transport_policy,
+                is_relay,
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );

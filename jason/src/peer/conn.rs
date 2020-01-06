@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use medea_client_api_proto::{IceServer, IceTransportPolicy};
+use medea_client_api_proto::IceServer;
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -211,18 +211,16 @@ pub struct RtcPeerConnection {
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
-    pub fn new<I>(
-        ice_servers: I,
-        ice_transport_policy: IceTransportPolicy,
-    ) -> Result<Self>
+    pub fn new<I>(ice_servers: I, is_relay: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
         // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
-        let ice_transport_policy = match ice_transport_policy {
-            IceTransportPolicy::All => RtcIceTransportPolicy::All,
-            IceTransportPolicy::Relay => RtcIceTransportPolicy::Relay,
+        let ice_transport_policy = if is_relay {
+            RtcIceTransportPolicy::Relay
+        } else {
+            RtcIceTransportPolicy::All
         };
         peer_conf.ice_transport_policy(ice_transport_policy);
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));

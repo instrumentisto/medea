@@ -48,6 +48,8 @@ pub struct WebRtcPublishEndpoint {
 
     /// Mode of connection for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
+
+    is_relay: bool,
 }
 
 impl WebRtcPublishEndpoint {
@@ -58,6 +60,7 @@ impl WebRtcPublishEndpoint {
         let mut proto = WebRtcPublishEndpointProto::new();
         proto.set_id(id);
         proto.set_p2p(self.p2p.into());
+        proto.set_is_relay(self.is_relay);
         proto
     }
 }
@@ -67,6 +70,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
         Self {
             id: proto.take_id(),
             p2p: proto.get_p2p().into(),
+            is_relay: proto.get_is_relay(),
         }
     }
 }

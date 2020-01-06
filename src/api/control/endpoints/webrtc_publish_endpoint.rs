@@ -5,7 +5,6 @@
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_client_api_proto::IceTransportPolicy;
 use medea_control_api_proto::grpc::api::{
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
@@ -18,7 +17,7 @@ use medea_control_api_proto::grpc::api::{
 pub struct WebRtcPublishId(String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Copy, Clone, Deserialize, Debug)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
@@ -50,27 +49,22 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
     }
 }
 
-impl Into<IceTransportPolicy> for P2pMode {
-    fn into(self) -> IceTransportPolicy {
-        match self {
-            Self::Always | Self::IfPossible => IceTransportPolicy::All,
-            Self::Never => IceTransportPolicy::Relay,
-        }
-    }
-}
-
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
+
+    #[serde(default)]
+    pub is_relay: bool,
 }
 
 impl From<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     fn from(value: &WebRtcPublishEndpointProto) -> Self {
         Self {
             p2p: P2pMode::from(value.get_p2p()),
+            is_relay: value.get_is_relay(),
         }
     }
 }

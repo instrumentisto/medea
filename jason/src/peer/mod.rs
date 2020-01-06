@@ -15,8 +15,7 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    Direction, IceConnectionState, IceServer, IceTransportPolicy, PeerId as Id,
-    Track, TrackId,
+    Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -181,10 +180,10 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         enabled_audio: bool,
         enabled_video: bool,
-        ice_transport_policy: IceTransportPolicy,
+        is_relay: bool,
     ) -> Result<Self> {
         let peer = Rc::new(
-            RtcPeerConnection::new(ice_servers, ice_transport_policy)
+            RtcPeerConnection::new(ice_servers, is_relay)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections = Rc::new(MediaConnections::new(
