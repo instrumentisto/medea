@@ -213,15 +213,17 @@ Where:
 
 ```rust
 struct PeerCreated {
-    peer: Peer,
+    peer_id: PeerId,
     sdp_offer: Option<String>,
-    ice_servers: Vec<ICEServer>,
+    tracks: Vec<Track>,
+    ice_servers: Vec<IceServer>,
+    is_relay: bool,
 }
 ```
 
 Related objects:
 ```rust
-struct ICEServer {
+struct IceServer {
     urls: Vec<String>,
     username: String,
     credential: String,
@@ -231,9 +233,11 @@ struct ICEServer {
 `Media Server` notifies about necessity of [RTCPeerConnection] creation.
 
 Params:
-1. `peer`: peer connection settings.
+1. `peer_id`: created `Peer`'s ID.
 2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server; if `Some`, client should set it as remote description, then create [SDP Answer], set it as local description, and pass it to the server.
-3. `ice_servers`: list of [ICE server]s that should be used to construct [RTCPeerConnection].
+3. `tracks`: tracks of this `Peer`.
+4. `ice_servers`: list of [ICE server]s that should be used to construct [RTCPeerConnection].
+5. `is_relay`: if `true` then all media will be relayed through [TURN] server.
 
 The most important part of `Peer` object is a list of `Track`s.
 - All `TrackDirection::Send` `Track`s must be created according to their settings and added to the `Peer`. 
@@ -246,31 +250,37 @@ The most important part of `Peer` object is a list of `Track`s.
 
 ```json
 {
-  "peer": {
-    "peer_id": 1,
-    "tracks": [{
+  "peer_id": 1,
+  "tracks": [
+    {
       "id": 1,
       "media_type": {
         "Audio": {}
       },
       "direction": {
         "Send": {
-          "receivers": [2],
+          "receivers": [
+            2
+          ],
           "mid": null
         }
       }
-    }, {
+    },
+    {
       "id": 2,
       "media_type": {
         "Video": {}
       },
       "direction": {
         "Send": {
-          "receivers": [2],
+          "receivers": [
+            2
+          ],
           "mid": null
         }
       }
-    }, {
+    },
+    {
       "id": 3,
       "media_type": {
         "Audio": {}
@@ -281,9 +291,10 @@ The most important part of `Peer` object is a list of `Track`s.
           "mid": null
         }
       }
-    }, {
+    },
+    {
       "id": 4,
-        "media_type": {
+      "media_type": {
         "Video": {}
       },
       "direction": {
@@ -293,16 +304,19 @@ The most important part of `Peer` object is a list of `Track`s.
         }
       }
     }
-  ]},
+  ],
   "sdp_offer": null,
-  "ice_servers": [{
-    "urls": [
-      "turn:turnserver.com:3478",
-      "turn:turnserver.com:3478?transport=tcp"
-    ],
-    "username": "turn_user",
-    "credential": "turn_credential"
-  }]
+  "ice_servers": [
+    {
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }
+  ],
+  "is_relay": false
 }
 ```
 
@@ -323,12 +337,12 @@ After negotiation is done and media starts flowing, `Web Client` might receive n
 
 ```json
 {
-  "peer": {
-    "peer_id": 1,
-    "tracks": [{
+  "peer_id": 1,
+  "tracks": [
+    {
       "id": 1,
-      "media_type": {
-        "Audio": {}
+      "media_type":{
+        "Audio":{}
       },
       "direction": {
         "Send": {
@@ -336,17 +350,20 @@ After negotiation is done and media starts flowing, `Web Client` might receive n
           "mid": null
         }
       }
-    }]
-  },
+    }
+  ],
   "sdp_offer": "server_user1_recvonly_offer",
-  "ice_servers": [{
-    "urls": [
-      "turn:turnserver.com:3478",
-      "turn:turnserver.com:3478?transport=tcp"
-    ],
-    "username": "turn_user",
-    "credential": "turn_credential"
-  }]
+  "ice_servers": [
+    {
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }
+  ],
+  "is_relay": false
 }
 ```
 
@@ -1082,70 +1099,84 @@ Metrics list will be extended as needed.
 
 1. `Media Server` sends `PeerCreated` event to `user1`:
 
-    ```json
-    {
-      "event": "PeerCreated",
-      "data": {
-        "peer": {
-          "peer_id": 1,
-          "tracks": [{
-            "id": 1,
-            "media_type": {
-              "Audio": {}
-            },
-            "direction": {
-              "Send": {
-                "receivers": [2],
-                "mid": null
-              }
+  ```json
+  {
+    "event": "PeerCreated",
+    "data": {
+      "peer_id": 1,
+      "tracks": [
+        {
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [
+                2
+              ],
+              "mid": null
             }
-          }, {
-            "id": 2,
-            "media_type": {
-              "Video": {}
-            },
-            "direction": {
-              "Send": {
-                "receivers": [2],
-                "mid": null
-              }
-            }
-          }, {
-            "id": 3,
-            "media_type": {
-              "Audio": {}
-            },
-            "direction": {
-              "Recv": {
-                "sender": 2,
-                "mid": null
-              }
-            }
-          }, {
-            "id": 4,
-            "media_type": {
-              "Video": {}
-            },
-            "direction": {
-              "Recv": {
-                "sender": 2,
-                "mid": null
-              }
-            }
-          }]
+          }
         },
-        "sdp_offer": null,
-        "ice_servers": [{
+        {
+          "id": 2,
+          "media_type": {
+            "Video": {
+
+            }
+          },
+          "direction": {
+            "Send": {
+              "receivers": [
+                2
+              ],
+              "mid": null
+            }
+          }
+        },
+        {
+          "id": 3,
+          "media_type": {
+            "Audio": {
+
+            }
+          },
+          "direction": {
+            "Recv": {
+              "sender": 2,
+              "mid": null
+            }
+          }
+        },
+        {
+          "id": 4,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 2,
+              "mid": null
+            }
+          }
+        }
+      ],
+      "sdp_offer": null,
+      "ice_servers": [
+        {
           "urls": [
             "turn:turnserver.com:3478",
             "turn:turnserver.com:3478?transport=tcp"
           ],
           "username": "turn_user",
           "credential": "turn_credential"
-        }]
-      }
+        }
+      ],
+      "is_relay": false
     }
-    ```
+  }
+  ```
  
 2. `user1` answers with [SDP Offer]:
 
@@ -1465,35 +1496,6 @@ Metrics list will be extended as needed.
 
 15. `Media Server` updates `user1` `Track`s:
 
-    ```json
-    {
-      "event": "TracksApplied",
-      "data": {
-        "peer_id": 1,
-        "tracks": [{
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [2]
-            }
-          }
-        }, {
-          "id": 2,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [2]
-            }
-          }
-        }]
-      }
-    }
-    ```
 
 16. SDP re-negotiation: 
 
