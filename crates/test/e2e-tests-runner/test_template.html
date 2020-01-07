@@ -10,9 +10,16 @@
     <script type="module">
         import init, {Jason} from "/.cache/jason-pkg/medea_jason.js";
 
+        let jason;
+
         async function getJason() {
-            await init();
-            return new Jason()
+            if (jason === undefined) {
+                await init();
+                jason = new Jason();
+                return jason;
+            } else {
+                return jason;
+            }
         }
 
         window.getJason = getJason;
