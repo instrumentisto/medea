@@ -9,6 +9,7 @@ pub mod test_runner;
 
 use std::path::PathBuf;
 
+use actix_files::NamedFile;
 use actix_web::{
     dev::Server, web, App, HttpRequest, HttpServer, Result as HttpResult,
 };
@@ -18,7 +19,6 @@ use clap::{
 };
 
 use crate::test_runner::TestRunnerBuilder;
-use actix_files::NamedFile;
 
 /// HTTP endpoint which return requested file from this dir.
 /// Used for loading tests.
@@ -62,9 +62,8 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     test_path
 }
 
-#[actix_rt::main]
-async fn main() {
-    let opts = app_from_crate!()
+fn get_opts<'a>() -> ArgMatches<'a> {
+    app_from_crate!()
         .arg(
             Arg::with_name("headless")
                 .help("Run tests in headless browser.")
@@ -97,12 +96,17 @@ async fn main() {
                 )
                 .long("wait-on-fail"),
         )
-        .get_matches();
+        .get_matches()
+}
+
+#[actix_rt::main]
+async fn main() {
+    let opts = get_opts();
 
     let server =
         run_test_files_server(opts.value_of("tests_files_addr").unwrap());
-    let path_to_tests = get_path_to_tests_from_args(&opts);
 
+    let path_to_tests = get_path_to_tests_from_args(&opts);
     TestRunnerBuilder::default()
         .test_addr(opts.value_of("tests_files_addr").unwrap())
         .is_wait_on_fail_mode(opts.is_present("wait_on_fail"))
@@ -113,22 +117,6 @@ async fn main() {
         .run(path_to_tests)
         .await
         .unwrap();
-    server.stop(true).await;
-}
 
-/// Get all paths to spec files from provided dir.
-fn get_all_tests_paths(path_to_test_dir: &PathBuf) -> Vec<PathBuf> {
-    let mut tests_paths = Vec::new();
-    for entry in std::fs::read_dir(path_to_test_dir).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext == "js" {
-                    tests_paths.push(path);
-                }
-            }
-        }
-    }
-    tests_paths
+    server.stop(true).await;
 }

@@ -6,14 +6,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::ArgMatches;
 use derive_builder::Builder;
 use failure::Fail;
 use fantoccini::{
     error::{CmdError, NewSessionError},
     Client, Locator,
 };
-use futures::Future;
 use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
@@ -104,10 +102,12 @@ impl<'a> TestRunner<'a> {
     }
 
     async fn get_client(&self) -> Client {
-        let caps = self.get_webdriver_capabilities();
-        Client::with_capabilities(self.webdriver_addr, caps)
-            .await
-            .unwrap()
+        Client::with_capabilities(
+            self.webdriver_addr,
+            self.get_webdriver_capabilities(),
+        )
+        .await
+        .unwrap()
     }
 
     /// Create WebDriver client, start e2e tests loop.
