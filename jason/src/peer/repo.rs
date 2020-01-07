@@ -1,8 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::{channel::mpsc, future::LocalBoxFuture, Future};
+use futures::{channel::mpsc, future::LocalBoxFuture};
 use medea_client_api_proto::{IceServer, PeerId};
-use std::pin::Pin;
 use tracerr::Traced;
 use wasm_bindgen::JsValue;
 
@@ -35,8 +34,8 @@ pub trait PeerRepository {
     /// Returns all [`PeerConnection`]s stored in repository.
     fn get_all(&self) -> Vec<Rc<PeerConnection>>;
 
-    /// Returns future which resolves into [RTCStatsReport][1]
-    /// for all [RtcPeerConnection][2]s from this [`PeerRepository`].
+    /// Returns [`Future`] which resolves into [`RTCStatsReport`][1]
+    /// for all [`RtcPeerConnection`][2]s from this [`PeerRepository`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
@@ -91,8 +90,8 @@ impl PeerRepository for Repository {
         Ok(self.peers.get(&id).cloned().unwrap())
     }
 
-    /// Returns future which resolves into [RTCStatsReport][1]
-    /// for all [RtcPeerConnection][2]s from this [`PeerRepository`].
+    /// Returns future which resolves into [`RTCStatsReport`][1]
+    /// for all [`RtcPeerConnection`][2]s from this [`PeerRepository`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection

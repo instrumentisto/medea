@@ -19,5 +19,5 @@ doc-valid-idents = [
     "RTCRtpTransceiver", "RTCRtpTransceiverDirection",
     "RTCSdpType",
     "RTCTrackEvent",
-    "WebRTC", "WebSocket",
+    "WebRTC", "WebSocket", "WebDriver",
 ]

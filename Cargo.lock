@@ -1568,7 +1568,6 @@ dependencies = [
  "grpcio 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.1.1-dev",
  "medea-control-api-proto 0.1.0-dev",
  "medea-macro 0.2.0-dev",

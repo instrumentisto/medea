@@ -13,12 +13,13 @@ mod track;
 use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future, Future};
+use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
+use wasm_bindgen::JsValue;
 use web_sys::{
     MediaStream as SysMediaStream, RtcIceConnectionState, RtcTrackEvent,
 };
@@ -43,7 +44,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
-use wasm_bindgen::JsValue;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -258,7 +258,7 @@ impl PeerConnection {
         });
     }
 
-    /// Returns future which resolves into [RTCStatsReport][1]
+    /// Returns future which resolves into [`RTCStatsReport`][1]
     /// for this [`PeerConnection`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport

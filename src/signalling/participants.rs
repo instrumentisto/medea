@@ -22,7 +22,6 @@ use futures::{
     future::{self, join_all, Either},
     Future,
 };
-
 use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
 use crate::{
@@ -170,7 +169,7 @@ impl ParticipantService {
     /// Returns [`AuthorizationError::MemberNotExists`] if lookup by
     /// [`MemberId`] failed.
     ///
-    /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
+    /// Returns [`AuthorizationError::InvalidCredentials`] if [`Member`]
     /// was found, but incorrect credentials were provided.
     pub fn get_member_by_id_and_credentials(
         &self,

@@ -461,8 +461,8 @@ impl InnerRoom {
         }
     }
 
-    /// Returns promise which resolves into [RTCStatsReport][1]
-    /// for all [RtcPeerConnection][2]s from this room.
+    /// Returns promise which resolves into [`RTCStatsReport`][1]
+    /// for all [`RtcPeerConnection`][2]s from this room.
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection

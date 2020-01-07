@@ -1,7 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use futures::{Future, TryFutureExt};
 use medea_client_api_proto::IceServer;
 use tracerr::Traced;
 use wasm_bindgen::JsValue;
@@ -160,7 +159,10 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to set remote SDP description: {}", _0)]
     SetRemoteDescriptionFailed(JsError),
 
-    #[display(fmt = "Failed get RtcPeerConnection stats: {}", _0)]
+    /// Occurs if [`RTCPeerConnection.getStats()`] is failed.
+    ///
+    /// [`RTCPeerConnection.getStats()`]: https://tinyurl.com/yfpgv4tl
+    #[display(fmt = "Failed to get RtcPeerConnection stats: {}", _0)]
     GetStatsFailed(JsError),
 }
 
@@ -236,7 +238,7 @@ impl RtcPeerConnection {
         })
     }
 
-    /// Returns future which resolves into [RTCStatsReport][1]
+    /// Returns future which resolves into [`RTCStatsReport`][1]
     /// for this [`RtcPeerConnection`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
