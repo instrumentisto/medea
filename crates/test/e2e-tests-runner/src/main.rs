@@ -1,4 +1,4 @@
-//! E2e tests runner.
+//! E2E tests runner.
 
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
@@ -9,8 +9,6 @@ pub mod test_runner;
 
 use std::path::PathBuf;
 
-use actix::System;
-use actix_files::NamedFile;
 use actix_web::{
     dev::Server, web, App, HttpRequest, HttpServer, Result as HttpResult,
 };
@@ -18,14 +16,14 @@ use clap::{
     app_from_crate, crate_authors, crate_description, crate_name,
     crate_version, Arg, ArgMatches,
 };
-use futures::Future;
 
-use crate::test_runner::TestRunner;
+use crate::test_runner::TestRunnerBuilder;
+use actix_files::NamedFile;
 
 /// HTTP endpoint which return requested file from this dir.
 /// Used for loading tests.
 #[allow(clippy::needless_pass_by_value)]
-fn index(req: HttpRequest) -> HttpResult<NamedFile> {
+async fn index(req: HttpRequest) -> HttpResult<NamedFile> {
     let path: PathBuf = req.match_info().query("filename").parse().unwrap();
     Ok(NamedFile::open(path)?)
 }
@@ -36,10 +34,13 @@ fn index(req: HttpRequest) -> HttpResult<NamedFile> {
 ///
 /// This is needed because restriction for type=module scripts.
 fn run_test_files_server(addr: &str) -> Server {
-    HttpServer::new(|| App::new().route("{filename:.*}", web::get().to(index)))
-        .bind(addr)
-        .unwrap()
-        .start()
+    HttpServer::new(|| {
+        App::new()
+            .service(web::resource("{filename:.*}").route(web::get().to(index)))
+    })
+    .bind(addr)
+    .unwrap()
+    .run()
 }
 
 /// Returns [`PathBuf`] to e2e-tests path.
@@ -61,7 +62,8 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     test_path
 }
 
-fn main() {
+#[actix_rt::main]
+async fn main() {
     let opts = app_from_crate!()
         .arg(
             Arg::with_name("headless")
@@ -97,14 +99,36 @@ fn main() {
         )
         .get_matches();
 
-    actix::run(|| {
-        let server =
-            run_test_files_server(opts.value_of("tests_files_addr").unwrap());
-        let path_to_tests = get_path_to_tests_from_args(&opts);
-        TestRunner::run(path_to_tests, &opts)
-            .map_err(|e| panic!("{}", e))
-            .and_then(move |_| server.stop(true))
-            .map(|_| System::current().stop())
-    })
-    .unwrap();
+    let server =
+        run_test_files_server(opts.value_of("tests_files_addr").unwrap());
+    let path_to_tests = get_path_to_tests_from_args(&opts);
+
+    TestRunnerBuilder::default()
+        .test_addr(opts.value_of("tests_files_addr").unwrap())
+        .is_wait_on_fail_mode(opts.is_present("wait_on_fail"))
+        .webdriver_addr(opts.value_of("webdriver_addr").unwrap())
+        .is_headless(opts.is_present("headless"))
+        .build()
+        .unwrap()
+        .run(path_to_tests)
+        .await
+        .unwrap();
+    server.stop(true).await;
+}
+
+/// Get all paths to spec files from provided dir.
+fn get_all_tests_paths(path_to_test_dir: &PathBuf) -> Vec<PathBuf> {
+    let mut tests_paths = Vec::new();
+    for entry in std::fs::read_dir(path_to_test_dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                if ext == "js" {
+                    tests_paths.push(path);
+                }
+            }
+        }
+    }
+    tests_paths
 }

@@ -7,15 +7,13 @@ use std::{
 };
 
 use clap::ArgMatches;
+use derive_builder::Builder;
 use failure::Fail;
 use fantoccini::{
     error::{CmdError, NewSessionError},
     Client, Locator,
 };
-use futures::{
-    future::{Either, Loop},
-    Future,
-};
+use futures::Future;
 use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
@@ -73,64 +71,77 @@ fn delete_all_tests_htmls(path_test_dir: &Path) -> Result<(), IoError> {
 /// Medea's e2e tests runner.
 ///
 /// Run e2e tests in browser, check results, print results.
-pub struct TestRunner {
+#[derive(Builder)]
+pub struct TestRunner<'a> {
+    #[builder(setter(skip))]
     /// All paths to tests.
     tests: Vec<PathBuf>,
 
     /// Address where html test files will be hosted.
-    test_addr: String,
+    test_addr: &'a str,
 
     /// Don't close browser immediately on test fail. Browser will closed only
     /// on <Enter> press.
     is_wait_on_fail_mode: bool,
+
+    webdriver_addr: &'a str,
+
+    is_headless: bool,
 }
 
-impl TestRunner {
+impl<'a> TestRunner<'a> {
     /// Run e2e tests.
-    pub fn run(
-        path_to_tests: PathBuf,
-        opts: &ArgMatches,
-    ) -> impl Future<Item = (), Error = Error> {
-        let test_addr = opts.value_of("tests_files_addr").unwrap().to_string();
-        let is_wait_on_fail_mode = opts.is_present("wait_on_fail");
-        if path_to_tests.is_dir() {
-            let tests = get_all_tests_paths(&path_to_tests);
-            let runner = Self {
-                test_addr,
-                tests,
-                is_wait_on_fail_mode,
-            };
-            Either::A(runner.run_tests(&opts).then(move |err| {
-                delete_all_tests_htmls(&path_to_tests).unwrap();
-                err
-            }))
+    pub async fn run(mut self, path_to_tests: PathBuf) -> Result<(), Error> {
+        let (tests, test_dir) = if path_to_tests.is_dir() {
+            (get_all_tests_paths(&path_to_tests), path_to_tests.as_path())
         } else {
-            let runner = Self {
-                test_addr,
-                tests: vec![path_to_tests.clone()],
-                is_wait_on_fail_mode,
-            };
-            Either::B(runner.run_tests(&opts).then(move |err| {
-                let test_dir = path_to_tests.parent().unwrap();
-                delete_all_tests_htmls(&test_dir).unwrap();
-                err
-            }))
-        }
+            (vec![path_to_tests.clone()], path_to_tests.parent().unwrap())
+        };
+        self.tests = tests;
+        let result = self.run_tests().await;
+        delete_all_tests_htmls(test_dir).unwrap();
+        result
+    }
+
+    async fn get_client(&self) -> Client {
+        let caps = self.get_webdriver_capabilities();
+        Client::with_capabilities(self.webdriver_addr, caps)
+            .await
+            .unwrap()
     }
 
     /// Create WebDriver client, start e2e tests loop.
-    fn run_tests(
-        self,
-        opts: &ArgMatches,
-    ) -> impl Future<Item = (), Error = Error> {
-        let caps = get_webdriver_capabilities(opts);
-        Client::with_capabilities(
-            opts.value_of("webdriver_addr").unwrap(),
-            caps,
-        )
-        .map_err(Error::from)
-        .and_then(|client| self.tests_loop(client))
-        .map_err(Error::from)
+    async fn run_tests(&mut self) -> Result<(), Error> {
+        let mut client = self.get_client().await;
+        let result = self.tests_loop(&mut client).await;
+        if result.is_err() {
+            if self.is_wait_on_fail_mode {
+                let mut s = String::new();
+                println!("Press <Enter> for close...");
+                std::io::stdin().read_line(&mut s).unwrap();
+            }
+            client.close().await?;
+        }
+        result
+    }
+
+    async fn run_test(
+        &mut self,
+        client: &mut Client,
+        test: &PathBuf,
+    ) -> Result<(), Error> {
+        let test_path = generate_and_save_test_html(test);
+        let test_url = self.get_url_to_test(&test_path);
+        println!(
+            "\nRunning {} test...",
+            test.file_name().unwrap().to_str().unwrap()
+        );
+
+        client.goto(&test_url).await?;
+        wait_for_test_end(client).await?;
+        self.check_test_results(client).await?;
+
+        Ok(())
     }
 
     /// Tests loop which alternately launches tests in browser.
@@ -138,32 +149,15 @@ impl TestRunner {
     /// This future resolve when all tests completed or when test failed.
     ///
     /// Returns [`Error::TestsFailed`] if some test failed.
-    fn tests_loop(
-        self,
-        client: Client,
-    ) -> impl Future<Item = (), Error = Error> {
-        futures::future::loop_fn((client, self), |(client, mut runner)| {
-            if let Some(test) = runner.tests.pop() {
-                let test_path = generate_and_save_test_html(&test);
-                let test_url = runner.get_url_to_test(&test_path);
-                println!(
-                    "\nRunning {} test...",
-                    test.file_name().unwrap().to_str().unwrap()
-                );
-                Either::A(
-                    client
-                        .goto(&test_url)
-                        .and_then(wait_for_test_end)
-                        .map_err(Error::from)
-                        .and_then(|client| runner.check_test_results(client))
-                        .map_err(Error::from)
-                        .map(Loop::Continue),
-                )
+    async fn tests_loop(&mut self, client: &mut Client) -> Result<(), Error> {
+        loop {
+            if let Some(test) = self.tests.pop() {
+                self.run_test(client, &test).await?;
             } else {
-                Either::B(futures::future::ok(Loop::Break(())))
+                break;
             }
-        })
-        .map_err(Error::from)
+        }
+        Ok(())
     }
 
     /// Check results of tests.
@@ -174,55 +168,83 @@ impl TestRunner {
     ///
     /// Returns [`Error::TestResultsNotFoundInLogs`] if mocha results not found
     /// in JS side console logs.
-    fn check_test_results(
-        self,
-        mut client: Client,
-    ) -> impl Future<Item = (Client, Self), Error = Error> {
-        let is_wait_on_fail_mode = self.is_wait_on_fail_mode;
-        client
+    async fn check_test_results(
+        &mut self,
+        client: &mut Client,
+    ) -> Result<(), Error> {
+        let errors = client
             .execute("return console.logs", Vec::new())
-            .map_err(|e| panic!("{:?}", e))
-            .map(move |e| (e, client))
-            .and_then(move |(result, client)| {
-                let logs = result.as_array().unwrap();
-                for message in logs {
-                    let message =
-                        message.as_array().unwrap()[0].as_str().unwrap();
-                    if let Ok(test_results) =
-                        serde_json::from_str::<TestResults>(message)
-                    {
-                        println!("{}", test_results);
-                        if test_results.is_has_error() {
-                            println!("Console log: ");
-                            for messages in logs {
-                                let messages = messages.as_array().unwrap();
-                                for message in messages {
-                                    let message = message.as_str().unwrap();
-                                    println!("{}", message);
-                                }
-                            }
-                            return Err((client, Error::TestsFailed));
-                        } else {
-                            return Ok((client, self));
+            .await
+            .unwrap();
+        let logs = errors.as_array().unwrap();
+        for message in logs {
+            let message = message.as_array().unwrap()[0].as_str().unwrap();
+            if let Ok(test_results) =
+                serde_json::from_str::<TestResults>(message)
+            {
+                println!("{}", test_results);
+                return if test_results.is_has_error() {
+                    println!("Console log: ");
+                    for messages in logs {
+                        let messages = messages.as_array().unwrap();
+                        for message in messages {
+                            let message = message.as_str().unwrap();
+                            println!("{}", message);
                         }
                     }
-                }
-                Err((client, Error::TestResultsNotFoundInLogs))
-            })
-            .or_else(move |(mut client, err)| {
-                if is_wait_on_fail_mode {
-                    let mut s = String::new();
-                    println!("Press <Enter> for close...");
-                    std::io::stdin().read_line(&mut s).unwrap();
-                }
-                client.close().then(move |_| Err(err))
-            })
+                    Err(Error::TestsFailed)
+                } else {
+                    Ok(())
+                };
+            }
+        }
+
+        Err(Error::TestResultsNotFoundInLogs)
     }
 
     /// Returns url which runner will open.
     fn get_url_to_test(&self, test_path: &PathBuf) -> String {
         let filename = test_path.file_name().unwrap().to_str().unwrap();
         format!("http://{}/e2e-tests/{}", self.test_addr, filename)
+    }
+
+    /// Returns browser capabilities based on arguments.
+    ///
+    /// Currently check `--headless` flag and based on this run headed or
+    /// headless browser.
+    fn get_webdriver_capabilities(&self) -> Capabilities {
+        let mut capabilities = Capabilities::new();
+
+        let mut firefox_args = Vec::new();
+        let mut chrome_args = vec![
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            "--disable-web-security",
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+        ];
+        if self.is_headless {
+            firefox_args.push("--headless");
+            chrome_args.push("--headless");
+        }
+
+        let firefox_settings = json!({
+            "prefs": {
+                "media.navigator.streams.fake": true,
+                "media.navigator.permission.disabled": true,
+                "media.autoplay.enabled": true,
+                "media.autoplay.enabled.user-gestures-needed ": false,
+                "media.autoplay.ask-permission": false,
+                "media.autoplay.default": 0,
+            },
+            "args": firefox_args
+        });
+        capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
+
+        let chrome_settings = json!({ "args": chrome_args });
+        capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
+
+        capabilities
     }
 }
 
@@ -280,12 +302,9 @@ fn generate_and_save_test_html(test_path: &PathBuf) -> PathBuf {
 }
 
 /// This future resolve when div with ID `test-end` appear on page.
-fn wait_for_test_end(
-    client: Client,
-) -> impl Future<Item = Client, Error = CmdError> {
-    client
-        .wait_for_find(Locator::Id("test-end"))
-        .map(fantoccini::Element::client)
+async fn wait_for_test_end(client: &mut Client) -> Result<(), CmdError> {
+    client.wait_for_find(Locator::Id("test-end")).await?;
+    Ok(())
 }
 
 /// Get all paths to spec files from provided dir.
@@ -303,43 +322,4 @@ fn get_all_tests_paths(path_to_test_dir: &PathBuf) -> Vec<PathBuf> {
         }
     }
     tests_paths
-}
-
-/// Returns browser capabilities based on arguments.
-///
-/// Currently check `--headless` flag and based on this run headed or headless
-/// browser.
-fn get_webdriver_capabilities(opts: &ArgMatches) -> Capabilities {
-    let mut capabilities = Capabilities::new();
-
-    let mut firefox_args = Vec::new();
-    let mut chrome_args = vec![
-        "--use-fake-device-for-media-stream",
-        "--use-fake-ui-for-media-stream",
-        "--disable-web-security",
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-    ];
-    if opts.is_present("headless") {
-        firefox_args.push("--headless");
-        chrome_args.push("--headless");
-    }
-
-    let firefox_settings = json!({
-        "prefs": {
-            "media.navigator.streams.fake": true,
-            "media.navigator.permission.disabled": true,
-            "media.autoplay.enabled": true,
-            "media.autoplay.enabled.user-gestures-needed ": false,
-            "media.autoplay.ask-permission": false,
-            "media.autoplay.default": 0,
-        },
-        "args": firefox_args
-    });
-    capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
-
-    let chrome_settings = json!({ "args": chrome_args });
-    capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
-
-    capabilities
 }
