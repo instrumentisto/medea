@@ -8,7 +8,6 @@ use medea_control_api_proto::grpc::callback::{
 use serde::Serialize;
 
 /// All callbacks which can happen.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum CallbackEvent {
@@ -31,7 +30,6 @@ impl From<CallbackEventProto> for CallbackEvent {
 
 /// Control API callback.
 #[derive(Clone, Serialize)]
-#[allow(clippy::module_name_repetitions)]
 pub struct CallbackItem {
     /// FID (Full ID) of element with which this event was occurred.
     fid: String,
@@ -60,7 +58,6 @@ mod join {
 
     /// `OnJoin` callback for Control API.
     #[derive(Clone, Serialize)]
-    #[allow(clippy::module_name_repetitions)]
     pub struct OnJoin;
 
     impl From<OnJoinProto> for OnJoin {
@@ -79,7 +76,6 @@ mod leave {
 
     /// `OnLeave` callback of Control API.
     #[derive(Clone, Serialize)]
-    #[allow(clippy::module_name_repetitions)]
     pub struct OnLeave {
         /// Reason of why `Member` leaves.
         reason: OnLeaveReason,

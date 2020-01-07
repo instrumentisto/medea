@@ -6,7 +6,9 @@ use actix::{Addr, Arbiter, Context, System};
 use actix_http::ws::CloseCode;
 use futures::Future;
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::callback::OnLeave_Reason as OnLeaveReason;
+use medea_control_api_proto::grpc::callback::{
+    OnLeave_Reason as OnLeaveReason, Request,
+};
 
 use crate::{
     callbacks::{GetCallbacks, GrpcCallbackServer},
@@ -24,7 +26,7 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// id: {{ PROVIDED NAME }}
 /// spec:
 ///    pipeline:
-///      test-member:
+///      {{ PROVIDED NAME }}:
 ///        kind: Member
 ///        on_join: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
 ///        on_leave: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
@@ -43,7 +45,7 @@ fn callback_test(
         .id(name)
         .add_member(
             MemberBuilder::default()
-                .id("test-member")
+                .id(String::from(name))
                 .on_leave(format!("grpc://127.0.0.1:{}", port))
                 .on_join(format!("grpc://127.0.0.1:{}", port))
                 .build()
@@ -58,7 +60,7 @@ fn callback_test(
         move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
     let deadline = Some(Duration::from_secs(5));
     TestMember::connect(
-        create_response.get("test-member").unwrap(),
+        create_response.get(name).unwrap(),
         Box::new(on_event),
         deadline,
     )
@@ -89,7 +91,7 @@ fn on_join() {
                 let on_joins_count = callbacks_result
                     .unwrap()
                     .into_iter()
-                    .filter(|req| req.has_on_join())
+                    .filter(Request::has_on_join)
                     .count();
                 assert_eq!(on_joins_count, 1);
                 System::current().stop();
@@ -132,8 +134,13 @@ fn on_leave_normally_disconnected() {
                 let on_leaves_count = callbacks_result
                     .unwrap()
                     .into_iter()
-                    .filter(|req| req.has_on_leave())
-                    .map(|mut req| req.take_on_leave().reason)
+                    .filter_map(|mut req| {
+                        if req.has_on_leave() {
+                            Some(req.take_on_leave().reason)
+                        } else {
+                            None
+                        }
+                    })
                     .filter(|reason| reason == &OnLeaveReason::DISCONNECTED)
                     .count();
                 assert_eq!(on_leaves_count, 1);
@@ -178,8 +185,13 @@ fn on_leave_on_connection_loss() {
                 let on_leaves_count = callbacks_result
                     .unwrap()
                     .into_iter()
-                    .filter(|req| req.has_on_leave())
-                    .map(|mut req| req.take_on_leave().reason)
+                    .filter_map(|mut req| {
+                        if req.has_on_leave() {
+                            Some(req.take_on_leave().reason)
+                        } else {
+                            None
+                        }
+                    })
                     .filter(|reason| reason == &OnLeaveReason::LOST_CONNECTION)
                     .count();
                 assert_eq!(on_leaves_count, 1);

@@ -70,7 +70,6 @@ impl Into<OnJoinProto> for OnJoinEvent {
 }
 
 /// All callbacks which can happen.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, From)]
 pub enum CallbackEvent {
     OnJoin(OnJoinEvent),
@@ -96,7 +95,6 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 ///
 /// [`CallbackClient::send`]:
 /// crate::api::control::callback::clients::CallbackClient::send
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct CallbackRequest {
     /// FID (Full ID) of element with which event was occurred.

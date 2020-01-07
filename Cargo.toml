@@ -66,6 +66,8 @@ url = "2.1"
     features = ["release_max_level_trace", "max_level_trace"]
 
 [dev-dependencies]
+lazy_static = "1.4"
+mockall = "0.6"
 actix-codec = "0.1"
 actix-http = "0.2"
 actix-http-test = "0.2"

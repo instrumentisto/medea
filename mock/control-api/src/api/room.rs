@@ -25,6 +25,7 @@ pub struct Room {
 
 impl Room {
     /// Converts [`Room`] into protobuf [`RoomProto`].
+    #[must_use]
     pub fn into_proto(self, id: String) -> RoomProto {
         let mut proto = RoomProto::new();
         let mut room_elements = HashMap::new();
@@ -46,6 +47,7 @@ pub enum RoomElement {
 }
 
 impl RoomElement {
+    #[must_use]
     pub fn into_proto(self, id: String) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         match self {

@@ -9,7 +9,9 @@ mod manager;
 #[doc(inline)]
 pub use self::{
     constraints::{
-        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaStreamConstraints,
+        MultiSourceMediaStreamConstraints, TrackConstraints,
         VideoTrackConstraints,
     },
     device_info::InputDeviceInfo,
