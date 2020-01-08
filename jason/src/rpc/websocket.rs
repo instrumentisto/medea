@@ -139,6 +139,19 @@ struct InnerSocket {
 }
 
 /// WebSocket [`RpcTransport`] between a client and server.
+///
+/// Don't forget that this structure have __cyclic references__ which will be
+/// freed in [`Drop`] implementation of this structure. If you added some new
+/// cyclic dependencies don't forget to [`drop`] them on [`drop`] of this
+/// reference and add to this doc.
+///
+/// # List of cyclic dependencies:
+///
+/// 1. [`InnerSocket::on_close_listener`],
+///
+/// 2. [`InnerSocket::on_message_listener`],
+///
+/// 3. [`InnerSocket::on_open_listener`].
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
@@ -345,6 +358,9 @@ impl WebSocketRpcTransport {
 }
 
 impl Drop for WebSocketRpcTransport {
+    /// Don't forget that [`WebSocketRpcTransport`] is [`Rc`]
+    /// and this [`Drop`] implementation will be called on every
+    /// [`Drop`] of this reference.
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         inner.on_open_listener.take();
