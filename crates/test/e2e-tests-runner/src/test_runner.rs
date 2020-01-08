@@ -150,12 +150,8 @@ impl<'a> TestRunner<'a> {
     ///
     /// Returns [`Error::TestsFailed`] if some test failed.
     async fn tests_loop(&mut self, client: &mut Client) -> Result<(), Error> {
-        loop {
-            if let Some(test) = self.tests.pop() {
-                self.run_test(client, &test).await?;
-            } else {
-                break;
-            }
+        while let Some(test) = self.tests.pop() {
+            self.run_test(client, &test).await?;
         }
         Ok(())
     }
