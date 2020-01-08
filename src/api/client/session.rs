@@ -82,11 +82,8 @@ impl WsSession {
 
     /// Starts watchdog which will drop connection if `now`-`last_activity` >
     /// `idle_timeout`.
-    fn start_watchdog(
-        idle_timeout: Duration,
-        ctx: &mut <Self as Actor>::Context,
-    ) {
-        ctx.run_interval(idle_timeout, |session, ctx| {
+    fn start_idle_watchdog(ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(Duration::new(1, 0), |session, ctx| {
             if Instant::now().duration_since(session.last_activity)
                 > session.idle_timeout
             {
@@ -107,11 +104,11 @@ impl WsSession {
     /// Starts [`ServerMsg::Ping`] sending.
     fn start_pinger(&self, ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(self.ping_interval, |session, ctx| {
-            session.last_ping_num += 1;
             ctx.text(
                 serde_json::to_string(&ServerMsg::Ping(session.last_ping_num))
                     .unwrap(),
             );
+            session.last_ping_num += 1;
         });
     }
 
@@ -136,9 +133,6 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        Self::start_watchdog(self.idle_timeout, ctx);
-        self.start_pinger(ctx);
-
         ctx.wait(
             wrap_future(self.room.connection_established(
                 self.member_id.clone(),
@@ -148,10 +142,13 @@ impl Actor for WsSession {
                 |_,
                  session: &mut Self,
                  ctx: &mut ws::WebsocketContext<Self>| {
-                    let msg =
+                    let rpc_settings_message =
                         serde_json::to_string(&session.get_rpc_settings())
                             .unwrap();
-                    ctx.text(msg);
+                    ctx.text(rpc_settings_message);
+
+                    Self::start_idle_watchdog(ctx);
+                    session.start_pinger(ctx);
                 },
             )
             .map_err(
@@ -278,8 +275,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             ws::Message::Text(text) => {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
-                    Ok(ClientMsg::Pong(n)) => {
-                        debug!("Received pong: {}", n);
+                    Ok(ClientMsg::Pong(_)) => {
+                        // do nothing
                     }
                     Ok(ClientMsg::Command(command)) => {
                         ctx.spawn(wrap_future(self.room.send_command(command)));
@@ -344,7 +341,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
 #[cfg(test)]
 mod test {
 
-    use std::{sync::Mutex, time::Duration};
+    use std::{
+        sync::Mutex,
+        time::{Duration, Instant},
+    };
 
     use actix_http::HttpService;
     use actix_http_test::{TestServer, TestServerRuntime};
@@ -421,9 +421,9 @@ mod test {
         assert_eq!(item, Some(close_frame));
     }
 
-    // WsSession handles ping requests and answers with pong.
+    // WsSession sends rpc settings and pings.
     #[test]
-    fn answers_ping_with_pong() {
+    fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
@@ -444,18 +444,34 @@ mod test {
         });
 
         let client = serv.ws().unwrap();
+        let (item, client) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        assert_eq!(
+            item,
+            Some(Frame::Text(Some(
+                String::from(
+                    r#"{"idle_timeout_ms":5000,"ping_interval_ms":50}"#
+                )
+                .into()
+            )))
+        );
 
-        let (item, _) = serv
-            .block_on(client.skip(1).into_future())
-            .map_err(|_| ())
-            .unwrap();
+        let (item, client) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        assert_eq!(
+            item,
+            Some(Frame::Text(Some(String::from(r#"{"ping":0}"#).into())))
+        );
+
+        let (item, _) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
         assert_eq!(
             item,
             Some(Frame::Text(Some(String::from(r#"{"ping":1}"#).into())))
         );
     }
 
-    // WsSession is dropped and WebSocket connection is closed if no pings
+    // WsSession is dropped and WebSocket connection is closed if no pongs
     // received for idle_timeout.
     #[test]
     fn dropped_if_idle() {
@@ -480,12 +496,13 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_millis(100),
-                Duration::from_millis(120),
+                Duration::from_secs(10),
             )
         });
 
         let client = serv.ws().unwrap();
 
+        let start = std::time::Instant::now();
         let (item, _) = serv
             .block_on(client.skip(1).into_future())
             .map_err(|_| ())
@@ -496,6 +513,10 @@ mod test {
             description: Some(String::from(r#"{"reason":"Idle"}"#)),
         }));
 
+        assert!(
+            Instant::now().duration_since(start) > Duration::from_millis(99)
+        );
+        assert!(Instant::now().duration_since(start) < Duration::from_secs(2));
         assert_eq!(item, Some(close_frame));
     }
 

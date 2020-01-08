@@ -15,8 +15,8 @@ All user visible changes to this project will be documented in this file. This p
 
 - Configuration:
     - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]).
-- Signalling:
-    - Send `Ping` to a client instead of responding with `Pong` on client `Ping` ([#75]).
+- RPC messaging:
+    - Reverse `ping-pong` mechanism: server sends `Ping` and expects `Pongs` from clients now. ([#75]).
 
 ### Added
 

@@ -60,7 +60,7 @@
 # Default:
 #   reconnect_timeout = "10s"
 
-# Interval between pings.
+# Interval between pings that server sends to clients.
 #
 # Default:
 #   ping_interval = "3s"

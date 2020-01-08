@@ -1,6 +1,6 @@
 //! Implementation of connection loss detection through Ping/Pong mechanism.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{cell::RefCell, rc::Rc};
 
 use derive_more::{Display, From, Mul};
 use futures::{
@@ -10,12 +10,13 @@ use futures::{
     StreamExt as _,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
-use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{console_error, resolve_after, JsCaused, JsDuration, JsError},
+    utils::{
+        console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
+    },
 };
 
 /// Errors that may occur in [`Heartbeat`].
@@ -24,9 +25,9 @@ pub struct HeartbeatError(TransportError);
 
 /// Wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
 #[derive(Debug, From)]
-struct Abort(AbortHandle);
+struct TaskHandle(AbortHandle);
 
-impl Drop for Abort {
+impl Drop for TaskHandle {
     fn drop(&mut self) {
         self.0.abort();
     }
@@ -42,7 +43,7 @@ pub struct PingInterval(pub JsDuration);
 
 struct Inner {
     /// [`RpcTransport`] which heartbeats.
-    transport: Option<Rc<dyn RpcTransport>>,
+    transport: Rc<dyn RpcTransport>,
 
     /// Idle timeout of [`RpcClient`].
     idle_timeout: IdleTimeout,
@@ -52,10 +53,10 @@ struct Inner {
 
     /// [`Abort`] for [`Future`] which sends [`ClientMsg::Pong`] on
     /// [`ServerMsg::Ping`].
-    handle_ping_task: Option<Abort>,
+    handle_ping_task: Option<TaskHandle>,
 
     /// [`Abort`] for idle watchdog.
-    idle_watchdog_task: Option<Abort>,
+    idle_watchdog_task: Option<TaskHandle>,
 
     /// Number of last received [`ServerMsg::Ping`].
     last_ping_num: u64,
@@ -70,93 +71,42 @@ impl Inner {
     /// If some error happen then it will be printed with [`console_error`].
     fn send_pong(&self, n: u64) {
         self.transport
-            .as_ref()
-            .ok_or_else(|| {
-                let e = tracerr::new!(
-                    "RpcTransport from Heartbeat unexpectedly gone."
-                );
-                format!("{}\n{}", e, e.trace())
-            })
-            .and_then(|t| {
-                t.send(&ClientMsg::Pong(n))
-                    .map_err(|e| format!("{}\n{}", e, e.trace()))
-            })
+            .send(&ClientMsg::Pong(n))
+            .map_err(tracerr::wrap!(=> TransportError))
+            .map_err(JasonError::from)
             .map_err(console_error)
             .ok();
     }
 }
 
 /// Service for detecting connection loss through ping/pong mechanism.
-pub struct Heartbeat(Rc<RefCell<Inner>>);
+pub struct Heartbeater(Rc<RefCell<Inner>>);
 
-impl Heartbeat {
-    /// Creates new [`Heartbeat`].
-    ///
-    /// By default `idle_timeout` will be set to 10 seconds and `ping_interval`
-    /// to 3 seconds. But this default values wouldn't be used anywhere. This
-    /// defaults is used only to avoid useless [`Option`] usage.
-    pub fn new() -> Self {
-        Self(Rc::new(RefCell::new(Inner {
-            idle_timeout: IdleTimeout(Duration::from_secs(10).into()),
-            ping_interval: PingInterval(Duration::from_secs(3).into()),
-            transport: None,
-            handle_ping_task: None,
-            on_idle_subs: Vec::new(),
-            idle_watchdog_task: None,
-            last_ping_num: 0,
-        })))
-    }
-
-    /// Start heartbeating for provided [`RpcTransport`] with provided
+impl Heartbeater {
+    /// Start heartbeater for provided [`RpcTransport`] with provided
     /// `idle_timeout` and `ping_interval`.
-    ///
-    /// If heartbeating is already started then old settings, idle watchdog and
-    /// ponger will be cancelled.
     pub fn start(
-        &self,
-        idle_timeout: IdleTimeout,
-        ping_interval: PingInterval,
         transport: Rc<dyn RpcTransport>,
-    ) -> Result<(), Traced<HeartbeatError>> {
-        let mut on_message_stream = transport
-            .on_message()
-            .map_err(tracerr::map_from_and_wrap!())?;
-        self.0.borrow_mut().transport = Some(transport);
-        self.0.borrow_mut().ping_interval = ping_interval;
-        self.0.borrow_mut().idle_timeout = idle_timeout;
+        ping_interval: PingInterval,
+        idle_timeout: IdleTimeout,
+    ) -> Self {
+        let inner = Rc::new(RefCell::new(Inner {
+            idle_timeout,
+            ping_interval,
+            transport,
+            handle_ping_task: None,
+            idle_watchdog_task: None,
+            on_idle_subs: Vec::new(),
+            last_ping_num: 0,
+        }));
 
-        self.reset_idle_watchdog();
+        let handle_ping_task = spawn_ping_handle_task(Rc::clone(&inner));
+        let idle_watchdog_task = spawn_idle_watchdog_task(Rc::clone(&inner));
 
-        let weak_this = Rc::downgrade(&self.0);
-        let (fut, pong_abort) = future::abortable(async move {
-            while let Some((this, msg)) =
-                on_message_stream.next().await.and_then(|msg| {
-                    weak_this.upgrade().map(move |t| (Self(t), msg))
-                })
-            {
-                this.reset_idle_watchdog();
+        inner.borrow_mut().idle_watchdog_task = Some(idle_watchdog_task);
+        inner.borrow_mut().handle_ping_task = Some(handle_ping_task);
 
-                if let ServerMsg::Ping(num) = msg {
-                    this.0.borrow_mut().last_ping_num = num;
-                    this.0.borrow().send_pong(num);
-                }
-            }
-        });
-        spawn_local(async move {
-            // Ignore this Abort error because aborting is normal behavior of
-            // this Future.
-            fut.await.ok();
-        });
-        self.0.borrow_mut().handle_ping_task = Some(pong_abort.into());
-
-        Ok(())
-    }
-
-    /// Stops [`Heartbeat`].
-    pub fn stop(&self) {
-        self.0.borrow_mut().transport.take();
-        self.0.borrow_mut().handle_ping_task.take();
-        self.0.borrow_mut().idle_watchdog_task.take();
+        Self(inner)
     }
 
     /// Updates [`Heartbeat`] settings.
@@ -177,56 +127,76 @@ impl Heartbeat {
 
         Box::pin(on_idle_rx)
     }
+}
 
-    /// Resets `idle_watchdog` task and sets new one.
-    ///
-    /// This watchdog is responsible for throwing [`Heartbeat::on_idle`] when
-    /// [`ServerMsg`] isn't received within `idle_timeout`.
-    ///
-    /// Also this watchdog will try to send [`ClientMsg::Pong`] if
-    /// [`ServerMsg::Ping`] wasn't received within `ping_interval * 2`.
-    fn reset_idle_watchdog(&self) {
-        self.0.borrow_mut().idle_watchdog_task.take();
+/// Spawns idle watchdog task returning its handle.
+///
+/// This task is responsible for throwing [`Heartbeat::on_idle`] when
+/// [`ServerMsg`] isn't received within `idle_timeout`.
+///
+/// Also this watchdog will repeat [`ClientMsg::Pong`] if
+/// [`ServerMsg::Ping`] wasn't received within `ping_interval * 2`.
+fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
+    let (idle_watchdog_fut, idle_watchdog_handle) =
+        future::abortable(async move {
+            let wait_for_ping = this.borrow().ping_interval * 2;
+            delay_for(wait_for_ping.0).await;
 
-        let weak_this = Rc::downgrade(&self.0);
-        let (idle_watchdog, idle_watchdog_handle) =
-            future::abortable(async move {
-                let this = if let Some(this) = weak_this.upgrade() {
-                    this
-                } else {
-                    return;
-                };
-                let wait_for_ping = this.borrow().ping_interval * 2;
-                resolve_after(wait_for_ping.0).await;
+            let last_ping_num = this.borrow().last_ping_num;
+            this.borrow().send_pong(last_ping_num + 1);
 
-                let last_ping_num = this.borrow().last_ping_num;
-                this.borrow().send_pong(last_ping_num + 1);
-
-                let idle_timeout = this.borrow().idle_timeout;
-                resolve_after(idle_timeout.0 - wait_for_ping.0).await;
-                this.borrow_mut()
-                    .on_idle_subs
-                    .retain(|sub| !sub.is_closed());
-                this.borrow()
-                    .on_idle_subs
-                    .iter()
-                    .filter_map(|sub| sub.unbounded_send(()).err())
-                    .for_each(|err| {
-                        console_error(format!(
-                            "Heartbeat::on_idle subscriber unexpectedly gone. \
-                             {:?}",
-                            err
-                        ))
-                    });
-            });
-
-        spawn_local(async move {
-            // Ignore this Abort error because aborting is normal behavior of
-            // watchdog.
-            idle_watchdog.await.ok();
+            let idle_timeout = this.borrow().idle_timeout;
+            delay_for(idle_timeout.0 - wait_for_ping.0).await;
+            this.borrow_mut()
+                .on_idle_subs
+                .retain(|sub| !sub.is_closed());
+            this.borrow()
+                .on_idle_subs
+                .iter()
+                .filter_map(|sub| sub.unbounded_send(()).err())
+                .for_each(|err| {
+                    console_error(format!(
+                        "Heartbeat::on_idle subscriber unexpectedly gone. {:?}",
+                        err
+                    ))
+                });
         });
 
-        self.0.borrow_mut().idle_watchdog_task =
-            Some(idle_watchdog_handle.into());
+    spawn_local(async move {
+        idle_watchdog_fut.await.ok();
+    });
+
+    idle_watchdog_handle.into()
+}
+
+/// Spawns ping handle task returning its handle.
+///
+/// This task is responsible for answering [`ServerMsg::Ping`] with
+/// [`ClientMsg::Pong`] and renewing idle watchdog task.
+fn spawn_ping_handle_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
+    let mut on_message_stream = this.borrow().transport.on_message();
+
+    let (handle_ping_fut, handle_ping_task) = future::abortable(async move {
+        while let Some(msg) = on_message_stream.next().await {
+            let idle_task = spawn_idle_watchdog_task(Rc::clone(&this));
+            this.borrow_mut().idle_watchdog_task = Some(idle_task);
+
+            if let ServerMsg::Ping(num) = msg {
+                this.borrow_mut().last_ping_num = num;
+                this.borrow().send_pong(num);
+            }
+        }
+    });
+    spawn_local(async move {
+        handle_ping_fut.await.ok();
+    });
+    handle_ping_task.into()
+}
+
+impl Drop for Heartbeater {
+    fn drop(&mut self) {
+        let mut inner = self.0.borrow_mut();
+        inner.handle_ping_task.take();
+        inner.idle_watchdog_task.take();
     }
 }

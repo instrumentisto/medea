@@ -98,6 +98,28 @@ impl Drop for IntervalHandle {
     }
 }
 
+/// Upgrades provided [`Weak`] reference, mapping it to
+/// Result<_,[`HandlerDetachedError`]> and invokes `Into::into` on err. If the
+/// err type cannot be infered, then you can provide concrete type, usually
+/// being: `JasonError` or `JsValue`.
+///
+/// [`Rc`]: std::rc::Rc
+/// [`Weak`]: std::rc::Weak
+macro_rules! upgrade_or_detached {
+    ($v:expr) => {{
+        $v.upgrade()
+            .ok_or_else(
+                || new_js_error!(HandlerDetachedError)
+            )
+    }};
+    ($v:expr, $err:ty) => {{
+        $v.upgrade()
+            .ok_or_else(
+                || new_js_error!(HandlerDetachedError => $err)
+            )
+    }};
+}
+
 /// Adds [`tracerr`] information to the provided error, wraps
 /// it into [`JasonError`] and converts it into needed error.
 ///
@@ -134,7 +156,7 @@ where
 }
 
 /// [`Future`] which resolves after provided [`JsDuration`].
-pub async fn resolve_after(delay_ms: JsDuration) {
+pub async fn delay_for(delay_ms: JsDuration) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
             .set_timeout_with_callback_and_timeout_and_arguments_0(

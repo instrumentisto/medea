@@ -139,17 +139,6 @@ struct InnerSocket {
 }
 
 /// WebSocket [`RpcTransport`] between a client and server.
-///
-/// Don't derive [`Clone`] and don't use it if there are no very serious reasons
-/// for this. Because with many strong [`Rc`]s we can catch many painful bugs
-/// with [`Drop`] implementation, memory leaks etc. It is especially not
-/// recommended use a strong pointer ([`Rc`]) in all kinds of callbacks and
-/// `async` closures. If you clone this then make sure that this
-/// [`WebSocketRpcTransport`] will be normally [`Drop`]ed.
-///
-/// Alternative for [`Clone`] is [`WebSocketRpcTransport::downgrade`] which will
-/// return [`WeakWebSocketRpcTransport`] which can be upgraded to
-/// [`WebSocketRpcTransport`] and will not hold this structure from destruction.
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
@@ -199,11 +188,15 @@ impl InnerSocket {
 }
 
 impl RpcTransport for WebSocketRpcTransport {
-    fn on_message(&self) -> Result<LocalBoxStream<'static, ServerMsg>> {
+    fn on_message(&self) -> LocalBoxStream<'static, ServerMsg> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_message_subs.push(tx);
 
-        Ok(Box::pin(rx))
+        Box::pin(rx)
+    }
+
+    fn set_close_reason(&self, close_reason: ClientDisconnect) {
+        self.0.borrow_mut().close_reason = close_reason;
     }
 
     fn send(&self, msg: &ClientMsg) -> Result<()> {
@@ -223,10 +216,6 @@ impl RpcTransport for WebSocketRpcTransport {
         }
     }
 
-    fn set_close_reason(&self, close_reason: ClientDisconnect) {
-        self.0.borrow_mut().close_reason = close_reason;
-    }
-
     fn on_state_change(&self) -> LocalBoxStream<'static, State> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_state_change_subs.push(tx);
@@ -242,35 +231,30 @@ impl WebSocketRpcTransport {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 
-        let inner = InnerSocket::new(url)?;
-        let socket = Self(Rc::new(RefCell::new(inner)));
+        let socket = Rc::new(RefCell::new(InnerSocket::new(url)?));
 
         {
-            let inner = Rc::downgrade(&socket.0);
-            let socket_transport = socket.0.borrow().socket.clone();
-            socket.0.borrow_mut().on_close_listener = Some(
+            let mut socket_mut = socket.borrow_mut();
+            let inner = Rc::clone(&socket);
+            socket_mut.on_close_listener = Some(
                 EventListener::new_once(
-                    Rc::clone(&socket_transport),
+                    Rc::clone(&socket_mut.socket),
                     "close",
                     move |_| {
-                        if let Some(inner) = inner.upgrade().map(Self) {
-                            inner.0.borrow_mut().sync_socket_state();
-                        }
+                        inner.borrow_mut().sync_socket_state();
                         let _ = tx_close.send(());
                     },
                 )
                 .map_err(tracerr::map_from_and_wrap!())?,
             );
 
-            let inner = Rc::downgrade(&socket.0);
-            socket.0.borrow_mut().on_open_listener = Some(
+            let inner = Rc::clone(&socket);
+            socket_mut.on_open_listener = Some(
                 EventListener::new_once(
-                    Rc::clone(&socket_transport),
+                    Rc::clone(&socket_mut.socket),
                     "open",
                     move |_| {
-                        if let Some(inner) = inner.upgrade().map(Self) {
-                            inner.0.borrow_mut().sync_socket_state();
-                        }
+                        inner.borrow_mut().sync_socket_state();
                         let _ = tx_open.send(());
                     },
                 )
@@ -280,14 +264,13 @@ impl WebSocketRpcTransport {
 
         let state = future::select(rx_open, rx_close).await;
 
-        socket.0.borrow_mut().on_open_listener.take();
-        socket.0.borrow_mut().on_close_listener.take();
-        socket.set_on_close_listener()?;
-        socket.set_on_message_listener()?;
+        let this = Self(socket);
+        this.set_on_close_listener()?;
+        this.set_on_message_listener()?;
 
         match state {
             future::Either::Left((opened, _)) => match opened {
-                Ok(_) => Ok(socket),
+                Ok(_) => Ok(this),
                 Err(_) => Err(tracerr::new!(TransportError::InitSocket)),
             },
             future::Either::Right(_closed) => {
@@ -296,27 +279,17 @@ impl WebSocketRpcTransport {
         }
     }
 
-    /// Sets [`WebSocketRpcTransport::on_close_listener`] which.will update
+    /// Sets [`WebSocketRpcTransport::on_close_listener`] which will update
     /// [`RpcTransport`] [`State`] to [`State::Closed`] with
     /// [`ClosedStateReason::ConnectionLoss`] with [`CloseMsg`].
     fn set_on_close_listener(&self) -> Result<()> {
-        let weak_transport = Rc::downgrade(&self.0);
+        let this = Rc::clone(&self.0);
         let on_close = EventListener::new_once(
             Rc::clone(&self.0.borrow().socket),
             "close",
             move |msg: CloseEvent| {
                 let close_msg = CloseMsg::from(&msg);
-                let transport = if let Some(socket_clone) =
-                    weak_transport.upgrade().map(Self)
-                {
-                    socket_clone
-                } else {
-                    console_error(
-                        "'WebSocketRpcTransport' was unexpectedly gone.",
-                    );
-                    return;
-                };
-                transport.0.borrow_mut().update_socket_state(&State::Closed(
+                this.borrow_mut().update_socket_state(&State::Closed(
                     ClosedStateReason::ConnectionLost(close_msg),
                 ));
             },
@@ -330,13 +303,13 @@ impl WebSocketRpcTransport {
     /// Sets [`WebSocketRpcTransport::on_message_listener`] which will send
     /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subs.
     fn set_on_message_listener(&self) -> Result<()> {
-        let weak_transport = Rc::downgrade(&self.0);
+        let this = Rc::clone(&self.0);
         let on_message = EventListener::new_mut(
             Rc::clone(&self.0.borrow().socket),
             "message",
             move |msg| {
-                let parsed: ServerMsg =
-                    match ServerMessage::try_from(&msg).map(Into::into) {
+                let msg =
+                    match ServerMessage::try_from(&msg).map(ServerMsg::from) {
                         Ok(parsed) => parsed,
                         Err(e) => {
                             // TODO: protocol versions mismatch? should drop
@@ -345,22 +318,13 @@ impl WebSocketRpcTransport {
                             return;
                         }
                     };
-                let transport = if let Some(transport) =
-                    weak_transport.upgrade().map(Self)
-                {
-                    transport
-                } else {
-                    console_error(
-                        "'WebSocketRpcTransport' was unexpectedly gone.",
-                    );
-                    return;
-                };
-                let mut transport_ref = transport.0.borrow_mut();
-                transport_ref
+
+                let mut this_mut = this.borrow_mut();
+                this_mut
                     .on_message_subs
                     .retain(|on_message| !on_message.is_closed());
-                transport_ref.on_message_subs.iter().for_each(|on_message| {
-                    on_message.unbounded_send(parsed.clone()).unwrap_or_else(
+                this_mut.on_message_subs.iter().for_each(|on_message| {
+                    on_message.unbounded_send(msg.clone()).unwrap_or_else(
                         |e| {
                             console_error(format!(
                                 "WebSocket's 'on_message' callback receiver \
@@ -377,6 +341,15 @@ impl WebSocketRpcTransport {
         self.0.borrow_mut().on_message_listener = Some(on_message);
 
         Ok(())
+    }
+}
+
+impl Drop for WebSocketRpcTransport {
+    fn drop(&mut self) {
+        let mut inner = self.0.borrow_mut();
+        inner.on_open_listener.take();
+        inner.on_message_listener.take();
+        inner.on_close_listener.take();
     }
 }
 

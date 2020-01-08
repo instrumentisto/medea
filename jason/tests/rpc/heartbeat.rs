@@ -8,11 +8,11 @@ use futures::{
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use medea_jason::rpc::{
-    Heartbeat, IdleTimeout, MockRpcTransport, PingInterval,
+    Heartbeater, IdleTimeout, MockRpcTransport, PingInterval, RpcTransport,
 };
 use wasm_bindgen_test::*;
 
-use crate::await_with_timeout;
+use crate::{await_with_timeout, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -27,23 +27,23 @@ wasm_bindgen_test_configure!(run_in_browser);
 /// 2. Mock [`RpcClient::send`] and check that [`ClientMsg::Pong`] was sent.
 #[wasm_bindgen_test]
 async fn sends_pong_on_received_ping() {
-    let hb = Heartbeat::new();
     let mut transport = MockRpcTransport::new();
     let (on_message_tx, on_message_rx) = mpsc::unbounded();
     transport
         .expect_on_message()
-        .return_once(|| Ok(Box::pin(on_message_rx)));
+        .return_once(|| Box::pin(on_message_rx));
     let (test_tx, test_rx) = oneshot::channel();
     transport.expect_send().return_once(move |msg| {
         test_tx.send(msg.clone()).unwrap();
         Ok(())
     });
-    hb.start(
-        IdleTimeout(Duration::from_secs(10).into()),
-        PingInterval(Duration::from_secs(10).into()),
+
+    let _hb = Heartbeater::start(
         Rc::new(transport),
-    )
-    .unwrap();
+        PingInterval(Duration::from_secs(10).into()),
+        IdleTimeout(Duration::from_secs(10).into()),
+    );
+
     on_message_tx.unbounded_send(ServerMsg::Ping(2)).unwrap();
     await_with_timeout(
         Box::pin(async move {
@@ -69,22 +69,19 @@ async fn sends_pong_on_received_ping() {
 /// 2. Wait for [`Heartbeat::on_idle`] resolving.
 #[wasm_bindgen_test]
 async fn on_idle_works() {
-    let hb = Heartbeat::new();
     let mut transport = MockRpcTransport::new();
     transport
         .expect_on_message()
-        .return_once(|| Ok(stream::pending().boxed()));
+        .return_once(|| stream::pending().boxed());
     transport.expect_send().return_once(|_| Ok(()));
 
-    let mut on_idle_stream = hb.on_idle();
-    hb.start(
-        IdleTimeout(Duration::from_millis(100).into()),
-        PingInterval(Duration::from_millis(50).into()),
+    let hb = Heartbeater::start(
         Rc::new(transport),
-    )
-    .unwrap();
+        PingInterval(Duration::from_millis(50).into()),
+        IdleTimeout(Duration::from_millis(100).into()),
+    );
 
-    await_with_timeout(Box::pin(on_idle_stream.next()), 110)
+    await_with_timeout(Box::pin(hb.on_idle().next()), 110)
         .await
         .unwrap()
         .unwrap();
@@ -103,23 +100,21 @@ async fn on_idle_works() {
 ///    milliseconds timeout).
 #[wasm_bindgen_test]
 async fn pre_sends_pong() {
-    let hb = Heartbeat::new();
     let mut transport = MockRpcTransport::new();
     transport
         .expect_on_message()
-        .return_once(|| Ok(stream::pending().boxed()));
+        .return_once(|| stream::pending().boxed());
     let (on_message_tx, mut on_message_rx) = mpsc::unbounded();
     transport.expect_send().return_once(move |msg| {
         on_message_tx.unbounded_send(msg.clone()).unwrap();
         Ok(())
     });
 
-    hb.start(
-        IdleTimeout(Duration::from_millis(100).into()),
-        PingInterval(Duration::from_millis(10).into()),
+    let _hb = Heartbeater::start(
         Rc::new(transport),
-    )
-    .unwrap();
+        PingInterval(Duration::from_millis(10).into()),
+        IdleTimeout(Duration::from_millis(100).into()),
+    );
 
     match await_with_timeout(on_message_rx.next().boxed(), 25)
         .await
@@ -133,4 +128,25 @@ async fn pre_sends_pong() {
             panic!("Received not pong message! Command: {:?}", cmd);
         }
     }
+}
+
+/// Tests that [`RpcTransport`] will be dropped when [`Heartbeater`] was
+/// dropped.
+#[wasm_bindgen_test]
+async fn transport_is_dropped_when_hearbeater_is_dropped() {
+    let mut transport = MockRpcTransport::new();
+    transport
+        .expect_on_message()
+        .returning(|| stream::pending().boxed());
+    let transport: Rc<dyn RpcTransport> = Rc::new(transport);
+
+    let hb = Heartbeater::start(
+        Rc::clone(&transport),
+        PingInterval(Duration::from_secs(3).into()),
+        IdleTimeout(Duration::from_secs(10).into()),
+    );
+    assert!(Rc::strong_count(&transport) > 1);
+    drop(hb);
+    resolve_after(100).await.unwrap();
+    assert_eq!(Rc::strong_count(&transport), 1);
 }

@@ -34,9 +34,7 @@ impl ConnectionHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0
-            .upgrade()
-            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+        upgrade_or_detached!(self.0)
             .map(|inner| inner.borrow_mut().on_remote_stream.set_func(f))
     }
 }

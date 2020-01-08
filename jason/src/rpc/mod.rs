@@ -22,22 +22,12 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, JsCaused, JsError};
+use crate::utils::{console_error, JasonError, JsCaused, JsError};
 
-#[cfg(not(feature = "mockable"))]
-use self::{
-    backoff_delayer::BackoffDelayer,
-    heartbeat::{Heartbeat, HeartbeatError},
-};
-
-#[cfg(feature = "mockable")]
-pub use self::{
-    backoff_delayer::BackoffDelayer,
-    heartbeat::{Heartbeat, HeartbeatError},
-};
 #[doc(inline)]
 pub use self::{
-    heartbeat::{IdleTimeout, PingInterval},
+    backoff_delayer::BackoffDelayer,
+    heartbeat::{HeartbeatError, Heartbeater, IdleTimeout, PingInterval},
     reconnect_handle::ReconnectorHandle,
     websocket::{TransportError, WebSocketRpcTransport},
 };
@@ -307,24 +297,13 @@ pub trait RpcClient {
     ///
     /// If token is `None` then [`RpcClient`] never was connected to a server.
     fn get_token(&self) -> Option<String>;
-
-    /// Returns current [`State`] of this [`RpcClient`].
-    fn get_state(&self) -> State;
-
-    /// Subscibes to a [`RpcClient`] [`State`] changes.
-    ///
-    /// This function guarantees that two identical [`State`]s in a row wouldn't
-    /// be sent.
-    fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
 /// RPC transport between a client and server.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Returns [`LocalBoxStream`] of all messages received by this transport.
-    fn on_message(
-        &self,
-    ) -> Result<LocalBoxStream<'static, ServerMsg>, Traced<TransportError>>;
+    fn on_message(&self) -> LocalBoxStream<'static, ServerMsg>;
 
     /// Sets reason, that will be sent to remote server when this transport will
     /// be dropped.
@@ -334,9 +313,6 @@ pub trait RpcTransport {
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
     /// Subscribes to a [`RpcTransport`]'s [`State`] changes.
-    ///
-    /// This function guarantees that two identical [`State`] variants in a row
-    /// doesn't will be sent.
     fn on_state_change(&self) -> LocalBoxStream<'static, State>;
 }
 
@@ -346,7 +322,7 @@ struct Inner {
     sock: Option<Rc<dyn RpcTransport>>,
 
     /// Service for connection loss detection through Ping/Pong mechanism.
-    heartbeat: Heartbeat,
+    heartbeat: Option<Heartbeater>,
 
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
@@ -399,7 +375,7 @@ impl Inner {
             sock: None,
             on_close_subscribers: Vec::new(),
             subs: vec![],
-            heartbeat: Heartbeat::new(),
+            heartbeat: None,
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             on_connection_loss_subs: Vec::new(),
             rpc_transport_factory,
@@ -437,18 +413,7 @@ impl Inner {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-/// Client API RPC client to talk with a server via [`WebSocket`].
-///
-/// Don't derive [`Clone`] and don't use it if there are no very serious reasons
-/// for this. Because with many strong [`Rc`]s we can catch many painful bugs
-/// with [`Drop`] implementation, memory leaks etc. It is especially not
-/// recommended use a strong pointer ([`Rc`]) in all kinds of callbacks and
-/// `async` closures. If you clone this then make sure that this
-/// [`WebSocketRpcClient`] will be normally [`Drop`]ed.
-///
-/// Alternative for [`Clone`] is [`WebSocketRpcClient::downgrade`] which will
-/// return [`WeakWebSocketRpcClient`] which can be upgraded to
-/// [`WebSocketRpcClient`] and will not hold this structure from destruction.
+/// Client API RPC client to talk with server via [`WebSocket`].
 pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 impl WebSocketRpcClient {
@@ -458,13 +423,10 @@ impl WebSocketRpcClient {
         Self(Inner::new(rpc_transport_factory))
     }
 
-    /// Will be called when [`RpcClient`] connection is
-    /// considered as lost.
-    ///
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
     /// subs about connection loss.
-    fn connection_loss(&self) {
-        self.0.borrow_mut().heartbeat.stop();
+    fn on_connection_loss(&self) {
+        self.0.borrow_mut().heartbeat.take();
         self.0
             .borrow_mut()
             .on_connection_loss_subs
@@ -485,14 +447,14 @@ impl WebSocketRpcClient {
     ///
     /// This function will be called on every WebSocket close (normal and
     /// abnormal) regardless of the [`CloseReason`].
-    fn transport_close(&self, close_msg: &CloseMsg) {
-        self.0.borrow_mut().heartbeat.stop();
+    fn on_close_message(&self, close_msg: &CloseMsg) {
+        self.0.borrow_mut().heartbeat.take();
 
         match &close_msg {
             CloseMsg::Normal(_, reason) => match reason {
                 CloseByServerReason::Reconnected => (),
                 CloseByServerReason::Idle => {
-                    self.connection_loss();
+                    self.on_connection_loss();
                 }
                 _ => {
                     self.0.borrow_mut().sock.take();
@@ -515,7 +477,7 @@ impl WebSocketRpcClient {
                 }
             },
             CloseMsg::Abnormal(_) => {
-                self.connection_loss();
+                self.on_connection_loss();
             }
         }
     }
@@ -541,7 +503,11 @@ impl WebSocketRpcClient {
                     PingInterval(
                         Duration::from_millis(settings.ping_interval_ms).into(),
                     ),
-                );
+                )
+                .map_err(tracerr::wrap!(=> RpcClientError))
+                .map_err(JasonError::from)
+                .map_err(console_error)
+                .ok();
             }
             _ => (),
         }
@@ -560,21 +526,20 @@ impl WebSocketRpcClient {
         let ping_interval = PingInterval(
             Duration::from_millis(rpc_settings.ping_interval_ms).into(),
         );
-        self.0
-            .borrow_mut()
-            .heartbeat
-            .start(idle_timeout, ping_interval, transport)
-            .map_err(tracerr::map_from_and_wrap!())?;
 
-        let mut on_idle = self.0.borrow().heartbeat.on_idle();
+        let heartbeat =
+            Heartbeater::start(transport, ping_interval, idle_timeout);
+
+        let mut on_idle = heartbeat.on_idle();
         let weak_this = Rc::downgrade(&self.0);
         spawn_local(async move {
             while let Some(_) = on_idle.next().await {
                 if let Some(this) = weak_this.upgrade().map(Self) {
-                    this.connection_loss();
+                    this.on_connection_loss();
                 }
             }
         });
+        self.0.borrow_mut().heartbeat = Some(heartbeat);
 
         Ok(())
     }
@@ -586,6 +551,8 @@ impl WebSocketRpcClient {
     ) -> Result<(), Traced<RpcClientError>> {
         self.0.borrow_mut().token = Some(token.clone());
         self.0.borrow_mut().update_state(&State::Connecting);
+
+        // wait for transport open
         let create_transport_fut =
             (self.0.borrow().rpc_transport_factory)(token);
         let transport = create_transport_fut.await.map_err(|e| {
@@ -598,12 +565,8 @@ impl WebSocketRpcClient {
             ))
         })?;
 
-        if let Some(msg) = transport
-            .on_message()
-            .map_err(tracerr::map_from_and_wrap!())?
-            .next()
-            .await
-        {
+        // wait for ServerMsg::RpcSettings
+        if let Some(msg) = transport.on_message().next().await {
             if let ServerMsg::RpcSettings(rpc_settings) = msg {
                 self.start_heartbeat(Rc::clone(&transport), rpc_settings)
                     .await?;
@@ -622,17 +585,17 @@ impl WebSocketRpcClient {
             return Err(tracerr::new!(RpcClientError::NoSocket));
         }
 
+        // subscribe to transport close
         let mut transport_on_state_change_stream = transport.on_state_change();
         let weak_inner = Rc::downgrade(&self.0);
         spawn_local(async move {
             while let Some(state) =
                 transport_on_state_change_stream.next().await
             {
-                if let Some(inner) = weak_inner.upgrade() {
-                    let this = Self(inner);
+                if let Some(this) = weak_inner.upgrade().map(Self) {
                     if let State::Closed(reason) = &state {
                         if let ClosedStateReason::ConnectionLost(msg) = reason {
-                            this.transport_close(&msg);
+                            this.on_close_message(&msg);
                         }
                     }
                     this.0.borrow_mut().update_state(&state);
@@ -640,10 +603,9 @@ impl WebSocketRpcClient {
             }
         });
 
+        // subscribe to transport message received
         let this_clone = Rc::downgrade(&self.0);
-        let mut on_socket_message = transport
-            .on_message()
-            .map_err(tracerr::map_from_and_wrap!())?;
+        let mut on_socket_message = transport.on_message();
         spawn_local(async move {
             while let Some(msg) = on_socket_message.next().await {
                 if let Some(this) = this_clone.upgrade().map(Self) {
@@ -683,11 +645,31 @@ impl WebSocketRpcClient {
         &self,
         idle_timeout: IdleTimeout,
         ping_interval: PingInterval,
-    ) {
+    ) -> Result<(), Traced<RpcClientError>> {
         self.0
             .borrow_mut()
             .heartbeat
-            .update_settings(idle_timeout, ping_interval);
+            .as_ref()
+            .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))
+            .map(|heartbeat| {
+                heartbeat.update_settings(idle_timeout, ping_interval)
+            })
+    }
+
+    /// Returns current [`State`] of this [`RpcClient`].
+    fn get_state(&self) -> State {
+        self.0.borrow().state.clone()
+    }
+
+    /// Subscribes to a [`RpcClient`] [`State`] changes.
+    ///
+    /// This function guarantees that two identical [`State`]s in a row wouldn't
+    /// be sent.
+    fn on_state_change(&self) -> LocalBoxStream<'static, State> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_state_change_subs.push(tx);
+
+        Box::pin(rx)
     }
 }
 
@@ -696,23 +678,27 @@ impl RpcClient for WebSocketRpcClient {
         &self,
         token: String,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-        let this = Self(Rc::clone(&self.0));
+        let weak_inner = Rc::downgrade(&self.0);
         Box::pin(async move {
-            let current_token = this.0.borrow().token.clone();
-            if let Some(current_token) = current_token {
-                if current_token == token {
-                    match this.get_state() {
-                        State::Open => Ok(()),
-                        State::Connecting => this.connecting_result().await,
-                        State::Closed(_) | State::Closing => {
-                            this.establish_connection(token).await
+            if let Some(this) = weak_inner.upgrade().map(Self) {
+                let current_token = this.0.borrow().token.clone();
+                if let Some(current_token) = current_token {
+                    if current_token == token {
+                        match this.get_state() {
+                            State::Open => Ok(()),
+                            State::Connecting => this.connecting_result().await,
+                            State::Closed(_) | State::Closing => {
+                                this.establish_connection(token).await
+                            }
                         }
+                    } else {
+                        this.establish_connection(token).await
                     }
                 } else {
                     this.establish_connection(token).await
                 }
             } else {
-                this.establish_connection(token).await
+                Err(tracerr::new!(RpcClientError::NoSocket))
             }
         })
     }
@@ -762,17 +748,6 @@ impl RpcClient for WebSocketRpcClient {
     fn get_token(&self) -> Option<String> {
         self.0.borrow().token.clone()
     }
-
-    fn get_state(&self) -> State {
-        self.0.borrow().state.clone()
-    }
-
-    fn on_state_change(&self) -> LocalBoxStream<'static, State> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_state_change_subs.push(tx);
-
-        Box::pin(rx)
-    }
 }
 
 impl Drop for Inner {
@@ -781,6 +756,5 @@ impl Drop for Inner {
         if let Some(socket) = self.sock.take() {
             socket.set_close_reason(self.close_reason.clone());
         }
-        self.heartbeat.stop();
     }
 }

@@ -111,13 +111,6 @@ pub struct ParticipantService {
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
-
-    /// Duration, after which the server deletes the client session if
-    /// the remote RPC client does not reconnect after it is idle.
-    idle_timeout: Duration,
-
-    /// Interval of sending `Ping`s from the server to the client.
-    ping_interval: Duration,
 }
 
 impl ParticipantService {
@@ -133,8 +126,6 @@ impl ParticipantService {
             drop_connection_tasks: HashMap::new(),
             turn_service: context.turn_service.clone(),
             rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
-            idle_timeout: context.config.rpc.idle_timeout,
-            ping_interval: context.config.rpc.ping_interval,
         })
     }
 
@@ -265,7 +256,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id.clone(), conn);
+                        room.members.insert_connection(member_id, conn);
                         member.replace_ice_user(ice);
 
                         wrap_future(future::ok(member))

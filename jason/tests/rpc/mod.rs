@@ -23,7 +23,7 @@ use medea_jason::rpc::{
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
-use crate::await_with_timeout;
+use crate::{await_with_timeout, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -37,10 +37,10 @@ fn new_client(transport: Rc<MockRpcTransport>) -> WebSocketRpcClient {
 /// Returns result for [`RpcTransport::on_message`] with [`LocalBoxStream`]
 /// which will only send [`ServerMsg::RpcSettings`] with provided
 /// [`RpcSettings`].
-fn on_message_mock<E>(
+fn on_message_mock(
     settings: RpcSettings,
-) -> Result<LocalBoxStream<'static, ServerMsg>, E> {
-    Ok(stream::once(async move { ServerMsg::RpcSettings(settings) }).boxed())
+) -> LocalBoxStream<'static, ServerMsg> {
+    stream::once(async move { ServerMsg::RpcSettings(settings) }).boxed()
 }
 
 /// Tests [`WebSocketRpcClient::subscribe`] function.
@@ -73,7 +73,7 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
             }))
             .unwrap();
             tx.unbounded_send(ServerMsg::Event(SRV_EVENT)).unwrap();
-            Ok(rx.boxed())
+            rx.boxed()
         });
         transport.expect_send().returning(|_| Ok(()));
         transport.expect_set_close_reason().return_const(());
@@ -150,7 +150,8 @@ async fn transport_is_dropped_when_client_is_dropped() {
     let ws = new_client(rpc_transport.clone());
     ws.connect(String::new()).await.unwrap();
     ws.set_close_reason(ClientDisconnect::RoomClosed);
-    std::mem::drop(ws);
+    drop(ws);
+    resolve_after(100).await.unwrap();
     assert_eq!(Rc::strong_count(&rpc_transport), 1);
 }
 
@@ -376,7 +377,7 @@ mod transport_close_reason_on_drop {
     async fn sets_default_close_reason_on_drop() {
         let (ws, test_rx) = get_client().await;
 
-        std::mem::drop(ws);
+        drop(ws);
 
         let close_reason = test_rx.await.unwrap();
         assert_eq!(
@@ -406,7 +407,7 @@ mod transport_close_reason_on_drop {
         let (ws, test_rx) = get_client().await;
 
         ws.set_close_reason(ClientDisconnect::RoomClosed);
-        std::mem::drop(ws);
+        drop(ws);
 
         let close_reason = test_rx.await.unwrap();
         assert_eq!(

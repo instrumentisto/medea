@@ -1,7 +1,7 @@
 //! Implementation of delayer which increases delay time by provided multiplier
 //! on every delay call.
 
-use crate::utils::{resolve_after, JsDuration};
+use crate::utils::{delay_for, JsDuration};
 
 /// Delayer which increases delay time by provided multiplier on every delay
 /// call
@@ -45,7 +45,7 @@ impl BackoffDelayer {
     /// [`BackoffDelayer::current_interval`] *
     /// [`BackoffDelayer::interval_multiplier`] milliseconds.
     pub async fn delay(&mut self) {
-        resolve_after(self.get_delay()).await;
+        delay_for(self.get_delay()).await;
     }
 
     /// Returns current interval and increases it for next call.
