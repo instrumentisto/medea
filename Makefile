@@ -447,7 +447,7 @@ endif
 #                 [browser=(chrome|firefox)]
 #                 [wait-on-fail=(no|yes)]
 
-test.e2e: up.e2e.services docker.up.webdriver
+test.e2e: up.e2e docker.up.webdriver
 	sleep 3
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
 		-w http://localhost:4444 \
@@ -483,7 +483,7 @@ run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
 run-medea-container-d =  $(run-medea-command) -d rust:latest
 run-medea-container = $(run-medea-command) rust:latest
 
-up.e2e.services:
+up.e2e:
 ifneq ($(dockerized),no)
 	mkdir -p .cache target ~/.cargo/registry
 endif
@@ -507,13 +507,14 @@ else
 	@make down.medea dockerized=no
 	@make up.coturn
 
-	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+	@make build.jason dockerized=yes
+	yes | cp -rf jason/pkg .cache/jason-pkg
 
-	$(run-medea-container) make build.medea optimized=yes
-	$(run-medea-container-d) cargo run --release > /tmp/medea.docker.uid
+	@make docker.build.medea
+	@make docker.up.medea dockerized=yes background=yes
 
-	$(run-medea-container) cargo build -p medea-control-api-mock
-	$(run-medea-container-d) cargo run -p medea-control-api-mock > /tmp/control-api-mock.docker.uid
+	@make docker.build.control dockerized=yes
+	@make docker.up.control dockerized=yes background=yes
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
 endif

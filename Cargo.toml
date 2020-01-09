@@ -13,6 +13,9 @@ keywords = ["medea", "media-server"]
 categories = ["multimedia"]
 include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 
+[badges]
+travis-ci = { repositoy = "instrumentisto/medea" }
+
 [workspace]
 members = [
     "crates/medea-macro",
