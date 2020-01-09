@@ -1,7 +1,7 @@
 //! Implementation for run tests in browser, check and print results.
 
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{prelude::*, Error as IoError},
     path::{Path, PathBuf},
 };
@@ -16,6 +16,13 @@ use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
+use std::fs::DirEntry;
+
+fn wait_for_enter() {
+    let mut s = String::new();
+    println!("Press <Enter> for close...");
+    std::io::stdin().read_line(&mut s).unwrap();
+}
 
 /// Errors which can occur in [`TestRunner`].
 #[allow(clippy::pub_enum_variant_names)]
@@ -91,7 +98,7 @@ impl<'a> TestRunner<'a> {
     /// Run e2e tests.
     pub async fn run(mut self, path_to_tests: PathBuf) -> Result<(), Error> {
         let (tests, test_dir) = if path_to_tests.is_dir() {
-            (get_all_tests_paths(&path_to_tests), path_to_tests.as_path())
+            (get_all_tests_paths(&path_to_tests).unwrap(), path_to_tests.as_path())
         } else {
             (vec![path_to_tests.clone()], path_to_tests.parent().unwrap())
         };
@@ -116,9 +123,7 @@ impl<'a> TestRunner<'a> {
         let result = self.tests_loop(&mut client).await;
         if result.is_err() {
             if self.is_wait_on_fail_mode {
-                let mut s = String::new();
-                println!("Press <Enter> for close...");
-                std::io::stdin().read_line(&mut s).unwrap();
+                wait_for_enter();
             }
             client.close().await?;
         }
@@ -181,13 +186,9 @@ impl<'a> TestRunner<'a> {
                 println!("{}", test_results);
                 return if test_results.is_has_error() {
                     println!("Console log: ");
-                    for messages in logs {
-                        let messages = messages.as_array().unwrap();
-                        for message in messages {
-                            let message = message.as_str().unwrap();
-                            println!("{}", message);
-                        }
-                    }
+                    logs.iter()
+                        .flat_map(|msg| msg.as_array().unwrap().iter())
+                        .for_each(|msg| println!("{}", msg.as_str().unwrap()));
                     Err(Error::TestsFailed)
                 } else {
                     Ok(())
@@ -204,15 +205,8 @@ impl<'a> TestRunner<'a> {
         format!("http://{}/e2e-tests/{}", self.test_addr, filename)
     }
 
-    /// Returns browser capabilities based on arguments.
-    ///
-    /// Currently check `--headless` flag and based on this run headed or
-    /// headless browser.
-    fn get_webdriver_capabilities(&self) -> Capabilities {
-        let mut capabilities = Capabilities::new();
-
-        let mut firefox_args = Vec::new();
-        let mut chrome_args = vec![
+    fn get_chrome_args(&self) -> Vec<&str> {
+        let mut default_args = vec![
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
             "--disable-web-security",
@@ -220,11 +214,23 @@ impl<'a> TestRunner<'a> {
             "--no-sandbox",
         ];
         if self.is_headless {
-            firefox_args.push("--headless");
-            chrome_args.push("--headless");
+            default_args.push("--headless");
         }
 
-        let firefox_settings = json!({
+        default_args
+    }
+
+    fn get_firefox_args(&self) -> Vec<&str> {
+        let mut default_args = vec![];
+        if self.is_headless {
+            default_args.push("--headless");
+        }
+
+        default_args
+    }
+
+    fn get_firefox_settings(&self) -> serde_json::Value {
+        json!({
             "prefs": {
                 "media.navigator.streams.fake": true,
                 "media.navigator.permission.disabled": true,
@@ -233,40 +239,51 @@ impl<'a> TestRunner<'a> {
                 "media.autoplay.ask-permission": false,
                 "media.autoplay.default": 0,
             },
-            "args": firefox_args
-        });
-        capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
+            "args": self.get_firefox_args()
+        })
+    }
 
-        let chrome_settings = json!({ "args": chrome_args });
-        capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
+    fn get_chrome_settings(&self) -> serde_json::Value {
+        json!({ "args": self.get_chrome_args() })
+    }
+
+    /// Returns browser capabilities based on arguments.
+    ///
+    /// Currently check `--headless` flag and based on this run headed or
+    /// headless browser.
+    fn get_webdriver_capabilities(&self) -> Capabilities {
+        let mut capabilities = Capabilities::new();
+        capabilities.insert(
+            "moz:firefoxOptions".to_string(),
+            self.get_firefox_settings(),
+        );
+        capabilities.insert(
+            "goog:chromeOptions".to_string(),
+            self.get_chrome_settings(),
+        );
 
         capabilities
     }
 }
 
+fn helper_url(path: &PathBuf) -> String {
+    let filename = path.file_name().unwrap().to_str().unwrap();
+    format!("/e2e-tests/helper/{}", filename)
+}
+
 /// Returns urls to all helpers JS from `e2e-tests/helper`.
 fn get_all_helpers_urls() -> Result<Vec<String>, IoError> {
-    let mut test_path = crate::get_path_to_tests();
-    let mut helpers = Vec::new();
+    let mut test_path = crate::get_default_path_to_tests();
     test_path.push("helper");
-    for entry in std::fs::read_dir(test_path)? {
-        let entry = entry?;
-        let path = entry.path();
-        helpers.push(path);
-    }
 
-    Ok(helpers
+    Ok(fs::read_dir(test_path)?
         .into_iter()
-        .map(|f| {
-            format!(
-                "/e2e-tests/helper/{}",
-                f.file_name().unwrap().to_str().unwrap()
-            )
-        })
+        .filter_map(|entry| entry.ok())
+        .map(|entry| helper_url(&entry.path()))
         .collect())
 }
 
-/// Generate html for spec by `test_template.html` from root.
+/// Generates HTML for spec by `test_template.html` from root.
 fn generate_test_html(test_name: &str) -> String {
     let dont_edit_warning = "<!--DON'T EDIT THIS FILE. THIS IS AUTOGENERATED \
                              FILE FOR TESTS-->"
@@ -284,7 +301,7 @@ fn generate_test_html(test_name: &str) -> String {
     format!("{}\n{}", dont_edit_warning, html_body)
 }
 
-/// Generate html and save it with same path as a spec but with extension
+/// Generates HTML and save it with same path as a spec but with extension
 /// `.html`.
 fn generate_and_save_test_html(test_path: &PathBuf) -> PathBuf {
     let test_html =
@@ -303,19 +320,17 @@ async fn wait_for_test_end(client: &mut Client) -> Result<(), CmdError> {
     Ok(())
 }
 
+fn is_js_file(path: &PathBuf) -> bool {
+    let is_js_ext = path.extension().filter(|ext| *ext == "js").is_some();
+    path.is_file() && is_js_ext
+}
+
 /// Get all paths to spec files from provided dir.
-fn get_all_tests_paths(path_to_test_dir: &PathBuf) -> Vec<PathBuf> {
-    let mut tests_paths = Vec::new();
-    for entry in std::fs::read_dir(path_to_test_dir).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext == "js" {
-                    tests_paths.push(path);
-                }
-            }
-        }
-    }
-    tests_paths
+fn get_all_tests_paths(path_to_test_dir: &PathBuf) -> Result<Vec<PathBuf>, IoError> {
+    Ok(fs::read_dir(path_to_test_dir)?
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| is_js_file(path))
+        .collect())
 }
