@@ -7,7 +7,7 @@
 pub mod mocha_result;
 pub mod test_runner;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use actix_files::NamedFile;
 use actix_web::{
@@ -19,7 +19,6 @@ use clap::{
 };
 
 use crate::test_runner::TestRunnerBuilder;
-use std::str::FromStr;
 
 /// HTTP endpoint which return requested file from this dir.
 ///
@@ -30,11 +29,11 @@ async fn index(req: HttpRequest) -> HttpResult<NamedFile> {
     Ok(NamedFile::open(path)?)
 }
 
-/// Start server which serves files from this dir.
+/// Start server which serves test files.
 ///
-/// WebDriver's browser will go into test files from this server.
+/// WebDriver's browser will be routed into test files from this server.
 ///
-/// This is needed because restriction for `type= "module"` scripts.
+/// This is needed because restriction for `type = "module"` scripts.
 fn run_test_files_server(addr: &str) -> Server {
     HttpServer::new(|| {
         App::new()
@@ -45,26 +44,28 @@ fn run_test_files_server(addr: &str) -> Server {
     .run()
 }
 
-/// Returns [`PathBuf`] to a `e2e-tests` path.
+/// Returns default path to a E2E tests directory.
 pub fn get_default_path_to_tests() -> PathBuf {
     let mut test_path = std::env::current_dir().unwrap();
     test_path.push("e2e-tests");
     test_path
 }
 
-/// Returns [`PathBuf`] to test/test dir from clap's [`ArgMatches`].
+/// Returns [`PathBuf`] to test/tests dir from clap's [`ArgMatches`].
 fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
-    opts.value_of("spec_path")
-        .map(|path_str| {
+    opts.value_of("spec_path").map_or_else(
+        get_default_path_to_tests,
+        |path_str| {
             let path = PathBuf::from_str(path_str).unwrap();
             if !path.exists() {
                 panic!("Path '{}' doesn't exists!", path_str);
             }
             path
-        })
-        .unwrap_or_else(|| get_default_path_to_tests())
+        },
+    )
 }
 
+/// Returns [`ArgMatches`] with arguments provided into `e2e-tests-runner`.
 fn get_opts<'a>() -> ArgMatches<'a> {
     app_from_crate!()
         .arg(
@@ -110,7 +111,7 @@ async fn main() {
         run_test_files_server(opts.value_of("tests_files_addr").unwrap());
 
     TestRunnerBuilder::default()
-        .test_addr(opts.value_of("tests_files_addr").unwrap())
+        .test_files_host(opts.value_of("tests_files_addr").unwrap())
         .is_wait_on_fail_mode(opts.is_present("wait_on_fail"))
         .webdriver_addr(opts.value_of("webdriver_addr").unwrap())
         .is_headless(opts.is_present("headless"))

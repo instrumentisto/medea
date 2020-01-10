@@ -5,26 +5,30 @@ use std::fmt;
 use serde::Deserialize;
 use yansi::Paint;
 
-/// Results of mocha tests.
+/// Results of [Mocha] tests.
 ///
-/// This struct will be parsed from mocha's JSON reporters string.
+/// This struct will be parsed from [Mocha]'s JSON reporters string.
+///
+/// [Mocha]: https://mochajs.org/
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestResults {
     /// Summary stats of all tests.
     pub stats: TestStats,
 
-    /// Collection of all failed tests.
+    /// All failed tests.
     pub failures: Vec<FailureTestResult>,
 
-    /// Collection of all success tests.
+    /// All success tests.
     pub passes: Vec<SuccessTestResult>,
 }
 
 impl TestResults {
-    /// Check that results of mocha tests has error.
+    /// Checks that results of [Mocha] tests has error.
     ///
     /// Returns `true` if failures vector not empty.
+    ///
+    /// [Mocha]: https://mochajs.org/
     pub fn is_has_error(&self) -> bool {
         !self.failures.is_empty()
     }
@@ -55,7 +59,9 @@ impl fmt::Display for TestResults {
     }
 }
 
-/// Summary stats of mocha tests.
+/// Summary stats of [Mocha] tests.
+///
+/// [Mocha]: https://mochajs.org/
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestStats {
@@ -69,6 +75,7 @@ pub struct TestStats {
     pub passes: i32,
 
     /// Count of pending tests.
+    ///
     /// This is __useless__ field because in our case this count always zero.
     pub pending: i32,
 
@@ -85,7 +92,7 @@ pub struct TestStats {
     pub duration: u32,
 }
 
-/// Test which failed.
+/// Error of failed test.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestError {
@@ -96,7 +103,7 @@ pub struct TestError {
     pub stack: String,
 }
 
-/// Test which success.
+/// Test which successfully passed.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SuccessTestResult {
@@ -124,7 +131,7 @@ impl fmt::Display for SuccessTestResult {
     }
 }
 
-/// Test which failed
+/// Failed test.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FailureTestResult {
