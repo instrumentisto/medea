@@ -23,6 +23,7 @@
         }
 
         window.getJason = getJason;
+        mocha.run()
     </script>
 </head>
 
@@ -52,10 +53,6 @@
 
 <!--Include a file with mocha tests-->
 <script src="/e2e-tests/{{{test}}}"></script>
-
-<script>
-    setTimeout(() => mocha.run(), 1);
-</script>
 </body>
 
 </html>
