@@ -2,7 +2,7 @@ let assert = chai.assert;
 
 describe('Pub<=>Pub video call', () => {
   /**
-   * Send POST request for create pub-pub-e2e-call to control-api-mock.
+   * Sends POST request for create 'pub-pub-e2e-call' with 'control-api-mock'.
    */
   async function createRoom() {
     await axios({
@@ -84,9 +84,9 @@ describe('Pub<=>Pub video call', () => {
   }
 
   /**
-   * Start Pub<=>Pub video call.
+   * Starts Pub<=>Pub video call.
    *
-   * This function returns caller room and responder room objects.
+   * @returns 'Room' for 'caller' and 'responder'.
    */
   async function startPubPubVideoCall() {
     const callerRoom = await newRoom(callerPartnerVideo);
@@ -105,6 +105,7 @@ describe('Pub<=>Pub video call', () => {
     }
   }
 
+  // Rooms with which tests will ran.
   let rooms;
 
   before(async () => {
@@ -119,7 +120,7 @@ describe('Pub<=>Pub video call', () => {
     await deleteRoom();
   });
 
-  it('send rtc packets', async () => {
+  it('sends rtc packets', async () => {
     /**
      * Takes array of RTCStatsReport and count "outbound-rtp" and "inbound-rtp"
      * for all RTCStatsReport. If "outbound-rtp"'s "packetsSent" or "inbound-rtp"'s
@@ -150,7 +151,7 @@ describe('Pub<=>Pub video call', () => {
     checkStats(responderStats);
   }).retries(20);
 
-  it('video not static', async () => {
+  it('videos not static', async () => {
     let callerVideo = await waitForElement(callerPartnerVideo);
     checkVideoDiff(callerVideo);
     let responderVideo = await waitForElement(responderPartnerVideo);
