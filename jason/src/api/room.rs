@@ -289,12 +289,8 @@ impl RoomHandle {
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
-    pub fn get_stats_for_peer_connections(&self) -> Promise {
-        self.0
-            .upgrade()
-            .unwrap()
-            .borrow()
-            .get_stats_of_peer_connections()
+    pub fn get_stats_for_peer_connections(&self) -> Result<Promise, JsValue> {
+        map_weak!(self, |inner| inner.borrow().get_stats_of_peer_connections())
     }
 }
 
@@ -467,15 +463,15 @@ impl InnerRoom {
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
     pub fn get_stats_of_peer_connections(&self) -> Promise {
-        let fut = self.peers.get_stats_for_all_peer_connections();
+        let get_stats_fut = self.peers.get_stats_of_all_peer_connections();
         future_to_promise(async move {
-            let js_array = js_sys::Array::new();
-            for result in fut.await {
-                let id = result.map_err(|e| JsValue::from(e.to_string()))?;
-                js_array.push(&id);
-            }
+            let stats_array = get_stats_fut
+                .await
+                .into_iter()
+                .map(|res| res.map_err(|e| JasonError::from(e).into()))
+                .collect::<Result<js_sys::Array, JsValue>>()?;
 
-            Ok(JsValue::from(js_array))
+            Ok(JsValue::from(stats_array))
         })
     }
 

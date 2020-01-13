@@ -29,7 +29,7 @@
 <body>
 <div id="mocha"></div>
 <script>
-    // This is needed for retrieving mocha results from e2e-tests-runner
+    // This is needed for retrieving Mocha results from 'e2e-tests-runner'
     console.stdlog = console.log.bind(console);
     console.logs = [];
     console.log = function() {
@@ -42,7 +42,7 @@
         reporter: 'json'
     });
 
-    // root after() for signal for test-runner that tests done.
+    // Root 'after()' for signal for 'e2e-test-runner' that tests done.
     after(() => {
         let successEl = document.createElement('div');
         successEl.id = 'test-end';

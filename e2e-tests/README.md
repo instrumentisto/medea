@@ -34,8 +34,8 @@ it works.__
 
 
 
-[e2e-tests-runner]: https://github.com/instrumentisto/medea/tree/master/crates/test/e2e-tests-runner
+[e2e-tests-runner]: https://github.com/instrumentisto/medea/tree/master/crates/e2e-tests-runner
 [jason]: https://github.com/instrumentisto/medea/tree/master/jason
 [mocha]: https://mochajs.org/
 [chai]: https://www.chaijs.com/
-[test_template.html]: https://github.com/instrumentisto/medea/blob/master/crates/test/e2e-tests-runner/test_template.html
+[test_template.html]: https://github.com/instrumentisto/medea/blob/master/crates/e2e-tests-runner/test_template.html

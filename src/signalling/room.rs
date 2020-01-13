@@ -82,8 +82,10 @@ pub enum RoomError {
     #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
 
+    #[display(fmt = "{}", _0)]
     MembersLoadError(MembersLoadError),
 
+    #[display(fmt = "{}", _0)]
     TryFromElementError(TryFromElementError),
 
     #[display(fmt = "Generic room error: {}", _0)]

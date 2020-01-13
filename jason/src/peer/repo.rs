@@ -39,7 +39,7 @@ pub trait PeerRepository {
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
-    fn get_stats_for_all_peer_connections(
+    fn get_stats_of_all_peer_connections(
         &self,
     ) -> LocalBoxFuture<'static, Vec<Result<JsValue, Traced<PeerError>>>>;
 }
@@ -95,17 +95,16 @@ impl PeerRepository for Repository {
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
-    fn get_stats_for_all_peer_connections(
+    fn get_stats_of_all_peer_connections(
         &self,
     ) -> LocalBoxFuture<'static, Vec<Result<JsValue, Traced<PeerError>>>> {
-        let futs: Vec<_> = self
-            .peers
-            .values()
-            .cloned()
-            .map(|p| Box::pin(async move { p.get_stats().await }))
-            .collect();
-
-        Box::pin(futures::future::join_all(futs))
+        Box::pin(futures::future::join_all(
+            self.peers
+                .values()
+                .cloned()
+                .map(|p| Box::pin(async move { p.get_stats().await }))
+                .collect::<Vec<_>>(),
+        ))
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.

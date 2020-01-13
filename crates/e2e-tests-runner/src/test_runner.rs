@@ -21,6 +21,7 @@ use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
 
+/// Locks thread until used presses `Enter` in command line.
 fn wait_for_enter() {
     let mut s = String::new();
     println!("Press <Enter> for close...");

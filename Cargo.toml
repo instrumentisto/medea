@@ -19,7 +19,7 @@ travis-ci = { repositoy = "instrumentisto/medea" }
 [workspace]
 members = [
     "crates/medea-macro",
-    "crates/test/e2e-tests-runner",
+    "crates/e2e-tests-runner",
     "jason",
     "mock/control-api",
     "proto/client-api",

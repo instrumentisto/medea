@@ -258,7 +258,7 @@ impl PeerConnection {
         });
     }
 
-    /// Returns future which resolves into [`RTCStatsReport`][1]
+    /// Returns [`Future`] which resolves into [`RTCStatsReport`][1]
     /// for this [`PeerConnection`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport

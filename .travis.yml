@@ -113,7 +113,7 @@ jobs:
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason browser=firefox
 
-    - name: E2E (stable)
+    - name: integration (stable)
       stage: test
       rust: stable
       services: ["docker"]
@@ -122,13 +122,13 @@ jobs:
       script: make test.integration up=yes dockerized=yes log=yes wait=30
                             TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
-    - name: Browser E2E (latest Firefox, stable Rust)
+    - name: E2E (stable, Firefox)
       stage: test
       rust: stable
       script: make test.e2e browser=firefox dockerized=yes log=yes wait=30
                           TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
-    - name: Browser E2E (latest Chrome, stable Rust)
+    - name: E2E (stable, Chrome)
       stage: test
       rust: stable
       script: make test.e2e browser=chrome dockerized=yes log=yes wait=30

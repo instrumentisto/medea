@@ -101,8 +101,8 @@ release: release.crates release.npm
 test:
 	@make test.unit
 	@make test.integration up=yes dockerized=no
-	@make test.e2e browser=chrome
-	@make test.e2e browser=firefox
+	@make test.e2e browser=chrome up=yes dockerized=yes
+	@make test.e2e browser=firefox up=yes dockerized=yes
 
 
 up: up.dev
@@ -140,7 +140,7 @@ down.dev:
 	@make docker.down.coturn
 
 
-# Stop all services needed for e2e testing of medea in browsers.
+# Stop all services needed for E2E testing of Medea and Jason in browsers.
 #
 # Usage:
 #   make down.e2e [dockerized=(yes|no)] [coturn=(yes|no)]
@@ -155,9 +155,9 @@ ifneq ($(coturn),no)
 	-@make down.coturn
 endif
 else
-	@make docker.down.control
-	@make docker.down.medea
-	@make down.coturn
+	- @make docker.down.control
+	- @make docker.down.medea
+	- @make down.coturn
 endif
 
 
@@ -198,15 +198,6 @@ up.medea: docker.up.medea
 
 up.jason:
 	npm run start --prefix=jason/e2e-demo
-
-
-# Run Control API mock server.
-#
-# Usage:
-#  make up.control-api-mock
-
-up.control-api-mock:
-	cargo run -p medea-control-api-mock
 
 
 
@@ -401,7 +392,7 @@ endif
 endif
 
 
-# Run Rust E2E tests of project.
+# Run Medea integration tests of project.
 #
 # Usage:
 # 	make test.integration [up=no]
@@ -440,27 +431,45 @@ endif
 # with 'dockerized=no' and 'headless=no' flags.
 #
 # Usage:
-#   make test.e2e [dockerized=(yes|no)]
+# 	make test.e2e [browser=(chrome|firefox)]
+#                 [up=(yes|no)]
+#	              [dockerized=yes [TAG=(dev|<docker-tag>)]
+#	                      [registry=<registry-host>]]
+#	                      [background=no]
+#	                      [background=yes [log=(no|yes)]]]
+#                 [logs=(no|yes)]
 #                 [headless=(yes|no)]
-#                 [browser=(chrome|firefox)]
 #                 [wait-on-fail=(no|yes)]
 
-test.e2e: up.e2e docker.up.webdriver
+test.e2e:
+ifneq ($(up),no)
+	@make up.e2e
+	@make docker.up.webdriver
+endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
 		-w http://localhost:4444 \
 		-f localhost:$(test-runner-port) \
 		$(if $(call eq,$(headless),no),,--headless) \
 		$(if $(call eq,$(wait-on-fail),yes),--wait-on-fail,)
+ifneq ($(up),no)
 	@make docker.down.webdriver
 	@make down.e2e
+endif
 
 
-# Start services needed for e2e tests of medea in browsers.
-# If logs set to "yes" then medea print all logs to stdout.
+# Start services needed for E2E tests of Medea in browsers.
+# If logs set to 'yes' then medea print all logs to STDOUT.
 #
 # Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)]
+# 	make up.e2e [browser=(chrome|firefox)]
+#	              [dockerized=yes [TAG=(dev|<docker-tag>)]
+#	                      [registry=<registry-host>]]
+#	                      [background=no]
+#	                      [background=yes [log=(no|yes)]]]
+#                 [logs=(no|yes)]
+#                 [headless=(yes|no)]
+#                 [wait-on-fail=(no|yes)]
 
 medea-env = RUST_BACKTRACE=1 \
 	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
@@ -620,18 +629,6 @@ else
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
 endif
-
-
-# Build REST Control API mock server.
-#
-# Usage:
-#   make docker.build.control-api-mock
-
-docker.build.control-api-mock:
-	docker build -t instrumentisto/medea-control-api-mock:dev \
-		-f crates/control-api-mock/Dockerfile \
-		--build-arg medea_build_image=$(medea-build-image) \
-		.
 
 
 # Build medea project Docker image.
@@ -1016,21 +1013,6 @@ endef
 
 
 
-###################
-# Protoc commands #
-###################
-
-# Rebuild gRPC protobuf specs for medea-control-api-proto.
-#
-# Usage:
-#  make protoc.rebuild
-
-protoc.rebuild:
-	rm -f proto/control-api/src/grpc/control_api*.rs
-	cargo build -p medea-control-api-proto
-
-
-
 ##################
 # .PHONY section #
 ##################
@@ -1044,12 +1026,11 @@ protoc.rebuild:
         	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
         	docker.up.webdriver \
         docs docs.rust \
-        down down.control down.coturn down.demo down.dev down.medea \
+        down down.control down.coturn down.demo down.dev down.medea down.e2e \
         helm helm.down helm.lint helm.list helm.package helm.package.release \
         	helm.up \
         minikube.boot \
-        protoc.rebuild \
         release release.crates release.helm release.npm \
         test test.e2e test.unit test.integration \
-        up up.control up.coturn up.demo up.dev up.jason up.medea \
+        up up.control up.coturn up.demo up.dev up.jason up.medea up.e2e \
         yarn
