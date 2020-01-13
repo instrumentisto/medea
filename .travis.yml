@@ -125,14 +125,14 @@ jobs:
     - name: Browser E2E (latest Firefox, stable Rust)
       stage: test
       rust: stable
-      cache: cargo
-      script: make test.e2e browser=firefox
+      script: make test.e2e browser=firefox dockerized=yes log=yes wait=30
+                          TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: Browser E2E (latest Chrome, stable Rust)
       stage: test
       rust: stable
-      cache: cargo
-      script: make test.e2e browser=chrome
+      script: make test.e2e browser=chrome dockerized=yes log=yes wait=30
+                          TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release

@@ -448,7 +448,7 @@ endif
 #                 [wait-on-fail=(no|yes)]
 
 test.e2e: up.e2e docker.up.webdriver
-	sleep 3
+	sleep $(if $(call eq,$(wait),),5,$(wait))
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
 		-w http://localhost:4444 \
 		-f localhost:$(test-runner-port) \
@@ -462,7 +462,7 @@ test.e2e: up.e2e docker.up.webdriver
 # If logs set to "yes" then medea print all logs to stdout.
 #
 # Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)]
 
 medea-env = RUST_BACKTRACE=1 \
 	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
@@ -510,8 +510,9 @@ else
 	@make build.jason dockerized=yes
 	yes | cp -rf jason/pkg .cache/jason-pkg
 
-	@make docker.build.medea
-	@make docker.up.medea dockerized=yes background=yes
+	make docker.up.medea debug=$(debug) background=yes log=$(log) \
+	                     dockerized=$(dockerized) \
+	                     TAG=$(TAG) registry=$(registry)
 
 	@make docker.build.control dockerized=yes
 	@make docker.up.control dockerized=yes background=yes
