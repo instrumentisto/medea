@@ -517,7 +517,6 @@ ifneq ($(up),no)
 	@make docker.up.webdriver
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
-	ls -R
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
 		-w http://localhost:4444 \
 		-f localhost:$(test-runner-port) \
