@@ -16,7 +16,7 @@ All user visible changes to this project will be documented in this file. This p
 - Configuration:
     - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]).
 - RPC messaging:
-    - Reverse `ping-pong` mechanism: server sends `Ping` and expects `Pongs` from clients now. ([#75]).
+    - Reverse `Ping`/`Pong` naming: server sends `Ping` and expects `Pongs` from client now. ([#75]).
 
 ### Added
 
@@ -38,7 +38,7 @@ All user visible changes to this project will be documented in this file. This p
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
-    - `rpc.ping_interval` option to configure `Ping` sending interval ([#75]).
+    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
 - Testing:
     - E2E tests for signalling ([#28]).
 

@@ -1,6 +1,9 @@
 //! WebSocket session.
 
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryInto as _,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
@@ -53,7 +56,7 @@ pub struct WsSession {
     /// Last number of [`ServerMsg::Ping`].
     last_ping_num: u64,
 
-    /// Interval of sending [`ServerMsg::Ping`]s to a client.
+    /// Interval to send [`ServerMsg::Ping`]s to a client with.
     ping_interval: Duration,
 
     /// [`WsSession`] closed reason. Should be set by the moment
@@ -113,12 +116,19 @@ impl WsSession {
     }
 
     /// Returns [`RpcSettings`] based on `idle_timeout` and `ping_interval`
-    /// setted for this [`WsSession`].
-    #[allow(clippy::cast_possible_truncation)]
+    /// settled for this [`WsSession`].
     fn get_rpc_settings(&self) -> RpcSettings {
         RpcSettings {
-            idle_timeout_ms: self.idle_timeout.as_millis() as u64,
-            ping_interval_ms: self.ping_interval.as_millis() as u64,
+            idle_timeout_ms: self
+                .idle_timeout
+                .as_millis()
+                .try_into()
+                .expect("'idle_timeout' should fit into u64"),
+            ping_interval_ms: self
+                .ping_interval
+                .as_millis()
+                .try_into()
+                .expect("'ping_interval' should fit into u64"),
         }
     }
 }
@@ -421,7 +431,6 @@ mod test {
         assert_eq!(item, Some(close_frame));
     }
 
-    // WsSession sends rpc settings and pings.
     #[test]
     fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {

@@ -92,7 +92,7 @@ impl PeerRepository {
 
         debug!(
             "Created Peers pair between {} and {}: [{}, {}].",
-            first_member_id, second_member_id, first_peer_id, second_peer_id
+            first_member_id, second_member_id, first_peer_id, second_peer_id,
         );
 
         let first_peer = Peer::new(

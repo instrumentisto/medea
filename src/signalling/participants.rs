@@ -178,7 +178,7 @@ impl ParticipantService {
     ) -> Result<Member, AuthorizationError> {
         let member = self
             .get_member_by_id(member_id)
-            .ok_or_else(|| AuthorizationError::MemberNotExists)?;
+            .ok_or(AuthorizationError::MemberNotExists)?;
         if member.credentials() == credentials {
             Ok(member)
         } else {
@@ -320,6 +320,8 @@ impl ParticipantService {
     }
 
     /// Deletes [`IceUser`] associated with provided [`Member`].
+    // Type inference fails on `.map_or_else()` and cannot coerce
+    // `Box<ResultFuture>` into `Box<dyn Future>`.
     #[allow(clippy::option_map_unwrap_or_else)]
     fn delete_ice_user(
         &mut self,
