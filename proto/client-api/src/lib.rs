@@ -60,29 +60,30 @@ impl_incrementable!(TrackId);
 #[derive(Clone, Debug)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
-    /// `ping` message that WebSocket server is expected to send to the client
-    /// periodically.
+    /// `ping` message that `Media Server` is expected to send to `Client`
+    /// periodically for probing its aliveness.
     Ping(u64),
+
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
     Event(Event),
-    /// Media server notifies Web Client about necessity to update RPC
+
+    /// `Media Server` notifies `Client` about necessity to update its RPC
     /// settings.
     RpcSettings(RpcSettings),
 }
 
-/// Media server notifies Web Client about necessity to update RPC
-/// settings.
+/// RPC settings of `Client` received from `Media Server`.
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RpcSettings {
-    /// If server doesn't receive [`ClientMsg::Pong`] from a client during
-    /// this time, the client's connection will be considered as `Lost`.
+    /// Timeout of considering `Client` as lost by `Media Server` when it
+    /// doesn't receive [`ClientMsg::Pong`].
     ///
     /// Unit: millisecond.
     pub idle_timeout_ms: u64,
 
-    /// Interval between [`ServerMsg::Ping`] sending.
+    /// Interval that `Media Server` sends [`ServerMsg::Ping`] with.
     ///
     /// Unit: millisecond.
     pub ping_interval_ms: u64,
@@ -92,10 +93,11 @@ pub struct RpcSettings {
 #[derive(Clone, Debug)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
-    /// `pong` message that client answers with to WebSocket server in response
-    /// to received `ping` message.
+    /// `pong` message that `Client` answers with to `Media Server` in response
+    /// to received [`ServerMsg::Ping`].
     Pong(u64),
-    /// Request of `Web Client` to change the state on `Media Server`.
+
+    /// Request of `Client` to change the state on `Media Server`.
     Command(Command),
 }
 
@@ -317,17 +319,20 @@ impl<'de> Deserialize<'de> for ClientMsg {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
+        use serde::de::Error as _;
 
         let ev = serde_json::Value::deserialize(deserializer)?;
         let map = ev.as_object().ok_or_else(|| {
-            Error::custom(format!("unable to deser ClientMsg [{:?}]", &ev))
+            D::Error::custom(format!(
+                "unable to deserialize ClientMsg [{:?}]",
+                &ev
+            ))
         })?;
 
         if let Some(v) = map.get("pong") {
             let n = v.as_u64().ok_or_else(|| {
-                Error::custom(format!(
-                    "unable to deser ClientMsg::Pong [{:?}]",
+                D::Error::custom(format!(
+                    "unable to deserialize ClientMsg::Pong [{:?}]",
                     &ev
                 ))
             })?;
@@ -336,8 +341,8 @@ impl<'de> Deserialize<'de> for ClientMsg {
         } else {
             let command =
                 serde_json::from_value::<Command>(ev).map_err(|e| {
-                    Error::custom(format!(
-                        "unable to deser ClientMsg::Command [{:?}]",
+                    D::Error::custom(format!(
+                        "unable to deserialize ClientMsg::Command [{:?}]",
                         e
                     ))
                 })?;
@@ -374,17 +379,20 @@ impl<'de> Deserialize<'de> for ServerMsg {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
+        use serde::de::Error as _;
 
         let ev = serde_json::Value::deserialize(deserializer)?;
         let map = ev.as_object().ok_or_else(|| {
-            Error::custom(format!("unable to deser ServerMsg [{:?}]", &ev))
+            D::Error::custom(format!(
+                "unable to deserialize ServerMsg [{:?}]",
+                &ev
+            ))
         })?;
 
         if let Some(v) = map.get("ping") {
             let n = v.as_u64().ok_or_else(|| {
-                Error::custom(format!(
-                    "unable to deser ServerMsg::Ping [{:?}]",
+                D::Error::custom(format!(
+                    "unable to deserialize ServerMsg::Ping [{:?}]",
                     &ev
                 ))
             })?;
@@ -398,8 +406,8 @@ impl<'de> Deserialize<'de> for ServerMsg {
                         .map(Self::RpcSettings)
                 })
                 .map_err(|e| {
-                    Error::custom(format!(
-                        "unable to deser ServerMsg [{:?}]",
+                    D::Error::custom(format!(
+                        "unable to deserialize ServerMsg [{:?}]",
                         e
                     ))
                 })?;
