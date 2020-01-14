@@ -16,9 +16,8 @@ use crate::{
     log::prelude::*,
     media::{New, Peer, PeerStateMachine},
     signalling::{
-        elements::{
-            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            Member,
+        elements::endpoints::webrtc::{
+            WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         },
         room::RoomError,
     },
@@ -81,33 +80,32 @@ impl PeerRepository {
     /// Creates interconnected [`Peer`]s for provided [`Member`]s.
     pub fn create_peers(
         &mut self,
-        first_member: &Member,
-        second_member: &Member,
-        is_relay: bool,
+        src: &WebRtcPublishEndpoint,
+        sink: &WebRtcPlayEndpoint,
     ) -> (Peer<New>, Peer<New>) {
-        let first_member_id = first_member.id();
-        let second_member_id = second_member.id();
+        let src_member_id = src.owner().id();
+        let sink_member_id = sink.owner().id();
 
         debug!(
             "Created peer between {} and {}.",
-            first_member_id, second_member_id
+            src_member_id, sink_member_id
         );
-        let first_peer_id = self.peers_count.next_id();
-        let second_peer_id = self.peers_count.next_id();
+        let src_peer_id = self.peers_count.next_id();
+        let sink_peer_id = self.peers_count.next_id();
 
         let first_peer = Peer::new(
-            first_peer_id,
-            first_member_id.clone(),
-            second_peer_id,
-            second_member_id.clone(),
-            is_relay,
+            src_peer_id,
+            src_member_id.clone(),
+            sink_peer_id,
+            sink_member_id.clone(),
+            src.is_force_relay(),
         );
         let second_peer = Peer::new(
-            second_peer_id,
-            second_member_id,
-            first_peer_id,
-            first_member_id,
-            is_relay,
+            sink_peer_id,
+            sink_member_id,
+            src_peer_id,
+            src_member_id,
+            sink.is_force_relay(),
         );
 
         (first_peer, second_peer)
@@ -313,8 +311,7 @@ impl PeerRepository {
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
         } else {
-            let (mut src_peer, mut sink_peer) =
-                self.create_peers(&src_owner, &sink_owner, src.is_relay());
+            let (mut src_peer, mut sink_peer) = self.create_peers(&src, &sink);
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 

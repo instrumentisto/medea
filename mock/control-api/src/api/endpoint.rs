@@ -50,7 +50,7 @@ pub struct WebRtcPublishEndpoint {
     p2p: P2pMode,
 
     /// If 'true' then all media will be relayed through TURN server.
-    is_relay: bool,
+    is_force_relay: bool,
 }
 
 impl WebRtcPublishEndpoint {
@@ -61,7 +61,7 @@ impl WebRtcPublishEndpoint {
         let mut proto = WebRtcPublishEndpointProto::new();
         proto.set_id(id);
         proto.set_p2p(self.p2p.into());
-        proto.set_is_relay(self.is_relay);
+        proto.set_is_force_relay(self.is_force_relay);
         proto
     }
 }
@@ -71,7 +71,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
         Self {
             id: proto.take_id(),
             p2p: proto.get_p2p().into(),
-            is_relay: proto.get_is_relay(),
+            is_force_relay: proto.get_is_force_relay(),
         }
     }
 }
@@ -88,6 +88,9 @@ pub struct WebRtcPlayEndpoint {
     /// URI in format `local://{room_id}/{member_id}/{endpoint_id}` pointing to
     /// [`WebRtcPublishEndpoint`] which this [`WebRtcPlayEndpoint`] plays.
     src: String,
+
+    /// If 'true' then all media will be relayed through TURN server.
+    is_force_relay: bool,
 }
 
 impl WebRtcPlayEndpoint {
@@ -107,6 +110,7 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
         Self {
             id: proto.take_id(),
             src: proto.take_src(),
+            is_force_relay: proto.get_is_force_relay(),
         }
     }
 }

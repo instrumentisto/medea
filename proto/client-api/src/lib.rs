@@ -186,7 +186,7 @@ pub enum Event {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
-        is_relay: bool,
+        is_force_relay: bool,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.

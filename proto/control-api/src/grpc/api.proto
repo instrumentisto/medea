@@ -164,7 +164,7 @@ message WebRtcPublishEndpoint {
   // Callback which fires when a client stops publishing media data.
   string on_stop = 4;
   // If 'true' then all media will be relayed through TURN server.
-  bool is_relay = 5;
+  bool is_force_relay = 5;
 
   // P2P mode of WebRTC interaction.
   enum P2P {
@@ -190,4 +190,6 @@ message WebRtcPlayEndpoint {
   // Callback which fires when a client stops playing media data
   // from the source.
   string on_stop = 4;
+  // If 'true' then all media will be relayed through TURN server.
+  bool is_force_relay = 5;
 }

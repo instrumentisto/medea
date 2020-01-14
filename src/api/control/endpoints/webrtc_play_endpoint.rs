@@ -22,6 +22,9 @@ pub struct WebRtcPlayId(String);
 pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SrcUri,
+
+    #[serde(default)]
+    pub is_force_relay: bool,
 }
 
 impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
@@ -30,6 +33,7 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
         Ok(Self {
             src: SrcUri::try_from(value.get_src().to_owned())?,
+            is_force_relay: value.get_is_force_relay(),
         })
     }
 }

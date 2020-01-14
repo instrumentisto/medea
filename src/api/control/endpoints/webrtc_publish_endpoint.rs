@@ -58,14 +58,14 @@ pub struct WebRtcPublishEndpoint {
 
     /// If 'true' then all media will be relayed through TURN server.
     #[serde(default)]
-    pub is_relay: bool,
+    pub is_force_relay: bool,
 }
 
 impl From<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     fn from(value: &WebRtcPublishEndpointProto) -> Self {
         Self {
             p2p: P2pMode::from(value.get_p2p()),
-            is_relay: value.get_is_relay(),
+            is_force_relay: value.get_is_force_relay(),
         }
     }
 }

@@ -70,7 +70,7 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
-#[enum_delegate(pub fn is_relay(&self) -> bool)]
+#[enum_delegate(pub fn is_force_relay(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -152,7 +152,7 @@ pub struct Context {
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
-    is_relay: bool,
+    is_force_relay: bool,
 }
 
 /// [RTCPeerConnection] representation.
@@ -228,8 +228,8 @@ impl<T> Peer<T> {
 
     /// If 'true' is returned then all media should be relayed through TURN
     /// server.
-    pub fn is_relay(&self) -> bool {
-        self.context.is_relay
+    pub fn is_force_relay(&self) -> bool {
+        self.context.is_force_relay
     }
 }
 
@@ -253,7 +253,7 @@ impl Peer<New> {
             sdp_answer: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
-            is_relay,
+            is_force_relay: is_relay,
         };
         Self {
             context,
