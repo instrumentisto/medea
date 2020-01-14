@@ -1,6 +1,9 @@
 let assert = chai.assert;
 
-describe('Pub<=>Pub video call', () => {
+describe('Pub<=>Pub video call', function() {
+
+  this.timeout(20000);
+
   /**
    * Sends POST request for create 'pub-pub-e2e-call' with 'control-api-mock'.
    */
