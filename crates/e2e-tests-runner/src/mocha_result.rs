@@ -1,4 +1,6 @@
-//! Objects which will be returned from mocha tests.
+//! Objects which will be returned from [Mocha] tests.
+//!
+//! [Mocha]: https://mochajs.org/
 
 use std::fmt;
 

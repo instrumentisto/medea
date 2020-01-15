@@ -34,7 +34,7 @@ pub trait PeerRepository {
     /// Returns all [`PeerConnection`]s stored in repository.
     fn get_all(&self) -> Vec<Rc<PeerConnection>>;
 
-    /// Returns [`Future`] which resolves into [`RTCStatsReport`][1]
+    /// Returns [`Future`] which resolves with [`RTCStatsReport`][1]
     /// for all [`RtcPeerConnection`][2]s from this [`PeerRepository`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
@@ -90,7 +90,7 @@ impl PeerRepository for Repository {
         Ok(self.peers.get(&id).cloned().unwrap())
     }
 
-    /// Returns future which resolves into [`RTCStatsReport`][1]
+    /// Returns future which resolves with [`RTCStatsReport`][1]
     /// for all [`RtcPeerConnection`][2]s from this [`PeerRepository`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport

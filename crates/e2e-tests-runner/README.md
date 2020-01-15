@@ -15,10 +15,10 @@ then you just need to run `make test.e2e`.__
 1) Running [WebDriver] (e.g. `chromedriver`, `geckodriver` etc)
 2) Installed browsers (chrome for `chromedriver` or firefox for `geckodriver`)
 3) Running [control-api-mock]
-4) Running [medea]
-5) Compiled [jason] with `--target web`
+4) Running [Medea]
+5) Compiled [Jason] with `--target web`
 
-## Compile [jason] for tests
+## Compile [Jason] for tests
 `$ wasm-pack build --target web --out-dir _dev/jason-pkg`
 
 Out dir is very important for tests. Run this command in root of project
@@ -26,7 +26,7 @@ and don't forget run test runner also here.
 
 ## Flags
 ### `-f --files-host`
-__Address where tests html files will be hosted.__
+__Address where tests HTML files will be hosted.__
 
 _If this flag is not specified then default value will be `localhost:9000`._
 
@@ -53,15 +53,15 @@ If you wish run only one test file then you may specify this test name and
 runner will run only this test.
 
 ## Example of usage
-__1. Run [coturn]__
+__1. Run [Coturn]__
 
 `$ make up.coturn`
 
-__2. Build [jason] with target web__
+__2. Build [Jason] with target web__
 
 `$ cd jason && wasm-pack build --target web --out-dir .cache/jason-pkg && cd ../`
 
-__3. Run [medea]__
+__3. Run [Medea]__
 
 `$ cargo run`
 
@@ -73,20 +73,24 @@ __5. Run some [WebDriver] ([chromedriver] in this example)__
 
 `$ chromedriver -p 9515`
 
-__6. Run all tests from `e2e-tests` root project dir__
+__6.1. Run all tests from `e2e-tests` root project dir__
 
 `$ cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000`
 
-__7. Or you can run only one test__
+__6.2. Or you can run only one test__
 
-`$ cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000 pub_pub_video_call.spec.js`
+`$ cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000 e2e-tests/pub_pub_video_call.spec.js`
+
+__6.3. Or you can run tests from a custom directory__
+
+`$ cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000 e2e-tests`
 
 
 
 
 [WebDriver]: https://developer.mozilla.org/en-US/docs/Web/WebDriver
 [control-api-mock]: https://github.com/instrumentisto/medea/tree/master/control-api-mock
-[medea]: https://github.com/instrumentisto/medea
-[jason]: https://github.com/instrumentisto/medea/tree/master/jason
+[Medea]: https://github.com/instrumentisto/medea
+[Jason]: https://github.com/instrumentisto/medea/tree/master/jason
 [chromedriver]: http://chromedriver.chromium.org/
-[coturn]: https://github.com/coturn/coturn
+[Coturn]: https://github.com/coturn/coturn

@@ -29,7 +29,7 @@ async fn index(req: HttpRequest) -> HttpResult<NamedFile> {
     Ok(NamedFile::open(path)?)
 }
 
-/// Start server which serves test files.
+/// Starts server which serves test files.
 ///
 /// WebDriver's browser will be routed into test files from this server.
 ///

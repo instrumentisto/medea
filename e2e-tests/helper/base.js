@@ -1,7 +1,8 @@
 /**
- * Promise for wait for element with provided ID to appear.
- * This promise try fro getElementById and if element is not null
- * then promise resolves with that ID.
+ * Promise for waiting for element with provided ID to appear.
+ *
+ * This promise tries 'getElementById' and if element is not null
+ * then promise will be resolved with that ID.
  */
 function waitForElement(id) {
     return new Promise(resolve => {
@@ -17,8 +18,6 @@ function waitForElement(id) {
 
 /**
  * Return difference between two arrays.
- *
- * In this test it's used for comparing images received from partner.
  *
  * @param o first array
  * @param n second array
@@ -54,9 +53,9 @@ function diff(o, n) {
  * Get two images from provided video element with some small interval
  * and check that they are different.
  *
- * Test will fail if difference between this two images are less than 10.
+ * Test will fail if difference between this two images are less than '10'.
  *
- * Use for testing that video which we receiving from partner are not static.
+ * Use for testing that video which we receiving from partner is not static.
  *
  * @param videoEl video element
  */
@@ -81,10 +80,11 @@ function checkVideoDiff(videoEl) {
 }
 
 /**
- *  Promise for wait for video to appear.
- *  This promise will check videoWidth parameter
- *  of provided video element. If videoWidth > 0 then
- *  we think that video is loaded.
+ *  Promise which will be resolved when provided 'video' element appears on page.
+ *
+ *  This promise will check 'videoWidth' parameter
+ *  of provided 'video' element. If 'videoWidth > 0' then
+ *  we think that 'video' element is loaded.
  */
 const waitForVideo = (videoEl) => {
     return new Promise(resolve => {

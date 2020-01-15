@@ -284,8 +284,8 @@ impl RoomHandle {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
 
-    /// Returns promise which resolves into [RTCStatsReport][1]
-    /// for all [RtcPeerConnection][2]s from this room.
+    /// Returns [`Promise`] which resolves with [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this [`Room`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
@@ -457,8 +457,8 @@ impl InnerRoom {
         }
     }
 
-    /// Returns promise which resolves into [`RTCStatsReport`][1]
-    /// for all [`RtcPeerConnection`][2]s from this room.
+    /// Returns promise which resolves with [`RTCStatsReport`][1]
+    /// for all [`RtcPeerConnection`][2]s from this [`Room`].
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection

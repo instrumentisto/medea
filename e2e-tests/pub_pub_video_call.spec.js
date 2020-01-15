@@ -48,7 +48,7 @@ describe('Pub<=>Pub video call', function() {
   }
 
   /**
-   * Send DELETE pub-pub-e2e-call request to control-api-room.
+   * Send DELETE 'pub-pub-e2e-call' request to a 'medea-control-api-mock' server.
    */
   async function deleteRoom() {
     await axios.delete(
@@ -59,6 +59,10 @@ describe('Pub<=>Pub video call', function() {
   const callerPartnerVideo = 'callers-partner-video';
   const responderPartnerVideo = 'responder-partner-video';
 
+  /**
+   * Creates new 'Room' which will add video of partner to a 'document.body'
+   * with provided ID.
+   */
   async function newRoom(id) {
     let jason = await window.getJason();
     room = await jason.init_room();
@@ -87,9 +91,9 @@ describe('Pub<=>Pub video call', function() {
   }
 
   /**
-   * Starts Pub<=>Pub video call.
-   *
-   * @returns 'Room' for 'caller' and 'responder'.
+   * Starts 'Pub<=>Pub' video call.
+   G
+   * Returns 'Room' for 'caller' and 'responder'.
    */
   async function startPubPubVideoCall() {
     const callerRoom = await newRoom(callerPartnerVideo);
@@ -125,8 +129,8 @@ describe('Pub<=>Pub video call', function() {
 
   it('sends rtc packets', async () => {
     /**
-     * Takes array of RTCStatsReport and count "outbound-rtp" and "inbound-rtp"
-     * for all RTCStatsReport. If "outbound-rtp"'s "packetsSent" or "inbound-rtp"'s
+     * Takes array of RTCStatsReport and count 'outbound-rtp' and 'inbound-rtp"
+     * for all RTCStatsReport. If 'outbound-rtp''s 'packetsSent' or 'inbound-rtp"'s
      * "packetsReceived" < 5 then test failed.
      * @param stats array of RTCStatsReports
      */
