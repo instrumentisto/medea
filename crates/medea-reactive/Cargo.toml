@@ -1,0 +1,19 @@
+[package]
+name = "medea-reactive"
+version = "0.1.0-dev"
+edition = "2018"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+license = "MIT/Apache-2.0"
+documentation = "https://docs.rs/medea-reactive"
+homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-reactive"
+repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-reactive"
+# TODO: add description, categories, keywords, README
+
+[dependencies]
+futures = "0.3"
+tokio = { version = "0.2", features = ["macros", "test-util"] }
+futures-signals = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.2"
+criterion = "0.3"
