@@ -1,4 +1,4 @@
-E2E testing of medea
+E2E testing of Medea
 ====================
 
 __Run E2E tests:__ `$ make test.e2e`
@@ -6,7 +6,7 @@ __Run E2E tests:__ `$ make test.e2e`
 
 
 
-## How to write e2e tests for medea
+## How to write E2E tests for Medea
 
 In this directory are located all medea's E2E tests (except signalling tests).
 All tests from this directory will be running by [e2e-tests-runner]. 

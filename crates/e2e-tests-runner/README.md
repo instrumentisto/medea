@@ -1,7 +1,7 @@
-Medea's e2e tests runner
+Medea's E2E tests runner
 ========================
 
-This program is used for running e2e tests jobs in browser
+This program is used for running E2E tests jobs in browser
 with [WebDriver].
 
 Runner load tests only from `e2e-tests` root project dir.
