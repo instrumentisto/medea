@@ -222,14 +222,14 @@ impl<T: Clone> OnReactiveFieldModification<T> for Vec<UniversalSubscriber<T>> {
             UniversalSubscriber::When { assert_fn, sender } => {
                 if (assert_fn)(data) {
                     sender.borrow_mut().take().unwrap().send(()).ok();
-                    true
-                } else {
                     false
+                } else {
+                    true
                 }
             }
             UniversalSubscriber::All(sender) => {
                 sender.unbounded_send(data.clone()).unwrap();
-                false
+                true
             }
         });
     }
@@ -284,5 +284,194 @@ where
         if self.data != &self.value_before_mutation {
             self.subs.on_modify(&self.data);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use futures::{
+        future::{self, Either, LocalBoxFuture},
+        StreamExt,
+    };
+    use tokio::{task, time::delay_for};
+
+    use crate::DefaultReactiveField;
+
+    #[derive(Debug)]
+    struct Timeout;
+
+    async fn await_future_with_timeout<T>(
+        fut: LocalBoxFuture<'_, T>,
+        timeout: Duration,
+    ) -> Result<T, Timeout> {
+        let res = future::select(delay_for(timeout), fut).await;
+        if let Either::Right((output, _)) = res {
+            Ok(output)
+        } else {
+            Err(Timeout)
+        }
+    }
+
+    #[tokio::test]
+    async fn subscribe_sends_current_data() {
+        let mut field = DefaultReactiveField::new(9i32);
+        let current_data = field.subscribe().next().await.unwrap();
+        assert_eq!(current_data, 9);
+    }
+
+    #[tokio::test]
+    async fn when_eq_resolves_if_value_already_eq() {
+        let mut field = DefaultReactiveField::new(9i32);
+        field.when_eq(9i32).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn when_eq_dont_resolves_if_value_is_not_eq() {
+        let mut field = DefaultReactiveField::new(9i32);
+        await_future_with_timeout(
+            field.when_eq(0i32),
+            Duration::from_millis(50),
+        )
+        .await
+        .err()
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn current_value_provided_into_assert_fn_on_when_call() {
+        let mut field = DefaultReactiveField::new(9i32);
+
+        await_future_with_timeout(
+            field.when(|val| val == &9),
+            Duration::from_millis(50),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn value_updates_is_sended_to_subs() {
+        task::LocalSet::new()
+            .run_until(async move {
+                let mut field = DefaultReactiveField::new(0i32);
+                let mut subscription_on_changes = field.subscribe();
+
+                task::spawn_local(async move {
+                    for _ in 0..100 {
+                        *field.borrow_mut() += 1;
+                    }
+                });
+                loop {
+                    if let Some(change) = subscription_on_changes.next().await {
+                        if change == 100 {
+                            break;
+                        }
+                    } else {
+                        panic!("Stream ended too early!");
+                    }
+                }
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn when_resolves_on_value_update() {
+        task::LocalSet::new()
+            .run_until(async move {
+                let mut field = DefaultReactiveField::new(0i32);
+                let subscription = field.when(|change| change == &100);
+
+                task::spawn_local(async move {
+                    for _ in 0..100 {
+                        *field.borrow_mut() += 1;
+                    }
+                });
+
+                await_future_with_timeout(
+                    subscription,
+                    Duration::from_millis(50),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn when_eq_resolves_on_value_update() {
+        task::LocalSet::new()
+            .run_until(async move {
+                let mut field = DefaultReactiveField::new(0i32);
+                let subscription = field.when_eq(100);
+
+                task::spawn_local(async move {
+                    for _ in 0..100 {
+                        *field.borrow_mut() += 1;
+                    }
+                });
+
+                await_future_with_timeout(
+                    subscription,
+                    Duration::from_millis(50),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn when_returns_dropped_error_on_drop() {
+        let mut field = DefaultReactiveField::new(0i32);
+        let subscription = field.when(|change| change == &100);
+        std::mem::drop(field);
+        subscription.await.err().unwrap();
+    }
+
+    #[tokio::test]
+    async fn when_eq_returns_dropped_error_on_drop() {
+        let mut field = DefaultReactiveField::new(0i32);
+        let subscription = field.when_eq(100);
+        std::mem::drop(field);
+        subscription.await.err().unwrap();
+    }
+
+    #[tokio::test]
+    async fn stream_ends_when_reactive_field_dropped() {
+        let mut field = DefaultReactiveField::new(0i32);
+        let subscription = field.subscribe();
+        std::mem::drop(field);
+        assert!(subscription.skip(1).next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn no_update_should_be_emitted_on_field_mutation() {
+        let mut field = DefaultReactiveField::new(0i32);
+        let subscription = field.subscribe();
+        *field.borrow_mut() = 0;
+        await_future_with_timeout(
+            Box::pin(subscription.skip(1).next()),
+            Duration::from_millis(50),
+        )
+        .await
+        .err()
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn only_last_update_should_be_send_to_the_subscribers() {
+        let mut field = DefaultReactiveField::new(0i32);
+        let subscription = field.subscribe();
+        let mut field_mut_guard = field.borrow_mut();
+        *field_mut_guard = 100;
+        *field_mut_guard = 200;
+        *field_mut_guard = 300;
+        std::mem::drop(field_mut_guard);
+        assert_eq!(subscription.skip(1).next().await.unwrap(), 300);
     }
 }

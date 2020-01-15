@@ -11,9 +11,7 @@ repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-r
 
 [dependencies]
 futures = "0.3"
-tokio = { version = "0.2", features = ["macros", "test-util"] }
 futures-signals = "0.3"
 
 [dev-dependencies]
-tokio-test = "0.2"
-criterion = "0.3"
+tokio = { version = "0.2", features = ["macros", "test-util", "rt-core", "rt-util", "time"] }
