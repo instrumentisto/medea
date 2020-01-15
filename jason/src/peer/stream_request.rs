@@ -106,7 +106,7 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`].
+    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`] wrapper.
     pub fn parse_stream(&self, stream: &SysMediaStream) -> Result<MediaStream> {
         use StreamRequestError::*;
 

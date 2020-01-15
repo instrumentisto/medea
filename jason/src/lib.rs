@@ -29,7 +29,8 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 pub use self::{
     api::{ConnectionHandle, Jason, RoomHandle},
     media::{
-        AudioTrackConstraints, MediaStreamConstraints, VideoTrackConstraints,
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaStreamConstraints,
     },
 };
 

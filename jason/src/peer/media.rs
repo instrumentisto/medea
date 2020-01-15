@@ -204,14 +204,14 @@ impl MediaConnections {
     }
 
     /// Inserts tracks from a provided [`MediaStream`] into [`Sender`]s
-    /// basing on track IDs.
+    /// based on track IDs.
     ///
-    /// Enables or disables tracks in provided [`MediaStream`] basing on current
+    /// Enables or disables tracks in provided [`MediaStream`] based on current
     /// media connections state.
     ///
     /// Provided [`MediaStream`] must have all required [`MediaTrack`]s.
     /// [`MediaTrack`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
-    /// via [`replaceTrack` method][1], so changing [`RtcRtpTransceiver`]
+    /// via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack

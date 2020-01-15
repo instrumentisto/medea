@@ -16,7 +16,6 @@ use crate::api::control::callback::{
 };
 
 /// gRPC client for sending [`CallbackRequest`]s.
-#[allow(clippy::module_name_repetitions)]
 pub struct GrpcCallbackClient {
     /// [`grpcio`] gRPC client of Control API Callback service.
     client: ProtoCallbackClient,

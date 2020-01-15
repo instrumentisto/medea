@@ -11,7 +11,7 @@
   <script type="module">
     import init, {
       Jason,
-      MediaStreamConstraints, AudioTrackConstraints, VideoTrackConstraints,
+      MediaStreamConstraints, AudioTrackConstraints, DeviceVideoTrackConstraints, DisplayVideoTrackConstraints
     } from './js/medea_jason.js';
 
     let inited = false;
@@ -94,6 +94,7 @@
           || "disable";
         const device_infos = await jason.media_manager().enumerate_devices();
         console.log('Available input and output devices:', device_infos);
+
         for (const device_info of device_infos) {
           const option = document.createElement('option');
           option.value = device_info.device_id();
@@ -109,22 +110,38 @@
             video_select.append(option);
           }
         }
+
+        const option = document.createElement('option');
+        option.value = "screen";
+        option.text = "screen";
+        video_select.append(option);
       }
 
       async function getStream(audio_select, video_select) {
+
         let constraints = new MediaStreamConstraints();
+
         let audio = new AudioTrackConstraints();
         let audioSource = audio_select.options[audio_select.selectedIndex];
         if (audioSource) {
           audio.device_id(audioSource.value);
         }
         constraints.audio(audio);
-        let video = new VideoTrackConstraints();
+
         let videoSource = video_select.options[video_select.selectedIndex];
         if (videoSource) {
-          video.device_id(videoSource.value);
+          if (videoSource.value === "screen") {
+            let video = new DisplayVideoTrackConstraints();
+            constraints.display_video(video);
+          } else {
+            let video = new DeviceVideoTrackConstraints();
+            video.device_id(videoSource.value);
+            constraints.device_video(video);
+          }
+        } else {
+          constraints.device_video(new DeviceVideoTrackConstraints());
         }
-        constraints.video(video);
+
         return await jason.media_manager().init_local_stream(constraints);
       }
 
@@ -177,6 +194,7 @@
           let videoDiv = document.getElementById("remote-videos");
           let video = document.createElement("video");
           video.srcObject = stream.get_media_stream();
+          video.controls = "true";
           video.style.maxWidth = "100%";
 
           let innerVideoDiv = document.createElement("div");
