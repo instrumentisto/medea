@@ -360,6 +360,34 @@ window.onload = async function() {
       console.error(error);
     });
 
+    room.on_connection_loss( async (reconnectHandle) => {
+      let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
+      contentVisibility.show(connectionLossNotification);
+
+      let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
+      let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
+      let connectionLossDefaultText = connectionLossMsg.textContent;
+
+      manualReconnectBtn.onclick = async () => {
+        try {
+          connectionLossMsg.textContent = 'Trying to manually reconnect...';
+          await reconnectHandle.reconnect_with_delay(0);
+          contentVisibility.hide(connectionLossNotification);
+          console.error("Reconnected!");
+        } catch (e) {
+          console.error("Failed to manually reconnect: " + e.message());
+        } finally {
+          connectionLossMsg.textContent = connectionLossDefaultText;
+        }
+      };
+      try {
+        await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
+      } catch (e) {
+        console.error('Error in reconnection with backoff:\n' + e.message());
+      }
+      contentVisibility.hide(connectionLossNotification);
+    });
+
     room.on_close(function (on_closed) {
       let videos = document.getElementsByClassName('remote-videos')[0];
       while (videos.firstChild) {

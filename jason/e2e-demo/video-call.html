@@ -205,6 +205,28 @@
     .control-debug__table-result>table>tr>th {
       font-weight: normal;
     }
+
+    .connection-loss-notification {
+      right: 50px;
+      top: 50px;
+      position: absolute;
+      background: #fff;
+      padding: 10px;
+      border-radius: 3px;
+      font-size: 11pt;
+    }
+
+    .connection-loss-notification__msg {
+      display: block;
+    }
+
+    .connection-loss-notification__manual-reconnect {
+      display: block;
+      color: #49668C;
+      text-align: center;
+      cursor: pointer;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -351,6 +373,12 @@
 
       <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
+
+  <div class="connection-loss-notification toggle-content">
+    <span class="connection-loss-notification__msg">Connection lost.</span>
+    <span>Trying to reconnect with backoff...</span>
+    <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
   </div>
 
   <div class="control-debug-menu__toggle">

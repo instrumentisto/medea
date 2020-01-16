@@ -176,15 +176,13 @@ impl ParticipantService {
         member_id: &MemberId,
         credentials: &str,
     ) -> Result<Member, AuthorizationError> {
-        match self.get_member_by_id(member_id) {
-            Some(member) => {
-                if member.credentials().eq(credentials) {
-                    Ok(member)
-                } else {
-                    Err(AuthorizationError::InvalidCredentials)
-                }
-            }
-            None => Err(AuthorizationError::MemberNotExists),
+        let member = self
+            .get_member_by_id(member_id)
+            .ok_or(AuthorizationError::MemberNotExists)?;
+        if member.credentials() == credentials {
+            Ok(member)
+        } else {
+            Err(AuthorizationError::InvalidCredentials)
         }
     }
 
@@ -200,14 +198,13 @@ impl ParticipantService {
         member_id: MemberId,
         event: Event,
     ) -> impl Future<Item = (), Error = RoomError> {
-        match self.connections.get(&member_id) {
-            Some(conn) => Either::A(
+        if let Some(conn) = self.connections.get(&member_id) {
+            Either::A(
                 conn.send_event(event)
                     .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
-            ),
-            None => Either::B(future::err(RoomError::ConnectionNotExists(
-                member_id,
-            ))),
+            )
+        } else {
+            Either::B(future::err(RoomError::ConnectionNotExists(member_id)))
         }
     }
 
@@ -241,6 +238,7 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
+            self.insert_connection(member_id, conn);
             Box::new(wrap_future(
                 connection
                     .close(CloseDescription::new(CloseReason::Reconnected))
@@ -322,18 +320,18 @@ impl ParticipantService {
     }
 
     /// Deletes [`IceUser`] associated with provided [`Member`].
+    // Type inference fails on `.map_or_else()` and cannot coerce
+    // `Box<ResultFuture>` into `Box<dyn Future>`.
+    #[allow(clippy::option_map_unwrap_or_else)]
     fn delete_ice_user(
         &mut self,
         member_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
-        // TODO: rewrite using `Option::flatten` when it will be in stable rust.
-        match self.get_member_by_id(&member_id) {
-            Some(member) => match member.take_ice_user() {
-                Some(ice_user) => self.turn_service.delete(vec![ice_user]),
-                None => Box::new(future::ok(())),
-            },
-            None => Box::new(future::ok(())),
-        }
+        self.get_member_by_id(&member_id)
+            .map(|member| member.take_ice_user())
+            .flatten()
+            .map(|ice_user| self.turn_service.delete(vec![ice_user]))
+            .unwrap_or_else(|| Box::new(future::ok(())))
     }
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and

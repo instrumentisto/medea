@@ -21,14 +21,17 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
-        PeerRepository,
+        EnabledAudio, EnabledVideo, MediaStream, MediaStreamHandle, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository,
     },
     rpc::{
-        ClientDisconnect, CloseReason, RpcClient, RpcClientError,
-        TransportError, WebSocketRpcTransport,
+        ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
+        RpcClientError, TransportError,
     },
-    utils::{Callback, JasonError, JsCaused, JsError},
+    utils::{
+        console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
+        JsError,
+    },
 };
 
 use super::{connection::Connection, ConnectionHandle};
@@ -97,10 +100,9 @@ impl RoomCloseReason {
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
 enum RoomError {
-    /// Returned if the `on_failed_local_stream` callback was not set before
-    /// joining the room.
-    #[display(fmt = "`on_failed_local_stream` callback is not set")]
-    CallbackNotSet,
+    /// Returned if the mandatory callback wasn't set.
+    #[display(fmt = "`{}` callback isn't set.", _0)]
+    CallbackNotSet(&'static str),
 
     /// Returned if unable to init [`RpcTransport`].
     #[display(fmt = "Unable to init RPC transport: {}", _0)]
@@ -174,26 +176,52 @@ impl RoomHandle {
         &self,
         token: String,
     ) -> impl Future<Output = Result<(), JasonError>> + 'static {
-        let inner: Result<_, JasonError> = map_weak!(self, |inner| inner);
+        let inner = upgrade_or_detached!(self.0, JasonError);
 
         async move {
             let inner = inner?;
 
             if !inner.borrow().on_failed_local_stream.is_set() {
                 return Err(JasonError::from(tracerr::new!(
-                    RoomError::CallbackNotSet
+                    RoomError::CallbackNotSet("Room.on_failed_local_stream()")
                 )));
             }
 
-            let websocket = WebSocketRpcTransport::new(&token)
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+            if !inner.borrow().on_connection_loss.is_set() {
+                return Err(JasonError::from(tracerr::new!(
+                    RoomError::CallbackNotSet("Room.on_connection_loss()")
+                )));
+            }
+
             inner
                 .borrow()
                 .rpc
-                .connect(Rc::new(websocket))
+                .connect(token)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+
+            let mut connection_loss_stream =
+                inner.borrow().rpc.on_connection_loss();
+            let weak_inner = Rc::downgrade(&inner);
+            spawn_local(async move {
+                while let Some(_) = connection_loss_stream.next().await {
+                    match upgrade_or_detached!(weak_inner, JsValue) {
+                        Ok(inner) => {
+                            let reconnect_handle = ReconnectHandle::new(
+                                Rc::downgrade(&inner.borrow().rpc),
+                            );
+                            inner
+                                .borrow()
+                                .on_connection_loss
+                                .call(reconnect_handle);
+                        }
+                        Err(e) => {
+                            console_error(e);
+                            break;
+                        }
+                    }
+                }
+            });
 
             Ok(())
         }
@@ -207,23 +235,23 @@ impl RoomHandle {
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner
-            .borrow_mut()
-            .on_new_connection
-            .set_func(f))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().on_new_connection.set_func(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve successfully. Only invoked if media
     /// request was initiated by media server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -232,10 +260,18 @@ impl RoomHandle {
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner
-            .borrow_mut()
-            .on_failed_local_stream
-            .set_func(f))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
+    }
+
+    /// Sets `on_connection_loss` callback, which will be invoked on
+    /// [`RpcClient`] connection loss.
+    pub fn on_connection_loss(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().on_connection_loss.set_func(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -261,27 +297,36 @@ impl RoomHandle {
         &self,
         stream: SysMediaStream,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().inject_local_stream(stream))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().inject_local_stream(stream))
     }
 
     /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(false))
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow_mut().toggle_send_audio(EnabledAudio(false))
+        })
     }
 
     /// Unmutes outbound audio in this room.
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(true))
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow_mut().toggle_send_audio(EnabledAudio(true))
+        })
     }
 
     /// Mutes outbound video in this room.
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(false))
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow_mut().toggle_send_video(EnabledVideo(false))
+        })
     }
 
     /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow_mut().toggle_send_video(EnabledVideo(true))
+        })
     }
 }
 
@@ -322,7 +367,7 @@ impl Room {
                         // happen, actually, since
                         // `InnerSession` should drop its `tx` by unsub from
                         // `RpcClient`.
-                        console_error!("Inner Room dropped unexpectedly")
+                        console_error("Inner Room dropped unexpectedly")
                     }
                     Some(inner) => {
                         match event {
@@ -403,11 +448,14 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_stream: Rc<Callback<JasonError>>,
 
+    /// Callback to be invoked when [`RpcClient`] loses connection.
+    on_connection_loss: Callback<ReconnectHandle>,
+
     /// Indicates if outgoing audio is enabled in this [`Room`].
-    enabled_audio: bool,
+    enabled_audio: EnabledAudio,
 
     /// Indicates if outgoing video is enabled in this [`Room`].
-    enabled_video: bool,
+    enabled_video: EnabledVideo,
 
     /// JS callback which will be called when this [`Room`] will be closed.
     on_close: Rc<Callback<RoomCloseReason>>,
@@ -437,9 +485,10 @@ impl InnerRoom {
             connections: HashMap::new(),
             on_new_connection: Callback::default(),
             on_local_stream: Callback::default(),
+            on_connection_loss: Callback::default(),
             on_failed_local_stream: Rc::new(Callback::default()),
-            enabled_audio: true,
-            enabled_video: true,
+            enabled_audio: EnabledAudio(true),
+            enabled_video: EnabledVideo(true),
             on_close: Rc::new(Callback::default()),
             close_reason: CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
@@ -485,7 +534,7 @@ impl InnerRoom {
 
     /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_send_audio(&mut self, enabled: bool) {
+    fn toggle_send_audio(&mut self, enabled: EnabledAudio) {
         for peer in self.peers.get_all() {
             peer.toggle_send_audio(enabled);
         }
@@ -494,7 +543,7 @@ impl InnerRoom {
 
     /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_send_video(&mut self, enabled: bool) {
+    fn toggle_send_video(&mut self, enabled: EnabledVideo) {
         for peer in self.peers.get_all() {
             peer.toggle_send_video(enabled);
         }
@@ -740,8 +789,6 @@ impl Drop for InnerRoom {
 
         self.on_close
             .call(RoomCloseReason::new(self.close_reason))
-            .map(|result| {
-                result.map_err(|err| console_error!(err.as_string()))
-            });
+            .map(|result| result.map_err(console_error));
     }
 }

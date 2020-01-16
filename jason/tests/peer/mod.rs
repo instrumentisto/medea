@@ -21,9 +21,16 @@ async fn mute_unmute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, true, true, false)
-            .unwrap();
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        vec![],
+        manager,
+        true.into(),
+        true.into(),
+        false,
+    )
+    .unwrap();
 
     peer.get_offer(vec![audio_track, video_track], None)
         .await
@@ -32,11 +39,11 @@ async fn mute_unmute_audio() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.toggle_send_audio(false);
+    peer.toggle_send_audio(false.into());
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.toggle_send_audio(true);
+    peer.toggle_send_audio(true.into());
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 }
@@ -46,9 +53,16 @@ async fn mute_unmute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, true, true, false)
-            .unwrap();
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        vec![],
+        manager,
+        true.into(),
+        true.into(),
+        false,
+    )
+    .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -56,11 +70,11 @@ async fn mute_unmute_video() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.toggle_send_video(false);
+    peer.toggle_send_video(false.into());
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled());
 
-    peer.toggle_send_video(true);
+    peer.toggle_send_video(true.into());
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 }
@@ -70,9 +84,16 @@ async fn new_with_mute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false, true, false)
-            .unwrap();
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        vec![],
+        manager,
+        false.into(),
+        true.into(),
+        false,
+    )
+    .unwrap();
 
     peer.get_offer(vec![audio_track, video_track], None)
         .await
@@ -87,9 +108,16 @@ async fn new_with_mute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, true, false, false)
-            .unwrap();
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        vec![],
+        manager,
+        true.into(),
+        false.into(),
+        false,
+    )
+    .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -109,15 +137,22 @@ async fn add_candidates_to_answerer_before_offer() {
         tx1,
         vec![],
         Rc::clone(&manager),
-        true,
-        true,
+        true.into(),
+        true.into(),
         false,
     )
     .unwrap();
 
-    let pc2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true, false)
-            .unwrap();
+    let pc2 = PeerConnection::new(
+        PeerId(2),
+        tx2,
+        vec![],
+        manager,
+        true.into(),
+        true.into(),
+        false,
+    )
+    .unwrap();
     let (audio_track, video_track) = get_test_tracks();
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None)
@@ -146,15 +181,23 @@ async fn add_candidates_to_offerer_before_answer() {
             tx1,
             vec![],
             Rc::clone(&manager),
-            true,
-            true,
+            true.into(),
+            true.into(),
             false,
         )
         .unwrap(),
     );
     let pc2 = Rc::new(
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true, false)
-            .unwrap(),
+        PeerConnection::new(
+            PeerId(2),
+            tx2,
+            vec![],
+            manager,
+            true.into(),
+            true.into(),
+            false,
+        )
+        .unwrap(),
     );
 
     let (audio_track, video_track) = get_test_tracks();
@@ -184,14 +227,21 @@ async fn normal_exchange_of_candidates() {
         tx1,
         vec![],
         Rc::clone(&manager),
-        true,
-        true,
+        true.into(),
+        true.into(),
         false,
     )
     .unwrap();
-    let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true, false)
-            .unwrap();
+    let peer2 = PeerConnection::new(
+        PeerId(2),
+        tx2,
+        vec![],
+        manager,
+        true.into(),
+        true.into(),
+        false,
+    )
+    .unwrap();
     let (audio_track, video_track) = get_test_tracks();
 
     let offer = peer1
@@ -246,8 +296,16 @@ async fn send_event_on_new_local_stream() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
     let id = PeerId(1);
-    let peer = PeerConnection::new(id, tx, vec![], manager, true, false, false)
-        .unwrap();
+    let peer = PeerConnection::new(
+        id,
+        tx,
+        vec![],
+        manager,
+        true.into(),
+        false.into(),
+        false,
+    )
+    .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -277,14 +335,21 @@ async fn ice_connection_state_changed_is_emitted() {
         tx1,
         vec![],
         Rc::clone(&manager),
-        true,
-        true,
+        true.into(),
+        true.into(),
         false,
     )
     .unwrap();
-    let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true, false)
-            .unwrap();
+    let peer2 = PeerConnection::new(
+        PeerId(2),
+        tx2,
+        vec![],
+        manager,
+        true.into(),
+        true.into(),
+        false,
+    )
+    .unwrap();
     let (audio_track, video_track) = get_test_tracks();
 
     let offer = peer1

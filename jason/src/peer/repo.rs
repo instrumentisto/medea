@@ -4,7 +4,10 @@ use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 
-use crate::media::MediaManager;
+use crate::{
+    media::MediaManager,
+    peer::media::{EnabledAudio, EnabledVideo},
+};
 
 use super::{PeerConnection, PeerError, PeerEvent};
 
@@ -19,9 +22,9 @@ pub trait PeerRepository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        events_sender: mpsc::UnboundedSender<PeerEvent>,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
         is_relay: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
@@ -63,8 +66,8 @@ impl PeerRepository for Repository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
         is_relay: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = Rc::new(
