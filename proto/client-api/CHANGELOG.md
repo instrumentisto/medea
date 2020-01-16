@@ -25,7 +25,6 @@ All user visible changes to this project will be documented in this file. This p
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71));
 - `RpcSettings` server message ([#75](/../../pull/75));
 - `is_relay` into `Event::PeerCreated` ([#79](/../../pull/79)).
->>>>>>> master
 
 [#28]: /../../pull/28
 
