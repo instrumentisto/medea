@@ -5,7 +5,10 @@ use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 use wasm_bindgen::JsValue;
 
-use crate::media::MediaManager;
+use crate::{
+    media::MediaManager,
+    peer::media::{EnabledAudio, EnabledVideo},
+};
 
 use super::{PeerConnection, PeerError, PeerEvent};
 
@@ -21,8 +24,8 @@ pub trait PeerRepository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -72,8 +75,8 @@ impl PeerRepository for Repository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = Rc::new(
             PeerConnection::new(

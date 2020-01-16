@@ -17,7 +17,7 @@ use crate::api::control::MemberId;
 pub struct CommandMessage(Command);
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
-#[derive(From, Into, Message)]
+#[derive(Debug, From, Into, Message)]
 pub struct EventMessage(Event);
 
 /// Abstraction over RPC connection with some remote [`Member`].

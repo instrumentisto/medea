@@ -12,7 +12,10 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
+    rpc::{
+        ClientDisconnect, RpcClient as _, RpcTransport, WebSocketRpcClient,
+        WebSocketRpcTransport,
+    },
     set_panic_hook,
 };
 
@@ -44,13 +47,20 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = Rc::new(WebSocketRpcClient::new(3000));
+        let rpc = WebSocketRpcClient::new(Box::new(|token| {
+            Box::pin(async move {
+                let ws = WebSocketRpcTransport::new(&token)
+                    .await
+                    .map_err(|e| tracerr::new!(e))?;
+                Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
+            })
+        }));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
 
         let inner = self.0.clone();
-        spawn_local(rpc.on_close().map(move |res| {
+        spawn_local(rpc.on_normal_close().map(move |res| {
             // TODO: Don't close all rooms when multiple rpc connections
             //       will be supported.
             let reason = res.unwrap_or_else(|_| {
@@ -64,7 +74,7 @@ impl Jason {
             inner.borrow_mut().media_manager = Rc::default();
         }));
 
-        let room = Room::new(rpc, peer_repository);
+        let room = Room::new(Rc::new(rpc), peer_repository);
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle

@@ -148,20 +148,21 @@ impl From<MediaStreamConstraints> for MultiSourceMediaStreamConstraints {
 /// Checks that the [MediaStreamTrack][1] is taken from a device
 /// with given [deviceId][2].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-/// [2]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
-macro_rules! satisfies_by_device_id {
-    ($v:expr, $track:ident) => {{
-        match &$v.device_id {
-            None => true,
-            Some(device_id) => get_property_by_name(
-                &$track.get_settings(),
-                "deviceId",
-                |val| val.as_string(),
-            )
-            .map_or(false, |id| id.as_str() == device_id),
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+/// [2]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+fn satisfies_by_device_id(
+    device_id: &Option<String>,
+    track: &SysMediaStreamTrack,
+) -> bool {
+    match device_id {
+        None => true,
+        Some(device_id) => {
+            get_property_by_name(&track.get_settings(), "deviceId", |v| {
+                v.as_string()
+            })
+            .map_or(false, |id| id.as_str() == device_id)
         }
-    }};
+    }
 }
 
 /// Wrapper around [MediaTrackConstraints][1].
@@ -243,7 +244,7 @@ impl AudioTrackConstraints {
             return false;
         }
 
-        satisfies_by_device_id!(self, track)
+        satisfies_by_device_id(&self.device_id, track)
         // TODO returns Result<bool, Error>
     }
 }
@@ -337,7 +338,7 @@ impl VideoTrackConstraints {
         match &self.0 {
             None => true,
             Some(StreamSource::Device(constraints)) => {
-                satisfies_by_device_id!(constraints, track)
+                satisfies_by_device_id(&constraints.device_id, track)
                     && !Self::guess_is_from_display(&track)
             }
             Some(StreamSource::Display(_)) => {

@@ -4,7 +4,7 @@
   <title>Chat</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fakerator@0.3.0/dist/fakerator.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
@@ -156,7 +156,7 @@
 
       let joinCallerButton = document.getElementById('join__join');
       let usernameInput = document.getElementById('join__username');
-      usernameInput.value = faker.name.firstName();
+      usernameInput.value = Fakerator().names.firstNameM();
 
       let room = await jason.init_room();
 
@@ -206,7 +206,23 @@
         });
       });
 
+      let connectionState = document.getElementById('connection-state__state');
+      room.on_connection_loss(async (reconnectHandle) => {
+        connectionState.className = 'badge badge-warning';
+        connectionState.textContent = 'Reconnecting';
+
+        try {
+          await reconnectHandle.reconnect_with_backoff(500, 2.0, 10000);
+          connectionState.className = 'badge badge-success';
+          connectionState.textContent = 'Connected';
+        } catch (e) {
+          console.error(e);
+        }
+      });
+
       room.on_close(function (on_closed) {
+        connectionState.className = 'badge badge-danger';
+        connectionState.textContent = "Closed";
         alert(
           `Call was ended.
           Reason: ${on_closed.reason()};
@@ -263,6 +279,8 @@
             await axios.delete(controlUrl + roomId + '/' + username);
             console.log("Creating new member.");
             await room.join(await addNewMember(roomId, username));
+            connectionState.className = 'badge badge-success';
+            connectionState.textContent = 'Connected';
 
           } catch (e) {
             logError("Join to room failed", e);
@@ -362,8 +380,13 @@
         </div>
 
         <div id="control" class="input-group mb-3" style="display: none">
-            <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
-            <button class="btn btn-info" id="control__mute_video">Mute video</button>
+          <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
+          <button class="btn btn-info" id="control__mute_video">Mute video</button>
+        </div>
+
+        <div>
+          <span>Connection state: </span>
+          <span id="connection-state__state" class="badge badge-danger">Closed</span>
         </div>
 
       </div>

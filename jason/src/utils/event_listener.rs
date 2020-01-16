@@ -5,12 +5,12 @@ use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;
 
-use crate::utils::{errors::JsCaused, JsError};
+use crate::utils::{console_error, errors::JsCaused, JsError};
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub struct EventListenerBindError(JsError);
 
 /// Wrapper for closure that handles some [`EventTarget`] event.
@@ -96,7 +96,7 @@ where
                 self.closure.as_ref().unchecked_ref(),
             )
         {
-            console_error!(err);
+            console_error(err);
         }
     }
 }
