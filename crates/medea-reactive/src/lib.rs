@@ -12,8 +12,7 @@ use futures::{
 };
 
 /// [`ReactiveField`] with which you can only subscribe on changes [`Stream`].
-pub type DefaultReactiveField<T> =
-    ReactiveField<T, Vec<UniversalSubscriber<T>>>;
+pub type Reactive<D> = ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>;
 
 /// A reactive cell which will emit all modification to the subscribers.
 ///
@@ -23,63 +22,63 @@ pub type DefaultReactiveField<T> =
 /// If you want to get [`Future`] which will be resolved only when data of this
 /// field will become equal to some data, you can use [`ReactiveField::when`] or
 /// [`ReactiveField::when_eq`].
-pub struct ReactiveField<T, S> {
+pub struct ReactiveField<D, S> {
     /// Data which stored by this [`ReactiveField`].
-    data: T,
+    data: D,
 
     /// Subscribers on [`ReactiveField`]'s data mutations.
     subs: S,
 }
 
-impl<T, S> fmt::Debug for ReactiveField<T, S>
+impl<D, S> fmt::Debug for ReactiveField<D, S>
 where
-    T: Debug,
+    D: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "ReactiveField {{ data: {:?} }}", self.data)
     }
 }
 
-impl<T> ReactiveField<T, Vec<UniversalSubscriber<T>>>
+impl<D> ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>
 where
-    T: 'static,
+    D: 'static,
 {
     /// Returns new [`ReactiveField`] on which mutations you can
     /// [`ReactiveSubscribe`], also you can subscribe on concrete mutation with
     /// [`ReactiveField::when`] and [`ReactiveField::when_eq`].
-    pub fn new(data: T) -> Self {
+    pub fn new(data: D) -> Self {
         Self {
             data,
-            subs: Vec::new(),
+            subs: RefCell::new(Vec::new()),
         }
     }
 }
 
-impl<T, S> ReactiveField<T, S>
+impl<D, S> ReactiveField<D, S>
 where
-    T: 'static,
-    S: Subscribable<T>,
+    D: 'static,
+    S: Subscribable<D>,
 {
     /// Creates new [`ReactiveField`] with custom [`Subscribable`]
     /// implementation.
-    pub fn new_with_custom(data: T, subs: S) -> Self {
+    pub fn new_with_custom(data: D, subs: S) -> Self {
         Self { data, subs }
     }
 }
 
-impl<T, S> ReactiveField<T, S>
+impl<D, S> ReactiveField<D, S>
 where
-    T: 'static,
-    S: SubscribableOnce<T>,
+    D: 'static,
+    S: Whenable<D>,
 {
     /// Returns [`Future`] which will be resolved only on modification with
     /// which your `assert_fn` returned `true`.
     pub fn when<F>(
-        &mut self,
+        &self,
         assert_fn: F,
     ) -> LocalBoxFuture<'static, Result<(), Dropped>>
     where
-        F: Fn(&T) -> bool + 'static,
+        F: Fn(&D) -> bool + 'static,
     {
         if (assert_fn)(&self.data) {
             Box::pin(future::ok(()))
@@ -89,12 +88,12 @@ where
     }
 }
 
-impl<T, S> ReactiveField<T, S>
+impl<D, S> ReactiveField<D, S>
 where
-    S: Subscribable<T>,
-    T: Clone + 'static,
+    S: Subscribable<D>,
+    D: Clone + 'static,
 {
-    pub fn subscribe(&mut self) -> LocalBoxStream<'static, T> {
+    pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let data = self.data.clone();
         let subscription = self.subs.subscribe();
 
@@ -102,25 +101,25 @@ where
     }
 }
 
-impl<T, S> ReactiveField<T, S>
+impl<D, S> ReactiveField<D, S>
 where
-    T: Eq + 'static,
-    S: SubscribableOnce<T>,
+    D: Eq + 'static,
+    S: Whenable<D>,
 {
     /// Returns [`Future`] which will be resolved only when data of this
     /// [`ReactiveField`] will become equal to provided `should_be`.
     pub fn when_eq(
-        &mut self,
-        should_be: T,
+        &self,
+        should_be: D,
     ) -> LocalBoxFuture<'static, Result<(), Dropped>> {
         self.when(move |data| data == &should_be)
     }
 }
 
-impl<T, S> ReactiveField<T, S>
+impl<D, S> ReactiveField<D, S>
 where
-    S: OnReactiveFieldModification<T>,
-    T: Clone + Eq,
+    S: OnReactiveFieldModification<D>,
+    D: Clone + Eq,
 {
     /// Returns [`MutReactiveFieldGuard`] which can be mutably dereferenced to
     /// underlying data.
@@ -133,7 +132,7 @@ where
     /// Notification about mutation will be sent only if this field __really__
     /// changed. This will be checked with [`PartialEq`] implementation of
     /// underlying data.
-    pub fn borrow_mut(&mut self) -> MutReactiveFieldGuard<'_, T, S> {
+    pub fn borrow_mut(&mut self) -> MutReactiveFieldGuard<'_, D, S> {
         MutReactiveFieldGuard {
             value_before_mutation: self.data.clone(),
             data: &mut self.data,
@@ -142,32 +141,32 @@ where
     }
 }
 
-pub trait OnReactiveFieldModification<T> {
+pub trait OnReactiveFieldModification<D> {
     /// This function will be called on every [`ReactiveField`] modification.
     ///
     /// On this function call subsciber which implements
     /// [`OnReactiveFieldModification`] should send a update to a [`Stream`]
     /// or resolve [`Future`].
-    fn on_modify(&mut self, data: &T);
+    fn on_modify(&mut self, data: &D);
 }
 
-pub trait Subscribable<T: 'static> {
+pub trait Subscribable<D: 'static> {
     /// This function will be called on [`ReactiveField::subscribe`].
     ///
     /// Should return [`LocalBoxStream`] to which will be sent data updates.
-    fn subscribe(&mut self) -> LocalBoxStream<'static, T>;
+    fn subscribe(&self) -> LocalBoxStream<'static, D>;
 }
 
 /// Subscriber which implements [`Subscribable`] and [`SubscribableOnce`] in
 /// [`Vec`].
 ///
 /// This structure should be wrapped into [`Vec`].
-pub enum UniversalSubscriber<T> {
+pub enum UniversalSubscriber<D> {
     When {
         sender: RefCell<Option<oneshot::Sender<()>>>,
-        assert_fn: Box<dyn Fn(&T) -> bool>,
+        assert_fn: Box<dyn Fn(&D) -> bool>,
     },
-    All(mpsc::UnboundedSender<T>),
+    All(mpsc::UnboundedSender<D>),
 }
 
 /// Error will be sent to all subscribers when this [`ReactiveField`] is
@@ -181,24 +180,24 @@ impl From<oneshot::Canceled> for Dropped {
     }
 }
 
-pub trait SubscribableOnce<T: 'static> {
+pub trait Whenable<D: 'static> {
     /// This function will be called on [`ReactiveField::when`].
     ///
     /// Should return [`LocalBoxFuture`] to which will be sent `()` when
     /// provided `assert_fn` returns `true`.
     fn when(
-        &mut self,
-        assert_fn: Box<dyn Fn(&T) -> bool>,
+        &self,
+        assert_fn: Box<dyn Fn(&D) -> bool>,
     ) -> LocalBoxFuture<'static, Result<(), Dropped>>;
 }
 
-impl<T: 'static> SubscribableOnce<T> for Vec<UniversalSubscriber<T>> {
+impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     fn when(
-        &mut self,
-        assert_fn: Box<dyn Fn(&T) -> bool>,
+        &self,
+        assert_fn: Box<dyn Fn(&D) -> bool>,
     ) -> LocalBoxFuture<'static, Result<(), Dropped>> {
         let (tx, rx) = oneshot::channel();
-        self.push(UniversalSubscriber::When {
+        self.borrow_mut().push(UniversalSubscriber::When {
             sender: RefCell::new(Some(tx)),
             assert_fn,
         });
@@ -207,18 +206,18 @@ impl<T: 'static> SubscribableOnce<T> for Vec<UniversalSubscriber<T>> {
     }
 }
 
-impl<T: 'static> Subscribable<T> for Vec<UniversalSubscriber<T>> {
-    fn subscribe(&mut self) -> LocalBoxStream<'static, T> {
+impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
+    fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let (tx, rx) = mpsc::unbounded();
-        self.push(UniversalSubscriber::All(tx));
+        self.borrow_mut().push(UniversalSubscriber::All(tx));
 
         Box::pin(rx)
     }
 }
 
-impl<T: Clone> OnReactiveFieldModification<T> for Vec<UniversalSubscriber<T>> {
-    fn on_modify(&mut self, data: &T) {
-        self.retain(|sub| match sub {
+impl<D: Clone> OnReactiveFieldModification<D> for RefCell<Vec<UniversalSubscriber<D>>> {
+    fn on_modify(&mut self, data: &D) {
+        self.borrow_mut().retain(|sub| match sub {
             UniversalSubscriber::When { assert_fn, sender } => {
                 if (assert_fn)(data) {
                     sender.borrow_mut().take().unwrap().send(()).ok();
@@ -235,50 +234,50 @@ impl<T: Clone> OnReactiveFieldModification<T> for Vec<UniversalSubscriber<T>> {
     }
 }
 
-impl<T, S> Deref for ReactiveField<T, S> {
-    type Target = T;
+impl<D, S> Deref for ReactiveField<D, S> {
+    type Target = D;
 
     fn deref(&self) -> &Self::Target {
         &self.data
     }
 }
 
-pub struct MutReactiveFieldGuard<'a, T, S>
+pub struct MutReactiveFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<T>,
-    T: Eq,
+    S: OnReactiveFieldModification<D>,
+    D: Eq,
 {
-    data: &'a mut T,
+    data: &'a mut D,
     subs: &'a mut S,
-    value_before_mutation: T,
+    value_before_mutation: D,
 }
 
-impl<'a, T, S> Deref for MutReactiveFieldGuard<'a, T, S>
+impl<'a, D, S> Deref for MutReactiveFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<T>,
-    T: Eq,
+    S: OnReactiveFieldModification<D>,
+    D: Eq,
 {
-    type Target = T;
+    type Target = D;
 
     fn deref(&self) -> &Self::Target {
         &self.data
     }
 }
 
-impl<'a, T, S> DerefMut for MutReactiveFieldGuard<'a, T, S>
+impl<'a, D, S> DerefMut for MutReactiveFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<T>,
-    T: Eq,
+    S: OnReactiveFieldModification<D>,
+    D: Eq,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }
 }
 
-impl<'a, T, S> Drop for MutReactiveFieldGuard<'a, T, S>
+impl<'a, D, S> Drop for MutReactiveFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<T>,
-    T: Eq,
+    S: OnReactiveFieldModification<D>,
+    D: Eq,
 {
     fn drop(&mut self) {
         if self.data != &self.value_before_mutation {
@@ -297,7 +296,7 @@ mod tests {
     };
     use tokio::{task, time::delay_for};
 
-    use crate::DefaultReactiveField;
+    use crate::Reactive;
 
     #[derive(Debug)]
     struct Timeout;
@@ -316,20 +315,20 @@ mod tests {
 
     #[tokio::test]
     async fn subscribe_sends_current_data() {
-        let mut field = DefaultReactiveField::new(9i32);
+        let mut field = Reactive::new(9i32);
         let current_data = field.subscribe().next().await.unwrap();
         assert_eq!(current_data, 9);
     }
 
     #[tokio::test]
     async fn when_eq_resolves_if_value_already_eq() {
-        let mut field = DefaultReactiveField::new(9i32);
+        let mut field = Reactive::new(9i32);
         field.when_eq(9i32).await.unwrap();
     }
 
     #[tokio::test]
     async fn when_eq_dont_resolves_if_value_is_not_eq() {
-        let mut field = DefaultReactiveField::new(9i32);
+        let mut field = Reactive::new(9i32);
         await_future_with_timeout(
             field.when_eq(0i32),
             Duration::from_millis(50),
@@ -341,7 +340,7 @@ mod tests {
 
     #[tokio::test]
     async fn current_value_provided_into_assert_fn_on_when_call() {
-        let mut field = DefaultReactiveField::new(9i32);
+        let mut field = Reactive::new(9i32);
 
         await_future_with_timeout(
             field.when(|val| val == &9),
@@ -356,7 +355,7 @@ mod tests {
     async fn value_updates_is_sended_to_subs() {
         task::LocalSet::new()
             .run_until(async move {
-                let mut field = DefaultReactiveField::new(0i32);
+                let mut field = Reactive::new(0i32);
                 let mut subscription_on_changes = field.subscribe();
 
                 task::spawn_local(async move {
@@ -381,7 +380,7 @@ mod tests {
     async fn when_resolves_on_value_update() {
         task::LocalSet::new()
             .run_until(async move {
-                let mut field = DefaultReactiveField::new(0i32);
+                let mut field = Reactive::new(0i32);
                 let subscription = field.when(|change| change == &100);
 
                 task::spawn_local(async move {
@@ -405,7 +404,7 @@ mod tests {
     async fn when_eq_resolves_on_value_update() {
         task::LocalSet::new()
             .run_until(async move {
-                let mut field = DefaultReactiveField::new(0i32);
+                let mut field = Reactive::new(0i32);
                 let subscription = field.when_eq(100);
 
                 task::spawn_local(async move {
@@ -427,7 +426,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_returns_dropped_error_on_drop() {
-        let mut field = DefaultReactiveField::new(0i32);
+        let mut field = Reactive::new(0i32);
         let subscription = field.when(|change| change == &100);
         std::mem::drop(field);
         subscription.await.err().unwrap();
@@ -435,7 +434,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_eq_returns_dropped_error_on_drop() {
-        let mut field = DefaultReactiveField::new(0i32);
+        let mut field = Reactive::new(0i32);
         let subscription = field.when_eq(100);
         std::mem::drop(field);
         subscription.await.err().unwrap();
@@ -443,7 +442,7 @@ mod tests {
 
     #[tokio::test]
     async fn stream_ends_when_reactive_field_dropped() {
-        let mut field = DefaultReactiveField::new(0i32);
+        let mut field = Reactive::new(0i32);
         let subscription = field.subscribe();
         std::mem::drop(field);
         assert!(subscription.skip(1).next().await.is_none());
@@ -451,7 +450,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_update_should_be_emitted_on_field_mutation() {
-        let mut field = DefaultReactiveField::new(0i32);
+        let mut field = Reactive::new(0i32);
         let subscription = field.subscribe();
         *field.borrow_mut() = 0;
         await_future_with_timeout(
@@ -465,7 +464,7 @@ mod tests {
 
     #[tokio::test]
     async fn only_last_update_should_be_send_to_the_subscribers() {
-        let mut field = DefaultReactiveField::new(0i32);
+        let mut field = Reactive::new(0i32);
         let subscription = field.subscribe();
         let mut field_mut_guard = field.borrow_mut();
         *field_mut_guard = 100;
