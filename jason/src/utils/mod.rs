@@ -68,7 +68,12 @@ impl Mul<f32> for JsDuration {
     type Output = Self;
 
     #[inline]
-    fn mul(self, rhs: f32) -> Self::Output {
+    fn mul(self, mut rhs: f32) -> Self::Output {
+        // Emulation of JS side's 'setTimeout' behavior which will be instantly
+        // resolved if call it with negative number.
+        if rhs < 0.0 {
+            rhs = 0.0;
+        };
         Self(self.0.mul_f64(rhs.into()))
     }
 }

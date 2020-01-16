@@ -71,6 +71,9 @@ impl ReconnectHandle {
     /// If [`RpcClient`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
+    ///
+    /// If `multiplier` is negative number than `multiplier` will be considered
+    /// as `0.0`.
     pub fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
