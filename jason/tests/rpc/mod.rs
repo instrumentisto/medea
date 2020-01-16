@@ -244,7 +244,7 @@ mod on_close {
                 ClosedStateReason::ConnectionLost(close_msg),
             ))
             .unwrap();
-            rx.boxed()
+            Box::pin(rx)
         });
         transport.expect_on_message().returning(|| {
             on_message_mock(RpcSettings {
