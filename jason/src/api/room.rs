@@ -25,7 +25,7 @@ use crate::{
         PeerEvent, PeerEventHandler, PeerRepository,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ReconnectorHandle, RpcClient,
+        ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
         RpcClientError, TransportError,
     },
     utils::{
@@ -100,7 +100,7 @@ impl RoomCloseReason {
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
 enum RoomError {
-    /// Returned if some mandatory callback wasn't set.
+    /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
     CallbackNotSet(&'static str),
 
@@ -207,7 +207,7 @@ impl RoomHandle {
                 while let Some(_) = connection_loss_stream.next().await {
                     match upgrade_or_detached!(weak_inner, JsValue) {
                         Ok(inner) => {
-                            let reconnect_handle = ReconnectorHandle::new(
+                            let reconnect_handle = ReconnectHandle::new(
                                 Rc::downgrade(&inner.borrow().rpc),
                             );
                             inner
@@ -449,7 +449,7 @@ struct InnerRoom {
     on_failed_local_stream: Rc<Callback<JasonError>>,
 
     /// Callback to be invoked when [`RpcClient`] loses connection.
-    on_connection_loss: Callback<ReconnectorHandle>,
+    on_connection_loss: Callback<ReconnectHandle>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: EnabledAudio,

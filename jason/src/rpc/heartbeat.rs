@@ -1,4 +1,4 @@
-//! Implementation of connection loss detection through Ping/Pong mechanism.
+//! Connection loss detection via ping/pong mechanism.
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -23,7 +23,7 @@ use crate::{
 #[derive(Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
 
-/// Wrapper around [`AbortHandle`] which will abort [`Future`] on [`Drop`].
+/// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
 #[derive(Debug, From)]
 struct TaskHandle(AbortHandle);
 
@@ -41,6 +41,7 @@ pub struct IdleTimeout(pub JsDuration);
 #[derive(Debug, Copy, Clone, Mul)]
 pub struct PingInterval(pub JsDuration);
 
+/// Inner data of [`Heartbeat`].
 struct Inner {
     /// [`RpcTransport`] which heartbeats.
     transport: Rc<dyn RpcTransport>,
@@ -79,12 +80,12 @@ impl Inner {
     }
 }
 
-/// Service for detecting connection loss through ping/pong mechanism.
-pub struct Heartbeater(Rc<RefCell<Inner>>);
+/// Detector of connection loss via ping/pong mechanism.
+pub struct Heartbeat(Rc<RefCell<Inner>>);
 
-impl Heartbeater {
-    /// Start heartbeater for provided [`RpcTransport`] with provided
-    /// `idle_timeout` and `ping_interval`.
+impl Heartbeat {
+    /// Start this [`Heartbeat`] for the provided [`RpcTransport`] with
+    /// the provided `idle_timeout` and `ping_interval`.
     pub fn start(
         transport: Rc<dyn RpcTransport>,
         ping_interval: PingInterval,
@@ -109,7 +110,7 @@ impl Heartbeater {
         Self(inner)
     }
 
-    /// Updates [`Heartbeat`] settings.
+    /// Updates this [`Heartbeat`] settings.
     pub fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
@@ -119,8 +120,8 @@ impl Heartbeater {
         self.0.borrow_mut().ping_interval = ping_interval;
     }
 
-    /// Returns [`LocalBoxStream`] to which will be sent `()` when
-    /// [`Heartbeat`] considers that [`RpcTransport`] is idle.
+    /// Returns [`LocalBoxStream`] to which will sent `()` when [`Heartbeat`]
+    /// considers that [`RpcTransport`] is idle.
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().on_idle_subs.push(on_idle_tx);
@@ -132,7 +133,7 @@ impl Heartbeater {
 /// Spawns idle watchdog task returning its handle.
 ///
 /// This task is responsible for throwing [`Heartbeat::on_idle`] when
-/// [`ServerMsg`] isn't received within `idle_timeout`.
+/// [`ServerMsg`] hasn't been received within `idle_timeout`.
 ///
 /// Also this watchdog will repeat [`ClientMsg::Pong`] if
 /// [`ServerMsg::Ping`] wasn't received within `ping_interval * 2`.
@@ -156,8 +157,9 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
                 .filter_map(|sub| sub.unbounded_send(()).err())
                 .for_each(|err| {
                     console_error(format!(
-                        "Heartbeat::on_idle subscriber unexpectedly gone. {:?}",
-                        err
+                        "Heartbeat::on_idle subscriber has gone unexpectedly: \
+                         {:?}",
+                        err,
                     ))
                 });
         });
@@ -193,7 +195,7 @@ fn spawn_ping_handle_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
     handle_ping_task.into()
 }
 
-impl Drop for Heartbeater {
+impl Drop for Heartbeat {
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         inner.handle_ping_task.take();

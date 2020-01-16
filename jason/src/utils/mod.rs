@@ -6,9 +6,8 @@ mod errors;
 mod callback;
 mod event_listener;
 
-use std::{ops::Mul, time::Duration};
+use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
-use bigdecimal::{BigDecimal, ToPrimitive as _};
 use derive_more::{From, Sub};
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::prelude::*;
@@ -39,25 +38,27 @@ pub fn window() -> Window {
 /// side timers.
 ///
 /// Also [`JsDuration`] can be multiplied by [`f32`].
-#[derive(Debug, From, Copy, Clone, Sub, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, From, PartialEq, PartialOrd, Sub)]
 pub struct JsDuration(Duration);
 
 impl JsDuration {
     /// Converts this [`JsDuration`] into `i32` milliseconds.
-    // Unfortunately, 'web_sys' believes that only 'i32' can be passed to a
-    // 'setTimeout'. But it is unlikely we will need a duration of more,
-    // than 596 hours, so it was decided to simply truncate the number. If we
-    // will need a longer duration in the future, then we can implement this
-    // with a few 'setTimeouts'.
-    #[allow(clippy::cast_possible_truncation)]
+    ///
+    /// Unfortunately, [`web_sys`] believes that only `i32` can be passed to a
+    /// `setTimeout`. But it is unlikely we will need a duration of more,
+    /// than 596 hours, so it was decided to simply truncate the number. If we
+    /// will need a longer duration in the future, then we can implement this
+    /// with a few `setTimeout`s.
+    #[inline]
     pub fn into_js_duration(self) -> i32 {
-        self.0.as_millis() as i32
+        self.0.as_millis().try_into().unwrap_or(i32::max_value())
     }
 }
 
 impl Mul<u32> for JsDuration {
     type Output = Self;
 
+    #[inline]
     fn mul(self, rhs: u32) -> Self::Output {
         Self(self.0 * rhs)
     }
@@ -66,25 +67,9 @@ impl Mul<u32> for JsDuration {
 impl Mul<f32> for JsDuration {
     type Output = Self;
 
-    // Truncation here is normal, because we will still be limited in
-    // 'JsDuration::into_js_duration' to the 596 hours (which is less than
-    // 'u64' limit).
-    #[allow(clippy::cast_possible_truncation)]
+    #[inline]
     fn mul(self, rhs: f32) -> Self::Output {
-        // Always positive.
-        let duration_ms = BigDecimal::from(self.0.as_millis() as u64);
-        // Can be negative, but that will be fixed in the result of calculation
-        // which will be transformed to 'u128' bellow.
-        let multiplier = BigDecimal::from(rhs);
-        // Theoretically we can get negative number here. But all negative
-        // numbers will be reduced to zero. This is default behavior of the
-        // JavaScript's 'setTimeout' and it's OK here.
-        //
-        // We can get 'Err' here only if value is less than zero (this can be
-        // proved by looking at the source code).
-        let multiplied_duration =
-            (duration_ms * multiplier).to_u64().unwrap_or(0);
-        Self(Duration::from_millis(multiplied_duration))
+        Self(self.0.mul_f64(rhs.into()))
     }
 }
 
@@ -98,38 +83,31 @@ impl Drop for IntervalHandle {
     }
 }
 
-/// Upgrades provided [`Weak`] reference, mapping it to
-/// Result<_,[`HandlerDetachedError`]> and invokes `Into::into` on err. If the
-/// err type cannot be infered, then you can provide concrete type, usually
-/// being: `JasonError` or `JsValue`.
+/// Upgrades provided [`Weak`] reference, mapping it to a [`Result`] with
+/// [`HandlerDetachedError`] and invokes [`Into::into`] on the error.
+/// If the errot type cannot be inferred, then you can provide a concrete type
+/// (usually being [`JasonError`] or [`JsValue`]).
 ///
-/// [`Rc`]: std::rc::Rc
 /// [`Weak`]: std::rc::Weak
 macro_rules! upgrade_or_detached {
     ($v:expr) => {{
         $v.upgrade()
-            .ok_or_else(
-                || new_js_error!(HandlerDetachedError)
-            )
+            .ok_or_else(|| new_js_error!(HandlerDetachedError))
     }};
     ($v:expr, $err:ty) => {{
         $v.upgrade()
-            .ok_or_else(
-                || new_js_error!(HandlerDetachedError => $err)
-            )
+            .ok_or_else(|| new_js_error!(HandlerDetachedError => $err))
     }};
 }
 
-/// Adds [`tracerr`] information to the provided error, wraps
-/// it into [`JasonError`] and converts it into needed error.
+/// Adds [`tracerr`] information to the provided error, wraps it into
+/// [`JasonError`] and converts it into the expected error type.
 ///
-/// This macro have two syntaxes:
-///
-/// `new_js_error!(DetachedStateError)` - which will convert provided error
-/// wrapped into [`JasonError`] with `into()` automatically.
-///
-/// Or you can use `new_js_error!(DetachedStateError => JsError)` if compiler
-/// can't determine which type you want.
+/// This macro has two syntaxes:
+/// - `new_js_error!(DetachedStateError)` - converts provided error wrapped into
+///   [`JasonError`] with [`Into::into`] automatically;
+/// - `new_js_error!(DetachedStateError => JsError)` - annotates explicitly
+///   which type conversion is required.
 macro_rules! new_js_error {
     ($e:expr) => {
         $crate::utils::JasonError::from(tracerr::new!($e)).into()
@@ -155,7 +133,7 @@ where
         .map_or_else(|| None, into)
 }
 
-/// [`Future`] which resolves after provided [`JsDuration`].
+/// [`Future`] which resolves after the provided [`JsDuration`].
 pub async fn delay_for(delay_ms: JsDuration) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()

@@ -27,8 +27,8 @@ use crate::utils::{console_error, JasonError, JsCaused, JsError};
 #[doc(inline)]
 pub use self::{
     backoff_delayer::BackoffDelayer,
-    heartbeat::{HeartbeatError, Heartbeater, IdleTimeout, PingInterval},
-    reconnect_handle::ReconnectorHandle,
+    heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
+    reconnect_handle::ReconnectHandle,
     websocket::{TransportError, WebSocketRpcTransport},
 };
 
@@ -123,42 +123,42 @@ impl From<&CloseEvent> for CloseMsg {
 /// State of [`RpcClient`] and [`RpcTransport`].
 #[derive(Clone, Debug)]
 pub enum State {
-    /// Socket has been created. The connection is not yet open.
+    /// Socket has been created. The connection is not open yet.
     ///
-    /// Reflects `CONNECTING` state from JS side [`WebSocket.readyState`].
+    /// Reflects `CONNECTING` state from JS side [`WebSocket.readyState`][1].
     ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Connecting,
 
     /// The connection is open and ready to communicate.
     ///
-    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`].
+    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`][1].
     ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Open,
 
     /// The connection is in the process of closing.
     ///
-    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`].
+    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`][1].
     ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Closing,
 
     /// The connection is closed or couldn't be opened.
     ///
-    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`].
+    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`][1].
     ///
-    /// [`ClosedStateReason`] is the reason of why a
+    /// [`ClosedStateReason`] is the reason of why
     /// [`RpcClient`]/[`RpcTransport`] went into this [`State`].
     ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Closed(ClosedStateReason),
 }
 
 impl State {
-    /// Returns number of [`WebSocket.readyState`].
+    /// Returns the number of [`WebSocket.readyState`][1].
     ///
-    /// [`WebSocket.readyState`]: https://tinyurl.com/t8ovwvr
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     pub fn id(&self) -> u8 {
         match self {
             Self::Connecting => 0,
@@ -169,7 +169,7 @@ impl State {
     }
 }
 
-/// The reason of why a [`RpcClient`]/[`RpcTransport`] went into
+/// The reason of why [`RpcClient`]/[`RpcTransport`] went into
 /// [`State::Closed`].
 #[derive(Clone, Debug)]
 pub enum ClosedStateReason {
@@ -299,7 +299,7 @@ pub trait RpcClient {
     fn get_token(&self) -> Option<String>;
 }
 
-/// RPC transport between a client and server.
+/// RPC transport between a client and a server.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Returns [`LocalBoxStream`] of all messages received by this transport.
@@ -309,7 +309,7 @@ pub trait RpcTransport {
     /// be dropped.
     fn set_close_reason(&self, reason: ClientDisconnect);
 
-    /// Sends a message to a server.
+    /// Sends given [`ClientMsg`] to a server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
     /// Subscribes to a [`RpcTransport`]'s [`State`] changes.
@@ -321,8 +321,8 @@ struct Inner {
     /// [`WebSocket`] connection to remote media server.
     sock: Option<Rc<dyn RpcTransport>>,
 
-    /// Service for connection loss detection through Ping/Pong mechanism.
-    heartbeat: Option<Heartbeater>,
+    /// Connection loss detector via ping/pong mechanism.
+    heartbeat: Option<Heartbeat>,
 
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
@@ -339,7 +339,7 @@ struct Inner {
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Senders for [`RpcClient::on_connection_loss`] subs.
+    /// Senders for [`RpcClient::on_connection_loss`] subscribers.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
     /// Closure which will create new [`RpcTransport`]s for this [`RpcClient`]
@@ -351,7 +351,7 @@ struct Inner {
     /// Will be `None` if this [`RpcClient`] was never connected to a sever.
     token: Option<String>,
 
-    /// Subscibers on [`State`] changes of this [`RpcClient`].
+    /// Subscribers on [`State`] changes of this [`RpcClient`].
     on_state_change_subs: Vec<mpsc::UnboundedSender<State>>,
 
     /// Current [`State`] of this [`RpcClient`].
@@ -385,13 +385,12 @@ impl Inner {
         }))
     }
 
-    /// Updates [`State`] of this [`WebSocketRpcClient`] and sends
-    /// update to all [`RpcClient::on_state_change`] subs.
+    /// Updates [`State`] of this [`WebSocketRpcClient`] and sends update to all
+    /// [`RpcClient::on_state_change`] subscribers.
     ///
-    /// Guarantees that two identical [`State`]s in a row doesn't
-    /// will be sent.
+    /// Guarantees that two identical [`State`]s in a row won't be sent.
     ///
-    /// Also, outdated subs will be cleaned here.
+    /// Also, outdated subscribers will be cleaned here.
     fn update_state(&mut self, state: &State) {
         if self.state.id() != state.id() {
             self.state = state.clone();
@@ -528,7 +527,7 @@ impl WebSocketRpcClient {
         );
 
         let heartbeat =
-            Heartbeater::start(transport, ping_interval, idle_timeout);
+            Heartbeat::start(transport, ping_interval, idle_timeout);
 
         let mut on_idle = heartbeat.on_idle();
         let weak_this = Rc::downgrade(&self.0);
@@ -661,10 +660,9 @@ impl WebSocketRpcClient {
         self.0.borrow().state.clone()
     }
 
-    /// Subscribes to a [`RpcClient`] [`State`] changes.
+    /// Subscribes to [`RpcClient`]'s [`State`] changes.
     ///
-    /// This function guarantees that two identical [`State`]s in a row wouldn't
-    /// be sent.
+    /// It guarantees that two identical [`State`]s in a row won't be sent.
     fn on_state_change(&self) -> LocalBoxStream<'static, State> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_state_change_subs.push(tx);

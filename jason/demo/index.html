@@ -208,27 +208,27 @@
 
       let connectionState = document.getElementById('connection-state__state');
       room.on_connection_loss(async (reconnectHandle) => {
-          connectionState.className = 'badge badge-warning';
-          connectionState.textContent = 'Reconnecting';
+        connectionState.className = 'badge badge-warning';
+        connectionState.textContent = 'Reconnecting';
 
-          try {
-              await reconnectHandle.reconnect_with_backoff(500, 2.0, 10000);
-              connectionState.className = 'badge badge-success';
-              connectionState.textContent = 'Connected';
-          } catch (e) {
-              console.error(e);
-          }
+        try {
+          await reconnectHandle.reconnect_with_backoff(500, 2.0, 10000);
+          connectionState.className = 'badge badge-success';
+          connectionState.textContent = 'Connected';
+        } catch (e) {
+          console.error(e);
+        }
       });
 
       room.on_close(function (on_closed) {
-          connectionState.className = 'badge badge-danger';
-          connectionState.textContent = "Closed";
-          alert(
-            `Call was ended.
-            Reason: ${on_closed.reason()};
-            Is closed by server: ${on_closed.is_closed_by_server()};
-            Is error: ${on_closed.is_err()}.`
-          );
+        connectionState.className = 'badge badge-danger';
+        connectionState.textContent = "Closed";
+        alert(
+          `Call was ended.
+          Reason: ${on_closed.reason()};
+          Is closed by server: ${on_closed.is_closed_by_server()};
+          Is error: ${on_closed.is_err()}.`
+        );
       });
 
       let muteAudio = document.getElementById('control__mute_audio');
@@ -380,8 +380,8 @@
         </div>
 
         <div id="control" class="input-group mb-3" style="display: none">
-            <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
-            <button class="btn btn-info" id="control__mute_video">Mute video</button>
+          <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
+          <button class="btn btn-info" id="control__mute_video">Mute video</button>
         </div>
 
         <div>

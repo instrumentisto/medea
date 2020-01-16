@@ -27,15 +27,15 @@ use crate::{await_with_timeout, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-/// Creates [`WebSocketRpcClient`] with provided [`MockRpcTransport`] [`Rc`].
+/// Creates [`WebSocketRpcClient`] with the provided [`MockRpcTransport`].
 fn new_client(transport: Rc<MockRpcTransport>) -> WebSocketRpcClient {
     WebSocketRpcClient::new(Box::new(move |_| {
         Box::pin(future::ok(transport.clone() as Rc<dyn RpcTransport>))
     }))
 }
 
-/// Returns result for [`RpcTransport::on_message`] with [`LocalBoxStream`]
-/// which will only send [`ServerMsg::RpcSettings`] with provided
+/// Returns result for [`RpcTransport::on_message`] with [`LocalBoxStream`],
+/// which will only send [`ServerMsg::RpcSettings`] with the provided
 /// [`RpcSettings`].
 fn on_message_mock(
     settings: RpcSettings,

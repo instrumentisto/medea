@@ -2,7 +2,7 @@
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
-use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From, Into};
 use futures::{
@@ -37,11 +37,11 @@ pub enum TransportError {
 
     /// Occurs when [`ClientMessage`] cannot be parsed.
     #[display(fmt = "Failed to parse client message: {}", _0)]
-    ParseClientMessage(String),
+    ParseClientMessage(Rc<serde_json::error::Error>),
 
     /// Occurs when [`ServerMessage`] cannot be parsed.
     #[display(fmt = "Failed to parse server message: {}", _0)]
-    ParseServerMessage(String),
+    ParseServerMessage(Rc<serde_json::error::Error>),
 
     /// Occurs if the parsed message is not string.
     #[display(fmt = "Message is not a string")]
@@ -61,6 +61,12 @@ pub enum TransportError {
     ClosedSocket,
 }
 
+impl From<EventListenerBindError> for TransportError {
+    fn from(err: EventListenerBindError) -> Self {
+        Self::WebSocketEventBindError(err)
+    }
+}
+
 /// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
@@ -75,84 +81,52 @@ impl TryFrom<&MessageEvent> for ServerMessage {
         let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(|e| ParseServerMessage(e.to_string()))
+            .map_err(|e| ParseServerMessage(e.into()))
             .map(Self::from)
-    }
-}
-
-impl From<EventListenerBindError> for TransportError {
-    fn from(err: EventListenerBindError) -> Self {
-        Self::WebSocketEventBindError(err)
     }
 }
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
 struct InnerSocket {
-    /// JS side [`WebSocket`].
+    /// JS side [WebSocket].
     ///
-    /// [`WebSocket`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
+    /// [WebSocket]: https://developer.mozilla.org/docs/Web/API/WebSocket
     socket: Rc<SysWebSocket>,
 
     /// State of [`WebSocketTransport`] connection.
     socket_state: State,
 
-    /// Listener for [`WebSocket`] [`open`] event.
+    /// Listener for [WebSocket] [open event][1].
     ///
-    /// [`WebSocket`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-    /// [`open`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/open_event
+    /// [WebSocket]: https://developer.mozilla.org/docs/Web/API/WebSocket
+    /// [1]: https://developer.mozilla.org/en-US/Web/API/WebSocket/open_event
     on_open_listener: Option<EventListener<SysWebSocket, Event>>,
 
-    /// Listener for [`WebSocket`] [`message`] event.
+    /// Listener for [WebSocket] [message event][1].
     ///
-    /// [`WebSocket`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-    /// [`message`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/message_event
+    /// [WebSocket]: https://developer.mozilla.org/docs/Web/API/WebSocket
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/message_event
     on_message_listener: Option<EventListener<SysWebSocket, MessageEvent>>,
 
-    /// Listener for [`WebSocket`] [`close`] event.
+    /// Listener for [WebSocket] [close event][1].
     ///
-    /// [`WebSocket`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-    /// [`close`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/close_event
+    /// [WebSocket]: https://developer.mozilla.org/docs/Web/API/WebSocket
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/close_event
     on_close_listener: Option<EventListener<SysWebSocket, CloseEvent>>,
 
-    /// [`mpsc::UnboundedSender`]s for [`RpcTransport::on_message`]'s
-    /// [`LocalBoxStream`].
+    /// Subscribers for [`RpcTransport::on_message`] events.
     on_message_subs: Vec<mpsc::UnboundedSender<ServerMsg>>,
 
-    /// [mpsc::UnboundedSender`]s for [`RpcTransport::on_state_change`]'s
-    /// [`LocalBoxStream`].
+    /// Subscribers for [`RpcTransport::on_state_change`] events.
     on_state_change_subs: Vec<mpsc::UnboundedSender<State>>,
 
-    /// Reason of [`WebSocketRpcTransport`] closing. Will be sent in
-    /// `WebSocket` [close frame].
+    /// Reason of [`WebSocketRpcTransport`] closing.
+    /// Will be sent in [WebSocket close frame][1].
     ///
-    /// [close frame]:
-    /// https://tools.ietf.org/html/rfc6455#section-5.5.1
+    /// [1]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     close_reason: ClientDisconnect,
 }
-
-/// WebSocket [`RpcTransport`] between a client and server.
-///
-/// Don't forget that this structure have __cyclic references__ which will be
-/// freed in [`Drop`] implementation of this structure. If you added some new
-/// cyclic dependencies don't forget to [`drop`] them on [`drop`] of this
-/// reference and add to this doc.
-///
-/// # List of cyclic dependencies:
-///
-/// 1. [`InnerSocket::on_close_listener`],
-///
-/// 2. [`InnerSocket::on_message_listener`],
-///
-/// 3. [`InnerSocket::on_open_listener`].
-pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
@@ -172,23 +146,24 @@ impl InnerSocket {
         })
     }
 
-    /// Updates `socket_state` with provided [`State`].
+    /// Updates `socket_state` of this [`InnerSocket`] with the provided
+    /// [`State`].
     ///
-    /// Sends updated [`State`] to a `on_state_change` subscribers. But
-    /// if [`State`] is not changed, nothing will be sent.
-    fn update_socket_state(&mut self, new_state: &State) {
-        if self.socket_state.id() != new_state.id() {
-            self.socket_state = new_state.clone();
+    /// Sends updated [`State`] to `on_state_change` subscribers.
+    /// But, if [`State`] is not changed, then nothing will be sent.
+    fn update_socket_state(&mut self, new: &State) {
+        if self.socket_state.id() != new.id() {
+            self.socket_state = new.clone();
             self.on_state_change_subs.retain(|sub| !sub.is_closed());
 
             self.on_state_change_subs
                 .iter()
-                .filter_map(|sub| sub.unbounded_send(new_state.clone()).err())
+                .filter_map(|sub| sub.unbounded_send(new.clone()).err())
                 .for_each(|e| {
                     console_error(format!(
                         "'WebSocketRpcTransport::on_state_change' subscriber \
-                         unexpectedly gone. {:?}",
-                        e
+                         has gone unexpectedly: {:?}",
+                        e,
                     ));
                 });
         }
@@ -200,42 +175,31 @@ impl InnerSocket {
     }
 }
 
-impl RpcTransport for WebSocketRpcTransport {
-    fn on_message(&self) -> LocalBoxStream<'static, ServerMsg> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_message_subs.push(tx);
-
-        Box::pin(rx)
-    }
-
-    fn set_close_reason(&self, close_reason: ClientDisconnect) {
-        self.0.borrow_mut().close_reason = close_reason;
-    }
-
-    fn send(&self, msg: &ClientMsg) -> Result<()> {
-        let inner = self.0.borrow();
-        let message = serde_json::to_string(msg)
-            .map_err(|e| TransportError::ParseClientMessage(e.to_string()))
-            .map_err(tracerr::wrap!())?;
-
-        match inner.socket_state {
-            State::Open => inner
-                .socket
-                .send_with_str(&message)
-                .map_err(Into::into)
-                .map_err(TransportError::SendMessage)
-                .map_err(tracerr::wrap!()),
-            _ => Err(tracerr::new!(TransportError::ClosedSocket)),
+impl Drop for InnerSocket {
+    fn drop(&mut self) {
+        if self.socket_state.can_close() {
+            let rsn = serde_json::to_string(&self.close_reason)
+                .expect("Could not serialize close message");
+            if let Err(e) = self.socket.close_with_code_and_reason(1000, &rsn) {
+                console_error(e);
+            }
         }
     }
-
-    fn on_state_change(&self) -> LocalBoxStream<'static, State> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_state_change_subs.push(tx);
-
-        Box::pin(rx)
-    }
 }
+
+/// WebSocket [`RpcTransport`] between a client and a server.
+///
+/// # Drop
+///
+/// This structure has __cyclic references__, which are freed in its [`Drop`]
+/// implementation.
+///
+/// If you're adding new cyclic dependencies, then don't forget to drop them in
+/// the [`Drop`] implementation and mention in the list below:
+/// 1. [`InnerSocket::on_close_listener`]
+/// 2. [`InnerSocket::on_message_listener`]
+/// 3. [`InnerSocket::on_open_listener`]
+pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
@@ -286,15 +250,15 @@ impl WebSocketRpcTransport {
                 Ok(_) => Ok(this),
                 Err(_) => Err(tracerr::new!(TransportError::InitSocket)),
             },
-            future::Either::Right(_closed) => {
+            future::Either::Right(_) => {
                 Err(tracerr::new!(TransportError::InitSocket))
             }
         }
     }
 
     /// Sets [`WebSocketRpcTransport::on_close_listener`] which will update
-    /// [`RpcTransport`] [`State`] to [`State::Closed`] with
-    /// [`ClosedStateReason::ConnectionLoss`] with [`CloseMsg`].
+    /// [`RpcTransport`]'s [`State`] to [`State::Closed`] with a
+    /// [`ClosedStateReason::ConnectionLoss`].
     fn set_on_close_listener(&self) -> Result<()> {
         let this = Rc::clone(&self.0);
         let on_close = EventListener::new_once(
@@ -314,7 +278,7 @@ impl WebSocketRpcTransport {
     }
 
     /// Sets [`WebSocketRpcTransport::on_message_listener`] which will send
-    /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subs.
+    /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subscribers.
     fn set_on_message_listener(&self) -> Result<()> {
         let this = Rc::clone(&self.0);
         let on_message = EventListener::new_mut(
@@ -357,33 +321,50 @@ impl WebSocketRpcTransport {
     }
 }
 
+impl RpcTransport for WebSocketRpcTransport {
+    fn on_message(&self) -> LocalBoxStream<'static, ServerMsg> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_message_subs.push(tx);
+
+        Box::pin(rx)
+    }
+
+    fn set_close_reason(&self, close_reason: ClientDisconnect) {
+        self.0.borrow_mut().close_reason = close_reason;
+    }
+
+    fn send(&self, msg: &ClientMsg) -> Result<()> {
+        let inner = self.0.borrow();
+        let message = serde_json::to_string(msg)
+            .map_err(|e| TransportError::ParseClientMessage(e.into()))
+            .map_err(tracerr::wrap!())?;
+
+        match inner.socket_state {
+            State::Open => inner
+                .socket
+                .send_with_str(&message)
+                .map_err(Into::into)
+                .map_err(TransportError::SendMessage)
+                .map_err(tracerr::wrap!()),
+            _ => Err(tracerr::new!(TransportError::ClosedSocket)),
+        }
+    }
+
+    fn on_state_change(&self) -> LocalBoxStream<'static, State> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_state_change_subs.push(tx);
+
+        Box::pin(rx)
+    }
+}
+
 impl Drop for WebSocketRpcTransport {
-    /// Don't forget that [`WebSocketRpcTransport`] is [`Rc`]
-    /// and this [`Drop`] implementation will be called on every
-    /// [`Drop`] of this reference.
+    /// Don't forget that [`WebSocketRpcTransport`] is a [`Rc`] and this
+    /// [`Drop`] implementation will be called on each drop of its references.
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         inner.on_open_listener.take();
         inner.on_message_listener.take();
         inner.on_close_listener.take();
-    }
-}
-
-impl Drop for InnerSocket {
-    fn drop(&mut self) {
-        if self.socket_state.can_close() {
-            let close_reason: Cow<'static, str> =
-                serde_json::to_string(&self.close_reason)
-                    .unwrap_or_else(|_| {
-                        "Could not serialize close message".into()
-                    })
-                    .into();
-
-            if let Err(err) =
-                self.socket.close_with_code_and_reason(1000, &close_reason)
-            {
-                console_error(err);
-            }
-        }
     }
 }

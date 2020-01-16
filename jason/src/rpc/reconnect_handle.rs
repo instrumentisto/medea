@@ -1,4 +1,4 @@
-//! Implementation of reconnector for a [`RpcClient`].
+//! Reconnection for [`RpcClient`].
 
 use std::{rc::Weak, time::Duration};
 
@@ -17,29 +17,29 @@ use crate::{
 #[derive(Debug, Display, JsCaused)]
 struct NoTokenError;
 
-/// Object with which JS side can reconnect to the Medea media server on
-/// connection loss.
+/// Handle that JS side can reconnect to the Medea media server on
+/// a connection loss with.
 ///
-/// This object will be provided into `Room.on_connection_loss` callback.
+/// This handle will be provided into `Room.on_connection_loss` callback.
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectorHandle(Weak<dyn RpcClient>);
+pub struct ReconnectHandle(Weak<dyn RpcClient>);
 
-impl ReconnectorHandle {
-    /// Creates new [`ReconnectorHandle`] with which JS side can reconnect
-    /// provided [`RpcClient`] on connection loss.
+impl ReconnectHandle {
+    /// Instantiates new [`ReconnectHandle`] from the given [`RpcClient`]
+    /// reference.
     pub fn new(rpc: Weak<dyn RpcClient>) -> Self {
         Self(rpc)
     }
 }
 
 #[wasm_bindgen]
-impl ReconnectorHandle {
-    /// Tries to reconnect after provided delay in milliseconds.
+impl ReconnectHandle {
+    /// Tries to reconnect after the provided delay in milliseconds.
     ///
-    /// If [`RpcClient`] is already reconnecting then new reconenction try
-    /// wouldn't be performed. Instead of this, this function will wait for
-    /// first reconnection try result and use it here.
+    /// If [`RpcClient`] is already reconnecting then new reconnection attempt
+    /// won't be performed. Instead, it will wait for the first reconnection
+    /// attempt result and use it here.
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
         let rpc = Clone::clone(&self.0);
         future_to_promise(async move {
@@ -57,21 +57,20 @@ impl ReconnectorHandle {
         })
     }
 
-    /// Tries to reconnect [`RpcClient`] in a loop with growing
-    /// delay until it will not be reconnected.
+    /// Tries to reconnect [`RpcClient`] in a loop with a growing backoff delay.
     ///
     /// The first attempt to reconnect is guaranteed to happen no earlier than
     /// `starting_delay_ms`.
     ///
-    /// Also this function guarantees that delay between reconnection attempts
-    /// will be not greater than `max_delay_ms`.
+    /// Also, it guarantees that delay between reconnection attempts won't be
+    /// greater than `max_delay_ms`.
     ///
-    /// After each reconnection try, delay between reconnections will be
-    /// multiplied by `multiplier` until it reaches `max_delay_ms`.
+    /// After each reconnection attempt, delay between reconnections will be
+    /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
     ///
-    /// If [`RpcClient`] is already reconnecting then new reconenction try
-    /// wouldn't be performed. Instead of this, this function will wait for
-    /// first reconnection try result and use it here.
+    /// If [`RpcClient`] is already reconnecting then new reconnection attempt
+    /// won't be performed. Instead, it will wait for the first reconnection
+    /// attempt result and use it here.
     pub fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,

@@ -8,7 +8,7 @@ use futures::{
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use medea_jason::rpc::{
-    Heartbeater, IdleTimeout, MockRpcTransport, PingInterval, RpcTransport,
+    Heartbeat, IdleTimeout, MockRpcTransport, PingInterval, RpcTransport,
 };
 use wasm_bindgen_test::*;
 
@@ -38,7 +38,7 @@ async fn sends_pong_on_received_ping() {
         Ok(())
     });
 
-    let _hb = Heartbeater::start(
+    let _hb = Heartbeat::start(
         Rc::new(transport),
         PingInterval(Duration::from_secs(10).into()),
         IdleTimeout(Duration::from_secs(10).into()),
@@ -75,7 +75,7 @@ async fn on_idle_works() {
         .return_once(|| stream::pending().boxed());
     transport.expect_send().return_once(|_| Ok(()));
 
-    let hb = Heartbeater::start(
+    let hb = Heartbeat::start(
         Rc::new(transport),
         PingInterval(Duration::from_millis(50).into()),
         IdleTimeout(Duration::from_millis(100).into()),
@@ -110,7 +110,7 @@ async fn pre_sends_pong() {
         Ok(())
     });
 
-    let _hb = Heartbeater::start(
+    let _hb = Heartbeat::start(
         Rc::new(transport),
         PingInterval(Duration::from_millis(10).into()),
         IdleTimeout(Duration::from_millis(100).into()),
@@ -130,7 +130,7 @@ async fn pre_sends_pong() {
     }
 }
 
-/// Tests that [`RpcTransport`] will be dropped when [`Heartbeater`] was
+/// Tests that [`RpcTransport`] will be dropped when [`Heartbeat`] was
 /// dropped.
 #[wasm_bindgen_test]
 async fn transport_is_dropped_when_hearbeater_is_dropped() {
@@ -140,7 +140,7 @@ async fn transport_is_dropped_when_hearbeater_is_dropped() {
         .returning(|| stream::pending().boxed());
     let transport: Rc<dyn RpcTransport> = Rc::new(transport);
 
-    let hb = Heartbeater::start(
+    let hb = Heartbeat::start(
         Rc::clone(&transport),
         PingInterval(Duration::from_secs(3).into()),
         IdleTimeout(Duration::from_secs(10).into()),

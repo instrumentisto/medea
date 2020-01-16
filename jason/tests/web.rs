@@ -173,9 +173,9 @@ async fn wait_and_check_test_result(
     };
 }
 
-/// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If in
-/// provided `timeout` time this [`LocalBoxFuture`] will not be resolved -
-/// `Err(String)` will be returned otherwise result of provided
+/// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
+/// provided `timeout` time this [`LocalBoxFuture`] won'tbe resolved, then
+/// `Err(String)` will be returned, otherwise a result of the provided
 /// [`LocalBoxFuture`] will be returned.
 async fn await_with_timeout<T>(
     f: LocalBoxFuture<'_, T>,

@@ -148,8 +148,8 @@ impl From<MediaStreamConstraints> for MultiSourceMediaStreamConstraints {
 /// Checks that the [MediaStreamTrack][1] is taken from a device
 /// with given [deviceId][2].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-/// [2]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+/// [2]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
 fn satisfies_by_device_id(
     device_id: &Option<String>,
     track: &SysMediaStreamTrack,
@@ -157,8 +157,8 @@ fn satisfies_by_device_id(
     match device_id {
         None => true,
         Some(device_id) => {
-            get_property_by_name(&track.get_settings(), "deviceId", |val| {
-                val.as_string()
+            get_property_by_name(&track.get_settings(), "deviceId", |v| {
+                v.as_string()
             })
             .map_or(false, |id| id.as_str() == device_id)
         }
