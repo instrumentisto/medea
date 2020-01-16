@@ -7,7 +7,10 @@ use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
-    peer::{MockPeerRepository, PeerConnection, PeerEvent},
+    peer::{
+        EnabledAudio, EnabledVideo, MockPeerRepository, PeerConnection,
+        PeerEvent,
+    },
     rpc::MockRpcClient,
     utils::JasonError,
 };
@@ -31,8 +34,8 @@ fn get_test_room_and_exist_peer(
             tx,
             vec![],
             Rc::new(MediaManager::default()),
-            true,
-            true,
+            true.into(),
+            true.into(),
         )
         .unwrap(),
     );
@@ -84,8 +87,8 @@ async fn mute_unmute_video() {
 
 fn get_test_room_and_new_peer(
     event_rx: mpsc::UnboundedReceiver<Event>,
-    with_enabled_audio: bool,
-    with_enabled_video: bool,
+    with_enabled_audio: EnabledAudio,
+    with_enabled_video: EnabledVideo,
 ) -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
@@ -111,8 +114,8 @@ fn get_test_room_and_new_peer(
             move |id: &PeerId,
                   _ice_servers: &Vec<IceServer>,
                   _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
-                  enabled_audio: &bool,
-                  enabled_video: &bool| {
+                  enabled_audio: &EnabledAudio,
+                  enabled_video: &EnabledVideo| {
                 *id == PeerId(1)
                     && *enabled_audio == with_enabled_audio
                     && *enabled_video == with_enabled_video
@@ -130,7 +133,8 @@ fn get_test_room_and_new_peer(
 #[wasm_bindgen_test]
 async fn mute_audio_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, peer) = get_test_room_and_new_peer(event_rx, false, true);
+    let (room, peer) =
+        get_test_room_and_new_peer(event_rx, false.into(), true.into());
     let (audio_track, video_track) = get_test_tracks();
 
     room.new_handle().mute_audio().unwrap();
@@ -152,7 +156,8 @@ async fn mute_audio_room_before_init_peer() {
 #[wasm_bindgen_test]
 async fn mute_video_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, peer) = get_test_room_and_new_peer(event_rx, true, false);
+    let (room, peer) =
+        get_test_room_and_new_peer(event_rx, true.into(), false.into());
     let (audio_track, video_track) = get_test_tracks();
 
     room.new_handle().mute_video().unwrap();
@@ -184,7 +189,8 @@ async fn mute_video_room_before_init_peer() {
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
+    let (room, _peer) =
+        get_test_room_and_new_peer(event_rx, true.into(), true.into());
 
     let room_handle = room.new_handle();
     let (cb, test_result) = js_callback!(|err: JasonError| {
@@ -259,7 +265,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
 #[wasm_bindgen_test]
 async fn error_get_local_stream_on_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
+    let (room, _peer) =
+        get_test_room_and_new_peer(event_rx, true.into(), true.into());
 
     let room_handle = room.new_handle();
 
@@ -300,7 +307,7 @@ async fn error_get_local_stream_on_new_peer() {
 // Assertions:
 //     1. Room::join returns error.
 #[wasm_bindgen_test]
-async fn error_join_room_without_failed_stream_callback() {
+async fn error_join_room_without_on_failed_stream_callback() {
     let (_, event_rx) = mpsc::unbounded();
     let mut rpc = MockRpcClient::new();
     rpc.expect_subscribe()
@@ -311,13 +318,53 @@ async fn error_join_room_without_failed_stream_callback() {
     let room = Room::new(Rc::new(rpc), repo);
 
     let room_handle = room.new_handle();
+    room_handle
+        .on_connection_loss(js_sys::Function::new_no_args(""))
+        .unwrap();
+
     match room_handle.inner_join(String::from("token")).await {
         Ok(_) => unreachable!(),
         Err(e) => {
             assert_eq!(e.name(), "CallbackNotSet");
             assert_eq!(
                 e.message(),
-                "`on_failed_local_stream` callback is not set",
+                "`Room.on_failed_local_stream()` callback isn't set.",
+            );
+            assert!(!e.trace().is_empty());
+        }
+    }
+}
+
+// Tests Room::join without set `on_connection_loss` callback.
+// Setup:
+//     1. Create Room.
+//     2. DO NOT set `on_connection_loss` callback.
+//     3. Try join to Room.
+// Assertions:
+//     1. Room::join returns error.
+#[wasm_bindgen_test]
+async fn error_join_room_without_on_connection_loss_callback() {
+    let (_, event_rx) = mpsc::unbounded();
+    let mut rpc = MockRpcClient::new();
+    rpc.expect_subscribe()
+        .return_once(move || Box::pin(event_rx));
+    rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
+    let repo = Box::new(MockPeerRepository::new());
+    let room = Room::new(Rc::new(rpc), repo);
+
+    let room_handle = room.new_handle();
+    room_handle
+        .on_failed_local_stream(js_sys::Function::new_no_args(""))
+        .unwrap();
+
+    match room_handle.inner_join(String::from("token")).await {
+        Ok(_) => unreachable!(),
+        Err(e) => {
+            assert_eq!(e.name(), "CallbackNotSet");
+            assert_eq!(
+                e.message(),
+                "`Room.on_connection_loss()` callback isn't set.",
             );
             assert!(!e.trace().is_empty());
         }
@@ -421,7 +468,7 @@ mod on_close_callback {
         });
         room_handle.on_close(cb.into()).unwrap();
 
-        std::mem::drop(room);
+        drop(room);
         wait_and_check_test_result(test_result, || {}).await;
     }
 
@@ -497,7 +544,7 @@ mod rpc_close_reason_on_room_drop {
     async fn set_default_close_reason_on_drop() {
         let (room, test_rx) = get_client().await;
 
-        std::mem::drop(room);
+        drop(room);
 
         let close_reason = test_rx.await.unwrap();
         assert_eq!(
