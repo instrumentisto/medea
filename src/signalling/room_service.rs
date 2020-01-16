@@ -7,7 +7,7 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{self, Future};
+use futures::future::{self, Future, FutureExt, LocalBoxFuture, TryFutureExt};
 use medea_control_api_proto::grpc::api::Element as ElementProto;
 
 use crate::{
@@ -141,7 +141,7 @@ impl RoomService {
     fn close_room(
         &self,
         id: RoomId,
-    ) -> Box<dyn Future<Output = Result<(), MailboxError>>> {
+    ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
@@ -151,12 +151,15 @@ impl RoomService {
 
             let room_repo = self.room_repo.clone();
 
-            Box::new(room.send(Close).map(move |_| {
-                debug!("Room [id = {}] removed.", id);
-                room_repo.remove(&id);
-            }))
+            room.send(Close)
+                .map(move |_| {
+                    debug!("Room [id = {}] removed.", id);
+                    room_repo.remove(&id);
+                    Ok(())
+                })
+                .boxed_local()
         } else {
-            Box::new(futures::future::ok(()))
+            async { Ok(()) }.boxed_local()
         }
     }
 
@@ -300,17 +303,17 @@ impl Handler<CreateMemberInRoom> for RoomService {
         sids.insert(msg.id.to_string(), sid);
 
         if let Some(room) = self.room_repo.get(&room_id) {
-            Box::new(
-                room.send(CreateMember(msg.id, msg.spec))
-                    .map_err(RoomServiceError::RoomMailboxErr)
-                    .and_then(move |r| {
-                        r.map_err(RoomServiceError::from).map(move |_| sids)
-                    }),
-            )
+            room.send(CreateMember(msg.id, msg.spec))
+                .map_err(RoomServiceError::RoomMailboxErr)
+                .then(move |r| async move {
+                    r.map_err(RoomServiceError::from).map(move |_| sids)
+                })
+                .boxed_local()
         } else {
-            Box::new(future::err(RoomServiceError::RoomNotFound(
-                Fid::<ToRoom>::new(room_id),
-            )))
+            async {
+                Err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(room_id)))
+            }
+            .boxed_local()
         }
     }
 }
@@ -338,21 +341,21 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         let endpoint_id = msg.id;
 
         if let Some(room) = self.room_repo.get(&room_id) {
-            Box::new(
-                room.send(CreateEndpoint {
-                    member_id,
-                    endpoint_id,
-                    spec: msg.spec,
-                })
-                .map_err(RoomServiceError::RoomMailboxErr)
-                .and_then(|r| {
-                    r.map_err(RoomServiceError::from).map(|_| HashMap::new())
-                }),
-            )
+            room.send(CreateEndpoint {
+                member_id,
+                endpoint_id,
+                spec: msg.spec,
+            })
+            .map_err(RoomServiceError::RoomMailboxErr)
+            .then(|r| async {
+                r.map_err(RoomServiceError::from).map(|_| HashMap::new())
+            })
+            .boxed_local()
         } else {
-            Box::new(future::err(RoomServiceError::RoomNotFound(
-                Fid::<ToRoom>::new(room_id),
-            )))
+            async {
+                Err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(room_id)))
+            }
+            .boxed_local()
         }
     }
 }
@@ -443,41 +446,38 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let mut deletes_from_room: Vec<StatefulFid> = Vec::new();
+
         // TODO: use Vec::drain_filter when it will be in stable
-        let room_messages_futs: Vec<
-            Box<dyn Future<Item = (), Error = MailboxError>>,
-        > = msg
-            .fids
-            .into_iter()
-            .filter_map(|fid| {
-                if let StatefulFid::Room(room_id) = fid {
-                    Some(self.close_room(room_id.take_room_id()))
-                } else {
-                    deletes_from_room.push(fid);
-                    None
-                }
-            })
-            .collect();
+        let room_messages_futs: Vec<ResponseFuture<Result<(), MailboxError>>> =
+            msg.fids
+                .into_iter()
+                .filter_map(|fid| {
+                    if let StatefulFid::Room(room_id) = fid {
+                        Some(self.close_room(room_id.take_room_id()))
+                    } else {
+                        deletes_from_room.push(fid);
+                        None
+                    }
+                })
+                .collect();
 
         if !room_messages_futs.is_empty() {
-            Box::new(
-                futures::future::join_all(room_messages_futs)
-                    .map(|_| ())
-                    .map_err(RoomServiceError::RoomMailboxErr),
-            )
+            future::try_join_all(room_messages_futs)
+                .map_ok(|_| ())
+                .map_err(RoomServiceError::RoomMailboxErr)
+                .boxed_local()
         } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
 
             if let Some(room) = self.room_repo.get(&room_id) {
-                Box::new(
-                    room.send(Delete(deletes_from_room))
-                        .map_err(RoomServiceError::RoomMailboxErr),
-                )
+                room.send(Delete(deletes_from_room))
+                    .map_err(RoomServiceError::RoomMailboxErr)
+                    .boxed_local()
             } else {
-                Box::new(future::ok(()))
+                async { Ok(()) }.boxed_local()
             }
         } else {
-            Box::new(future::err(RoomServiceError::EmptyUrisList))
+            async { Err(RoomServiceError::EmptyUrisList) }.boxed_local()
         }
     }
 }
@@ -506,9 +506,10 @@ impl Handler<Get> for RoomService {
                     .or_insert_with(Vec::new)
                     .push(fid);
             } else {
-                return Box::new(future::err(RoomServiceError::RoomNotFound(
-                    fid.into(),
-                )));
+                return async {
+                    Err(RoomServiceError::RoomNotFound(fid.into()))
+                }
+                .boxed_local();
             }
         }
 
@@ -517,20 +518,19 @@ impl Handler<Get> for RoomService {
             futs.push(room.send(SerializeProto(elements)));
         }
 
-        Box::new(
-            futures::future::join_all(futs)
-                .map_err(RoomServiceError::RoomMailboxErr)
-                .and_then(|results| {
-                    let mut all = HashMap::new();
-                    for result in results {
-                        match result {
-                            Ok(res) => all.extend(res),
-                            Err(e) => return Err(RoomServiceError::from(e)),
-                        }
+        future::try_join_all(futs)
+            .map_err(RoomServiceError::RoomMailboxErr)
+            .and_then(|results| async {
+                let mut all = HashMap::new();
+                for result in results {
+                    match result {
+                        Ok(res) => all.extend(res),
+                        Err(e) => return Err(RoomServiceError::from(e)),
                     }
-                    Ok(all)
-                }),
-        )
+                }
+                Ok(all)
+            })
+            .boxed_local()
     }
 }
 

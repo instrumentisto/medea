@@ -19,7 +19,7 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::{
-    future::{self, join_all, TryFutureExt},
+    future::{self, join_all, FutureExt, LocalBoxFuture, TryFutureExt},
     Future,
 };
 use medea_client_api_proto::{CloseDescription, CloseReason, Event};
@@ -195,17 +195,18 @@ impl ParticipantService {
     }
 
     /// Sends [`Event`] to specified remote [`Member`].
-    pub async fn send_event_to_member(
+    pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> Result<(), RoomError> {
+    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
         match self.connections.get(&member_id) {
             Some(conn) => conn
                 .send_event(event)
-                .await
-                .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
-            None => Err(RoomError::ConnectionNotExists(member_id)),
+                .map_err(move |_| RoomError::UnableToSendEvent(member_id))
+                .boxed_local(),
+            None => future::err(RoomError::ConnectionNotExists(member_id))
+                .boxed_local(),
         }
     }
 
@@ -217,7 +218,7 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
         conn: Box<dyn RpcConnection>,
-    ) -> ActFuture<Member, ParticipantServiceErr> {
+    ) -> ActFuture<Result<Member, ParticipantServiceErr>> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
                 return Box::new(wrap_future(future::err(
@@ -242,7 +243,7 @@ impl ParticipantService {
             Box::new(wrap_future(
                 connection
                     .close(CloseDescription::new(CloseReason::Reconnected))
-                    .then(move |_| Ok(member)),
+                    .map(move |_| Ok(member)),
             ))
         } else {
             Box::new(
@@ -251,15 +252,14 @@ impl ParticipantService {
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
                 ))
-                .map_err(|err, _: &mut Room, _| {
-                    ParticipantServiceErr::from(err)
-                })
-                .and_then(
-                    move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id, conn);
-                        member.replace_ice_user(ice);
-
-                        wrap_future(future::ok(member))
+                .map(
+                    |result, room: &mut Room, _| match result {
+                        Ok(ice_user) => {
+                            room.members.insert_connection(member_id, conn);
+                            member.replace_ice_user(ice_user);
+                            Ok(member)
+                        }
+                        Err(err) => Err(ParticipantServiceErr::from(err)),
                     },
                 ),
             )
@@ -291,12 +291,16 @@ impl ParticipantService {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
                 ctx.spawn(wrap_future(
-                    self.delete_ice_user(&member_id).map_err(move |err| {
-                        error!(
-                            "Error deleting IceUser of Member [id = {}]. {:?}",
-                            member_id, err
-                        )
-                    }),
+                    self.delete_ice_user(&member_id)
+                        .map_err(move |err| {
+                            error!(
+                                "Error deleting IceUser of Member [id = {}]. \
+                                 {:?}",
+                                member_id, err
+                            )
+                        })
+                        .into_future()
+                        .map(|_| ()),
                 ));
                 // TODO: we have no way to handle absence of RpcConnection right
                 //       now.
@@ -323,37 +327,41 @@ impl ParticipantService {
     fn delete_ice_user(
         &mut self,
         member_id: &MemberId,
-    ) -> Box<dyn Future<Output = Result<(), TurnServiceErr>>> {
+    ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>> {
         // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
                 Some(ice_user) => self.turn_service.delete(vec![ice_user]),
-                None => Box::new(future::ok(())),
+                None => async { Ok(()) }.boxed(),
             },
-            None => Box::new(future::ok(())),
+            None => async { Ok(()) }.boxed(),
         }
     }
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
     /// deletes all [`IceUser`]s.
-    pub async fn drop_connections(&mut self, ctx: &mut Context<Room>) {
+    pub fn drop_connections(
+        &mut self,
+        ctx: &mut Context<Room>,
+    ) -> LocalBoxFuture<'static, ()> {
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);
         });
 
         // closing all RpcConnection's
-        let close_connections = self.connections.drain().fold(
-            vec![],
-            |mut futures, (_, mut connection)| {
-                futures.push(
-                    connection
-                        .close(CloseDescription::new(CloseReason::Finished)),
-                );
-                futures
-            },
-        );
-        future::join_all(close_connections).await;
+        let close_rpc_connections =
+            future::join_all(self.connections.drain().fold(
+                vec![],
+                |mut futures, (_, mut connection)| {
+                    futures.push(
+                        connection.close(CloseDescription::new(
+                            CloseReason::Finished,
+                        )),
+                    );
+                    futures
+                },
+            ));
 
         // deleting all IceUsers
         let ice_users = self
@@ -362,10 +370,14 @@ impl ParticipantService {
             .filter_map(|member| member.take_ice_user())
             .collect();
 
-        self.turn_service
+        let delete_ice_users = self
+            .turn_service
             .delete(ice_users)
-            .map_err(|err| error!("Error removing IceUsers {:?}", err))
-            .await;
+            .map_err(|err| error!("Error removing IceUsers {:?}", err));
+
+        future::join(close_rpc_connections, delete_ice_users)
+            .map(|_| ())
+            .boxed_local()
     }
 
     /// Deletes [`Member`] from [`ParticipantService`], removes this user from
@@ -393,7 +405,9 @@ impl ParticipantService {
                 let delete_ice_user_fut = self
                     .turn_service
                     .delete(vec![ice_user])
-                    .map_err(|err| error!("Error removing IceUser {:?}", err));
+                    .map_err(|err| error!("Error removing IceUser {:?}", err))
+                    .into_future()
+                    .map(|_| ());
                 ctx.spawn(wrap_future(delete_ice_user_fut));
             }
         }

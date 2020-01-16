@@ -162,25 +162,29 @@ impl Actor for WsSession {
 impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsSession`] by sending itself "normal closure" close message
     /// with [`CloseDescription`] as description of [Close] frame.
-    ///
     /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,
-    ) -> LocalBoxFuture<()> {
-        async {
-            self.send(Close::with_normal_code(&close_description)).await;
-        }
-        .boxed_local()
+    ) -> LocalBoxFuture<'static, ()> {
+        self.send(Close::with_normal_code(&close_description))
+            .into_future()
+            .map(|_| ())
+            .boxed_local()
     }
 
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(&self, msg: Event) -> LocalBoxFuture<Result<(), ()>> {
-        self.send(EventMessage::from(msg)).map_err(|err| {
-            warn!("Failed send Event to RpcConnection: {:?} ", err)
-        }).boxed_local()
+    fn send_event(
+        &self,
+        msg: Event,
+    ) -> LocalBoxFuture<'static, Result<(), ()>> {
+        self.send(EventMessage::from(msg))
+            .map_err(|err| {
+                warn!("Failed send Event to RpcConnection: {:?} ", err)
+            })
+            .boxed_local()
     }
 }
 

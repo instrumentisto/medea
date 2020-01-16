@@ -8,17 +8,19 @@ use std::{
 #[cfg(unix)]
 use actix::AsyncContext;
 use actix::{
+    fut::wrap_future,
     prelude::{Actor, Context},
     Addr, Handler, Message, Recipient, ResponseActFuture, ResponseFuture,
     StreamHandler, System,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::{future, stream, Future, FutureExt, Stream, StreamExt};
+use futures::{
+    future, stream, FutureExt as _, StreamExt as _, TryFutureExt as _,
+};
+use tokio::time::timeout;
 
-use crate::log::prelude::*;
-use actix::fut::wrap_future;
-use std::process::Output;
+use crate::{log::prelude::*, utils::ResponseAnyFuture};
 
 /// Priority that [`Subscriber`] should be triggered to shutdown gracefully
 /// with.
@@ -28,7 +30,7 @@ pub struct Priority(pub u8);
 /// Message that [`Subscriber`] is informed with to perform its graceful
 /// shutdown.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "()")]
 pub struct ShutdownGracefully;
 
 /// Service which listens incoming OS signals and performs graceful
@@ -104,14 +106,14 @@ impl Actor for GracefulShutdown {
 struct OsSignal(i32);
 
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ();
+    type Result = ResponseAnyFuture<()>;
 
-    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) {
+    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
             State::ShuttingDown => {
-                return;
+                return ResponseAnyFuture(async {}.boxed());
             }
             State::Listening => {
                 self.state = State::ShuttingDown;
@@ -122,24 +124,19 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return;
+            return ResponseAnyFuture(async {}.boxed());
         }
 
-        let ordered_subs: Vec<Vec<_>> = self
+        let ordered_subs: Vec<_> = self
             .subs
             .values()
             .rev()
             .map(|addrs| {
-                let addrs = addrs
+                let addrs: Vec<_> = addrs
                     .iter()
-                    .map(|addr| async {
-                        let send_result = addr.send(ShutdownGracefully).await;
-
-                        addr.send(ShutdownGracefully).map(|_| ()).or_else(|e| {
-                            error!(
-                                "Error requesting shutdown: {}", e
-                            );
-                            future::ok::<(), ()>(())
+                    .map(|addr| {
+                        addr.send(ShutdownGracefully).map_err(|err| {
+                            error!("Error requesting shutdown: {}", err);
                         })
                     })
                     .collect();
@@ -147,23 +144,21 @@ impl Handler<OsSignal> for GracefulShutdown {
             })
             .collect();
 
-        Box::new(
-            stream::iter(ordered_subs)
-                .for_each(|row| row.map(|_| ()))
-                .timeout(self.timeout)
-                .map_err(|_| {
-                    error!(
-                        "Graceful shutdown has timed out, stopping system"
-                    );
-                    System::current().stop()
-                })
-                .map(|_| {
-                    info!(
-                        "Graceful shutdown succeeded, stopping system"
-                    );
-                    System::current().stop()
-                }),
-        );
+        ResponseAnyFuture(
+            timeout(
+                self.timeout,
+                stream::iter(ordered_subs).for_each(|row| row.map(|_| ())),
+            )
+            .map_err(|_| {
+                error!("Graceful shutdown has timed out, stopping system");
+                System::current().stop()
+            })
+            .map(|_| {
+                info!("Graceful shutdown succeeded, stopping system");
+                System::current().stop()
+            })
+            .boxed(),
+        )
     }
 }
 

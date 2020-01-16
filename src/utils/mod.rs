@@ -2,8 +2,11 @@
 
 use std::pin::Pin;
 
+use actix::{
+    dev::fut::IntoActorFuture,
+    prelude::{dev::*, *},
+};
 use futures::Future;
-use actix::{prelude::*, prelude::dev::*};
 
 /// Creates new [`HashMap`] from a list of key-value pairs.
 ///
@@ -39,15 +42,20 @@ macro_rules! hashmap {
     };
 }
 
-#[derive(derive_more::From)]
+#[derive(derive_more::From, derive_more::Into)]
 pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
 
+#[derive(derive_more::From, derive_more::Into)]
+pub struct ResponseActAnyFuture<A, O>(
+    pub Box<dyn ActorFuture<Output = O, Actor = A>>,
+);
+
 impl<A, M, T: 'static> MessageResponse<A, M> for ResponseAnyFuture<T>
-    where
-        A: Actor,
-        M::Result: Send,
-        M: Message<Result = T>,
-        A::Context: AsyncContext<A>,
+where
+    A: Actor,
+    M::Result: Send,
+    M: Message<Result = T>,
+    A::Context: AsyncContext<A>,
 {
     fn handle<R: ResponseChannel<M>>(self, _: &mut A::Context, tx: Option<R>) {
         Arbiter::spawn(async move {
@@ -55,5 +63,25 @@ impl<A, M, T: 'static> MessageResponse<A, M> for ResponseAnyFuture<T>
                 tx.send(self.0.await)
             }
         });
+    }
+}
+
+impl<A, M, O: 'static> MessageResponse<A, M> for ResponseActAnyFuture<A, O>
+where
+    A: Actor,
+    M: Message<Result = O>,
+    A::Context: AsyncContext<A>,
+{
+    fn handle<R: ResponseChannel<M>>(
+        self,
+        ctx: &mut A::Context,
+        tx: Option<R>,
+    ) {
+        ctx.spawn(self.0.then(move |res, this, _| {
+            if let Some(tx) = tx {
+                tx.send(res);
+            }
+            async {}.into_actor(this)
+        }));
     }
 }

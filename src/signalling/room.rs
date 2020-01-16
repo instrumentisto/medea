@@ -6,12 +6,13 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
-    Message, ResponseActFuture, WrapFuture as _,
+    fut::{wrap_future, IntoActorFuture},
+    Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
+    ResponseActFuture, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{self, Future, LocalBoxFuture};
+use futures::future::{self, Future, FutureExt, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
@@ -56,12 +57,12 @@ use crate::{
         participants::{ParticipantService, ParticipantServiceErr},
         peers::PeerRepository,
     },
+    utils::{ResponseActAnyFuture, ResponseAnyFuture},
     AppContext,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-pub type ActFuture<I, E> =
-    Box<dyn ActorFuture<Actor = Room, Output = Result<I, E>>>;
+pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
 
 #[derive(Debug, Fail, Display)]
 pub enum RoomError {
@@ -214,7 +215,7 @@ impl Room {
         &mut self,
         peer1_id: PeerId,
         peer2_id: PeerId,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
+    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
         let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
 
@@ -260,7 +261,7 @@ impl Room {
         &mut self,
         member_id: MemberId,
         removed_peers_ids: Vec<PeerId>,
-    ) -> ActFuture<(), RoomError> {
+    ) -> ActFuture<Result<(), RoomError>> {
         Box::new(wrap_future(self.members.send_event_to_member(
             member_id,
             Event::PeersRemoved {
@@ -333,20 +334,18 @@ impl Room {
         second_peer: PeerId,
     ) {
         let fut = match self.send_peer_created(first_peer, second_peer) {
-            Ok(res) => {
-                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                    if res.is_ok() {
-                        return Box::new(future::ok(()).into_actor(room));
-                    }
-                    error!(
-                        "Failed connect peers, because {}. Room [id = {}] \
-                         will be stopped.",
-                        res.unwrap_err(),
-                        room.id,
-                    );
-                    room.close_gracefully(ctx)
-                }))
-            }
+            Ok(res) => Box::new(res.then(|res, room, ctx| -> ActFuture<()> {
+                if res.is_ok() {
+                    return Box::new(async {}.into_actor(room));
+                }
+                error!(
+                    "Failed connect peers, because {}. Room [id = {}] will be \
+                     stopped.",
+                    res.unwrap_err(),
+                    room.id,
+                );
+                room.close_gracefully(ctx)
+            })),
             Err(err) => {
                 error!(
                     "Failed connect peers, because {}. Room [id = {}] will be \
@@ -362,10 +361,7 @@ impl Room {
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving
     /// into [`State::Stopped`].
-    fn close_gracefully(
-        &mut self,
-        ctx: &mut Context<Self>,
-    ) -> ResponseActFuture<Self, Result<(), ()>> {
+    fn close_gracefully(&mut self, ctx: &mut Context<Self>) -> ActFuture<()> {
         info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
 
@@ -387,17 +383,11 @@ impl Room {
                 );
             });
 
-        Box::new(
-            self.members
-                .drop_connections(ctx)
-                .into_actor(self)
-                .map(|_, room: &mut Self, _| {
-                    room.state = State::Stopped;
-                })
-                .map_err(|_, room, _| {
-                    error!("Error closing room {:?}", room.id);
-                }),
-        )
+        Box::new(self.members.drop_connections(ctx).into_actor(self).map(
+            |result, room: &mut Self, _| {
+                room.state = State::Stopped;
+            },
+        ))
     }
 
     /// Signals about removing [`Member`]'s [`Peer`]s.
@@ -406,7 +396,7 @@ impl Room {
         peers_id: Vec<PeerId>,
         member_id: MemberId,
         ctx: &mut Context<Self>,
-    ) -> ActFuture<(), ()> {
+    ) -> ActFuture<()> {
         info!(
             "Peers {:?} removed for member [id = {}].",
             peers_id, member_id
@@ -420,7 +410,7 @@ impl Room {
                 member_id
             );
 
-            return Box::new(self.close_gracefully(ctx));
+            return self.close_gracefully(ctx);
         }
 
         Box::new(self.send_peers_removed(member_id, peers_id).then(
@@ -429,7 +419,7 @@ impl Room {
                     match e {
                         RoomError::ConnectionNotExists(_)
                         | RoomError::UnableToSendEvent(_) => {
-                            Box::new(future::ok(()).into_actor(room))
+                            Box::new(async {}.into_actor(room))
                         }
                         _ => {
                             error!(
@@ -441,7 +431,7 @@ impl Room {
                         }
                     }
                 } else {
-                    Box::new(future::ok(()).into_actor(room))
+                    Box::new(async {}.into_actor(room))
                 }
             },
         ))
@@ -463,7 +453,10 @@ impl Room {
             .remove_peers(&member_id, peer_ids_to_remove)
             .into_iter()
             .for_each(|(member_id, peers_id)| {
-                let fut = self.member_peers_removed(peers_id, member_id, ctx);
+                let fut = self
+                    .member_peers_removed(peers_id, member_id, ctx)
+                    .into_future()
+                    .map(|_, _, _| ());
                 ctx.spawn(fut);
             });
     }
@@ -507,32 +500,33 @@ impl Room {
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
-        let endpoint_id = if let Some(member) =
-            self.members.get_member_by_id(member_id)
-        {
-            let play_id = endpoint_id.into();
-            if let Some(endpoint) = member.take_sink(&play_id) {
-                if let Some(peer_id) = endpoint.peer_id() {
-                    let removed_peers =
-                        self.peers.remove_peer(member_id, peer_id);
-                    for (member_id, peers_ids) in removed_peers {
-                        let fut = self
-                            .member_peers_removed(peers_ids, member_id, ctx);
-                        ctx.spawn(fut);
+        let endpoint_id =
+            if let Some(member) = self.members.get_member_by_id(member_id) {
+                let play_id = endpoint_id.into();
+                if let Some(endpoint) = member.take_sink(&play_id) {
+                    if let Some(peer_id) = endpoint.peer_id() {
+                        let removed_peers =
+                            self.peers.remove_peer(member_id, peer_id);
+                        for (member_id, peers_ids) in removed_peers {
+                            let fut = self
+                                .member_peers_removed(peers_ids, member_id, ctx)
+                                .into_future()
+                                .map(|_, _, _| ());
+                            ctx.spawn(fut);
+                        }
                     }
                 }
-            }
 
-            let publish_id = String::from(play_id).into();
-            if let Some(endpoint) = member.take_src(&publish_id) {
-                let peer_ids = endpoint.peer_ids();
-                self.remove_peers(member_id, peer_ids, ctx);
-            }
+                let publish_id = String::from(play_id).into();
+                if let Some(endpoint) = member.take_src(&publish_id) {
+                    let peer_ids = endpoint.peer_ids();
+                    self.remove_peers(member_id, peer_ids, ctx);
+                }
 
-            publish_id.into()
-        } else {
-            endpoint_id
-        };
+                publish_id.into()
+            } else {
+                endpoint_id
+            };
 
         debug!(
             "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
@@ -730,19 +724,21 @@ impl RpcServer for Addr<Room> {
         member_id: MemberId,
         connection: Box<dyn RpcConnection>,
     ) -> LocalBoxFuture<'static, Result<(), ()>> {
-        Box::new(
-            self.send(RpcConnectionEstablished {
-                member_id,
-                connection,
-            })
-            .map_err(|err| {
+        self.send(RpcConnectionEstablished {
+            member_id,
+            connection,
+        })
+        .map(|result| match result {
+            Ok(_) => Ok(()),
+            Err(err) => {
                 error!(
                     "Failed to send RpcConnectionEstablished cause {:?}",
                     err,
                 );
-            })
-            .and_then(|result| result),
-        )
+                Err(())
+            }
+        })
+        .boxed_local()
     }
 
     /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
@@ -752,32 +748,32 @@ impl RpcServer for Addr<Room> {
         member_id: MemberId,
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()> {
-        Box::new(
-            self.send(RpcConnectionClosed { member_id, reason })
-                .map_err(|err| {
+        self.send(RpcConnectionClosed { member_id, reason })
+            .map(|result| {
+                if let Err(err) = result {
                     error!(
                         "Failed to send RpcConnectionClosed cause {:?}",
                         err,
                     );
-                })
-                .then(|_| Ok(())),
-        )
+                };
+            })
+            .boxed_local()
     }
 
     /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
     fn send_command(&self, msg: Command) -> LocalBoxFuture<'static, ()> {
-        Box::new(
-            self.send(CommandMessage::from(msg))
-                .map_err(|err| {
-                    error!("Failed to send CommandMessage cause {:?}", err,);
-                })
-                .then(|_| Ok(())),
-        )
+        self.send(CommandMessage::from(msg))
+            .map(|result| {
+                if let Err(err) = result {
+                    error!("Failed to send CommandMessage cause {:?}", err);
+                }
+            })
+            .boxed_local()
     }
 }
 
 impl CommandHandler for Room {
-    type Output = Result<ActFuture<(), RoomError>, RoomError>;
+    type Output = Result<ActFuture<Result<(), RoomError>>, RoomError>;
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
@@ -866,8 +862,7 @@ impl CommandHandler for Room {
         // TODO: add E2E test
         if candidate.candidate.is_empty() {
             warn!("Empty candidate from Peer: {}, ignoring", from_peer_id);
-            let fut: ActFuture<_, _> = Box::new(actix::fut::ok(()));
-            return Ok(fut);
+            return Ok(Box::new(async { Ok(()) }.into_actor(self)));
         }
 
         let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
@@ -1011,7 +1006,7 @@ impl Handler<Authorize> for Room {
 }
 
 impl Handler<CommandMessage> for Room {
-    type Result = ActFuture<(), ()>;
+    type Result = ResponseActAnyFuture<Self, ()>;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
     /// handlers. Will emit `CloseRoom` on any error.
@@ -1020,12 +1015,11 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        match Command::from(msg).dispatch_with(self) {
-            Ok(res) => {
-                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                    if res.is_ok() {
-                        return Box::new(future::ok(()).into_actor(room));
-                    }
+        let fut = match Command::from(msg).dispatch_with(self) {
+            Ok(res) => Box::new(res.then(|res, room, ctx| -> ActFuture<()> {
+                if res.is_ok() {
+                    Box::new(async {}.into_actor(room))
+                } else {
                     error!(
                         "Failed handle command, because {}. Room [id = {}] \
                          will be stopped.",
@@ -1033,8 +1027,8 @@ impl Handler<CommandMessage> for Room {
                         room.id,
                     );
                     room.close_gracefully(ctx)
-                }))
-            }
+                }
+            })),
             Err(err) => {
                 error!(
                     "Failed handle command, because {}. Room [id = {}] will \
@@ -1043,12 +1037,13 @@ impl Handler<CommandMessage> for Room {
                 );
                 self.close_gracefully(ctx)
             }
-        }
+        };
+        ResponseActAnyFuture(fut)
     }
 }
 
 impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<(), ()>;
+    type Result = ActFuture<Result<(), ()>>;
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
@@ -1068,17 +1063,21 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .map_err(|err, _, _| {
-                error!("RpcConnectionEstablished error {:?}", err)
-            })
-            .map(|member, room, ctx| {
-                room.init_member_connections(&member, ctx);
-                if let Some(callback_url) = member.get_on_join() {
-                    room.callbacks.send_callback(
-                        callback_url,
-                        member.get_fid().into(),
-                        OnJoinEvent,
-                    );
+            .map(|result, room, ctx| match result {
+                Ok(member) => {
+                    room.init_member_connections(&member, ctx);
+                    if let Some(callback_url) = member.get_on_join() {
+                        room.callbacks.send_callback(
+                            callback_url,
+                            member.get_fid().into(),
+                            OnJoinEvent,
+                        );
+                    };
+                    Ok(())
+                }
+                Err(err) => {
+                    error!("RpcConnectionEstablished error {:?}", err);
+                    Err(())
                 }
             });
         Box::new(fut)
@@ -1086,7 +1085,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 }
 
 impl Handler<ShutdownGracefully> for Room {
-    type Result = ResponseActFuture<Self, Result<(), ()>>;
+    type Result = ResponseActAnyFuture<Self, ()>;
 
     fn handle(
         &mut self,
@@ -1098,7 +1097,7 @@ impl Handler<ShutdownGracefully> for Room {
              down",
             self.id
         );
-        self.close_gracefully(ctx)
+        ResponseActAnyFuture(self.close_gracefully(ctx))
     }
 }
 
@@ -1144,7 +1143,8 @@ impl Handler<RpcConnectionClosed> for Room {
                      found.",
                     msg.member_id,
                 );
-                let close_fut = self.close_gracefully(ctx);
+                let close_fut =
+                    self.close_gracefully(ctx).into_future().map(|_, _, _| ());
                 ctx.spawn(close_fut);
             }
 
@@ -1157,8 +1157,11 @@ impl Handler<RpcConnectionClosed> for Room {
                 // to another participant fail,
                 // because connection already closed but we don't know about it
                 // because message in event loop.
-                let fut =
-                    self.member_peers_removed(peers_ids, peer_member_id, ctx);
+                let fut = self
+                    .member_peers_removed(peers_ids, peer_member_id, ctx)
+                    .into_future()
+                    .map(|_, _, _| ());
+
                 ctx.spawn(fut);
             }
         }

@@ -11,8 +11,9 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use futures::{
+    compat::Future01CompatExt as _,
     future::{self, Either},
-    Future,
+    Future, FutureExt as _,
 };
 use serde::Deserialize;
 
@@ -28,6 +29,7 @@ use crate::{
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
+    utils::ResponseAnyFuture,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -108,10 +110,7 @@ impl Server {
 
         let server = HttpServer::new(move || {
             App::new()
-                .app_data(Self::app_data(
-                    rooms.clone(),
-                    config.rpc.clone(),
-                ))
+                .app_data(Self::app_data(rooms.clone(), config.rpc.clone()))
                 .configure(Self::configure)
                 .wrap(middleware::Logger::default())
         })
@@ -144,7 +143,7 @@ impl Actor for Server {
 }
 
 impl Handler<ShutdownGracefully> for Server {
-    type Result = ResponseFuture<Result<(), ()>>;
+    type Result = ResponseAnyFuture<()>;
 
     fn handle(
         &mut self,
@@ -152,7 +151,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: &mut Self::Context,
     ) -> Self::Result {
         info!("Server received ShutdownGracefully message so shutting down");
-        Box::new(self.0.stop(true))
+        ResponseAnyFuture(self.0.stop(true).boxed())
     }
 }
 

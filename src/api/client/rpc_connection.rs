@@ -13,7 +13,7 @@ use crate::api::control::MemberId;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "()")]
 pub struct CommandMessage(Command);
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
@@ -35,12 +35,13 @@ pub trait RpcConnection: fmt::Debug + Send {
     fn close(
         &mut self,
         close_description: CloseDescription,
-    ) -> LocalBoxFuture<()>;
+    ) -> LocalBoxFuture<'static, ()>;
 
     /// Sends [`Event`] to remote [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_event(&self, msg: Event) -> LocalBoxFuture<Result<(), ()>>;
+    fn send_event(&self, msg: Event)
+        -> LocalBoxFuture<'static, Result<(), ()>>;
 }
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.

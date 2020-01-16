@@ -7,7 +7,7 @@ use std::{
 };
 
 use actix::Arbiter;
-use futures::future::Future as _;
+use futures::future::{Future as _, TryFutureExt};
 
 use crate::{
     api::control::{
@@ -61,10 +61,12 @@ impl CallbackService {
             send
         };
 
-        Arbiter::spawn(
-            send_request.map_err(|e| {
-                error!("Failed to send callback because {:?}.", e)
-            }),
-        );
+        Arbiter::spawn(async {
+            send_request.await;
+        });
+        //            send_request.map_err(|e| {
+        //                error!("Failed to send callback because {:?}.", e)
+        //            }),
+        //        );
     }
 }

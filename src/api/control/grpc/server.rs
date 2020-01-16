@@ -13,7 +13,12 @@ use actix::{
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{self, Future, IntoFuture};
+use futures::{
+    compat::{Compat, Compat01As03, Future01CompatExt},
+    future::{
+        self, BoxFuture, Future, FutureExt, LocalBoxFuture, TryFutureExt,
+    },
+};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     api::{
@@ -41,6 +46,7 @@ use crate::{
         CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
         Get, RoomService, RoomServiceError, Sids,
     },
+    utils::ResponseAnyFuture,
     AppContext,
 };
 
@@ -81,84 +87,84 @@ struct ControlApiService {
 
 impl ControlApiService {
     /// Implementation of `Create` method for [`Room`].
-    async fn create_room(
+    fn create_room(
         &self,
         spec: RoomSpec,
-    ) -> Result<Sids, GrpcControlApiError> {
+    ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
         self.room_service
             .send(CreateRoom { spec })
-            .await
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(move |r| r.map_err(GrpcControlApiError::from))
+            .and_then(move |r| async { r.map_err(GrpcControlApiError::from) })
+            .boxed()
     }
 
     /// Implementation of `Create` method for [`Member`] element.
-    async fn create_member(
+    fn create_member(
         &self,
         id: MemberId,
         parent_fid: Fid<ToRoom>,
         spec: MemberSpec,
-    ) -> Result<Sids, GrpcControlApiError> {
+    ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
         self.room_service
             .send(CreateMemberInRoom {
                 id,
                 parent_fid,
                 spec,
             })
-            .await
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| r.map_err(GrpcControlApiError::from))
+            .and_then(|r| async { r.map_err(GrpcControlApiError::from) })
+            .boxed()
     }
 
     /// Implementation of `Create` method for [`Endpoint`] element.
-    async fn create_endpoint(
+    fn create_endpoint(
         &self,
         id: EndpointId,
         parent_fid: Fid<ToMember>,
         spec: EndpointSpec,
-    ) -> Result<Sids, GrpcControlApiError> {
+    ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
         self.room_service
             .send(CreateEndpointInRoom {
                 id,
                 parent_fid,
                 spec,
             })
-            .await
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| r.map_err(GrpcControlApiError::from))
+            .and_then(|r| async { r.map_err(GrpcControlApiError::from) })
+            .boxed()
     }
 
     /// Creates element based on provided [`CreateRequest`].
     pub fn create_element(
         &self,
         mut req: CreateRequest,
-    ) -> Box<dyn Future<Output = Result<Sids, ErrorResponse>> + Send> {
+    ) -> BoxFuture<'static, Result<Sids, ErrorResponse>> {
         let unparsed_parent_fid = req.take_parent_fid();
         let elem = if let Some(elem) = req.el {
             elem
         } else {
-            return Box::new(future::err(ErrorResponse::new(
-                ErrorCode::NoElement,
-                &unparsed_parent_fid,
-            )));
+            return async move {
+                Err(ErrorResponse::new(
+                    ErrorCode::NoElement,
+                    &unparsed_parent_fid,
+                ))
+            }
+            .boxed();
         };
 
         if unparsed_parent_fid.is_empty() {
-            return Box::new(
-                RoomSpec::try_from(elem)
-                    .map_err(ErrorResponse::from)
-                    .map(|spec| {
-                        self.create_room(spec).map_err(ErrorResponse::from)
-                    })
-                    .into_future()
-                    .and_then(|create_result| create_result),
-            );
+            return match RoomSpec::try_from(elem).map_err(ErrorResponse::from) {
+                Ok(spec) => {
+                    self.create_room(spec).map_err(ErrorResponse::from).boxed()
+                }
+                Err(err) => async { Err(err) }.boxed(),
+            };
         }
 
         let parent_fid = match StatefulFid::try_from(unparsed_parent_fid) {
             Ok(parent_fid) => parent_fid,
             Err(e) => {
-                return Box::new(future::err(e.into()));
+                return async { Err(e.into()) }.boxed();
             }
         };
 
@@ -166,21 +172,20 @@ impl ControlApiService {
             StatefulFid::Room(parent_fid) => match elem {
                 CreateRequestOneof::member(mut member) => {
                     let id: MemberId = member.take_id().into();
-                    Box::new(
-                        MemberSpec::try_from(member)
+                    match MemberSpec::try_from(member)
+                        .map_err(ErrorResponse::from)
+                    {
+                        Ok(spec) => self
+                            .create_member(id, parent_fid, spec)
                             .map_err(ErrorResponse::from)
-                            .map(|spec| {
-                                self.create_member(id, parent_fid, spec)
-                                    .map_err(ErrorResponse::from)
-                            })
-                            .into_future()
-                            .and_then(|create_result| create_result),
-                    )
+                            .boxed(),
+                        Err(err) => async { Err(err) }.boxed(),
+                    }
                 }
-                _ => Box::new(future::err(ErrorResponse::new(
-                    ElementIdMismatch,
-                    &parent_fid,
-                ))),
+                _ => async move {
+                    Err(ErrorResponse::new(ElementIdMismatch, &parent_fid))
+                }
+                .boxed(),
             },
             StatefulFid::Member(parent_fid) => {
                 let (endpoint, id) = match elem {
@@ -195,74 +200,84 @@ impl ControlApiService {
                         publish.take_id().into(),
                     ),
                     _ => {
-                        return Box::new(future::err(ErrorResponse::new(
-                            ElementIdMismatch,
-                            &parent_fid,
-                        )))
+                        return async move {
+                            Err(ErrorResponse::new(
+                                ElementIdMismatch,
+                                &parent_fid,
+                            ))
+                        }
+                        .boxed()
                     }
                 };
-                Box::new(
-                    endpoint
+
+                match endpoint.map_err(ErrorResponse::from) {
+                    Ok(spec) => self
+                        .create_endpoint(id, parent_fid, spec)
                         .map_err(ErrorResponse::from)
-                        .map(move |spec| {
-                            self.create_endpoint(id, parent_fid, spec)
-                                .map_err(ErrorResponse::from)
-                        })
-                        .into_future()
-                        .and_then(|create_res| create_res),
-                )
+                        .boxed(),
+                    Err(err) => async move { Err(err) }.boxed(),
+                }
             }
-            StatefulFid::Endpoint(_) => Box::new(future::err(
-                ErrorResponse::new(ElementIdIsTooLong, &parent_fid),
-            )),
+            StatefulFid::Endpoint(_) => async move {
+                Err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid))
+            }
+            .boxed(),
         }
     }
 
     /// Deletes element by [`IdRequest`].
-    pub async fn delete_element(
+    pub fn delete_element(
         &self,
         mut req: IdRequest,
-    ) -> Result<(), ErrorResponse> {
-        let mut delete_elements_msg = DeleteElements::new();
-        for id in req.take_fid().into_iter() {
-            let fid = StatefulFid::try_from(id)?;
-            delete_elements_msg.add_fid(fid);
+    ) -> BoxFuture<'static, Result<(), ErrorResponse>> {
+        let room_service = Clone::clone(&self.room_service);
+        async move {
+            let mut delete_elements_msg = DeleteElements::new();
+            for id in req.take_fid().into_iter() {
+                let fid = StatefulFid::try_from(id)?;
+                delete_elements_msg.add_fid(fid);
+            }
+            room_service
+                .send(delete_elements_msg.validate()?)
+                .await
+                .map_err(|err| {
+                    ErrorResponse::from(
+                        GrpcControlApiError::RoomServiceMailboxError(err),
+                    )
+                })??;
+            Ok(())
         }
-
-        self.room_service
-            .send(delete_elements_msg.validate()?)
-            .await
-            .map_err(|err| {
-                ErrorResponse::from(
-                    GrpcControlApiError::RoomServiceMailboxError(err),
-                )
-            })??;
-        Ok(())
+        .boxed()
     }
 
     /// Returns requested by [`IdRequest`] [`Element`]s serialized to protobuf.
-    pub async fn get_element(
+    pub fn get_element(
         &self,
         mut req: IdRequest,
-    ) -> Result<HashMap<String, Element>, ErrorResponse> {
-        let mut fids = Vec::new();
-        for id in req.take_fid().into_iter() {
-            let fid = StatefulFid::try_from(id)?;
-            fids.push(fid);
+    ) -> BoxFuture<'static, Result<HashMap<String, Element>, ErrorResponse>>
+    {
+        let room_service = Clone::clone(&self.room_service);
+        async move {
+            let mut fids = Vec::new();
+            for id in req.take_fid().into_iter() {
+                let fid = StatefulFid::try_from(id)?;
+                fids.push(fid);
+            }
+
+            let elements =
+                room_service.send(Get(fids)).await.map_err(|err| {
+                    ErrorResponse::from(
+                        GrpcControlApiError::RoomServiceMailboxError(err),
+                    )
+                })??;
+
+            let result = elements
+                .into_iter()
+                .map(|(id, value)| (id.to_string(), value))
+                .collect();
+            Ok(result)
         }
-
-        let elements =
-            self.room_service.send(Get(fids)).await.map_err(|err| {
-                ErrorResponse::from(
-                    GrpcControlApiError::RoomServiceMailboxError(err),
-                )
-            })??;
-
-        let result = elements
-            .into_iter()
-            .map(|(id, value)| (id.to_string(), value))
-            .collect();
-        Ok(result)
+        .boxed()
     }
 }
 
@@ -276,24 +291,26 @@ impl ControlApi for ControlApiService {
         req: CreateRequest,
         sink: UnarySink<CreateResponse>,
     ) {
+        let create_element = self.create_element(req);
         ctx.spawn(
-            self.create_element(req)
-                .then(move |result| {
-                    let mut response = CreateResponse::new();
-                    match result {
-                        Ok(sid) => {
-                            response.set_sid(sid);
-                        }
-                        Err(e) => response.set_error(e.into()),
+            async {
+                let mut response = CreateResponse::new();
+                match create_element.await {
+                    Ok(sid) => {
+                        response.set_sid(sid);
                     }
-                    sink.success(response)
-                })
-                .map_err(|e| {
+                    Err(e) => response.set_error(e.into()),
+                }
+                if let Err(err) = sink.success(response).compat().await {
                     warn!(
                         "Error while sending Create response by gRPC. {:?}",
-                        e
+                        err
                     )
-                }),
+                }
+                Ok(())
+            }
+            .boxed()
+            .compat(),
         );
     }
 
@@ -306,22 +323,24 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
+        let delete_element = self.delete_element(req);
         ctx.spawn(
-            self.delete_element(req)
-                .then(move |result| {
-                    let mut response = Response::new();
-                    if let Err(e) = result {
-                        response.set_error(e.into());
-                    }
-                    sink.success(response)
-                })
-                .map_err(|e| {
+            async {
+                let mut response = Response::new();
+                if let Err(e) = delete_element.await {
+                    response.set_error(e.into());
+                }
+                if let Err(err) = sink.success(response).compat().await {
                     warn!(
                         "Error while sending response on 'Delete' request by \
                          gRPC: {:?}",
-                        e
+                        err
                     )
-                }),
+                }
+                Ok(())
+            }
+            .boxed()
+            .compat(),
         );
     }
 
@@ -334,27 +353,29 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<GetResponse>,
     ) {
+        let get_element = self.get_element(req);
         ctx.spawn(
-            self.get_element(req)
-                .then(|result| {
-                    let mut response = GetResponse::new();
-                    match result {
-                        Ok(elements) => {
-                            response.set_elements(elements);
-                        }
-                        Err(e) => {
-                            response.set_error(e.into());
-                        }
+            async {
+                let mut response = GetResponse::new();
+                match get_element.await {
+                    Ok(elements) => {
+                        response.set_elements(elements);
                     }
-                    sink.success(response)
-                })
-                .map_err(|e| {
+                    Err(e) => {
+                        response.set_error(e.into());
+                    }
+                }
+                if let Err(err) = sink.success(response).compat().await {
                     warn!(
                         "Error while sending response on 'Get' request by \
                          gRPC: {:?}",
-                        e
+                        err
                     )
-                }),
+                }
+                Ok(())
+            }
+            .boxed()
+            .compat(),
         );
     }
 }
@@ -375,7 +396,7 @@ impl Actor for GrpcServer {
 }
 
 impl Handler<ShutdownGracefully> for GrpcServer {
-    type Result = ResponseFuture<Result<(), ()>>;
+    type Result = ResponseAnyFuture<()>;
 
     fn handle(
         &mut self,
@@ -386,13 +407,19 @@ impl Handler<ShutdownGracefully> for GrpcServer {
             "gRPC Control API server received ShutdownGracefully message so \
              shutting down.",
         );
-        Box::new(self.0.shutdown().map_err(|e| {
-            warn!(
-                "Error while graceful shutdown of gRPC Control API server: \
-                 {:?}",
-                e
-            )
-        }))
+        ResponseAnyFuture(
+            Compat01As03::new(self.0.shutdown())
+                .map_err(|e| {
+                    warn!(
+                        "Error while graceful shutdown of gRPC Control API \
+                         server: {:?}",
+                        e
+                    )
+                })
+                .into_future()
+                .map(|_| ())
+                .boxed(),
+        )
     }
 }
 
