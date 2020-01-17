@@ -60,6 +60,12 @@
 # Default:
 #   reconnect_timeout = "10s"
 
+# Interval between pings that server sends to clients.
+#
+# Env var: MEDEA_RPC__PING_INTERVAL
+# Default:
+#   ping_interval = "3s"
+
 
 
 

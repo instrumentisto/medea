@@ -7,7 +7,10 @@ use std::{
 
 use wasm_bindgen::prelude::*;
 
-use crate::{peer::MediaStreamHandle, utils::Callback};
+use crate::{
+    peer::MediaStreamHandle,
+    utils::{Callback, HandlerDetachedError},
+};
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
@@ -31,10 +34,8 @@ impl ConnectionHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner
-            .borrow_mut()
-            .on_remote_stream
-            .set_func(f))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow_mut().on_remote_stream.set_func(f))
     }
 }
 

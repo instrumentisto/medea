@@ -73,6 +73,7 @@ async fn ws_index(
                         member_id,
                         Box::new(room),
                         state.config.idle_timeout,
+                        state.config.ping_interval,
                     ),
                     &request,
                     payload,
