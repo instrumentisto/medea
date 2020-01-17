@@ -182,10 +182,10 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         enabled_audio: EnabledAudio,
         enabled_video: EnabledVideo,
-        is_relay: bool,
+        is_force_relay: bool,
     ) -> Result<Self> {
         let peer = Rc::new(
-            RtcPeerConnection::new(ice_servers, is_relay)
+            RtcPeerConnection::new(ice_servers, is_force_relay)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections = Rc::new(MediaConnections::new(

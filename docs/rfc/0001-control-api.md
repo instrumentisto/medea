@@ -71,7 +71,7 @@ spec:
               # Fires when "caller" client stops publishing media data.
               on_stop: "http://127.0.0.1:8080/publish/stopped"
               # All media will be relayed through TURN server.
-              is_relay: false
+              is_force_relay: false
           # Media element which is able to play media data for client via WebRTC.
           play:
             kind: WebRtcPlayEndpoint
@@ -798,7 +798,7 @@ message WebRtcPublishEndpoint {
   optional string dst = 2;
   optional string on_start = 3;
   optional string on_stop = 4;
-  optional bool is_relay = 5;
+  optional bool is_force_relay = 5;
   
   enum P2P {
     NEVER = 0;

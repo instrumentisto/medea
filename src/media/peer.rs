@@ -242,7 +242,7 @@ impl Peer<New> {
         member_id: MemberId,
         partner_peer: Id,
         partner_member: MemberId,
-        is_relay: bool,
+        is_force_relay: bool,
     ) -> Self {
         let context = Context {
             id,
@@ -253,7 +253,7 @@ impl Peer<New> {
             sdp_answer: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
-            is_force_relay: is_relay,
+            is_force_relay,
         };
         Self {
             context,

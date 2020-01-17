@@ -24,7 +24,7 @@ All user visible changes to this project will be documented in this file. This p
 - `CloseReason` and `CloseDescription` types ([#58](/../../pull/58));
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71));
 - `RpcSettings` server message ([#75](/../../pull/75));
-- `is_relay` into `Event::PeerCreated` ([#79](/../../pull/79)).
+- `is_force_relay` field to `PeerCreated` event ([#79](/../../pull/79)).
 
 [#28]: /../../pull/28
 

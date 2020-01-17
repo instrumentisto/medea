@@ -48,6 +48,7 @@ struct WebRtcPlayEndpointInner {
     /// and related peer.
     peer_id: Option<PeerId>,
 
+    /// Is ice candidates discovering limited to relay candidates.
     is_force_relay: bool,
 }
 

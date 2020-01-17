@@ -217,7 +217,7 @@ struct PeerCreated {
     sdp_offer: Option<String>,
     tracks: Vec<Track>,
     ice_servers: Vec<IceServer>,
-    is_relay: bool,
+    is_force_relay: bool,
 }
 ```
 
@@ -237,7 +237,7 @@ Params:
 2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server; if `Some`, client should set it as remote description, then create [SDP Answer], set it as local description, and pass it to the server.
 3. `tracks`: tracks of this `Peer`.
 4. `ice_servers`: list of [ICE server]s that should be used to construct [RTCPeerConnection].
-5. `is_relay`: if `true` then all media will be relayed through [TURN] server.
+5. `is_force_relay`: if `true` then all media will be relayed through [TURN] server.
 
 The most important part of `Peer` object is a list of `Track`s.
 - All `TrackDirection::Send` `Track`s must be created according to their settings and added to the `Peer`. 
@@ -316,7 +316,7 @@ The most important part of `Peer` object is a list of `Track`s.
       "credential": "turn_credential"
     }
   ],
-  "is_relay": false
+  "is_force_relay": false
 }
 ```
 
@@ -363,7 +363,7 @@ After negotiation is done and media starts flowing, `Web Client` might receive n
       "credential": "turn_credential"
     }
   ],
-  "is_relay": false
+  "is_force_relay": false
 }
 ```
 
@@ -1173,7 +1173,7 @@ Metrics list will be extended as needed.
             "credential": "turn_credential"
           }
         ],
-        "is_relay": false
+        "is_force_relay": false
       }
     }
     ```

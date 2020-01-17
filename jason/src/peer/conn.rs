@@ -211,13 +211,13 @@ pub struct RtcPeerConnection {
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
-    pub fn new<I>(ice_servers: I, is_relay: bool) -> Result<Self>
+    pub fn new<I>(ice_servers: I, is_force_relay: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
         // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
-        let ice_transport_policy = if is_relay {
+        let ice_transport_policy = if is_force_relay {
             RtcIceTransportPolicy::Relay
         } else {
             RtcIceTransportPolicy::All

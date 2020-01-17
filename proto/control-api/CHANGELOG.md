@@ -27,7 +27,7 @@ All user visible changes to this project will be documented in this file. This p
             - `Member`;
             - `WebRtcPlayEndpoint`;
             - `WebRtcPublishEndpoint`.
-        - `is_relay` field into `WebRtcPublishEndpoint` ([#79](/../../pull/79)).
+        - `is_force_relay` field into `WebRtcPublishEndpoint` and `WebRtcPlayEndpoint` ([#79](/../../pull/79)).
     - `Callback` service:
         - Callbacks ([#63]):
             - `OnJoin`;
