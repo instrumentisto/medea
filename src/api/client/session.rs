@@ -1,6 +1,9 @@
 //! WebSocket session.
 
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryInto as _,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
@@ -9,7 +12,7 @@ use actix::{
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
 };
 
 use crate::{
@@ -50,6 +53,12 @@ pub struct WsSession {
     /// from client.
     last_activity: Instant,
 
+    /// Last number of [`ServerMsg::Ping`].
+    last_ping_num: u64,
+
+    /// Interval to send [`ServerMsg::Ping`]s to a client with.
+    ping_interval: Duration,
+
     /// [`WsSession`] closed reason. Should be set by the moment
     /// `Actor::stopped()` for this [`WsSession`] is called.
     close_reason: Option<InnerCloseReason>,
@@ -61,19 +70,22 @@ impl WsSession {
         member_id: MemberId,
         room: Box<dyn RpcServer>,
         idle_timeout: Duration,
+        ping_interval: Duration,
     ) -> Self {
         Self {
             member_id,
             room,
             idle_timeout,
             last_activity: Instant::now(),
+            last_ping_num: 0,
+            ping_interval,
             close_reason: None,
         }
     }
 
     /// Starts watchdog which will drop connection if `now`-`last_activity` >
     /// `idle_timeout`.
-    fn start_watchdog(ctx: &mut <Self as Actor>::Context) {
+    fn start_idle_watchdog(ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::new(1, 0), |session, ctx| {
             if Instant::now().duration_since(session.last_activity)
                 > session.idle_timeout
@@ -91,6 +103,34 @@ impl WsSession {
             }
         });
     }
+
+    /// Starts [`ServerMsg::Ping`] sending.
+    fn start_pinger(&self, ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(self.ping_interval, |session, ctx| {
+            ctx.text(
+                serde_json::to_string(&ServerMsg::Ping(session.last_ping_num))
+                    .unwrap(),
+            );
+            session.last_ping_num += 1;
+        });
+    }
+
+    /// Returns [`RpcSettings`] based on `idle_timeout` and `ping_interval`
+    /// settled for this [`WsSession`].
+    fn get_rpc_settings(&self) -> RpcSettings {
+        RpcSettings {
+            idle_timeout_ms: self
+                .idle_timeout
+                .as_millis()
+                .try_into()
+                .expect("'idle_timeout' should fit into u64"),
+            ping_interval_ms: self
+                .ping_interval
+                .as_millis()
+                .try_into()
+                .expect("'ping_interval' should fit into u64"),
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way to deal with
@@ -103,13 +143,24 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        Self::start_watchdog(ctx);
-
         ctx.wait(
             wrap_future(self.room.connection_established(
                 self.member_id.clone(),
                 Box::new(ctx.address()),
             ))
+            .map(
+                |_,
+                 session: &mut Self,
+                 ctx: &mut ws::WebsocketContext<Self>| {
+                    let rpc_settings_message =
+                        serde_json::to_string(&session.get_rpc_settings())
+                            .unwrap();
+                    ctx.text(rpc_settings_message);
+
+                    Self::start_idle_watchdog(ctx);
+                    session.start_pinger(ctx);
+                },
+            )
             .map_err(
                 move |err,
                       session: &mut Self,
@@ -234,11 +285,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             ws::Message::Text(text) => {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
-                    Ok(ClientMsg::Ping(n)) => {
-                        // Answer with Heartbeat::Pong.
-                        ctx.text(
-                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
-                        );
+                    Ok(ClientMsg::Pong(_)) => {
+                        // do nothing
                     }
                     Ok(ClientMsg::Command(command)) => {
                         ctx.spawn(wrap_future(self.room.send_command(command)));
@@ -303,7 +351,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
 #[cfg(test)]
 mod test {
 
-    use std::{sync::Mutex, time::Duration};
+    use std::{
+        sync::Mutex,
+        time::{Duration, Instant},
+    };
 
     use actix_http::HttpService;
     use actix_http_test::{TestServer, TestServerRuntime};
@@ -353,10 +404,14 @@ mod test {
                 .expect_connection_established()
                 .withf(move |member_id, _| *member_id == expected_member_id)
                 .return_once(|_, _| Box::new(future::err(())));
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
                 Box::new(rpc_server),
+                Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         }
@@ -376,9 +431,8 @@ mod test {
         assert_eq!(item, Some(close_frame));
     }
 
-    // WsSession handles ping requests and answers with pong.
     #[test]
-    fn answers_ping_with_pong() {
+    fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
@@ -386,30 +440,47 @@ mod test {
             rpc_server
                 .expect_connection_established()
                 .return_once(|_, _| Box::new(future::ok(())));
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_secs(5),
+                Duration::from_millis(50),
             )
         });
 
         let client = serv.ws().unwrap();
+        let (item, client) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        assert_eq!(
+            item,
+            Some(Frame::Text(Some(
+                String::from(
+                    r#"{"idle_timeout_ms":5000,"ping_interval_ms":50}"#
+                )
+                .into()
+            )))
+        );
 
-        let client = serv
-            .block_on(
-                client.send(Message::Text(String::from(r#"{"ping":25}"#))),
-            )
-            .unwrap();
+        let (item, client) =
+            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        assert_eq!(
+            item,
+            Some(Frame::Text(Some(String::from(r#"{"ping":0}"#).into())))
+        );
+
         let (item, _) =
             serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
         assert_eq!(
             item,
-            Some(Frame::Text(Some(String::from(r#"{"pong":25}"#).into())))
+            Some(Frame::Text(Some(String::from(r#"{"ping":1}"#).into())))
         );
     }
 
-    // WsSession is dropped and WebSocket connection is closed if no pings
+    // WsSession is dropped and WebSocket connection is closed if no pongs
     // received for idle_timeout.
     #[test]
     fn dropped_if_idle() {
@@ -434,19 +505,27 @@ mod test {
                 member_id,
                 Box::new(rpc_server),
                 Duration::from_millis(100),
+                Duration::from_secs(10),
             )
         });
 
         let client = serv.ws().unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let start = std::time::Instant::now();
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
+            .unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
             description: Some(String::from(r#"{"reason":"Idle"}"#)),
         }));
 
+        assert!(
+            Instant::now().duration_since(start) > Duration::from_millis(99)
+        );
+        assert!(Instant::now().duration_since(start) < Duration::from_secs(2));
         assert_eq!(item, Some(close_frame));
     }
 
@@ -467,6 +546,9 @@ mod test {
             rpc_server
                 .expect_connection_established()
                 .return_once(|_, _| Box::new(future::ok(())));
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             rpc_server.expect_send_command().return_once(|command| {
                 let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
@@ -476,6 +558,7 @@ mod test {
             WsSession::new(
                 member_id,
                 Box::new(rpc_server),
+                Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         });
@@ -537,10 +620,14 @@ mod test {
                     Box::new(future::ok(()))
                 },
             );
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
                 Box::new(rpc_server),
+                Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         });
@@ -564,8 +651,10 @@ mod test {
             .wait()
             .unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
+            .unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -597,10 +686,14 @@ mod test {
                     Box::new(future::ok(()))
                 },
             );
+            rpc_server
+                .expect_connection_closed()
+                .returning(|_, _| Box::new(future::ok(())));
 
             WsSession::new(
                 member_id,
                 Box::new(rpc_server),
+                Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         });
@@ -625,8 +718,10 @@ mod test {
             .wait()
             .unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let (item, _) = serv
+            .block_on(client.skip(1).into_future())
+            .map_err(|_| ())
+            .unwrap();
 
         let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
                      sdp_answer\":\"sdp_answer\"}}";

@@ -22,7 +22,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaStreamConstraints, MultiSourceMediaStreamConstraints},
-    utils::{window, JasonError, JsCaused, JsError},
+    utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
@@ -341,34 +341,32 @@ impl MediaManager {
 pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 
 #[wasm_bindgen]
+#[allow(clippy::unused_self)]
 impl MediaManagerHandle {
     /// Returns the JS array of [`MediaDeviceInfo`] objects.
     pub fn enumerate_devices(&self) -> Promise {
-        match map_weak!(self, |_| InnerMediaManager::enumerate_devices()) {
-            Ok(devices) => future_to_promise(async {
-                devices
-                    .await
-                    .map(|devices| {
-                        devices
-                            .into_iter()
-                            .fold(js_sys::Array::new(), |devices_info, info| {
-                                devices_info.push(&JsValue::from(info));
-                                devices_info
-                            })
-                            .into()
-                    })
-                    .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|e| JasonError::from(e).into())
-            }),
-            Err(e) => future_to_promise(future::err(e)),
-        }
+        future_to_promise(async {
+            InnerMediaManager::enumerate_devices()
+                .await
+                .map(|devices| {
+                    devices
+                        .into_iter()
+                        .fold(js_sys::Array::new(), |devices_info, info| {
+                            devices_info.push(&JsValue::from(info));
+                            devices_info
+                        })
+                        .into()
+                })
+                .map_err(tracerr::wrap!(=> MediaManagerError))
+                .map_err(|e| JasonError::from(e).into())
+        })
     }
 
     /// Returns [MediaStream][1] object.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
-        match map_weak!(self, |inner| { inner.get_stream(caps) }) {
+        match upgrade_or_detached!(self.0).map(|inner| inner.get_stream(caps)) {
             Ok(stream) => future_to_promise(async {
                 stream
                     .await
