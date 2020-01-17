@@ -147,45 +147,34 @@ struct Service {
 
 /// Create new instance [`TurnAuthService`].
 pub fn new_turn_auth_service<'a>(
-    cf: &'a conf::Turn,
-) -> impl Future<Output = Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr>>
-{
-    //    let db_pass = cf.db.redis.pass.clone();
-    //    let turn_address = cf.addr();
-    //    let turn_username = cf.user.clone();
-    //    let turn_password = cf.pass.clone();
-    //
-    //    async {
-    //        let turn_db = TurnDatabase::new(
-    //            cf.db.redis.connection_timeout,
-    //            ConnectionInfo {
-    //                addr: Box::new(redis::ConnectionAddr::Tcp(
-    //                    cf.db.redis.ip.to_string(),
-    //                    cf.db.redis.port,
-    //                )),
-    //                db: cf.db.redis.db_number,
-    //                passwd: if cf.db.redis.pass.is_empty() {
-    //                    None
-    //                } else {
-    //                    Some(cf.db.redis.pass.clone())
-    //                },
-    //            },
-    //        )
-    //        .await?;
-    //
-    //        let service = Service {
-    //            turn_db,
-    //            db_pass,
-    //            turn_address,
-    //            turn_username,
-    //            turn_password,
-    //            static_user: None,
-    //        };
-    //
-    //        let result: Arc<dyn TurnAuthService> = Arc::new(service.start());
-    //        Ok(result)
-    //    }
-    async { unimplemented!() }
+    cf: &conf::Turn,
+) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
+    let turn_db = TurnDatabase::new(
+        cf.db.redis.connection_timeout,
+        ConnectionInfo {
+            addr: Box::new(redis::ConnectionAddr::Tcp(
+                cf.db.redis.ip.to_string(),
+                cf.db.redis.port,
+            )),
+            db: cf.db.redis.db_number,
+            passwd: if cf.db.redis.pass.is_empty() {
+                None
+            } else {
+                Some(cf.db.redis.pass.clone())
+            },
+        },
+    )?;
+
+    let turn_service = Service {
+        turn_db,
+        db_pass: cf.db.redis.pass.clone(),
+        turn_address: cf.addr(),
+        turn_username: cf.user.clone(),
+        turn_password: cf.pass.clone(),
+        static_user: None,
+    };
+
+    Ok(Arc::new(turn_service.start()))
 }
 
 impl Service {

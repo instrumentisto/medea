@@ -2,9 +2,9 @@
 
 use std::pin::Pin;
 
-use actix::{
-    dev::fut::IntoActorFuture,
-    prelude::{dev::*, *},
+use actix::prelude::dev::{
+    Actor, ActorFuture, Arbiter, AsyncContext, Message, MessageResponse,
+    ResponseChannel, WrapFuture,
 };
 use futures::Future;
 
@@ -42,10 +42,8 @@ macro_rules! hashmap {
     };
 }
 
-#[derive(derive_more::From, derive_more::Into)]
 pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
 
-#[derive(derive_more::From, derive_more::Into)]
 pub struct ResponseActAnyFuture<A, O>(
     pub Box<dyn ActorFuture<Output = O, Actor = A>>,
 );
