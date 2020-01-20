@@ -1492,6 +1492,7 @@ dependencies = [
  "js-sys 0.3.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.2.0-dev",
  "medea-macro 0.2.0-dev",
+ "medea-reactive 0.1.0-dev",
  "mockall 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "predicates-tree 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",

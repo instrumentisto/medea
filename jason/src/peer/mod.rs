@@ -43,7 +43,7 @@ pub use self::{
     },
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
-    track::MediaTrack,
+    track::{MediaTrack, MutedState},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -180,18 +180,13 @@ impl PeerConnection {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
-        enabled_audio: EnabledAudio,
-        enabled_video: EnabledVideo,
     ) -> Result<Self> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
-        let media_connections = Rc::new(MediaConnections::new(
-            Rc::clone(&peer),
-            enabled_audio,
-            enabled_video,
-        ));
+        let media_connections =
+            Rc::new(MediaConnections::new(Rc::clone(&peer)));
 
         let peer = Self {
             id,
@@ -324,13 +319,13 @@ impl PeerConnection {
     }
 
     /// Disables or enables all audio tracks for all [`Sender`]s.
-    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
-        self.media_connections.toggle_send_audio(enabled)
+    pub fn change_audio_muted_state(&self, new_state: MutedState) {
+        self.media_connections.change_audio_muted_state(new_state)
     }
 
     /// Disables or enables all video tracks for all [`Sender`]s.
-    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
-        self.media_connections.toggle_send_video(enabled)
+    pub fn change_video_muted_state(&self, new_state: MutedState) {
+        self.media_connections.change_video_muted_state(new_state)
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.

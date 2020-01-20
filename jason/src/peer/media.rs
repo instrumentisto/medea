@@ -13,6 +13,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
+    peer::track::MutedState,
     utils::{JsCaused, JsError},
 };
 
@@ -76,12 +77,6 @@ struct InnerMediaConnections {
 
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
-
-    /// Are senders audio tracks muted or not.
-    enabled_audio: EnabledAudio,
-
-    /// Are senders video tracks muted or not.
-    enabled_video: EnabledVideo,
 }
 
 impl InnerMediaConnections {
@@ -101,36 +96,28 @@ impl MediaConnections {
     /// Instantiates new [`MediaConnections`] storage for a given
     /// [`RtcPeerConnection`].
     #[inline]
-    pub fn new(
-        peer: Rc<RtcPeerConnection>,
-        enabled_audio: EnabledAudio,
-        enabled_video: EnabledVideo,
-    ) -> Self {
+    pub fn new(peer: Rc<RtcPeerConnection>) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            enabled_audio,
-            enabled_video,
         }))
     }
 
     /// Enables or disables all [`Sender`]s with [`TransceiverKind::Audio`].
-    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
-        self.0.borrow_mut().enabled_audio = enabled;
+    pub fn change_audio_muted_state(&self, new_state: MutedState) {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .for_each(|s| s.set_track_enabled(enabled.0));
+            .for_each(|s| s.change_muted_state(new_state));
     }
 
     /// Enables or disables all [`Sender`]s with [`TransceiverKind::Video`].
-    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
-        self.0.borrow_mut().enabled_video = enabled;
+    pub fn change_video_muted_state(&self, new_state: MutedState) {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .for_each(|s| s.set_track_enabled(enabled.0));
+            .for_each(|s| s.change_muted_state(new_state));
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
@@ -271,8 +258,7 @@ impl MediaConnections {
             }
         }
 
-        stream.toggle_audio_tracks(s.enabled_audio);
-        stream.toggle_video_tracks(s.enabled_video);
+        // TODO: maybe toggle muted state here???
 
         future::try_join_all(
             sender_and_track
@@ -303,6 +289,7 @@ impl MediaConnections {
                             receiver.track_id,
                             track,
                             receiver.caps.clone(),
+                            MutedState::Unmuted,
                         );
                         receiver.transceiver.replace(transceiver);
                         receiver.track.replace(track);
@@ -421,9 +408,9 @@ impl Sender {
     }
 
     /// Enables or disables this [`Sender`]s track.
-    fn set_track_enabled(&self, enabled: bool) {
-        if let Some(track) = self.track.borrow().as_ref() {
-            track.set_enabled(enabled);
+    fn change_muted_state(&self, new_state: MutedState) {
+        if let Some(track) = self.track.borrow_mut().as_mut() {
+            track.change_muted_state(new_state);
         }
     }
 
@@ -431,7 +418,7 @@ impl Sender {
     fn is_track_enabled(&self) -> bool {
         match self.track.borrow().as_ref() {
             None => false,
-            Some(track) => track.is_enabled(),
+            Some(track) => MutedState::Unmuted == track.get_muted_state(),
         }
     }
 }

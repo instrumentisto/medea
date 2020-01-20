@@ -92,19 +92,19 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(audio_track.is_enabled());
     assert!(video_track.is_enabled());
 
-    media_connections.toggle_send_audio(false.into());
+    media_connections.change_audio_muted_state(false.into());
     assert!(!audio_track.is_enabled());
     assert!(video_track.is_enabled());
 
-    media_connections.toggle_send_video(false.into());
+    media_connections.change_video_muted_state(false.into());
     assert!(!audio_track.is_enabled());
     assert!(!video_track.is_enabled());
 
-    media_connections.toggle_send_audio(true.into());
+    media_connections.change_audio_muted_state(true.into());
     assert!(audio_track.is_enabled());
     assert!(!video_track.is_enabled());
 
-    media_connections.toggle_send_video(true.into());
+    media_connections.change_video_muted_state(true.into());
     assert!(audio_track.is_enabled());
     assert!(video_track.is_enabled());
 }

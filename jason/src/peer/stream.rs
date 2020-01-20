@@ -13,7 +13,10 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     media::TrackConstraints,
-    peer::media::{EnabledAudio, EnabledVideo},
+    peer::{
+        media::{EnabledAudio, EnabledVideo},
+        MutedState,
+    },
     utils::HandlerDetachedError,
 };
 
@@ -106,16 +109,16 @@ impl MediaStream {
     }
 
     /// Enables or disables all audio [`MediaTrack`]s in this stream.
-    pub fn toggle_audio_tracks(&self, enabled: EnabledAudio) {
+    pub fn change_audio_muted_state(&self, new_state: MutedState) {
         for track in self.0.audio_tracks.values() {
-            track.set_enabled(enabled.0);
+            track.change_muted_state(new_state);
         }
     }
 
     /// Enables or disables all video [`MediaTrack`]s in this stream.
-    pub fn toggle_video_tracks(&self, enabled: EnabledVideo) {
+    pub fn change_video_muted_state(&self, new_state: MutedState) {
         for track in self.0.video_tracks.values() {
-            track.set_enabled(enabled.0);
+            track.change_muted_state(new_state);
         }
     }
 

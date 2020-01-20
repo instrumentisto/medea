@@ -2,12 +2,23 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
+use futures::StreamExt;
 use medea_client_api_proto::TrackId as Id;
+use medea_reactive::Reactive;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::MediaStreamTrack;
 
 use crate::media::TrackConstraints;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MutedState {
+    Unmuted,
+    Unmuting,
+    Muting,
+    Muted,
+}
 
 /// Representation of [MediaStreamTrack][1].
 ///
@@ -16,6 +27,7 @@ pub struct MediaTrack {
     id: Id,
     track: MediaStreamTrack,
     caps: TrackConstraints,
+    muted_state: RefCell<Reactive<MutedState>>,
 }
 
 impl MediaTrack {
@@ -24,8 +36,37 @@ impl MediaTrack {
         id: Id,
         track: MediaStreamTrack,
         caps: TrackConstraints,
+        muted_state: MutedState,
     ) -> Rc<Self> {
-        Rc::new(Self { id, track, caps })
+        let muted_state = RefCell::new(Reactive::new(muted_state));
+        let mut muted_state_subscribe = muted_state.borrow().subscribe();
+        let this = Rc::new(Self {
+            id,
+            track,
+            caps,
+            muted_state,
+        });
+
+        // TODO: this Future will hold [`MediaTrack`] from dropping. Should be
+        // fixed.
+        let this_clone = this.clone();
+        spawn_local(async move {
+            while let Some(changed_muted_state) =
+                muted_state_subscribe.next().await
+            {
+                match changed_muted_state {
+                    MutedState::Muted => {
+                        this_clone.track.set_enabled(false);
+                    }
+                    MutedState::Unmuted => {
+                        this_clone.track.set_enabled(true);
+                    }
+                    _ => (),
+                }
+            }
+        });
+
+        this
     }
 
     /// Returns ID of this [`MediaTrack`].
@@ -44,13 +85,11 @@ impl MediaTrack {
         &self.caps
     }
 
-    /// Checks if underlying [`MediaStreamTrack`] is enabled.
-    pub fn is_enabled(&self) -> bool {
-        self.track.enabled()
+    pub fn get_muted_state(&self) -> MutedState {
+        **self.muted_state.borrow()
     }
 
-    /// Enables or disables underlying [`MediaStreamTrack`].
-    pub fn set_enabled(&self, enabled: bool) {
-        self.track.set_enabled(enabled)
+    pub fn change_muted_state(&self, new_state: MutedState) {
+        *self.muted_state.borrow_mut().borrow_mut() = new_state;
     }
 }

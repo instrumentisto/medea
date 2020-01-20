@@ -40,6 +40,7 @@ tracerr = "0.1"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4"
 wee_alloc = { version = "0.4", optional = true }
+medea-reactive = { path = "../crates/medea-reactive" }
 [dependencies.web-sys]
     version = "0.3"
     features = [

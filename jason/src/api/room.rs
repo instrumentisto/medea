@@ -21,8 +21,8 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        EnabledAudio, EnabledVideo, MediaStream, MediaStreamHandle, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository,
+        EnabledAudio, EnabledVideo, MediaStream, MediaStreamHandle, MutedState,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -304,28 +304,36 @@ impl RoomHandle {
     /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_audio(EnabledAudio(false))
+            inner
+                .borrow_mut()
+                .change_audio_muted_state(MutedState::Muted)
         })
     }
 
     /// Unmutes outbound audio in this room.
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_audio(EnabledAudio(true))
+            inner
+                .borrow_mut()
+                .change_audio_muted_state(MutedState::Unmuted)
         })
     }
 
     /// Mutes outbound video in this room.
     pub fn mute_video(&self) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_video(EnabledVideo(false))
+            inner
+                .borrow_mut()
+                .change_video_muted_state(MutedState::Muted)
         })
     }
 
     /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_video(EnabledVideo(true))
+            inner
+                .borrow_mut()
+                .change_video_muted_state(MutedState::Unmuted)
         })
     }
 }
@@ -451,12 +459,6 @@ struct InnerRoom {
     /// Callback to be invoked when [`RpcClient`] loses connection.
     on_connection_loss: Callback<ReconnectHandle>,
 
-    /// Indicates if outgoing audio is enabled in this [`Room`].
-    enabled_audio: EnabledAudio,
-
-    /// Indicates if outgoing video is enabled in this [`Room`].
-    enabled_video: EnabledVideo,
-
     /// JS callback which will be called when this [`Room`] will be closed.
     on_close: Rc<Callback<RoomCloseReason>>,
 
@@ -487,8 +489,6 @@ impl InnerRoom {
             on_local_stream: Callback::default(),
             on_connection_loss: Callback::default(),
             on_failed_local_stream: Rc::new(Callback::default()),
-            enabled_audio: EnabledAudio(true),
-            enabled_video: EnabledVideo(true),
             on_close: Rc::new(Callback::default()),
             close_reason: CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
@@ -534,20 +534,18 @@ impl InnerRoom {
 
     /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_send_audio(&mut self, enabled: EnabledAudio) {
+    fn change_audio_muted_state(&mut self, new_state: MutedState) {
         for peer in self.peers.get_all() {
-            peer.toggle_send_audio(enabled);
+            peer.change_audio_muted_state(new_state);
         }
-        self.enabled_audio = enabled;
     }
 
     /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_send_video(&mut self, enabled: EnabledVideo) {
+    fn change_video_muted_state(&mut self, new_state: MutedState) {
         for peer in self.peers.get_all() {
-            peer.toggle_send_video(enabled);
+            peer.change_video_muted_state(new_state);
         }
-        self.enabled_video = enabled;
     }
 
     /// Injects given local stream into all [`PeerConnection`]s of this [`Room`]
@@ -592,13 +590,7 @@ impl EventHandler for InnerRoom {
     ) -> Self::Output {
         let peer = match self
             .peers
-            .create_peer(
-                peer_id,
-                ice_servers,
-                self.peer_event_sender.clone(),
-                self.enabled_audio,
-                self.enabled_video,
-            )
+            .create_peer(peer_id, ice_servers, self.peer_event_sender.clone())
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
             Ok(peer) => peer,

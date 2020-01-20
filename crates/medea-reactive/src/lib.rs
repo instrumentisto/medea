@@ -103,7 +103,7 @@ where
 
 impl<D, S> ReactiveField<D, S>
 where
-    D: Eq + 'static,
+    D: PartialEq + 'static,
     S: Whenable<D>,
 {
     /// Returns [`Future`] which will be resolved only when data of this
@@ -119,7 +119,7 @@ where
 impl<D, S> ReactiveField<D, S>
 where
     S: OnReactiveFieldModification<D>,
-    D: Clone + Eq,
+    D: Clone + PartialEq,
 {
     /// Returns [`MutReactiveFieldGuard`] which can be mutably dereferenced to
     /// underlying data.
@@ -247,7 +247,7 @@ impl<D, S> Deref for ReactiveField<D, S> {
 pub struct MutReactiveFieldGuard<'a, D, S>
 where
     S: OnReactiveFieldModification<D>,
-    D: Eq,
+    D: PartialEq,
 {
     data: &'a mut D,
     subs: &'a mut S,
@@ -257,7 +257,7 @@ where
 impl<'a, D, S> Deref for MutReactiveFieldGuard<'a, D, S>
 where
     S: OnReactiveFieldModification<D>,
-    D: Eq,
+    D: PartialEq,
 {
     type Target = D;
 
@@ -269,7 +269,7 @@ where
 impl<'a, D, S> DerefMut for MutReactiveFieldGuard<'a, D, S>
 where
     S: OnReactiveFieldModification<D>,
-    D: Eq,
+    D: PartialEq,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
@@ -279,7 +279,7 @@ where
 impl<'a, D, S> Drop for MutReactiveFieldGuard<'a, D, S>
 where
     S: OnReactiveFieldModification<D>,
-    D: Eq,
+    D: PartialEq,
 {
     fn drop(&mut self) {
         if self.data != &self.value_before_mutation {
@@ -299,6 +299,7 @@ mod tests {
     use tokio::{task, time::delay_for};
 
     use crate::Reactive;
+    use std::cell::RefCell;
 
     #[derive(Debug)]
     struct Timeout;
@@ -474,5 +475,18 @@ mod tests {
         *field_mut_guard = 300;
         std::mem::drop(field_mut_guard);
         assert_eq!(subscription.skip(1).next().await.unwrap(), 300);
+    }
+
+    #[tokio::test]
+    async fn reactive_with_refcell_inside() {
+        let field = RefCell::new(Reactive::new(0i32));
+        let subscription = field.borrow().when_eq(1);
+        *field.borrow_mut().borrow_mut() = 1;
+        await_future_with_timeout(
+            Box::pin(subscription),
+            Duration::from_millis(50),
+        )
+        .await
+        .unwrap();
     }
 }
