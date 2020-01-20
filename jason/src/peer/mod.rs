@@ -15,7 +15,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
+    Direction, IceConnectionState, IceServer, PeerId as Id, Track,
+    Track as TrackProto, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -45,6 +46,7 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::{MediaTrack, MutedState},
 };
+use std::convert::From;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -233,6 +235,19 @@ impl PeerConnection {
         Ok(peer)
     }
 
+    pub fn update_tracks(&self, tracks: Vec<TrackProto>) {
+        for track_proto in tracks {
+            let track = self
+                .media_connections
+                .get_track_by_id(
+                    TransceiverDirection::from(&track_proto.direction),
+                    track_proto.id,
+                )
+                .unwrap();
+            track.update(track_proto);
+        }
+    }
+
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
     pub fn candidates_buffer_len(&self) -> usize {
         self.ice_candidates_buffer.borrow().len()
@@ -336,6 +351,20 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
+    }
+
+    pub async fn on_video_muted_state(&self, state: MutedState) -> Result<()> {
+        self.media_connections
+            .on_video_muted_state(state)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
+    pub async fn on_audio_muted_state(&self, state: MutedState) -> Result<()> {
+        self.media_connections
+            .on_audio_muted_state(state)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Track id to mid relations of all send tracks of this

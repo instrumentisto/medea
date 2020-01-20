@@ -715,6 +715,7 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         tracks: Vec<Track>,
     ) -> Self::Output {
+        self.peers.get(peer_id).unwrap().update_tracks(tracks);
     }
 }
 

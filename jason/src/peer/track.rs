@@ -5,12 +5,16 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::StreamExt;
-use medea_client_api_proto::TrackId as Id;
-use medea_reactive::Reactive;
+use medea_client_api_proto::{Track as TrackProto, TrackId as Id};
+use medea_reactive::{Dropped, Reactive};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::MediaStreamTrack;
 
-use crate::media::TrackConstraints;
+use crate::{
+    media::TrackConstraints,
+    peer::media::MediaConnectionsError::MutedStateDropped,
+};
+use tracerr::Traced;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutedState {
@@ -91,5 +95,24 @@ impl MediaTrack {
 
     pub fn change_muted_state(&self, new_state: MutedState) {
         *self.muted_state.borrow_mut().borrow_mut() = new_state;
+    }
+
+    pub async fn on_muted_state(
+        &self,
+        state: MutedState,
+    ) -> Result<(), Traced<Dropped>> {
+        self.muted_state
+            .borrow()
+            .when_eq(state)
+            .await
+            .map_err(|e| tracerr::new!(e))
+    }
+
+    pub fn update(&self, track: TrackProto) {
+        if track.is_muted {
+            *self.muted_state.borrow_mut().borrow_mut() = MutedState::Muted;
+        } else {
+            *self.muted_state.borrow_mut().borrow_mut() = MutedState::Unmuted;
+        }
     }
 }

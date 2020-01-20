@@ -90,7 +90,7 @@ impl PeerRepository for Repository {
         self.peers.remove(&id);
     }
 
-    /// Returns all [`PeerConnection`]s stored in repository.
+    /// Returns all [`PeerConnection`]s stored in a repository.
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
         self.peers.values().cloned().collect()

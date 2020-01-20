@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -97,6 +97,15 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
         match direction {
             Sendonly => Self::Sendonly,
             Recvonly => Self::Recvonly,
+        }
+    }
+}
+
+impl From<&DirectionProto> for TransceiverDirection {
+    fn from(proto: &DirectionProto) -> Self {
+        match proto {
+            DirectionProto::Recv { .. } => Self::Recvonly,
+            DirectionProto::Send { .. } => Self::Sendonly,
         }
     }
 }

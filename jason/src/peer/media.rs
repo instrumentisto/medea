@@ -23,6 +23,8 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
+use medea_reactive::Dropped;
+use std::convert::From;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -54,6 +56,16 @@ pub enum MediaConnectionsError {
     /// [`Sender`] constraints.
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
+
+    MutedStateDropped,
+
+    NoTrack,
+}
+
+impl From<Dropped> for MediaConnectionsError {
+    fn from(_: Dropped) -> Self {
+        Self::MutedStateDropped
+    }
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
@@ -118,6 +130,32 @@ impl MediaConnections {
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
             .for_each(|s| s.change_muted_state(new_state));
+    }
+
+    pub async fn on_video_muted_state(&self, state: MutedState) -> Result<()> {
+        let this = self.0.borrow();
+        let futs = this
+            .iter_senders_with_kind(TransceiverKind::Video)
+            .map(|sender| sender.on_muted_state(state));
+
+        future::join_all(futs)
+            .await
+            .into_iter()
+            .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
+            .collect()
+    }
+
+    pub async fn on_audio_muted_state(&self, state: MutedState) -> Result<()> {
+        let this = self.0.borrow();
+        let futs = this
+            .iter_senders_with_kind(TransceiverKind::Audio)
+            .map(|sender| sender.on_muted_state(state));
+
+        future::join_all(futs)
+            .await
+            .into_iter()
+            .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
+            .collect()
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
@@ -419,6 +457,17 @@ impl Sender {
         match self.track.borrow().as_ref() {
             None => false,
             Some(track) => MutedState::Unmuted == track.get_muted_state(),
+        }
+    }
+
+    pub async fn on_muted_state(&self, state: MutedState) -> Result<()> {
+        if let Some(track) = self.track.borrow().as_ref() {
+            track
+                .on_muted_state(state)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+        } else {
+            Err(tracerr::new!(MediaConnectionsError::NoTrack))
         }
     }
 }
