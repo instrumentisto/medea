@@ -917,10 +917,20 @@ impl CommandHandler for Room {
 
     fn on_apply_tracks(
         &mut self,
-        _peer_id: PeerId,
-        _tracks: Vec<Track>,
+        peer_id: PeerId,
+        tracks: Vec<Track>,
     ) -> Self::Output {
-        Ok(Box::new(wrap_future(future::ok(()))))
+        if let PeerStateMachine::Stable(peer) =
+            self.peers.get_peer_by_id(peer_id).unwrap()
+        {
+            let member_id = peer.member_id();
+            Ok(Box::new(wrap_future(self.members.send_event_to_member(
+                member_id,
+                Event::TracksApplied { peer_id, tracks },
+            ))))
+        } else {
+            todo!()
+        }
     }
 }
 
