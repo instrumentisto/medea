@@ -131,6 +131,9 @@ pub enum Command {
         peer_id: PeerId,
         metrics: PeerMetrics,
     },
+    /// Web Client asks permission to update [`Track`]s in specified [`Peer`].
+    /// Media Server gives permission by sending [`Event::TracksApplied`].
+    ApplyTracks { peer_id: PeerId, tracks: Vec<Track> },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -224,6 +227,19 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
+
+    /// Media Server notifies about necessity to update [`Track`]s in specified
+    /// [`Peer`].
+    ///
+    /// Can be used to:
+    ///
+    /// 1. Add a new [`Track`].
+    ///
+    /// 2. Update existing [`Track`] settings (e.g. change to lower video
+    /// resolution, mute audio).
+    ///
+    /// 3. Update `send` [`Track`] receivers list (add/remove).
+    TracksApplied { peer_id: PeerId, tracks: Vec<Track> },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

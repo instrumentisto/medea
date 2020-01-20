@@ -215,7 +215,9 @@ impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     }
 }
 
-impl<D: Clone> OnReactiveFieldModification<D> for RefCell<Vec<UniversalSubscriber<D>>> {
+impl<D: Clone> OnReactiveFieldModification<D>
+    for RefCell<Vec<UniversalSubscriber<D>>>
+{
     fn on_modify(&mut self, data: &D) {
         self.borrow_mut().retain(|sub| match sub {
             UniversalSubscriber::When { assert_fn, sender } => {

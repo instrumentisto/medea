@@ -589,7 +589,7 @@ impl EventHandler for InnerRoom {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
-    ) {
+    ) -> Self::Output {
         let peer = match self
             .peers
             .create_peer(
@@ -661,7 +661,11 @@ impl EventHandler for InnerRoom {
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
-    fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
+    fn on_sdp_answer_made(
+        &mut self,
+        peer_id: PeerId,
+        sdp_answer: String,
+    ) -> Self::Output {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
                 if let Err(err) = peer
@@ -684,7 +688,7 @@ impl EventHandler for InnerRoom {
         &mut self,
         peer_id: PeerId,
         candidate: IceCandidate,
-    ) {
+    ) -> Self::Output {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
                 let add = peer
@@ -707,11 +711,18 @@ impl EventHandler for InnerRoom {
     }
 
     /// Disposes specified [`PeerConnection`]s.
-    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
+    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) -> Self::Output {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
         })
+    }
+
+    fn on_tracks_applied(
+        &mut self,
+        peer_id: PeerId,
+        tracks: Vec<Track>,
+    ) -> Self::Output {
     }
 }
 
