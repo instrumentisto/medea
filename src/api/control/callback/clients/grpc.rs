@@ -4,7 +4,7 @@ use std::{fmt, sync::Arc};
 
 use futures::{
     compat::Future01CompatExt,
-    future::{Future, FutureExt, IntoFuture as _, LocalBoxFuture},
+    future::{FutureExt as _, LocalBoxFuture},
 };
 use grpcio::{ChannelBuilder, EnvBuilder};
 #[rustfmt::skip]
@@ -53,7 +53,7 @@ impl CallbackClient for GrpcCallbackClient {
     ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
         let request = self.client.on_event_async(&request.into());
         async {
-            request?.compat().await;
+            request?.compat().await?;
             Ok(())
         }
         .boxed()

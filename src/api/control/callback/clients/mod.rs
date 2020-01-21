@@ -5,7 +5,7 @@ pub mod grpc;
 use std::fmt::Debug;
 
 use derive_more::From;
-use futures::{future::LocalBoxFuture, Future};
+use futures::future::LocalBoxFuture;
 
 use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},

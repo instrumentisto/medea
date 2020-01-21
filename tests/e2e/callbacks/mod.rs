@@ -5,7 +5,7 @@ mod member;
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
-use futures::Future as _;
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     callback::{Request, Response},
@@ -66,7 +66,14 @@ impl Callback for CallbackServer {
         sink: UnarySink<Response>,
     ) {
         self.callbacks.lock().unwrap().push(req);
-        ctx.spawn(sink.success(Response::new()).map_err(|e| panic!("{:?}", e)))
+        ctx.spawn(
+            async move {
+                sink.success(Response::new()).compat().await.unwrap();
+                Ok(())
+            }
+            .boxed()
+            .compat(),
+        )
     }
 }
 

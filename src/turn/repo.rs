@@ -8,8 +8,7 @@ use deadpool_redis::{cmd, Pool, PoolError};
 use derive_more::Display;
 use failure::Fail;
 use futures::future::Future;
-use redis::{ConnectionInfo, IntoConnectionInfo, RedisError};
-use tokio::prelude::*;
+use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{log::prelude::*, media::IceUser};
 

@@ -8,16 +8,12 @@ use std::{
     sync::Arc,
 };
 
-use actix::{
-    Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
-};
+use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::{
-    compat::{Compat, Compat01As03, Future01CompatExt},
-    future::{
-        self, BoxFuture, Future, FutureExt, LocalBoxFuture, TryFutureExt,
-    },
+    compat::{Compat01As03, Future01CompatExt},
+    future::{BoxFuture, FutureExt as _, TryFutureExt as _},
 };
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{

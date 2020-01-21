@@ -8,10 +8,8 @@ use std::{
 #[cfg(unix)]
 use actix::AsyncContext;
 use actix::{
-    fut::wrap_future,
     prelude::{Actor, Context},
-    Addr, Handler, Message, Recipient, ResponseActFuture, ResponseFuture,
-    StreamHandler, System,
+    Addr, Handler, Message, Recipient, System,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -93,7 +91,7 @@ impl Actor for GracefulShutdown {
     }
 
     fn stopped(&mut self, _: &mut Self::Context) {
-        if let State::Listening = self.state {
+        if let State::ShuttingDown = self.state {
             info!("Graceful shutdown has been completed");
         }
     }

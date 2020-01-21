@@ -6,11 +6,11 @@ use std::{
 };
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, Arbiter,
-    AsyncContext, Handler, Message, Running, StreamHandler,
+    fut::WrapFuture as _, Actor, ActorContext, ActorFuture, Addr, Arbiter,
+    AsyncContext, ContextFutureSpawner as _, Handler, Message, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
-use futures::future::Future;
+use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
 };
@@ -143,39 +143,39 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        ctx.wait(
-            wrap_future(self.room.connection_established(
+        Self::start_idle_watchdog(ctx);
+
+        self.room
+            .connection_established(
                 self.member_id.clone(),
                 Box::new(ctx.address()),
-            ))
-            .map(
-                |_,
-                 session: &mut Self,
-                 ctx: &mut ws::WebsocketContext<Self>| {
-                    let rpc_settings_message =
-                        serde_json::to_string(&session.get_rpc_settings())
-                            .unwrap();
-                    ctx.text(rpc_settings_message);
-
-                    Self::start_idle_watchdog(ctx);
-                    session.start_pinger(ctx);
-                },
             )
-            .map_err(
-                move |err,
-                      session: &mut Self,
-                      ctx: &mut ws::WebsocketContext<Self>| {
-                    error!(
-                        "WsSession of member {} failed to join Room, because: \
-                         {:?}",
-                        session.member_id, err,
-                    );
-                    ctx.notify(Close::with_normal_code(
-                        &CloseDescription::new(CloseReason::InternalError),
-                    ));
-                },
-            ),
-        );
+            .into_actor(self)
+            .then(move |result, this, ctx| {
+                match result {
+                    Ok(_) => {
+                        // send RpcSettings
+                        let rpc_settings_message =
+                            serde_json::to_string(&this.get_rpc_settings())
+                                .unwrap();
+                        ctx.text(rpc_settings_message);
+
+                        this.start_pinger(ctx);
+                    }
+                    Err(err) => {
+                        error!(
+                            "WsSession of member {} failed to join Room, \
+                             because: {:?}",
+                            this.member_id, err,
+                        );
+                        ctx.notify(Close::with_normal_code(
+                            &CloseDescription::new(CloseReason::InternalError),
+                        ));
+                    }
+                };
+                async {}.into_actor(this)
+            })
+            .wait(ctx);
     }
 
     /// Invokes `RpcServer::connection_closed()` with `ClosedReason::Lost` if
@@ -210,33 +210,45 @@ impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsSession`] by sending itself "normal closure" close message
     /// with [`CloseDescription`] as description of [Close] frame.
     ///
-    /// Never returns error.
-    ///
-    /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
+    /// [Close]:https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,
-    ) -> Box<dyn Future<Item = (), Error = ()>> {
-        let fut = self
-            .send(Close::with_normal_code(&close_description))
-            .or_else(|_| Ok(()));
-
-        Box::new(fut)
+    ) -> LocalBoxFuture<'static, ()> {
+        let close_result =
+            self.send(Close::with_normal_code(&close_description));
+        async {
+            if let Err(err) = close_result.await {
+                error!("Failed Close RpcConnection: {:?} ", err)
+            }
+        }
+        .boxed_local()
     }
 
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>> {
-        let fut = self.send(EventMessage::from(msg)).map_err(|err| {
-            warn!("Failed send Event to RpcConnection: {:?} ", err)
-        });
-        Box::new(fut)
+    fn send_event(
+        &self,
+        msg: Event,
+    ) -> LocalBoxFuture<'static, Result<(), ()>> {
+        let send_result = self.send(EventMessage::from(msg));
+        async {
+            match send_result.await {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    error!("Failed send Event to RpcConnection: {:?} ", err);
+                    Err(())
+                }
+            }
+        }
+        .boxed_local()
     }
 }
 
 /// Message for closing [`WsSession`].
 #[derive(Message)]
+#[rtype(result = "()")]
 pub struct Close(ws::CloseReason);
 
 impl Close {
@@ -274,67 +286,69 @@ impl Handler<EventMessage> for WsSession {
     }
 }
 
-impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
-    fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
+    fn handle(
+        &mut self,
+        msg: Result<ws::Message, ws::ProtocolError>,
+        ctx: &mut Self::Context,
+    ) {
         debug!(
             "Received WS message: {:?} from member {}",
             msg, self.member_id
         );
         match msg {
-            ws::Message::Text(text) => {
-                self.last_activity = Instant::now();
-                match serde_json::from_str::<ClientMsg>(&text) {
-                    Ok(ClientMsg::Pong(_)) => {
-                        // do nothing
+            Ok(msg) => match msg {
+                ws::Message::Text(text) => {
+                    self.last_activity = Instant::now();
+                    match serde_json::from_str::<ClientMsg>(&text) {
+                        Ok(ClientMsg::Pong(_)) => {
+                            // do nothing
+                        }
+                        Ok(ClientMsg::Command(command)) => {
+                            self.room
+                                .send_command(command)
+                                .into_actor(self)
+                                .spawn(ctx);
+                        }
+                        Err(err) => error!(
+                            "Error [{:?}] parsing client message [{}]",
+                            err, &text
+                        ),
                     }
-                    Ok(ClientMsg::Command(command)) => {
-                        ctx.spawn(wrap_future(self.room.send_command(command)));
-                    }
-                    Err(err) => error!(
-                        "Error [{:?}] parsing client message [{}]",
-                        err, &text
-                    ),
                 }
-            }
-            ws::Message::Close(reason) => {
-                if self.close_reason.is_none() {
-                    let closed_reason = if let Some(reason) = &reason {
-                        if reason.code == CloseCode::Normal
-                            || reason.code == CloseCode::Away
-                        {
-                            ClosedReason::Closed { normal: true }
+                ws::Message::Close(reason) => {
+                    if self.close_reason.is_none() {
+                        let closed_reason = if let Some(reason) = &reason {
+                            if reason.code == CloseCode::Normal
+                                || reason.code == CloseCode::Away
+                            {
+                                ClosedReason::Closed { normal: true }
+                            } else {
+                                ClosedReason::Lost
+                            }
                         } else {
                             ClosedReason::Lost
-                        }
-                    } else {
-                        ClosedReason::Lost
-                    };
+                        };
 
-                    self.close_reason =
-                        Some(InnerCloseReason::ByClient(closed_reason));
-                    ctx.close(reason);
-                    ctx.stop();
+                        self.close_reason =
+                            Some(InnerCloseReason::ByClient(closed_reason));
+                        ctx.close(reason);
+                        ctx.stop();
+                    }
                 }
+                _ => error!(
+                    "Unsupported client message from member {}",
+                    self.member_id
+                ),
+            },
+            Err(err) => {
+                error!(
+                    "Error in WsSession StreamHandler for Member [{}]: {:?}",
+                    self.member_id, err
+                );
             }
-            _ => error!(
-                "Unsupported client message from member {}",
-                self.member_id
-            ),
-        }
-    }
-
-    /// Method is called when stream emits error. Stops stream processing.
-    fn error(
-        &mut self,
-        err: ws::ProtocolError,
-        _: &mut Self::Context,
-    ) -> Running {
-        error!(
-            "Error in WsSession StreamHandler for Member [{}]: {:?}",
-            self.member_id, err
-        );
-        Running::Stop
+        };
     }
 
     /// Method is called when stream finishes. Stops [`WsSession`] actor
@@ -356,9 +370,7 @@ mod test {
         time::{Duration, Instant},
     };
 
-    use actix_http::HttpService;
-    use actix_http_test::{TestServer, TestServerRuntime};
-    use actix_web::{web, App, HttpRequest};
+    use actix_web::{test::TestServer, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use medea_client_api_proto::{
         CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
@@ -366,9 +378,8 @@ mod test {
     };
 
     use futures::{
-        future::{self, Future, IntoFuture},
-        sync::oneshot::{self, Receiver, Sender},
-        Sink, Stream,
+        channel::oneshot::{self, Receiver, Sender},
+        FutureExt as _, SinkExt as _, StreamExt as _,
     };
 
     use crate::api::{
@@ -381,20 +392,20 @@ mod test {
 
     type SharedChan<T> = (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
 
-    fn test_server(factory: fn() -> WsSession) -> TestServerRuntime {
-        TestServer::new(move || {
-            HttpService::new(App::new().service(web::resource("/").to(
-                move |req: HttpRequest, stream: web::Payload| {
+    fn test_server(factory: fn() -> WsSession) -> TestServer {
+        actix_web::test::start(move || {
+            App::new().service(web::resource("/").to(
+                move |req: HttpRequest, stream: web::Payload| async move {
                     start(factory(), &req, stream)
                 },
-            )))
+            ))
         })
     }
 
     // WsSession is dropped and WebSocket connection is closed when RpcServer
     // errors on RpcConnectionEstablished.
-    #[test]
-    fn close_if_rpc_established_failed() {
+    #[actix_rt::test]
+    async fn close_if_rpc_established_failed() {
         fn factory() -> WsSession {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
@@ -403,10 +414,10 @@ mod test {
             rpc_server
                 .expect_connection_established()
                 .withf(move |member_id, _| *member_id == expected_member_id)
-                .return_once(|_, _| Box::new(future::err(())));
+                .return_once(|_, _| async { Err(()) }.boxed_local());
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| Box::new(future::ok(())));
+                .returning(|_, _| async {}.boxed_local());
 
             WsSession::new(
                 member_id,
@@ -418,31 +429,30 @@ mod test {
 
         let mut serv = test_server(factory);
 
-        let client = serv.ws().unwrap();
+        let mut client = serv.ws().await.unwrap();
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let item = client.next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
             description: Some(String::from(r#"{"reason":"InternalError"}"#)),
         }));
 
-        assert_eq!(item, Some(close_frame));
+        assert_eq!(item, close_frame);
     }
 
-    #[test]
-    fn sends_rpc_settings_and_pings() {
+    #[actix_rt::test]
+    async fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
                 .expect_connection_established()
-                .return_once(|_, _| Box::new(future::ok(())));
+                .return_once(|_, _| async { Ok(()) }.boxed_local());
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| Box::new(future::ok(())));
+                .returning(|_, _| async {}.boxed_local());
 
             WsSession::new(
                 member_id,
@@ -452,45 +462,37 @@ mod test {
             )
         });
 
-        let client = serv.ws().unwrap();
-        let (item, client) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
+        let mut client = serv.ws().await.unwrap();
+        let item = client.next().await.unwrap().unwrap();
         assert_eq!(
             item,
-            Some(Frame::Text(Some(
+            Frame::Text(
                 String::from(
                     r#"{"idle_timeout_ms":5000,"ping_interval_ms":50}"#
                 )
                 .into()
-            )))
+            )
         );
 
-        let (item, client) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
-        assert_eq!(
-            item,
-            Some(Frame::Text(Some(String::from(r#"{"ping":0}"#).into())))
-        );
+        let item = client.next().await.unwrap().unwrap();
+        assert_eq!(item, Frame::Text(String::from(r#"{"ping":0}"#).into()));
 
-        let (item, _) =
-            serv.block_on(client.into_future()).map_err(|_| ()).unwrap();
-        assert_eq!(
-            item,
-            Some(Frame::Text(Some(String::from(r#"{"ping":1}"#).into())))
-        );
+        let item = client.next().await.unwrap().unwrap();
+
+        assert_eq!(item, Frame::Text(String::from(r#"{"ping":1}"#).into()));
     }
 
     // WsSession is dropped and WebSocket connection is closed if no pongs
     // received for idle_timeout.
-    #[test]
-    fn dropped_if_idle() {
+    #[actix_rt::test]
+    async fn dropped_if_idle() {
         let mut serv = test_server(|| -> WsSession {
             let member_id = MemberId::from(String::from("test_member"));
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
                 .expect_connection_established()
-                .return_once(|_, _| Box::new(future::ok(())));
+                .return_once(|_, _| async { Ok(()) }.boxed_local());
 
             let expected_member_id = member_id.clone();
             rpc_server
@@ -499,7 +501,7 @@ mod test {
                     *member_id == expected_member_id
                         && *reason == ClosedReason::Lost
                 })
-                .return_once(|_, _| Box::new(future::ok(())));
+                .return_once(|_, _| async {}.boxed_local());
 
             WsSession::new(
                 member_id,
@@ -509,13 +511,11 @@ mod test {
             )
         });
 
-        let client = serv.ws().unwrap();
+        let client = serv.ws().await.unwrap();
 
         let start = std::time::Instant::now();
-        let (item, _) = serv
-            .block_on(client.skip(1).into_future())
-            .map_err(|_| ())
-            .unwrap();
+
+        let item = client.skip(1).next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -526,12 +526,12 @@ mod test {
             Instant::now().duration_since(start) > Duration::from_millis(99)
         );
         assert!(Instant::now().duration_since(start) < Duration::from_secs(2));
-        assert_eq!(item, Some(close_frame));
+        assert_eq!(item, close_frame);
     }
 
     // Make sure that WsSession redirects all Commands it receives to RpcServer.
-    #[test]
-    fn passes_commands_to_rpc_server() {
+    #[actix_rt::test]
+    async fn passes_commands_to_rpc_server() {
         lazy_static::lazy_static! {
             static ref CHAN: SharedChan<Command> = {
                 let (tx, rx) = oneshot::channel();
@@ -545,14 +545,14 @@ mod test {
 
             rpc_server
                 .expect_connection_established()
-                .return_once(|_, _| Box::new(future::ok(())));
+                .return_once(|_, _| async { Ok(()) }.boxed_local());
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| Box::new(future::ok(())));
+                .returning(|_, _| async {}.boxed_local());
 
             rpc_server.expect_send_command().return_once(|command| {
                 let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
-                Box::new(future::ok(()))
+                async {}.boxed_local()
             });
 
             WsSession::new(
@@ -563,7 +563,7 @@ mod test {
             )
         });
 
-        let client = serv.ws().unwrap();
+        let mut client = serv.ws().await.unwrap();
 
         let command = r#"{
                             "command":"SetIceCandidate",
@@ -577,18 +577,12 @@ mod test {
                                 }
                             }"#;
 
-        serv.block_on(client.send(Message::Text(String::from(command))))
+        client
+            .send(Message::Text(String::from(command)))
+            .await
             .unwrap();
 
-        let command = CHAN
-            .1
-            .lock()
-            .unwrap()
-            .take()
-            .unwrap()
-            .into_future()
-            .wait()
-            .unwrap();
+        let command = CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
         match command {
             Command::SetIceCandidate { peer_id, candidate } => {
                 assert_eq!(peer_id.0, 15);
@@ -600,8 +594,8 @@ mod test {
 
     // WsSession is dropped and WebSocket connection is closed when
     // RpcConnection::close is called.
-    #[test]
-    fn close_when_rpc_connection_close() {
+    #[actix_rt::test]
+    async fn close_when_rpc_connection_close() {
         lazy_static::lazy_static! {
             static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
                 let (tx, rx) = oneshot::channel();
@@ -617,12 +611,12 @@ mod test {
                 |_, connection| {
                     let _ =
                         CHAN.0.lock().unwrap().take().unwrap().send(connection);
-                    Box::new(future::ok(()))
+                    async { Ok(()) }.boxed_local()
                 },
             );
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| Box::new(future::ok(())));
+                .returning(|_, _| async {}.boxed_local());
 
             WsSession::new(
                 member_id,
@@ -632,42 +626,31 @@ mod test {
             )
         });
 
-        let client = serv.ws().unwrap();
+        let client = serv.ws().await.unwrap();
 
-        let mut rpc_connection: Box<dyn RpcConnection> = CHAN
-            .1
-            .lock()
-            .unwrap()
-            .take()
-            .unwrap()
-            .into_future()
-            .wait()
-            .unwrap();
+        let mut rpc_connection: Box<dyn RpcConnection> =
+            CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
 
         rpc_connection
             .close(CloseDescription {
                 reason: ProtoCloseReason::Evicted,
             })
-            .wait()
-            .unwrap();
+            .await;
 
-        let (item, _) = serv
-            .block_on(client.skip(1).into_future())
-            .map_err(|_| ())
-            .unwrap();
+        let item = client.skip(1).next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
             description: Some(String::from(r#"{"reason":"Evicted"}"#)),
         }));
 
-        assert_eq!(item, Some(close_frame));
+        assert_eq!(item, close_frame);
     }
 
     // WsSession transmits Events to WebSocket client when
     // RpcConnection::send_event is called.
-    #[test]
-    fn send_text_message_when_rpc_connection_send_event() {
+    #[actix_rt::test]
+    async fn send_text_message_when_rpc_connection_send_event() {
         lazy_static::lazy_static! {
             static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
                 let (tx, rx) = oneshot::channel();
@@ -683,12 +666,12 @@ mod test {
                 |_, connection| {
                     let _ =
                         CHAN.0.lock().unwrap().take().unwrap().send(connection);
-                    Box::new(future::ok(()))
+                    async { Ok(()) }.boxed_local()
                 },
             );
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| Box::new(future::ok(())));
+                .returning(|_, _| async {}.boxed_local());
 
             WsSession::new(
                 member_id,
@@ -698,36 +681,24 @@ mod test {
             )
         });
 
-        let client = serv.ws().unwrap();
+        let client = serv.ws().await.unwrap();
 
-        let rpc_connection: Box<dyn RpcConnection> = CHAN
-            .1
-            .lock()
-            .unwrap()
-            .take()
-            .unwrap()
-            .into_future()
-            .wait()
-            .unwrap();
+        let rpc_connection: Box<dyn RpcConnection> =
+            CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
 
         rpc_connection
             .send_event(Event::SdpAnswerMade {
                 peer_id: PeerId(77),
                 sdp_answer: String::from("sdp_answer"),
             })
-            .wait()
+            .await
             .unwrap();
 
-        let (item, _) = serv
-            .block_on(client.skip(1).into_future())
-            .map_err(|_| ())
-            .unwrap();
+        let item = client.skip(1).next().await.unwrap().unwrap();
 
         let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
                      sdp_answer\":\"sdp_answer\"}}";
 
-        let event = Frame::Text(Some(event.into()));
-
-        assert_eq!(item, Some(event));
+        assert_eq!(item, Frame::Text(event.into()));
     }
 }

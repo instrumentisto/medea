@@ -6,7 +6,7 @@ use std::fmt;
 
 use actix::Message;
 use derive_more::{From, Into};
-use futures::future::{Future, LocalBoxFuture};
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{CloseDescription, Command, Event};
 
 use crate::api::control::MemberId;

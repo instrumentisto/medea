@@ -37,6 +37,7 @@ pub struct AppContext {
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     pub callbacks: CallbackService,
 }
+
 impl AppContext {
     /// Creates new [`AppContext`].
     #[inline]

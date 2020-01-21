@@ -3,8 +3,8 @@
 use std::pin::Pin;
 
 use actix::prelude::dev::{
-    Actor, ActorFuture, Arbiter, AsyncContext, Message, MessageResponse,
-    ResponseChannel, WrapFuture,
+    Actor, ActorFuture, Arbiter, AsyncContext, ContextFutureSpawner as _,
+    Message, MessageResponse, ResponseChannel, WrapFuture as _,
 };
 use futures::Future;
 
@@ -42,8 +42,16 @@ macro_rules! hashmap {
     };
 }
 
+// TODO: remove after https://github.com/actix/actix/pull/313
+/// A specialized future for asynchronous message handling. Exists, because
+/// [`actix::ResponseFuture`] implements [`actix::dev::MessageResponse`] only
+/// for `Output = Result<_, _>`;
 pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
 
+// TODO: remove after https://github.com/actix/actix/pull/310
+/// A specialized actor future for asynchronous message handling. Exists,
+/// because [`actix::ResponseActFuture`] implements
+/// [`actix::dev::MessageResponse`] only for `Output = Result<_, _>`;
 pub struct ResponseActAnyFuture<A, O>(
     pub Box<dyn ActorFuture<Output = O, Actor = A>>,
 );
@@ -75,11 +83,13 @@ where
         ctx: &mut A::Context,
         tx: Option<R>,
     ) {
-        ctx.spawn(self.0.then(move |res, this, _| {
-            if let Some(tx) = tx {
-                tx.send(res);
-            }
-            async {}.into_actor(this)
-        }));
+        self.0
+            .then(move |res, this, _| {
+                if let Some(tx) = tx {
+                    tx.send(res);
+                }
+                async {}.into_actor(this)
+            })
+            .spawn(ctx);
     }
 }

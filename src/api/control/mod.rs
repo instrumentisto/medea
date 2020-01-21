@@ -15,8 +15,7 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
 use actix::Addr;
 use derive_more::Display;
-use failure::Fail;
-use futures::Future;
+use failure::{Error, Fail};
 use serde::Deserialize;
 
 use crate::{
@@ -208,26 +207,21 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 /// [`Room`]: crate::signalling::room::Room
 pub async fn start_static_rooms(
     room_service: &Addr<RoomService>,
-) -> Result<(), ()> {
-    room_service
-        .send(StartStaticRooms)
-        .await
-        .map_err(|e| error!("StartStaticRooms mailbox error: {:?}", e))
-        .map(|result| {
-            if let Err(e) = result {
-                match e {
-                    RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
-                        LoadStaticControlSpecsError::SpecDirReadError(e) => {
-                            warn!(
-                                "Error while reading static control API specs \
-                                 dir. Control API specs not loaded. {}",
-                                e
-                            );
-                        }
-                        _ => panic!("{}", e),
-                    },
-                    _ => panic!("{}", e),
+) -> Result<(), Error> {
+    if let Err(err) = room_service.send(StartStaticRooms).await? {
+        match err {
+            RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
+                LoadStaticControlSpecsError::SpecDirReadError(e) => {
+                    warn!(
+                        "Error while reading static control API specs dir. \
+                         Control API specs not loaded. {}",
+                        e
+                    );
                 }
-            }
-        })
+                _ => panic!("{}", e),
+            },
+            _ => panic!("{}", err),
+        }
+    };
+    Ok(())
 }

@@ -27,8 +27,10 @@ lto = "thin"
 
 [dependencies]
 actix = "0.9"
+actix-rt = "1.0.0"
 actix-web = "2.0"
 actix-web-actors = "2.0"
+async-trait = "0.1"
 chrono = "0.4"
 config = "0.10"
 deadpool = "0.5"

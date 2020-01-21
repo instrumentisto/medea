@@ -6,12 +6,12 @@
 use std::{fmt, sync::Arc};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
-    Message, ResponseFuture, WrapFuture,
+    fut, Actor, ActorFuture, Addr, Context, Handler, MailboxError, Message,
+    ResponseFuture, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{self, Future, FutureExt, LocalBoxFuture, TryFutureExt};
+use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
@@ -49,20 +49,18 @@ impl TurnAuthService for Addr<Service> {
         room_id: RoomId,
         policy: UnreachablePolicy,
     ) -> LocalBoxFuture<'static, Result<IceUser, TurnServiceErr>> {
-        self.send(CreateIceUser {
+        let create_result = self.send(CreateIceUser {
             member_id,
             room_id,
             policy,
-        })
-        .then(
-            |r: Result<Result<IceUser, TurnServiceErr>, MailboxError>| async {
-                match r {
-                    Ok(Ok(ice)) => Ok(ice),
-                    Ok(Err(err)) => Err(err),
-                    Err(err) => Err(TurnServiceErr::from(err)),
-                }
-            },
-        )
+        });
+        async {
+            match create_result.await {
+                Ok(Ok(ice)) => Ok(ice),
+                Ok(Err(err)) => Err(err),
+                Err(err) => Err(TurnServiceErr::from(err)),
+            }
+        }
         .boxed_local()
     }
 
@@ -78,15 +76,15 @@ impl TurnAuthService for Addr<Service> {
         if users.is_empty() {
             async { Ok(()) }.boxed_local()
         } else {
-            self.send(DeleteIceUsers(users)).then(
-                |r: Result<Result<(), TurnServiceErr>, MailboxError>| async {
-                    match r {
-                        Ok(Err(err)) => Err(err),
-                        Err(err) => Err(TurnServiceErr::from(err)),
-                        _ => Ok(()),
-                    }
-                },
-            ).boxed_local()
+            let delete_result = self.send(DeleteIceUsers(users));
+            async {
+                match delete_result.await {
+                    Ok(Err(err)) => Err(err),
+                    Err(err) => Err(TurnServiceErr::from(err)),
+                    _ => Ok(()),
+                }
+            }
+            .boxed_local()
         }
     }
 }
@@ -231,16 +229,14 @@ impl Handler<CreateIceUser> for Service {
         );
 
         Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
-            move |result, act, _| {
-                wrap_future(match result {
-                    Ok(_) => future::ok(ice_user),
-                    Err(e) => match msg.policy {
-                        UnreachablePolicy::ReturnErr => future::err(e.into()),
-                        UnreachablePolicy::ReturnStatic => {
-                            future::ok(act.static_user())
-                        }
-                    },
-                })
+            move |result, this, _| match result {
+                Ok(_) => fut::ok(ice_user),
+                Err(err) => match msg.policy {
+                    UnreachablePolicy::ReturnErr => fut::err(err.into()),
+                    UnreachablePolicy::ReturnStatic => {
+                        fut::ok(this.static_user())
+                    }
+                },
             },
         ))
     }
@@ -268,8 +264,6 @@ impl Handler<DeleteIceUsers> for Service {
 pub mod test {
     use std::sync::Arc;
 
-    use futures::future;
-
     use crate::media::IceUser;
 
     use super::*;
@@ -283,19 +277,22 @@ pub mod test {
             _: MemberId,
             _: RoomId,
             _: UnreachablePolicy,
-        ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
-            Box::new(future::ok(IceUser::new(
-                "5.5.5.5:1234".parse().unwrap(),
-                String::from("username"),
-                String::from("password"),
-            )))
+        ) -> LocalBoxFuture<'static, Result<IceUser, TurnServiceErr>> {
+            async {
+                Ok(IceUser::new(
+                    "5.5.5.5:1234".parse().unwrap(),
+                    String::from("username"),
+                    String::from("password"),
+                ))
+            }
+            .boxed_local()
         }
 
         fn delete(
             &self,
             _: Vec<IceUser>,
-        ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
-            Box::new(future::ok(()))
+        ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>> {
+            async { Ok(()) }.boxed_local()
         }
     }
 

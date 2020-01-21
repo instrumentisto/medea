@@ -2,7 +2,7 @@
 
 use std::io;
 
-use actix::{Actor, Addr, Handler, ResponseFuture};
+use actix::{Actor, Addr, Handler};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -10,11 +10,7 @@ use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
-use futures::{
-    compat::Future01CompatExt as _,
-    future::{self, Either},
-    Future, FutureExt as _,
-};
+use futures::FutureExt as _;
 use serde::Deserialize;
 
 use crate::{
@@ -60,14 +56,14 @@ async fn ws_index(
 
     match state.rooms.get(&room_id) {
         Some(room) => {
-            let auth = room
+            let auth_result = room
                 .send(Authorize {
                     member_id: member_id.clone(),
                     credentials,
                 })
                 .await?;
 
-            match auth {
+            match auth_result {
                 Ok(_) => ws::start(
                     WsSession::new(
                         member_id,
@@ -152,7 +148,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: &mut Self::Context,
     ) -> Self::Result {
         info!("Server received ShutdownGracefully message so shutting down");
-        ResponseAnyFuture(self.0.stop(true).boxed())
+        ResponseAnyFuture(self.0.stop(true).boxed_local())
     }
 }
 
@@ -160,8 +156,7 @@ impl Handler<ShutdownGracefully> for Server {
 mod test {
     use std::time::Duration;
 
-    use actix_http::HttpService;
-    use actix_http_test::{TestServer, TestServerRuntime};
+    use actix_web::test::TestServer;
     use awc::error::WsClientError;
 
     use crate::{
@@ -189,21 +184,19 @@ mod test {
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
-    fn ws_server(conf: Conf) -> TestServerRuntime {
-        TestServer::new(move || {
-            HttpService::new(
-                App::new()
-                    .register_data(Server::register_data(
-                        build_room_repo(conf.clone()),
-                        conf.rpc.clone(),
-                    ))
-                    .configure(Server::configure),
-            )
+    fn ws_server(conf: Conf) -> TestServer {
+        actix_web::test::start(move || {
+            App::new()
+                .app_data(Server::app_data(
+                    build_room_repo(conf.clone()),
+                    conf.rpc.clone(),
+                ))
+                .configure(Server::configure)
         })
     }
 
-    #[test]
-    fn forbidden_if_bad_credentials() {
+    #[actix_rt::test]
+    async fn forbidden_if_bad_credentials() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
@@ -214,7 +207,10 @@ mod test {
 
         let mut server = ws_server(conf.clone());
 
-        match server.ws_at("/ws/pub-sub-video-call/caller/bad_credentials") {
+        match server
+            .ws_at("/ws/pub-sub-video-call/caller/bad_credentials")
+            .await
+        {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 403);
             }
@@ -222,8 +218,8 @@ mod test {
         }
     }
 
-    #[test]
-    fn not_found_if_bad_url() {
+    #[actix_rt::test]
+    async fn not_found_if_bad_url() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
@@ -234,14 +230,14 @@ mod test {
 
         let mut server = ws_server(conf.clone());
 
-        match server.ws_at("/ws/bad_room/caller/test") {
+        match server.ws_at("/ws/bad_room/caller/test").await {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 404);
             }
             _ => unreachable!(),
         };
 
-        match server.ws_at("/ws/pub-sub-video-call/bad_member/test") {
+        match server.ws_at("/ws/pub-sub-video-call/bad_member/test").await {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 404);
             }
@@ -249,8 +245,8 @@ mod test {
         };
     }
 
-    #[test]
-    fn established() {
+    #[actix_rt::test]
+    async fn established() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
@@ -261,6 +257,9 @@ mod test {
 
         let mut server = ws_server(conf.clone());
 
-        server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
+        server
+            .ws_at("/ws/pub-sub-video-call/caller/test")
+            .await
+            .unwrap();
     }
 }

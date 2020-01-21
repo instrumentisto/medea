@@ -5,7 +5,6 @@ pub mod control;
 
 use std::fmt::Debug;
 
-use futures::Future;
 use medea_client_api_proto::Command;
 
 use crate::api::{
