@@ -12,12 +12,7 @@ use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::TrackConstraints,
-    peer::{
-        media::{EnabledAudio, EnabledVideo},
-        MutedState,
-    },
-    utils::HandlerDetachedError,
+    media::TrackConstraints, peer::MutedState, utils::HandlerDetachedError,
 };
 
 use super::MediaTrack;

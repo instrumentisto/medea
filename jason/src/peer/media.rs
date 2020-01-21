@@ -1,11 +1,12 @@
 //! Media tracks.
 
 use std::{
-    borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From, rc::Rc,
+    borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
+    future::Future, rc::Rc,
 };
 
 use derive_more::{Display, From};
-use futures::{future, future::LocalBoxFuture};
+use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use medea_reactive::Dropped;
 use tracerr::Traced;
@@ -17,7 +18,7 @@ use web_sys::{
 use crate::{
     media::TrackConstraints,
     peer::track::MutedState,
-    utils::{console_error, JsCaused, JsError},
+    utils::{JsCaused, JsError},
 };
 
 use super::{
@@ -133,58 +134,39 @@ impl MediaConnections {
             .for_each(|s| s.change_muted_state(new_state));
     }
 
-    pub fn on_video_muted_state(
-        &self,
-        state: MutedState,
-    ) -> LocalBoxFuture<'_, Result<()>> {
-        let inner = self.0.try_borrow().expect("sdfjsadlfj");
-        let video_tracks: Vec<_> = self
+    pub async fn on_video_muted_state(&self, state: MutedState) -> Result<()> {
+        let futs: Vec<_> = self
             .0
-            .try_borrow()
-            .expect("asdfj")
-            .iter_senders_with_kind(TransceiverKind::Video)
-            .cloned()
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Audio)
+            .map(|sender| sender.on_muted_state(state))
             .collect();
-        std::mem::drop(inner);
 
-        Box::pin(async move {
-            let futs: Vec<_> = video_tracks
-                .iter()
-                .map(move |sender| sender.on_muted_state(state))
-                .collect();
-            future::join_all(futs)
-                .await
-                .into_iter()
-                .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
-                .collect()
-        })
+        future::join_all(futs)
+            .await
+            .into_iter()
+            .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
+            .collect()
     }
 
     pub async fn on_audio_muted_state(&self, state: MutedState) -> Result<()> {
-        console_error("20");
-        let this = self.0.borrow();
-        console_error("21");
-        let futs = this
+        let futs: Vec<_> = self
+            .0
+            .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .map(|sender| sender.on_muted_state(state));
-        console_error("22");
+            .map(|sender| sender.on_muted_state(state))
+            .collect();
 
-        let res = future::join_all(futs)
+        future::join_all(futs)
             .await
             .into_iter()
-            .map(|res| {
-                console_error("24");
-                res.map_err(tracerr::map_from_and_wrap!())
-            })
-            .collect();
-        console_error("23");
-        res
+            .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
+            .collect()
     }
 
     pub fn get_all_audio_senders_id(&self) -> Vec<TrackId> {
         self.0
-            .try_borrow()
-            .expect("asdf")
+            .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
             .map(|sender| sender.track_id)
             .collect()
@@ -192,8 +174,7 @@ impl MediaConnections {
 
     pub fn get_all_video_senders_id(&self) -> Vec<TrackId> {
         self.0
-            .try_borrow()
-            .expect("sadfasdf")
+            .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
             .map(|sender| sender.track_id)
             .collect()
@@ -418,7 +399,7 @@ impl MediaConnections {
     }
 
     pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<MediaTrack>> {
-        let inner = self.0.try_borrow().expect("sadfsdf");
+        let inner = self.0.borrow();
         if let Some(track) = inner
             .senders
             .get(&id)
@@ -517,16 +498,17 @@ impl Sender {
     pub fn on_muted_state(
         &self,
         state: MutedState,
-    ) -> LocalBoxFuture<'_, Result<()>> {
-        if let Some(track) = self.track.borrow().clone() {
-            Box::pin(async move {
+    ) -> impl Future<Output = Result<()>> {
+        let track = self.track.borrow().clone();
+        async move {
+            if let Some(track) = track {
                 track
                     .on_muted_state(state)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())
-            })
-        } else {
-            Box::pin(future::err(tracerr::new!(MediaConnectionsError::NoTrack)))
+            } else {
+                Err(tracerr::new!(MediaConnectionsError::NoTrack))
+            }
         }
     }
 }

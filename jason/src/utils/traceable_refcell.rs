@@ -1,21 +1,21 @@
-use std::cell::{RefCell, RefMut, Ref};
+use std::cell::{Ref, RefCell, RefMut};
 
 macro_rules! invocation_place {
     () => {
         format!("{}:{}", file!(), line!())
-    }
+    };
 }
 
 macro_rules! borrow {
     ($cell:expr) => {
         $cell.borrow(invocation_place!())
-    }
+    };
 }
 
 macro_rules! borrow_mut {
     ($cell:expr) => {
         $cell.borrow_mut(invocation_place!())
-    }
+    };
 }
 
 pub struct TraceableRefCell<T> {
@@ -35,21 +35,38 @@ impl<T> TraceableRefCell<T> {
 
     pub fn borrow_mut(&self, invocation_place: String) -> RefMut<T> {
         if let Ok(ref_mut) = self.cell.try_borrow_mut() {
-            web_sys::console::debug_1(&format!("Borrow mut in {}", invocation_place).into());
-            *self.current_borrow_mut_place.borrow_mut() = Some(invocation_place);
-            return ref_mut
+            web_sys::console::debug_1(
+                &format!("Borrow mut in {}", invocation_place).into(),
+            );
+            *self.current_borrow_mut_place.borrow_mut() =
+                Some(invocation_place);
+            return ref_mut;
         } else {
-            panic!("RefCell BorrowMutError. Borrow mut place: {:?}. Last borrow place: {:?}. Where called: {}.", self.current_borrow_mut_place.borrow(), self.last_borrow_place.borrow(), invocation_place);
+            panic!(
+                "RefCell BorrowMutError. Borrow mut place: {:?}. Last borrow \
+                 place: {:?}. Where called: {}.",
+                self.current_borrow_mut_place.borrow(),
+                self.last_borrow_place.borrow(),
+                invocation_place
+            );
         }
     }
 
     pub fn borrow(&self, invocation_place: String) -> Ref<T> {
         if let Ok(ref_mut) = self.cell.try_borrow() {
-            web_sys::console::debug_1(&format!("Borrow in {}", invocation_place).into());
+            web_sys::console::debug_1(
+                &format!("Borrow in {}", invocation_place).into(),
+            );
             *self.last_borrow_place.borrow_mut() = Some(invocation_place);
-            return ref_mut
+            return ref_mut;
         } else {
-            panic!("RefCell BorrowError. Borrow mut place: {:?}. Last borrow place: {:?}. Where called: {}.", self.current_borrow_mut_place.borrow(), self.last_borrow_place.borrow(), invocation_place);
+            panic!(
+                "RefCell BorrowError. Borrow mut place: {:?}. Last borrow \
+                 place: {:?}. Where called: {}.",
+                self.current_borrow_mut_place.borrow(),
+                self.last_borrow_place.borrow(),
+                invocation_place
+            );
         }
     }
 }

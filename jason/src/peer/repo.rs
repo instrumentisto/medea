@@ -4,11 +4,7 @@ use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 
-use crate::{
-    media::MediaManager,
-    peer::media::{EnabledAudio, EnabledVideo},
-};
-use crate::peer::MutedState;
+use crate::media::MediaManager;
 
 use super::{PeerConnection, PeerError, PeerEvent};
 

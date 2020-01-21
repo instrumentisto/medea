@@ -1,7 +1,6 @@
 //! Medea room.
 
 use std::{
-    cell::RefCell,
     collections::HashMap,
     ops::DerefMut as _,
     rc::{Rc, Weak},
@@ -9,23 +8,23 @@ use std::{
 
 use derive_more::Display;
 use futures::{
-    channel::mpsc, stream, Future, FutureExt as _, StreamExt as _, TryFutureExt,
+    channel::mpsc, future::LocalBoxFuture, stream, Future, FutureExt as _,
+    StreamExt as _,
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
     IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackUpdate,
 };
-use tracerr::{Traced, Trace};
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
-use futures::future::LocalBoxFuture;
 
 use crate::{
     peer::{
-        EnabledAudio, EnabledVideo, MediaStream, MediaStreamHandle, MutedState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        MediaStream, MediaStreamHandle, MutedState, PeerError, PeerEvent,
+        PeerEventHandler, PeerRepository,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -33,12 +32,11 @@ use crate::{
     },
     utils::{
         console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
+        JsError, TraceableRefCell,
     },
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::utils::TraceableRefCell;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -366,7 +364,8 @@ impl Room {
 
         let (tx, peer_events_rx) = mpsc::unbounded();
         let events_stream = rpc.subscribe();
-        let room = Rc::new(TraceableRefCell::new(InnerRoom::new(rpc, peers, tx)));
+        let room =
+            Rc::new(TraceableRefCell::new(InnerRoom::new(rpc, peers, tx)));
 
         let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
         let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
@@ -588,7 +587,7 @@ impl InnerRoom {
 
     /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_mute_video(&self, is_muted: bool) -> LocalBoxFuture<'static, ()>{
+    fn toggle_mute_video(&self, is_muted: bool) -> LocalBoxFuture<'static, ()> {
         let qq = self.peers.get_all();
         let rpc = self.rpc.clone();
         Box::pin(async move {
