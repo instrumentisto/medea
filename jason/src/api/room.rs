@@ -38,7 +38,6 @@ use crate::{
 
 use super::{connection::Connection, ConnectionHandle};
 use crate::peer::TransceiverKind;
-use js_sys::Atomics::wait;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -308,8 +307,11 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute(true, TransceiverKind::Audio);
-            fut.await;
+            while !borrow!(inner).is_muted(TransceiverKind::Audio) {
+                let fut =
+                    borrow!(inner).toggle_mute(true, TransceiverKind::Audio);
+                fut.await;
+            }
             Ok(JsValue::NULL)
         })
     }
@@ -319,8 +321,11 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute(false, TransceiverKind::Audio);
-            fut.await;
+            while !borrow!(inner).is_unmuted(TransceiverKind::Audio) {
+                let fut =
+                    borrow!(inner).toggle_mute(false, TransceiverKind::Audio);
+                fut.await;
+            }
             Ok(JsValue::NULL)
         })
     }
@@ -330,8 +335,11 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute(true, TransceiverKind::Video);
-            fut.await;
+            while !borrow!(inner).is_muted(TransceiverKind::Video) {
+                let fut =
+                    borrow!(inner).toggle_mute(true, TransceiverKind::Video);
+                fut.await;
+            }
             Ok(JsValue::NULL)
         })
     }
@@ -341,8 +349,11 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute(false, TransceiverKind::Video);
-            fut.await;
+            while !borrow!(inner).is_unmuted(TransceiverKind::Video) {
+                let fut =
+                    borrow!(inner).toggle_mute(false, TransceiverKind::Video);
+                fut.await;
+            }
             Ok(JsValue::NULL)
         })
     }
@@ -549,38 +560,63 @@ impl InnerRoom {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
-    ) -> LocalBoxFuture<'static, ()> {
+    ) -> impl Future<Output = ()> {
         let peers = self.peers.get_all();
         let rpc = self.rpc.clone();
-        Box::pin(async move {
+        async move {
             let subscriptions: Vec<_> = peers
                 .iter()
                 .map(|peer| {
-                    let tracks_updates = peer
-                        .get_all_senders_ids_with_kind(kind)
+                    let needed_muted_state = MutedState::from(is_muted);
+                    let (track_updates, subscriptions): (Vec<_>, Vec<_>) = peer
+                        .iter_senders_with_kind_and_muted_state(
+                            kind,
+                            !needed_muted_state,
+                        )
                         .into_iter()
-                        .map(|id| TrackUpdate {
-                            id,
-                            is_muted: Some(is_muted),
-                            direction: None,
-                            media_type: None,
+                        .map(|sender| {
+                            let id = sender.track_id();
+                            let track_update = TrackUpdate {
+                                id,
+                                is_muted: Some(is_muted),
+                                direction: None,
+                                media_type: None,
+                            };
+                            sender.change_muted_state(
+                                needed_muted_state.proccessing_state(),
+                            );
+                            let fut = sender.on_muted_state(needed_muted_state);
+
+                            (track_update, fut)
                         })
-                        .collect();
+                        .unzip();
                     rpc.send_command(Command::ApplyTracks {
                         peer_id: peer.id(),
-                        tracks: tracks_updates,
+                        tracks: track_updates,
                     });
-
-                    let wait_for_muted_state = MutedState::from(is_muted);
-                    let set_muted_state =
-                        wait_for_muted_state.proccessing_state();
-                    peer.change_muted_state_for_kind(set_muted_state, kind);
-
-                    peer.when_muted_state_for_kind(wait_for_muted_state, kind)
+                    futures::future::join_all(subscriptions)
                 })
                 .collect();
             futures::future::join_all(subscriptions).await;
-        })
+        }
+    }
+
+    pub fn is_muted(&self, kind: TransceiverKind) -> bool {
+        for peer in self.peers.get_all() {
+            if !peer.is_all_tracks_muted(kind) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn is_unmuted(&self, kind: TransceiverKind) -> bool {
+        for peer in self.peers.get_all() {
+            if !peer.is_all_tracks_unmuted(kind) {
+                return false;
+            }
+        }
+        true
     }
 
     /// Injects given local stream into all [`PeerConnection`]s of this [`Room`]

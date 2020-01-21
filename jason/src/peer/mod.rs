@@ -44,6 +44,7 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::{MediaTrack, MutedState},
 };
+use crate::peer::media::Sender;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -232,6 +233,14 @@ impl PeerConnection {
         Ok(peer)
     }
 
+    pub fn is_all_tracks_muted(&self, kind: TransceiverKind) -> bool {
+        self.media_connections.is_all_tracks_with_kind_muted(kind)
+    }
+
+    pub fn is_all_tracks_unmuted(&self, kind: TransceiverKind) -> bool {
+        self.media_connections.is_all_tracks_with_kind_unmuted(kind)
+    }
+
     pub fn id(&self) -> PeerId {
         self.id
     }
@@ -366,6 +375,15 @@ impl PeerConnection {
         kind: TransceiverKind,
     ) -> Vec<TrackId> {
         self.media_connections.get_all_senders_id_with_kind(kind)
+    }
+
+    pub fn iter_senders_with_kind_and_muted_state(
+        &self,
+        kind: TransceiverKind,
+        muted_state: MutedState,
+    ) -> Vec<Rc<Sender>> {
+        self.media_connections
+            .iter_senders_with_kind_and_mute_state(kind, muted_state)
     }
 
     /// Track id to mid relations of all send tracks of this

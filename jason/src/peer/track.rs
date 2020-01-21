@@ -12,6 +12,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::MediaStreamTrack;
 
 use crate::media::TrackConstraints;
+use std::ops::Not;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutedState {
@@ -37,6 +38,19 @@ impl From<bool> for MutedState {
             Self::Muted
         } else {
             Self::Unmuted
+        }
+    }
+}
+
+impl Not for MutedState {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Muted => Self::Unmuted,
+            Self::Unmuted => Self::Muted,
+            Self::Unmuting => Self::Unmuting,
+            Self::Muting => Self::Unmuting,
         }
     }
 }

@@ -27,6 +27,7 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
+use crate::peer::media::MediaConnectionsError::MutedStateDropped;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -119,6 +120,49 @@ impl MediaConnections {
             .borrow()
             .iter_senders_with_kind(kind)
             .for_each(|s| s.change_muted_state(new_state));
+    }
+
+    pub fn iter_senders_with_kind_and_mute_state(
+        &self,
+        kind: TransceiverKind,
+        mute_state: MutedState,
+    ) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .iter_senders_with_kind(kind)
+            .filter(|sender| {
+                sender
+                    .muted_state()
+                    .filter(|s| s == &mute_state)
+                    .map_or(false, |_| true)
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn is_all_tracks_with_kind_muted(&self, kind: TransceiverKind) -> bool {
+        for sender in self.0.borrow().iter_senders_with_kind(kind) {
+            if let Some(muted_state) = sender.muted_state() {
+                if muted_state != MutedState::Muted {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    pub fn is_all_tracks_with_kind_unmuted(
+        &self,
+        kind: TransceiverKind,
+    ) -> bool {
+        for sender in self.0.borrow().iter_senders_with_kind(kind) {
+            if let Some(muted_state) = sender.muted_state() {
+                if muted_state != MutedState::Unmuted {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     pub async fn when_muted_state_for_kind(
@@ -419,9 +463,20 @@ impl Sender {
         }))
     }
 
+    pub fn track_id(&self) -> TrackId {
+        self.track_id
+    }
+
     /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
     fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
+    }
+
+    pub fn muted_state(&self) -> Option<MutedState> {
+        self.track
+            .borrow()
+            .as_ref()
+            .map(|track| track.get_muted_state())
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
@@ -452,7 +507,7 @@ impl Sender {
     }
 
     /// Enables or disables this [`Sender`]s track.
-    fn change_muted_state(&self, new_state: MutedState) {
+    pub fn change_muted_state(&self, new_state: MutedState) {
         if let Some(track) = self.track.borrow_mut().as_mut() {
             track.change_muted_state(new_state);
         }
