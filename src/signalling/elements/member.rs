@@ -192,7 +192,7 @@ impl Member {
                     spec_play_endpoint.src.clone(),
                     publisher.downgrade(),
                     this_member.downgrade(),
-                    spec_play_endpoint.is_force_relay,
+                    spec_play_endpoint.force_relay,
                 );
 
                 self.insert_sink(new_play_endpoint.clone());
@@ -204,7 +204,7 @@ impl Member {
                     new_publish_id,
                     publisher_endpoint.p2p,
                     publisher_member.downgrade(),
-                    publisher_endpoint.is_force_relay,
+                    publisher_endpoint.force_relay,
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -212,7 +212,7 @@ impl Member {
                     spec_play_endpoint.src.clone(),
                     new_publish.downgrade(),
                     this_member.downgrade(),
-                    spec_play_endpoint.is_force_relay,
+                    spec_play_endpoint.force_relay,
                 );
 
                 new_publish.add_sink(new_self_play.downgrade());
@@ -233,7 +233,7 @@ impl Member {
                     endpoint_id,
                     e.p2p,
                     this_member.downgrade(),
-                    e.is_force_relay,
+                    e.force_relay,
                 ));
             });
 
@@ -380,7 +380,7 @@ impl Member {
             spec.src,
             src.downgrade(),
             member.downgrade(),
-            spec.is_force_relay,
+            spec.force_relay,
         );
 
         src.add_sink(sink.downgrade());

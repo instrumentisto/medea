@@ -248,7 +248,7 @@ impl Room {
             sdp_offer: None,
             tracks: sender.tracks(),
             ice_servers,
-            is_force_relay: sender.is_force_relay(),
+            force_relay: sender.is_force_relayed(),
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
@@ -574,7 +574,7 @@ impl Room {
             String::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
-            spec.is_force_relay,
+            spec.force_relay,
         );
 
         debug!(
@@ -634,7 +634,7 @@ impl Room {
             spec.src,
             src.downgrade(),
             member.downgrade(),
-            spec.is_force_relay,
+            spec.force_relay,
         );
 
         src.add_sink(sink.downgrade());
@@ -686,7 +686,7 @@ impl Room {
                 id.clone(),
                 publish.p2p,
                 signalling_member.downgrade(),
-                publish.is_force_relay,
+                publish.force_relay,
             );
             signalling_member.insert_src(signalling_publish);
         }
@@ -709,7 +709,7 @@ impl Room {
                 play.src.clone(),
                 src.downgrade(),
                 signalling_member.downgrade(),
-                play.is_force_relay,
+                play.force_relay,
             );
 
             signalling_member.insert_sink(sink);
@@ -821,7 +821,7 @@ impl CommandHandler for Room {
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
-            is_force_relay: to_peer.is_force_relay(),
+            force_relay: to_peer.is_force_relayed(),
         };
 
         self.peers.add_peer(from_peer);

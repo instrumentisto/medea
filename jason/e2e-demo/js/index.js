@@ -18,7 +18,7 @@ async function createRoom(roomId, memberId) {
             publish: {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always',
-              is_force_relay: false
+              force_relay: false
             },
           },
           on_join: "grpc://127.0.0.1:9099",
@@ -38,7 +38,7 @@ async function createMember(roomId, memberId) {
     publish: {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
-      is_force_relay: false
+      force_relay: false
     }
   };
 
@@ -138,19 +138,19 @@ const controlDebugWindows = {
       let endpointType = container.getElementsByClassName('control-debug__endpoint-type')[0].value;
       if (endpointType === 'WebRtcPublishEndpoint') {
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
-          let isForceRelay = container.getElementsByClassName('webrtc-publish-endpoint-spec__is-force-relay')[0].value === 'true';
+          let isForceRelay = container.getElementsByClassName('webrtc-publish-endpoint-spec__force-relay')[0].value === 'true';
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             p2p: p2pMode,
-            is_force_relay: isForceRelay,
+            force_relay: isForceRelay,
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
           let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
-          let isForceRelay = container.getElementsByClassName('webrtc-play-endpoint-spec__is-force-relay')[0].value === 'true';
+          let isForceRelay = container.getElementsByClassName('webrtc-play-endpoint-spec__force-relay')[0].value === 'true';
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             src: source,
-            is_force_relay: isForceRelay,
+            force_relay: isForceRelay,
           });
       }
     })

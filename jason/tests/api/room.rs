@@ -147,7 +147,7 @@ async fn mute_audio_room_before_init_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            is_force_relay: false,
+            force_relay: false,
         })
         .unwrap();
 
@@ -171,7 +171,7 @@ async fn mute_video_room_before_init_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            is_force_relay: false,
+            force_relay: false,
         })
         .unwrap();
 
@@ -224,7 +224,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            is_force_relay: false,
+            force_relay: false,
         })
         .unwrap();
 
@@ -298,7 +298,7 @@ async fn error_get_local_stream_on_new_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
-            is_force_relay: false,
+            force_relay: false,
         })
         .unwrap();
 

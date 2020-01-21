@@ -32,8 +32,9 @@ struct WebRtcPublishEndpointInner {
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 
-    /// If 'true' then all media will be relayed through TURN server.
-    is_force_relay: bool,
+    /// Indicator whether only `relay` ICE candidates are allowed for this
+    /// [`WebRtcPublishEndpoint`].
+    is_force_relayed: bool,
 
     /// All sinks of this [`WebRtcPublishEndpoint`].
     sinks: Vec<WeakWebRtcPlayEndpoint>,
@@ -116,12 +117,12 @@ impl WebRtcPublishEndpoint {
         id: Id,
         p2p: P2pMode,
         owner: WeakMember,
-        is_force_relay: bool,
+        is_force_relayed: bool,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
-            is_force_relay,
+            is_force_relayed,
             sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
@@ -199,10 +200,10 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().p2p
     }
 
-    /// If 'true' is returned then all media should be relayed through TURN
-    /// server.
-    pub fn is_force_relay(&self) -> bool {
-        self.0.borrow().is_force_relay
+    /// Indicates whether only `relay` ICE candidates are allowed for this
+    /// [`WebRtcPublishEndpoint`].
+    pub fn is_force_relayed(&self) -> bool {
+        self.0.borrow().is_force_relayed
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
@@ -247,7 +248,7 @@ impl Into<ElementProto> for WebRtcPublishEndpoint {
         let mut publish = WebRtcPublishEndpointProto::new();
         publish.set_p2p(self.p2p().into());
         publish.set_id(self.id().to_string());
-        publish.set_is_force_relay(self.is_force_relay());
+        publish.set_force_relay(self.is_force_relayed());
         element.set_webrtc_pub(publish);
 
         element

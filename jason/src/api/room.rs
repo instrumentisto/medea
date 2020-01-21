@@ -589,7 +589,7 @@ impl EventHandler for InnerRoom {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
-        is_force_relay: bool,
+        is_force_relayed: bool,
     ) {
         let peer = match self
             .peers
@@ -599,7 +599,7 @@ impl EventHandler for InnerRoom {
                 self.peer_event_sender.clone(),
                 self.enabled_audio,
                 self.enabled_video,
-                is_force_relay,
+                is_force_relayed,
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {

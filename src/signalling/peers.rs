@@ -98,14 +98,14 @@ impl PeerRepository {
             src_member_id.clone(),
             sink_peer_id,
             sink_member_id.clone(),
-            src.is_force_relay(),
+            src.is_force_relayed(),
         );
         let second_peer = Peer::new(
             sink_peer_id,
             sink_member_id,
             src_peer_id,
             src_member_id,
-            sink.is_force_relay(),
+            sink.is_force_relayed(),
         );
 
         (first_peer, second_peer)
