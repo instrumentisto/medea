@@ -307,10 +307,9 @@ impl RoomHandle {
     pub fn mute_audio(&self) -> Promise {
         let weak = self.0.clone();
         future_to_promise(async move {
-            let inner = weak.upgrade().unwrap();
+            let inner = upgrade_or_detached!(weak, JsValue)?;
             let fut = borrow!(inner).toggle_mute_audio(true);
-            std::mem::drop(inner);
-            let qq = fut.await;
+            fut.await;
             Ok(JsValue::NULL)
         })
     }
@@ -319,27 +318,34 @@ impl RoomHandle {
     pub fn unmute_audio(&self) -> Promise {
         let weak = self.0.clone();
         future_to_promise(async move {
-            let inner = weak.upgrade().unwrap();
+            let inner = upgrade_or_detached!(weak, JsValue)?;
             let fut = borrow!(inner).toggle_mute_audio(false);
-            std::mem::drop(inner);
-            let qq = fut.await;
+            fut.await;
             Ok(JsValue::NULL)
         })
     }
 
-//    /// Mutes outbound video in this room.
-//    pub fn mute_video(&self) -> Result<(), JsValue> {
-//        upgrade_or_detached!(self.0).map(|inner| {
-//            inner.borrow_mut().toggle_mute_video(MutedState::Muted)
-//        })
-//    }
-//
-//    /// Unmutes outbound video in this room.
-//    pub fn unmute_video(&self) -> Result<(), JsValue> {
-//        upgrade_or_detached!(self.0).map(|inner| {
-//            inner.borrow_mut().toggle_mute_video(MutedState::Unmuted)
-//        })
-//    }
+    /// Mutes outbound video in this room.
+    pub fn mute_video(&self) -> Promise {
+        let weak = self.0.clone();
+        future_to_promise(async move {
+            let inner = upgrade_or_detached!(weak, JsValue)?;
+            let fut = borrow!(inner).toggle_mute_video(true);
+            fut.await;
+            Ok(JsValue::NULL)
+        })
+    }
+
+    /// Unmutes outbound video in this room.
+    pub fn unmute_video(&self) -> Promise {
+        let weak = self.0.clone();
+        future_to_promise(async move {
+            let inner = upgrade_or_detached!(weak, JsValue)?;
+            let fut = borrow!(inner).toggle_mute_video(false);
+            fut.await;
+            Ok(JsValue::NULL)
+        })
+    }
 }
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
@@ -582,10 +588,45 @@ impl InnerRoom {
 
     /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_mute_video(&mut self, new_state: MutedState) {
-        for peer in self.peers.get_all() {
-            peer.change_video_muted_state(new_state);
-        }
+    fn toggle_mute_video(&self, is_muted: bool) -> LocalBoxFuture<'static, ()>{
+        let qq = self.peers.get_all();
+        let rpc = self.rpc.clone();
+        Box::pin(async move {
+            let subscriptions: Vec<_> = qq
+                .iter()
+                .map(|peer| {
+                    let tracks_updates = peer
+                        .get_all_video_senders_ids()
+                        .into_iter()
+                        .map(|id| TrackUpdate {
+                            id,
+                            is_muted: Some(is_muted),
+                            direction: None,
+                            media_type: None,
+                        })
+                        .collect();
+                    let wait_for_muted_state = if is_muted {
+                        MutedState::Muted
+                    } else {
+                        MutedState::Unmuted
+                    };
+                    let set_muted_state = if is_muted {
+                        MutedState::Muting
+                    } else {
+                        MutedState::Unmuting
+                    };
+                    rpc.send_command(Command::ApplyTracks {
+                        peer_id: peer.id(),
+                        tracks: tracks_updates,
+                    });
+                    peer.change_video_muted_state(set_muted_state);
+
+                    let q = peer.on_video_muted_state(wait_for_muted_state);
+                    q
+                })
+                .collect();
+            futures::future::join_all(subscriptions).await;
+        })
     }
 
     /// Injects given local stream into all [`PeerConnection`]s of this [`Room`]
