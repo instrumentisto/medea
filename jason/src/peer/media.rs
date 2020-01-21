@@ -72,14 +72,6 @@ impl From<Dropped> for MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
-/// Indicator of audio being switched on or off.
-#[derive(Clone, Copy, Debug, Display, Eq, From, PartialEq)]
-pub struct EnabledAudio(pub bool);
-
-/// Indicator of video being switched on or off.
-#[derive(Clone, Copy, Debug, Display, Eq, From, PartialEq)]
-pub struct EnabledVideo(pub bool);
-
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for

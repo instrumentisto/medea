@@ -40,7 +40,7 @@ pub use self::{
         TransceiverDirection, TransceiverKind,
     },
     media::{
-        EnabledAudio, EnabledVideo, MediaConnections, MediaConnectionsError,
+        MediaConnections, MediaConnectionsError,
     },
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},

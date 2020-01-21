@@ -390,7 +390,6 @@ impl Room {
                         match event {
                             RoomEvent::RpcEvent(event) => {
                                 event.dispatch_with(
-                                    // TODO: BorrowMutError HERE.
                                     borrow_mut!(inner).deref_mut(),
                                 );
                             }
@@ -545,10 +544,10 @@ impl InnerRoom {
     /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
     fn toggle_mute_audio(&self, is_muted: bool) -> LocalBoxFuture<'static, ()> {
-        let qq = self.peers.get_all();
+        let all_peers = self.peers.get_all();
         let rpc = self.rpc.clone();
         Box::pin(async move {
-            let subscriptions: Vec<_> = qq
+            let subscriptions: Vec<_> = all_peers
                 .iter()
                 .map(|peer| {
                     let tracks_updates = peer
@@ -577,8 +576,7 @@ impl InnerRoom {
                     });
                     peer.change_audio_muted_state(set_muted_state);
 
-                    let q = peer.on_audio_muted_state(wait_for_muted_state);
-                    q
+                    peer.on_audio_muted_state(wait_for_muted_state)
                 })
                 .collect();
             futures::future::join_all(subscriptions).await;
@@ -620,8 +618,7 @@ impl InnerRoom {
                     });
                     peer.change_video_muted_state(set_muted_state);
 
-                    let q = peer.on_video_muted_state(wait_for_muted_state);
-                    q
+                    peer.on_video_muted_state(wait_for_muted_state)
                 })
                 .collect();
             futures::future::join_all(subscriptions).await;
