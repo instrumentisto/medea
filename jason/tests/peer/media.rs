@@ -21,7 +21,7 @@ async fn get_test_media_connections(
     enabled_video: bool,
 ) -> (MediaConnections, TrackId, TrackId) {
     let media_connections = MediaConnections::new(
-        Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
         enabled_audio.into(),
         enabled_video.into(),
     );
@@ -47,7 +47,7 @@ async fn get_test_media_connections(
 #[wasm_bindgen_test]
 fn get_stream_request() {
     let media_connections = MediaConnections::new(
-        Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
         true.into(),
         true.into(),
     );
@@ -59,7 +59,7 @@ fn get_stream_request() {
     assert!(request.is_some());
 
     let media_connections = MediaConnections::new(
-        Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
         true.into(),
         true.into(),
     );

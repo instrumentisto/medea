@@ -28,6 +28,7 @@ async fn mute_unmute_audio() {
         manager,
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
 
@@ -59,6 +60,7 @@ async fn mute_unmute_video() {
         manager,
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -89,6 +91,7 @@ async fn new_with_mute_audio() {
         manager,
         false.into(),
         true.into(),
+        false,
     )
     .unwrap();
 
@@ -112,6 +115,7 @@ async fn new_with_mute_video() {
         manager,
         true.into(),
         false.into(),
+        false,
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -135,6 +139,7 @@ async fn add_candidates_to_answerer_before_offer() {
         Rc::clone(&manager),
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
 
@@ -145,6 +150,7 @@ async fn add_candidates_to_answerer_before_offer() {
         manager,
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
     let (audio_track, video_track) = get_test_tracks();
@@ -177,6 +183,7 @@ async fn add_candidates_to_offerer_before_answer() {
             Rc::clone(&manager),
             true.into(),
             true.into(),
+            false,
         )
         .unwrap(),
     );
@@ -188,6 +195,7 @@ async fn add_candidates_to_offerer_before_answer() {
             manager,
             true.into(),
             true.into(),
+            false,
         )
         .unwrap(),
     );
@@ -221,6 +229,7 @@ async fn normal_exchange_of_candidates() {
         Rc::clone(&manager),
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -230,6 +239,7 @@ async fn normal_exchange_of_candidates() {
         manager,
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
     let (audio_track, video_track) = get_test_tracks();
@@ -286,9 +296,16 @@ async fn send_event_on_new_local_stream() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
     let id = PeerId(1);
-    let peer =
-        PeerConnection::new(id, tx, vec![], manager, true.into(), false.into())
-            .unwrap();
+    let peer = PeerConnection::new(
+        id,
+        tx,
+        vec![],
+        manager,
+        true.into(),
+        false.into(),
+        false,
+    )
+    .unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -320,6 +337,7 @@ async fn ice_connection_state_changed_is_emitted() {
         Rc::clone(&manager),
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -329,6 +347,7 @@ async fn ice_connection_state_changed_is_emitted() {
         manager,
         true.into(),
         true.into(),
+        false,
     )
     .unwrap();
     let (audio_track, video_track) = get_test_tracks();
