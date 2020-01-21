@@ -340,15 +340,6 @@ impl PeerConnection {
         }
     }
 
-    pub fn change_muted_state_for_kind(
-        &self,
-        new_state: MutedState,
-        kind: TransceiverKind,
-    ) {
-        self.media_connections
-            .change_muted_state_for_kind(new_state, kind)
-    }
-
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()
@@ -357,24 +348,6 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
-    }
-
-    pub async fn when_muted_state_for_kind(
-        &self,
-        state: MutedState,
-        kind: TransceiverKind,
-    ) -> Result<()> {
-        self.media_connections
-            .when_muted_state_for_kind(state, kind)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-    }
-
-    pub fn get_all_senders_ids_with_kind(
-        &self,
-        kind: TransceiverKind,
-    ) -> Vec<TrackId> {
-        self.media_connections.get_all_senders_id_with_kind(kind)
     }
 
     pub fn iter_senders_with_kind_and_muted_state(

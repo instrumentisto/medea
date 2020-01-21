@@ -111,17 +111,6 @@ impl MediaConnections {
         }))
     }
 
-    pub fn change_muted_state_for_kind(
-        &self,
-        new_state: MutedState,
-        kind: TransceiverKind,
-    ) {
-        self.0
-            .borrow()
-            .iter_senders_with_kind(kind)
-            .for_each(|s| s.change_muted_state(new_state));
-    }
-
     pub fn iter_senders_with_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
@@ -163,36 +152,6 @@ impl MediaConnections {
             }
         }
         true
-    }
-
-    pub async fn when_muted_state_for_kind(
-        &self,
-        state: MutedState,
-        kind: TransceiverKind,
-    ) -> Result<()> {
-        let futs: Vec<_> = self
-            .0
-            .borrow()
-            .iter_senders_with_kind(kind)
-            .map(|sender| sender.on_muted_state(state))
-            .collect();
-
-        future::join_all(futs)
-            .await
-            .into_iter()
-            .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
-            .collect()
-    }
-
-    pub fn get_all_senders_id_with_kind(
-        &self,
-        kind: TransceiverKind,
-    ) -> Vec<TrackId> {
-        self.0
-            .borrow()
-            .iter_senders_with_kind(kind)
-            .map(|sender| sender.track_id)
-            .collect()
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
