@@ -57,6 +57,7 @@ medea-reactive = { path = "../crates/medea-reactive" }
         "RtcIceCandidate", "RtcIceCandidateInit",
         "RtcIceConnectionState",
         "RtcIceServer",
+        "RtcIceTransportPolicy",
         "RtcPeerConnection", "RtcPeerConnectionIceEvent",
         "RtcRtpReceiver", "RtcRtpSender",
         "RtcRtpTransceiver", "RtcRtpTransceiverDirection",

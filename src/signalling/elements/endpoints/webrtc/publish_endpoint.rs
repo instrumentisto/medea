@@ -32,6 +32,10 @@ struct WebRtcPublishEndpointInner {
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 
+    /// Indicator whether only `relay` ICE candidates are allowed for this
+    /// [`WebRtcPublishEndpoint`].
+    is_force_relayed: bool,
+
     /// All sinks of this [`WebRtcPublishEndpoint`].
     sinks: Vec<WeakWebRtcPlayEndpoint>,
 
@@ -109,10 +113,16 @@ pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
     /// Creates new [`WebRtcPublishEndpoint`].
-    pub fn new(id: Id, p2p: P2pMode, owner: WeakMember) -> Self {
+    pub fn new(
+        id: Id,
+        p2p: P2pMode,
+        owner: WeakMember,
+        is_force_relayed: bool,
+    ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
+            is_force_relayed,
             sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
@@ -187,7 +197,13 @@ impl WebRtcPublishEndpoint {
 
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub fn p2p(&self) -> P2pMode {
-        self.0.borrow().p2p.clone()
+        self.0.borrow().p2p
+    }
+
+    /// Indicates whether only `relay` ICE candidates are allowed for this
+    /// [`WebRtcPublishEndpoint`].
+    pub fn is_force_relayed(&self) -> bool {
+        self.0.borrow().is_force_relayed
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
@@ -232,6 +248,7 @@ impl Into<ElementProto> for WebRtcPublishEndpoint {
         let mut publish = WebRtcPublishEndpointProto::new();
         publish.set_p2p(self.p2p().into());
         publish.set_id(self.id().to_string());
+        publish.set_force_relay(self.is_force_relayed());
         element.set_webrtc_pub(publish);
 
         element

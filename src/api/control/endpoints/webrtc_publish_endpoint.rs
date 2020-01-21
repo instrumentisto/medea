@@ -17,7 +17,7 @@ use medea_control_api_proto::grpc::api::{
 pub struct WebRtcPublishId(String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Copy, Deserialize, Debug)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
@@ -55,12 +55,17 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
+
+    /// Option to relay all media through a TURN server forcibly.
+    #[serde(default)]
+    pub force_relay: bool,
 }
 
 impl From<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     fn from(value: &WebRtcPublishEndpointProto) -> Self {
         Self {
             p2p: P2pMode::from(value.get_p2p()),
+            force_relay: value.get_force_relay(),
         }
     }
 }

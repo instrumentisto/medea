@@ -180,9 +180,10 @@ impl PeerConnection {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
+        is_force_relayed: bool,
     ) -> Result<Self> {
         let peer = Rc::new(
-            RtcPeerConnection::new(ice_servers)
+            RtcPeerConnection::new(ice_servers, is_force_relayed)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections =

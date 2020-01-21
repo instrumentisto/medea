@@ -658,10 +658,16 @@ impl EventHandler for InnerRoom {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
+        is_force_relayed: bool,
     ) -> Self::Output {
         let peer = match self
             .peers
-            .create_peer(peer_id, ice_servers, self.peer_event_sender.clone())
+            .create_peer(
+                peer_id,
+                ice_servers,
+                self.peer_event_sender.clone(),
+                is_force_relayed,
+            )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
             Ok(peer) => peer,

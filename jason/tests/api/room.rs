@@ -36,6 +36,7 @@ fn get_test_room_and_exist_peer(
             Rc::new(MediaManager::default()),
             true.into(),
             true.into(),
+            false,
         )
         .unwrap(),
     );
@@ -105,6 +106,7 @@ fn get_test_room_and_new_peer(
             Rc::new(MediaManager::default()),
             with_enabled_audio,
             with_enabled_video,
+            false,
         )
         .unwrap(),
     );
@@ -115,13 +117,14 @@ fn get_test_room_and_new_peer(
                   _ice_servers: &Vec<IceServer>,
                   _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
                   enabled_audio: &EnabledAudio,
-                  enabled_video: &EnabledVideo| {
+                  enabled_video: &EnabledVideo,
+                  _is_force_relay: &bool| {
                 *id == PeerId(1)
                     && *enabled_audio == with_enabled_audio
                     && *enabled_video == with_enabled_video
             },
         )
-        .return_once_st(move |_, _, _, _, _| Ok(peer_clone));
+        .return_once_st(move |_, _, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
@@ -144,6 +147,7 @@ async fn mute_audio_room_before_init_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
+            force_relay: false,
         })
         .unwrap();
 
@@ -167,6 +171,7 @@ async fn mute_video_room_before_init_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
+            force_relay: false,
         })
         .unwrap();
 
@@ -219,6 +224,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
+            force_relay: false,
         })
         .unwrap();
 
@@ -292,6 +298,7 @@ async fn error_get_local_stream_on_new_peer() {
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
+            force_relay: false,
         })
         .unwrap();
 

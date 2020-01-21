@@ -20,6 +20,7 @@ pub trait PeerRepository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
+        is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -60,6 +61,7 @@ impl PeerRepository for Repository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+        is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = Rc::new(
             PeerConnection::new(
@@ -67,6 +69,7 @@ impl PeerRepository for Repository {
                 peer_events_sender,
                 ice_servers,
                 Rc::clone(&self.media_manager),
+                is_force_relayed,
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );
