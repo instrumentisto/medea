@@ -16,7 +16,7 @@ use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
     IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackUpdate,
 };
-use tracerr::Traced;
+use tracerr::{Traced, Trace};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
@@ -38,6 +38,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::utils::TraceableRefCell;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -171,7 +172,7 @@ impl From<PeerError> for RoomError {
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
 #[wasm_bindgen]
-pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
+pub struct RoomHandle(Weak<TraceableRefCell<InnerRoom>>);
 
 impl RoomHandle {
     /// Implements externally visible `RoomHandle::join`.
@@ -184,37 +185,35 @@ impl RoomHandle {
         async move {
             let inner = inner?;
 
-            if !inner.borrow().on_failed_local_stream.is_set() {
+            if !borrow!(inner).on_failed_local_stream.is_set() {
                 return Err(JasonError::from(tracerr::new!(
                     RoomError::CallbackNotSet("Room.on_failed_local_stream()")
                 )));
             }
 
-            if !inner.borrow().on_connection_loss.is_set() {
+            if !borrow!(inner).on_connection_loss.is_set() {
                 return Err(JasonError::from(tracerr::new!(
                     RoomError::CallbackNotSet("Room.on_connection_loss()")
                 )));
             }
 
-            inner
-                .borrow()
+            borrow!(inner)
                 .rpc
                 .connect(token)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
 
             let mut connection_loss_stream =
-                inner.borrow().rpc.on_connection_loss();
+                borrow!(inner).rpc.on_connection_loss();
             let weak_inner = Rc::downgrade(&inner);
             spawn_local(async move {
                 while let Some(_) = connection_loss_stream.next().await {
                     match upgrade_or_detached!(weak_inner, JsValue) {
                         Ok(inner) => {
                             let reconnect_handle = ReconnectHandle::new(
-                                Rc::downgrade(&inner.borrow().rpc),
+                                Rc::downgrade(&borrow!(inner).rpc),
                             );
-                            inner
-                                .borrow()
+                            borrow!(inner)
                                 .on_connection_loss
                                 .call(reconnect_handle);
                         }
@@ -239,14 +238,14 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_new_connection.set_func(f))
+            .map(|inner| borrow_mut!(inner).on_new_connection.set_func(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_close.set_func(f))
+            .map(|inner| borrow_mut!(inner).on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
@@ -254,7 +253,7 @@ impl RoomHandle {
     /// request was initiated by media server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
+            .map(|inner| borrow_mut!(inner).on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -264,7 +263,7 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
+            .map(|inner| borrow_mut!(inner).on_failed_local_stream.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
@@ -274,7 +273,7 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_connection_loss.set_func(f))
+            .map(|inner| borrow_mut!(inner).on_connection_loss.set_func(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -301,7 +300,7 @@ impl RoomHandle {
         stream: SysMediaStream,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().inject_local_stream(stream))
+            .map(|inner| borrow_mut!(inner).inject_local_stream(stream))
     }
 
     /// Mutes outbound audio in this room.
@@ -309,7 +308,9 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = weak.upgrade().unwrap();
-            let qq = inner.borrow().toggle_mute_audio(true).await;
+            let fut = borrow!(inner).toggle_mute_audio(true);
+            std::mem::drop(inner);
+            let qq = fut.await;
             Ok(JsValue::NULL)
         })
     }
@@ -319,7 +320,9 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = weak.upgrade().unwrap();
-            let qq = inner.borrow().toggle_mute_audio(false).await;
+            let fut = borrow!(inner).toggle_mute_audio(false);
+            std::mem::drop(inner);
+            let qq = fut.await;
             Ok(JsValue::NULL)
         })
     }
@@ -345,7 +348,7 @@ impl RoomHandle {
 /// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
-pub struct Room(Rc<RefCell<InnerRoom>>);
+pub struct Room(Rc<TraceableRefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
@@ -357,7 +360,7 @@ impl Room {
 
         let (tx, peer_events_rx) = mpsc::unbounded();
         let events_stream = rpc.subscribe();
-        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
+        let room = Rc::new(TraceableRefCell::new(InnerRoom::new(rpc, peers, tx)));
 
         let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
         let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
@@ -383,12 +386,12 @@ impl Room {
                             RoomEvent::RpcEvent(event) => {
                                 event.dispatch_with(
                                     // TODO: BorrowMutError HERE.
-                                    inner.borrow_mut().deref_mut(),
+                                    borrow_mut!(inner).deref_mut(),
                                 );
                             }
                             RoomEvent::PeerEvent(event) => {
                                 event.dispatch_with(
-                                    inner.borrow_mut().deref_mut(),
+                                    borrow_mut!(inner).deref_mut(),
                                 );
                             }
                         };
@@ -412,7 +415,7 @@ impl Room {
     /// may check count of pointers to [`InnerRoom`] with
     /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
-        self.0.borrow_mut().set_close_reason(reason);
+        borrow_mut!(self.0).set_close_reason(reason);
     }
 
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
@@ -536,7 +539,7 @@ impl InnerRoom {
 
     /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_mute_audio(&self, is_muted: bool) -> LocalBoxFuture<'_, ()> {
+    fn toggle_mute_audio(&self, is_muted: bool) -> LocalBoxFuture<'static, ()> {
         let qq = self.peers.get_all();
         let rpc = self.rpc.clone();
         Box::pin(async move {

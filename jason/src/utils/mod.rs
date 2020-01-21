@@ -2,6 +2,8 @@
 
 #[macro_use]
 mod errors;
+#[macro_use]
+mod traceable_refcell;
 
 mod callback;
 mod event_listener;
@@ -21,6 +23,7 @@ pub use self::{
         console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
     },
     event_listener::{EventListener, EventListenerBindError},
+    traceable_refcell::TraceableRefCell,
 };
 
 /// Returns [`Window`] object.
