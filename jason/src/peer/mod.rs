@@ -39,9 +39,7 @@ pub use self::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
         TransceiverDirection, TransceiverKind,
     },
-    media::{
-        MediaConnections, MediaConnectionsError,
-    },
+    media::{MediaConnections, MediaConnectionsError},
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::{MediaTrack, MutedState},
@@ -333,14 +331,13 @@ impl PeerConnection {
         }
     }
 
-    /// Disables or enables all audio tracks for all [`Sender`]s.
-    pub fn change_audio_muted_state(&self, new_state: MutedState) {
-        self.media_connections.change_audio_muted_state(new_state)
-    }
-
-    /// Disables or enables all video tracks for all [`Sender`]s.
-    pub fn change_video_muted_state(&self, new_state: MutedState) {
-        self.media_connections.change_video_muted_state(new_state)
+    pub fn change_muted_state_for_kind(
+        &self,
+        new_state: MutedState,
+        kind: TransceiverKind,
+    ) {
+        self.media_connections
+            .change_muted_state_for_kind(new_state, kind)
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
@@ -353,26 +350,22 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    pub async fn on_video_muted_state(&self, state: MutedState) -> Result<()> {
+    pub async fn when_muted_state_for_kind(
+        &self,
+        state: MutedState,
+        kind: TransceiverKind,
+    ) -> Result<()> {
         self.media_connections
-            .on_video_muted_state(state)
+            .when_muted_state_for_kind(state, kind)
             .await
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    pub async fn on_audio_muted_state(&self, state: MutedState) -> Result<()> {
-        self.media_connections
-            .on_audio_muted_state(state)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-    }
-
-    pub fn get_all_video_senders_ids(&self) -> Vec<TrackId> {
-        self.media_connections.get_all_video_senders_id()
-    }
-
-    pub fn get_all_audio_senders_ids(&self) -> Vec<TrackId> {
-        self.media_connections.get_all_audio_senders_id()
+    pub fn get_all_senders_ids_with_kind(
+        &self,
+        kind: TransceiverKind,
+    ) -> Vec<TrackId> {
+        self.media_connections.get_all_senders_id_with_kind(kind)
     }
 
     /// Track id to mid relations of all send tracks of this

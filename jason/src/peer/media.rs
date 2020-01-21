@@ -110,27 +110,26 @@ impl MediaConnections {
         }))
     }
 
-    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Audio`].
-    pub fn change_audio_muted_state(&self, new_state: MutedState) {
+    pub fn change_muted_state_for_kind(
+        &self,
+        new_state: MutedState,
+        kind: TransceiverKind,
+    ) {
         self.0
             .borrow()
-            .iter_senders_with_kind(TransceiverKind::Audio)
+            .iter_senders_with_kind(kind)
             .for_each(|s| s.change_muted_state(new_state));
     }
 
-    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Video`].
-    pub fn change_video_muted_state(&self, new_state: MutedState) {
-        self.0
-            .borrow()
-            .iter_senders_with_kind(TransceiverKind::Video)
-            .for_each(|s| s.change_muted_state(new_state));
-    }
-
-    pub async fn on_video_muted_state(&self, state: MutedState) -> Result<()> {
+    pub async fn when_muted_state_for_kind(
+        &self,
+        state: MutedState,
+        kind: TransceiverKind,
+    ) -> Result<()> {
         let futs: Vec<_> = self
             .0
             .borrow()
-            .iter_senders_with_kind(TransceiverKind::Audio)
+            .iter_senders_with_kind(kind)
             .map(|sender| sender.on_muted_state(state))
             .collect();
 
@@ -141,33 +140,13 @@ impl MediaConnections {
             .collect()
     }
 
-    pub async fn on_audio_muted_state(&self, state: MutedState) -> Result<()> {
-        let futs: Vec<_> = self
-            .0
-            .borrow()
-            .iter_senders_with_kind(TransceiverKind::Audio)
-            .map(|sender| sender.on_muted_state(state))
-            .collect();
-
-        future::join_all(futs)
-            .await
-            .into_iter()
-            .map(|res| res.map_err(tracerr::map_from_and_wrap!()))
-            .collect()
-    }
-
-    pub fn get_all_audio_senders_id(&self) -> Vec<TrackId> {
+    pub fn get_all_senders_id_with_kind(
+        &self,
+        kind: TransceiverKind,
+    ) -> Vec<TrackId> {
         self.0
             .borrow()
-            .iter_senders_with_kind(TransceiverKind::Audio)
-            .map(|sender| sender.track_id)
-            .collect()
-    }
-
-    pub fn get_all_video_senders_id(&self) -> Vec<TrackId> {
-        self.0
-            .borrow()
-            .iter_senders_with_kind(TransceiverKind::Video)
+            .iter_senders_with_kind(kind)
             .map(|sender| sender.track_id)
             .collect()
     }

@@ -21,6 +21,26 @@ pub enum MutedState {
     Muted,
 }
 
+impl MutedState {
+    pub fn proccessing_state(self) -> Self {
+        match self {
+            Self::Unmuted => Self::Unmuting,
+            Self::Muted => Self::Muting,
+            _ => self,
+        }
+    }
+}
+
+impl From<bool> for MutedState {
+    fn from(is_muted: bool) -> Self {
+        if is_muted {
+            Self::Muted
+        } else {
+            Self::Unmuted
+        }
+    }
+}
+
 /// Representation of [MediaStreamTrack][1].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack

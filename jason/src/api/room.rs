@@ -37,6 +37,8 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::peer::TransceiverKind;
+use js_sys::Atomics::wait;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -306,7 +308,7 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute_audio(true);
+            let fut = borrow!(inner).toggle_mute(true, TransceiverKind::Audio);
             fut.await;
             Ok(JsValue::NULL)
         })
@@ -317,7 +319,7 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute_audio(false);
+            let fut = borrow!(inner).toggle_mute(false, TransceiverKind::Audio);
             fut.await;
             Ok(JsValue::NULL)
         })
@@ -328,7 +330,7 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute_video(true);
+            let fut = borrow!(inner).toggle_mute(true, TransceiverKind::Video);
             fut.await;
             Ok(JsValue::NULL)
         })
@@ -339,7 +341,7 @@ impl RoomHandle {
         let weak = self.0.clone();
         future_to_promise(async move {
             let inner = upgrade_or_detached!(weak, JsValue)?;
-            let fut = borrow!(inner).toggle_mute_video(false);
+            let fut = borrow!(inner).toggle_mute(false, TransceiverKind::Video);
             fut.await;
             Ok(JsValue::NULL)
         })
@@ -541,59 +543,21 @@ impl InnerRoom {
         }
     }
 
-    /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
-    /// [`Room`] manage.
-    fn toggle_mute_audio(&self, is_muted: bool) -> LocalBoxFuture<'static, ()> {
-        let all_peers = self.peers.get_all();
-        let rpc = self.rpc.clone();
-        Box::pin(async move {
-            let subscriptions: Vec<_> = all_peers
-                .iter()
-                .map(|peer| {
-                    let tracks_updates = peer
-                        .get_all_audio_senders_ids()
-                        .into_iter()
-                        .map(|id| TrackUpdate {
-                            id,
-                            is_muted: Some(is_muted),
-                            direction: None,
-                            media_type: None,
-                        })
-                        .collect();
-                    let wait_for_muted_state = if is_muted {
-                        MutedState::Muted
-                    } else {
-                        MutedState::Unmuted
-                    };
-                    let set_muted_state = if is_muted {
-                        MutedState::Muting
-                    } else {
-                        MutedState::Unmuting
-                    };
-                    rpc.send_command(Command::ApplyTracks {
-                        peer_id: peer.id(),
-                        tracks: tracks_updates,
-                    });
-                    peer.change_audio_muted_state(set_muted_state);
-
-                    peer.on_audio_muted_state(wait_for_muted_state)
-                })
-                .collect();
-            futures::future::join_all(subscriptions).await;
-        })
-    }
-
     /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
     /// [`Room`] manage.
-    fn toggle_mute_video(&self, is_muted: bool) -> LocalBoxFuture<'static, ()> {
-        let qq = self.peers.get_all();
+    fn toggle_mute(
+        &self,
+        is_muted: bool,
+        kind: TransceiverKind,
+    ) -> LocalBoxFuture<'static, ()> {
+        let peers = self.peers.get_all();
         let rpc = self.rpc.clone();
         Box::pin(async move {
-            let subscriptions: Vec<_> = qq
+            let subscriptions: Vec<_> = peers
                 .iter()
                 .map(|peer| {
                     let tracks_updates = peer
-                        .get_all_video_senders_ids()
+                        .get_all_senders_ids_with_kind(kind)
                         .into_iter()
                         .map(|id| TrackUpdate {
                             id,
@@ -602,23 +566,17 @@ impl InnerRoom {
                             media_type: None,
                         })
                         .collect();
-                    let wait_for_muted_state = if is_muted {
-                        MutedState::Muted
-                    } else {
-                        MutedState::Unmuted
-                    };
-                    let set_muted_state = if is_muted {
-                        MutedState::Muting
-                    } else {
-                        MutedState::Unmuting
-                    };
                     rpc.send_command(Command::ApplyTracks {
                         peer_id: peer.id(),
                         tracks: tracks_updates,
                     });
-                    peer.change_video_muted_state(set_muted_state);
 
-                    peer.on_video_muted_state(wait_for_muted_state)
+                    let wait_for_muted_state = MutedState::from(is_muted);
+                    let set_muted_state =
+                        wait_for_muted_state.proccessing_state();
+                    peer.change_muted_state_for_kind(set_muted_state, kind);
+
+                    peer.when_muted_state_for_kind(wait_for_muted_state, kind)
                 })
                 .collect();
             futures::future::join_all(subscriptions).await;
