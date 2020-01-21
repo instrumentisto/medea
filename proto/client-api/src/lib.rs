@@ -133,7 +133,10 @@ pub enum Command {
     },
     /// Web Client asks permission to update [`Track`]s in specified [`Peer`].
     /// Media Server gives permission by sending [`Event::TracksApplied`].
-    ApplyTracks { peer_id: PeerId, tracks: Vec<Track> },
+    ApplyTracks {
+        peer_id: PeerId,
+        tracks: Vec<TrackUpdate>,
+    },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -239,7 +242,10 @@ pub enum Event {
     /// resolution, mute audio).
     ///
     /// 3. Update `send` [`Track`] receivers list (add/remove).
-    TracksApplied { peer_id: PeerId, tracks: Vec<Track> },
+    TracksApplied {
+        peer_id: PeerId,
+        tracks: Vec<TrackUpdate>,
+    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -260,6 +266,15 @@ pub struct Track {
     pub direction: Direction,
     pub media_type: MediaType,
     pub is_muted: bool,
+}
+
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub struct TrackUpdate {
+    pub id: TrackId,
+    pub direction: Option<Direction>,
+    pub media_type: Option<MediaType>,
+    pub is_muted: Option<bool>,
 }
 
 /// Representation of [RTCIceServer][1] (item of `iceServers` field

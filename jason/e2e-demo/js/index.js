@@ -431,13 +431,13 @@ window.onload = async function() {
     let isAudioMuted = false;
     let isVideoMuted = false;
 
-    muteAudio.addEventListener('click', () => {
+    muteAudio.addEventListener('click', async () => {
       if (isAudioMuted) {
-        room.unmute_audio();
+        await room.unmute_audio();
         isAudioMuted = false;
         muteAudio.textContent = "Mute audio";
       } else {
-        room.mute_audio();
+        await room.mute_audio();
         isAudioMuted = true;
         muteAudio.textContent = "Unmute audio";
       }

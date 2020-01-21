@@ -13,10 +13,10 @@ mod track;
 use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto::{
-    Direction, IceConnectionState, IceServer, PeerId as Id, Track,
-    Track as TrackProto, TrackId,
+    self as proto, Direction, IceConnectionState, IceServer, PeerId as Id,
+    PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -46,7 +46,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::{MediaTrack, MutedState},
 };
-use std::convert::From;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -235,14 +234,15 @@ impl PeerConnection {
         Ok(peer)
     }
 
-    pub fn update_tracks(&self, tracks: Vec<TrackProto>) {
+    pub fn id(&self) -> PeerId {
+        self.id
+    }
+
+    pub fn update_tracks(&self, tracks: Vec<proto::TrackUpdate>) {
         for track_proto in tracks {
             let track = self
                 .media_connections
-                .get_track_by_id(
-                    TransceiverDirection::from(&track_proto.direction),
-                    track_proto.id,
-                )
+                .get_track_by_id(track_proto.id)
                 .unwrap();
             track.update(track_proto);
         }
@@ -353,18 +353,36 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    pub async fn on_video_muted_state(&self, state: MutedState) -> Result<()> {
-        self.media_connections
-            .on_video_muted_state(state)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+    pub fn on_video_muted_state(
+        &self,
+        state: MutedState,
+    ) -> LocalBoxFuture<'_, Result<()>> {
+        let media_connections = self.media_connections.clone();
+        Box::pin(async move {
+            media_connections
+                .on_video_muted_state(state)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+        })
     }
 
-    pub async fn on_audio_muted_state(&self, state: MutedState) -> Result<()> {
-        self.media_connections
-            .on_audio_muted_state(state)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+    pub fn on_audio_muted_state(
+        &self,
+        state: MutedState,
+    ) -> LocalBoxFuture<'_, Result<()>> {
+        let fut = self.media_connections.on_audio_muted_state(state);
+        Box::pin(async move {
+            let res = fut.await.map_err(tracerr::map_from_and_wrap!());
+            res
+        })
+    }
+
+    pub fn get_all_video_senders_ids(&self) -> Vec<TrackId> {
+        self.media_connections.get_all_video_senders_id()
+    }
+
+    pub fn get_all_audio_senders_ids(&self) -> Vec<TrackId> {
+        self.media_connections.get_all_audio_senders_id()
     }
 
     /// Track id to mid relations of all send tracks of this

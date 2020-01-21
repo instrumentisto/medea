@@ -4,17 +4,18 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::StreamExt;
-use medea_client_api_proto::{Track as TrackProto, TrackId as Id};
+use futures::{future::LocalBoxFuture, StreamExt};
+use medea_client_api_proto::{self as proto, TrackId as Id};
 use medea_reactive::{Dropped, Reactive};
+use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::MediaStreamTrack;
 
 use crate::{
     media::TrackConstraints,
     peer::media::MediaConnectionsError::MutedStateDropped,
+    utils::console_error,
 };
-use tracerr::Traced;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutedState {
@@ -94,25 +95,45 @@ impl MediaTrack {
     }
 
     pub fn change_muted_state(&self, new_state: MutedState) {
-        *self.muted_state.borrow_mut().borrow_mut() = new_state;
+        *self
+            .muted_state
+            .try_borrow_mut()
+            .expect("sadklfjadsl;kjfdsakl;jfdsakl;jfklsa;jdfklj")
+            .borrow_mut() = new_state;
     }
 
-    pub async fn on_muted_state(
+    pub fn on_muted_state(
         &self,
         state: MutedState,
-    ) -> Result<(), Traced<Dropped>> {
-        self.muted_state
-            .borrow()
-            .when_eq(state)
-            .await
-            .map_err(|e| tracerr::new!(e))
+    ) -> LocalBoxFuture<'_, Result<(), Traced<Dropped>>> {
+        let subscription = self
+            .muted_state
+            .try_borrow()
+            .expect("sadfjakldsjfdklsajfd")
+            .when_eq(state);
+        Box::pin(async move {
+            console_error("1000");
+            let qq = subscription.await.map_err(|e| tracerr::new!(e));
+            console_error("1001");
+            qq
+        })
     }
 
-    pub fn update(&self, track: TrackProto) {
-        if track.is_muted {
-            *self.muted_state.borrow_mut().borrow_mut() = MutedState::Muted;
-        } else {
-            *self.muted_state.borrow_mut().borrow_mut() = MutedState::Unmuted;
+    pub fn update(&self, track: proto::TrackUpdate) {
+        if let Some(is_muted) = track.is_muted {
+            if is_muted {
+                *self
+                    .muted_state
+                    .try_borrow_mut()
+                    .expect("sadf")
+                    .borrow_mut() = MutedState::Muted;
+            } else {
+                *self
+                    .muted_state
+                    .try_borrow_mut()
+                    .expect("sadf")
+                    .borrow_mut() = MutedState::Unmuted;
+            }
         }
     }
 }

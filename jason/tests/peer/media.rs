@@ -83,10 +83,16 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         get_test_media_connections(true, true).await;
 
     let audio_track = media_connections
-        .get_track_by_id(TransceiverDirection::Sendonly, audio_track_id)
+        .get_track_by_id_and_kind(
+            TransceiverDirection::Sendonly,
+            audio_track_id,
+        )
         .unwrap();
     let video_track = media_connections
-        .get_track_by_id(TransceiverDirection::Sendonly, video_track_id)
+        .get_track_by_id_and_kind(
+            TransceiverDirection::Sendonly,
+            video_track_id,
+        )
         .unwrap();
 
     assert!(audio_track.is_enabled());
@@ -115,10 +121,16 @@ async fn new_media_connections_with_disabled_audio_tracks() {
         get_test_media_connections(false, true).await;
 
     let audio_track = media_connections
-        .get_track_by_id(TransceiverDirection::Sendonly, audio_track_id)
+        .get_track_by_id_and_kind(
+            TransceiverDirection::Sendonly,
+            audio_track_id,
+        )
         .unwrap();
     let video_track = media_connections
-        .get_track_by_id(TransceiverDirection::Sendonly, video_track_id)
+        .get_track_by_id_and_kind(
+            TransceiverDirection::Sendonly,
+            video_track_id,
+        )
         .unwrap();
 
     assert!(!audio_track.is_enabled());
@@ -131,10 +143,16 @@ async fn new_media_connections_with_disabled_video_tracks() {
         get_test_media_connections(true, false).await;
 
     let audio_track = media_connections
-        .get_track_by_id(TransceiverDirection::Sendonly, audio_track_id)
+        .get_track_by_id_and_kind(
+            TransceiverDirection::Sendonly,
+            audio_track_id,
+        )
         .unwrap();
     let video_track = media_connections
-        .get_track_by_id(TransceiverDirection::Sendonly, video_track_id)
+        .get_track_by_id_and_kind(
+            TransceiverDirection::Sendonly,
+            video_track_id,
+        )
         .unwrap();
 
     assert!(audio_track.is_enabled());

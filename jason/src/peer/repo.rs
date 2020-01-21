@@ -8,9 +8,9 @@ use crate::{
     media::MediaManager,
     peer::media::{EnabledAudio, EnabledVideo},
 };
+use crate::peer::MutedState;
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::peer::MutedState;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
