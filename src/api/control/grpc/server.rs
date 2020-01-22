@@ -12,7 +12,7 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::{
-    compat::{Compat01As03, Future01CompatExt},
+    compat::Future01CompatExt as _,
     future::{BoxFuture, FutureExt as _, TryFutureExt as _},
 };
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
@@ -87,11 +87,13 @@ impl ControlApiService {
         &self,
         spec: RoomSpec,
     ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
-        self.room_service
-            .send(CreateRoom { spec })
-            .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(move |r| async { r.map_err(GrpcControlApiError::from) })
-            .boxed()
+        let send_result = self.room_service.send(CreateRoom { spec });
+        async {
+            Ok(send_result
+                .await
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)??)
+        }
+        .boxed()
     }
 
     /// Implementation of `Create` method for [`Member`] element.
@@ -101,15 +103,17 @@ impl ControlApiService {
         parent_fid: Fid<ToRoom>,
         spec: MemberSpec,
     ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
-        self.room_service
-            .send(CreateMemberInRoom {
-                id,
-                parent_fid,
-                spec,
-            })
-            .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| async { r.map_err(GrpcControlApiError::from) })
-            .boxed()
+        let send_result = self.room_service.send(CreateMemberInRoom {
+            id,
+            parent_fid,
+            spec,
+        });
+        async {
+            Ok(send_result
+                .await
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)??)
+        }
+        .boxed()
     }
 
     /// Implementation of `Create` method for [`Endpoint`] element.
@@ -119,15 +123,17 @@ impl ControlApiService {
         parent_fid: Fid<ToMember>,
         spec: EndpointSpec,
     ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
-        self.room_service
-            .send(CreateEndpointInRoom {
-                id,
-                parent_fid,
-                spec,
-            })
-            .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| async { r.map_err(GrpcControlApiError::from) })
-            .boxed()
+        let send_result = self.room_service.send(CreateEndpointInRoom {
+            id,
+            parent_fid,
+            spec,
+        });
+        async {
+            Ok(send_result
+                .await
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)??)
+        }
+        .boxed()
     }
 
     /// Creates element based on provided [`CreateRequest`].
@@ -150,9 +156,7 @@ impl ControlApiService {
 
         if unparsed_parent_fid.is_empty() {
             return match RoomSpec::try_from(elem).map_err(ErrorResponse::from) {
-                Ok(spec) => {
-                    self.create_room(spec).map_err(ErrorResponse::from).boxed()
-                }
+                Ok(spec) => self.create_room(spec).err_into().boxed(),
                 Err(err) => async { Err(err) }.boxed(),
             };
         }
@@ -173,7 +177,7 @@ impl ControlApiService {
                     {
                         Ok(spec) => self
                             .create_member(id, parent_fid, spec)
-                            .map_err(ErrorResponse::from)
+                            .err_into()
                             .boxed(),
                         Err(err) => async { Err(err) }.boxed(),
                     }
@@ -209,7 +213,7 @@ impl ControlApiService {
                 match endpoint.map_err(ErrorResponse::from) {
                     Ok(spec) => self
                         .create_endpoint(id, parent_fid, spec)
-                        .map_err(ErrorResponse::from)
+                        .err_into()
                         .boxed(),
                     Err(err) => async move { Err(err) }.boxed(),
                 }
@@ -404,7 +408,9 @@ impl Handler<ShutdownGracefully> for GrpcServer {
              shutting down.",
         );
         ResponseAnyFuture(
-            Compat01As03::new(self.0.shutdown())
+            self.0
+                .shutdown()
+                .compat()
                 .map_err(|e| {
                     warn!(
                         "Error while graceful shutdown of gRPC Control API \

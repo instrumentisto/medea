@@ -43,13 +43,13 @@ macro_rules! hashmap {
 }
 
 // TODO: remove after https://github.com/actix/actix/pull/313
-/// A specialized future for asynchronous message handling. Exists, because
+/// A specialized future for asynchronous message handling. Exists because
 /// [`actix::ResponseFuture`] implements [`actix::dev::MessageResponse`] only
 /// for `Output = Result<_, _>`;
 pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
 
 // TODO: remove after https://github.com/actix/actix/pull/310
-/// A specialized actor future for asynchronous message handling. Exists,
+/// A specialized actor future for asynchronous message handling. Exists
 /// because [`actix::ResponseActFuture`] implements
 /// [`actix::dev::MessageResponse`] only for `Output = Result<_, _>`;
 pub struct ResponseActAnyFuture<A, O>(

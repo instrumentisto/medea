@@ -152,14 +152,15 @@ impl RoomService {
             );
 
             let room_repo = self.room_repo.clone();
-
-            room.send(Close)
-                .map(move |_| {
-                    debug!("Room [id = {}] removed.", id);
+            let send_result = room.send(Close);
+            async move {
+                let send_result = send_result.await;
+                if send_result.is_ok() {
                     room_repo.remove(&id);
-                    Ok(())
-                })
-                .boxed_local()
+                }
+                send_result
+            }
+            .boxed_local()
         } else {
             async { Ok(()) }.boxed_local()
         }
@@ -305,12 +306,14 @@ impl Handler<CreateMemberInRoom> for RoomService {
         sids.insert(msg.id.to_string(), sid);
 
         if let Some(room) = self.room_repo.get(&room_id) {
-            room.send(CreateMember(msg.id, msg.spec))
-                .map_err(RoomServiceError::RoomMailboxErr)
-                .and_then(move |r| async {
-                    r.map(move |_| sids).map_err(RoomServiceError::from)
-                })
-                .boxed_local()
+            let send_result = room.send(CreateMember(msg.id, msg.spec));
+            async {
+                send_result
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                Ok(sids)
+            }
+            .boxed_local()
         } else {
             async {
                 Err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(room_id)))
@@ -343,15 +346,17 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         let endpoint_id = msg.id;
 
         if let Some(room) = self.room_repo.get(&room_id) {
-            room.send(CreateEndpoint {
+            let send_result = room.send(CreateEndpoint {
                 member_id,
                 endpoint_id,
                 spec: msg.spec,
-            })
-            .map_err(RoomServiceError::RoomMailboxErr)
-            .and_then(|r| async {
-                r.map(|_| HashMap::new()).map_err(RoomServiceError::from)
-            })
+            });
+            async {
+                send_result
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                Ok(HashMap::new())
+            }
             .boxed_local()
         } else {
             async {
@@ -472,9 +477,14 @@ impl Handler<DeleteElements<Validated>> for RoomService {
             let room_id = deletes_from_room[0].room_id().clone();
 
             if let Some(room) = self.room_repo.get(&room_id) {
-                room.send(Delete(deletes_from_room))
-                    .map_err(RoomServiceError::RoomMailboxErr)
-                    .boxed_local()
+                let send_result = room.send(Delete(deletes_from_room));
+                async {
+                    send_result
+                        .await
+                        .map_err(RoomServiceError::RoomMailboxErr)?;
+                    Ok(())
+                }
+                .boxed_local()
             } else {
                 async { Ok(()) }.boxed_local()
             }
@@ -520,19 +530,21 @@ impl Handler<Get> for RoomService {
             futs.push(room.send(SerializeProto(elements)));
         }
 
-        future::try_join_all(futs)
-            .map_err(RoomServiceError::RoomMailboxErr)
-            .and_then(|results| async {
-                let mut all = HashMap::new();
-                for result in results {
-                    match result {
-                        Ok(res) => all.extend(res),
-                        Err(e) => return Err(RoomServiceError::from(e)),
-                    }
+        async {
+            let results = future::try_join_all(futs)
+                .await
+                .map_err(RoomServiceError::RoomMailboxErr)?;
+
+            let mut all = HashMap::new();
+            for result in results {
+                match result {
+                    Ok(res) => all.extend(res),
+                    Err(e) => return Err(RoomServiceError::from(e)),
                 }
-                Ok(all)
-            })
-            .boxed_local()
+            }
+            Ok(all)
+        }
+        .boxed_local()
     }
 }
 
