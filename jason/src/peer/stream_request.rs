@@ -16,7 +16,6 @@ use crate::{
         AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
         VideoTrackConstraints,
     },
-    peer::track::MutedState,
     utils::{JsCaused, JsError},
 };
 

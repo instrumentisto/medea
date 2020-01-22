@@ -9,7 +9,7 @@ use derive_more::Display;
 use futures::{future, StreamExt};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
-use medea_reactive::{Dropped, Reactive, ReactiveField};
+use medea_reactive::{Dropped, Reactive};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
@@ -28,7 +28,6 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
-use crate::peer::media::MediaConnectionsError::MutedStateDropped;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -374,6 +373,7 @@ impl MediaConnections {
         }
     }
 
+    /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
     pub fn get_sender(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.0.borrow().senders.get(&id).cloned()
     }

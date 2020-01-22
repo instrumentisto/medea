@@ -2,13 +2,9 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::{cell::RefCell, ops::Not, rc::Rc};
+use std::{ops::Not, rc::Rc};
 
-use futures::StreamExt;
-use medea_client_api_proto::{self as proto, TrackId as Id};
-use medea_reactive::{Dropped, Reactive};
-use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
+use medea_client_api_proto::TrackId as Id;
 use web_sys::MediaStreamTrack;
 
 use crate::media::TrackConstraints;

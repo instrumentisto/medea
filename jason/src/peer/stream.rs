@@ -11,9 +11,7 @@ use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::{
-    media::TrackConstraints, peer::MutedState, utils::HandlerDetachedError,
-};
+use crate::{media::TrackConstraints, utils::HandlerDetachedError};
 
 use super::MediaTrack;
 

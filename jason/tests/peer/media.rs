@@ -6,14 +6,12 @@ use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
     peer::{
-        MediaConnections, RtcPeerConnection, SimpleStreamRequest,
-        TransceiverDirection,
+        MediaConnections, MutedState, RtcPeerConnection, SimpleStreamRequest,
     },
 };
 use wasm_bindgen_test::*;
 
-use crate::{get_test_tracks, peer::toggle_mute_tracks_updates};
-use medea_jason::peer::{MutedState, TransceiverKind};
+use crate::get_test_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
