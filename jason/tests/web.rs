@@ -116,7 +116,10 @@ extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
 
-pub fn get_test_tracks() -> (Track, Track) {
+pub fn get_test_tracks(
+    is_audio_muted: bool,
+    is_video_muted: bool,
+) -> (Track, Track) {
     (
         Track {
             id: TrackId(1),

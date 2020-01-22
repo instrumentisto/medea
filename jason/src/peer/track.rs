@@ -132,7 +132,7 @@ impl MediaTrack {
     }
 
     /// Returns current [`MutedState`] of this [`MediaTrack`].
-    pub fn get_muted_state(&self) -> MutedState {
+    pub fn muted_state(&self) -> MutedState {
         **self.muted_state.borrow()
     }
 

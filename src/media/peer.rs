@@ -197,7 +197,6 @@ impl<T> Peer<T> {
                 tracks.push(Track {
                     id: track.id,
                     media_type: track.media_type.clone(),
-                    is_muted: true,
                     direction: Direction::Send {
                         receivers: vec![self.context.partner_peer],
                         mid: track.mid(),
@@ -213,7 +212,6 @@ impl<T> Peer<T> {
                 tracks.push(Track {
                     id: track.id,
                     media_type: track.media_type.clone(),
-                    is_muted: true,
                     direction: Direction::Recv {
                         sender: self.context.partner_peer,
                         mid: track.mid(),

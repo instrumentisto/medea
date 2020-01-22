@@ -446,7 +446,7 @@ impl Sender {
         self.track
             .borrow()
             .as_ref()
-            .map(|track| track.get_muted_state())
+            .map(|track| track.muted_state())
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
@@ -487,7 +487,7 @@ impl Sender {
     fn is_track_enabled(&self) -> bool {
         match self.track.borrow().as_ref() {
             None => false,
-            Some(track) => MutedState::Unmuted == track.get_muted_state(),
+            Some(track) => MutedState::Unmuted == track.muted_state(),
         }
     }
 
