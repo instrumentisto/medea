@@ -412,9 +412,8 @@ impl Handler<ShutdownGracefully> for GrpcServer {
                         e
                     )
                 })
-                .into_future()
                 .map(|_| ())
-                .boxed(),
+                .boxed_local(),
         )
     }
 }

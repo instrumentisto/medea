@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut::IntoActorFuture, Actor, ActorFuture, Addr, Context,
-    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
+    Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
+    Message, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -458,7 +458,6 @@ impl Room {
             .into_iter()
             .for_each(|(member_id, peers_id)| {
                 self.member_peers_removed(peers_id, member_id, ctx)
-                    .into_future()
                     .map(|_, _, _| ())
                     .spawn(ctx);
             });
@@ -513,7 +512,6 @@ impl Room {
                         self.peers.remove_peer(member_id, peer_id);
                     for (member_id, peers_ids) in removed_peers {
                         self.member_peers_removed(peers_ids, member_id, ctx)
-                            .into_future()
                             .map(|_, _, _| ())
                             .spawn(ctx);
                     }
@@ -1151,10 +1149,7 @@ impl Handler<RpcConnectionClosed> for Room {
                      found.",
                     msg.member_id,
                 );
-                self.close_gracefully(ctx)
-                    .into_future()
-                    .map(|_, _, _| ())
-                    .spawn(ctx);
+                self.close_gracefully(ctx).spawn(ctx);
             }
 
             let removed_peers =
@@ -1167,7 +1162,6 @@ impl Handler<RpcConnectionClosed> for Room {
                 // because connection already closed but we don't know about it
                 // because message in event loop.
                 self.member_peers_removed(peers_ids, peer_member_id, ctx)
-                    .into_future()
                     .map(|_, _, _| ())
                     .spawn(ctx);
             }
@@ -1183,7 +1177,7 @@ pub struct Close;
 impl Handler<Close> for Room {
     type Result = ();
 
-    fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _: Close, ctx: &mut Self::Context) {
         for id in self.members.members().keys() {
             self.delete_member(id, ctx);
         }

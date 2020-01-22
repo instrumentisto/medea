@@ -297,7 +297,6 @@ impl ParticipantService {
                                 member_id, err
                             )
                         })
-                        .into_future()
                         .map(|_| ()),
                 )
                 .spawn(ctx);
@@ -411,7 +410,6 @@ impl ParticipantService {
                         .map_err(|err| {
                             error!("Error removing IceUser {:?}", err)
                         })
-                        .into_future()
                         .map(|_| ()),
                 )
                 .spawn(ctx);

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use actix::Actor;
+use actix::{Actor, Arbiter, System};
 use failure::Error;
 use futures::FutureExt as _;
 use medea::{
@@ -29,8 +29,8 @@ fn main() -> Result<(), Error> {
 
     info!("{:?}", config);
 
-    let sys = actix_rt::System::new("medea");
-    actix_rt::spawn(
+    let sys = System::new("medea");
+    Arbiter::spawn(
         async move {
             let turn_service = new_turn_auth_service(&config.turn)?;
             let graceful_shutdown =

@@ -2,6 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashSet},
+    mem,
     time::Duration,
 };
 
@@ -9,16 +10,15 @@ use std::{
 use actix::AsyncContext;
 use actix::{
     prelude::{Actor, Context},
-    Addr, Handler, Message, Recipient, System,
+    Addr, ContextFutureSpawner as _, Handler, Message, Recipient, System,
+    WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::{
-    future, stream, FutureExt as _, StreamExt as _, TryFutureExt as _,
-};
+use futures::{future, stream, FutureExt as _, StreamExt as _};
 use tokio::time::timeout;
 
-use crate::{log::prelude::*, utils::ResponseAnyFuture};
+use crate::log::prelude::*;
 
 /// Priority that [`Subscriber`] should be triggered to shutdown gracefully
 /// with.
@@ -104,14 +104,14 @@ impl Actor for GracefulShutdown {
 struct OsSignal(i32);
 
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ResponseAnyFuture<()>;
+    type Result = ();
 
-    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, sig: OsSignal, ctx: &mut Context<Self>) {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
             State::ShuttingDown => {
-                return ResponseAnyFuture(async {}.boxed());
+                return;
             }
             State::Listening => {
                 self.state = State::ShuttingDown;
@@ -122,41 +122,42 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return ResponseAnyFuture(async {}.boxed());
+            return;
         }
 
-        let ordered_subs: Vec<_> = self
-            .subs
-            .values()
+        let subs = mem::replace(&mut self.subs, BTreeMap::new());
+        let ordered_subs: Vec<_> = subs
+            .into_iter()
             .rev()
-            .map(|addrs| {
+            .map(|(_, addrs)| {
                 let addrs: Vec<_> = addrs
-                    .iter()
-                    .map(|addr| {
-                        addr.send(ShutdownGracefully).map_err(|err| {
+                    .into_iter()
+                    .map(|addr| async move {
+                        if let Err(err) = addr.send(ShutdownGracefully).await {
                             error!("Error requesting shutdown: {}", err);
-                        })
+                        };
                     })
                     .collect();
                 future::join_all(addrs)
             })
             .collect();
 
-        ResponseAnyFuture(
-            timeout(
-                self.timeout,
+        let deadline = self.timeout;
+        async move {
+            let wait_finish = timeout(
+                deadline,
                 stream::iter(ordered_subs).for_each(|row| row.map(|_| ())),
             )
-            .map_err(|_| {
-                error!("Graceful shutdown has timed out, stopping system");
-                System::current().stop()
-            })
-            .map(|_| {
+            .await;
+            if wait_finish.is_ok() {
                 info!("Graceful shutdown succeeded, stopping system");
-                System::current().stop()
-            })
-            .boxed(),
-        )
+            } else {
+                error!("Graceful shutdown has timed out, stopping system");
+            }
+            System::current().stop()
+        }
+        .into_actor(self)
+        .wait(ctx);
     }
 }
 

@@ -56,6 +56,6 @@ impl CallbackClient for GrpcCallbackClient {
             request?.compat().await?;
             Ok(())
         }
-        .boxed()
+        .boxed_local()
     }
 }

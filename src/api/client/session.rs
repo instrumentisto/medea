@@ -104,15 +104,22 @@ impl WsSession {
         });
     }
 
-    /// Starts [`ServerMsg::Ping`] sending.
-    fn start_pinger(&self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(self.ping_interval, |session, ctx| {
-            ctx.text(
-                serde_json::to_string(&ServerMsg::Ping(session.last_ping_num))
-                    .unwrap(),
-            );
-            session.last_ping_num += 1;
+    /// Sends [`ServerMsg::Ping`] immediately and starts ping send scheduler
+    /// with `ping_interval`.
+    fn start_pinger(&mut self, ctx: &mut <Self as Actor>::Context) {
+        self.send_ping(ctx);
+        ctx.run_interval(self.ping_interval, |this, ctx| {
+            this.send_ping(ctx);
         });
+    }
+
+    /// Sends [`ServerMsg::Ping`] increasing ping counter.
+    fn send_ping(&mut self, ctx: &mut <Self as Actor>::Context) {
+        ctx.text(
+            serde_json::to_string(&ServerMsg::Ping(self.last_ping_num))
+                .unwrap(),
+        );
+        self.last_ping_num += 1;
     }
 
     /// Returns [`RpcSettings`] based on `idle_timeout` and `ping_interval`
@@ -143,8 +150,6 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        Self::start_idle_watchdog(ctx);
-
         self.room
             .connection_established(
                 self.member_id.clone(),
@@ -161,6 +166,7 @@ impl Actor for WsSession {
                         ctx.text(rpc_settings_message);
 
                         this.start_pinger(ctx);
+                        Self::start_idle_watchdog(ctx);
                     }
                     Err(err) => {
                         error!(
@@ -515,7 +521,7 @@ mod test {
 
         let start = std::time::Instant::now();
 
-        let item = client.skip(1).next().await.unwrap().unwrap();
+        let item = client.skip(2).next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -637,7 +643,7 @@ mod test {
             })
             .await;
 
-        let item = client.skip(1).next().await.unwrap().unwrap();
+        let item = client.skip(2).next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -694,7 +700,7 @@ mod test {
             .await
             .unwrap();
 
-        let item = client.skip(1).next().await.unwrap().unwrap();
+        let item = client.skip(2).next().await.unwrap().unwrap();
 
         let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
                      sdp_answer\":\"sdp_answer\"}}";

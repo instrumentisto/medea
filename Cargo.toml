@@ -27,7 +27,6 @@ lto = "thin"
 
 [dependencies]
 actix = "0.9"
-actix-rt = "1.0.0"
 actix-web = "2.0"
 actix-web-actors = "2.0"
 async-trait = "0.1"
@@ -65,13 +64,13 @@ url = "2.1"
     features = ["release_max_level_trace", "max_level_trace"]
 
 [dev-dependencies]
-lazy_static = "1.4"
-mockall = "0.6"
 actix-codec = "0.2"
 actix-http = "1.0"
-actix-http-test = "1.0"
+actix-rt = "1.0.0"
 awc = "1.0"
 derive_builder = "0.9"
+lazy_static = "1.4"
+mockall = "0.6"
 serial_test = "0.3"
 serial_test_derive = "0.3"
 tempfile = "3.1"
