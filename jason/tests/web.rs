@@ -128,6 +128,7 @@ pub fn get_test_tracks(
                 mid: None,
             },
             media_type: MediaType::Audio(AudioSettings {}),
+            is_muted: is_audio_muted,
         },
         Track {
             id: TrackId(2),
@@ -136,6 +137,7 @@ pub fn get_test_tracks(
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {}),
+            is_muted: is_video_muted,
         },
     )
 }

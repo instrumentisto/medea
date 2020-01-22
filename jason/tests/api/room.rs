@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{Event, IceServer, PeerId};
+use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
@@ -37,15 +37,26 @@ fn get_test_room_and_exist_peer(
         .unwrap(),
     );
 
-    let (_, event_rx) = mpsc::unbounded();
+    let (event_tx, event_rx) = mpsc::unbounded();
     let peer_clone = Rc::clone(&peer);
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     repo.expect_get_all()
         .times(count_gets_peer)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
+    let peer_clone = Rc::clone(&peer);
+    repo.expect_get()
+        .returning_st(move |_| Some(Rc::clone(&peer_clone)));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_send_command().returning(move |cmd| match cmd {
+        Command::ApplyTracks { peer_id, tracks } => {
+            event_tx
+                .unbounded_send(Event::TracksApplied { peer_id, tracks })
+                .unwrap();
+        }
+        _ => (),
+    });
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -53,7 +64,7 @@ fn get_test_room_and_exist_peer(
 
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
-    let (room, peer) = get_test_room_and_exist_peer(2);
+    let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     peer.get_offer(vec![audio_track, video_track], None)
@@ -68,7 +79,7 @@ async fn mute_unmute_audio() {
 
 #[wasm_bindgen_test]
 async fn mute_unmute_video() {
-    let (room, peer) = get_test_room_and_exist_peer(2);
+    let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     peer.get_offer(vec![audio_track, video_track], None)
@@ -123,7 +134,7 @@ fn get_test_room_and_new_peer(
 async fn mute_audio_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
     let (room, peer) = get_test_room_and_new_peer(event_rx);
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_tracks(true, false);
 
     JsFuture::from(room.new_handle().mute_audio())
         .await
@@ -148,7 +159,7 @@ async fn mute_audio_room_before_init_peer() {
 async fn mute_video_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
     let (room, peer) = get_test_room_and_new_peer(event_rx);
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_tracks(false, true);
 
     JsFuture::from(room.new_handle().mute_video())
         .await

@@ -42,11 +42,11 @@ async fn get_test_media_connections(
         .unwrap();
 
     media_connections
-        .get_track_by_id(audio_track_id)
+        .get_sender(audio_track_id)
         .unwrap()
         .change_muted_state(MutedState::from(!enabled_audio));
     media_connections
-        .get_track_by_id(video_track_id)
+        .get_sender(video_track_id)
         .unwrap()
         .change_muted_state(MutedState::from(!enabled_video));
 
@@ -87,18 +87,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let (media_connections, audio_track_id, video_track_id) =
         get_test_media_connections(true, true).await;
 
-    let audio_track = media_connections
-        .get_track_by_id_and_direction(
-            TransceiverDirection::Sendonly,
-            audio_track_id,
-        )
-        .unwrap();
-    let video_track = media_connections
-        .get_track_by_id_and_direction(
-            TransceiverDirection::Sendonly,
-            video_track_id,
-        )
-        .unwrap();
+    let audio_track = media_connections.get_sender(audio_track_id).unwrap();
+    let video_track = media_connections.get_sender(video_track_id).unwrap();
 
     assert_eq!(audio_track.muted_state(), MutedState::Unmuted);
     assert_eq!(video_track.muted_state(), MutedState::Unmuted);
@@ -125,18 +115,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
         get_test_media_connections(false, true).await;
 
-    let audio_track = media_connections
-        .get_track_by_id_and_direction(
-            TransceiverDirection::Sendonly,
-            audio_track_id,
-        )
-        .unwrap();
-    let video_track = media_connections
-        .get_track_by_id_and_direction(
-            TransceiverDirection::Sendonly,
-            video_track_id,
-        )
-        .unwrap();
+    let audio_track = media_connections.get_sender(audio_track_id).unwrap();
+    let video_track = media_connections.get_sender(video_track_id).unwrap();
 
     assert_eq!(audio_track.muted_state(), MutedState::Muted);
     assert_eq!(video_track.muted_state(), MutedState::Unmuted);
@@ -147,18 +127,8 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
         get_test_media_connections(true, false).await;
 
-    let audio_track = media_connections
-        .get_track_by_id_and_direction(
-            TransceiverDirection::Sendonly,
-            audio_track_id,
-        )
-        .unwrap();
-    let video_track = media_connections
-        .get_track_by_id_and_direction(
-            TransceiverDirection::Sendonly,
-            video_track_id,
-        )
-        .unwrap();
+    let audio_track = media_connections.get_sender(audio_track_id).unwrap();
+    let video_track = media_connections.get_sender(video_track_id).unwrap();
 
     assert_eq!(audio_track.muted_state(), MutedState::Unmuted);
     assert_eq!(video_track.muted_state(), MutedState::Muted);

@@ -83,48 +83,36 @@ async fn mute_unmute_video() {
     assert!(peer.is_send_video_enabled());
 }
 
-//#[wasm_bindgen_test]
-// async fn new_with_mute_audio() {
-//    let (tx, _rx) = mpsc::unbounded();
-//    let manager = Rc::new(MediaManager::default());
-//    let (audio_track, video_track) = get_test_tracks(true, false);
-//    let peer = PeerConnection::new(
-//        PeerId(1),
-//        tx,
-//        vec![],
-//        manager,
-//        false,
-//    )
-//    .unwrap();
-//
-//    peer.get_offer(vec![audio_track, video_track], None)
-//        .await
-//        .unwrap();
-//    assert!(!peer.is_send_audio_enabled());
-//
-//    assert!(peer.is_send_video_enabled());
-//}
-//
-//#[wasm_bindgen_test]
-// async fn new_with_mute_video() {
-//    let (tx, _rx) = mpsc::unbounded();
-//    let manager = Rc::new(MediaManager::default());
-//    let (audio_track, video_track) = get_test_tracks(false, true);
-//    let peer = PeerConnection::new(
-//        PeerId(1),
-//        tx,
-//        vec![],
-//        manager,
-//        false,
-//    )
-//    .unwrap();
-//    peer.get_offer(vec![audio_track, video_track], None)
-//        .await
-//        .unwrap();
-//
-//    assert!(peer.is_send_audio_enabled());
-//    assert!(!peer.is_send_video_enabled());
-//}
+#[wasm_bindgen_test]
+async fn new_with_mute_audio() {
+    let (tx, _rx) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_tracks(true, false);
+    let peer =
+        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+    assert!(!peer.is_send_audio_enabled());
+
+    assert!(peer.is_send_video_enabled());
+}
+
+#[wasm_bindgen_test]
+async fn new_with_mute_video() {
+    let (tx, _rx) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_tracks(false, true);
+    let peer =
+        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    assert!(peer.is_send_audio_enabled());
+    assert!(!peer.is_send_video_enabled());
+}
 
 #[wasm_bindgen_test]
 async fn add_candidates_to_answerer_before_offer() {
