@@ -40,10 +40,10 @@ pub use self::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
         TransceiverDirection, TransceiverKind,
     },
-    media::{MediaConnections, MediaConnectionsError},
+    media::{MediaConnections, MediaConnectionsError, MutedState},
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
-    track::{MediaTrack, MutedState},
+    track::MediaTrack,
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].

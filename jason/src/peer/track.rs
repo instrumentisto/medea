@@ -2,63 +2,12 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::{ops::Not, rc::Rc};
+use std::rc::Rc;
 
 use medea_client_api_proto::TrackId as Id;
 use web_sys::MediaStreamTrack;
 
 use crate::media::TrackConstraints;
-
-/// Mute state of [`MediaTrack`].
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum MutedState {
-    /// [`MediaTrack`] is unmuted.
-    Unmuted,
-
-    /// [`MediaTrack`] should be unmuted, but awaits server permission.
-    Unmuting,
-
-    /// [`MediaTrack`] should be muted, but awaits server permission.
-    Muting,
-
-    /// [`MediaTrack`] is muted.
-    Muted,
-}
-
-impl MutedState {
-    /// Returns [`MutedState`] which should be set while transition to this
-    /// [`MutedState`].
-    pub fn proccessing_state(self) -> Self {
-        match self {
-            Self::Unmuted => Self::Unmuting,
-            Self::Muted => Self::Muting,
-            _ => self,
-        }
-    }
-}
-
-impl From<bool> for MutedState {
-    fn from(is_muted: bool) -> Self {
-        if is_muted {
-            Self::Muted
-        } else {
-            Self::Unmuted
-        }
-    }
-}
-
-impl Not for MutedState {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Self::Muted => Self::Unmuted,
-            Self::Unmuted => Self::Muted,
-            Self::Unmuting => Self::Muting,
-            Self::Muting => Self::Unmuting,
-        }
-    }
-}
 
 /// Representation of [MediaStreamTrack][1].
 ///
