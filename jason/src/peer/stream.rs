@@ -103,20 +103,6 @@ impl MediaStream {
         MediaStreamHandle(Rc::downgrade(&self.0))
     }
 
-    /// Enables or disables all audio [`MediaTrack`]s in this stream.
-    pub fn change_audio_muted_state(&self, new_state: MutedState) {
-        for track in self.0.audio_tracks.values() {
-            track.change_muted_state(new_state);
-        }
-    }
-
-    /// Enables or disables all video [`MediaTrack`]s in this stream.
-    pub fn change_video_muted_state(&self, new_state: MutedState) {
-        for track in self.0.video_tracks.values() {
-            track.change_muted_state(new_state);
-        }
-    }
-
     /// Returns actual underlying [MediaStream][1] object.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream

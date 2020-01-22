@@ -266,6 +266,7 @@ pub struct Track {
     pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
+    pub is_muted: bool,
 }
 
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]

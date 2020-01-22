@@ -128,7 +128,6 @@ impl SimpleStreamRequest {
                         *id,
                         track,
                         TrackConstraints::Audio(audio.clone()),
-                        MutedState::Unmuted,
                     ))
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
@@ -153,7 +152,6 @@ impl SimpleStreamRequest {
                         *id,
                         track,
                         TrackConstraints::Video(video.clone()),
-                        MutedState::Unmuted,
                     ))
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));

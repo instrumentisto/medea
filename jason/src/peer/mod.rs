@@ -261,7 +261,7 @@ impl PeerConnection {
         for track_proto in tracks {
             let track = self
                 .media_connections
-                .get_track_by_id(track_proto.id)
+                .get_sender(track_proto.id)
                 .ok_or_else(|| {
                     tracerr::new!(PeerError::InvalidTrackUpdate(track_proto.id))
                 })?;

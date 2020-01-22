@@ -71,7 +71,6 @@ pub struct MediaTrack {
     id: Id,
     track: MediaStreamTrack,
     caps: TrackConstraints,
-    muted_state: RefCell<Reactive<MutedState>>,
 }
 
 impl MediaTrack {
@@ -80,39 +79,8 @@ impl MediaTrack {
         id: Id,
         track: MediaStreamTrack,
         caps: TrackConstraints,
-        muted_state: MutedState,
     ) -> Rc<Self> {
-        let muted_state = RefCell::new(Reactive::new(muted_state));
-        let mut muted_state_subscribe = muted_state.borrow().subscribe();
-        let this = Rc::new(Self {
-            id,
-            track,
-            caps,
-            muted_state,
-        });
-
-        let this_weak = Rc::downgrade(&this);
-        spawn_local(async move {
-            while let Some(changed_muted_state) =
-                muted_state_subscribe.next().await
-            {
-                if let Some(this) = this_weak.upgrade() {
-                    match changed_muted_state {
-                        MutedState::Muted => {
-                            this.track.set_enabled(false);
-                        }
-                        MutedState::Unmuted => {
-                            this.track.set_enabled(true);
-                        }
-                        _ => (),
-                    }
-                } else {
-                    break;
-                }
-            }
-        });
-
-        this
+        Rc::new(Self { id, track, caps })
     }
 
     /// Returns ID of this [`MediaTrack`].
@@ -131,36 +99,13 @@ impl MediaTrack {
         &self.caps
     }
 
-    /// Returns current [`MutedState`] of this [`MediaTrack`].
-    pub fn muted_state(&self) -> MutedState {
-        **self.muted_state.borrow()
+    /// Checks if underlying [`MediaStreamTrack`] is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.track.enabled()
     }
 
-    /// Changes [`MutedState`] of this [`MediaTrack`].
-    pub fn change_muted_state(&self, new_state: MutedState) {
-        *self.muted_state.borrow_mut().borrow_mut() = new_state;
-    }
-
-    /// Will be resolved when [`MutedState`] of this [`Track`] will be become
-    /// equal to provided [`MutedState`].
-    pub async fn on_muted_state(
-        &self,
-        state: MutedState,
-    ) -> Result<(), Traced<Dropped>> {
-        let subscription = self.muted_state.borrow().when_eq(state);
-        subscription.await.map_err(|e| tracerr::new!(e))
-    }
-
-    /// Update this [`Track`] based on provided
-    /// [`medea_client_api_proto::TrackUpdate`].
-    pub fn update(&self, track: &proto::TrackUpdate) {
-        if let Some(is_muted) = track.is_muted {
-            if is_muted {
-                *self.muted_state.borrow_mut().borrow_mut() = MutedState::Muted;
-            } else {
-                *self.muted_state.borrow_mut().borrow_mut() =
-                    MutedState::Unmuted;
-            }
-        }
+    /// Enables or disables underlying [`MediaStreamTrack`].
+    pub fn set_enabled(&self, enabled: bool) {
+        self.track.set_enabled(enabled)
     }
 }

@@ -201,6 +201,7 @@ impl<T> Peer<T> {
                         receivers: vec![self.context.partner_peer],
                         mid: track.mid(),
                     },
+                    is_muted: false,
                 });
                 tracks
             },
@@ -216,6 +217,7 @@ impl<T> Peer<T> {
                         sender: self.context.partner_peer,
                         mid: track.mid(),
                     },
+                    is_muted: false,
                 });
                 tracks
             })
