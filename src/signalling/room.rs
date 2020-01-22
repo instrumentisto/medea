@@ -248,6 +248,7 @@ impl Room {
             sdp_offer: None,
             tracks: sender.tracks(),
             ice_servers,
+            force_relay: sender.is_force_relayed(),
         };
         self.peers.add_peer(sender);
         Ok(Box::new(
@@ -547,7 +548,7 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         publish_id: WebRtcPublishId,
-        spec: WebRtcPublishEndpointSpec,
+        spec: &WebRtcPublishEndpointSpec,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -568,6 +569,7 @@ impl Room {
             String::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
+            spec.force_relay,
         );
 
         debug!(
@@ -627,6 +629,7 @@ impl Room {
             spec.src,
             src.downgrade(),
             member.downgrade(),
+            spec.force_relay,
         );
 
         src.add_sink(sink.downgrade());
@@ -676,8 +679,9 @@ impl Room {
         for (id, publish) in spec.publish_endpoints() {
             let signalling_publish = WebRtcPublishEndpoint::new(
                 id.clone(),
-                publish.p2p.clone(),
+                publish.p2p,
                 signalling_member.downgrade(),
+                publish.force_relay,
             );
             signalling_member.insert_src(signalling_publish);
         }
@@ -700,6 +704,7 @@ impl Room {
                 play.src.clone(),
                 src.downgrade(),
                 signalling_member.downgrade(),
+                play.force_relay,
             );
 
             signalling_member.insert_sink(sink);
@@ -810,6 +815,7 @@ impl CommandHandler for Room {
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
+            force_relay: to_peer.is_force_relayed(),
         };
 
         self.peers.add_peer(from_peer);
@@ -1272,7 +1278,7 @@ impl Handler<CreateEndpoint> for Room {
                 self.create_src_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
-                    endpoint,
+                    &endpoint,
                 )?;
             }
         }

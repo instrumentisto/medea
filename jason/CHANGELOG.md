@@ -42,6 +42,8 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.join()`;
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
+        - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+        - `RtcIceTransportPolicy` configuration ([#79](/../../pull/79)).
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
