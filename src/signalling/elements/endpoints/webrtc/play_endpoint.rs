@@ -47,6 +47,10 @@ struct WebRtcPlayEndpointInner {
     /// In future this may be used for removing [`WebRtcPlayEndpoint`]
     /// and related peer.
     peer_id: Option<PeerId>,
+
+    /// Indicator whether only `relay` ICE candidates are allowed for this
+    /// [`WebRtcPlayEndpoint`].
+    is_force_relayed: bool,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -100,6 +104,7 @@ impl WebRtcPlayEndpoint {
         src_uri: SrcUri,
         publisher: WeakWebRtcPublishEndpoint,
         owner: WeakMember,
+        is_force_relayed: bool,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPlayEndpointInner {
             id,
@@ -107,6 +112,7 @@ impl WebRtcPlayEndpoint {
             src: publisher,
             owner,
             peer_id: None,
+            is_force_relayed,
         })))
     }
 
@@ -159,6 +165,12 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().id.clone()
     }
 
+    /// Indicates whether only `relay` ICE candidates are allowed for this
+    /// [`WebRtcPlayEndpoint`].
+    pub fn is_force_relayed(&self) -> bool {
+        self.0.borrow().is_force_relayed
+    }
+
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
     /// pointer.
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
@@ -201,6 +213,7 @@ impl Into<ElementProto> for WebRtcPlayEndpoint {
         let mut play = WebRtcPlayEndpointProto::new();
         play.set_src(self.src_uri().to_string());
         play.set_id(self.id().to_string());
+        play.set_force_relay(self.is_force_relayed());
         element.set_webrtc_play(play);
 
         element

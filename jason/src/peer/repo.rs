@@ -26,6 +26,7 @@ pub trait PeerRepository {
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: EnabledAudio,
         enabled_video: EnabledVideo,
+        is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -77,6 +78,7 @@ impl PeerRepository for Repository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: EnabledAudio,
         enabled_video: EnabledVideo,
+        is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = Rc::new(
             PeerConnection::new(
@@ -86,6 +88,7 @@ impl PeerRepository for Repository {
                 Rc::clone(&self.media_manager),
                 enabled_audio,
                 enabled_video,
+                is_force_relayed,
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );

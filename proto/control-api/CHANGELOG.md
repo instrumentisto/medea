@@ -22,7 +22,7 @@ All user visible changes to this project will be documented in this file. This p
             - `Create`;
             - `Get`;
             - `Delete`.
-        - Elements ([#57]):
+        - Elements ([#57], [#79](/../../pull/79)):
             - `Room`;
             - `Member`;
             - `WebRtcPlayEndpoint`;

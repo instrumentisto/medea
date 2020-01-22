@@ -3244,6 +3244,7 @@ pub struct WebRtcPublishEndpoint {
     pub p2p: WebRtcPublishEndpoint_P2P,
     pub on_start: ::std::string::String,
     pub on_stop: ::std::string::String,
+    pub force_relay: bool,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -3352,6 +3353,21 @@ impl WebRtcPublishEndpoint {
     pub fn take_on_stop(&mut self) -> ::std::string::String {
         ::std::mem::replace(&mut self.on_stop, ::std::string::String::new())
     }
+
+    // bool force_relay = 5;
+
+
+    pub fn get_force_relay(&self) -> bool {
+        self.force_relay
+    }
+    pub fn clear_force_relay(&mut self) {
+        self.force_relay = false;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_force_relay(&mut self, v: bool) {
+        self.force_relay = v;
+    }
 }
 
 impl ::protobuf::Message for WebRtcPublishEndpoint {
@@ -3374,6 +3390,13 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
                 },
                 4 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_stop)?;
+                },
+                5 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_bool()?;
+                    self.force_relay = tmp;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -3399,6 +3422,9 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
         if !self.on_stop.is_empty() {
             my_size += ::protobuf::rt::string_size(4, &self.on_stop);
         }
+        if self.force_relay != false {
+            my_size += 2;
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -3416,6 +3442,9 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
         }
         if !self.on_stop.is_empty() {
             os.write_string(4, &self.on_stop)?;
+        }
+        if self.force_relay != false {
+            os.write_bool(5, self.force_relay)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -3479,6 +3508,11 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
                     |m: &WebRtcPublishEndpoint| { &m.on_stop },
                     |m: &mut WebRtcPublishEndpoint| { &mut m.on_stop },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                    "force_relay",
+                    |m: &WebRtcPublishEndpoint| { &m.force_relay },
+                    |m: &mut WebRtcPublishEndpoint| { &mut m.force_relay },
+                ));
                 ::protobuf::reflect::MessageDescriptor::new::<WebRtcPublishEndpoint>(
                     "WebRtcPublishEndpoint",
                     fields,
@@ -3505,6 +3539,7 @@ impl ::protobuf::Clear for WebRtcPublishEndpoint {
         self.p2p = WebRtcPublishEndpoint_P2P::NEVER;
         self.on_start.clear();
         self.on_stop.clear();
+        self.force_relay = false;
         self.unknown_fields.clear();
     }
 }
@@ -3586,6 +3621,7 @@ pub struct WebRtcPlayEndpoint {
     pub src: ::std::string::String,
     pub on_start: ::std::string::String,
     pub on_stop: ::std::string::String,
+    pub force_relay: bool,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -3705,6 +3741,21 @@ impl WebRtcPlayEndpoint {
     pub fn take_on_stop(&mut self) -> ::std::string::String {
         ::std::mem::replace(&mut self.on_stop, ::std::string::String::new())
     }
+
+    // bool force_relay = 5;
+
+
+    pub fn get_force_relay(&self) -> bool {
+        self.force_relay
+    }
+    pub fn clear_force_relay(&mut self) {
+        self.force_relay = false;
+    }
+
+    // Param is passed by value, moved
+    pub fn set_force_relay(&mut self, v: bool) {
+        self.force_relay = v;
+    }
 }
 
 impl ::protobuf::Message for WebRtcPlayEndpoint {
@@ -3727,6 +3778,13 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
                 },
                 4 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_stop)?;
+                },
+                5 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_bool()?;
+                    self.force_relay = tmp;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -3752,6 +3810,9 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
         if !self.on_stop.is_empty() {
             my_size += ::protobuf::rt::string_size(4, &self.on_stop);
         }
+        if self.force_relay != false {
+            my_size += 2;
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -3769,6 +3830,9 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
         }
         if !self.on_stop.is_empty() {
             os.write_string(4, &self.on_stop)?;
+        }
+        if self.force_relay != false {
+            os.write_bool(5, self.force_relay)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -3832,6 +3896,11 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
                     |m: &WebRtcPlayEndpoint| { &m.on_stop },
                     |m: &mut WebRtcPlayEndpoint| { &mut m.on_stop },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                    "force_relay",
+                    |m: &WebRtcPlayEndpoint| { &m.force_relay },
+                    |m: &mut WebRtcPlayEndpoint| { &mut m.force_relay },
+                ));
                 ::protobuf::reflect::MessageDescriptor::new::<WebRtcPlayEndpoint>(
                     "WebRtcPlayEndpoint",
                     fields,
@@ -3858,6 +3927,7 @@ impl ::protobuf::Clear for WebRtcPlayEndpoint {
         self.src.clear();
         self.on_start.clear();
         self.on_stop.clear();
+        self.force_relay = false;
         self.unknown_fields.clear();
     }
 }
@@ -3916,19 +3986,20 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x20\x01(\x0b2\x15.medea.Member.ElementR\x05value:\x028\x01\x1a\x8c\x01\
     \n\x07Element\x12<\n\x0bwebrtc_play\x18\x01\x20\x01(\x0b2\x19.medea.WebR\
     tcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x02\x20\x01(\x0b2\
-    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xbe\x01\n\
+    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xdf\x01\n\
     \x15WebRtcPublishEndpoint\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x122\
     \n\x03p2p\x18\x02\x20\x01(\x0e2\x20.medea.WebRtcPublishEndpoint.P2PR\x03\
     p2p\x12\x19\n\x08on_start\x18\x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on\
-    _stop\x18\x04\x20\x01(\tR\x06onStop\"-\n\x03P2P\x12\t\n\x05NEVER\x10\0\
-    \x12\x0f\n\x0bIF_POSSIBLE\x10\x01\x12\n\n\x06ALWAYS\x10\x02\"j\n\x12WebR\
-    tcPlayEndpoint\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x12\x10\n\x03sr\
-    c\x18\x02\x20\x01(\tR\x03src\x12\x19\n\x08on_start\x18\x03\x20\x01(\tR\
-    \x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\x01(\tR\x06onStop2\x9d\x01\
-    \n\nControlApi\x125\n\x06Create\x12\x14.medea.CreateRequest\x1a\x15.mede\
-    a.CreateResponse\x12+\n\x06Delete\x12\x10.medea.IdRequest\x1a\x0f.medea.\
-    Response\x12+\n\x03Get\x12\x10.medea.IdRequest\x1a\x12.medea.GetResponse\
-    b\x06proto3\
+    _stop\x18\x04\x20\x01(\tR\x06onStop\x12\x1f\n\x0bforce_relay\x18\x05\x20\
+    \x01(\x08R\nforceRelay\"-\n\x03P2P\x12\t\n\x05NEVER\x10\0\x12\x0f\n\x0bI\
+    F_POSSIBLE\x10\x01\x12\n\n\x06ALWAYS\x10\x02\"\x8b\x01\n\x12WebRtcPlayEn\
+    dpoint\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x12\x10\n\x03src\x18\
+    \x02\x20\x01(\tR\x03src\x12\x19\n\x08on_start\x18\x03\x20\x01(\tR\x07onS\
+    tart\x12\x17\n\x07on_stop\x18\x04\x20\x01(\tR\x06onStop\x12\x1f\n\x0bfor\
+    ce_relay\x18\x05\x20\x01(\x08R\nforceRelay2\x9d\x01\n\nControlApi\x125\n\
+    \x06Create\x12\x14.medea.CreateRequest\x1a\x15.medea.CreateResponse\x12+\
+    \n\x06Delete\x12\x10.medea.IdRequest\x1a\x0f.medea.Response\x12+\n\x03Ge\
+    t\x12\x10.medea.IdRequest\x1a\x12.medea.GetResponseb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

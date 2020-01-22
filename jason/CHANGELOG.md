@@ -43,6 +43,7 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+        - `RtcIceTransportPolicy` configuration ([#79](/../../pull/79)).
         - `Room.get_stats_of_peer_connections` function ([#39](/../../pull/39)).
 - Room management:
     - Library API:
