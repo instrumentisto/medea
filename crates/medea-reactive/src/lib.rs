@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+
 use std::{
     cell::RefCell,
     fmt::{self, Debug, Error, Formatter},
@@ -166,7 +168,7 @@ pub enum UniversalSubscriber<D> {
         sender: RefCell<Option<oneshot::Sender<()>>>,
         assert_fn: Box<dyn Fn(&D) -> bool>,
     },
-    All(mpsc::UnboundedSender<D>),
+    Subscribe(mpsc::UnboundedSender<D>),
 }
 
 /// Error will be sent to all subscribers when this [`ReactiveField`] is
@@ -191,6 +193,7 @@ pub trait Whenable<D: 'static> {
     ) -> LocalBoxFuture<'static, Result<(), Dropped>>;
 }
 
+#[allow(clippy::use_self)]
 impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     fn when(
         &self,
@@ -209,7 +212,7 @@ impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
 impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let (tx, rx) = mpsc::unbounded();
-        self.borrow_mut().push(UniversalSubscriber::All(tx));
+        self.borrow_mut().push(UniversalSubscriber::Subscribe(tx));
 
         Box::pin(rx)
     }
@@ -228,7 +231,7 @@ impl<D: Clone> OnReactiveFieldModification<D>
                     true
                 }
             }
-            UniversalSubscriber::All(sender) => {
+            UniversalSubscriber::Subscribe(sender) => {
                 sender.unbounded_send(data.clone()).unwrap();
                 true
             }
@@ -272,7 +275,7 @@ where
     D: PartialEq,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
+        self.data
     }
 }
 

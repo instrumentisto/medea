@@ -2,7 +2,7 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::Not, rc::Rc};
 
 use futures::StreamExt;
 use medea_client_api_proto::{self as proto, TrackId as Id};
@@ -12,17 +12,26 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::MediaStreamTrack;
 
 use crate::media::TrackConstraints;
-use std::ops::Not;
 
+/// Mute state of [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutedState {
+    /// [`MediaTrack`] is unmuted.
     Unmuted,
+
+    /// [`MediaTrack`] should be unmuted, but awaits server permission.
     Unmuting,
+
+    /// [`MediaTrack`] should be muted, but awaits server permission.
     Muting,
+
+    /// [`MediaTrack`] is muted.
     Muted,
 }
 
 impl MutedState {
+    /// Returns [`MutedState`] which should be set while transition to this
+    /// [`MutedState`].
     pub fn proccessing_state(self) -> Self {
         match self {
             Self::Unmuted => Self::Unmuting,
@@ -49,7 +58,7 @@ impl Not for MutedState {
         match self {
             Self::Muted => Self::Unmuted,
             Self::Unmuted => Self::Muted,
-            Self::Unmuting => Self::Unmuting,
+            Self::Unmuting => Self::Muting,
             Self::Muting => Self::Unmuting,
         }
     }
@@ -82,21 +91,23 @@ impl MediaTrack {
             muted_state,
         });
 
-        // TODO: this Future will hold [`MediaTrack`] from dropping. Should be
-        // fixed.
-        let this_clone = this.clone();
+        let this_weak = Rc::downgrade(&this);
         spawn_local(async move {
             while let Some(changed_muted_state) =
                 muted_state_subscribe.next().await
             {
-                match changed_muted_state {
-                    MutedState::Muted => {
-                        this_clone.track.set_enabled(false);
+                if let Some(this) = this_weak.upgrade() {
+                    match changed_muted_state {
+                        MutedState::Muted => {
+                            this.track.set_enabled(false);
+                        }
+                        MutedState::Unmuted => {
+                            this.track.set_enabled(true);
+                        }
+                        _ => (),
                     }
-                    MutedState::Unmuted => {
-                        this_clone.track.set_enabled(true);
-                    }
-                    _ => (),
+                } else {
+                    break;
                 }
             }
         });
@@ -120,14 +131,18 @@ impl MediaTrack {
         &self.caps
     }
 
+    /// Returns current [`MutedState`] of this [`MediaTrack`].
     pub fn get_muted_state(&self) -> MutedState {
         **self.muted_state.borrow()
     }
 
+    /// Changes [`MutedState`] of this [`MediaTrack`].
     pub fn change_muted_state(&self, new_state: MutedState) {
         *self.muted_state.borrow_mut().borrow_mut() = new_state;
     }
 
+    /// Will be resolved when [`MutedState`] of this [`Track`] will be become
+    /// equal to provided [`MutedState`].
     pub async fn on_muted_state(
         &self,
         state: MutedState,
@@ -136,7 +151,9 @@ impl MediaTrack {
         subscription.await.map_err(|e| tracerr::new!(e))
     }
 
-    pub fn update(&self, track: proto::TrackUpdate) {
+    /// Update this [`Track`] based on provided
+    /// [`medea_client_api_proto::TrackUpdate`].
+    pub fn update(&self, track: &proto::TrackUpdate) {
         if let Some(is_muted) = track.is_muted {
             if is_muted {
                 *self.muted_state.borrow_mut().borrow_mut() = MutedState::Muted;

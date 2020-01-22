@@ -26,6 +26,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
+    peer::media::Sender,
     utils::{console_error, JsCaused, JsError},
 };
 
@@ -44,7 +45,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::{MediaTrack, MutedState},
 };
-use crate::peer::media::Sender;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -70,6 +70,10 @@ pub enum PeerError {
     /// parsing [`MediaStream`].
     #[display(fmt = "{}", _0)]
     StreamRequest(#[js(cause)] StreamRequestError),
+
+    /// Invalid [`medea_client_api_proto::TrackUpdate`] for [`MediaTrack`].
+    #[display(fmt = "Invalid TrackUpdate for Track with {} ID.", _0)]
+    InvalidTrackUpdate(TrackId),
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
@@ -234,26 +238,37 @@ impl PeerConnection {
         Ok(peer)
     }
 
+    /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
+    /// [`MutedState::Muted`].
     pub fn is_all_tracks_muted(&self, kind: TransceiverKind) -> bool {
         self.media_connections.is_all_tracks_with_kind_muted(kind)
     }
 
+    /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
+    /// [`MutedState::Unmuted`].
     pub fn is_all_tracks_unmuted(&self, kind: TransceiverKind) -> bool {
         self.media_connections.is_all_tracks_with_kind_unmuted(kind)
     }
 
+    /// Returns [`PeerId`] of this [`PeerConnection`].
     pub fn id(&self) -> PeerId {
         self.id
     }
 
-    pub fn update_tracks(&self, tracks: Vec<proto::TrackUpdate>) {
+    /// Updates [`MediaTrack`]s of this [`PeerConnection`] with
+    /// [`medea_client_api_proto::TrackUpdate`].
+    pub fn update_tracks(&self, tracks: Vec<proto::TrackUpdate>) -> Result<()> {
         for track_proto in tracks {
             let track = self
                 .media_connections
                 .get_track_by_id(track_proto.id)
-                .unwrap();
-            track.update(track_proto);
+                .ok_or_else(|| {
+                    tracerr::new!(PeerError::InvalidTrackUpdate(track_proto.id))
+                })?;
+            track.update(&track_proto);
         }
+
+        Ok(())
     }
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
@@ -351,13 +366,15 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    pub fn iter_senders_with_kind_and_muted_state(
+    /// Returns all [`Sender`]s with provided [`TransceiverKind`] and
+    /// [`MutedState`] from this [`PeerConnection`].
+    pub fn get_senders_by_kind_and_muted_state(
         &self,
         kind: TransceiverKind,
         muted_state: MutedState,
     ) -> Vec<Rc<Sender>> {
         self.media_connections
-            .iter_senders_with_kind_and_mute_state(kind, muted_state)
+            .get_senders_by_kind_and_mute_state(kind, muted_state)
     }
 
     /// Track id to mid relations of all send tracks of this

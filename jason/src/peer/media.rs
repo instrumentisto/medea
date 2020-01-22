@@ -5,7 +5,7 @@ use std::{
     future::Future, rc::Rc,
 };
 
-use derive_more::{Display, From};
+use derive_more::Display;
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use medea_reactive::Dropped;
@@ -27,7 +27,6 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
-use crate::peer::media::MediaConnectionsError::MutedStateDropped;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -60,8 +59,12 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
+    /// [`MutedState`] of [`MediaTrack`] was dropped.
+    #[display(fmt = "'MutedState' of 'MediaTrack' was dropped.")]
     MutedStateDropped,
 
+    /// No [`MediaTrack`] in [`Sender`].
+    #[display(fmt = "No 'MediaTrack' in 'Sender'.")]
     NoTrack,
 }
 
@@ -111,7 +114,9 @@ impl MediaConnections {
         }))
     }
 
-    pub fn iter_senders_with_kind_and_mute_state(
+    /// Returns all [`Sender`]s with provided [`TransceiverKind`] and
+    /// [`MutedState`] from this [`MediaConnections`].
+    pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
         mute_state: MutedState,
@@ -129,6 +134,8 @@ impl MediaConnections {
             .collect()
     }
 
+    /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
+    /// in [`MutedState::Muted`].
     pub fn is_all_tracks_with_kind_muted(&self, kind: TransceiverKind) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
             if let Some(muted_state) = sender.muted_state() {
@@ -140,6 +147,8 @@ impl MediaConnections {
         true
     }
 
+    /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
+    /// in [`MutedState::Unmuted`].
     pub fn is_all_tracks_with_kind_unmuted(
         &self,
         kind: TransceiverKind,
@@ -355,7 +364,7 @@ impl MediaConnections {
     }
 
     /// Returns [`MediaTrack`] by its [`TrackId`] and [`TransceiverDirection`].
-    pub fn get_track_by_id_and_kind(
+    pub fn get_track_by_id_and_direction(
         &self,
         direction: TransceiverDirection,
         id: TrackId,
@@ -372,17 +381,17 @@ impl MediaConnections {
         }
     }
 
+    /// Returns [`MediaTrack`] by its [`TrackId`].
     pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<MediaTrack>> {
         let inner = self.0.borrow();
-        if let Some(track) = inner
+
+        inner
             .senders
             .get(&id)
             .and_then(|sender| sender.track.borrow().clone())
-        {
-            Some(track)
-        } else {
-            inner.receivers.get(&id).and_then(|recv| recv.track.clone())
-        }
+            .or_else(|| {
+                inner.receivers.get(&id).and_then(|recv| recv.track.clone())
+            })
     }
 }
 
@@ -422,6 +431,7 @@ impl Sender {
         }))
     }
 
+    /// Returns [`TrackId`] of this [`Sender`].
     pub fn track_id(&self) -> TrackId {
         self.track_id
     }
@@ -431,6 +441,7 @@ impl Sender {
         TransceiverKind::from(&self.caps)
     }
 
+    /// Returns [`MutedState`] of underlying [`MediaTrack`] of this [`Sender`].
     pub fn muted_state(&self) -> Option<MutedState> {
         self.track
             .borrow()
@@ -465,7 +476,7 @@ impl Sender {
         Ok(())
     }
 
-    /// Enables or disables this [`Sender`]s track.
+    /// Changes [`MutedState`] of this [`Sender`]'s underlying [`MediaTrack`].
     pub fn change_muted_state(&self, new_state: MutedState) {
         if let Some(track) = self.track.borrow_mut().as_mut() {
             track.change_muted_state(new_state);
@@ -480,6 +491,8 @@ impl Sender {
         }
     }
 
+    /// Resolves when [`MutedState`] of underlying [`MediaTrack`] of this
+    /// [`Sender`] will become equal to provided [`MutedState`].
     pub fn on_muted_state(
         &self,
         state: MutedState,
