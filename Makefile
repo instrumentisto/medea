@@ -120,7 +120,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	kill -9 $(pidof medea-control-api-mock)
+	killall medea-control-api-mock
 
 
 down.coturn: docker.down.coturn
@@ -147,10 +147,8 @@ down.dev:
 
 down.e2e:
 ifeq ($(dockerized),no)
-	-kill $$(cat /tmp/e2e_medea.pid)
-	-kill $$(cat /tmp/e2e_control_api_mock.pid)
-	-rm -f /tmp/e2e_medea.pid \
-		/tmp/e2e_control_api_mock.pid
+	killall medea
+	killall medea-control-api-mock
 ifneq ($(coturn),no)
 	-@make down.coturn
 endif
@@ -162,6 +160,19 @@ endif
 
 
 down.medea: docker.down.medea
+
+
+# Stop WebDriver.
+#
+# Usage:
+#   make down.webdriver [browser=(chrome|firefox)]
+
+down.webdriver:
+ifeq ($(browser),firefox)
+	killall geckodriver
+else
+	killall chromedriver
+endif
 
 
 # Run Control API mock server.
@@ -245,10 +256,8 @@ ifeq ($(dockerized),no)
 	pushd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg && popd
 
 	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
-		$(if $(call eq,$(release),yes),--release) & \
-		echo $$! > /tmp/e2e_medea.pid
-	env RUST_LOG=warn cargo run -p medea-control-api-mock & \
-		echo $$! > /tmp/e2e_control_api_mock.pid
+		$(if $(call eq,$(release),yes),--release) &
+	env RUST_LOG=warn cargo run -p medea-control-api-mock &
 
 	cargo build -p e2e-tests-runner
 else
@@ -267,6 +276,19 @@ else
 	@make docker.up.control dockerized=yes background=yes
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
+endif
+
+
+# Start WebDriver.
+#
+# Usage:
+#   make up.webdriver [browser=(chrome|firefox)]
+
+up.webdriver:
+ifeq ($(browser),firefox)
+	geckodriver --port 4444 &
+else
+	chromedriver --port=4444 &
 endif
 
 
@@ -514,7 +536,11 @@ endif
 test.e2e:
 ifneq ($(up),no)
 	@make up.e2e
+ifeq ($(dockerized),no)
+	@make up.webdriver
+else
 	@make docker.up.webdriver
+endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
@@ -523,7 +549,11 @@ endif
 		$(if $(call eq,$(headless),no),,--headless) \
 		$(if $(call eq,$(wait-on-fail),yes),--wait-on-fail,)
 ifneq ($(up),no)
+ifeq ($(dockerized),no)
+	@make down.webdriver
+else
 	@make docker.down.webdriver
+endif
 	@make down.e2e
 endif
 
@@ -1032,5 +1062,5 @@ endef
         minikube.boot \
         release release.crates release.helm release.npm \
         test test.e2e test.unit test.integration \
-        up up.control up.coturn up.demo up.dev up.jason up.medea up.e2e \
+        up up.control up.coturn up.demo up.dev up.jason up.medea up.e2e up.webdriver \
         yarn

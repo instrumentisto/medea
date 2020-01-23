@@ -20,11 +20,13 @@ describe('Pub<=>Pub video call', function() {
             pipeline: {
               publish: {
                 kind: 'WebRtcPublishEndpoint',
-                p2p: 'Always'
+                p2p: 'Always',
+                force_relay: false,
               },
               play: {
                 kind: 'WebRtcPlayEndpoint',
                 src: 'local://pub-pub-e2e-call/responder/publish',
+                force_relay: false,
               }
             }
           },
@@ -35,10 +37,12 @@ describe('Pub<=>Pub video call', function() {
               publish: {
                 kind: 'WebRtcPublishEndpoint',
                 p2p: 'Always',
+                force_relay: false,
               },
               play: {
                 kind: 'WebRtcPlayEndpoint',
                 src: 'local://pub-pub-e2e-call/caller/publish',
+                force_relay: false,
               }
             }
           }
@@ -86,6 +90,8 @@ describe('Pub<=>Pub video call', function() {
     room.on_close(function(on_closed) {
       throw Error("on_closed");
     });
+
+    room.on_connection_loss(() => {})
 
     return room;
   }
