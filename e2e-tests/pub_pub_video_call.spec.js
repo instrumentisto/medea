@@ -1,4 +1,4 @@
-//TODO: Extend tests in separate PR's: force relay, mute unmute.
+// TODO: Extend tests in separate PR's: force relay, mute unmute.
 
 let assert = chai.assert;
 
@@ -64,6 +64,7 @@ describe('Pub<=>Pub video call', function() {
 
   const callerPartnerVideo = 'callers-partner-video';
   const responderPartnerVideo = 'responder-partner-video';
+  const onCanPlayFired = {};
 
   /**
    * Creates new 'Room' which will add video of partner to a 'document.body'
@@ -79,6 +80,9 @@ describe('Pub<=>Pub video call', function() {
         video.id = id;
 
         video.srcObject = stream.get_media_stream();
+        video.oncanplay = () => {
+          onCanPlayFired[id] = true;
+        };
         document.body.appendChild(video);
         await video.play();
       });
@@ -136,9 +140,6 @@ describe('Pub<=>Pub video call', function() {
   });
 
   it('sends rtc packets', async () => {
-    // TODO: The best way to check that video is flowing, is waiting for `canplay`
-    //       event on video element (video.oncanplay)
-
     /**
      * Takes array of RTCStatsReport and count 'outbound-rtp' and 'inbound-rtp"
      * for all RTCStatsReport. If 'outbound-rtp''s 'packetsSent' or 'inbound-rtp"'s
@@ -168,6 +169,15 @@ describe('Pub<=>Pub video call', function() {
     let responderStats = await rooms.responder.get_stats_for_peer_connections();
     checkStats(responderStats);
   }).retries(20);
+
+  it('oncanplay fired', (done) => {
+    const intervalId = setInterval(() => {
+      if (onCanPlayFired[callerPartnerVideo] && onCanPlayFired[responderPartnerVideo]) {
+        done();
+        clearInterval(intervalId);
+      }
+    }, 50);
+  })
 
   it('videos not static', async () => {
     let callerVideo = await waitForElement(callerPartnerVideo);
