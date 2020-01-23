@@ -80,7 +80,7 @@ impl TurnDatabase {
         debug!("Remove ICE users: {:?}", users);
 
         let delete_keys: Vec<_> = users
-            .into_iter()
+            .iter()
             .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
             .collect();
 
