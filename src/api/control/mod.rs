@@ -208,20 +208,16 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 pub async fn start_static_rooms(
     room_service: &Addr<RoomService>,
 ) -> Result<(), Error> {
-    if let Err(err) = room_service.send(StartStaticRooms).await? {
-        match err {
-            RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
-                LoadStaticControlSpecsError::SpecDirReadError(e) => {
-                    warn!(
-                        "Error while reading static control API specs dir. \
-                         Control API specs not loaded. {}",
-                        e
-                    );
-                }
-                _ => panic!("{}", e),
-            },
-            _ => panic!("{}", err),
-        }
+    match room_service.send(StartStaticRooms).await? {
+        Err(RoomServiceError::FailedToLoadStaticSpecs(
+            LoadStaticControlSpecsError::SpecDirReadError(e),
+        )) => warn!(
+            "Error while reading static control API specs dir. Control API \
+             specs not loaded. {}",
+            e,
+        ),
+        Err(e) => panic!("{}", e),
+        _ => {}
     };
     Ok(())
 }

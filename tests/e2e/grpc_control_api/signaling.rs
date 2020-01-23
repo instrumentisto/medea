@@ -4,12 +4,13 @@
 
 use std::{
     cell::{Cell, RefCell},
+    future::Future,
     rc::Rc,
     time::Duration,
 };
 
 use actix::Context;
-use futures::{channel::mpsc, Future, StreamExt as _};
+use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::Event;
 use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
 use tokio::time::timeout;

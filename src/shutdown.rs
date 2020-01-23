@@ -81,7 +81,7 @@ impl Actor for GracefulShutdown {
             Ok(sig_stream) => {
                 ctx.add_message_stream(sig_stream.map(move |_| OsSignal(num)));
             }
-            Err(err) => error!("Cannot register OsSignal: {:?}", err),
+            Err(e) => error!("Cannot register OsSignal: {:?}", e),
         };
 
         register_sig(SignalKind::hangup(), 1);
@@ -133,8 +133,8 @@ impl Handler<OsSignal> for GracefulShutdown {
                 let addrs: Vec<_> = addrs
                     .into_iter()
                     .map(|addr| async move {
-                        if let Err(err) = addr.send(ShutdownGracefully).await {
-                            error!("Error requesting shutdown: {}", err);
+                        if let Err(e) = addr.send(ShutdownGracefully).await {
+                            error!("Error requesting shutdown: {}", e);
                         };
                     })
                     .collect();

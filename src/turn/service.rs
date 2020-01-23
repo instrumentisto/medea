@@ -9,9 +9,11 @@ use actix::{
     fut, Actor, ActorFuture, Addr, Context, Handler, MailboxError, Message,
     ResponseFuture, WrapFuture as _,
 };
-use derive_more::Display;
+use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
+use futures::future::{
+    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
@@ -49,16 +51,16 @@ impl TurnAuthService for Addr<Service> {
         room_id: RoomId,
         policy: UnreachablePolicy,
     ) -> LocalBoxFuture<'static, Result<IceUser, TurnServiceErr>> {
-        let create_result = self.send(CreateIceUser {
+        let creating = self.send(CreateIceUser {
             member_id,
             room_id,
             policy,
         });
         async {
-            match create_result.await {
+            match creating.await {
                 Ok(Ok(ice)) => Ok(ice),
                 Ok(Err(err)) => Err(err),
-                Err(err) => Err(TurnServiceErr::from(err)),
+                Err(err) => Err(err.into()),
             }
         }
         .boxed_local()
@@ -74,13 +76,13 @@ impl TurnAuthService for Addr<Service> {
             users.into_iter().filter(|u| !u.is_static()).collect();
 
         if users.is_empty() {
-            async { Ok(()) }.boxed_local()
+            future::ok(()).boxed_local()
         } else {
-            let delete_result = self.send(DeleteIceUsers(users));
+            let deleting = self.send(DeleteIceUsers(users));
             async {
-                match delete_result.await {
+                match deleting.await {
                     Ok(Err(err)) => Err(err),
-                    Err(err) => Err(TurnServiceErr::from(err)),
+                    Err(err) => Err(err.into()),
                     _ => Ok(()),
                 }
             }
@@ -93,26 +95,17 @@ impl TurnAuthService for Addr<Service> {
 type ActFuture<T> = Box<dyn ActorFuture<Actor = Service, Output = T>>;
 
 /// Error which can happen in [`TurnAuthService`].
-#[derive(Display, Debug, Fail)]
+#[derive(Display, Debug, Fail, From)]
 pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
+
     #[display(fmt = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
     MailboxErr(MailboxError),
+
     #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
+    #[from(ignore)]
     TimedOut,
-}
-
-impl From<TurnDatabaseErr> for TurnServiceErr {
-    fn from(err: TurnDatabaseErr) -> Self {
-        Self::TurnAuthRepoErr(err)
-    }
-}
-
-impl From<MailboxError> for TurnServiceErr {
-    fn from(err: MailboxError) -> Self {
-        Self::MailboxErr(err)
-    }
 }
 
 /// Defines [`TurnAuthService`] behaviour if remote database is unreachable
@@ -121,6 +114,7 @@ pub enum UnreachablePolicy {
     /// Error will be propagated if request to db fails cause it is
     /// unreachable.
     ReturnErr,
+
     /// Static member credentials will be returned if request to db fails cause
     /// it is unreachable.
     ReturnStatic,
@@ -131,14 +125,19 @@ pub enum UnreachablePolicy {
 struct Service {
     /// Turn credentials repository.
     turn_db: TurnDatabase,
+
     /// TurnAuthRepo password.
     db_pass: String,
+
     /// Turn server address.
     turn_address: String,
+
     /// Turn server static user.
     turn_username: String,
+
     /// Turn server static user password.
     turn_password: String,
+
     /// Lazy static [`ICEUser`].
     static_user: Option<IceUser>,
 }
@@ -281,8 +280,8 @@ pub mod test {
             async {
                 Ok(IceUser::new(
                     "5.5.5.5:1234".parse().unwrap(),
-                    String::from("username"),
-                    String::from("password"),
+                    "username".into(),
+                    "password".into(),
                 ))
             }
             .boxed_local()
@@ -292,7 +291,7 @@ pub mod test {
             &self,
             _: Vec<IceUser>,
         ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>> {
-            async { Ok(()) }.boxed_local()
+            future::ok(()).boxed_local()
         }
     }
 

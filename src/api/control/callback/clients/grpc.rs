@@ -3,7 +3,7 @@
 use std::{fmt, sync::Arc};
 
 use futures::{
-    compat::Future01CompatExt,
+    compat::Future01CompatExt as _,
     future::{FutureExt as _, LocalBoxFuture},
 };
 use grpcio::{ChannelBuilder, EnvBuilder};

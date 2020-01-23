@@ -33,8 +33,10 @@ use crate::{
 struct RequestParams {
     /// ID of [`Room`] that WebSocket connection connects to.
     room_id: RoomId,
+
     /// ID of [`Member`] that establishes WebSocket connection.
     member_id: MemberId,
+
     /// Credential of [`Member`] to authorize WebSocket connection with.
     credentials: String,
 }
@@ -62,7 +64,6 @@ async fn ws_index(
                     credentials,
                 })
                 .await?;
-
             match auth_result {
                 Ok(_) => ws::start(
                     WsSession::new(
@@ -206,7 +207,6 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-
         match server
             .ws_at("/ws/pub-sub-video-call/caller/bad_credentials")
             .await
@@ -229,14 +229,12 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-
         match server.ws_at("/ws/bad_room/caller/test").await {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 404);
             }
             _ => unreachable!(),
         };
-
         match server.ws_at("/ws/pub-sub-video-call/bad_member/test").await {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 404);
@@ -256,7 +254,6 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-
         server
             .ws_at("/ws/pub-sub-video-call/caller/test")
             .await

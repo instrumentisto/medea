@@ -10,7 +10,7 @@ use actix::{
     AsyncContext, ContextFutureSpawner as _, Handler, Message, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
-use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
 };
@@ -179,7 +179,7 @@ impl Actor for WsSession {
                         ));
                     }
                 };
-                async {}.into_actor(this)
+                future::ready(()).into_actor(this)
             })
             .wait(ctx);
     }
@@ -319,7 +319,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         }
                         Err(err) => error!(
                             "Error [{:?}] parsing client message [{}]",
-                            err, &text
+                            err, &text,
                         ),
                     }
                 }
@@ -345,13 +345,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 }
                 _ => error!(
                     "Unsupported client message from member {}",
-                    self.member_id
+                    self.member_id,
                 ),
             },
             Err(err) => {
                 error!(
                     "Error in WsSession StreamHandler for Member [{}]: {:?}",
-                    self.member_id, err
+                    self.member_id, err,
                 );
             }
         };
@@ -385,7 +385,7 @@ mod test {
 
     use futures::{
         channel::oneshot::{self, Receiver, Sender},
-        FutureExt as _, SinkExt as _, StreamExt as _,
+        future, FutureExt as _, SinkExt as _, StreamExt as _,
     };
 
     use crate::api::{
@@ -420,10 +420,10 @@ mod test {
             rpc_server
                 .expect_connection_established()
                 .withf(move |member_id, _| *member_id == expected_member_id)
-                .return_once(|_, _| async { Err(()) }.boxed_local());
+                .return_once(|_, _| future::err(()).boxed_local());
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| async {}.boxed_local());
+                .returning(|_, _| future::ready(()).boxed_local());
 
             WsSession::new(
                 member_id,
@@ -455,10 +455,10 @@ mod test {
 
             rpc_server
                 .expect_connection_established()
-                .return_once(|_, _| async { Ok(()) }.boxed_local());
+                .return_once(|_, _| future::ok(()).boxed_local());
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| async {}.boxed_local());
+                .returning(|_, _| future::ready(()).boxed_local());
 
             WsSession::new(
                 member_id,
@@ -484,7 +484,6 @@ mod test {
         assert_eq!(item, Frame::Text(String::from(r#"{"ping":0}"#).into()));
 
         let item = client.next().await.unwrap().unwrap();
-
         assert_eq!(item, Frame::Text(String::from(r#"{"ping":1}"#).into()));
     }
 
@@ -498,7 +497,7 @@ mod test {
 
             rpc_server
                 .expect_connection_established()
-                .return_once(|_, _| async { Ok(()) }.boxed_local());
+                .return_once(|_, _| future::ok(()).boxed_local());
 
             let expected_member_id = member_id.clone();
             rpc_server
@@ -507,7 +506,7 @@ mod test {
                     *member_id == expected_member_id
                         && *reason == ClosedReason::Lost
                 })
-                .return_once(|_, _| async {}.boxed_local());
+                .return_once(|_, _| future::ready(()).boxed_local());
 
             WsSession::new(
                 member_id,
@@ -551,14 +550,14 @@ mod test {
 
             rpc_server
                 .expect_connection_established()
-                .return_once(|_, _| async { Ok(()) }.boxed_local());
+                .return_once(|_, _| future::ok(()).boxed_local());
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| async {}.boxed_local());
+                .returning(|_, _| future::ready(()).boxed_local());
 
             rpc_server.expect_send_command().return_once(|command| {
                 let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
-                async {}.boxed_local()
+                future::ready(()).boxed_local()
             });
 
             WsSession::new(
@@ -617,12 +616,12 @@ mod test {
                 |_, connection| {
                     let _ =
                         CHAN.0.lock().unwrap().take().unwrap().send(connection);
-                    async { Ok(()) }.boxed_local()
+                    future::ok(()).boxed_local()
                 },
             );
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| async {}.boxed_local());
+                .returning(|_, _| future::ready(()).boxed_local());
 
             WsSession::new(
                 member_id,
@@ -677,7 +676,7 @@ mod test {
             );
             rpc_server
                 .expect_connection_closed()
-                .returning(|_, _| async {}.boxed_local());
+                .returning(|_, _| future::ready(()).boxed_local());
 
             WsSession::new(
                 member_id,

@@ -152,13 +152,13 @@ impl RoomService {
             );
 
             let room_repo = self.room_repo.clone();
-            let send_result = room.send(Close);
+            let sending = room.send(Close);
             async move {
-                let send_result = send_result.await;
-                if send_result.is_ok() {
+                let res = sending.await;
+                if res.is_ok() {
                     room_repo.remove(&id);
                 }
-                send_result
+                res
             }
             .boxed_local()
         } else {
@@ -306,18 +306,16 @@ impl Handler<CreateMemberInRoom> for RoomService {
         sids.insert(msg.id.to_string(), sid);
 
         if let Some(room) = self.room_repo.get(&room_id) {
-            let send_result = room.send(CreateMember(msg.id, msg.spec));
+            let sending = room.send(CreateMember(msg.id, msg.spec));
             async {
-                send_result
-                    .await
-                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
                 Ok(sids)
             }
             .boxed_local()
         } else {
-            async {
-                Err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(room_id)))
-            }
+            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                room_id,
+            )))
             .boxed_local()
         }
     }
@@ -346,22 +344,20 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         let endpoint_id = msg.id;
 
         if let Some(room) = self.room_repo.get(&room_id) {
-            let send_result = room.send(CreateEndpoint {
+            let sending = room.send(CreateEndpoint {
                 member_id,
                 endpoint_id,
                 spec: msg.spec,
             });
             async {
-                send_result
-                    .await
-                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
                 Ok(HashMap::new())
             }
             .boxed_local()
         } else {
-            async {
-                Err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(room_id)))
-            }
+            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                room_id,
+            )))
             .boxed_local()
         }
     }
@@ -477,19 +473,17 @@ impl Handler<DeleteElements<Validated>> for RoomService {
             let room_id = deletes_from_room[0].room_id().clone();
 
             if let Some(room) = self.room_repo.get(&room_id) {
-                let send_result = room.send(Delete(deletes_from_room));
+                let sending = room.send(Delete(deletes_from_room));
                 async {
-                    send_result
-                        .await
-                        .map_err(RoomServiceError::RoomMailboxErr)?;
+                    sending.await.map_err(RoomServiceError::RoomMailboxErr)?;
                     Ok(())
                 }
                 .boxed_local()
             } else {
-                async { Ok(()) }.boxed_local()
+                future::ok(()).boxed_local()
             }
         } else {
-            async { Err(RoomServiceError::EmptyUrisList) }.boxed_local()
+            future::err(RoomServiceError::EmptyUrisList).boxed_local()
         }
     }
 }
@@ -518,10 +512,8 @@ impl Handler<Get> for RoomService {
                     .or_insert_with(Vec::new)
                     .push(fid);
             } else {
-                return async {
-                    Err(RoomServiceError::RoomNotFound(fid.into()))
-                }
-                .boxed_local();
+                return future::err(RoomServiceError::RoomNotFound(fid.into()))
+                    .boxed_local();
             }
         }
 
@@ -536,9 +528,9 @@ impl Handler<Get> for RoomService {
                 .map_err(RoomServiceError::RoomMailboxErr)?;
 
             let mut all = HashMap::new();
-            for result in results {
-                match result {
-                    Ok(res) => all.extend(res),
+            for res in results {
+                match res {
+                    Ok(r) => all.extend(r),
                     Err(e) => return Err(RoomServiceError::from(e)),
                 }
             }

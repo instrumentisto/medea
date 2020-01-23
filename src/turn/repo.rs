@@ -1,40 +1,30 @@
 //! Abstraction over remote Redis database used to store Turn server
 //! credentials.
-use std::{fmt::Debug, sync::Arc, time::Duration};
+
+use std::{fmt, future::Future, time::Duration};
 
 use crypto::{digest::Digest, md5::Md5};
 use deadpool::managed::{PoolConfig, Timeouts};
 use deadpool_redis::{cmd, Pool, PoolError};
-use derive_more::Display;
+use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::Future;
 use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{log::prelude::*, media::IceUser};
 
-#[derive(Debug, Display, Fail)]
+#[derive(Debug, Display, Fail, From)]
 pub enum TurnDatabaseErr {
-    #[display(fmt = "Could not get connection from pool because: {}", _0)]
+    #[display(fmt = "Couldn't get connection from pool: {}", _0)]
     PoolError(PoolError),
+
     #[display(fmt = "Redis returned error: {}", _0)]
     RedisError(RedisError),
-}
-
-impl From<RedisError> for TurnDatabaseErr {
-    fn from(err: RedisError) -> Self {
-        Self::RedisError(err)
-    }
-}
-impl From<PoolError> for TurnDatabaseErr {
-    fn from(err: PoolError) -> Self {
-        Self::PoolError(err)
-    }
 }
 
 // Abstraction over remote Redis database used to store Turn server
 // credentials.
 pub struct TurnDatabase {
-    pool: Arc<Pool>,
+    pool: Pool,
 }
 
 impl TurnDatabase {
@@ -45,17 +35,15 @@ impl TurnDatabase {
     ) -> Result<Self, TurnDatabaseErr> {
         let manager = deadpool_redis::Manager::new(conn_info)?;
         let config = PoolConfig {
-            max_size: 16,
+            max_size: 16, // TODO: configure via conf
             timeouts: Timeouts {
                 wait: None,
                 create: Some(conn_timeout),
                 recycle: None,
             },
         };
-        let pool = Pool::from_config(manager, config);
-
         Ok(Self {
-            pool: Arc::new(pool),
+            pool: Pool::from_config(manager, config),
         })
     }
 
@@ -69,18 +57,17 @@ impl TurnDatabase {
         let key = format!("turn/realm/medea/user/{}/key", user.user());
         let value = format!("{}:medea:{}", user.user(), user.pass());
 
-        let pool = Arc::clone(&self.pool);
+        let mut hasher = Md5::new();
+        hasher.input_str(&value);
+        let result = hasher.result_str();
+
+        let pool = self.pool.clone();
         async move {
-            let mut connection = pool.get().await?;
-
-            let mut hasher = Md5::new();
-            hasher.input_str(&value);
-            let result = hasher.result_str();
-
+            let mut conn = pool.get().await?;
             Ok(cmd("SET")
                 .arg(key)
                 .arg(result)
-                .query_async(&mut connection)
+                .query_async(&mut conn)
                 .await?)
         }
     }
@@ -92,25 +79,23 @@ impl TurnDatabase {
     ) -> impl Future<Output = Result<(), TurnDatabaseErr>> {
         debug!("Remove ICE users: {:?}", users);
 
-        let mut delete_keys = Vec::with_capacity(users.len());
-        for user in users {
-            delete_keys
-                .push(format!("turn/realm/medea/user/{}/key", user.user()));
-        }
-        let pool = Arc::clone(&self.pool);
-        async move {
-            let mut connection = pool.get().await?;
+        let delete_keys: Vec<_> = users
+            .into_iter()
+            .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
+            .collect();
 
-            Ok(cmd("DEL")
-                .arg(delete_keys)
-                .query_async(&mut connection)
-                .await?)
+        let pool = self.pool.clone();
+        async move {
+            let mut conn = pool.get().await?;
+            Ok(cmd("DEL").arg(delete_keys).query_async(&mut conn).await?)
         }
     }
 }
 
-impl Debug for TurnDatabase {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "TurnDatabase: {:?}", self.pool.status())
+impl fmt::Debug for TurnDatabase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TurnDatabase")
+            .field("pool", &self.pool.status())
+            .finish()
     }
 }

@@ -61,8 +61,8 @@ impl CallbackService {
         };
 
         Arbiter::spawn(async {
-            if let Err(err) = send_request.await {
-                error!("Failed to send callback because {:?}.", err);
+            if let Err(e) = send_request.await {
+                error!("Failed to send callback because {:?}.", e);
             }
         });
     }

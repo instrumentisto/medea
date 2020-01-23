@@ -5,7 +5,9 @@ mod member;
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{
+    compat::Future01CompatExt as _, FutureExt as _, TryFutureExt as _,
+};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     callback::{Request, Response},

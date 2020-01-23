@@ -11,7 +11,7 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
@@ -342,7 +342,7 @@ impl Room {
         match self.send_peer_created(first_peer, second_peer) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
                 if res.is_ok() {
-                    return Box::new(async {}.into_actor(this));
+                    return Box::new(future::ready(()).into_actor(this));
                 }
                 error!(
                     "Failed connect peers, because {}. Room [id = {}] will be \
@@ -424,7 +424,7 @@ impl Room {
                     match e {
                         RoomError::ConnectionNotExists(_)
                         | RoomError::UnableToSendEvent(_) => {
-                            Box::new(async {}.into_actor(this))
+                            Box::new(future::ready(()).into_actor(this))
                         }
                         _ => {
                             error!(
@@ -436,7 +436,7 @@ impl Room {
                         }
                     }
                 } else {
-                    Box::new(async {}.into_actor(this))
+                    Box::new(future::ready(()).into_actor(this))
                 }
             },
         ))
@@ -734,12 +734,12 @@ impl RpcServer for Addr<Room> {
             member_id,
             connection,
         })
-        .map(|result| match result {
+        .map(|res| match res {
             Ok(_) => Ok(()),
-            Err(err) => {
+            Err(e) => {
                 error!(
                     "Failed to send RpcConnectionEstablished cause {:?}",
-                    err,
+                    e,
                 );
                 Err(())
             }
@@ -755,12 +755,9 @@ impl RpcServer for Addr<Room> {
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()> {
         self.send(RpcConnectionClosed { member_id, reason })
-            .map(|result| {
-                if let Err(err) = result {
-                    error!(
-                        "Failed to send RpcConnectionClosed cause {:?}",
-                        err,
-                    );
+            .map(|res| {
+                if let Err(e) = res {
+                    error!("Failed to send RpcConnectionClosed cause {:?}", e,);
                 };
             })
             .boxed_local()
@@ -769,9 +766,9 @@ impl RpcServer for Addr<Room> {
     /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
     fn send_command(&self, msg: Command) -> LocalBoxFuture<'static, ()> {
         self.send(CommandMessage::from(msg))
-            .map(|result| {
-                if let Err(err) = result {
-                    error!("Failed to send CommandMessage cause {:?}", err);
+            .map(|res| {
+                if let Err(e) = res {
+                    error!("Failed to send CommandMessage cause {:?}", e);
                 }
             })
             .boxed_local()
@@ -873,7 +870,7 @@ impl CommandHandler for Room {
         // TODO: add E2E test
         if candidate.candidate.is_empty() {
             warn!("Empty candidate from Peer: {}, ignoring", from_peer_id);
-            return Ok(Box::new(async { Ok(()) }.into_actor(self)));
+            return Ok(Box::new(future::ok(()).into_actor(self)));
         }
 
         let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
@@ -916,7 +913,7 @@ impl CommandHandler for Room {
         _peer_id: PeerId,
         _candidate: PeerMetrics,
     ) -> Self::Output {
-        Ok(Box::new(async { Ok(()) }.into_actor(self)))
+        Ok(Box::new(future::ok(()).into_actor(self)))
     }
 }
 
@@ -1030,15 +1027,15 @@ impl Handler<CommandMessage> for Room {
     ) -> Self::Result {
         let fut = match Command::from(msg).dispatch_with(self) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
-                if let Err(err) = res {
+                if let Err(e) = res {
                     error!(
                         "Failed handle command, because {}. Room [id = {}] \
                          will be stopped.",
-                        err, this.id,
+                        e, this.id,
                     );
                     this.close_gracefully(ctx)
                 } else {
-                    Box::new(async {}.into_actor(this))
+                    Box::new(future::ready(()).into_actor(this))
                 }
             })),
             Err(err) => {
@@ -1075,7 +1072,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .map(|result, room, ctx| match result {
+            .map(|res, room, ctx| match res {
                 Ok(member) => {
                     room.init_member_connections(&member, ctx);
                     if let Some(callback_url) = member.get_on_join() {
@@ -1087,8 +1084,8 @@ impl Handler<RpcConnectionEstablished> for Room {
                     };
                     Ok(())
                 }
-                Err(err) => {
-                    error!("RpcConnectionEstablished error {:?}", err);
+                Err(e) => {
+                    error!("RpcConnectionEstablished error {:?}", e);
                     Err(())
                 }
             });

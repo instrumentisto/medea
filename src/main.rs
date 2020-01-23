@@ -63,13 +63,9 @@ fn main() -> Result<(), Error> {
             );
             Ok(())
         }
-        .map(|result: Result<(), Error>| match result {
-            Ok(_) => {
-                info!("Started system");
-            }
-            Err(err) => {
-                error!("Startup error: {:?}", err);
-            }
+        .map(|res: Result<(), Error>| match res {
+            Ok(_) => info!("Started system"),
+            Err(e) => error!("Startup error: {:?}", e),
         }),
     );
     sys.run().map_err(Into::into)
