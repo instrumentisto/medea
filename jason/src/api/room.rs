@@ -139,6 +139,7 @@ enum RoomError {
     #[display(fmt = "Remote stream from unknown peer")]
     UnknownRemotePeer,
 
+    /// Returned if [`MediaTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackUpdate(TrackId),
 }

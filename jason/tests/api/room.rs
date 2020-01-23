@@ -11,12 +11,12 @@ use medea_jason::{
     rpc::MockRpcClient,
     utils::JasonError,
 };
+use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{
     get_test_tracks, resolve_after, wait_and_check_test_result, MockNavigator,
 };
-use wasm_bindgen_futures::JsFuture;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

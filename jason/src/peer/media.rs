@@ -293,8 +293,6 @@ impl MediaConnections {
             }
         }
 
-        // TODO: maybe toggle muted state here???
-
         future::try_join_all(
             sender_and_track
                 .into_iter()
@@ -373,7 +371,7 @@ impl MediaConnections {
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
-    pub fn get_sender(&self, id: TrackId) -> Option<Rc<Sender>> {
+    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.0.borrow().senders.get(&id).cloned()
     }
 
@@ -391,19 +389,19 @@ impl MediaConnections {
     }
 }
 
-/// Mute state of [`MediaTrack`].
+/// Mute state of [`Sender`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutedState {
-    /// [`MediaTrack`] is unmuted.
+    /// [`Sender`] is unmuted.
     Unmuted,
 
-    /// [`MediaTrack`] should be unmuted, but awaits server permission.
+    /// [`Sender`] should be unmuted, but awaits server permission.
     Unmuting,
 
-    /// [`MediaTrack`] should be muted, but awaits server permission.
+    /// [`Sender`] should be muted, but awaits server permission.
     Muting,
 
-    /// [`MediaTrack`] is muted.
+    /// [`Sender`] is muted.
     Muted,
 }
 
@@ -546,7 +544,7 @@ impl Sender {
         *self.muted_state.borrow_mut().borrow_mut() = new_state;
     }
 
-    /// Checks is sender has track and it is enabled.
+    /// Checks that [`Sender`] has a track, and it's unmuted.
     fn is_track_enabled(&self) -> bool {
         **self.muted_state.borrow() == MutedState::Unmuted
     }
@@ -565,7 +563,7 @@ impl Sender {
         }
     }
 
-    /// Update this [`Track`] based on provided
+    /// Updates this [`Track`] based on provided
     /// [`medea_client_api_proto::TrackUpdate`].
     pub fn update(&self, track: &proto::TrackUpdate) {
         if let Some(is_muted) = track.is_muted {

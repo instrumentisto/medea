@@ -31,6 +31,7 @@ fragile = { version = "0.3", optional = true }
 futures = "0.3"
 js-sys = "0.3"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
+medea-reactive = { path = "../crates/medea-reactive" }
 medea-macro = { path = "../crates/medea-macro" }
 mockall = { version = "0.5", optional = true }
 predicates-tree = { version = "1.0", optional = true }
@@ -40,7 +41,6 @@ tracerr = "0.1"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4"
 wee_alloc = { version = "0.4", optional = true }
-medea-reactive = { path = "../crates/medea-reactive" }
 [dependencies.web-sys]
     version = "0.3"
     features = [

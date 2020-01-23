@@ -255,13 +255,13 @@ impl PeerConnection {
         self.id
     }
 
-    /// Updates [`MediaTrack`]s of this [`PeerConnection`] with
+    /// Updates [`Sender`]s of this [`PeerConnection`] with
     /// [`medea_client_api_proto::TrackUpdate`].
     pub fn update_tracks(&self, tracks: Vec<proto::TrackUpdate>) -> Result<()> {
         for track_proto in tracks {
             let track = self
                 .media_connections
-                .get_sender(track_proto.id)
+                .get_sender_by_id(track_proto.id)
                 .ok_or_else(|| {
                     tracerr::new!(PeerError::InvalidTrackUpdate(track_proto.id))
                 })?;

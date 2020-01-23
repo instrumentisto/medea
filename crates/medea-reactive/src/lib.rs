@@ -1,34 +1,34 @@
 //! This crate provides a container to which data modifications you can
 //! subscribe.
 //!
-//! Most of all you will interact with [`Reactive`] object. With
-//! [`ReactiveField`] object you can customize behavior of reactivity, but this
-//! is rare usage case.
 //!
-//! # Usage
+//! # Basic iteraction with a `ReactiveField`
 //!
 //!
-//! ## Basic iteraction with a `ReactiveField`
 //!
-//! ### With primitive
+//!
+//! ## With primitive
 //!
 //! ```
 //! use medea_reactive::Reactive;
 //!
-//! // Create reactive field with 'u32' data inside.
+//! // Create a reactive field with 'u32' data inside.
 //! let mut foo = Reactive::new(0u32);
 //!
-//! // If you want to get data which holded by 'Reactive' you can just deref
-//! // 'Reactive' container:
+//! // If you want to get data which held by 'ReactiveField' you can just deref
+//! // 'ReactiveField' container:
 //! assert_eq!(*foo + 100, 100);
 //!
-//! // If you want to modify data which 'Reactive' holds, you should use
+//! // If you want to modify data which 'ReactiveField' holds, you should use
 //! // '.borrow_mut()':
 //! *foo.borrow_mut() = 0;
 //! assert_eq!(*foo, 0);
 //! ```
 //!
-//! ### With object
+//!
+//!
+//!
+//! ## With object
 //!
 //! ```
 //! use medea_reactive::Reactive;
@@ -62,7 +62,10 @@
 //! assert_eq!(foo.current_num(), 1);
 //! ```
 //!
-//! ## Subscription on all `ReactiveField` data modification
+//!
+//!
+//!
+//! # Subscription on all `ReactiveField` data modification
 //!
 //! ```
 //! use medea_reactive::Reactive;
@@ -73,10 +76,10 @@
 //! // Subscribe on all field modifications:
 //! let mut foo_changes_stream = foo.subscribe();
 //!
-//! // Initial `Reactive` field data will be sent as modification:
+//! // Initial 'ReactiveField' field data will be sent as modification:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
 //!
-//! // Modify 'Reactive' field:
+//! // Modify 'ReactiveField' field:
 //! *foo.borrow_mut() = 1;
 //! // Receive modification update:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 1);
@@ -90,7 +93,10 @@
 //! # });
 //! ```
 //!
-//! ## Subscription on concrete `ReactiveField` data modification
+//!
+//!
+//!
+//! # Subscription on concrete `ReactiveField` data modification
 //!
 //! ```
 //! use medea_reactive::Reactive;
@@ -113,7 +119,10 @@
 //! # });
 //! ```
 //!
-//! ## Hold mutable reference of `ReactiveField`
+//!
+//!
+//!
+//! # Hold mutable reference of `ReactiveField`
 //!
 //! ```
 //! use medea_reactive::Reactive;
@@ -167,7 +176,9 @@ use futures::{
     StreamExt as _,
 };
 
-/// [`ReactiveField`] with which you can only subscribe on changes [`Stream`].
+/// [`ReactiveField`] with which you can only subscribe on changes
+/// ([`ReactiveField::subscribe`]) and only on concrete changes
+/// ([`ReactiveField::when`] and [`ReactiveField::when_eq`]).
 pub type Reactive<D> = ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>;
 
 /// A reactive cell which will emit all modification to the subscribers.
@@ -306,6 +317,8 @@ where
     }
 }
 
+/// With this trait you can catch all unique modification of a
+/// [`ReactiveField`].
 pub trait OnReactiveFieldModification<D> {
     /// This function will be called on every [`ReactiveField`] modification.
     ///
@@ -315,6 +328,8 @@ pub trait OnReactiveFieldModification<D> {
     fn on_modify(&mut self, data: &D);
 }
 
+/// With this trait you can implement [`ReactiveField::subscribe`] functional
+/// for some object.
 pub trait Subscribable<D: 'static> {
     /// This function will be called on [`ReactiveField::subscribe`].
     ///
@@ -347,6 +362,8 @@ impl From<oneshot::Canceled> for Dropped {
     }
 }
 
+/// With this trait you can implement [`ReactiveField::when`] and
+/// [`ReactiveField::when_eq`] functional for some object.
 pub trait Whenable<D: 'static> {
     /// This function will be called on [`ReactiveField::when`].
     ///
@@ -412,6 +429,12 @@ impl<D, S> Deref for ReactiveField<D, S> {
     }
 }
 
+/// Mutable [`ReactiveField`] reference which you can get by calling
+/// [`ReactiveField::borrow_mut`].
+///
+/// When this object will be [`Drop`]ped check for modification will be
+/// performed. If data was changed, then
+/// [`OnReactiveFieldModification::on_modify`] will be called.
 pub struct MutReactiveFieldGuard<'a, D, S>
 where
     S: OnReactiveFieldModification<D>,
@@ -463,7 +486,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{cell::RefCell, time::Duration};
 
     use futures::{
         future::{self, Either, LocalBoxFuture},
@@ -472,7 +495,6 @@ mod tests {
     use tokio::{task, time::delay_for};
 
     use crate::Reactive;
-    use std::cell::RefCell;
 
     #[derive(Debug)]
     struct Timeout;

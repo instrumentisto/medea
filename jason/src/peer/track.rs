@@ -7,8 +7,7 @@ use std::rc::Rc;
 use medea_client_api_proto::TrackId as Id;
 use web_sys::MediaStreamTrack;
 
-use crate::media::TrackConstraints;
-use crate::peer::MutedState;
+use crate::{media::TrackConstraints, peer::MutedState};
 
 /// Representation of [MediaStreamTrack][1].
 ///
