@@ -1,3 +1,5 @@
+//TODO: Extend tests in separate PR's: force relay, mute unmute.
+
 let assert = chai.assert;
 
 describe('Pub<=>Pub video call', function() {
@@ -128,6 +130,9 @@ describe('Pub<=>Pub video call', function() {
   });
 
   it('sends rtc packets', async () => {
+    // TODO: The best way to check that video is flowing, is waiting for `canplay`
+    //       event on video element (video.oncanplay)
+
     /**
      * Takes array of RTCStatsReport and count 'outbound-rtp' and 'inbound-rtp"
      * for all RTCStatsReport. If 'outbound-rtp''s 'packetsSent' or 'inbound-rtp"'s
