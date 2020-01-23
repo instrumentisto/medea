@@ -67,8 +67,8 @@ pub struct TestRunner<'a> {
     /// Address where HTML test files will be hosted.
     test_files_host: &'a str,
 
-    /// Don't close browser immediately on test fail. Browser will be closed only
-    /// on <Enter> press.
+    /// Don't close browser immediately on test fail. Browser will be closed
+    /// only on <Enter> press.
     is_wait_on_fail_mode: bool,
 
     /// URL to a WebDriver with which tests will be run.

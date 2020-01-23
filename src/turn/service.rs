@@ -6,13 +6,14 @@
 use std::{fmt, sync::Arc};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
-    Message, WrapFuture,
+    fut, Actor, ActorFuture, Addr, Context, Handler, MailboxError, Message,
+    ResponseFuture, WrapFuture as _,
 };
-use bb8::RunError;
-use derive_more::Display;
+use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{err, ok, Future};
+use futures::future::{
+    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
@@ -33,13 +34,13 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
         member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>>;
+    ) -> LocalBoxFuture<'static, Result<IceUser, TurnServiceErr>>;
 
     /// Deletes batch of [`IceUser`]s.
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
+    ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>>;
 }
 
 impl TurnAuthService for Addr<Service> {
@@ -49,82 +50,62 @@ impl TurnAuthService for Addr<Service> {
         member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
-        Box::new(
-            self.send(CreateIceUser {
-                member_id,
-                room_id,
-                policy,
-            })
-            .then(
-                |r: Result<Result<IceUser, TurnServiceErr>, MailboxError>| {
-                    match r {
-                        Ok(Ok(ice)) => Ok(ice),
-                        Ok(Err(err)) => Err(err),
-                        Err(err) => Err(TurnServiceErr::from(err)),
-                    }
-                },
-            ),
-        )
+    ) -> LocalBoxFuture<'static, Result<IceUser, TurnServiceErr>> {
+        let creating = self.send(CreateIceUser {
+            member_id,
+            room_id,
+            policy,
+        });
+        async {
+            match creating.await {
+                Ok(Ok(ice)) => Ok(ice),
+                Ok(Err(err)) => Err(err),
+                Err(err) => Err(err.into()),
+            }
+        }
+        .boxed_local()
     }
 
     /// Sends `DeleteRoom` to [`Service`].
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+    ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>> {
         // leave only non static users
         let users: Vec<IceUser> =
             users.into_iter().filter(|u| !u.is_static()).collect();
 
         if users.is_empty() {
-            Box::new(futures::future::ok(()))
+            future::ok(()).boxed_local()
         } else {
-            Box::new(self.send(DeleteIceUsers(users)).then(
-                |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
+            let deleting = self.send(DeleteIceUsers(users));
+            async {
+                match deleting.await {
                     Ok(Err(err)) => Err(err),
-                    Err(err) => Err(TurnServiceErr::from(err)),
+                    Err(err) => Err(err.into()),
                     _ => Ok(()),
-                },
-            ))
+                }
+            }
+            .boxed_local()
         }
     }
 }
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`AuthService`].
-type ActFuture<I, E> =
-    Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
+type ActFuture<T> = Box<dyn ActorFuture<Actor = Service, Output = T>>;
 
 /// Error which can happen in [`TurnAuthService`].
-#[derive(Display, Debug, Fail)]
+#[derive(Display, Debug, Fail, From)]
 pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
+
     #[display(fmt = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
     MailboxErr(MailboxError),
+
     #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
+    #[from(ignore)]
     TimedOut,
-}
-
-impl From<TurnDatabaseErr> for TurnServiceErr {
-    fn from(err: TurnDatabaseErr) -> Self {
-        Self::TurnAuthRepoErr(err)
-    }
-}
-
-impl From<bb8::RunError<TurnDatabaseErr>> for TurnServiceErr {
-    fn from(err: bb8::RunError<TurnDatabaseErr>) -> Self {
-        match err {
-            RunError::User(error) => Self::TurnAuthRepoErr(error),
-            RunError::TimedOut => Self::TimedOut,
-        }
-    }
-}
-
-impl From<MailboxError> for TurnServiceErr {
-    fn from(err: MailboxError) -> Self {
-        Self::MailboxErr(err)
-    }
 }
 
 /// Defines [`TurnAuthService`] behaviour if remote database is unreachable
@@ -133,6 +114,7 @@ pub enum UnreachablePolicy {
     /// Error will be propagated if request to db fails cause it is
     /// unreachable.
     ReturnErr,
+
     /// Static member credentials will be returned if request to db fails cause
     /// it is unreachable.
     ReturnStatic,
@@ -143,14 +125,19 @@ pub enum UnreachablePolicy {
 struct Service {
     /// Turn credentials repository.
     turn_db: TurnDatabase,
+
     /// TurnAuthRepo password.
     db_pass: String,
+
     /// Turn server address.
     turn_address: String,
+
     /// Turn server static user.
     turn_username: String,
+
     /// Turn server static user password.
     turn_password: String,
+
     /// Lazy static [`ICEUser`].
     static_user: Option<IceUser>,
 }
@@ -158,12 +145,8 @@ struct Service {
 /// Create new instance [`TurnAuthService`].
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
-) -> impl Future<Item = Arc<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
-    let db_pass = cf.db.redis.pass.clone();
-    let turn_address = cf.addr();
-    let turn_username = cf.user.clone();
-    let turn_password = cf.pass.clone();
-    TurnDatabase::new(
+) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
+    let turn_db = TurnDatabase::new(
         cf.db.redis.connection_timeout,
         ConnectionInfo {
             addr: Box::new(redis::ConnectionAddr::Tcp(
@@ -177,17 +160,18 @@ pub fn new_turn_auth_service<'a>(
                 Some(cf.db.redis.pass.clone())
             },
         },
-    )
-    .map(move |turn_db| Service {
+    )?;
+
+    let turn_service = Service {
         turn_db,
-        db_pass,
-        turn_address,
-        turn_username,
-        turn_password,
+        db_pass: cf.db.redis.pass.clone(),
+        turn_address: cf.addr(),
+        turn_username: cf.user.clone(),
+        turn_password: cf.pass.clone(),
         static_user: None,
-    })
-    .map::<_, Arc<dyn TurnAuthService>>(|service| Arc::new(service.start()))
-    .map_err(TurnServiceErr::from)
+    };
+
+    Ok(Arc::new(turn_service.start()))
 }
 
 impl Service {
@@ -227,7 +211,7 @@ struct CreateIceUser {
 }
 
 impl Handler<CreateIceUser> for Service {
-    type Result = ActFuture<IceUser, TurnServiceErr>;
+    type Result = ActFuture<Result<IceUser, TurnServiceErr>>;
 
     /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
     /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
@@ -244,16 +228,14 @@ impl Handler<CreateIceUser> for Service {
         );
 
         Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
-            move |result, act, _| {
-                wrap_future(match result {
-                    Ok(_) => ok(ice_user),
-                    Err(e) => match msg.policy {
-                        UnreachablePolicy::ReturnErr => err(e.into()),
-                        UnreachablePolicy::ReturnStatic => {
-                            ok(act.static_user())
-                        }
-                    },
-                })
+            move |result, this, _| match result {
+                Ok(_) => fut::ok(ice_user),
+                Err(err) => match msg.policy {
+                    UnreachablePolicy::ReturnErr => fut::err(err.into()),
+                    UnreachablePolicy::ReturnStatic => {
+                        fut::ok(this.static_user())
+                    }
+                },
             },
         ))
     }
@@ -265,7 +247,7 @@ impl Handler<CreateIceUser> for Service {
 struct DeleteIceUsers(Vec<IceUser>);
 
 impl Handler<DeleteIceUsers> for Service {
-    type Result = ActFuture<(), TurnServiceErr>;
+    type Result = ResponseFuture<Result<(), TurnServiceErr>>;
 
     /// Deletes all users with provided [`RoomId`]
     fn handle(
@@ -273,20 +255,13 @@ impl Handler<DeleteIceUsers> for Service {
         msg: DeleteIceUsers,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        Box::new(
-            self.turn_db
-                .remove(&msg.0)
-                .map_err(TurnServiceErr::from)
-                .into_actor(self),
-        )
+        self.turn_db.remove(&msg.0).err_into().boxed_local()
     }
 }
 
 #[cfg(test)]
 pub mod test {
     use std::sync::Arc;
-
-    use futures::future;
 
     use crate::media::IceUser;
 
@@ -301,19 +276,22 @@ pub mod test {
             _: MemberId,
             _: RoomId,
             _: UnreachablePolicy,
-        ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
-            Box::new(future::ok(IceUser::new(
-                "5.5.5.5:1234".parse().unwrap(),
-                String::from("username"),
-                String::from("password"),
-            )))
+        ) -> LocalBoxFuture<'static, Result<IceUser, TurnServiceErr>> {
+            async {
+                Ok(IceUser::new(
+                    "5.5.5.5:1234".parse().unwrap(),
+                    "username".into(),
+                    "password".into(),
+                ))
+            }
+            .boxed_local()
         }
 
         fn delete(
             &self,
             _: Vec<IceUser>,
-        ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
-            Box::new(future::ok(()))
+        ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>> {
+            future::ok(()).boxed_local()
         }
     }
 
