@@ -282,7 +282,6 @@ impl<'a> TestRunner<'a> {
     }
 }
 
-// TODO: change to anykey
 /// Locks thread until used presses `Enter` in command line.
 fn wait_for_enter() {
     let mut s = String::new();

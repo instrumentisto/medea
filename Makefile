@@ -253,7 +253,7 @@ endif
 ifeq ($(dockerized),no)
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p medea-control-api-mock
-	pushd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg && popd
+	cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg
 
 	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
 		$(if $(call eq,$(release),yes),--release) &
