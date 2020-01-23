@@ -1,3 +1,157 @@
+//! This crate provides a container to which data modifications you can
+//! subscribe.
+//!
+//! Most of all you will interact with [`Reactive`] object. With
+//! [`ReactiveField`] object you can customize behavior of reactivity, but this
+//! is rare usage case.
+//!
+//! # Usage
+//!
+//!
+//! ## Basic iteraction with a `ReactiveField`
+//!
+//! ### With primitive
+//!
+//! ```
+//! use medea_reactive::Reactive;
+//!
+//! // Create reactive field with 'u32' data inside.
+//! let mut foo = Reactive::new(0u32);
+//!
+//! // If you want to get data which holded by 'Reactive' you can just deref
+//! // 'Reactive' container:
+//! assert_eq!(*foo + 100, 100);
+//!
+//! // If you want to modify data which 'Reactive' holds, you should use
+//! // '.borrow_mut()':
+//! *foo.borrow_mut() = 0;
+//! assert_eq!(*foo, 0);
+//! ```
+//!
+//! ### With object
+//!
+//! ```
+//! use medea_reactive::Reactive;
+//!
+//! // 'ReactiveField' only works with objects which implements
+//! // 'Clone' and 'PartialEq'.
+//! #[derive(Clone, PartialEq)]
+//! struct Foo(u32);
+//!
+//! impl Foo {
+//!     pub fn new() -> Self {
+//!         Self(0)
+//!     }
+//!
+//!     pub fn increase(&mut self) {
+//!         self.0 += 1;
+//!     }
+//!
+//!     pub fn current_num(&self) -> u32 {
+//!         self.0
+//!     }
+//! }
+//!
+//! let mut foo = Reactive::new(Foo::new());
+//! // You can transparently call methods of object which stored by
+//! // 'ReactiveField' if they not mutate.
+//! assert_eq!(foo.current_num(), 0);
+//! // If you want to call mutable method of object which stored by
+//! // 'ReactiveField' you should call '.borrow_mut()' before it.
+//! foo.borrow_mut().increase();
+//! assert_eq!(foo.current_num(), 1);
+//! ```
+//!
+//! ## Subscription on all `ReactiveField` data modification
+//!
+//! ```
+//! use medea_reactive::Reactive;
+//! # use futures::{executor, StreamExt as _};
+//!
+//! # executor::block_on(async {
+//! let mut foo = Reactive::new(0u32);
+//! // Subscribe on all field modifications:
+//! let mut foo_changes_stream = foo.subscribe();
+//!
+//! // Initial `Reactive` field data will be sent as modification:
+//! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
+//!
+//! // Modify 'Reactive' field:
+//! *foo.borrow_mut() = 1;
+//! // Receive modification update:
+//! assert_eq!(foo_changes_stream.next().await.unwrap(), 1);
+//!
+//! // On this mutable borrow, field actually not changed:
+//! *foo.borrow_mut() = 1;
+//! // After this we really modify value:
+//! *foo.borrow_mut() = 2;
+//! // Only real modification was sent to the modification subscriber:
+//! assert_eq!(foo_changes_stream.next().await.unwrap(), 2);
+//! # });
+//! ```
+//!
+//! ## Subscription on concrete `ReactiveField` data modification
+//!
+//! ```
+//! use medea_reactive::Reactive;
+//! # use futures::{executor, StreamExt as _};
+//!
+//! # executor::block_on(async {
+//! let mut foo = Reactive::new(0u32);
+//!
+//! // Create future which will be resolved when foo will become one:
+//! let when_foo_will_be_one = foo.when_eq(1);
+//! *foo.borrow_mut() = 1;
+//! // Future resolves because value was become 1.
+//! when_foo_will_be_one.await.unwrap();
+//!
+//! // Or you can define your own resolve logic:
+//! let when_foo_will_be_greated_than_5 = foo.when(|foo_upd| foo_upd > &5);
+//! *foo.borrow_mut() = 6;
+//! // Future resolves because value was become greater than 5.
+//! when_foo_will_be_greated_than_5.await.unwrap();
+//! # });
+//! ```
+//!
+//! ## Hold mutable reference of `ReactiveField`
+//!
+//! ```
+//! use medea_reactive::Reactive;
+//! # use futures::{executor, StreamExt as _};
+//!
+//! # executor::block_on(async {
+//! let mut foo = Reactive::new(0u32);
+//!
+//! // Subscribe on all 'foo' changes:
+//! let mut foo_changes_stream = foo.subscribe();
+//! // Just skip initial 'ReactiveField' value:
+//! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
+//! // And hold mutable reference in variable:
+//! let mut foo_mut_ref = foo.borrow_mut();
+//! // First change:
+//! *foo_mut_ref = 100;
+//! // Second change:
+//! *foo_mut_ref = 200;
+//! // Drop mutable reference because only on mutable reference drop changes
+//! // will be checked:
+//! std::mem::drop(foo_mut_ref);
+//! // Only last change was sent into change stream:
+//! assert_eq!(foo_changes_stream.next().await.unwrap(), 200);
+//!
+//! let mut foo_changes_subscription = foo.subscribe();
+//! let mut foo_mut_ref = foo.borrow_mut();
+//! // Really change data of 'ReactiveField' here:
+//! *foo_mut_ref = 100;
+//! // But at the end we're reverted to a original value:
+//! *foo_mut_ref = 200;
+//! // Drop mutable reference because only on mutable reference drop changes
+//! // will be checked:
+//! std::mem::drop(foo_mut_ref);
+//! // No changes will be sent into 'foo_change_subscription' stream,
+//! // because only last value checked.
+//! # })
+//! ```
+
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 use std::{
@@ -38,6 +192,15 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "ReactiveField {{ data: {:?} }}", self.data)
+    }
+}
+
+impl<D, S> fmt::Display for ReactiveField<D, S>
+where
+    D: fmt::Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "{}", self.data)
     }
 }
 
@@ -164,10 +327,12 @@ pub trait Subscribable<D: 'static> {
 ///
 /// This structure should be wrapped into [`Vec`].
 pub enum UniversalSubscriber<D> {
+    /// Subscriber for [`Whenable`].
     When {
         sender: RefCell<Option<oneshot::Sender<()>>>,
         assert_fn: Box<dyn Fn(&D) -> bool>,
     },
+    /// Subscriber for [`Subscribable`].
     Subscribe(mpsc::UnboundedSender<D>),
 }
 
@@ -252,8 +417,13 @@ where
     S: OnReactiveFieldModification<D>,
     D: PartialEq,
 {
+    /// Data which stored by this [`ReactiveField`].
     data: &'a mut D,
+
+    /// Subscribers on [`ReactiveField`]'s data mutations.
     subs: &'a mut S,
+
+    /// Data which stored by this [`ReactiveField`] before mutation.
     value_before_mutation: D,
 }
 

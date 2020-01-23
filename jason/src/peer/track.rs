@@ -8,6 +8,7 @@ use medea_client_api_proto::TrackId as Id;
 use web_sys::MediaStreamTrack;
 
 use crate::media::TrackConstraints;
+use crate::peer::MutedState;
 
 /// Representation of [MediaStreamTrack][1].
 ///
@@ -52,5 +53,18 @@ impl MediaTrack {
     /// Enables or disables underlying [`MediaStreamTrack`].
     pub fn set_enabled(&self, enabled: bool) {
         self.track.set_enabled(enabled)
+    }
+
+    /// Sets [`MediaStreamTrack`] enabled based on provided [`MutedState`].
+    pub fn set_enabled_by_muted_state(&self, muted_state: MutedState) {
+        match muted_state {
+            MutedState::Muted => {
+                self.set_enabled(false);
+            }
+            MutedState::Unmuted => {
+                self.set_enabled(true);
+            }
+            _ => (),
+        }
     }
 }

@@ -2,7 +2,7 @@
 
 use std::{
     borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
-    future::Future, rc::Rc,
+    future::Future, ops::Not, rc::Rc,
 };
 
 use derive_more::Display;
@@ -27,7 +27,6 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
-use std::ops::Not;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -487,18 +486,8 @@ impl Sender {
         spawn_local(async move {
             while let Some(mute_state_update) = subscription.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    match mute_state_update {
-                        MutedState::Muted => {
-                            if let Some(track) = this.track.borrow().as_ref() {
-                                track.set_enabled(false);
-                            }
-                        }
-                        MutedState::Unmuted => {
-                            if let Some(track) = this.track.borrow().as_ref() {
-                                track.set_enabled(true);
-                            }
-                        }
-                        _ => (),
+                    if let Some(track) = this.track.borrow().as_ref() {
+                        track.set_enabled_by_muted_state(mute_state_update);
                     }
                 } else {
                     break;
@@ -546,6 +535,7 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
+        track.set_enabled_by_muted_state(sender.muted_state());
         sender.track.borrow_mut().replace(track);
 
         Ok(())

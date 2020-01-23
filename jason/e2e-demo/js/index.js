@@ -448,11 +448,11 @@ window.onload = async function() {
     });
     muteVideo.addEventListener('click', () => {
       if (isVideoMuted) {
-        room.unmute_video();
+        await room.unmute_video();
         isVideoMuted = false;
         muteVideo.textContent = "Mute video";
       } else {
-        room.mute_video();
+        await room.mute_video();
         isVideoMuted = true;
         muteVideo.textContent = "Unmute video";
       }
