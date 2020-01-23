@@ -122,7 +122,7 @@ impl ControlClient {
     pub fn delete(&self, ids: &[&str]) -> Result<(), Error> {
         let mut delete_req = IdRequest::new();
         let mut delete_ids = RepeatedField::new();
-        ids.iter().for_each(|id| delete_ids.push(id.to_string()));
+        ids.iter().for_each(|id| delete_ids.push((*id).to_string()));
         delete_req.set_fid(delete_ids);
 
         let mut resp = self.0.delete(&delete_req).unwrap();

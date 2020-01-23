@@ -5,7 +5,7 @@ pub mod control;
 
 use std::fmt::Debug;
 
-use futures::Future;
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::Command;
 
 use crate::api::{
@@ -25,25 +25,22 @@ pub trait RpcServer: Debug + Send {
         &self,
         member_id: MemberId,
         connection: Box<dyn RpcConnection>,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    ) -> LocalBoxFuture<'static, Result<(), ()>>;
 
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
-    /// closed. Cannot fail.
+    /// closed.
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     fn connection_closed(
         &self,
         member_id: MemberId,
         reason: ClosedReason,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    ) -> LocalBoxFuture<'static, ()>;
 
-    /// Sends [`Command`]. Cannot fail
+    /// Sends [`Command`].
     ///
     /// [`Command`]:
-    fn send_command(
-        &self,
-        msg: Command,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn send_command(&self, msg: Command) -> LocalBoxFuture<'static, ()>;
 }
 
 #[cfg(test)]

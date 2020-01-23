@@ -27,17 +27,18 @@ members = [
 lto = "thin"
 
 [dependencies]
-actix = "0.8"
-actix-web = "1.0"
-actix-web-actors = "1.0"
-bb8 = "0.3"
-bb8-redis = "0.3"
+actix = "0.9"
+actix-web = "2.0"
+actix-web-actors = "2.0"
+async-trait = "0.1"
 chrono = "0.4"
 config = "0.10"
+deadpool = "0.5"
+deadpool-redis = "0.5"
 derive_more = "0.99"
 dotenv = "0.15"
 failure = "0.1"
-futures = "0.1"
+futures = { version = "0.3", features = ["compat"] }
 grpcio = { version = "0.4", features = ["openssl"] }
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
@@ -45,7 +46,7 @@ medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
 protobuf = "2.7"
 rand = "0.7"
-redis = "0.11"
+redis = "0.14"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -55,9 +56,8 @@ slog-envlogger = "2.2"
 slog-json = "2.3"
 slog-scope = "4.1"
 slog-stdlog = "4.0"
-smart-default = "0.5"
-tokio = "0.1"
-tokio-signal = "0.2"
+smart-default = "0.6"
+tokio = { version = "0.2", features = ["signal", "time"] }
 toml = "0.5"
 url = "2.1"
 [dependencies.slog]
@@ -65,13 +65,13 @@ url = "2.1"
     features = ["release_max_level_trace", "max_level_trace"]
 
 [dev-dependencies]
+actix-codec = "0.2"
+actix-http = "1.0"
+actix-rt = "1.0"
+awc = "1.0"
+derive_builder = "0.9"
 lazy_static = "1.4"
 mockall = "0.6"
-actix-codec = "0.1"
-actix-http = "0.2"
-actix-http-test = "0.2"
-awc = "0.2"
-derive_builder = "0.9"
-serial_test = "0.2"
-serial_test_derive = "0.2"
+serial_test = "0.3"
+serial_test_derive = "0.3"
 tempfile = "3.1"

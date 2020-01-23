@@ -113,12 +113,13 @@ mod tests {
             ("grpc://example.com", "example.com"),
             ("grpc://127.0.0.1", "127.0.0.1"),
         ] {
-            let callback_url = CallbackUrl::try_from(url.to_string()).unwrap();
+            let callback_url =
+                CallbackUrl::try_from((*url).to_string()).unwrap();
             match callback_url {
                 CallbackUrl::Grpc(grpc_callback_url) => {
                     assert_eq!(
                         grpc_callback_url.addr(),
-                        expected_callback_url.to_string()
+                        (*expected_callback_url).to_string()
                     );
                 }
             }
@@ -132,7 +133,7 @@ mod tests {
             "asdf://127.0.0.1",
             "asdf://127.0.0.1:9090",
         ] {
-            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
+            let err = CallbackUrl::try_from((*url).to_string()).unwrap_err();
             match err {
                 CallbackUrlParseError::UnsupportedScheme => {}
                 _ => {
@@ -150,7 +151,7 @@ mod tests {
             "example.com",
             "example.com:9090",
         ] {
-            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
+            let err = CallbackUrl::try_from((*url).to_string()).unwrap_err();
             match err {
                 CallbackUrlParseError::UrlParseErr(e) => match e {
                     ParseError::RelativeUrlWithoutBase => {}

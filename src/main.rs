@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use actix::Actor;
+use actix::{Actor, Arbiter, System};
 use failure::Error;
-use futures::future::Future;
+use futures::FutureExt as _;
 use medea::{
     api::{client::server::Server, control::grpc},
     conf::Conf,
@@ -29,46 +29,44 @@ fn main() -> Result<(), Error> {
 
     info!("{:?}", config);
 
-    actix::run(move || {
-        new_turn_auth_service(&config.turn)
-            .map_err(move |e| error!("{:?}", e))
-            .map(|turn_service| {
-                let graceful_shutdown =
-                    GracefulShutdown::new(config.shutdown.timeout).start();
-                (turn_service, graceful_shutdown, config)
-            })
-            .and_then(move |(turn_service, graceful_shutdown, config)| {
-                let app_context = AppContext::new(config.clone(), turn_service);
+    let sys = System::new("medea");
+    Arbiter::spawn(
+        async move {
+            let turn_service = new_turn_auth_service(&config.turn)?;
+            let graceful_shutdown =
+                GracefulShutdown::new(config.shutdown.timeout).start();
+            let app_context = AppContext::new(config.clone(), turn_service);
 
-                let room_repo = RoomRepository::new(HashMap::new());
-                let room_service = RoomService::new(
-                    room_repo.clone(),
-                    app_context.clone(),
-                    graceful_shutdown.clone(),
-                )
-                .start();
+            let room_repo = RoomRepository::new(HashMap::new());
+            let room_service = RoomService::new(
+                room_repo.clone(),
+                app_context.clone(),
+                graceful_shutdown.clone(),
+            )
+            .start();
 
-                medea::api::control::start_static_rooms(&room_service).map(
-                    move |_| {
-                        let grpc_addr =
-                            grpc::server::run(room_service, &app_context);
-                        shutdown::subscribe(
-                            &graceful_shutdown,
-                            grpc_addr.recipient(),
-                            shutdown::Priority(1),
-                        );
+            medea::api::control::start_static_rooms(&room_service).await?;
 
-                        let server = Server::run(room_repo, config).unwrap();
-                        shutdown::subscribe(
-                            &graceful_shutdown,
-                            server.recipient(),
-                            shutdown::Priority(1),
-                        );
-                    },
-                )
-            })
-    })
-    .unwrap();
+            let grpc_server = grpc::server::run(room_service, &app_context);
+            let server = Server::run(room_repo, config)?;
 
-    Ok(())
+            shutdown::subscribe(
+                &graceful_shutdown,
+                grpc_server.recipient(),
+                shutdown::Priority(1),
+            );
+
+            shutdown::subscribe(
+                &graceful_shutdown,
+                server.recipient(),
+                shutdown::Priority(1),
+            );
+            Ok(())
+        }
+        .map(|res: Result<(), Error>| match res {
+            Ok(_) => info!("Started system"),
+            Err(e) => error!("Startup error: {:?}", e),
+        }),
+    );
+    sys.run().map_err(Into::into)
 }
