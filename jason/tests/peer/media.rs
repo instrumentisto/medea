@@ -6,7 +6,7 @@ use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
     peer::{
-        MediaConnections, MutedState, RtcPeerConnection, SimpleStreamRequest,
+        MediaConnections, MuteState, RtcPeerConnection, SimpleStreamRequest,
     },
 };
 use wasm_bindgen_test::*;
@@ -42,11 +42,11 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .change_muted_state(MutedState::from(!enabled_audio));
+        .change_muted_state(MuteState::from(!enabled_audio));
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .change_muted_state(MutedState::from(!enabled_video));
+        .change_muted_state(MuteState::from(!enabled_video));
 
     (media_connections, audio_track_id, video_track_id)
 }
@@ -90,24 +90,24 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.muted_state(), MutedState::Unmuted);
-    assert_eq!(video_track.muted_state(), MutedState::Unmuted);
+    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
 
-    audio_track.change_muted_state(MutedState::Muted);
-    assert_eq!(audio_track.muted_state(), MutedState::Muted);
-    assert_eq!(video_track.muted_state(), MutedState::Unmuted);
+    audio_track.change_muted_state(MuteState::Muted);
+    assert_eq!(audio_track.muted_state(), MuteState::Muted);
+    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
 
-    video_track.change_muted_state(MutedState::Muted);
-    assert_eq!(audio_track.muted_state(), MutedState::Muted);
-    assert_eq!(video_track.muted_state(), MutedState::Muted);
+    video_track.change_muted_state(MuteState::Muted);
+    assert_eq!(audio_track.muted_state(), MuteState::Muted);
+    assert_eq!(video_track.muted_state(), MuteState::Muted);
 
-    audio_track.change_muted_state(MutedState::Unmuted);
-    assert_eq!(audio_track.muted_state(), MutedState::Unmuted);
-    assert_eq!(video_track.muted_state(), MutedState::Muted);
+    audio_track.change_muted_state(MuteState::Unmuted);
+    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(video_track.muted_state(), MuteState::Muted);
 
-    video_track.change_muted_state(MutedState::Unmuted);
-    assert_eq!(audio_track.muted_state(), MutedState::Unmuted);
-    assert_eq!(video_track.muted_state(), MutedState::Unmuted);
+    video_track.change_muted_state(MuteState::Unmuted);
+    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
 }
 
 #[wasm_bindgen_test]
@@ -120,8 +120,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.muted_state(), MutedState::Muted);
-    assert_eq!(video_track.muted_state(), MutedState::Unmuted);
+    assert_eq!(audio_track.muted_state(), MuteState::Muted);
+    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
 }
 
 #[wasm_bindgen_test]
@@ -134,6 +134,6 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.muted_state(), MutedState::Unmuted);
-    assert_eq!(video_track.muted_state(), MutedState::Muted);
+    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(video_track.muted_state(), MuteState::Muted);
 }

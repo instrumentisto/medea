@@ -24,7 +24,7 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, MediaStreamHandle, MutedState, PeerError, PeerEvent,
+        MediaStream, MediaStreamHandle, MuteState, PeerError, PeerEvent,
         PeerEventHandler, PeerRepository, TransceiverKind,
     },
     rpc::{
@@ -577,7 +577,7 @@ impl InnerRoom {
             let subscriptions: Vec<_> = peers
                 .iter()
                 .map(|peer| {
-                    let needed_muted_state = MutedState::from(is_muted);
+                    let needed_muted_state = MuteState::from(is_muted);
                     let (track_updates, subscriptions): (Vec<_>, Vec<_>) = peer
                         .get_senders_by_kind_and_muted_state(
                             kind,

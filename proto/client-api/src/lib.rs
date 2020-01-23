@@ -269,6 +269,7 @@ pub struct Track {
     pub is_muted: bool,
 }
 
+/// Path for existing [`Track`] or new [`Track`] (if it not exists).
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct TrackUpdate {

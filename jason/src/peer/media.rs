@@ -119,7 +119,7 @@ impl MediaConnections {
     pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: MutedState,
+        mute_state: MuteState,
     ) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
@@ -133,7 +133,7 @@ impl MediaConnections {
     /// in [`MutedState::Muted`].
     pub fn is_all_tracks_with_kind_muted(&self, kind: TransceiverKind) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.muted_state() != MutedState::Muted {
+            if sender.muted_state() != MuteState::Muted {
                 return false;
             }
         }
@@ -147,7 +147,7 @@ impl MediaConnections {
         kind: TransceiverKind,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.muted_state() != MutedState::Unmuted {
+            if sender.muted_state() != MuteState::Unmuted {
                 return false;
             }
         }
@@ -391,7 +391,7 @@ impl MediaConnections {
 
 /// Mute state of [`Sender`].
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum MutedState {
+pub enum MuteState {
     /// [`Sender`] is unmuted.
     Unmuted,
 
@@ -405,7 +405,7 @@ pub enum MutedState {
     Muted,
 }
 
-impl MutedState {
+impl MuteState {
     /// Returns [`MutedState`] which should be set while transition to this
     /// [`MutedState`].
     pub fn proccessing_state(self) -> Self {
@@ -417,7 +417,7 @@ impl MutedState {
     }
 }
 
-impl From<bool> for MutedState {
+impl From<bool> for MuteState {
     fn from(is_muted: bool) -> Self {
         if is_muted {
             Self::Muted
@@ -427,7 +427,7 @@ impl From<bool> for MutedState {
     }
 }
 
-impl Not for MutedState {
+impl Not for MuteState {
     type Output = Self;
 
     fn not(self) -> Self::Output {
@@ -447,7 +447,7 @@ pub struct Sender {
     caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
-    muted_state: RefCell<Reactive<MutedState>>,
+    muted_state: RefCell<Reactive<MuteState>>,
 }
 
 impl Sender {
@@ -460,7 +460,7 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-        muted_state: MutedState,
+        muted_state: MuteState,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -507,7 +507,7 @@ impl Sender {
     }
 
     /// Returns [`MutedState`] of underlying [`MediaTrack`] of this [`Sender`].
-    pub fn muted_state(&self) -> MutedState {
+    pub fn muted_state(&self) -> MuteState {
         **self.muted_state.borrow()
     }
 
@@ -540,20 +540,20 @@ impl Sender {
     }
 
     /// Changes [`MutedState`] of this [`Sender`]'s underlying [`MediaTrack`].
-    pub fn change_muted_state(&self, new_state: MutedState) {
+    pub fn change_muted_state(&self, new_state: MuteState) {
         *self.muted_state.borrow_mut().borrow_mut() = new_state;
     }
 
     /// Checks that [`Sender`] has a track, and it's unmuted.
     fn is_track_enabled(&self) -> bool {
-        **self.muted_state.borrow() == MutedState::Unmuted
+        **self.muted_state.borrow() == MuteState::Unmuted
     }
 
     /// Resolves when [`MutedState`] of underlying [`MediaTrack`] of this
     /// [`Sender`] will become equal to provided [`MutedState`].
     pub fn on_muted_state(
         &self,
-        state: MutedState,
+        state: MuteState,
     ) -> impl Future<Output = Result<()>> {
         let subscription = self.muted_state.borrow().when_eq(state);
         async move {
@@ -568,10 +568,10 @@ impl Sender {
     pub fn update(&self, track: &proto::TrackUpdate) {
         if let Some(is_muted) = track.is_muted {
             if is_muted {
-                *self.muted_state.borrow_mut().borrow_mut() = MutedState::Muted;
+                *self.muted_state.borrow_mut().borrow_mut() = MuteState::Muted;
             } else {
                 *self.muted_state.borrow_mut().borrow_mut() =
-                    MutedState::Unmuted;
+                    MuteState::Unmuted;
             }
         }
     }

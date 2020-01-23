@@ -40,7 +40,7 @@ pub use self::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
         TransceiverDirection, TransceiverKind,
     },
-    media::{MediaConnections, MediaConnectionsError, MutedState},
+    media::{MediaConnections, MediaConnectionsError, MuteState},
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
@@ -371,7 +371,7 @@ impl PeerConnection {
     pub fn get_senders_by_kind_and_muted_state(
         &self,
         kind: TransceiverKind,
-        muted_state: MutedState,
+        muted_state: MuteState,
     ) -> Vec<Rc<Sender>> {
         self.media_connections
             .get_senders_by_kind_and_mute_state(kind, muted_state)
