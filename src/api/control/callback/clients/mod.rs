@@ -5,7 +5,7 @@ pub mod grpc;
 use std::fmt::Debug;
 
 use derive_more::From;
-use futures::Future;
+use futures::future::LocalBoxFuture;
 
 use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},
@@ -18,7 +18,7 @@ pub trait CallbackClient: Debug + Send + Sync {
     fn send(
         &self,
         request: CallbackRequest,
-    ) -> Box<dyn Future<Item = (), Error = CallbackClientError>>;
+    ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>>;
 }
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].

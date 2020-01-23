@@ -6,18 +6,19 @@ use std::fmt;
 
 use actix::Message;
 use derive_more::{From, Into};
-use futures::Future;
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{CloseDescription, Command, Event};
 
 use crate::api::control::MemberId;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(From, Into, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "()")]
 pub struct CommandMessage(Command);
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
 #[derive(Debug, From, Into, Message)]
+#[rtype(result = "()")]
 pub struct EventMessage(Event);
 
 /// Abstraction over RPC connection with some remote [`Member`].
@@ -30,18 +31,17 @@ pub trait RpcConnection: fmt::Debug + Send {
     ///
     /// No [`RpcConnectionClosed`] signals should be emitted.
     ///
-    /// Always succeeds.
-    ///
     /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,
-    ) -> Box<dyn Future<Item = (), Error = ()>>;
+    ) -> LocalBoxFuture<'static, ()>;
 
     /// Sends [`Event`] to remote [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_event(&self, msg: Event) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn send_event(&self, msg: Event)
+        -> LocalBoxFuture<'static, Result<(), ()>>;
 }
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.
@@ -88,6 +88,7 @@ pub struct RpcConnectionEstablished {
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Debug, Message)]
+#[rtype(result = "()")]
 pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     ///

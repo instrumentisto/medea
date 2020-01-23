@@ -2,7 +2,10 @@
 
 use std::{fmt, sync::Arc};
 
-use futures::future::{Future, IntoFuture as _};
+use futures::{
+    compat::Future01CompatExt as _,
+    future::{FutureExt as _, LocalBoxFuture},
+};
 use grpcio::{ChannelBuilder, EnvBuilder};
 #[rustfmt::skip]
 use medea_control_api_proto::grpc::callback_grpc::{
@@ -47,14 +50,12 @@ impl CallbackClient for GrpcCallbackClient {
     fn send(
         &self,
         request: CallbackRequest,
-    ) -> Box<dyn Future<Item = (), Error = CallbackClientError>> {
-        Box::new(
-            self.client
-                .on_event_async(&request.into())
-                .into_future()
-                .and_then(|f| f)
-                .map(|_| ())
-                .map_err(CallbackClientError::from),
-        )
+    ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
+        let request = self.client.on_event_async(&request.into());
+        async {
+            request?.compat().await?;
+            Ok(())
+        }
+        .boxed_local()
     }
 }

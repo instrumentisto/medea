@@ -2,7 +2,7 @@
 
 use std::io;
 
-use actix::{Actor, Addr, Handler, ResponseFuture};
+use actix::{Actor, Addr, Handler};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -10,10 +10,7 @@ use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
-use futures::{
-    future::{self, Either},
-    Future,
-};
+use futures::FutureExt as _;
 use serde::Deserialize;
 
 use crate::{
@@ -28,6 +25,7 @@ use crate::{
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
+    utils::ResponseAnyFuture,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -35,20 +33,22 @@ use crate::{
 struct RequestParams {
     /// ID of [`Room`] that WebSocket connection connects to.
     room_id: RoomId,
+
     /// ID of [`Member`] that establishes WebSocket connection.
     member_id: MemberId,
+
     /// Credential of [`Member`] to authorize WebSocket connection with.
     credentials: String,
 }
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
-fn ws_index(
+async fn ws_index(
     request: HttpRequest,
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     debug!("Request params: {:?}", info);
     let RequestParams {
         room_id,
@@ -57,13 +57,14 @@ fn ws_index(
     } = info.into_inner();
 
     match state.rooms.get(&room_id) {
-        Some(room) => Either::A(
-            room.send(Authorize {
-                member_id: member_id.clone(),
-                credentials,
-            })
-            .from_err()
-            .and_then(move |res| match res {
+        Some(room) => {
+            let auth_result = room
+                .send(Authorize {
+                    member_id: member_id.clone(),
+                    credentials,
+                })
+                .await?;
+            match auth_result {
                 Ok(_) => ws::start(
                     WsSession::new(
                         member_id,
@@ -80,9 +81,9 @@ fn ws_index(
                 Err(AuthorizationError::InvalidCredentials) => {
                     Ok(HttpResponse::Forbidden().into())
                 }
-            }),
-        ),
-        None => Either::B(future::ok(HttpResponse::NotFound().into())),
+            }
+        }
+        None => Ok(HttpResponse::NotFound().into()),
     }
 }
 
@@ -107,16 +108,13 @@ impl Server {
 
         let server = HttpServer::new(move || {
             App::new()
-                .register_data(Self::register_data(
-                    rooms.clone(),
-                    config.rpc.clone(),
-                ))
+                .app_data(Self::app_data(rooms.clone(), config.rpc.clone()))
                 .configure(Self::configure)
                 .wrap(middleware::Logger::default())
         })
         .disable_signals()
         .bind(server_addr)?
-        .start();
+        .run();
 
         info!("Started Client API HTTP server on {}", server_addr);
 
@@ -124,7 +122,7 @@ impl Server {
     }
 
     /// Set application data.
-    fn register_data(rooms: RoomRepository, config: Rpc) -> Data<Context> {
+    fn app_data(rooms: RoomRepository, config: Rpc) -> Data<Context> {
         Data::new(Context { rooms, config })
     }
 
@@ -133,7 +131,7 @@ impl Server {
     fn configure(cfg: &mut ServiceConfig) {
         cfg.service(
             resource("/ws/{room_id}/{member_id}/{credentials}")
-                .route(actix_web::web::get().to_async(ws_index)),
+                .route(actix_web::web::get().to(ws_index)),
         );
     }
 }
@@ -143,7 +141,7 @@ impl Actor for Server {
 }
 
 impl Handler<ShutdownGracefully> for Server {
-    type Result = ResponseFuture<(), ()>;
+    type Result = ResponseAnyFuture<()>;
 
     fn handle(
         &mut self,
@@ -151,7 +149,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: &mut Self::Context,
     ) -> Self::Result {
         info!("Server received ShutdownGracefully message so shutting down");
-        Box::new(self.0.stop(true))
+        ResponseAnyFuture(self.0.stop(true).boxed_local())
     }
 }
 
@@ -159,8 +157,7 @@ impl Handler<ShutdownGracefully> for Server {
 mod test {
     use std::time::Duration;
 
-    use actix_http::HttpService;
-    use actix_http_test::{TestServer, TestServerRuntime};
+    use actix_web::test::TestServer;
     use awc::error::WsClientError;
 
     use crate::{
@@ -188,21 +185,19 @@ mod test {
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
-    fn ws_server(conf: Conf) -> TestServerRuntime {
-        TestServer::new(move || {
-            HttpService::new(
-                App::new()
-                    .register_data(Server::register_data(
-                        build_room_repo(conf.clone()),
-                        conf.rpc.clone(),
-                    ))
-                    .configure(Server::configure),
-            )
+    fn ws_server(conf: Conf) -> TestServer {
+        actix_web::test::start(move || {
+            App::new()
+                .app_data(Server::app_data(
+                    build_room_repo(conf.clone()),
+                    conf.rpc.clone(),
+                ))
+                .configure(Server::configure)
         })
     }
 
-    #[test]
-    fn forbidden_if_bad_credentials() {
+    #[actix_rt::test]
+    async fn forbidden_if_bad_credentials() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
@@ -212,8 +207,10 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-
-        match server.ws_at("/ws/pub-sub-video-call/caller/bad_credentials") {
+        match server
+            .ws_at("/ws/pub-sub-video-call/caller/bad_credentials")
+            .await
+        {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 403);
             }
@@ -221,8 +218,8 @@ mod test {
         }
     }
 
-    #[test]
-    fn not_found_if_bad_url() {
+    #[actix_rt::test]
+    async fn not_found_if_bad_url() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
@@ -232,15 +229,13 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-
-        match server.ws_at("/ws/bad_room/caller/test") {
+        match server.ws_at("/ws/bad_room/caller/test").await {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 404);
             }
             _ => unreachable!(),
         };
-
-        match server.ws_at("/ws/pub-sub-video-call/bad_member/test") {
+        match server.ws_at("/ws/pub-sub-video-call/bad_member/test").await {
             Err(WsClientError::InvalidResponseStatus(code)) => {
                 assert_eq!(code, 404);
             }
@@ -248,8 +243,8 @@ mod test {
         };
     }
 
-    #[test]
-    fn established() {
+    #[actix_rt::test]
+    async fn established() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
@@ -259,7 +254,9 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-
-        server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
+        server
+            .ws_at("/ws/pub-sub-video-call/caller/test")
+            .await
+            .unwrap();
     }
 }
