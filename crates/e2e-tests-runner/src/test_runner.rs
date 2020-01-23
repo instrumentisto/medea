@@ -55,9 +55,9 @@ impl From<NewSessionError> for Error {
     }
 }
 
-/// Medea's e2e tests runner.
+/// Medea's E2E tests runner.
 ///
-/// Run e2e tests in browser, check results, print results.
+/// Run E2E tests in a browser, check results, print results.
 #[derive(Builder)]
 pub struct TestRunner<'a> {
     /// All paths to tests.
@@ -67,7 +67,7 @@ pub struct TestRunner<'a> {
     /// Address where HTML test files will be hosted.
     test_files_host: &'a str,
 
-    /// Don't close browser immediately on test fail. Browser will closed only
+    /// Don't close browser immediately on test fail. Browser will be closed only
     /// on <Enter> press.
     is_wait_on_fail_mode: bool,
 

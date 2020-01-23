@@ -104,7 +104,7 @@ describe('Pub<=>Pub video call', function() {
 
   /**
    * Starts 'Pub<=>Pub' video call.
-   G
+   *
    * Returns 'Room' for 'caller' and 'responder'.
    */
   async function startPubPubVideoCall() {
