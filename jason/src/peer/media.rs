@@ -87,6 +87,8 @@ struct InnerMediaConnections {
 
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
+    /* TODO: few fileds were deleted, they were used to mute tracks that
+     *       were added after mute_room call how do you handle this now? */
 }
 
 impl InnerMediaConnections {
@@ -147,7 +149,7 @@ impl MediaConnections {
         kind: TransceiverKind,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.muted_state() != MuteState::Unmuted {
+            if sender.muted_state() != MuteState::NotMuted {
                 return false;
             }
         }
@@ -392,8 +394,8 @@ impl MediaConnections {
 /// Mute state of [`Sender`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MuteState {
-    /// [`Sender`] is unmuted.
-    Unmuted,
+    /// [`Sender`] is not muted.
+    NotMuted,
 
     /// [`Sender`] should be unmuted, but awaits server permission.
     Unmuting,
@@ -410,7 +412,7 @@ impl MuteState {
     /// [`MutedState`].
     pub fn proccessing_state(self) -> Self {
         match self {
-            Self::Unmuted => Self::Unmuting,
+            Self::NotMuted => Self::Unmuting,
             Self::Muted => Self::Muting,
             _ => self,
         }
@@ -422,7 +424,7 @@ impl From<bool> for MuteState {
         if is_muted {
             Self::Muted
         } else {
-            Self::Unmuted
+            Self::NotMuted
         }
     }
 }
@@ -432,8 +434,8 @@ impl Not for MuteState {
 
     fn not(self) -> Self::Output {
         match self {
-            Self::Muted => Self::Unmuted,
-            Self::Unmuted => Self::Muted,
+            Self::Muted => Self::NotMuted,
+            Self::NotMuted => Self::Muted,
             Self::Unmuting => Self::Muting,
             Self::Muting => Self::Unmuting,
         }
@@ -546,7 +548,7 @@ impl Sender {
 
     /// Checks that [`Sender`] has a track, and it's unmuted.
     fn is_track_enabled(&self) -> bool {
-        **self.muted_state.borrow() == MuteState::Unmuted
+        **self.muted_state.borrow() == MuteState::NotMuted
     }
 
     /// Resolves when [`MutedState`] of underlying [`MediaTrack`] of this
@@ -571,7 +573,7 @@ impl Sender {
                 *self.muted_state.borrow_mut().borrow_mut() = MuteState::Muted;
             } else {
                 *self.muted_state.borrow_mut().borrow_mut() =
-                    MuteState::Unmuted;
+                    MuteState::NotMuted;
             }
         }
     }

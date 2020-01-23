@@ -309,10 +309,12 @@ impl RoomHandle {
             .map(|inner| inner.borrow_mut().inject_local_stream(stream))
     }
 
-    /// Mutes an outbound audio in this [`Room`].
+    /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
         let weak = self.0.clone();
         future_to_promise(async move {
+            // TODO: this while looks a bit strange, should be moved
+            //       lower i think
             let inner = upgrade_or_detached!(weak, JsValue)?;
             while !inner.borrow().is_muted(TransceiverKind::Audio) {
                 let fut =
@@ -324,7 +326,7 @@ impl RoomHandle {
         })
     }
 
-    /// Unmutes an outbound audio in this [`Room`].
+    /// Unmutes outbound audio in this [`Room`].
     pub fn unmute_audio(&self) -> Promise {
         let weak = self.0.clone();
         future_to_promise(async move {
@@ -339,7 +341,7 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes an outbound video in this [`Room`].
+    /// Mutes outbound video in this [`Room`].
     pub fn mute_video(&self) -> Promise {
         let weak = self.0.clone();
         future_to_promise(async move {
@@ -354,7 +356,7 @@ impl RoomHandle {
         })
     }
 
-    /// Unmutes an outbound video in this [`Room`].
+    /// Unmutes outbound video in this [`Room`].
     pub fn unmute_video(&self) -> Promise {
         let weak = self.0.clone();
         future_to_promise(async move {
@@ -564,8 +566,8 @@ impl InnerRoom {
         }
     }
 
-    /// Toggles sending of [`Track`]s with provided [`TransceiverKind`] from all
-    /// [`PeerConnection`]s which this [`Room`] manages.
+    /// Toggles [`Track`]s mute state by provided [`TransceiverKind`] in all
+    /// [`PeerConnection`]s in this [`Room`].
     fn toggle_mute(
         &self,
         is_muted: bool,
@@ -673,7 +675,7 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
-    ) -> Self::Output {
+    ) {
         let peer = match self
             .peers
             .create_peer(
@@ -744,11 +746,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
-    fn on_sdp_answer_made(
-        &mut self,
-        peer_id: PeerId,
-        sdp_answer: String,
-    ) -> Self::Output {
+    fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
                 if let Err(err) = peer
@@ -771,7 +769,7 @@ impl EventHandler for InnerRoom {
         &mut self,
         peer_id: PeerId,
         candidate: IceCandidate,
-    ) -> Self::Output {
+    ) {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
                 let add = peer
@@ -794,23 +792,19 @@ impl EventHandler for InnerRoom {
     }
 
     /// Disposes specified [`PeerConnection`]s.
-    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) -> Self::Output {
+    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
-        })
+        });
     }
 
     /// Updates [`Track`]s of this [`Room`].
-    fn on_tracks_applied(
-        &mut self,
-        peer_id: PeerId,
-        tracks: Vec<TrackUpdate>,
-    ) -> Self::Output {
+    fn on_tracks_applied(&mut self, peer_id: PeerId, tracks: Vec<TrackUpdate>) {
         if let Some(peer) = self.peers.get(peer_id) {
             if let Err(err) = peer.update_tracks(tracks) {
                 JasonError::from(err).print();
-            };
+            }
         } else {
             JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
                 .print();

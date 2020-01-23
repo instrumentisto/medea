@@ -446,7 +446,7 @@ window.onload = async function() {
         muteAudio.textContent = "Unmute audio";
       }
     });
-    muteVideo.addEventListener('click', () => {
+    muteVideo.addEventListener('click', async () => {
       if (isVideoMuted) {
         await room.unmute_video();
         isVideoMuted = false;

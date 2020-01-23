@@ -90,24 +90,24 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
-    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(audio_track.muted_state(), MuteState::NotMuted);
+    assert_eq!(video_track.muted_state(), MuteState::NotMuted);
 
     audio_track.change_muted_state(MuteState::Muted);
     assert_eq!(audio_track.muted_state(), MuteState::Muted);
-    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(video_track.muted_state(), MuteState::NotMuted);
 
     video_track.change_muted_state(MuteState::Muted);
     assert_eq!(audio_track.muted_state(), MuteState::Muted);
     assert_eq!(video_track.muted_state(), MuteState::Muted);
 
-    audio_track.change_muted_state(MuteState::Unmuted);
-    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
+    audio_track.change_muted_state(MuteState::NotMuted);
+    assert_eq!(audio_track.muted_state(), MuteState::NotMuted);
     assert_eq!(video_track.muted_state(), MuteState::Muted);
 
-    video_track.change_muted_state(MuteState::Unmuted);
-    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
-    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
+    video_track.change_muted_state(MuteState::NotMuted);
+    assert_eq!(audio_track.muted_state(), MuteState::NotMuted);
+    assert_eq!(video_track.muted_state(), MuteState::NotMuted);
 }
 
 #[wasm_bindgen_test]
@@ -121,7 +121,7 @@ async fn new_media_connections_with_disabled_audio_tracks() {
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
     assert_eq!(audio_track.muted_state(), MuteState::Muted);
-    assert_eq!(video_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(video_track.muted_state(), MuteState::NotMuted);
 }
 
 #[wasm_bindgen_test]
@@ -134,6 +134,6 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.muted_state(), MuteState::Unmuted);
+    assert_eq!(audio_track.muted_state(), MuteState::NotMuted);
     assert_eq!(video_track.muted_state(), MuteState::Muted);
 }

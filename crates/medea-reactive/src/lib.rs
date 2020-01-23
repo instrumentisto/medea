@@ -143,7 +143,7 @@
 //! *foo_mut_ref = 200;
 //! // Drop mutable reference because only on mutable reference drop changes
 //! // will be checked:
-//! std::mem::drop(foo_mut_ref);
+//! drop(foo_mut_ref);
 //! // Only last change was sent into change stream:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 200);
 //!
@@ -155,7 +155,7 @@
 //! *foo_mut_ref = 200;
 //! // Drop mutable reference because only on mutable reference drop changes
 //! // will be checked:
-//! std::mem::drop(foo_mut_ref);
+//! drop(foo_mut_ref);
 //! // No changes will be sent into 'foo_change_subscription' stream,
 //! // because only last value checked.
 //! # })
@@ -172,7 +172,7 @@ use std::{
 use futures::{
     channel::{mpsc, oneshot},
     future::{self, LocalBoxFuture},
-    stream::LocalBoxStream,
+    stream::{self, LocalBoxStream},
     StreamExt as _,
 };
 
@@ -180,6 +180,8 @@ use futures::{
 /// ([`ReactiveField::subscribe`]) and only on concrete changes
 /// ([`ReactiveField::when`] and [`ReactiveField::when_eq`]).
 pub type Reactive<D> = ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>;
+
+// TODO: it seems that Observable suits better here.
 
 /// A reactive cell which will emit all modification to the subscribers.
 ///
@@ -195,24 +197,6 @@ pub struct ReactiveField<D, S> {
 
     /// Subscribers on [`ReactiveField`]'s data mutations.
     subs: S,
-}
-
-impl<D, S> fmt::Debug for ReactiveField<D, S>
-where
-    D: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "ReactiveField {{ data: {:?} }}", self.data)
-    }
-}
-
-impl<D, S> fmt::Display for ReactiveField<D, S>
-where
-    D: fmt::Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.data)
-    }
 }
 
 impl<D> ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>
@@ -273,7 +257,7 @@ where
         let data = self.data.clone();
         let subscription = self.subs.subscribe();
 
-        Box::pin(futures::stream::once(async move { data }).chain(subscription))
+        Box::pin(stream::once(async move { data }).chain(subscription))
     }
 }
 
@@ -297,6 +281,9 @@ where
     S: OnReactiveFieldModification<D>,
     D: Clone + PartialEq,
 {
+    // TODO: perhaps, we should grant interior mutability for all reactive
+    //       fields?
+
     /// Returns [`MutReactiveFieldGuard`] which can be mutably dereferenced to
     /// underlying data.
     ///
@@ -426,6 +413,24 @@ impl<D, S> Deref for ReactiveField<D, S> {
 
     fn deref(&self) -> &Self::Target {
         &self.data
+    }
+}
+
+impl<D, S> fmt::Debug for ReactiveField<D, S>
+where
+    D: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "ReactiveField {{ data: {:?} }}", self.data)
+    }
+}
+
+impl<D, S> fmt::Display for ReactiveField<D, S>
+where
+    D: fmt::Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "{}", self.data)
     }
 }
 
@@ -626,7 +631,7 @@ mod tests {
     async fn when_returns_dropped_error_on_drop() {
         let mut field = Reactive::new(0i32);
         let subscription = field.when(|change| change == &100);
-        std::mem::drop(field);
+        drop(field);
         subscription.await.err().unwrap();
     }
 
@@ -634,7 +639,7 @@ mod tests {
     async fn when_eq_returns_dropped_error_on_drop() {
         let mut field = Reactive::new(0i32);
         let subscription = field.when_eq(100);
-        std::mem::drop(field);
+        drop(field);
         subscription.await.err().unwrap();
     }
 
@@ -642,7 +647,7 @@ mod tests {
     async fn stream_ends_when_reactive_field_dropped() {
         let mut field = Reactive::new(0i32);
         let subscription = field.subscribe();
-        std::mem::drop(field);
+        drop(field);
         assert!(subscription.skip(1).next().await.is_none());
     }
 
@@ -668,7 +673,7 @@ mod tests {
         *field_mut_guard = 100;
         *field_mut_guard = 200;
         *field_mut_guard = 300;
-        std::mem::drop(field_mut_guard);
+        drop(field_mut_guard);
         assert_eq!(subscription.skip(1).next().await.unwrap(), 300);
     }
 

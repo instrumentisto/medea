@@ -60,7 +60,7 @@ impl MediaTrack {
             MuteState::Muted => {
                 self.set_enabled(false);
             }
-            MuteState::Unmuted => {
+            MuteState::NotMuted => {
                 self.set_enabled(true);
             }
             _ => (),
