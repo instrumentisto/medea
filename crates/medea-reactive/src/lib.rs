@@ -164,7 +164,7 @@
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell},
     fmt::{self, Debug, Error, Formatter},
     ops::{Deref, DerefMut},
 };
@@ -176,11 +176,94 @@ use futures::{
     StreamExt as _,
 };
 
+type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
+
 /// [`ObservableField`] with which you can only subscribe on changes
 /// ([`ObservableField::subscribe`]) and only on concrete changes
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
-pub type Observable<D> =
-    ObservableField<D, RefCell<Vec<UniversalSubscriber<D>>>>;
+pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
+
+pub struct ObservableCell<D>(RefCell<Observable<D>>);
+
+impl<D> ObservableCell<D>
+where
+    D: 'static,
+{
+    pub fn new(data: D) -> Self {
+        Self(RefCell::new(Observable::new(data)))
+    }
+
+    pub fn borrow(&self) -> Ref<D> {
+        let reference = self.0.borrow();
+        Ref::map(reference, |observable| observable.deref())
+    }
+
+    pub fn when<F>(
+        &self,
+        assert_fn: F,
+    ) -> LocalBoxFuture<'static, Result<(), Dropped>>
+    where
+        F: Fn(&D) -> bool + 'static,
+    {
+        self.0.borrow().when(assert_fn)
+    }
+}
+
+impl<D> ObservableCell<D>
+where
+    D: Copy + 'static,
+{
+    pub fn get(&self) -> D {
+        **self.0.borrow()
+    }
+}
+
+impl<D> ObservableCell<D>
+where
+    D: Clone + 'static,
+{
+    pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
+        self.0.borrow().subscribe()
+    }
+}
+
+impl<D> ObservableCell<D>
+where
+    D: PartialEq + 'static,
+{
+    /// Returns [`Future`] which will be resolved only when data of this
+    /// [`ObservableField`] will become equal to provided `should_be`.
+    pub fn when_eq(
+        &self,
+        should_be: D,
+    ) -> LocalBoxFuture<'static, Result<(), Dropped>> {
+        self.0.borrow().when_eq(should_be)
+    }
+}
+
+impl<D> ObservableCell<D>
+where
+    D: Clone + PartialEq + 'static,
+{
+    pub fn set(&self, new_data: D) {
+        *self.0.borrow_mut().borrow_mut() = new_data;
+    }
+
+    pub fn replace(&self, mut new_data: D) -> D {
+        std::mem::swap(
+            self.0.borrow_mut().borrow_mut().deref_mut(),
+            &mut new_data,
+        );
+        new_data
+    }
+
+    pub fn mutate<F>(&self, f: F)
+    where
+        F: FnOnce(MutObservableFieldGuard<D, DefaultSubscribers<D>>),
+    {
+        (f)(self.0.borrow_mut().borrow_mut());
+    }
+}
 
 /// A reactive cell which will emit all modification to the subscribers.
 ///
@@ -280,9 +363,6 @@ where
     S: OnObservableFieldModification<D>,
     D: Clone + PartialEq,
 {
-    // TODO: perhaps, we should grant interior mutability for all reactive
-    //       fields?
-
     /// Returns [`MutObservableFieldGuard`] which can be mutably dereferenced to
     /// underlying data.
     ///
@@ -688,5 +768,164 @@ mod tests {
         .await
         .unwrap()
         .unwrap();
+    }
+
+    mod observable_cell {
+        use super::*;
+
+        use crate::ObservableCell;
+
+        #[tokio::test]
+        async fn subscription_works() {
+            let field = ObservableCell::new(0i32);
+            let subscription = field.subscribe();
+
+            field.set(100i32);
+            assert_eq!(subscription.skip(1).next().await.unwrap(), 100);
+        }
+
+        #[tokio::test]
+        async fn when_works() {
+            let field = ObservableCell::new(0i32);
+            let when_will_be_greater_than_5 = field.when(|upd| upd > &5);
+
+            field.set(6);
+            await_future_with_timeout(
+                Box::pin(when_will_be_greater_than_5),
+                Duration::from_millis(50),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn when_eq_works() {
+            let field = ObservableCell::new(0i32);
+            let when_will_be_5 = field.when_eq(5);
+
+            field.set(5);
+            await_future_with_timeout(
+                Box::pin(when_will_be_5),
+                Duration::from_millis(50),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn only_initial_update_emitted() {
+            let field = ObservableCell::new(0i32);
+            let mut subscription = field.subscribe();
+            assert_eq!(subscription.next().await.unwrap(), 0);
+
+            await_future_with_timeout(
+                Box::pin(subscription.next()),
+                Duration::from_millis(10),
+            )
+            .await
+            .unwrap_err();
+        }
+
+        #[tokio::test]
+        async fn when_eq_never_resolves() {
+            let field = ObservableCell::new(0i32);
+            let when_will_be_5 = field.when_eq(5);
+
+            await_future_with_timeout(
+                Box::pin(when_will_be_5),
+                Duration::from_millis(10),
+            )
+            .await
+            .unwrap_err();
+        }
+
+        #[tokio::test]
+        async fn data_mutates() {
+            let field = ObservableCell::new(0i32);
+            assert_eq!(*field.borrow(), 0);
+            field.set(100500i32);
+            assert_eq!(*field.borrow(), 100500i32);
+        }
+
+        #[tokio::test]
+        async fn updates_emitted_on_replace() {
+            let field = ObservableCell::new(0i32);
+            let mut subscription = field.subscribe().skip(1);
+
+            assert_eq!(field.replace(100), 0);
+            assert_eq!(*field.borrow(), 100);
+
+            assert_eq!(subscription.next().await.unwrap(), 100);
+        }
+
+        #[tokio::test]
+        async fn when_works_on_replace() {
+            let field = ObservableCell::new(0i32);
+            let when_will_be_greater_than_5 = field.when(|upd| upd > &5);
+
+            assert_eq!(field.replace(6), 0);
+
+            await_future_with_timeout(
+                Box::pin(when_will_be_greater_than_5),
+                Duration::from_millis(50),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn when_eq_works_on_replace() {
+            let field = ObservableCell::new(0i32);
+            let when_will_be_5 = field.when_eq(5);
+
+            assert_eq!(field.replace(5), 0);
+
+            await_future_with_timeout(
+                Box::pin(when_will_be_5),
+                Duration::from_millis(50),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn get_works() {
+            let field = ObservableCell::new(0i32);
+            assert_eq!(field.get(), 0);
+
+            field.set(5);
+            assert_eq!(field.get(), 5);
+
+            assert_eq!(field.replace(10), 5);
+            assert_eq!(field.get(), 10);
+        }
+
+        #[tokio::test]
+        async fn emits_changes_on_mutate() {
+            let field = ObservableCell::new(0i32);
+            let mut subscription = field.subscribe().skip(1);
+
+            field.mutate(|mut data| *data = 100);
+            assert_eq!(subscription.next().await.unwrap(), 100);
+        }
+
+        #[tokio::test]
+        async fn when_works_with_mutate() {
+            let field = ObservableCell::new(0i32);
+            let when_will_be_5 = field.when_eq(5);
+
+            field.mutate(|mut data| *data = 5);
+            await_future_with_timeout(
+                Box::pin(when_will_be_5),
+                Duration::from_millis(50),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        }
     }
 }
