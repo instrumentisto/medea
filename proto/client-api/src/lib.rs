@@ -263,12 +263,6 @@ pub struct Track {
     pub is_muted: bool,
 }
 
-// TODO:
-//   1. new TrackId but no direction/mediatype?
-//   2. known track id but differen direction/mediatype?
-//   It seems to me that this event should not be used for creatring new tracks,
-//   and direction and media_type should be removed.
-
 /// Path to existing [`Track`] and field which can be updated.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
