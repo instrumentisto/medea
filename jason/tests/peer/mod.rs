@@ -26,8 +26,6 @@ fn toggle_mute_tracks_updates(
         .into_iter()
         .map(|track_id| TrackUpdate {
             id: TrackId(*track_id),
-            direction: None,
-            media_type: None,
             is_muted: Some(is_muted),
         })
         .collect()
