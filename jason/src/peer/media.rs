@@ -9,7 +9,7 @@ use derive_more::Display;
 use futures::{future, StreamExt};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
-use medea_reactive::{Dropped, Observable};
+use medea_reactive::{Dropped, ObservableCell};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
@@ -436,7 +436,7 @@ pub struct Sender {
     caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
-    muted_state: RefCell<Observable<MuteState>>,
+    muted_state: ObservableCell<MuteState>,
 }
 
 impl Sender {
@@ -460,8 +460,8 @@ impl Sender {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let muted_state = RefCell::new(Observable::new(muted_state));
-        let mut subscription = muted_state.borrow().subscribe();
+        let muted_state = ObservableCell::new(muted_state);
+        let mut subscription = muted_state.subscribe();
         let this = Rc::new(Self {
             track_id,
             caps,
@@ -497,7 +497,7 @@ impl Sender {
 
     /// Returns [`MutedState`] of underlying [`MediaTrack`] of this [`Sender`].
     pub fn muted_state(&self) -> MuteState {
-        **self.muted_state.borrow()
+        self.muted_state.get()
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
@@ -530,12 +530,12 @@ impl Sender {
 
     /// Changes [`MutedState`] of this [`Sender`]'s underlying [`MediaTrack`].
     pub fn change_muted_state(&self, new_state: MuteState) {
-        *self.muted_state.borrow_mut().borrow_mut() = new_state;
+        self.muted_state.set(new_state)
     }
 
     /// Checks that [`Sender`] has a track, and it's unmuted.
     fn is_track_enabled(&self) -> bool {
-        **self.muted_state.borrow() == MuteState::NotMuted
+        self.muted_state.get() == MuteState::NotMuted
     }
 
     /// Resolves when [`MutedState`] of underlying [`MediaTrack`] of this
@@ -544,7 +544,7 @@ impl Sender {
         &self,
         state: MuteState,
     ) -> impl Future<Output = Result<()>> {
-        let subscription = self.muted_state.borrow().when_eq(state);
+        let subscription = self.muted_state.when_eq(state);
         async move {
             subscription.await.map_err(|_| {
                 tracerr::new!(MediaConnectionsError::MutedStateDropped)
@@ -556,12 +556,7 @@ impl Sender {
     /// [`medea_client_api_proto::TrackUpdate`].
     pub fn update(&self, track: &proto::TrackUpdate) {
         if let Some(is_muted) = track.is_muted {
-            if is_muted {
-                *self.muted_state.borrow_mut().borrow_mut() = MuteState::Muted;
-            } else {
-                *self.muted_state.borrow_mut().borrow_mut() =
-                    MuteState::NotMuted;
-            }
+            self.muted_state.set(is_muted.into());
         }
     }
 }
