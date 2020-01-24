@@ -239,15 +239,14 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
-    /// [`MutedState::Muted`].
-    pub fn is_all_tracks_muted(&self, kind: TransceiverKind) -> bool {
-        self.media_connections.is_all_tracks_with_kind_muted(kind)
-    }
-
-    /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
-    /// [`MutedState::Unmuted`].
-    pub fn is_all_tracks_unmuted(&self, kind: TransceiverKind) -> bool {
-        self.media_connections.is_all_tracks_with_kind_unmuted(kind)
+    /// provided [`MuteState`].
+    pub fn is_all_tracks_in_mute_state(
+        &self,
+        kind: TransceiverKind,
+        mute_state: MuteState,
+    ) -> bool {
+        self.media_connections
+            .is_all_tracks_in_mute_state(kind, mute_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].

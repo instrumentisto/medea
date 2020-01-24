@@ -234,6 +234,24 @@ impl RoomHandle {
             Ok(())
         }
     }
+
+    async fn toggle_mute(
+        &self,
+        is_muted: bool,
+        kind: TransceiverKind,
+    ) -> Result<(), JsValue> {
+        let inner = upgrade_or_detached!(self.0, JsValue)?;
+        while !inner
+            .borrow()
+            .is_all_peers_in_mute_state(kind, MuteState::from(is_muted))
+        {
+            let fut =
+                inner.borrow().toggle_mute_for_current_state(is_muted, kind);
+            fut.await;
+        }
+
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -311,16 +329,9 @@ impl RoomHandle {
 
     /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
-        let weak = self.0.clone();
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            // TODO: this while looks a bit strange, should be moved
-            //       lower i think
-            let inner = upgrade_or_detached!(weak, JsValue)?;
-            while !inner.borrow().is_muted(TransceiverKind::Audio) {
-                let fut =
-                    inner.borrow().toggle_mute(true, TransceiverKind::Audio);
-                fut.await;
-            }
+            this.toggle_mute(true, TransceiverKind::Audio).await?;
 
             Ok(JsValue::UNDEFINED)
         })
@@ -328,14 +339,9 @@ impl RoomHandle {
 
     /// Unmutes outbound audio in this [`Room`].
     pub fn unmute_audio(&self) -> Promise {
-        let weak = self.0.clone();
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            let inner = upgrade_or_detached!(weak, JsValue)?;
-            while !inner.borrow().is_unmuted(TransceiverKind::Audio) {
-                let fut =
-                    inner.borrow().toggle_mute(false, TransceiverKind::Audio);
-                fut.await;
-            }
+            this.toggle_mute(false, TransceiverKind::Audio).await?;
 
             Ok(JsValue::UNDEFINED)
         })
@@ -343,14 +349,9 @@ impl RoomHandle {
 
     /// Mutes outbound video in this [`Room`].
     pub fn mute_video(&self) -> Promise {
-        let weak = self.0.clone();
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            let inner = upgrade_or_detached!(weak, JsValue)?;
-            while !inner.borrow().is_muted(TransceiverKind::Video) {
-                let fut =
-                    inner.borrow().toggle_mute(true, TransceiverKind::Video);
-                fut.await;
-            }
+            this.toggle_mute(true, TransceiverKind::Video).await?;
 
             Ok(JsValue::UNDEFINED)
         })
@@ -358,14 +359,9 @@ impl RoomHandle {
 
     /// Unmutes outbound video in this [`Room`].
     pub fn unmute_video(&self) -> Promise {
-        let weak = self.0.clone();
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            let inner = upgrade_or_detached!(weak, JsValue)?;
-            while !inner.borrow().is_unmuted(TransceiverKind::Video) {
-                let fut =
-                    inner.borrow().toggle_mute(false, TransceiverKind::Video);
-                fut.await;
-            }
+            this.toggle_mute(false, TransceiverKind::Video).await?;
 
             Ok(JsValue::UNDEFINED)
         })
@@ -568,7 +564,7 @@ impl InnerRoom {
 
     /// Toggles [`Track`]s mute state by provided [`TransceiverKind`] in all
     /// [`PeerConnection`]s in this [`Room`].
-    fn toggle_mute(
+    fn toggle_mute_for_current_state(
         &self,
         is_muted: bool,
         kind: TransceiverKind,
@@ -613,24 +609,19 @@ impl InnerRoom {
         }
     }
 
-    /// Returns `true` if all tracks of this [`Room`] is in
-    /// [`MutedState::Muted`].
-    pub fn is_muted(&self, kind: TransceiverKind) -> bool {
+    /// Returns `true` if all tracks of this [`Room`] is in provided
+    /// [`MuteState`].
+    pub fn is_all_peers_in_mute_state(
+        &self,
+        kind: TransceiverKind,
+        mute_state: MuteState,
+    ) -> bool {
         self.peers
             .get_all()
             .into_iter()
-            .skip_while(|peer| peer.is_all_tracks_muted(kind))
-            .next()
-            .is_none()
-    }
-
-    /// Returns `true` if all tracks of this [`Room`] is in
-    /// [`MutedState::Unmuted`].
-    pub fn is_unmuted(&self, kind: TransceiverKind) -> bool {
-        self.peers
-            .get_all()
-            .into_iter()
-            .skip_while(|peer| peer.is_all_tracks_unmuted(kind))
+            .skip_while(|peer| {
+                peer.is_all_tracks_in_mute_state(kind, mute_state)
+            })
             .next()
             .is_none()
     }

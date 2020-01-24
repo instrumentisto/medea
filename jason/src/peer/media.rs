@@ -132,24 +132,14 @@ impl MediaConnections {
     }
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
-    /// in [`MutedState::Muted`].
-    pub fn is_all_tracks_with_kind_muted(&self, kind: TransceiverKind) -> bool {
-        for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.muted_state() != MuteState::Muted {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
-    /// in [`MutedState::Unmuted`].
-    pub fn is_all_tracks_with_kind_unmuted(
+    /// in provided [`MutedState`].
+    pub fn is_all_tracks_in_mute_state(
         &self,
         kind: TransceiverKind,
+        mute_state: MuteState,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.muted_state() != MuteState::NotMuted {
+            if sender.muted_state() != mute_state {
                 return false;
             }
         }
