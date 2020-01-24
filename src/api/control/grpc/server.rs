@@ -15,16 +15,12 @@ use futures::{
     compat::Future01CompatExt as _,
     future::{self, BoxFuture, FutureExt as _, TryFutureExt as _},
 };
-use tonic::{
-    transport::Server
+use medea_control_api_proto::grpc::medea::{
+    control_api_server::{ControlApi, ControlApiServer},
+    create_request::El as CreateRequestOneof,
+    CreateRequest, CreateResponse, Element, GetResponse, IdRequest, Response,
 };
-use medea_control_api_proto::grpc::{
-    medea::{
-        CreateRequest, create_request::El as CreateRequestOneof,
-        CreateResponse, Element, GetResponse, IdRequest, Response,
-        control_api_server::{ControlApi, ControlApiServer},
-    },
-};
+use tonic::transport::Server;
 
 use crate::{
     api::control::{
@@ -47,7 +43,7 @@ use crate::{
     utils::ResponseAnyFuture,
     AppContext,
 };
-use tonic::{Status, Request};
+use tonic::{Request, Status};
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -282,52 +278,49 @@ impl ControlApiService {
 
 #[tonic::async_trait]
 impl ControlApi for ControlApiService {
-    async fn create(&self, request: tonic::Request<CreateRequest>) -> Result<tonic::Response<CreateResponse>, Status> {
-        let create_response = match self.create_element(request.into_inner()).await {
-            Ok(sid) => {
-                CreateResponse {
-                    sid,
-                    error: None,
-                }
-            }
-            Err(err) => {
-                CreateResponse {
+    async fn create(
+        &self,
+        request: tonic::Request<CreateRequest>,
+    ) -> Result<tonic::Response<CreateResponse>, Status> {
+        let create_response =
+            match self.create_element(request.into_inner()).await {
+                Ok(sid) => CreateResponse { sid, error: None },
+                Err(err) => CreateResponse {
                     sid: HashMap::new(),
                     error: Some(err.into()),
-                }
-            }
-        };
+                },
+            };
 
         Ok(tonic::Response::new(create_response))
     }
 
-    async fn delete(&self, request: tonic::Request<IdRequest>) -> Result<tonic::Response<Response>, Status> {
+    async fn delete(
+        &self,
+        request: tonic::Request<IdRequest>,
+    ) -> Result<tonic::Response<Response>, Status> {
         let response = match self.delete_element(request.into_inner()).await {
-            Ok(_) => Response {
-                error: None,
-            },
+            Ok(_) => Response { error: None },
             Err(e) => Response {
-                error: Some(e.into())
+                error: Some(e.into()),
             },
         };
 
         Ok(tonic::Response::new(response))
     }
 
-    async fn get(&self, request: tonic::Request<IdRequest>) -> Result<tonic::Response<GetResponse>, Status> {
+    async fn get(
+        &self,
+        request: tonic::Request<IdRequest>,
+    ) -> Result<tonic::Response<GetResponse>, Status> {
         let response = match self.get_element(request.into_inner()).await {
-            Ok(elements) => {
-                GetResponse {
-                    elements,
-                    error: None
-                }
-            }
-            Err(e) => {
-                GetResponse {
-                    elements: HashMap::new(),
-                    error: None,
-                }
-            }
+            Ok(elements) => GetResponse {
+                elements,
+                error: None,
+            },
+            Err(e) => GetResponse {
+                elements: HashMap::new(),
+                error: None,
+            },
         };
 
         Ok(tonic::Response::new(response))
@@ -370,7 +363,10 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 /// Run gRPC [Control API] server in actix actor.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub async fn run(room_repo: Addr<RoomService>, app: &AppContext) -> Addr<GrpcServer> {
+pub async fn run(
+    room_repo: Addr<RoomService>,
+    app: &AppContext,
+) -> Addr<GrpcServer> {
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;
 
@@ -381,13 +377,21 @@ pub async fn run(room_repo: Addr<RoomService>, app: &AppContext) -> Addr<GrpcSer
 
     info!("Starting gRPC server on {}:{}", bind_ip, bind_port);
 
-    let (grpc_shutdown_tx, grpc_shutdown_rx) = futures::channel::oneshot::channel();
+    let (grpc_shutdown_tx, grpc_shutdown_rx) =
+        futures::channel::oneshot::channel();
 
     let server = Server::builder()
         .add_service(service)
-        .serve_with_shutdown(format!("{}:{}", bind_ip, bind_port).parse().unwrap(), async move { grpc_shutdown_rx.await; })
+        .serve_with_shutdown(
+            format!("{}:{}", bind_ip, bind_port).parse().unwrap(),
+            async move {
+                grpc_shutdown_rx.await;
+            },
+        )
         .await
         .unwrap();
 
-    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| GrpcServer(Some(grpc_shutdown_tx)))
+    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| {
+        GrpcServer(Some(grpc_shutdown_tx))
+    })
 }

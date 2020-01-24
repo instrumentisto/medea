@@ -6,8 +6,8 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::medea::{
-    create_request::El as ElementProto, Member as MemberProto,
-    room::element::El as RoomElementProto,
+    create_request::El as ElementProto, room::element::El as RoomElementProto,
+    Member as MemberProto,
 };
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;

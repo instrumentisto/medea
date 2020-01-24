@@ -7,7 +7,7 @@ use std::{
 
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::medea::{
-    Element as RootElementProto, member::Element as ElementProto,
+    member::Element as ElementProto, Element as RootElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
 };
 

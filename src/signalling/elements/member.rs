@@ -13,8 +13,8 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
 use medea_control_api_proto::grpc::medea::{
-    Element as RootElementProto, Member as MemberProto,
-    room::Element as ElementProto,
+    room::Element as ElementProto, Element as RootElementProto,
+    Member as MemberProto,
 };
 
 use crate::{

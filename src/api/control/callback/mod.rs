@@ -7,9 +7,9 @@ pub mod url;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use medea_control_api_proto::grpc::medea_callback::{
-    OnJoin as OnJoinProto, OnJoin, OnLeave as OnLeaveProto,
-    on_leave::Reason as OnLeaveReasonProto, Request as CallbackRequestProto,
-    request::Event as RequestOneofEventProto,
+    on_leave::Reason as OnLeaveReasonProto,
+    request::Event as RequestOneofEventProto, OnJoin as OnJoinProto, OnJoin,
+    OnLeave as OnLeaveProto, Request as CallbackRequestProto,
 };
 
 use crate::api::control::refs::StatefulFid;

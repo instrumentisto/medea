@@ -45,12 +45,12 @@ mod grpc {
                         .build_client(true)
                         .build_server(true)
                         .compile(&grpc_spec_files, &[GRPC_DIR.to_string()])?;
-//                    protoc_grpcio::compile_grpc_protos(
-//                        &grpc_spec_files,
-//                        &[GRPC_DIR],
-//                        &GRPC_DIR,
-//                        None,
-//                    )?;
+                    //                    protoc_grpcio::compile_grpc_protos(
+                    //                        &grpc_spec_files,
+                    //                        &[GRPC_DIR],
+                    //                        &GRPC_DIR,
+                    //                        None,
+                    //                    )?;
                     break;
                 } else {
                     panic!("{}", e);
