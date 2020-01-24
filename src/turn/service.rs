@@ -123,7 +123,7 @@ impl TurnAuthService for Service {
     /// Sends `DeleteRoom` to [`Service`].
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
         // leave only non static users
-        let users: Vec<_>= users.iter().filter(|u| !u.is_static()).collect();
+        let users: Vec<_> = users.iter().filter(|u| !u.is_static()).collect();
 
         if users.is_empty() {
             Ok(())
@@ -190,10 +190,7 @@ pub mod test {
             ))
         }
 
-        async fn delete(
-            &self,
-            _: &[IceUser],
-        ) -> Result<(), TurnServiceErr> {
+        async fn delete(&self, _: &[IceUser]) -> Result<(), TurnServiceErr> {
             Ok(())
         }
     }
