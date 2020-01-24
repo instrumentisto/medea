@@ -9,7 +9,7 @@ use derive_more::Display;
 use futures::{future, StreamExt};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
-use medea_reactive::{Dropped, Reactive};
+use medea_reactive::{Dropped, Observable};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
@@ -436,7 +436,7 @@ pub struct Sender {
     caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
-    muted_state: RefCell<Reactive<MuteState>>,
+    muted_state: RefCell<Observable<MuteState>>,
 }
 
 impl Sender {
@@ -460,7 +460,7 @@ impl Sender {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let muted_state = RefCell::new(Reactive::new(muted_state));
+        let muted_state = RefCell::new(Observable::new(muted_state));
         let mut subscription = muted_state.borrow().subscribe();
         let this = Rc::new(Self {
             track_id,

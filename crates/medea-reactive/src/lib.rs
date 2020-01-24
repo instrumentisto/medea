@@ -2,7 +2,7 @@
 //! subscribe.
 //!
 //!
-//! # Basic iteraction with a `ReactiveField`
+//! # Basic iteraction with a `ObservableField`
 //!
 //!
 //!
@@ -10,16 +10,16 @@
 //! ## With primitive
 //!
 //! ```
-//! use medea_reactive::Reactive;
+//! use medea_reactive::Observable;
 //!
 //! // Create a reactive field with 'u32' data inside.
-//! let mut foo = Reactive::new(0u32);
+//! let mut foo = Observable::new(0u32);
 //!
-//! // If you want to get data which held by 'ReactiveField' you can just deref
-//! // 'ReactiveField' container:
+//! // If you want to get data which held by 'ObservableField' you can
+//! // just deref 'ObservableField' container:
 //! assert_eq!(*foo + 100, 100);
 //!
-//! // If you want to modify data which 'ReactiveField' holds, you should use
+//! // If you want to modify data which 'ObservableField' holds, you should use
 //! // '.borrow_mut()':
 //! *foo.borrow_mut() = 0;
 //! assert_eq!(*foo, 0);
@@ -31,9 +31,9 @@
 //! ## With object
 //!
 //! ```
-//! use medea_reactive::Reactive;
+//! use medea_reactive::Observable;
 //!
-//! // 'ReactiveField' only works with objects which implements
+//! // 'ObservableField' only works with objects which implements
 //! // 'Clone' and 'PartialEq'.
 //! #[derive(Clone, PartialEq)]
 //! struct Foo(u32);
@@ -52,12 +52,12 @@
 //!     }
 //! }
 //!
-//! let mut foo = Reactive::new(Foo::new());
+//! let mut foo = Observable::new(Foo::new());
 //! // You can transparently call methods of object which stored by
-//! // 'ReactiveField' if they not mutate.
+//! // 'ObservableField' if they not mutate.
 //! assert_eq!(foo.current_num(), 0);
 //! // If you want to call mutable method of object which stored by
-//! // 'ReactiveField' you should call '.borrow_mut()' before it.
+//! // 'ObservableField' you should call '.borrow_mut()' before it.
 //! foo.borrow_mut().increase();
 //! assert_eq!(foo.current_num(), 1);
 //! ```
@@ -65,21 +65,21 @@
 //!
 //!
 //!
-//! # Subscription on all `ReactiveField` data modification
+//! # Subscription on all `ObservableField` data modification
 //!
 //! ```
-//! use medea_reactive::Reactive;
+//! use medea_reactive::Observable;
 //! # use futures::{executor, StreamExt as _};
 //!
 //! # executor::block_on(async {
-//! let mut foo = Reactive::new(0u32);
+//! let mut foo = Observable::new(0u32);
 //! // Subscribe on all field modifications:
 //! let mut foo_changes_stream = foo.subscribe();
 //!
-//! // Initial 'ReactiveField' field data will be sent as modification:
+//! // Initial 'ObservableField' field data will be sent as modification:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
 //!
-//! // Modify 'ReactiveField' field:
+//! // Modify 'ObservableField' field:
 //! *foo.borrow_mut() = 1;
 //! // Receive modification update:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 1);
@@ -96,14 +96,14 @@
 //!
 //!
 //!
-//! # Subscription on concrete `ReactiveField` data modification
+//! # Subscription on concrete `ObservableField` data modification
 //!
 //! ```
-//! use medea_reactive::Reactive;
+//! use medea_reactive::Observable;
 //! # use futures::{executor, StreamExt as _};
 //!
 //! # executor::block_on(async {
-//! let mut foo = Reactive::new(0u32);
+//! let mut foo = Observable::new(0u32);
 //!
 //! // Create future which will be resolved when foo will become one:
 //! let when_foo_will_be_one = foo.when_eq(1);
@@ -122,18 +122,18 @@
 //!
 //!
 //!
-//! # Hold mutable reference of `ReactiveField`
+//! # Hold mutable reference of `ObservableField`
 //!
 //! ```
-//! use medea_reactive::Reactive;
+//! use medea_reactive::Observable;
 //! # use futures::{executor, StreamExt as _};
 //!
 //! # executor::block_on(async {
-//! let mut foo = Reactive::new(0u32);
+//! let mut foo = Observable::new(0u32);
 //!
 //! // Subscribe on all 'foo' changes:
 //! let mut foo_changes_stream = foo.subscribe();
-//! // Just skip initial 'ReactiveField' value:
+//! // Just skip initial 'ObservableField' value:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
 //! // And hold mutable reference in variable:
 //! let mut foo_mut_ref = foo.borrow_mut();
@@ -149,7 +149,7 @@
 //!
 //! let mut foo_changes_subscription = foo.subscribe();
 //! let mut foo_mut_ref = foo.borrow_mut();
-//! // Really change data of 'ReactiveField' here:
+//! // Really change data of 'ObservableField' here:
 //! *foo_mut_ref = 100;
 //! // But at the end we're reverted to a original value:
 //! *foo_mut_ref = 200;
@@ -176,36 +176,35 @@ use futures::{
     StreamExt as _,
 };
 
-/// [`ReactiveField`] with which you can only subscribe on changes
-/// ([`ReactiveField::subscribe`]) and only on concrete changes
-/// ([`ReactiveField::when`] and [`ReactiveField::when_eq`]).
-pub type Reactive<D> = ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>;
-
-// TODO: it seems that Observable suits better here.
+/// [`ObservableField`] with which you can only subscribe on changes
+/// ([`ObservableField::subscribe`]) and only on concrete changes
+/// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
+pub type Observable<D> =
+    ObservableField<D, RefCell<Vec<UniversalSubscriber<D>>>>;
 
 /// A reactive cell which will emit all modification to the subscribers.
 ///
 /// You can subscribe to this field modifications with
-/// [`ReactiveField::subscribe`].
+/// [`ObservableField::subscribe`].
 ///
 /// If you want to get [`Future`] which will be resolved only when data of this
-/// field will become equal to some data, you can use [`ReactiveField::when`] or
-/// [`ReactiveField::when_eq`].
-pub struct ReactiveField<D, S> {
-    /// Data which stored by this [`ReactiveField`].
+/// field will become equal to some data, you can use [`ObservableField::when`]
+/// or [`ObservableField::when_eq`].
+pub struct ObservableField<D, S> {
+    /// Data which stored by this [`ObservableField`].
     data: D,
 
-    /// Subscribers on [`ReactiveField`]'s data mutations.
+    /// Subscribers on [`ObservableField`]'s data mutations.
     subs: S,
 }
 
-impl<D> ReactiveField<D, RefCell<Vec<UniversalSubscriber<D>>>>
+impl<D> ObservableField<D, RefCell<Vec<UniversalSubscriber<D>>>>
 where
     D: 'static,
 {
-    /// Returns new [`ReactiveField`] on which mutations you can
-    /// [`ReactiveSubscribe`], also you can subscribe on concrete mutation with
-    /// [`ReactiveField::when`] and [`ReactiveField::when_eq`].
+    /// Returns new [`ObservableField`] on which mutations you can
+    /// [`ObservableSubscribe`], also you can subscribe on concrete mutation
+    /// with [`ObservableField::when`] and [`ObservableField::when_eq`].
     pub fn new(data: D) -> Self {
         Self {
             data,
@@ -214,19 +213,19 @@ where
     }
 }
 
-impl<D, S> ReactiveField<D, S>
+impl<D, S> ObservableField<D, S>
 where
     D: 'static,
     S: Subscribable<D>,
 {
-    /// Creates new [`ReactiveField`] with custom [`Subscribable`]
+    /// Creates new [`ObservableField`] with custom [`Subscribable`]
     /// implementation.
     pub fn new_with_custom(data: D, subs: S) -> Self {
         Self { data, subs }
     }
 }
 
-impl<D, S> ReactiveField<D, S>
+impl<D, S> ObservableField<D, S>
 where
     D: 'static,
     S: Whenable<D>,
@@ -248,7 +247,7 @@ where
     }
 }
 
-impl<D, S> ReactiveField<D, S>
+impl<D, S> ObservableField<D, S>
 where
     S: Subscribable<D>,
     D: Clone + 'static,
@@ -261,13 +260,13 @@ where
     }
 }
 
-impl<D, S> ReactiveField<D, S>
+impl<D, S> ObservableField<D, S>
 where
     D: PartialEq + 'static,
     S: Whenable<D>,
 {
     /// Returns [`Future`] which will be resolved only when data of this
-    /// [`ReactiveField`] will become equal to provided `should_be`.
+    /// [`ObservableField`] will become equal to provided `should_be`.
     pub fn when_eq(
         &self,
         should_be: D,
@@ -276,27 +275,27 @@ where
     }
 }
 
-impl<D, S> ReactiveField<D, S>
+impl<D, S> ObservableField<D, S>
 where
-    S: OnReactiveFieldModification<D>,
+    S: OnObservableFieldModification<D>,
     D: Clone + PartialEq,
 {
     // TODO: perhaps, we should grant interior mutability for all reactive
     //       fields?
 
-    /// Returns [`MutReactiveFieldGuard`] which can be mutably dereferenced to
+    /// Returns [`MutObservableFieldGuard`] which can be mutably dereferenced to
     /// underlying data.
     ///
     /// If some mutation of data happened between calling
-    /// [`ReactiveField::borrow_mut`] and dropping of
-    /// [`MutReactiveFieldGuard`], then all subscribers of this
-    /// [`ReactiveField`] will be notified about this.
+    /// [`ObservableField::borrow_mut`] and dropping of
+    /// [`MutObservableFieldGuard`], then all subscribers of this
+    /// [`ObservableField`] will be notified about this.
     ///
     /// Notification about mutation will be sent only if this field __really__
     /// changed. This will be checked with [`PartialEq`] implementation of
     /// underlying data.
-    pub fn borrow_mut(&mut self) -> MutReactiveFieldGuard<'_, D, S> {
-        MutReactiveFieldGuard {
+    pub fn borrow_mut(&mut self) -> MutObservableFieldGuard<'_, D, S> {
+        MutObservableFieldGuard {
             value_before_mutation: self.data.clone(),
             data: &mut self.data,
             subs: &mut self.subs,
@@ -305,20 +304,20 @@ where
 }
 
 /// With this trait you can catch all unique modification of a
-/// [`ReactiveField`].
-pub trait OnReactiveFieldModification<D> {
-    /// This function will be called on every [`ReactiveField`] modification.
+/// [`ObservableField`].
+pub trait OnObservableFieldModification<D> {
+    /// This function will be called on every [`ObservableField`] modification.
     ///
     /// On this function call subsciber which implements
-    /// [`OnReactiveFieldModification`] should send a update to a [`Stream`]
+    /// [`OnObservableFieldModification`] should send a update to a [`Stream`]
     /// or resolve [`Future`].
     fn on_modify(&mut self, data: &D);
 }
 
-/// With this trait you can implement [`ReactiveField::subscribe`] functional
+/// With this trait you can implement [`ObservableField::subscribe`] functional
 /// for some object.
 pub trait Subscribable<D: 'static> {
-    /// This function will be called on [`ReactiveField::subscribe`].
+    /// This function will be called on [`ObservableField::subscribe`].
     ///
     /// Should return [`LocalBoxStream`] to which will be sent data updates.
     fn subscribe(&self) -> LocalBoxStream<'static, D>;
@@ -338,7 +337,7 @@ pub enum UniversalSubscriber<D> {
     Subscribe(mpsc::UnboundedSender<D>),
 }
 
-/// Error will be sent to all subscribers when this [`ReactiveField`] is
+/// Error will be sent to all subscribers when this [`ObservableField`] is
 /// dropped.
 #[derive(Debug)]
 pub struct Dropped;
@@ -349,10 +348,10 @@ impl From<oneshot::Canceled> for Dropped {
     }
 }
 
-/// With this trait you can implement [`ReactiveField::when`] and
-/// [`ReactiveField::when_eq`] functional for some object.
+/// With this trait you can implement [`ObservableField::when`] and
+/// [`ObservableField::when_eq`] functional for some object.
 pub trait Whenable<D: 'static> {
-    /// This function will be called on [`ReactiveField::when`].
+    /// This function will be called on [`ObservableField::when`].
     ///
     /// Should return [`LocalBoxFuture`] to which will be sent `()` when
     /// provided `assert_fn` returns `true`.
@@ -387,7 +386,7 @@ impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     }
 }
 
-impl<D: Clone> OnReactiveFieldModification<D>
+impl<D: Clone> OnObservableFieldModification<D>
     for RefCell<Vec<UniversalSubscriber<D>>>
 {
     fn on_modify(&mut self, data: &D) {
@@ -408,7 +407,7 @@ impl<D: Clone> OnReactiveFieldModification<D>
     }
 }
 
-impl<D, S> Deref for ReactiveField<D, S> {
+impl<D, S> Deref for ObservableField<D, S> {
     type Target = D;
 
     fn deref(&self) -> &Self::Target {
@@ -416,16 +415,16 @@ impl<D, S> Deref for ReactiveField<D, S> {
     }
 }
 
-impl<D, S> fmt::Debug for ReactiveField<D, S>
+impl<D, S> fmt::Debug for ObservableField<D, S>
 where
     D: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "ReactiveField {{ data: {:?} }}", self.data)
+        write!(f, "ObservableField {{ data: {:?} }}", self.data)
     }
 }
 
-impl<D, S> fmt::Display for ReactiveField<D, S>
+impl<D, S> fmt::Display for ObservableField<D, S>
 where
     D: fmt::Display,
 {
@@ -434,30 +433,30 @@ where
     }
 }
 
-/// Mutable [`ReactiveField`] reference which you can get by calling
-/// [`ReactiveField::borrow_mut`].
+/// Mutable [`ObservableField`] reference which you can get by calling
+/// [`ObservableField::borrow_mut`].
 ///
 /// When this object will be [`Drop`]ped check for modification will be
 /// performed. If data was changed, then
-/// [`OnReactiveFieldModification::on_modify`] will be called.
-pub struct MutReactiveFieldGuard<'a, D, S>
+/// [`OnObservableFieldModification::on_modify`] will be called.
+pub struct MutObservableFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<D>,
+    S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
-    /// Data which stored by this [`ReactiveField`].
+    /// Data which stored by this [`ObservableField`].
     data: &'a mut D,
 
-    /// Subscribers on [`ReactiveField`]'s data mutations.
+    /// Subscribers on [`ObservableField`]'s data mutations.
     subs: &'a mut S,
 
-    /// Data which stored by this [`ReactiveField`] before mutation.
+    /// Data which stored by this [`ObservableField`] before mutation.
     value_before_mutation: D,
 }
 
-impl<'a, D, S> Deref for MutReactiveFieldGuard<'a, D, S>
+impl<'a, D, S> Deref for MutObservableFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<D>,
+    S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
     type Target = D;
@@ -467,9 +466,9 @@ where
     }
 }
 
-impl<'a, D, S> DerefMut for MutReactiveFieldGuard<'a, D, S>
+impl<'a, D, S> DerefMut for MutObservableFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<D>,
+    S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -477,9 +476,9 @@ where
     }
 }
 
-impl<'a, D, S> Drop for MutReactiveFieldGuard<'a, D, S>
+impl<'a, D, S> Drop for MutObservableFieldGuard<'a, D, S>
 where
-    S: OnReactiveFieldModification<D>,
+    S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
     fn drop(&mut self) {
@@ -499,7 +498,7 @@ mod tests {
     };
     use tokio::{task, time::delay_for};
 
-    use crate::Reactive;
+    use crate::Observable;
 
     #[derive(Debug)]
     struct Timeout;
@@ -518,20 +517,20 @@ mod tests {
 
     #[tokio::test]
     async fn subscribe_sends_current_data() {
-        let field = Reactive::new(9i32);
+        let field = Observable::new(9i32);
         let current_data = field.subscribe().next().await.unwrap();
         assert_eq!(current_data, 9);
     }
 
     #[tokio::test]
     async fn when_eq_resolves_if_value_already_eq() {
-        let field = Reactive::new(9i32);
+        let field = Observable::new(9i32);
         field.when_eq(9i32).await.unwrap();
     }
 
     #[tokio::test]
     async fn when_eq_dont_resolves_if_value_is_not_eq() {
-        let field = Reactive::new(9i32);
+        let field = Observable::new(9i32);
         await_future_with_timeout(
             field.when_eq(0i32),
             Duration::from_millis(50),
@@ -543,7 +542,7 @@ mod tests {
 
     #[tokio::test]
     async fn current_value_provided_into_assert_fn_on_when_call() {
-        let field = Reactive::new(9i32);
+        let field = Observable::new(9i32);
 
         await_future_with_timeout(
             field.when(|val| val == &9),
@@ -558,7 +557,7 @@ mod tests {
     async fn value_updates_is_sended_to_subs() {
         task::LocalSet::new()
             .run_until(async move {
-                let mut field = Reactive::new(0i32);
+                let mut field = Observable::new(0i32);
                 let mut subscription_on_changes = field.subscribe();
 
                 task::spawn_local(async move {
@@ -583,7 +582,7 @@ mod tests {
     async fn when_resolves_on_value_update() {
         task::LocalSet::new()
             .run_until(async move {
-                let mut field = Reactive::new(0i32);
+                let mut field = Observable::new(0i32);
                 let subscription = field.when(|change| change == &100);
 
                 task::spawn_local(async move {
@@ -607,7 +606,7 @@ mod tests {
     async fn when_eq_resolves_on_value_update() {
         task::LocalSet::new()
             .run_until(async move {
-                let mut field = Reactive::new(0i32);
+                let mut field = Observable::new(0i32);
                 let subscription = field.when_eq(100);
 
                 task::spawn_local(async move {
@@ -629,7 +628,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_returns_dropped_error_on_drop() {
-        let field = Reactive::new(0i32);
+        let field = Observable::new(0i32);
         let subscription = field.when(|change| change == &100);
         drop(field);
         subscription.await.err().unwrap();
@@ -637,7 +636,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_eq_returns_dropped_error_on_drop() {
-        let field = Reactive::new(0i32);
+        let field = Observable::new(0i32);
         let subscription = field.when_eq(100);
         drop(field);
         subscription.await.err().unwrap();
@@ -645,7 +644,7 @@ mod tests {
 
     #[tokio::test]
     async fn stream_ends_when_reactive_field_dropped() {
-        let field = Reactive::new(0i32);
+        let field = Observable::new(0i32);
         let subscription = field.subscribe();
         drop(field);
         assert!(subscription.skip(1).next().await.is_none());
@@ -653,7 +652,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_update_should_be_emitted_on_field_mutation() {
-        let mut field = Reactive::new(0i32);
+        let mut field = Observable::new(0i32);
         let subscription = field.subscribe();
         *field.borrow_mut() = 0;
         await_future_with_timeout(
@@ -667,7 +666,7 @@ mod tests {
 
     #[tokio::test]
     async fn only_last_update_should_be_send_to_the_subscribers() {
-        let mut field = Reactive::new(0i32);
+        let mut field = Observable::new(0i32);
         let subscription = field.subscribe();
         let mut field_mut_guard = field.borrow_mut();
         *field_mut_guard = 100;
@@ -679,7 +678,7 @@ mod tests {
 
     #[tokio::test]
     async fn reactive_with_refcell_inside() {
-        let field = RefCell::new(Reactive::new(0i32));
+        let field = RefCell::new(Observable::new(0i32));
         let subscription = field.borrow().when_eq(1);
         *field.borrow_mut().borrow_mut() = 1;
         await_future_with_timeout(
