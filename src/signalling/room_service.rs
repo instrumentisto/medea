@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_control_api_proto::grpc::api::Element as ElementProto;
+use medea_control_api_proto::grpc::medea::Element as ElementProto;
 
 use crate::{
     api::control::{

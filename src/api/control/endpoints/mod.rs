@@ -10,9 +10,9 @@ use std::convert::TryFrom;
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::api::{
-    CreateRequest_oneof_el as ElementProto,
-    Member_Element_oneof_el as MemberElementProto,
+use medea_control_api_proto::grpc::medea::{
+    create_request::El as ElementProto,
+    member::element::El as MemberElementProto,
 };
 
 use super::{member::MemberElement, TryFromProtobufError};
@@ -78,11 +78,11 @@ impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
     ) -> Result<Self, Self::Error> {
         use MemberElementProto::*;
         match proto {
-            webrtc_play(elem) => {
+            WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPlay(play))
             }
-            webrtc_pub(elem) => {
+            WebrtcPub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
             }
@@ -96,15 +96,15 @@ impl TryFrom<(Id, ElementProto)> for EndpointSpec {
     fn try_from((id, proto): (Id, ElementProto)) -> Result<Self, Self::Error> {
         use ElementProto::*;
         match proto {
-            webrtc_play(elem) => {
+            WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPlay(play))
             }
-            webrtc_pub(elem) => {
+            WebrtcPub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
             }
-            member(_) | room(_) => {
+            Member(_) | Room(_) => {
                 Err(TryFromProtobufError::ExpectedOtherElement(
                     String::from("Endpoint"),
                     id.0,

@@ -5,7 +5,7 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
-use medea_control_api_proto::grpc::api as medea_grpc_control_api;
+use medea_control_api_proto::grpc::medea as medea_grpc_control_api;
 use medea_grpc_control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 use serde::Deserialize;
 

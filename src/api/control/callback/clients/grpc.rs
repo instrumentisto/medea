@@ -8,8 +8,8 @@ use futures::{
 };
 use grpcio::{ChannelBuilder, EnvBuilder};
 #[rustfmt::skip]
-use medea_control_api_proto::grpc::callback_grpc::{
-    CallbackClient as ProtoCallbackClient
+use medea_control_api_proto::grpc::medea_callback::{
+    callback_client::CallbackClient as ProtoCallbackClient
 };
 
 use crate::api::control::callback::{
@@ -17,11 +17,12 @@ use crate::api::control::callback::{
     url::GrpcCallbackUrl,
     CallbackRequest,
 };
+use tonic::transport::Channel;
 
 /// gRPC client for sending [`CallbackRequest`]s.
 pub struct GrpcCallbackClient {
     /// [`grpcio`] gRPC client of Control API Callback service.
-    client: ProtoCallbackClient,
+    client: ProtoCallbackClient<Channel>,
 }
 
 impl fmt::Debug for GrpcCallbackClient {
@@ -37,10 +38,9 @@ impl GrpcCallbackClient {
     ///
     /// Note that this function doesn't check availability of gRPC server on
     /// provided [`GrpcCallbackUrl`].
-    pub fn new(addr: &GrpcCallbackUrl) -> Self {
-        let env = Arc::new(EnvBuilder::new().build());
-        let ch = ChannelBuilder::new(env).connect(addr.addr());
-        let client = ProtoCallbackClient::new(ch);
+    pub async fn new(addr: &GrpcCallbackUrl) -> Self {
+        let addr = addr.addr().to_string();
+        let client = ProtoCallbackClient::connect(addr).await.unwrap();
 
         Self { client }
     }

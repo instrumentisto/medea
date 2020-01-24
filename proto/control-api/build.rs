@@ -39,12 +39,18 @@ mod grpc {
         for filename in &out_files {
             if let Err(e) = fs::File::open(filename) {
                 if let io::ErrorKind::NotFound = e.kind() {
-                    protoc_grpcio::compile_grpc_protos(
-                        &grpc_spec_files,
-                        &[GRPC_DIR],
-                        &GRPC_DIR,
-                        None,
-                    )?;
+                    tonic_build::configure()
+                        .out_dir(GRPC_DIR)
+                        .format(false)
+                        .build_client(true)
+                        .build_server(true)
+                        .compile(&grpc_spec_files, &[GRPC_DIR.to_string()])?;
+//                    protoc_grpcio::compile_grpc_protos(
+//                        &grpc_spec_files,
+//                        &[GRPC_DIR],
+//                        &GRPC_DIR,
+//                        None,
+//                    )?;
                     break;
                 } else {
                     panic!("{}", e);

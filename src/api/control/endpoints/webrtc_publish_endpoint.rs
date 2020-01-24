@@ -5,9 +5,9 @@
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::api::{
+use medea_control_api_proto::grpc::medea::{
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-    WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
+    web_rtc_publish_endpoint::P2p as WebRtcPublishEndpointP2pProto,
 };
 
 /// ID of [`WebRtcPublishEndpoint`].

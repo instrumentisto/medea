@@ -5,9 +5,9 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_control_api_proto::grpc::api::{
-    CreateRequest_oneof_el as ElementProto, Member as MemberProto,
-    Room_Element_oneof_el as RoomElementProto,
+use medea_control_api_proto::grpc::medea::{
+    create_request::El as ElementProto, Member as MemberProto,
+    room::element::El as RoomElementProto,
 };
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
