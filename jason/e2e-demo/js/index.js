@@ -49,7 +49,8 @@ async function createMember(roomId, memberId) {
     memberIds.push(memberId);
     pipeline["play-" + memberId] = {
       kind: 'WebRtcPlayEndpoint',
-      src: 'local://' + roomId + '/' + memberId + "/publish"
+      src: 'local://' + roomId + '/' + memberId + "/publish",
+      force_relay: false
     }
   }
 
@@ -73,7 +74,8 @@ async function createMember(roomId, memberId) {
         url: controlUrl + roomId + "/" + id + '/' + 'play-' + memberId,
         data: {
           kind: 'WebRtcPlayEndpoint',
-          src: 'local://' + roomId + '/' + memberId + '/publish'
+          src: 'local://' + roomId + '/' + memberId + '/publish',
+          force_relay: false
         }
       })
     }
