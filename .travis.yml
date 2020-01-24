@@ -1,4 +1,5 @@
 language: rust
+os: linux
 
 install:
   - rustc -vV
@@ -137,7 +138,6 @@ jobs:
         - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
       deploy:
         provider: script
-        skip_cleanup: true
         script: make release.crates crate=$MEDEA_CRATE_NAME publish=yes
         on:
           tags: true
@@ -155,7 +155,6 @@ jobs:
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       deploy:
         provider: script
-        skip_cleanup: true
         script: make release.npm crate=$MEDEA_CRATE_NAME publish=yes
         on:
           tags: true
@@ -170,8 +169,7 @@ jobs:
         - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
       deploy:
         provider: releases
-        skip_cleanup: true
-        api_key: $GH_TOKEN
+        token: $GH_TOKEN
         name: $TRAVIS_TAG
         on:
           tags: true
