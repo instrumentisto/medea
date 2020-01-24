@@ -1,4 +1,4 @@
-//! Containers to which data modifictions you can subscribe.
+//! Containers to which data modifications you can subscribe.
 //!
 //! # Basic iteraction with a `ObservableField`
 //!
