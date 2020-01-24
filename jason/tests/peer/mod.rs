@@ -5,9 +5,7 @@ mod media;
 use std::rc::Rc;
 
 use futures::{channel::mpsc, StreamExt as _};
-use medea_client_api_proto::{
-    IceConnectionState, PeerId, TrackId, TrackUpdate,
-};
+use medea_client_api_proto::{IceConnectionState, PeerId, TrackId, TrackPatch};
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent},
@@ -21,10 +19,10 @@ wasm_bindgen_test_configure!(run_in_browser);
 fn toggle_mute_tracks_updates(
     tracks_ids: &[u64],
     is_muted: bool,
-) -> Vec<TrackUpdate> {
+) -> Vec<TrackPatch> {
     tracks_ids
         .into_iter()
-        .map(|track_id| TrackUpdate {
+        .map(|track_id| TrackPatch {
             id: TrackId(*track_id),
             is_muted: Some(is_muted),
         })

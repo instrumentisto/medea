@@ -54,9 +54,9 @@ impl MediaTrack {
         self.track.set_enabled(enabled)
     }
 
-    /// Sets [`MediaStreamTrack`] enabled based on provided [`MutedState`].
-    pub fn set_enabled_by_muted_state(&self, muted_state: MuteState) {
-        match muted_state {
+    /// Sets [`MediaStreamTrack`] enabled based on provided [`MuteState`].
+    pub fn set_enabled_by_mute_state(&self, mute_state: MuteState) {
+        match mute_state {
             MuteState::Muted => {
                 self.set_enabled(false);
             }

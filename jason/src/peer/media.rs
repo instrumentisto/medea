@@ -59,24 +59,22 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// [`MutedState`] of [`MediaTrack`] was dropped.
-    #[display(fmt = "'MutedState' of 'MediaTrack' was dropped.")]
-    MutedStateDropped,
-
-    /// No [`MediaTrack`] in [`Sender`].
-    #[display(fmt = "No 'MediaTrack' in 'Sender'.")]
-    NoTrack,
+    /// [`MuteState`] of [`MediaTrack`] was dropped.
+    #[display(fmt = "'MuteState' of 'MediaTrack' was dropped.")]
+    MuteStateDropped,
 }
 
 impl From<Dropped> for MediaConnectionsError {
     fn from(_: Dropped) -> Self {
-        Self::MutedStateDropped
+        Self::MuteStateDropped
     }
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
+// TODO: few fields were deleted, they were used to mute tracks that
+//       were added after mute_room call how do we handle this now?
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
@@ -87,8 +85,6 @@ struct InnerMediaConnections {
 
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
-    /* TODO: few fileds were deleted, they were used to mute tracks that
-     *       were added after mute_room call how do you handle this now? */
 }
 
 impl InnerMediaConnections {
@@ -117,7 +113,7 @@ impl MediaConnections {
     }
 
     /// Returns all [`Sender`]s with provided [`TransceiverKind`] and
-    /// [`MutedState`] from this [`MediaConnections`].
+    /// [`MuteState`] from this [`MediaConnections`].
     pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
@@ -126,20 +122,20 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(kind)
-            .filter(|sender| sender.muted_state() == mute_state)
+            .filter(|sender| sender.mute_state() == mute_state)
             .cloned()
             .collect()
     }
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
-    /// in provided [`MutedState`].
-    pub fn is_all_tracks_in_mute_state(
+    /// in provided [`MuteState`].
+    pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
         mute_state: MuteState,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.muted_state() != mute_state {
+            if sender.mute_state() != mute_state {
                 return false;
             }
         }
@@ -398,8 +394,8 @@ pub enum MuteState {
 }
 
 impl MuteState {
-    /// Returns [`MutedState`] which should be set while transition to this
-    /// [`MutedState`].
+    /// Returns [`MuteState`] which should be set while transition to this
+    /// [`MuteState`].
     pub fn proccessing_state(self) -> Self {
         match self {
             Self::NotMuted => Self::Unmuting,
@@ -408,7 +404,7 @@ impl MuteState {
         }
     }
 
-    /// Returns opposite [`MutedState`] of this [`MutedState`].
+    /// Returns opposite [`MuteState`] of this [`MuteState`].
     pub fn opposite_state(self) -> Self {
         match self {
             Self::Muted => Self::NotMuted,
@@ -436,7 +432,7 @@ pub struct Sender {
     caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
-    muted_state: ObservableCell<MuteState>,
+    mute_state: ObservableCell<MuteState>,
 }
 
 impl Sender {
@@ -449,7 +445,7 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-        muted_state: MuteState,
+        mute_state: MuteState,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -460,21 +456,21 @@ impl Sender {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let muted_state = ObservableCell::new(muted_state);
-        let mut subscription = muted_state.subscribe();
+        let mute_state = ObservableCell::new(mute_state);
+        let mut subscription = mute_state.subscribe();
         let this = Rc::new(Self {
             track_id,
             caps,
             track: RefCell::new(None),
             transceiver,
-            muted_state,
+            mute_state,
         });
         let weak_this = Rc::downgrade(&this);
         spawn_local(async move {
             while let Some(mute_state_update) = subscription.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     if let Some(track) = this.track.borrow().as_ref() {
-                        track.set_enabled_by_muted_state(mute_state_update);
+                        track.set_enabled_by_mute_state(mute_state_update);
                     }
                 } else {
                     break;
@@ -495,9 +491,9 @@ impl Sender {
         TransceiverKind::from(&self.caps)
     }
 
-    /// Returns [`MutedState`] of underlying [`MediaTrack`] of this [`Sender`].
-    pub fn muted_state(&self) -> MuteState {
-        self.muted_state.get()
+    /// Returns [`MuteState`] of underlying [`MediaTrack`] of this [`Sender`].
+    pub fn mute_state(&self) -> MuteState {
+        self.mute_state.get()
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
@@ -522,41 +518,41 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
-        track.set_enabled_by_muted_state(sender.muted_state());
+        track.set_enabled_by_mute_state(sender.mute_state());
         sender.track.borrow_mut().replace(track);
 
         Ok(())
     }
 
-    /// Changes [`MutedState`] of this [`Sender`]'s underlying [`MediaTrack`].
-    pub fn change_muted_state(&self, new_state: MuteState) {
-        self.muted_state.set(new_state)
+    /// Changes [`MuteState`] of this [`Sender`]'s underlying [`MediaTrack`].
+    pub fn change_mute_state(&self, new_state: MuteState) {
+        self.mute_state.set(new_state)
     }
 
     /// Checks that [`Sender`] has a track, and it's unmuted.
     fn is_track_enabled(&self) -> bool {
-        self.muted_state.get() == MuteState::NotMuted
+        self.mute_state.get() == MuteState::NotMuted
     }
 
-    /// Resolves when [`MutedState`] of underlying [`MediaTrack`] of this
-    /// [`Sender`] will become equal to provided [`MutedState`].
-    pub fn on_muted_state(
+    /// Resolves when [`MuteState`] of underlying [`MediaTrack`] of this
+    /// [`Sender`] will become equal to provided [`MuteState`].
+    pub fn on_mute_state(
         &self,
         state: MuteState,
     ) -> impl Future<Output = Result<()>> {
-        let subscription = self.muted_state.when_eq(state);
+        let subscription = self.mute_state.when_eq(state);
         async move {
             subscription.await.map_err(|_| {
-                tracerr::new!(MediaConnectionsError::MutedStateDropped)
+                tracerr::new!(MediaConnectionsError::MuteStateDropped)
             })
         }
     }
 
     /// Updates this [`Track`] based on provided
     /// [`medea_client_api_proto::TrackUpdate`].
-    pub fn update(&self, track: &proto::TrackUpdate) {
+    pub fn update(&self, track: &proto::TrackPatch) {
         if let Some(is_muted) = track.is_muted {
-            self.muted_state.set(is_muted.into());
+            self.mute_state.set(is_muted.into());
         }
     }
 }

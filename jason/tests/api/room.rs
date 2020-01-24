@@ -50,9 +50,15 @@ fn get_test_room_and_exist_peer(
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
     rpc.expect_send_command().returning(move |cmd| match cmd {
-        Command::UpdateTracks { peer_id, tracks } => {
+        Command::UpdateTracks {
+            peer_id,
+            tracks_patches,
+        } => {
             event_tx
-                .unbounded_send(Event::TracksUpdated { peer_id, tracks })
+                .unbounded_send(Event::TracksUpdated {
+                    peer_id,
+                    tracks_patches,
+                })
                 .unwrap();
         }
         _ => (),

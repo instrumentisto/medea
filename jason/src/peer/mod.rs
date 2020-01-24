@@ -240,13 +240,13 @@ impl PeerConnection {
 
     /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
     /// provided [`MuteState`].
-    pub fn is_all_tracks_in_mute_state(
+    pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
         mute_state: MuteState,
     ) -> bool {
         self.media_connections
-            .is_all_tracks_in_mute_state(kind, mute_state)
+            .is_all_senders_in_mute_state(kind, mute_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
@@ -256,7 +256,7 @@ impl PeerConnection {
 
     /// Updates [`Sender`]s of this [`PeerConnection`] with
     /// [`medea_client_api_proto::TrackUpdate`].
-    pub fn update_tracks(&self, tracks: Vec<proto::TrackUpdate>) -> Result<()> {
+    pub fn update_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
             let track = self
                 .media_connections
@@ -366,14 +366,14 @@ impl PeerConnection {
     }
 
     /// Returns all [`Sender`]s with provided [`TransceiverKind`] and
-    /// [`MutedState`] from this [`PeerConnection`].
-    pub fn get_senders_by_kind_and_muted_state(
+    /// [`MuteState`] from this [`PeerConnection`].
+    pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
-        muted_state: MuteState,
+        mute_state: MuteState,
     ) -> Vec<Rc<Sender>> {
         self.media_connections
-            .get_senders_by_kind_and_mute_state(kind, muted_state)
+            .get_senders_by_kind_and_mute_state(kind, mute_state)
     }
 
     /// Track id to mid relations of all send tracks of this

@@ -14,7 +14,7 @@ use failure::Fail;
 use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackUpdate,
+    TrackPatch,
 };
 use medea_control_api_proto::grpc::api::{
     Element as ElementProto, Room as RoomProto,
@@ -920,7 +920,7 @@ impl CommandHandler for Room {
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
-        tracks: Vec<TrackUpdate>,
+        tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
         if let PeerStateMachine::Stable(peer) =
             self.peers.get_peer_by_id(peer_id).unwrap()
@@ -930,7 +930,10 @@ impl CommandHandler for Room {
                 self.members
                     .send_event_to_member(
                         member_id,
-                        Event::TracksUpdated { peer_id, tracks },
+                        Event::TracksUpdated {
+                            peer_id,
+                            tracks_patches,
+                        },
                     )
                     .into_actor(self),
             ))

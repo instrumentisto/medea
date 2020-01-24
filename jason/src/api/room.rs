@@ -15,7 +15,7 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
     IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackId,
-    TrackUpdate,
+    TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -235,6 +235,8 @@ impl RoomHandle {
         }
     }
 
+    /// Calls [`InnerRoom::toggle_mute`] until all [`PeerConnection`]s of this
+    /// [`Room`] will have same [`MuteState`] as requested.
     async fn toggle_mute(
         &self,
         is_muted: bool,
@@ -246,7 +248,7 @@ impl RoomHandle {
             .is_all_peers_in_mute_state(kind, MuteState::from(is_muted))
         {
             let fut =
-                inner.borrow().toggle_mute_for_current_state(is_muted, kind);
+                inner.borrow().toggle_mute(is_muted, kind);
             fut.await;
         }
 
@@ -562,9 +564,9 @@ impl InnerRoom {
         }
     }
 
-    /// Toggles [`Track`]s mute state by provided [`TransceiverKind`] in all
+    /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
     /// [`PeerConnection`]s in this [`Room`].
-    fn toggle_mute_for_current_state(
+    fn toggle_mute(
         &self,
         is_muted: bool,
         kind: TransceiverKind,
@@ -575,30 +577,30 @@ impl InnerRoom {
             let subscriptions: Vec<_> = peers
                 .iter()
                 .map(|peer| {
-                    let needed_muted_state = MuteState::from(is_muted);
-                    let (track_updates, subscriptions): (Vec<_>, Vec<_>) = peer
-                        .get_senders_by_kind_and_muted_state(
+                    let needed_mute_state = MuteState::from(is_muted);
+                    let (tracks_patches, subscriptions): (Vec<_>, Vec<_>) =
+                        peer.get_senders_by_kind_and_mute_state(
                             kind,
-                            needed_muted_state.opposite_state(),
+                            needed_mute_state.opposite_state(),
                         )
                         .into_iter()
                         .map(|sender| {
                             let id = sender.track_id();
-                            let track_update = TrackUpdate {
+                            let track_update = TrackPatch {
                                 id,
                                 is_muted: Some(is_muted),
                             };
-                            sender.change_muted_state(
-                                needed_muted_state.proccessing_state(),
+                            sender.change_mute_state(
+                                needed_mute_state.proccessing_state(),
                             );
-                            let fut = sender.on_muted_state(needed_muted_state);
+                            let fut = sender.on_mute_state(needed_mute_state);
 
                             (track_update, fut)
                         })
                         .unzip();
                     rpc.send_command(Command::UpdateTracks {
                         peer_id: peer.id(),
-                        tracks: track_updates,
+                        tracks_patches,
                     });
                     future::join_all(subscriptions)
                 })
@@ -607,7 +609,7 @@ impl InnerRoom {
         }
     }
 
-    /// Returns `true` if all tracks of this [`Room`] is in provided
+    /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
     /// [`MuteState`].
     pub fn is_all_peers_in_mute_state(
         &self,
@@ -618,7 +620,7 @@ impl InnerRoom {
             .get_all()
             .into_iter()
             .skip_while(|peer| {
-                peer.is_all_tracks_in_mute_state(kind, mute_state)
+                peer.is_all_senders_in_mute_state(kind, mute_state)
             })
             .next()
             .is_none()
@@ -789,7 +791,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Updates [`Track`]s of this [`Room`].
-    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackUpdate>) {
+    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
         if let Some(peer) = self.peers.get(peer_id) {
             if let Err(err) = peer.update_tracks(tracks) {
                 JasonError::from(err).print();
