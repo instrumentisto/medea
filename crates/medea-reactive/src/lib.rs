@@ -513,20 +513,20 @@ mod tests {
 
     #[tokio::test]
     async fn subscribe_sends_current_data() {
-        let mut field = Reactive::new(9i32);
+        let field = Reactive::new(9i32);
         let current_data = field.subscribe().next().await.unwrap();
         assert_eq!(current_data, 9);
     }
 
     #[tokio::test]
     async fn when_eq_resolves_if_value_already_eq() {
-        let mut field = Reactive::new(9i32);
+        let field = Reactive::new(9i32);
         field.when_eq(9i32).await.unwrap();
     }
 
     #[tokio::test]
     async fn when_eq_dont_resolves_if_value_is_not_eq() {
-        let mut field = Reactive::new(9i32);
+        let field = Reactive::new(9i32);
         await_future_with_timeout(
             field.when_eq(0i32),
             Duration::from_millis(50),
@@ -538,7 +538,7 @@ mod tests {
 
     #[tokio::test]
     async fn current_value_provided_into_assert_fn_on_when_call() {
-        let mut field = Reactive::new(9i32);
+        let field = Reactive::new(9i32);
 
         await_future_with_timeout(
             field.when(|val| val == &9),
@@ -624,7 +624,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_returns_dropped_error_on_drop() {
-        let mut field = Reactive::new(0i32);
+        let field = Reactive::new(0i32);
         let subscription = field.when(|change| change == &100);
         std::mem::drop(field);
         subscription.await.err().unwrap();
@@ -632,7 +632,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_eq_returns_dropped_error_on_drop() {
-        let mut field = Reactive::new(0i32);
+        let field = Reactive::new(0i32);
         let subscription = field.when_eq(100);
         std::mem::drop(field);
         subscription.await.err().unwrap();
@@ -640,7 +640,7 @@ mod tests {
 
     #[tokio::test]
     async fn stream_ends_when_reactive_field_dropped() {
-        let mut field = Reactive::new(0i32);
+        let field = Reactive::new(0i32);
         let subscription = field.subscribe();
         std::mem::drop(field);
         assert!(subscription.skip(1).next().await.is_none());
@@ -682,6 +682,7 @@ mod tests {
             Duration::from_millis(50),
         )
         .await
+        .unwrap()
         .unwrap();
     }
 }

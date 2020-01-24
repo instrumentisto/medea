@@ -84,6 +84,11 @@ jobs:
       rust: stable
       script: make test.unit crate=medea-client-api-proto
 
+    - name: unit medea-reactive (stable)
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea-reactive
+
     - name: unit medea (stable)
       stage: test
       rust: stable
