@@ -579,7 +579,7 @@ impl InnerRoom {
                     let (track_updates, subscriptions): (Vec<_>, Vec<_>) = peer
                         .get_senders_by_kind_and_muted_state(
                             kind,
-                            !needed_muted_state,
+                            needed_muted_state.opposite_state(),
                         )
                         .into_iter()
                         .map(|sender| {

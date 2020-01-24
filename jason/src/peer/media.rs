@@ -2,7 +2,7 @@
 
 use std::{
     borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
-    future::Future, ops::Not, rc::Rc,
+    future::Future, rc::Rc,
 };
 
 use derive_more::Display;
@@ -407,6 +407,16 @@ impl MuteState {
             _ => self,
         }
     }
+
+    /// Returns opposite [`MutedState`] of this [`MutedState`].
+    pub fn opposite_state(self) -> Self {
+        match self {
+            Self::Muted => Self::NotMuted,
+            Self::NotMuted => Self::Muted,
+            Self::Unmuting => Self::Muting,
+            Self::Muting => Self::Unmuting,
+        }
+    }
 }
 
 impl From<bool> for MuteState {
@@ -415,19 +425,6 @@ impl From<bool> for MuteState {
             Self::Muted
         } else {
             Self::NotMuted
-        }
-    }
-}
-
-impl Not for MuteState {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Self::Muted => Self::NotMuted,
-            Self::NotMuted => Self::Muted,
-            Self::Unmuting => Self::Muting,
-            Self::Muting => Self::Unmuting,
         }
     }
 }
