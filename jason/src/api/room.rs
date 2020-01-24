@@ -247,8 +247,7 @@ impl RoomHandle {
             .borrow()
             .is_all_peers_in_mute_state(kind, MuteState::from(is_muted))
         {
-            let fut =
-                inner.borrow().toggle_mute(is_muted, kind);
+            let fut = inner.borrow().toggle_mute(is_muted, kind);
             fut.await;
         }
 
