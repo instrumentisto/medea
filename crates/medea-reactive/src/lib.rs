@@ -1,11 +1,6 @@
-//! This crate provides a container to which data modifications you can
-//! subscribe.
-//!
+//! Containers to which data modifictions you can subscribe.
 //!
 //! # Basic iteraction with a `ObservableField`
-//!
-//!
-//!
 //!
 //! ## With primitive
 //!
@@ -24,9 +19,6 @@
 //! *foo.borrow_mut() = 0;
 //! assert_eq!(*foo, 0);
 //! ```
-//!
-//!
-//!
 //!
 //! ## With object
 //!
@@ -62,9 +54,6 @@
 //! assert_eq!(foo.current_num(), 1);
 //! ```
 //!
-//!
-//!
-//!
 //! # Subscription on all `ObservableField` data modification
 //!
 //! ```
@@ -93,9 +82,6 @@
 //! # });
 //! ```
 //!
-//!
-//!
-//!
 //! # Subscription on concrete `ObservableField` data modification
 //!
 //! ```
@@ -118,9 +104,6 @@
 //! when_foo_will_be_greated_than_5.await.unwrap();
 //! # });
 //! ```
-//!
-//!
-//!
 //!
 //! # Hold mutable reference of `ObservableField`
 //!
@@ -162,6 +145,7 @@
 //! ```
 
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+#![warn(missing_docs)]
 
 use std::{
     cell::{Ref, RefCell},
@@ -179,25 +163,97 @@ use futures::{
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 
 /// [`ObservableField`] with which you can only subscribe on changes
-/// ([`ObservableField::subscribe`]) and only on concrete changes
+/// ([`ObservableField::subscribe`]) and on concrete changes
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 
+/// Observable analog for the [`Cell`].
+///
+/// Subscription on changes works same as [`ObservableField`],
+/// but working with underlying data of [`ObservableCell`] is differs.
+///
+/// # `ObservableCell` underlying data accessing
+///
+/// ## For copyable types
+///
+/// ```
+/// use medea_reactive::ObservableCell;
+///
+/// let foo = ObservableCell::new(0i32);
+///
+/// // If data implements 'Copy' then you can get copy of current value:
+/// assert_eq!(foo.get(), 0);
+/// ```
+///
+/// ## Reference to a underlying data
+///
+/// ```
+/// use medea_reactive::ObservableCell;
+///
+/// struct Foo(i32);
+///
+/// impl Foo {
+///     pub fn new(num: i32) -> Self {
+///         Self(num)
+///     }
+///
+///     pub fn get_num(&self) -> i32 {
+///         self.0
+///     }
+/// }
+///
+/// let foo = ObservableCell::new(Foo::new(100));
+/// assert_eq!(foo.borrow().get_num(), 100);
+/// ```
+///
+/// # `ObservableCell` data mutating
+///
+/// ```
+/// use medea_reactive::ObservableCell;
+///
+/// let foo = ObservableCell::new(0i32);
+///
+/// // You can just set some data:
+/// foo.set(100);
+/// assert_eq!(foo.get(), 100);
+///
+/// // Or replace data with new data and get old data:
+/// let old_value = foo.replace(200);
+/// assert_eq!(old_value, 100);
+/// assert_eq!(foo.get(), 200);
+///
+/// // Or mutate this data:
+/// foo.mutate(|mut data| *data = 300);
+/// assert_eq!(foo.get(), 300);
+/// ```
+///
+/// [`Cell`]: std::cell::Cell
 pub struct ObservableCell<D>(RefCell<Observable<D>>);
 
 impl<D> ObservableCell<D>
 where
     D: 'static,
 {
+    /// Returns new [`ObservableCell`] on which mutations you can
+    /// subscribe, also you can subscribe on concrete mutation
+    /// with [`ObservableCell::when`] and [`ObservableCell::when_eq`].
+    ///
+    /// This container can mutate internally. Read docs of [`ObservableCell`]
+    /// for more info.
     pub fn new(data: D) -> Self {
         Self(RefCell::new(Observable::new(data)))
     }
 
+    /// Returns immutable reference to a underlying data.
     pub fn borrow(&self) -> Ref<D> {
         let reference = self.0.borrow();
         Ref::map(reference, |observable| observable.deref())
     }
 
+    /// Returns [`Future`] which will be resolved only on modification with
+    /// which your `assert_fn` returned `true`.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when<F>(
         &self,
         assert_fn: F,
@@ -213,6 +269,7 @@ impl<D> ObservableCell<D>
 where
     D: Copy + 'static,
 {
+    /// Returns copy of underlying data.
     pub fn get(&self) -> D {
         **self.0.borrow()
     }
@@ -222,6 +279,9 @@ impl<D> ObservableCell<D>
 where
     D: Clone + 'static,
 {
+    /// Returns [`Stream`] into which underlying data updates will be emitted.
+    ///
+    /// [`Stream`]: futures::Stream
     pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         self.0.borrow().subscribe()
     }
@@ -232,7 +292,9 @@ where
     D: PartialEq + 'static,
 {
     /// Returns [`Future`] which will be resolved only when data of this
-    /// [`ObservableField`] will become equal to provided `should_be`.
+    /// [`ObservableCell`] will become equal to provided `should_be`.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_eq(
         &self,
         should_be: D,
@@ -245,10 +307,12 @@ impl<D> ObservableCell<D>
 where
     D: Clone + PartialEq + 'static,
 {
+    /// Sets the contained value.
     pub fn set(&self, new_data: D) {
         *self.0.borrow_mut().borrow_mut() = new_data;
     }
 
+    /// Replaces the contained value, and returns it.
     pub fn replace(&self, mut new_data: D) -> D {
         std::mem::swap(
             self.0.borrow_mut().borrow_mut().deref_mut(),
@@ -257,6 +321,8 @@ where
         new_data
     }
 
+    /// Updates the contained value using a function to which will be provided
+    /// mutable reference to a underlying data.
     pub fn mutate<F>(&self, f: F)
     where
         F: FnOnce(MutObservableFieldGuard<D, DefaultSubscribers<D>>),
@@ -273,6 +339,8 @@ where
 /// If you want to get [`Future`] which will be resolved only when data of this
 /// field will become equal to some data, you can use [`ObservableField::when`]
 /// or [`ObservableField::when_eq`].
+///
+/// [`Future`]: std::future::Future
 pub struct ObservableField<D, S> {
     /// Data which stored by this [`ObservableField`].
     data: D,
@@ -286,7 +354,7 @@ where
     D: 'static,
 {
     /// Returns new [`ObservableField`] on which mutations you can
-    /// [`ObservableSubscribe`], also you can subscribe on concrete mutation
+    /// subscribe, also you can subscribe on concrete mutation
     /// with [`ObservableField::when`] and [`ObservableField::when_eq`].
     pub fn new(data: D) -> Self {
         Self {
@@ -315,6 +383,8 @@ where
 {
     /// Returns [`Future`] which will be resolved only on modification with
     /// which your `assert_fn` returned `true`.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when<F>(
         &self,
         assert_fn: F,
@@ -335,6 +405,9 @@ where
     S: Subscribable<D>,
     D: Clone + 'static,
 {
+    /// Returns [`Stream`] into which underlying data updates will be emitted.
+    ///
+    /// [`Stream`]: futures::Stream
     pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let data = self.data.clone();
         let subscription = self.subs.subscribe();
@@ -350,6 +423,8 @@ where
 {
     /// Returns [`Future`] which will be resolved only when data of this
     /// [`ObservableField`] will become equal to provided `should_be`.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_eq(
         &self,
         should_be: D,
@@ -391,6 +466,9 @@ pub trait OnObservableFieldModification<D> {
     /// On this function call subsciber which implements
     /// [`OnObservableFieldModification`] should send a update to a [`Stream`]
     /// or resolve [`Future`].
+    ///
+    /// [`Stream`]: futures::Stream
+    /// [`Future`]: std::future::Future
     fn on_modify(&mut self, data: &D);
 }
 
@@ -403,14 +481,23 @@ pub trait Subscribable<D: 'static> {
     fn subscribe(&self) -> LocalBoxStream<'static, D>;
 }
 
-/// Subscriber which implements [`Subscribable`] and [`SubscribableOnce`] in
+/// Subscriber which implements [`Subscribable`] and [`Whenable`] in
 /// [`Vec`].
 ///
 /// This structure should be wrapped into [`Vec`].
 pub enum UniversalSubscriber<D> {
     /// Subscriber for [`Whenable`].
     When {
+        /// [`oneshot::Sender`] with which [`Whenable::when`]'s [`Future`] will
+        /// be resolved.
+        ///
+        /// [`Future`]: std::future::Future
         sender: RefCell<Option<oneshot::Sender<()>>>,
+
+        /// Function with which will be checked that [`Whenable::when`]'s
+        /// [`Future`] should be resolved.
+        ///
+        /// [`Future`]: std::future::Future
         assert_fn: Box<dyn Fn(&D) -> bool>,
     },
     /// Subscriber for [`Subscribable`].
