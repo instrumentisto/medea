@@ -132,8 +132,8 @@ pub enum Command {
         metrics: PeerMetrics,
     },
     /// Web Client asks permission to update [`Track`]s in specified [`Peer`].
-    /// Media Server gives permission by sending [`Event::TracksApplied`].
-    ApplyTracks {
+    /// Media Server gives permission by sending [`Event::TracksUpdated`].
+    UpdateTracks {
         peer_id: PeerId,
         tracks: Vec<TrackUpdate>,
     },
@@ -235,15 +235,9 @@ pub enum Event {
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// [`Peer`].
     ///
-    /// Can be used to:
-    ///
-    /// 1. Add a new [`Track`].
-    ///
-    /// 2. Update existing [`Track`] settings (e.g. change to lower video
-    /// resolution, mute audio).
-    ///
-    /// 3. Update `send` [`Track`] receivers list (add/remove).
-    TracksApplied {
+    /// Can be used to update existing [`Track`] settings (e.g. change to lower
+    /// video resolution, mute audio).
+    TracksUpdated {
         peer_id: PeerId,
         tracks: Vec<TrackUpdate>,
     },
@@ -275,13 +269,11 @@ pub struct Track {
 //   It seems to me that this event should not be used for creatring new tracks,
 //   and direction and media_type should be removed.
 
-/// Path for existing [`Track`] or new [`Track`] (if it not exists).
+/// Path to existing [`Track`] and field which can be updated.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct TrackUpdate {
     pub id: TrackId,
-    pub direction: Option<Direction>,
-    pub media_type: Option<MediaType>,
     pub is_muted: Option<bool>,
 }
 

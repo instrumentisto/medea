@@ -917,7 +917,7 @@ impl CommandHandler for Room {
         Ok(Box::new(future::ok(()).into_actor(self)))
     }
 
-    fn on_apply_tracks(
+    fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
         tracks: Vec<TrackUpdate>,
@@ -930,7 +930,7 @@ impl CommandHandler for Room {
                 self.members
                     .send_event_to_member(
                         member_id,
-                        Event::TracksApplied { peer_id, tracks },
+                        Event::TracksUpdated { peer_id, tracks },
                     )
                     .into_actor(self),
             ))

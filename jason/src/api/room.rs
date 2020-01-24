@@ -587,8 +587,6 @@ impl InnerRoom {
                             let track_update = TrackUpdate {
                                 id,
                                 is_muted: Some(is_muted),
-                                direction: None,
-                                media_type: None,
                             };
                             sender.change_muted_state(
                                 needed_muted_state.proccessing_state(),
@@ -598,7 +596,7 @@ impl InnerRoom {
                             (track_update, fut)
                         })
                         .unzip();
-                    rpc.send_command(Command::ApplyTracks {
+                    rpc.send_command(Command::UpdateTracks {
                         peer_id: peer.id(),
                         tracks: track_updates,
                     });
@@ -791,7 +789,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Updates [`Track`]s of this [`Room`].
-    fn on_tracks_applied(&mut self, peer_id: PeerId, tracks: Vec<TrackUpdate>) {
+    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackUpdate>) {
         if let Some(peer) = self.peers.get(peer_id) {
             if let Err(err) = peer.update_tracks(tracks) {
                 JasonError::from(err).print();
