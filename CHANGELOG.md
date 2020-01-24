@@ -35,7 +35,8 @@ All user visible changes to this project will be documented in this file. This p
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58](/../../pull/58));
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
-    - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79](/../../pull/79)).
+    - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79](/../../pull/79));
+    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81](/../../pull/81)).
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);

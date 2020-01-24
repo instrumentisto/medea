@@ -43,7 +43,12 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RtcIceTransportPolicy` configuration ([#79](/../../pull/79)).
+        - `RtcIceTransportPolicy` configuration ([#79](/../../pull/79));
+        - Mute/unmute returns `Promise` now ([#81](/../../pull/81)):
+            - `Room.mute_audio()`;
+            - `Room.unmute_audio()`;
+            - `Room.mute_video()`;
+            - `Room.unmute_video()`.
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
@@ -53,7 +58,8 @@ All user visible changes to this project will be documented in this file. This p
     - `RpcClient` and `RpcTransport` reconnection ([#75]).
 - Signalling:
     - Emitting of RPC commands:
-        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71)).
+        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71));
+        - `ApplyTracks` for muting/unmuting ([#81](/../../pull/81)).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
