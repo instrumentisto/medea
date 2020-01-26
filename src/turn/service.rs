@@ -97,7 +97,8 @@ impl Service {
 
 #[async_trait::async_trait]
 impl TurnAuthService for Service {
-    /// Sends [`CreateIceUser`] to [`Service`].
+    /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
+    /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
     async fn create(
         &self,
         member_id: MemberId,
@@ -120,7 +121,7 @@ impl TurnAuthService for Service {
         }
     }
 
-    /// Sends `DeleteRoom` to [`Service`].
+    /// Deletes provided [`IceUser`]s from [`TurnDatabase`].
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
         // leave only non static users
         let users: Vec<_> = users.iter().filter(|u| !u.is_static()).collect();
