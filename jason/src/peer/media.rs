@@ -549,7 +549,7 @@ impl Sender {
     }
 
     /// Updates this [`Track`] based on provided
-    /// [`medea_client_api_proto::TrackUpdate`].
+    /// [`medea_client_api_proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
         if let Some(is_muted) = track.is_muted {
             self.mute_state.set(is_muted.into());

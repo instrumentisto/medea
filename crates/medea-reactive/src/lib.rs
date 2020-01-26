@@ -318,6 +318,7 @@ where
             self.0.borrow_mut().borrow_mut().deref_mut(),
             &mut new_data,
         );
+
         new_data
     }
 

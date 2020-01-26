@@ -71,9 +71,9 @@ pub enum PeerError {
     #[display(fmt = "{}", _0)]
     StreamRequest(#[js(cause)] StreamRequestError),
 
-    /// Invalid [`medea_client_api_proto::TrackUpdate`] for [`MediaTrack`].
-    #[display(fmt = "Invalid TrackUpdate for Track with {} ID.", _0)]
-    InvalidTrackUpdate(TrackId),
+    /// Invalid [`medea_client_api_proto::TrackPatch`] for [`MediaTrack`].
+    #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
+    InvalidTrackPatch(TrackId),
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
@@ -255,14 +255,14 @@ impl PeerConnection {
     }
 
     /// Updates [`Sender`]s of this [`PeerConnection`] with
-    /// [`medea_client_api_proto::TrackUpdate`].
+    /// [`medea_client_api_proto::TrackPatch`].
     pub fn update_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
             let track = self
                 .media_connections
                 .get_sender_by_id(track_proto.id)
                 .ok_or_else(|| {
-                    tracerr::new!(PeerError::InvalidTrackUpdate(track_proto.id))
+                    tracerr::new!(PeerError::InvalidTrackPatch(track_proto.id))
                 })?;
             track.update(&track_proto);
         }

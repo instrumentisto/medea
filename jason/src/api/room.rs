@@ -141,7 +141,7 @@ enum RoomError {
 
     /// Returned if [`MediaTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
-    FailedTrackUpdate(TrackId),
+    FailedTrackPatch(TrackId),
 }
 
 impl From<RpcClientError> for RoomError {
@@ -165,7 +165,7 @@ impl From<PeerError> for RoomError {
             }
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
-            InvalidTrackUpdate(id) => Self::FailedTrackUpdate(id),
+            InvalidTrackPatch(id) => Self::FailedTrackPatch(id),
         }
     }
 }
