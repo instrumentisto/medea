@@ -1,11 +1,12 @@
 //! `Endpoint` related methods and entities.
 
-use medea_control_api_proto::grpc::api::{
-    Member_Element as MemberElementProto,
-    Member_Element_oneof_el as MemberElementOneOfEl,
+use medea_control_api_proto::grpc::medea::{
+    member::{
+        element::El as MemberElementOneOfEl, Element as MemberElementProto,
+    },
+    web_rtc_publish_endpoint::P2p as P2pModeProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-    WebRtcPublishEndpoint_P2P as P2pModeProto,
 };
 use serde::{Deserialize, Serialize};
 
@@ -20,9 +21,9 @@ pub enum P2pMode {
 impl Into<P2pModeProto> for P2pMode {
     fn into(self) -> P2pModeProto {
         match self {
-            Self::Always => P2pModeProto::ALWAYS,
-            Self::IfPossible => P2pModeProto::IF_POSSIBLE,
-            Self::Never => P2pModeProto::NEVER,
+            Self::Always => P2pModeProto::Always,
+            Self::IfPossible => P2pModeProto::IfPossible,
+            Self::Never => P2pModeProto::Never,
         }
     }
 }
@@ -30,9 +31,9 @@ impl Into<P2pModeProto> for P2pMode {
 impl From<P2pModeProto> for P2pMode {
     fn from(proto: P2pModeProto) -> Self {
         match proto {
-            P2pModeProto::ALWAYS => Self::Always,
-            P2pModeProto::IF_POSSIBLE => Self::IfPossible,
-            P2pModeProto::NEVER => Self::Never,
+            P2pModeProto::Always => Self::Always,
+            P2pModeProto::IfPossible => Self::IfPossible,
+            P2pModeProto::Never => Self::Never,
         }
     }
 }
@@ -58,20 +59,23 @@ impl WebRtcPublishEndpoint {
     /// [`WebRtcPublishEndpointProto`].
     #[must_use]
     pub fn into_proto(self, id: String) -> WebRtcPublishEndpointProto {
-        let mut proto = WebRtcPublishEndpointProto::new();
-        proto.set_id(id);
-        proto.set_p2p(self.p2p.into());
-        proto.set_force_relay(self.force_relay);
-        proto
+        let p2p: P2pModeProto = self.p2p.into();
+        WebRtcPublishEndpointProto {
+            id,
+            p2p: p2p as i32,
+            force_relay: self.force_relay,
+            on_start: String::new(),
+            on_stop: String::new(),
+        }
     }
 }
 
 impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     fn from(mut proto: WebRtcPublishEndpointProto) -> Self {
         Self {
-            id: proto.take_id(),
-            p2p: proto.get_p2p().into(),
-            force_relay: proto.get_force_relay(),
+            id: proto.id,
+            p2p: P2pModeProto::from_i32(proto.p2p).unwrap_or_default().into(),
+            force_relay: proto.force_relay,
         }
     }
 }
@@ -98,20 +102,22 @@ impl WebRtcPlayEndpoint {
     /// [`WebRtcPlayEndpointProto`].
     #[must_use]
     pub fn into_proto(self, id: String) -> WebRtcPlayEndpointProto {
-        let mut proto = WebRtcPlayEndpointProto::new();
-        proto.set_id(id);
-        proto.set_src(self.src);
-        proto.set_force_relay(self.force_relay);
-        proto
+        WebRtcPlayEndpointProto {
+            id,
+            src: self.src,
+            force_relay: self.force_relay,
+            on_start: String::new(),
+            on_stop: String::new(),
+        }
     }
 }
 
 impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     fn from(mut proto: WebRtcPlayEndpointProto) -> Self {
         Self {
-            id: proto.take_id(),
-            src: proto.take_src(),
-            force_relay: proto.get_force_relay(),
+            id: proto.id,
+            src: proto.src,
+            force_relay: proto.force_relay,
         }
     }
 }
@@ -128,26 +134,26 @@ impl Endpoint {
     /// Converts [`Endpoint`] into protobuf [`MemberElementProto`].
     #[must_use]
     pub fn into_proto(self, id: String) -> MemberElementProto {
-        let mut proto = MemberElementProto::new();
-        match self {
+        let oneof = match self {
             Self::WebRtcPlayEndpoint(spec) => {
-                proto.set_webrtc_play(spec.into_proto(id))
+                MemberElementOneOfEl::WebrtcPlay(spec.into_proto(id))
             }
             Self::WebRtcPublishEndpoint(spec) => {
-                proto.set_webrtc_pub(spec.into_proto(id))
+                MemberElementOneOfEl::WebrtcPub(spec.into_proto(id))
             }
-        }
-        proto
+        };
+
+        MemberElementProto { el: Some(oneof) }
     }
 }
 
 impl From<MemberElementProto> for Endpoint {
     fn from(proto: MemberElementProto) -> Self {
         match proto.el.unwrap() {
-            MemberElementOneOfEl::webrtc_pub(webrtc_pub) => {
+            MemberElementOneOfEl::WebrtcPub(webrtc_pub) => {
                 Self::WebRtcPublishEndpoint(webrtc_pub.into())
             }
-            MemberElementOneOfEl::webrtc_play(webrtc_play) => {
+            MemberElementOneOfEl::WebrtcPlay(webrtc_play) => {
                 Self::WebRtcPlayEndpoint(webrtc_play.into())
             }
         }

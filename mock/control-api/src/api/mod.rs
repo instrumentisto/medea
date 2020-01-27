@@ -17,12 +17,12 @@ use actix_web::{
 };
 use clap::ArgMatches;
 use futures::Future;
-use medea_control_api_proto::grpc::api::{
+use medea_control_api_proto::grpc::medea::{
+    element::El as ElementOneOf,
+    room::{element::El as RoomElementOneOf, Element as RoomElementProto},
     CreateResponse as CreateResponseProto, Element as ElementProto,
-    Element_oneof_el as ElementOneOf, Error as ErrorProto,
-    GetResponse as GetResponseProto, Response as ResponseProto,
-    Room_Element as RoomElementProto,
-    Room_Element_oneof_el as RoomElementOneOf,
+    Error as ErrorProto, GetResponse as GetResponseProto,
+    Response as ResponseProto,
 };
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +37,7 @@ use self::{
     member::Member,
     room::Room,
 };
+use actix::fut::err;
 
 /// Context of [`actix_web`] server.
 pub struct Context {
@@ -227,9 +228,9 @@ pub struct ErrorResponse {
 impl Into<ErrorResponse> for ErrorProto {
     fn into(mut self) -> ErrorResponse {
         ErrorResponse {
-            code: self.get_code(),
-            text: self.take_text(),
-            element: self.take_element(),
+            code: self.code,
+            text: self.text,
+            element: self.element,
         }
     }
 }
@@ -290,26 +291,22 @@ impl_into_http_response!(SingleGetResponse);
 
 impl From<ResponseProto> for Response {
     fn from(mut resp: ResponseProto) -> Self {
-        if resp.has_error() {
-            Self {
-                error: Some(resp.take_error().into()),
-            }
-        } else {
-            Self { error: None }
+        Self {
+            error: resp.error.map(|e| e.into()),
         }
     }
 }
 
 impl From<CreateResponseProto> for CreateResponse {
     fn from(mut resp: CreateResponseProto) -> Self {
-        if resp.has_error() {
+        if let Some(error) = resp.error {
             Self {
                 sids: None,
-                error: Some(resp.take_error().into()),
+                error: Some(error.into()),
             }
         } else {
             Self {
-                sids: Some(resp.take_sid()),
+                sids: Some(resp.sid),
                 error: None,
             }
         }
@@ -331,24 +328,23 @@ pub enum Element {
 impl Element {
     #[must_use]
     pub fn into_proto(self, id: String) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        match self {
-            Self::Member(m) => proto.set_member(m.into_proto(id)),
+        let el = match self {
+            Self::Member(m) => RoomElementOneOf::Member(m.into_proto(id)),
             _ => unimplemented!(),
-        }
-        proto
+        };
+        RoomElementProto { el: Some(el) }
     }
 }
 
 impl From<ElementProto> for Element {
     fn from(proto: ElementProto) -> Self {
         match proto.el.unwrap() {
-            ElementOneOf::room(room) => Self::Room(room.into()),
-            ElementOneOf::member(member) => Self::Member(member.into()),
-            ElementOneOf::webrtc_pub(webrtc_pub) => {
+            ElementOneOf::Room(room) => Self::Room(room.into()),
+            ElementOneOf::Member(member) => Self::Member(member.into()),
+            ElementOneOf::WebrtcPub(webrtc_pub) => {
                 Self::WebRtcPublishEndpoint(webrtc_pub.into())
             }
-            ElementOneOf::webrtc_play(webrtc_play) => {
+            ElementOneOf::WebrtcPlay(webrtc_play) => {
                 Self::WebRtcPlayEndpoint(webrtc_play.into())
             }
         }
@@ -358,7 +354,7 @@ impl From<ElementProto> for Element {
 impl From<RoomElementProto> for Element {
     fn from(proto: RoomElementProto) -> Self {
         match proto.el.unwrap() {
-            RoomElementOneOf::member(member) => Self::Member(member.into()),
+            RoomElementOneOf::Member(member) => Self::Member(member.into()),
             _ => unimplemented!(
                 "Currently Control API mock server supports only Member \
                  element in Room pipeline."
@@ -384,16 +380,16 @@ pub struct SingleGetResponse {
 
 impl From<GetResponseProto> for SingleGetResponse {
     fn from(mut proto: GetResponseProto) -> Self {
-        if proto.has_error() {
+        if let Some(error) = proto.error {
             Self {
                 element: None,
-                error: Some(proto.take_error().into()),
+                error: error.into(),
             }
         } else {
             Self {
                 error: None,
                 element: proto
-                    .take_elements()
+                    .elements
                     .into_iter()
                     .map(|(_, e)| e.into())
                     .next(),

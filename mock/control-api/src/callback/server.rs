@@ -8,9 +8,8 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use clap::ArgMatches;
 use futures::future::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
-use medea_control_api_proto::grpc::{
-    callback::{Request, Response},
-    callback_grpc::{create_callback, Callback as CallbackService},
+use medea_control_api_proto::grpc::medea_callback::{
+    callback_server::Callback as CallbackService, Request, Response,
 };
 
 use crate::{callback::CallbackItem, prelude::*};
