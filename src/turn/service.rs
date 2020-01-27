@@ -5,6 +5,7 @@
 
 use std::{fmt, sync::Arc};
 
+use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
 use rand::{distributions::Alphanumeric, Rng};
@@ -43,7 +44,7 @@ pub enum UnreachablePolicy {
 }
 
 /// Manages Turn server credentials.
-#[async_trait::async_trait]
+#[async_trait]
 pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Generates and registers Turn credentials.
     async fn create(
@@ -85,7 +86,7 @@ impl Service {
             .collect()
     }
 
-    /// Returns [`ICEUser`] with static credentials.
+    /// Returns [`IceUser`] with static credentials.
     fn static_user(&self) -> IceUser {
         IceUser::new(
             self.turn_address.clone(),
@@ -95,7 +96,7 @@ impl Service {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl TurnAuthService for Service {
     /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
     /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
@@ -123,14 +124,13 @@ impl TurnAuthService for Service {
 
     /// Deletes provided [`IceUser`]s from [`TurnDatabase`].
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
-        // leave only non static users
-        let users: Vec<_> = users.iter().filter(|u| !u.is_static()).collect();
-
         if users.is_empty() {
-            Ok(())
-        } else {
-            Ok(self.turn_db.remove(users.as_slice()).await?)
+            return Ok(());
         }
+
+        // leave only non static users
+        let users = users.iter().filter(|u| !u.is_static()).collect::<Vec<_>>();
+        Ok(self.turn_db.remove(users.as_slice()).await?)
     }
 }
 
@@ -173,10 +173,10 @@ pub mod test {
 
     use super::*;
 
-    #[derive(Debug)]
-    struct TurnAuthServiceMock {}
+    #[derive(Clone, Copy, Debug)]
+    struct TurnAuthServiceMock;
 
-    #[async_trait::async_trait]
+    #[async_trait]
     impl TurnAuthService for TurnAuthServiceMock {
         async fn create(
             &self,
@@ -197,6 +197,6 @@ pub mod test {
     }
 
     pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
-        Arc::new(TurnAuthServiceMock {})
+        Arc::new(TurnAuthServiceMock)
     }
 }

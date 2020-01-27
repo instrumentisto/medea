@@ -21,8 +21,9 @@ pub enum TurnDatabaseErr {
     RedisError(RedisError),
 }
 
-// Abstraction over remote Redis database used to store Turn server
-// credentials.
+/// Abstraction over remote Redis database used to store Turn server
+/// credentials.
+///
 /// This struct can be cloned and transferred across thread boundaries.
 #[derive(Clone)]
 pub struct TurnDatabase {
@@ -53,8 +54,6 @@ impl TurnDatabase {
     pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
         debug!("Store ICE user: {:?}", user);
 
-        let mut conn = self.pool.get().await?;
-
         let key = format!("turn/realm/medea/user/{}/key", user.user());
         let value = format!("{}:medea:{}", user.user(), user.pass());
 
@@ -62,6 +61,7 @@ impl TurnDatabase {
         hasher.input_str(&value);
         let result = hasher.result_str();
 
+        let mut conn = self.pool.get().await?;
         Ok(cmd("SET")
             .arg(key)
             .arg(result)
@@ -70,20 +70,25 @@ impl TurnDatabase {
     }
 
     /// Deletes batch of provided [`IceUser`]s.
+    ///
+    /// No-op if empty batch is provided.
     pub async fn remove(
         &self,
         users: &[&IceUser],
     ) -> Result<(), TurnDatabaseErr> {
         debug!("Remove ICE users: {:?}", users);
 
-        let mut conn = self.pool.get().await?;
+        if users.is_empty() {
+            return Ok(());
+        }
 
-        let delete_keys: Vec<_> = users
+        let keys: Vec<_> = users
             .iter()
             .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
             .collect();
 
-        Ok(cmd("DEL").arg(delete_keys).query_async(&mut conn).await?)
+        let mut conn = self.pool.get().await?;
+        Ok(cmd("DEL").arg(keys).query_async(&mut conn).await?)
     }
 }
 
