@@ -16,7 +16,6 @@ use actix_web::{
     App, HttpResponse, HttpServer,
 };
 use clap::ArgMatches;
-use futures::Future;
 use medea_control_api_proto::grpc::medea::{
     element::El as ElementOneOf,
     room::{element::El as RoomElementOneOf, Element as RoomElementProto},
@@ -37,8 +36,7 @@ use self::{
     member::Member,
     room::Room,
 };
-use actix::fut::err;
-use std::{rc::Rc, sync::Mutex};
+use std::sync::Mutex;
 
 /// Context of [`actix_web`] server.
 pub struct Context {
@@ -243,7 +241,7 @@ pub struct ErrorResponse {
 }
 
 impl Into<ErrorResponse> for ErrorProto {
-    fn into(mut self) -> ErrorResponse {
+    fn into(self) -> ErrorResponse {
         ErrorResponse {
             code: self.code,
             text: self.text,
@@ -307,7 +305,7 @@ impl_into_http_response!(Response);
 impl_into_http_response!(SingleGetResponse);
 
 impl From<ResponseProto> for Response {
-    fn from(mut resp: ResponseProto) -> Self {
+    fn from(resp: ResponseProto) -> Self {
         Self {
             error: resp.error.map(|e| e.into()),
         }
@@ -315,7 +313,7 @@ impl From<ResponseProto> for Response {
 }
 
 impl From<CreateResponseProto> for CreateResponse {
-    fn from(mut resp: CreateResponseProto) -> Self {
+    fn from(resp: CreateResponseProto) -> Self {
         if let Some(error) = resp.error {
             Self {
                 sids: None,
@@ -396,7 +394,7 @@ pub struct SingleGetResponse {
 }
 
 impl From<GetResponseProto> for SingleGetResponse {
-    fn from(mut proto: GetResponseProto) -> Self {
+    fn from(proto: GetResponseProto) -> Self {
         if let Some(error) = proto.error {
             Self {
                 element: None,

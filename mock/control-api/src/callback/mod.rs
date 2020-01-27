@@ -3,7 +3,6 @@
 pub mod server;
 
 use medea_control_api_proto::grpc::medea_callback::{
-    on_leave::Reason as OnLeaveReasonProto,
     request::Event as CallbackEventProto, Request as CallbackProto,
 };
 use serde::Serialize;
@@ -41,7 +40,7 @@ pub struct CallbackItem {
 }
 
 impl From<CallbackProto> for CallbackItem {
-    fn from(mut proto: CallbackProto) -> Self {
+    fn from(proto: CallbackProto) -> Self {
         Self {
             fid: proto.fid,
             at: proto.at,

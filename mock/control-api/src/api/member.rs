@@ -67,7 +67,7 @@ impl Member {
 }
 
 impl From<MemberProto> for Member {
-    fn from(mut proto: MemberProto) -> Self {
+    fn from(proto: MemberProto) -> Self {
         let member_pipeline = proto
             .pipeline
             .into_iter()

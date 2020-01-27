@@ -68,7 +68,7 @@ impl From<RoomElementProto> for RoomElement {
 }
 
 impl From<RoomProto> for Room {
-    fn from(mut proto: RoomProto) -> Self {
+    fn from(proto: RoomProto) -> Self {
         let pipeline = proto
             .pipeline
             .into_iter()

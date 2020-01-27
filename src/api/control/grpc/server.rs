@@ -5,16 +5,12 @@
 use std::{
     collections::HashMap,
     convert::{From, TryFrom},
-    sync::Arc,
 };
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::{
-    compat::Future01CompatExt as _,
-    future::{self, BoxFuture, FutureExt as _, TryFutureExt as _},
-};
+use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
 use medea_control_api_proto::grpc::medea::{
     control_api_server::{
         ControlApi, ControlApiServer as TonicControlApiServer,
@@ -36,17 +32,15 @@ use crate::{
         EndpointId, EndpointSpec, MemberId, MemberSpec, RoomSpec,
         TryFromProtobufError,
     },
-    conf::server::ControlApiServer,
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
         CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
         Get, RoomService, RoomServiceError, Sids,
     },
-    utils::ResponseAnyFuture,
     AppContext,
 };
-use tonic::{Request, Status};
+use tonic::Status;
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -141,7 +135,7 @@ impl ControlApiService {
     /// Creates element based on provided [`CreateRequest`].
     pub fn create_element(
         &self,
-        mut req: CreateRequest,
+        req: CreateRequest,
     ) -> BoxFuture<'static, Result<Sids, ErrorResponse>> {
         let unparsed_parent_fid = req.parent_fid;
         let elem = if let Some(elem) = req.el {
@@ -170,7 +164,7 @@ impl ControlApiService {
 
         match parent_fid {
             StatefulFid::Room(parent_fid) => match elem {
-                CreateRequestOneof::Member(mut member) => {
+                CreateRequestOneof::Member(member) => {
                     let id: MemberId = member.id.clone().into();
                     match MemberSpec::try_from(member)
                         .map_err(ErrorResponse::from)
@@ -190,12 +184,12 @@ impl ControlApiService {
             },
             StatefulFid::Member(parent_fid) => {
                 let (endpoint, id) = match elem {
-                    CreateRequestOneof::WebrtcPlay(mut play) => (
+                    CreateRequestOneof::WebrtcPlay(play) => (
                         WebRtcPlayEndpoint::try_from(&play)
                             .map(EndpointSpec::from),
                         play.id.into(),
                     ),
-                    CreateRequestOneof::WebrtcPub(mut publish) => (
+                    CreateRequestOneof::WebrtcPub(publish) => (
                         Ok(WebRtcPublishEndpoint::from(&publish))
                             .map(EndpointSpec::from),
                         publish.id.into(),
@@ -227,12 +221,12 @@ impl ControlApiService {
     /// Deletes element by [`IdRequest`].
     pub fn delete_element(
         &self,
-        mut req: IdRequest,
+        req: IdRequest,
     ) -> BoxFuture<'static, Result<(), ErrorResponse>> {
         let room_service = self.room_service.clone();
         async move {
             let mut delete_elements_msg = DeleteElements::new();
-            for id in req.fid.into_iter() {
+            for id in req.fid {
                 let fid = StatefulFid::try_from(id)?;
                 delete_elements_msg.add_fid(fid);
             }
@@ -252,13 +246,13 @@ impl ControlApiService {
     /// Returns requested by [`IdRequest`] [`Element`]s serialized to protobuf.
     pub fn get_element(
         &self,
-        mut req: IdRequest,
+        req: IdRequest,
     ) -> BoxFuture<'static, Result<HashMap<String, Element>, ErrorResponse>>
     {
         let room_service = self.room_service.clone();
         async move {
             let mut fids = Vec::new();
-            for id in req.fid.into_iter() {
+            for id in req.fid {
                 let fid = StatefulFid::try_from(id)?;
                 fids.push(fid);
             }
@@ -357,7 +351,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
             "gRPC Control API server received ShutdownGracefully message so \
              shutting down.",
         );
-        if let Some(mut grpc_shutdown) = self.0.take() {
+        if let Some(grpc_shutdown) = self.0.take() {
             grpc_shutdown.send(()).unwrap();
         }
     }
@@ -388,7 +382,7 @@ pub async fn run(
         Server::builder()
             .add_service(service)
             .serve_with_shutdown(addr, async move {
-                grpc_shutdown_rx.await;
+                grpc_shutdown_rx.await.ok();
             })
             .await
             .unwrap();

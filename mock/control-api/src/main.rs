@@ -17,7 +17,7 @@ use clap::{
     crate_version, Arg,
 };
 use slog::{o, Drain};
-use slog_scope::{debug, GlobalLoggerGuard};
+use slog_scope::GlobalLoggerGuard;
 
 #[actix_rt::main]
 async fn main() {

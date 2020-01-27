@@ -26,7 +26,6 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-use crate::api::control::error_codes::ErrorCode::ElementIdIsNotLocal;
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {

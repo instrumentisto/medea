@@ -34,7 +34,6 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
-use futures::AsyncReadExt;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]

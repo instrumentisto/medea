@@ -3,16 +3,11 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::sync::Arc;
-
-use futures::{Future, IntoFuture};
 use medea_control_api_proto::grpc::medea::{
     control_api_client::ControlApiClient,
     create_request::El as CreateRequestElProto, CreateRequest, CreateResponse,
     GetResponse, IdRequest, Response,
 };
-use protobuf::RepeatedField;
-use slog_scope::debug;
 use tonic::{transport::Channel, Status};
 
 use crate::api::Element;
@@ -126,21 +121,18 @@ impl ControlClient {
             .await
             .create(tonic::Request::new(req))
             .await
-            .map(|resp| resp.into_inner())
+            .map(tonic::Response::into_inner)
     }
 
     /// Gets element from Control API by FID.
     pub async fn get(&mut self, fid: Fid) -> Result<GetResponse, Status> {
         let req = id_request(vec![fid.into()]);
 
-        let resp = self
-            .get_client()
+        self.get_client()
             .await
             .get(tonic::Request::new(req))
             .await
-            .map(|resp| resp.into_inner());
-        debug!("Get response {:?}", resp);
-        resp
+            .map(tonic::Response::into_inner)
     }
 
     /// Deletes element from Control API by FID.
@@ -151,7 +143,7 @@ impl ControlClient {
             .await
             .delete(tonic::Request::new(req))
             .await
-            .map(|resp| resp.into_inner())
+            .map(tonic::Response::into_inner)
     }
 }
 

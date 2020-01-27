@@ -72,7 +72,7 @@ impl WebRtcPublishEndpoint {
 }
 
 impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    fn from(mut proto: WebRtcPublishEndpointProto) -> Self {
+    fn from(proto: WebRtcPublishEndpointProto) -> Self {
         Self {
             id: proto.id,
             p2p: P2pModeProto::from_i32(proto.p2p).unwrap_or_default().into(),
@@ -115,7 +115,7 @@ impl WebRtcPlayEndpoint {
 }
 
 impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
-    fn from(mut proto: WebRtcPlayEndpointProto) -> Self {
+    fn from(proto: WebRtcPlayEndpointProto) -> Self {
         Self {
             id: proto.id,
             src: proto.src,

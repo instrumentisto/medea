@@ -2,11 +2,7 @@
 
 use std::{fmt, sync::Arc};
 
-use futures::{
-    compat::Future01CompatExt as _,
-    future::{FutureExt as _, LocalBoxFuture},
-};
-use grpcio::{ChannelBuilder, EnvBuilder};
+use futures::future::{FutureExt as _, LocalBoxFuture};
 #[rustfmt::skip]
 use medea_control_api_proto::grpc::medea_callback::{
     callback_client::CallbackClient as ProtoCallbackClient
@@ -18,7 +14,7 @@ use crate::api::control::callback::{
     CallbackRequest,
 };
 use std::sync::Mutex;
-use tonic::{transport::Channel, IntoRequest};
+use tonic::transport::Channel;
 
 /// gRPC client for sending [`CallbackRequest`]s.
 pub struct GrpcCallbackClient {
@@ -40,7 +36,7 @@ impl GrpcCallbackClient {
     /// Note that this function doesn't check availability of gRPC server on
     /// provided [`GrpcCallbackUrl`].
     pub async fn new(addr: &GrpcCallbackUrl) -> Self {
-        let addr = addr.addr().to_string();
+        let addr = addr.addr();
         let client = Arc::new(Mutex::new(
             ProtoCallbackClient::connect(addr).await.unwrap(),
         ));

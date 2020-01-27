@@ -148,7 +148,7 @@ fn generate_member_credentials() -> String {
 impl TryFrom<MemberProto> for MemberSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(mut member: MemberProto) -> Result<Self, Self::Error> {
+    fn try_from(member: MemberProto) -> Result<Self, Self::Error> {
         let mut pipeline = HashMap::new();
         for (id, member_element) in member.pipeline {
             if let Some(elem) = member_element.el {

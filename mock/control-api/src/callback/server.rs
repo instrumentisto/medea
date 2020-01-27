@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use clap::ArgMatches;
-use futures::future::Future as _;
 use medea_control_api_proto::grpc::medea_callback::{
     callback_server::{
         Callback as CallbackService, CallbackServer as TonicCallbackServer,
@@ -16,7 +15,6 @@ use medea_control_api_proto::grpc::medea_callback::{
 use tonic::transport::Server;
 
 use crate::{callback::CallbackItem, prelude::*};
-use tonic::Status;
 
 /// Type which used in [`GrpcCallbackServer`] for [`CallbackItem`] storing.
 type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
@@ -87,7 +85,6 @@ impl Handler<GetCallbackItems> for GrpcCallbackServer {
 }
 
 /// Run [`GrpcCallbackServer`].
-#[must_use]
 pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
     let host = args.value_of("callback_host").unwrap();
     let port: u32 = args.value_of("callback_port").unwrap().parse().unwrap();
@@ -98,7 +95,7 @@ pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
         TonicCallbackServer::new(GrpcCallbackService::new(Arc::clone(&events)));
     let addr = format!("{}:{}", host, port).parse().unwrap();
 
-    let server = Arbiter::spawn(async move {
+    Arbiter::spawn(async move {
         Server::builder()
             .add_service(service)
             .serve(addr)
