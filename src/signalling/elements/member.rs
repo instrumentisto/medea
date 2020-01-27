@@ -13,8 +13,9 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
 use medea_control_api_proto::grpc::medea::{
-    room::Element as ElementProto, Element as RootElementProto,
-    Member as MemberProto,
+    element::El as RootElProto,
+    room::{element::El as RoomElProto, Element as ElementProto},
+    Element as RootElementProto, Member as MemberProto,
 };
 
 use crate::{
@@ -33,6 +34,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use futures::AsyncReadExt;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -509,44 +511,47 @@ pub fn parse_members(
     Ok(members)
 }
 
+impl Into<MemberProto> for Member {
+    fn into(self) -> MemberProto {
+        let member_pipeline = self
+            .sinks()
+            .into_iter()
+            .map(|(id, play)| (id.to_string(), play.into()))
+            .chain(
+                self.srcs()
+                    .into_iter()
+                    .map(|(id, publish)| (id.to_string(), publish.into())),
+            )
+            .collect();
+        MemberProto {
+            id: self.id().to_string(),
+            credentials: self.credentials(),
+            on_leave: self
+                .get_on_leave()
+                .map(|c| c.to_string())
+                .unwrap_or_default(),
+            on_join: self
+                .get_on_join()
+                .map(|c| c.to_string())
+                .unwrap_or_default(),
+            pipeline: member_pipeline,
+        }
+    }
+}
+
 impl Into<ElementProto> for Member {
     fn into(self) -> ElementProto {
-        let mut element = ElementProto::new();
-        let mut member = MemberProto::new();
-
-        let mut member_pipeline = HashMap::new();
-        for (id, play) in self.sinks() {
-            member_pipeline.insert(id.to_string(), play.into());
+        ElementProto {
+            el: Some(RoomElProto::Member(self.into())),
         }
-        for (id, publish) in self.srcs() {
-            member_pipeline.insert(id.to_string(), publish.into());
-        }
-        member.set_pipeline(member_pipeline);
-
-        member.set_id(self.id().to_string());
-        member.set_credentials(self.credentials());
-        if let Some(on_leave) = self.get_on_leave() {
-            member.set_on_leave(on_leave.to_string());
-        }
-        if let Some(on_join) = self.get_on_join() {
-            member.set_on_join(on_join.to_string());
-        }
-
-        element.set_member(member);
-
-        element
     }
 }
 
 impl Into<RootElementProto> for Member {
     fn into(self) -> RootElementProto {
-        let mut member_element: ElementProto = self.into();
-        let member = member_element.take_member();
-
-        let mut element = RootElementProto::new();
-        element.set_member(member);
-
-        element
+        RootElementProto {
+            el: Some(RootElProto::Member(self.into())),
+        }
     }
 }
 

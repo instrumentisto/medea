@@ -30,9 +30,10 @@ impl OnLeaveEvent {
 
 impl Into<OnLeaveProto> for OnLeaveEvent {
     fn into(self) -> OnLeaveProto {
-        let mut proto = OnLeaveProto::new();
-        proto.set_reason(self.reason.into());
-        proto
+        let on_leave: OnLeaveReasonProto = self.reason.into();
+        OnLeaveProto {
+            reason: on_leave as i32,
+        }
     }
 }
 
@@ -52,9 +53,9 @@ pub enum OnLeaveReason {
 impl Into<OnLeaveReasonProto> for OnLeaveReason {
     fn into(self) -> OnLeaveReasonProto {
         match self {
-            Self::LostConnection => OnLeaveReasonProto::LOST_CONNECTION,
-            Self::ServerShutdown => OnLeaveReasonProto::SERVER_SHUTDOWN,
-            Self::Disconnected => OnLeaveReasonProto::DISCONNECTED,
+            Self::LostConnection => OnLeaveReasonProto::LostConnection,
+            Self::ServerShutdown => OnLeaveReasonProto::ServerShutdown,
+            Self::Disconnected => OnLeaveReasonProto::Disconnected,
         }
     }
 }
@@ -65,7 +66,7 @@ pub struct OnJoinEvent;
 
 impl Into<OnJoinProto> for OnJoinEvent {
     fn into(self) -> OnJoin {
-        OnJoinProto::new()
+        OnJoinProto {}
     }
 }
 
@@ -80,10 +81,10 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
     fn into(self) -> RequestOneofEventProto {
         match self {
             Self::OnJoin(on_join) => {
-                RequestOneofEventProto::on_join(on_join.into())
+                RequestOneofEventProto::OnJoin(on_join.into())
             }
             Self::OnLeave(on_leave) => {
-                RequestOneofEventProto::on_leave(on_leave.into())
+                RequestOneofEventProto::OnLeave(on_leave.into())
             }
         }
     }
@@ -121,10 +122,10 @@ impl CallbackRequest {
 
 impl Into<CallbackRequestProto> for CallbackRequest {
     fn into(self) -> CallbackRequestProto {
-        let mut proto = CallbackRequestProto::new();
-        proto.event = Some(self.event.into());
-        proto.set_fid(self.fid.to_string());
-        proto.set_at(self.at.to_rfc3339());
-        proto
+        CallbackRequestProto {
+            event: Some(self.event.into()),
+            fid: self.fid.to_string(),
+            at: self.at.to_rfc3339(),
+        }
     }
 }

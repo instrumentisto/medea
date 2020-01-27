@@ -103,24 +103,18 @@ impl ErrorResponse {
 
 impl Into<ErrorProto> for ErrorResponse {
     fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-
-        if let Some(additional_text) = &self.explanation {
-            error.set_text(format!(
-                "{} {}",
-                self.error_code.to_string(),
-                additional_text
-            ));
+        let text = if let Some(additional_text) = &self.explanation {
+            format!("{} {}", self.error_code.to_string(), additional_text)
         } else {
-            error.set_text(self.error_code.to_string());
-        }
+            self.error_code.to_string()
+        };
 
-        if let Some(id) = self.element_id {
-            error.set_element(id);
+        ErrorProto {
+            doc: String::new(),
+            text,
+            element: self.element_id.unwrap_or_default(),
+            code: self.error_code as u32,
         }
-        error.set_code(self.error_code as u32);
-
-        error
     }
 }
 

@@ -16,7 +16,9 @@ use futures::{
     future::{self, BoxFuture, FutureExt as _, TryFutureExt as _},
 };
 use medea_control_api_proto::grpc::medea::{
-    control_api_server::{ControlApi, ControlApiServer},
+    control_api_server::{
+        ControlApi, ControlApiServer as TonicControlApiServer,
+    },
     create_request::El as CreateRequestOneof,
     CreateRequest, CreateResponse, Element, GetResponse, IdRequest, Response,
 };
@@ -34,6 +36,7 @@ use crate::{
         EndpointId, EndpointSpec, MemberId, MemberSpec, RoomSpec,
         TryFromProtobufError,
     },
+    conf::server::ControlApiServer,
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
@@ -140,7 +143,7 @@ impl ControlApiService {
         &self,
         mut req: CreateRequest,
     ) -> BoxFuture<'static, Result<Sids, ErrorResponse>> {
-        let unparsed_parent_fid = req.take_parent_fid();
+        let unparsed_parent_fid = req.parent_fid;
         let elem = if let Some(elem) = req.el {
             elem
         } else {
@@ -167,8 +170,8 @@ impl ControlApiService {
 
         match parent_fid {
             StatefulFid::Room(parent_fid) => match elem {
-                CreateRequestOneof::member(mut member) => {
-                    let id: MemberId = member.take_id().into();
+                CreateRequestOneof::Member(mut member) => {
+                    let id: MemberId = member.id.clone().into();
                     match MemberSpec::try_from(member)
                         .map_err(ErrorResponse::from)
                     {
@@ -187,15 +190,15 @@ impl ControlApiService {
             },
             StatefulFid::Member(parent_fid) => {
                 let (endpoint, id) = match elem {
-                    CreateRequestOneof::webrtc_play(mut play) => (
+                    CreateRequestOneof::WebrtcPlay(mut play) => (
                         WebRtcPlayEndpoint::try_from(&play)
                             .map(EndpointSpec::from),
-                        play.take_id().into(),
+                        play.id.into(),
                     ),
-                    CreateRequestOneof::webrtc_pub(mut publish) => (
+                    CreateRequestOneof::WebrtcPub(mut publish) => (
                         Ok(WebRtcPublishEndpoint::from(&publish))
                             .map(EndpointSpec::from),
-                        publish.take_id().into(),
+                        publish.id.into(),
                     ),
                     _ => {
                         return future::err(ErrorResponse::new(
@@ -337,7 +340,6 @@ impl Actor for GrpcServer {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        self.0.start();
         info!("gRPC Control API server started.");
     }
 }
@@ -370,7 +372,7 @@ pub async fn run(
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;
 
-    let service = create_control_api(ControlApiService {
+    let service = TonicControlApiServer::new(ControlApiService {
         public_url: app.config.server.client.http.public_url.clone(),
         room_service: room_repo,
     });

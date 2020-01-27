@@ -25,14 +25,16 @@ pub trait CallbackClient: Debug + Send + Sync {
 #[derive(Debug, From)]
 pub enum CallbackClientError {
     /// [`grpcio`] failed to send [`CallbackRequest`].
-    Grpcio(grpcio::Error),
+    Tonic(tonic::Status),
 }
 
 /// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
 #[inline]
-pub fn build_client(url: &CallbackUrl) -> impl CallbackClient {
+pub async fn build_client(url: &CallbackUrl) -> impl CallbackClient {
     info!("Creating CallbackClient for url: {}", url);
     match &url {
-        CallbackUrl::Grpc(grpc_url) => grpc::GrpcCallbackClient::new(grpc_url),
+        CallbackUrl::Grpc(grpc_url) => {
+            grpc::GrpcCallbackClient::new(grpc_url).await
+        }
     }
 }

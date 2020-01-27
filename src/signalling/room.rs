@@ -16,7 +16,7 @@ use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
 use medea_control_api_proto::grpc::medea::{
-    Element as ElementProto, Room as RoomProto,
+    element::El as RootElProto, Element as ElementProto, Room as RoomProto,
 };
 
 use crate::{
@@ -927,23 +927,26 @@ impl Actor for Room {
     }
 }
 
-impl Into<ElementProto> for &mut Room {
-    fn into(self) -> ElementProto {
-        let mut element = ElementProto::new();
-        let mut room = RoomProto::new();
-
+impl Into<RoomProto> for &mut Room {
+    fn into(self) -> RoomProto {
         let pipeline = self
             .members
             .members()
             .into_iter()
             .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
+        RoomProto {
+            id: self.id().to_string(),
+            pipeline,
+        }
+    }
+}
 
-        room.set_pipeline(pipeline);
-        room.set_id(self.id().to_string());
-        element.set_room(room);
-
-        element
+impl Into<ElementProto> for &mut Room {
+    fn into(self) -> ElementProto {
+        ElementProto {
+            el: Some(RootElProto::Room(self.into())),
+        }
     }
 }
 

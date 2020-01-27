@@ -59,9 +59,9 @@ impl TryFrom<ElementProto> for RoomSpec {
 
     fn try_from(proto: ElementProto) -> Result<Self, Self::Error> {
         let id = match proto {
-            ElementProto::room(mut room) => {
+            ElementProto::Room(mut room) => {
                 let mut pipeline = HashMap::new();
-                for (id, room_element) in room.take_pipeline() {
+                for (id, room_element) in room.pipeline {
                     if let Some(elem) = room_element.el {
                         let member =
                             MemberSpec::try_from((MemberId(id.clone()), elem))?;
@@ -73,13 +73,13 @@ impl TryFrom<ElementProto> for RoomSpec {
 
                 let pipeline = Pipeline::new(pipeline);
                 return Ok(Self {
-                    id: room.take_id().into(),
+                    id: room.id.into(),
                     pipeline,
                 });
             }
-            ElementProto::member(mut member) => member.take_id(),
-            ElementProto::webrtc_pub(mut webrtc_pub) => webrtc_pub.take_id(),
-            ElementProto::webrtc_play(mut webrtc_play) => webrtc_play.take_id(),
+            ElementProto::Member(mut member) => member.id,
+            ElementProto::WebrtcPub(mut webrtc_pub) => webrtc_pub.id,
+            ElementProto::WebrtcPlay(mut webrtc_play) => webrtc_play.id,
         };
 
         Err(TryFromProtobufError::ExpectedOtherElement(

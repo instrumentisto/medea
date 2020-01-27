@@ -37,33 +37,35 @@ impl CallbackService {
     /// Will use existing [`CallbackClient`] or create new.
     // TODO: Add buffering and resending for failed 'Callback' sends.
     //       https://github.com/instrumentisto/medea/issues/61
-    pub fn send_callback<T: Into<CallbackEvent>>(
+    pub fn send_callback<T: Into<CallbackEvent> + 'static>(
         &self,
         callback_url: CallbackUrl,
         fid: StatefulFid,
         event: T,
     ) {
-        let req = CallbackRequest::new(fid, event.into());
-        info!("Sending CallbackRequest [{:?}] to [{}]", req, callback_url);
+        let inner = self.0.clone();
+        Arbiter::spawn(async move {
+            let req = CallbackRequest::new(fid, event.into());
+            info!("Sending CallbackRequest [{:?}] to [{}]", req, callback_url);
 
-        let read_lock = self.0.read().unwrap();
-        let send_request = if let Some(client) = read_lock.get(&callback_url) {
-            client.send(req)
-        } else {
-            drop(read_lock);
-            let new_client = build_client(&callback_url);
-            let send = new_client.send(req);
-            self.0
-                .write()
-                .unwrap()
-                .insert(callback_url, Box::new(new_client));
-            send
-        };
+            let read_lock = inner.read().unwrap();
+            let send_request =
+                if let Some(client) = read_lock.get(&callback_url) {
+                    client.send(req)
+                } else {
+                    drop(read_lock);
+                    let new_client = build_client(&callback_url).await;
+                    let send = new_client.send(req);
+                    inner
+                        .write()
+                        .unwrap()
+                        .insert(callback_url, Box::new(new_client));
+                    send
+                };
 
-        Arbiter::spawn(async {
             if let Err(e) = send_request.await {
                 error!("Failed to send callback because {:?}.", e);
             }
-        });
+        })
     }
 }

@@ -33,8 +33,8 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
         Ok(Self {
-            src: SrcUri::try_from(value.get_src().to_owned())?,
-            force_relay: value.get_force_relay(),
+            src: SrcUri::try_from(value.src.clone())?,
+            force_relay: value.force_relay,
         })
     }
 }

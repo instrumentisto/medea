@@ -17,12 +17,13 @@ use crate::api::control::callback::{
     url::GrpcCallbackUrl,
     CallbackRequest,
 };
-use tonic::transport::Channel;
+use std::sync::Mutex;
+use tonic::{transport::Channel, IntoRequest};
 
 /// gRPC client for sending [`CallbackRequest`]s.
 pub struct GrpcCallbackClient {
     /// [`grpcio`] gRPC client of Control API Callback service.
-    client: ProtoCallbackClient<Channel>,
+    client: Arc<Mutex<ProtoCallbackClient<Channel>>>,
 }
 
 impl fmt::Debug for GrpcCallbackClient {
@@ -40,7 +41,9 @@ impl GrpcCallbackClient {
     /// provided [`GrpcCallbackUrl`].
     pub async fn new(addr: &GrpcCallbackUrl) -> Self {
         let addr = addr.addr().to_string();
-        let client = ProtoCallbackClient::connect(addr).await.unwrap();
+        let client = Arc::new(Mutex::new(
+            ProtoCallbackClient::connect(addr).await.unwrap(),
+        ));
 
         Self { client }
     }
@@ -51,9 +54,13 @@ impl CallbackClient for GrpcCallbackClient {
         &self,
         request: CallbackRequest,
     ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
-        let request = self.client.on_event_async(&request.into());
-        async {
-            request?.compat().await?;
+        let client = Arc::clone(&self.client);
+        async move {
+            client
+                .lock()
+                .unwrap()
+                .on_event(tonic::Request::new(request.into()))
+                .await?;
             Ok(())
         }
         .boxed_local()

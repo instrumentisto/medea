@@ -150,7 +150,7 @@ impl TryFrom<MemberProto> for MemberSpec {
 
     fn try_from(mut member: MemberProto) -> Result<Self, Self::Error> {
         let mut pipeline = HashMap::new();
-        for (id, member_element) in member.take_pipeline() {
+        for (id, member_element) in member.pipeline {
             if let Some(elem) = member_element.el {
                 let endpoint =
                     EndpointSpec::try_from((EndpointId(id.clone()), elem))?;
@@ -160,13 +160,13 @@ impl TryFrom<MemberProto> for MemberSpec {
             }
         }
 
-        let mut credentials = member.take_credentials();
+        let mut credentials = member.credentials;
         if credentials.is_empty() {
             credentials = generate_member_credentials();
         }
 
         let on_leave = {
-            let on_leave = member.take_on_leave();
+            let on_leave = member.on_leave;
             if on_leave.is_empty() {
                 None
             } else {
@@ -174,7 +174,7 @@ impl TryFrom<MemberProto> for MemberSpec {
             }
         };
         let on_join = {
-            let on_join = member.take_on_join();
+            let on_join = member.on_join;
             if on_join.is_empty() {
                 None
             } else {
@@ -200,7 +200,7 @@ macro_rules! impl_try_from_proto_for_member {
                 (id, proto): (Id, $proto),
             ) -> Result<Self, Self::Error> {
                 match proto {
-                    $proto::member(member) => Self::try_from(member),
+                    $proto::Member(member) => Self::try_from(member),
                     _ => Err(TryFromProtobufError::ExpectedOtherElement(
                         String::from("Member"),
                         id.to_string(),
