@@ -8,8 +8,7 @@ use std::sync::Arc;
 use futures::{Future, IntoFuture};
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea_control_api_proto::grpc::{
-    api_grpc::ControlApiClient,
-    medea::{CreateRequest, CreateResponse, GetResponse, IdRequest, Response},
+    medea::{CreateRequest, CreateResponse, GetResponse, IdRequest, Response, create_request::El as CreateRequestElProto, control_api_client::ControlApiClient},
 };
 use protobuf::RepeatedField;
 
@@ -51,10 +50,9 @@ impl Into<String> for Fid {
 
 /// Returns new [`IdRequest`] with provided FIDs.
 fn id_request(ids: Vec<String>) -> IdRequest {
-    let mut req = IdRequest::new();
-    let ids = RepeatedField::from(ids);
-    req.set_fid(ids);
-    req
+    IdRequest {
+        fid: ids
+    }
 }
 
 /// Client for [Medea]'s [Control API].
@@ -80,33 +78,32 @@ impl ControlClient {
     }
 
     /// Creates provided element with gRPC Control API.
-    pub fn create(
-        &self,
+    pub async fn create(
+        &mut self,
         id: String,
         fid: Fid,
         element: Element,
-    ) -> impl Future<Item = CreateResponse, Error = Error> {
-        let mut req = CreateRequest::new();
-        req.set_parent_fid(fid.into());
-        match element {
+    ) -> Result<CreateResponse, Error> {
+        let el = match element {
             Element::Room(room) => {
-                req.set_room(room.into_proto(id));
+                CreateRequestElProto::Room(room.into_proto(id))
             }
             Element::Member(member) => {
-                req.set_member(member.into_proto(id));
+                CreateRequestElProto::Member(member.into_proto(id))
             }
             Element::WebRtcPlayEndpoint(webrtc_play) => {
-                req.set_webrtc_play(webrtc_play.into_proto(id));
+                CreateRequestElProto::WebrtcPlay(webrtc_play.into_proto(id))
             }
             Element::WebRtcPublishEndpoint(webrtc_pub) => {
-                req.set_webrtc_pub(webrtc_pub.into_proto(id));
+                CreateRequestElProto::WebrtcPub(webrtc_pub.into_proto(id))
             }
-        }
+        };
+        let req = CreateRequest {
+            parent_fid: fid.into(),
+            el: Some(el),
+        };
 
-        self.grpc_client
-            .create_async(&req)
-            .into_future()
-            .and_then(|r| r)
+        self.grpc_client.create(tonic::Request::new(req))
     }
 
     /// Gets element from Control API by FID.

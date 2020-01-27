@@ -7,12 +7,13 @@ use std::sync::{Arc, Mutex};
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use clap::ArgMatches;
 use futures::future::Future as _;
-use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
+use tonic::transport::Server;
 use medea_control_api_proto::grpc::medea_callback::{
-    callback_server::Callback as CallbackService, Request, Response,
+    callback_server::{Callback as CallbackService, CallbackServer as TonicCallbackServer}, Request, Response,
 };
 
 use crate::{callback::CallbackItem, prelude::*};
+use tonic::Status;
 
 /// Type which used in [`GrpcCallbackServer`] for [`CallbackItem`] storing.
 type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
@@ -22,9 +23,6 @@ type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
 /// Also this [`Actor`] can return all received callbacks
 /// with [`GetCallbacks`] [`Message`].
 pub struct GrpcCallbackServer {
-    /// [`grpcio`] gRPC server.
-    server: Server,
-
     /// All [`Callback`]s which this server received.
     events: CallbackItems,
 }
@@ -33,7 +31,6 @@ impl Actor for GrpcCallbackServer {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        self.server.start();
     }
 }
 
@@ -53,19 +50,13 @@ impl GrpcCallbackService {
     }
 }
 
+#[tonic::async_trait]
 impl CallbackService for GrpcCallbackService {
-    fn on_event(
-        &mut self,
-        ctx: RpcContext,
-        req: Request,
-        sink: UnarySink<Response>,
-    ) {
-        info!("Callback request received: [{:?}]", req);
-        self.events.lock().unwrap().push(req.into());
-        ctx.spawn(
-            sink.success(Response::new())
-                .map_err(|e| error!("Err: {:?}", e)),
-        )
+    async fn on_event(&self, request: tonic::Request<Request>) -> Result<tonic::Response<Response>, tonic::Status> {
+        info!("Callback request received: [{:?}]", request);
+        self.events.lock().unwrap().push(request.into_inner().into());
+
+        Ok(tonic::Response::new(Response {}))
     }
 }
 
@@ -89,24 +80,24 @@ impl Handler<GetCallbackItems> for GrpcCallbackServer {
 
 /// Run [`GrpcCallbackServer`].
 #[must_use]
-pub fn run(args: &ArgMatches) -> Addr<GrpcCallbackServer> {
+pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
     let host = args.value_of("callback_host").unwrap();
-    let port = args.value_of("callback_port").unwrap().parse().unwrap();
-    let cq_count = 2;
+    let port: u32 = args.value_of("callback_port").unwrap().parse().unwrap();
 
     let events = Arc::new(Mutex::new(Vec::new()));
 
-    let service =
-        create_callback(GrpcCallbackService::new(Arc::clone(&events)));
-    let env = Arc::new(Environment::new(cq_count));
+    let service = TonicCallbackServer::new(
+        GrpcCallbackService::new(Arc::clone(&events))
+    );
 
-    let server = ServerBuilder::new(env)
-        .register_service(service)
-        .bind(host, port)
-        .build()
-        .unwrap();
+    let server = Server::builder()
+        .add_service(service)
+        .serve(
+            format!("{}:{}", host, port).parse().unwrap(),
+        )
+        .await.unwrap();
 
     GrpcCallbackServer::start_in_arbiter(&Arbiter::new(), move |_| {
-        GrpcCallbackServer { server, events }
+        GrpcCallbackServer { events }
     })
 }

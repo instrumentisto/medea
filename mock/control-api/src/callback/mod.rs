@@ -4,6 +4,7 @@ pub mod server;
 
 use medea_control_api_proto::grpc::medea_callback::{
     request::Event as CallbackEventProto, Request as CallbackProto,
+    on_leave::Reason as OnLeaveReasonProto,
 };
 use serde::Serialize;
 
@@ -82,7 +83,7 @@ mod leave {
     impl From<OnLeaveProto> for OnLeave {
         fn from(proto: OnLeaveProto) -> Self {
             Self {
-                reason: proto.reason.into(),
+                reason: OnLeaveReasonProto::from_i32(proto.reason).unwrap_or_default().into(),
             }
         }
     }

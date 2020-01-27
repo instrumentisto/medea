@@ -383,7 +383,7 @@ impl From<GetResponseProto> for SingleGetResponse {
         if let Some(error) = proto.error {
             Self {
                 element: None,
-                error: error.into(),
+                error: Some(error.into()),
             }
         } else {
             Self {
