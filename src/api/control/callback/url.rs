@@ -22,8 +22,8 @@ impl GrpcCallbackUrl {
     /// If you wish to get address with protocol - just use [`Display`]
     /// implementation.
     #[inline]
-    pub fn addr(&self) -> &str {
-        &self.0
+    pub fn addr(&self) -> String {
+        format!("http://{}", self.0)
     }
 }
 

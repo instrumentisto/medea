@@ -38,6 +38,7 @@ use self::{
     room::Room,
 };
 use actix::fut::err;
+use std::{rc::Rc, sync::Mutex};
 
 /// Context of [`actix_web`] server.
 pub struct Context {
@@ -45,7 +46,7 @@ pub struct Context {
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Medea]: https://github.com/instrumentisto/medea
-    client: ControlClient,
+    client: Mutex<ControlClient>,
 
     /// gRPC server which receives Control API callbacks.
     callback_server: Addr<GrpcCallbackServer>,
@@ -54,42 +55,47 @@ pub struct Context {
 /// Run REST [Control API] server mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub fn run(args: &ArgMatches, callback_server_addr: Addr<GrpcCallbackServer>) {
+pub async fn run(
+    args: &ArgMatches<'static>,
+    callback_server_addr: Addr<GrpcCallbackServer>,
+) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
     HttpServer::new(move || {
+        debug!("Running HTTP server...");
         App::new()
-            .wrap(Cors::new())
+            .wrap(Cors::new().finish())
             .data(Context {
-                client: ControlClient::new(&medea_addr),
+                client: Mutex::new(ControlClient::new(medea_addr.clone())),
                 callback_server: callback_server_addr.clone(),
             })
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/control-api/{a}")
-                    .route(web::post().to_async(create::create1))
-                    .route(web::get().to_async(get::get1))
-                    .route(web::delete().to_async(delete::delete1)),
+                    .route(web::post().to(create::create1))
+                    .route(web::get().to(get::get1))
+                    .route(web::delete().to(delete::delete1)),
             )
             .service(
                 web::resource("/control-api/{a}/{b}")
-                    .route(web::post().to_async(create::create2))
-                    .route(web::get().to_async(get::get2))
-                    .route(web::delete().to_async(delete::delete2)),
+                    .route(web::post().to(create::create2))
+                    .route(web::get().to(get::get2))
+                    .route(web::delete().to(delete::delete2)),
             )
             .service(
                 web::resource("/control-api/{a}/{b}/{c}")
-                    .route(web::post().to_async(create::create3))
-                    .route(web::get().to_async(get::get3))
-                    .route(web::delete().to_async(delete::delete3)),
+                    .route(web::post().to(create::create3))
+                    .route(web::get().to(get::get3))
+                    .route(web::delete().to(delete::delete3)),
             )
             .service(
-                web::resource("/callbacks")
-                    .route(web::get().to_async(get_callbacks)),
+                web::resource("/callbacks").route(web::get().to(get_callbacks)),
             )
     })
     .bind(args.value_of("addr").unwrap())
     .unwrap()
-    .start();
+    .run()
+    .await
+    .unwrap();
 }
 
 /// Generates `request` macro which will generate [`actix_web`] request handler
@@ -108,13 +114,16 @@ macro_rules! gen_request_macro {
         /// `$uri_tuple` - type of path which will be provided by [`actix_web`].
         macro_rules! request {
             ($name:tt, $uri_tuple:ty) => {
-                pub fn $name(
+                pub async fn $name(
                     path: actix_web::web::Path<$uri_tuple>,
                     state: Data<Context>,
-                ) -> impl Future<Item = HttpResponse, Error = ()> {
+                ) -> Result<HttpResponse, ()> {
                     state
                         .client
+                        .lock()
+                        .unwrap()
                         .$call_fn(path.into_inner().into())
+                        .await
                         .map_err(|e| error!("{:?}", e))
                         .map(|r| <$resp>::from(r).into())
                 }
@@ -126,12 +135,11 @@ macro_rules! gen_request_macro {
 /// [`actix_web`] REST API endpoint which returns all
 /// [`Callback`]s received by this mock server.
 #[allow(clippy::needless_pass_by_value)]
-pub fn get_callbacks(
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
+pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
     state
         .callback_server
         .send(GetCallbackItems)
+        .await
         .map_err(|e| warn!("GrpcCallbackServer mailbox error. {:?}", e))
         .map(|callbacks| HttpResponse::Ok().json(&callbacks.unwrap()))
 }
@@ -171,40 +179,49 @@ mod get {
 mod create {
     use super::*;
 
-    pub fn create1(
+    pub async fn create1(
         path: actix_web::web::Path<String>,
         state: Data<Context>,
         data: Json<Element>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
+    ) -> Result<HttpResponse, ()> {
         state
             .client
+            .lock()
+            .unwrap()
             .create(path.into_inner(), Fid::from(()), data.0)
+            .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }
 
-    pub fn create2(
+    pub async fn create2(
         path: actix_web::web::Path<(String, String)>,
         state: Data<Context>,
         data: Json<Element>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
+    ) -> Result<HttpResponse, ()> {
         let uri = path.into_inner();
         state
             .client
+            .lock()
+            .unwrap()
             .create(uri.1, Fid::from(uri.0), data.0)
+            .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }
 
-    pub fn create3(
+    pub async fn create3(
         path: actix_web::web::Path<(String, String, String)>,
         state: Data<Context>,
         data: Json<Element>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
+    ) -> Result<HttpResponse, ()> {
         let uri = path.into_inner();
         state
             .client
+            .lock()
+            .unwrap()
             .create(uri.2, Fid::from((uri.0, uri.1)), data.0)
+            .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }

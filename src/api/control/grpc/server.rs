@@ -285,6 +285,7 @@ impl ControlApi for ControlApiService {
         &self,
         request: tonic::Request<CreateRequest>,
     ) -> Result<tonic::Response<CreateResponse>, Status> {
+        debug!("Create Request: {:?}", request);
         let create_response =
             match self.create_element(request.into_inner()).await {
                 Ok(sid) => CreateResponse { sid, error: None },
@@ -322,7 +323,7 @@ impl ControlApi for ControlApiService {
             },
             Err(e) => GetResponse {
                 elements: HashMap::new(),
-                error: None,
+                error: Some(e.into()),
             },
         };
 
@@ -382,16 +383,16 @@ pub async fn run(
     let (grpc_shutdown_tx, grpc_shutdown_rx) =
         futures::channel::oneshot::channel();
 
-    let server = Server::builder()
-        .add_service(service)
-        .serve_with_shutdown(
-            format!("{}:{}", bind_ip, bind_port).parse().unwrap(),
-            async move {
+    let addr = format!("{}:{}", bind_ip, bind_port).parse().unwrap();
+    Arbiter::spawn(async move {
+        Server::builder()
+            .add_service(service)
+            .serve_with_shutdown(addr, async move {
                 grpc_shutdown_rx.await;
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .await
+            .unwrap();
+    });
 
     GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| {
         GrpcServer(Some(grpc_shutdown_tx))

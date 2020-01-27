@@ -7,10 +7,13 @@ use std::sync::{Arc, Mutex};
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use clap::ArgMatches;
 use futures::future::Future as _;
-use tonic::transport::Server;
 use medea_control_api_proto::grpc::medea_callback::{
-    callback_server::{Callback as CallbackService, CallbackServer as TonicCallbackServer}, Request, Response,
+    callback_server::{
+        Callback as CallbackService, CallbackServer as TonicCallbackServer,
+    },
+    Request, Response,
 };
+use tonic::transport::Server;
 
 use crate::{callback::CallbackItem, prelude::*};
 use tonic::Status;
@@ -30,8 +33,7 @@ pub struct GrpcCallbackServer {
 impl Actor for GrpcCallbackServer {
     type Context = Context<Self>;
 
-    fn started(&mut self, _ctx: &mut Self::Context) {
-    }
+    fn started(&mut self, _ctx: &mut Self::Context) {}
 }
 
 /// Implementation for [`CallbackService`] gRPC service.
@@ -52,9 +54,15 @@ impl GrpcCallbackService {
 
 #[tonic::async_trait]
 impl CallbackService for GrpcCallbackService {
-    async fn on_event(&self, request: tonic::Request<Request>) -> Result<tonic::Response<Response>, tonic::Status> {
+    async fn on_event(
+        &self,
+        request: tonic::Request<Request>,
+    ) -> Result<tonic::Response<Response>, tonic::Status> {
         info!("Callback request received: [{:?}]", request);
-        self.events.lock().unwrap().push(request.into_inner().into());
+        self.events
+            .lock()
+            .unwrap()
+            .push(request.into_inner().into());
 
         Ok(tonic::Response::new(Response {}))
     }
@@ -86,16 +94,19 @@ pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
 
     let events = Arc::new(Mutex::new(Vec::new()));
 
-    let service = TonicCallbackServer::new(
-        GrpcCallbackService::new(Arc::clone(&events))
-    );
+    let service =
+        TonicCallbackServer::new(GrpcCallbackService::new(Arc::clone(&events)));
+    let addr = format!("{}:{}", host, port).parse().unwrap();
 
-    let server = Server::builder()
-        .add_service(service)
-        .serve(
-            format!("{}:{}", host, port).parse().unwrap(),
-        )
-        .await.unwrap();
+    let server = Arbiter::spawn(async move {
+        Server::builder()
+            .add_service(service)
+            .serve(addr)
+            .await
+            .unwrap();
+    });
+
+    debug!("gRPC callback server started.");
 
     GrpcCallbackServer::start_in_arbiter(&Arbiter::new(), move |_| {
         GrpcCallbackServer { events }

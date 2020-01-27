@@ -51,6 +51,7 @@ pub struct WebRtcPublishEndpoint {
     p2p: P2pMode,
 
     /// Option to relay all media through a TURN server forcibly.
+    #[serde(default)]
     force_relay: bool,
 }
 
@@ -94,6 +95,7 @@ pub struct WebRtcPlayEndpoint {
     src: String,
 
     /// Option to relay all media through a TURN server forcibly.
+    #[serde(default)]
     force_relay: bool,
 }
 
