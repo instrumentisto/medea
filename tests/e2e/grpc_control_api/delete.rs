@@ -26,49 +26,51 @@ use super::{create_room_req, ControlClient};
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`ErrorCode`]: medea::api::control::error_codes::ErrorCode
-fn test_for_delete(
+async fn test_for_delete(
     room_id: &str,
     element_id: &str,
     error_code: MedeaErrorCode,
 ) {
-    let client = ControlClient::new();
-    client.create(&create_room_req(room_id));
+    let mut client = ControlClient::new().await;
+    client.create(create_room_req(room_id)).await;
 
-    client.try_get(element_id).unwrap();
+    client.try_get(element_id).await.unwrap();
 
-    client.delete(&[element_id]).unwrap();
+    client.delete(&[element_id]).await.unwrap();
 
-    let get_room_err = match client.try_get(element_id) {
+    let get_room_err = match client.try_get(element_id).await {
         Ok(_) => panic!("{} not deleted!", element_id),
         Err(e) => e,
     };
     assert_eq!(get_room_err.code, error_code as u32);
 }
 
-#[test]
-fn room() {
+#[actix_rt::test]
+async fn room() {
     const TEST_NAME: &str = "delete-room";
-    test_for_delete(TEST_NAME, TEST_NAME, ErrorCode::RoomNotFound);
+    test_for_delete(TEST_NAME, TEST_NAME, ErrorCode::RoomNotFound).await;
 }
 
-#[test]
-fn member() {
+#[actix_rt::test]
+async fn member() {
     const TEST_NAME: &str = "delete-member";
     test_for_delete(
         TEST_NAME,
         &format!("{}/publisher", TEST_NAME),
         ErrorCode::MemberNotFound,
-    );
+    )
+    .await;
 }
 
-#[test]
-fn endpoint() {
+#[actix_rt::test]
+async fn endpoint() {
     const TEST_NAME: &str = "delete-endpoint";
     test_for_delete(
         &TEST_NAME,
         &format!("{}/publisher/publish", TEST_NAME),
         ErrorCode::EndpointNotFound,
-    );
+    )
+    .await;
 }
 
 /// Tests that `Delete` method on parent element also deletes all nested
@@ -89,17 +91,17 @@ fn endpoint() {
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`ErrorCode`]: medea::api::control::error_codes::ErrorCode
-fn test_cascade_delete(
+async fn test_cascade_delete(
     room_id: &str,
     elements_uris: &[&str],
     code: MedeaErrorCode,
     root_elem_uri: &str,
 ) {
-    let client = ControlClient::new();
-    client.create(&create_room_req(room_id));
-    client.delete(elements_uris).unwrap();
+    let mut client = ControlClient::new().await;
+    client.create(create_room_req(room_id)).await;
+    client.delete(elements_uris).await.unwrap();
 
-    match client.try_get(root_elem_uri) {
+    match client.try_get(root_elem_uri).await {
         Ok(_) => panic!("Member not deleted!"),
         Err(e) => {
             assert_eq!(e.code, code as u32);
@@ -107,8 +109,8 @@ fn test_cascade_delete(
     }
 }
 
-#[test]
-fn cascade_delete_endpoints_when_deleting_member() {
+#[actix_rt::test]
+async fn cascade_delete_endpoints_when_deleting_member() {
     const TEST_NAME: &str = "member-and-endpoint-same-time";
 
     test_cascade_delete(
@@ -119,11 +121,12 @@ fn cascade_delete_endpoints_when_deleting_member() {
         ],
         MedeaErrorCode::MemberNotFound,
         &format!("{}/publisher", TEST_NAME),
-    );
+    )
+    .await;
 }
 
-#[test]
-fn cascade_delete_everything_when_deleting_room() {
+#[actix_rt::test]
+async fn cascade_delete_everything_when_deleting_room() {
     const TEST_NAME: &str = "room-and-inner-elements-same-time";
 
     test_cascade_delete(
@@ -135,26 +138,28 @@ fn cascade_delete_everything_when_deleting_room() {
         ],
         MedeaErrorCode::RoomNotFound,
         TEST_NAME,
-    );
+    )
+    .await;
 }
 
-#[test]
-fn cant_delete_members_from_different_rooms_in_single_request() {
-    let client = ControlClient::new();
+#[actix_rt::test]
+async fn cant_delete_members_from_different_rooms_in_single_request() {
+    let mut client = ControlClient::new().await;
 
-    if let Err(err) = client.delete(&["room1/member1", "room2/member1"]) {
+    if let Err(err) = client.delete(&["room1/member1", "room2/member1"]).await {
         assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
     } else {
         panic!("should err")
     }
 }
 
-#[test]
-fn cant_delete_endpoints_from_different_rooms_in_single_request() {
-    let client = ControlClient::new();
+#[actix_rt::test]
+async fn cant_delete_endpoints_from_different_rooms_in_single_request() {
+    let mut client = ControlClient::new().await;
 
-    if let Err(err) =
-        client.delete(&["room1/member1/endpoint1", "room2/member1/endpoint1"])
+    if let Err(err) = client
+        .delete(&["room1/member1/endpoint1", "room2/member1/endpoint1"])
+        .await
     {
         assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
     } else {

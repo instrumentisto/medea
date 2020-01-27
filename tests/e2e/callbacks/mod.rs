@@ -8,27 +8,22 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use futures::{
     compat::Future01CompatExt as _, FutureExt as _, TryFutureExt as _,
 };
-use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
-use medea_control_api_proto::grpc::{
-    callback::{Request, Response},
-    callback_grpc::{create_callback, Callback},
+use medea_control_api_proto::grpc::medea_callback::{
+    callback_server::{Callback, CallbackServer as TonicCallbackServer},
+    Request, Response,
 };
+use tonic::{transport::Server, Status};
 
 /// Requests which [`GrpcCallbackServer`] will receive.
 type CallbackItems = Arc<Mutex<Vec<Request>>>;
 
 /// gRPC Control API callback server for tests.
 pub struct GrpcCallbackServer {
-    server: Server,
     callbacks: CallbackItems,
 }
 
 impl Actor for GrpcCallbackServer {
     type Context = Context<Self>;
-
-    fn started(&mut self, _: &mut Self::Context) {
-        self.server.start();
-    }
 }
 
 /// Returns all [`Request`]s which this [`GrpcCallbackServer`] received.
@@ -60,40 +55,33 @@ impl CallbackServer {
     }
 }
 
+#[tonic::async_trait]
 impl Callback for CallbackServer {
-    fn on_event(
-        &mut self,
-        ctx: RpcContext,
-        req: Request,
-        sink: UnarySink<Response>,
-    ) {
-        self.callbacks.lock().unwrap().push(req);
-        ctx.spawn(
-            async move {
-                sink.success(Response::new()).compat().await.unwrap();
-                Ok(())
-            }
-            .boxed()
-            .compat(),
-        )
+    async fn on_event(
+        &self,
+        request: tonic::Request<Request>,
+    ) -> Result<tonic::Response<Response>, Status> {
+        self.callbacks.lock().unwrap().push(request.into_inner());
+        Ok(tonic::Response::new(Response {}))
     }
 }
 
 /// Runs [`GrpcCallbackServer`] on `localhost` and provided port.
 pub fn run(port: u16) -> Addr<GrpcCallbackServer> {
-    let cq_count = 2;
     let callbacks = Arc::new(Mutex::new(Vec::new()));
 
-    let service = create_callback(CallbackServer::new(Arc::clone(&callbacks)));
-    let env = Arc::new(Environment::new(cq_count));
+    let service =
+        TonicCallbackServer::new(CallbackServer::new(Arc::clone(&callbacks)));
 
-    let server = ServerBuilder::new(env)
-        .register_service(service)
-        .bind("127.0.0.1", port)
-        .build()
-        .unwrap();
+    Arbiter::spawn(async move {
+        Server::builder()
+            .add_service(service)
+            .serve(format!("127.0.0.1:{}", port).parse().unwrap())
+            .await
+            .unwrap()
+    });
 
     GrpcCallbackServer::start_in_arbiter(&Arbiter::new(), move |_| {
-        GrpcCallbackServer { server, callbacks }
+        GrpcCallbackServer { callbacks }
     })
 }

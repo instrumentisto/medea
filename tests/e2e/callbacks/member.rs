@@ -5,8 +5,8 @@ use std::time::Duration;
 use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::callback::{
-    OnLeave_Reason as OnLeaveReason, Request,
+use medea_control_api_proto::grpc::medea_callback::{
+    on_leave::Reason as OnLeaveReason, request::Event as EventProto, Request,
 };
 
 use crate::{
@@ -36,7 +36,7 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// will receive all callbacks from Medea.
 async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
     let callback_server = super::run(port);
-    let control_client = ControlClient::new();
+    let mut control_client = ControlClient::new().await;
     let member = RoomBuilder::default()
         .id(name)
         .add_member(
@@ -50,7 +50,7 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
         .build()
         .unwrap()
         .build_request(String::new());
-    let create_response = control_client.create(&member);
+    let create_response = control_client.create(member).await;
 
     let on_event =
         move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
@@ -80,8 +80,16 @@ async fn on_join() {
     let (_, callback_server) = callback_test(TEST_NAME, 9096).await;
     delay_for(Duration::from_millis(300)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
-    let on_joins_count =
-        callbacks.into_iter().filter(Request::has_on_join).count();
+    let on_joins_count = callbacks
+        .into_iter()
+        .filter(|r| {
+            if let EventProto::OnJoin(_) = r.event.as_ref().unwrap() {
+                true
+            } else {
+                false
+            }
+        })
+        .count();
     assert_eq!(on_joins_count, 1);
 }
 
@@ -110,13 +118,13 @@ async fn on_leave_normally_disconnected() {
     let on_leaves_count = callbacks
         .into_iter()
         .filter_map(|mut req| {
-            if req.has_on_leave() {
-                Some(req.take_on_leave().reason)
+            if let Some(EventProto::OnLeave(on_leave)) = req.event {
+                Some(on_leave.reason)
             } else {
                 None
             }
         })
-        .filter(|reason| reason == &OnLeaveReason::DISCONNECTED)
+        .filter(|reason| reason == &(OnLeaveReason::Disconnected as i32))
         .count();
     assert_eq!(on_leaves_count, 1);
 }
@@ -147,13 +155,13 @@ async fn on_leave_on_connection_loss() {
     let on_leaves_count = callbacks
         .into_iter()
         .filter_map(|mut req| {
-            if req.has_on_leave() {
-                Some(req.take_on_leave().reason)
+            if let Some(EventProto::OnLeave(on_leave)) = req.event {
+                Some(on_leave.reason)
             } else {
                 None
             }
         })
-        .filter(|reason| reason == &OnLeaveReason::LOST_CONNECTION)
+        .filter(|reason| reason == &(OnLeaveReason::LostConnection as i32))
         .count();
     assert_eq!(on_leaves_count, 1);
 }

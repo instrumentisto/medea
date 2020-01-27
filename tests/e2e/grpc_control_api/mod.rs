@@ -10,24 +10,57 @@ mod signaling;
 use std::{collections::HashMap, sync::Arc};
 
 use derive_builder::*;
-use grpcio::{ChannelBuilder, EnvBuilder};
-use medea_control_api_proto::grpc::{
-    api::{
-        CreateRequest, Element, Error, IdRequest, Member as GrpcMember,
-        Member_Element, Room as GrpcRoom, Room_Element,
-        WebRtcPlayEndpoint as GrpcWebRtcPlayEndpoint,
-        WebRtcPublishEndpoint as GrpcWebRtcPublishEndpoint,
-        WebRtcPublishEndpoint_P2P,
-    },
-    api_grpc::ControlApiClient,
+use medea::conf::ControlApi;
+use medea_control_api_proto::grpc::medea::{
+    control_api_client::ControlApiClient,
+    create_request::El as CreateRequestEl,
+    element::El as RootEl,
+    member::{element::El as MemberEl, Element as Member_Element},
+    room::{element::El as RoomEl, Element as Room_Element},
+    web_rtc_publish_endpoint::P2p as WebRtcPublishEndpoint_P2P,
+    CreateRequest, Element, Error, IdRequest, Member as GrpcMember,
+    Room as GrpcRoom, WebRtcPlayEndpoint as GrpcWebRtcPlayEndpoint,
+    WebRtcPublishEndpoint as GrpcWebRtcPublishEndpoint,
 };
-use protobuf::RepeatedField;
+use tonic::transport::Channel;
+
+pub struct Elem(pub Element);
+
+impl Elem {
+    pub fn take_room(self) -> GrpcRoom {
+        match self.0.el.unwrap() {
+            RootEl::Room(room) => room,
+            _ => panic!("Not Room element!"),
+        }
+    }
+
+    pub fn take_member(self) -> GrpcMember {
+        match self.0.el.unwrap() {
+            RootEl::Member(member) => member,
+            _ => panic!("Not Room element!"),
+        }
+    }
+
+    pub fn take_webrtc_pub(self) -> GrpcWebRtcPublishEndpoint {
+        match self.0.el.unwrap() {
+            RootEl::WebrtcPub(webrtc_pub) => webrtc_pub,
+            _ => panic!("Not Room element!"),
+        }
+    }
+
+    pub fn take_webrtc_play(self) -> GrpcWebRtcPlayEndpoint {
+        match self.0.el.unwrap() {
+            RootEl::WebrtcPlay(webrtc_play) => webrtc_play,
+            _ => panic!("Not Room element!"),
+        }
+    }
+}
 
 /// Client for [Medea]'s gRPC [Control API].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 #[derive(Clone)]
-pub struct ControlClient(ControlApiClient);
+pub struct ControlClient(ControlApiClient<Channel>);
 
 impl ControlClient {
     /// Create new [`ControlClient`].
@@ -37,10 +70,12 @@ impl ControlClient {
     /// Note that this function don't connects to the server. This mean that
     /// when you call [`ControlClient::new`] and server not working you will
     /// don't know it until try to send something with this client.
-    pub fn new() -> Self {
-        let env = Arc::new(EnvBuilder::new().build());
-        let ch = ChannelBuilder::new(env).connect("127.0.0.1:6565");
-        Self(ControlApiClient::new(ch))
+    pub async fn new() -> Self {
+        Self(
+            ControlApiClient::connect("http://127.0.0.1:6565")
+                .await
+                .unwrap(),
+        )
     }
 
     /// Gets some [`Element`] by local URI.
@@ -49,17 +84,16 @@ impl ControlClient {
     ///
     /// - if [`GetResponse`] has error
     /// - if connection with server failed
-    pub fn get(&self, uri: &str) -> Element {
-        let mut get_room_request = IdRequest::new();
-        let mut room = RepeatedField::new();
-        room.push(uri.to_string());
-        get_room_request.set_fid(room);
+    pub async fn get(&mut self, uri: &str) -> Elem {
+        let room = vec![uri.to_string()];
+        let get_room_request = IdRequest { fid: room };
 
-        let mut resp = self.0.get(&get_room_request).unwrap();
-        if resp.has_error() {
-            panic!("{:?}", resp.get_error());
+        let mut resp = self.0.get(get_room_request).await.unwrap().into_inner();
+        if let Some(err) = resp.error {
+            panic!("{:?}", err);
         }
-        resp.take_elements().remove(&uri.to_string()).unwrap()
+
+        Elem(resp.elements.remove(&uri.to_string()).unwrap())
     }
 
     /// Tries to get some [`Element`] by local URI.
@@ -67,17 +101,16 @@ impl ControlClient {
     /// # Panics
     ///
     /// - if connection with server failed.
-    pub fn try_get(&self, uri: &str) -> Result<Element, Error> {
-        let mut get_room_request = IdRequest::new();
-        let mut room = RepeatedField::new();
-        room.push(uri.to_string());
-        get_room_request.set_fid(room);
+    pub async fn try_get(&mut self, uri: &str) -> Result<Element, Error> {
+        let room = vec![uri.to_string()];
+        let get_room_request = IdRequest { fid: room };
 
-        let mut resp = self.0.get(&get_room_request).unwrap();
-        if resp.has_error() {
-            return Err(resp.take_error());
+        let mut resp = self.0.get(get_room_request).await.unwrap().into_inner();
+        if let Some(e) = resp.error {
+            return Err(e);
         }
-        Ok(resp.take_elements().remove(&uri.to_string()).unwrap())
+
+        Ok(resp.elements.remove(&uri.to_string()).unwrap())
     }
 
     /// Creates `Element` and returns it sids.
@@ -86,10 +119,13 @@ impl ControlClient {
     ///
     /// - if [`CreateResponse`] has error.
     /// - if connection with server failed.
-    pub fn create(&self, req: &CreateRequest) -> HashMap<String, String> {
-        let resp = self.0.create(&req).unwrap();
-        if resp.has_error() {
-            panic!("{:?}", resp.get_error());
+    pub async fn create(
+        &mut self,
+        req: CreateRequest,
+    ) -> HashMap<String, String> {
+        let resp = self.0.create(req).await.unwrap().into_inner();
+        if let Some(e) = resp.error {
+            panic!("{:?}", e);
         }
 
         resp.sid
@@ -100,14 +136,14 @@ impl ControlClient {
     /// # Panics
     ///
     /// - if connection with server failed.
-    pub fn try_create(
-        &self,
-        req: &CreateRequest,
+    pub async fn try_create(
+        &mut self,
+        req: CreateRequest,
     ) -> Result<HashMap<String, String>, Error> {
-        let mut resp = self.0.create(&req).unwrap();
+        let mut resp = self.0.create(req).await.unwrap().into_inner();
 
-        if resp.has_error() {
-            Err(resp.take_error())
+        if let Some(e) = resp.error {
+            Err(e)
         } else {
             Ok(resp.sid)
         }
@@ -119,15 +155,13 @@ impl ControlClient {
     ///
     /// - if [`Response`] has error
     /// - if connection with server failed.
-    pub fn delete(&self, ids: &[&str]) -> Result<(), Error> {
-        let mut delete_req = IdRequest::new();
-        let mut delete_ids = RepeatedField::new();
-        ids.iter().for_each(|id| delete_ids.push((*id).to_string()));
-        delete_req.set_fid(delete_ids);
+    pub async fn delete(&mut self, ids: &[&str]) -> Result<(), Error> {
+        let delete_ids = ids.iter().map(|id| id.to_string()).collect();
+        let delete_req = IdRequest { fid: delete_ids };
 
-        let mut resp = self.0.delete(&delete_req).unwrap();
-        if resp.has_error() {
-            Err(resp.take_error())
+        let mut resp = self.0.delete(delete_req).await.unwrap().into_inner();
+        if let Some(e) = resp.error {
+            Err(e)
         } else {
             Ok(())
         }
@@ -145,25 +179,26 @@ pub struct Room {
 
 impl Room {
     pub fn build_request<T: Into<String>>(self, uri: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
+        let members = self
+            .members
+            .into_iter()
+            .map(|(id, member)| {
+                let room_element = Room_Element {
+                    el: Some(RoomEl::Member(member.into())),
+                };
 
-        let mut grpc_room = GrpcRoom::new();
-        let mut members = HashMap::new();
+                (id, room_element)
+            })
+            .collect();
+        let grpc_room = GrpcRoom {
+            id: self.id,
+            pipeline: members,
+        };
 
-        for (id, member) in self.members {
-            let mut room_element = Room_Element::new();
-            room_element.set_member(member.into());
-
-            members.insert(id, room_element);
+        CreateRequest {
+            parent_fid: uri.into(),
+            el: Some(CreateRequestEl::Room(grpc_room)),
         }
-
-        grpc_room.set_id(self.id);
-        grpc_room.set_pipeline(members);
-
-        request.set_parent_fid(uri.into());
-        request.set_room(grpc_room);
-
-        request
     }
 }
 
@@ -198,39 +233,28 @@ pub struct Member {
 
 impl Into<GrpcMember> for Member {
     fn into(self) -> GrpcMember {
-        let mut grpc_member = GrpcMember::new();
+        let pipeline = self
+            .endpoints
+            .into_iter()
+            .map(|(id, element)| (id, element.into()))
+            .collect();
 
-        let mut pipeline = HashMap::new();
-
-        for (id, element) in self.endpoints {
-            pipeline.insert(id, element.into());
+        GrpcMember {
+            id: self.id,
+            pipeline,
+            on_leave: self.on_leave.unwrap_or_default(),
+            on_join: self.on_join.unwrap_or_default(),
+            credentials: self.credentials.unwrap_or_default(),
         }
-
-        if let Some(credentials) = self.credentials {
-            grpc_member.set_credentials(credentials)
-        }
-
-        grpc_member.set_pipeline(pipeline);
-        grpc_member.set_id(self.id);
-        if let Some(on_join) = self.on_join {
-            grpc_member.set_on_join(on_join)
-        }
-        if let Some(on_leave) = self.on_leave {
-            grpc_member.set_on_leave(on_leave)
-        }
-
-        grpc_member
     }
 }
 
 impl Member {
     fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
-
-        request.set_parent_fid(url.into());
-        request.set_member(self.into());
-
-        request
+        CreateRequest {
+            parent_fid: url.into(),
+            el: Some(CreateRequestEl::Member(self.into())),
+        }
     }
 }
 
@@ -262,18 +286,18 @@ impl Endpoint {
 
 impl Into<Member_Element> for Endpoint {
     fn into(self) -> Member_Element {
-        let mut member_elem = Member_Element::new();
-
-        match self {
+        let member_el = match self {
             Self::WebRtcPlayElement(element) => {
-                member_elem.set_webrtc_play(element.into());
+                MemberEl::WebrtcPlay(element.into())
             }
             Self::WebRtcPublishElement(element) => {
-                member_elem.set_webrtc_pub(element.into())
+                MemberEl::WebrtcPub(element.into())
             }
-        }
+        };
 
-        member_elem
+        Member_Element {
+            el: Some(member_el),
+        }
     }
 }
 
@@ -286,22 +310,22 @@ pub struct WebRtcPlayEndpoint {
 
 impl WebRtcPlayEndpoint {
     pub fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
-
-        request.set_parent_fid(url.into());
-        request.set_webrtc_play(self.into());
-
-        request
+        CreateRequest {
+            el: Some(CreateRequestEl::WebrtcPlay(self.into())),
+            parent_fid: url.into(),
+        }
     }
 }
 
 impl Into<GrpcWebRtcPlayEndpoint> for WebRtcPlayEndpoint {
     fn into(self) -> GrpcWebRtcPlayEndpoint {
-        let mut endpoint = GrpcWebRtcPlayEndpoint::new();
-        endpoint.set_src(self.src);
-        endpoint.set_id(self.id);
-
-        endpoint
+        GrpcWebRtcPlayEndpoint {
+            src: self.src,
+            on_start: String::new(),
+            on_stop: String::new(),
+            id: self.id,
+            force_relay: false,
+        }
     }
 }
 
@@ -320,22 +344,22 @@ pub struct WebRtcPublishEndpoint {
 
 impl WebRtcPublishEndpoint {
     pub fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
-
-        request.set_parent_fid(url.into());
-        request.set_webrtc_pub(self.into());
-
-        request
+        CreateRequest {
+            el: Some(CreateRequestEl::WebrtcPub(self.into())),
+            parent_fid: url.into(),
+        }
     }
 }
 
 impl Into<GrpcWebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     fn into(self) -> GrpcWebRtcPublishEndpoint {
-        let mut endpoint = GrpcWebRtcPublishEndpoint::new();
-        endpoint.set_p2p(self.p2p_mode);
-        endpoint.set_id(self.id);
-
-        endpoint
+        GrpcWebRtcPublishEndpoint {
+            p2p: self.p2p_mode as i32,
+            on_start: String::default(),
+            on_stop: String::default(),
+            id: self.id,
+            force_relay: bool::default(),
+        }
     }
 }
 
@@ -382,7 +406,7 @@ fn create_room_req(room_id: &str) -> CreateRequest {
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .p2p_mode(WebRtcPublishEndpoint_P2P::Always)
                         .build()
                         .unwrap(),
                 )
