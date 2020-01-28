@@ -25,6 +25,10 @@ members = [
 [profile.release]
 lto = "thin"
 
+[features]
+deadlock_detection = []
+default = ["deadlock_detection"]
+
 [dependencies]
 actix = "0.9"
 actix-web = "2.0"
@@ -60,6 +64,7 @@ tokio = { version = "0.2", features = ["signal", "time"] }
 tonic = "0.1"
 toml = "0.5"
 url = "2.1"
+parking_lot = { version = "0.10", features = ["deadlock_detection"] }
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]

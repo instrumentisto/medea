@@ -13,12 +13,13 @@ use crate::{
 };
 
 /// Client that sends [`CallbackRequest`]'s to [`Callback`] server.
+#[async_trait::async_trait]
 pub trait CallbackClient: Debug + Send + Sync {
     /// Sends [`CallbackRequest`] to [`Callback`] server.
-    fn send(
-        &self,
+    async fn send(
+        &mut self,
         request: CallbackRequest,
-    ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>>;
+    ) -> Result<(), CallbackClientError>;
 }
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].

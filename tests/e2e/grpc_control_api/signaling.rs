@@ -281,8 +281,8 @@ async fn peers_removed_on_delete_member() {
                     if peers_created.get() == 2 {
                         let client = control_client.clone();
                         Arbiter::spawn(async move {
-                           client
-                               .borrow_mut()
+                            client
+                                .borrow_mut()
                                 .delete(&[&format!("{}/responder", TEST_NAME)])
                                 .await
                                 .unwrap();
