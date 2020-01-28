@@ -917,6 +917,8 @@ impl CommandHandler for Room {
         Ok(Box::new(future::ok(()).into_actor(self)))
     }
 
+    /// Sends [`Event::TracksUpdated`] with data from received
+    /// [`Command::UpdateTracks`].
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,

@@ -7,7 +7,10 @@ use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
-    peer::{MockPeerRepository, PeerConnection, PeerEvent},
+    peer::{
+        MockPeerRepository, MuteState, PeerConnection, PeerEvent,
+        TransceiverKind,
+    },
     rpc::MockRpcClient,
     utils::JasonError,
 };
@@ -17,7 +20,6 @@ use wasm_bindgen_test::*;
 use crate::{
     get_test_tracks, resolve_after, wait_and_check_test_result, MockNavigator,
 };
-use medea_jason::peer::{MuteState, TransceiverKind};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -170,7 +172,7 @@ async fn join_two_video_mutes() {
     ));
 }
 
-/// Tests that two simultaneous calls of [`RoomHandle::mute_audio`] and
+/// Tests that simultaneous calls of [`RoomHandle::mute_audio`] and
 /// [`RoomHandle::unmute_audio`] not goes into an infinite loop. Also,
 /// [`RoomHandle::unmute_audio`] should be dismissed.
 ///
@@ -212,7 +214,7 @@ async fn join_mute_and_unmute_audio() {
     ));
 }
 
-/// Tests that two simultaneous calls of [`RoomHandle::mute_video`] and
+/// Tests that simultaneous calls of [`RoomHandle::mute_video`] and
 /// [`RoomHandle::unmute_video`] not goes into an infinite loop. Also,
 /// [`RoomHandle::unmute_video`] should be dismissed.
 ///
@@ -254,7 +256,7 @@ async fn join_mute_and_unmute_video() {
     ));
 }
 
-/// Tests that two simultaneous calls of [`RoomHandle::mute_video`] and
+/// Tests that simultaneous calls of [`RoomHandle::mute_video`] and
 /// [`RoomHandle::unmute_video`] on [`Room`] with video in
 /// [`MuteState::Muted`] not goes into an infinite loop.
 ///

@@ -144,6 +144,8 @@ enum RoomError {
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
+    /// Typically, returned if [`RoomHandle::mute_audio`] like functions called
+    /// simultaneous.
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
 }
@@ -602,7 +604,7 @@ impl InnerRoom {
                                 is_muted: Some(is_muted),
                             };
                             sender.change_mute_state(
-                                needed_mute_state.proccessing_state(),
+                                needed_mute_state.processing_state(),
                             );
 
                             track_update

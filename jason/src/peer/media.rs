@@ -6,7 +6,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{future, StreamExt};
+use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use medea_reactive::{Dropped, ObservableCell};
@@ -27,7 +27,6 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
-use futures::future::Either;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -380,7 +379,8 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Returns [`MediaTrack`] by its [`TrackId`].
+    /// Returns [`MediaTrack`] from this [`MediaConnections`] by its
+    /// [`TrackId`].
     pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<MediaTrack>> {
         let inner = self.0.borrow();
 
@@ -413,7 +413,7 @@ pub enum MuteState {
 impl MuteState {
     /// Returns [`MuteState`] which should be set while transition to this
     /// [`MuteState`].
-    pub fn proccessing_state(self) -> Self {
+    pub fn processing_state(self) -> Self {
         match self {
             Self::NotMuted => Self::Unmuting,
             Self::Muted => Self::Muting,
@@ -508,7 +508,7 @@ impl Sender {
         TransceiverKind::from(&self.caps)
     }
 
-    /// Returns [`MuteState`] of underlying [`MediaTrack`] of this [`Sender`].
+    /// Returns [`MuteState`] of this [`Sender`].
     pub fn mute_state(&self) -> MuteState {
         self.mute_state.get()
     }
@@ -541,17 +541,17 @@ impl Sender {
         Ok(())
     }
 
-    /// Changes [`MuteState`] of this [`Sender`]'s underlying [`MediaTrack`].
+    /// Changes [`MuteState`] of this [`Sender`].
     pub fn change_mute_state(&self, new_state: MuteState) {
         self.mute_state.set(new_state)
     }
 
-    /// Checks that [`Sender`] has a track, and it's unmuted.
+    /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
     fn is_track_enabled(&self) -> bool {
         self.mute_state.get() == MuteState::NotMuted
     }
 
-    /// Resolves when [`MuteState`] of underlying [`MediaTrack`] of this
+    /// Resolves when [`MuteState`] of this
     /// [`Sender`] will become equal to provided [`MuteState`].
     fn on_mute_state(
         &self,
@@ -571,9 +571,9 @@ impl Sender {
         &self,
         state: MuteState,
     ) -> impl Future<Output = Result<()>> {
-        let subscription = self.mute_state.when(move |upd| {
-            upd != &state && upd != &state.proccessing_state()
-        });
+        let subscription = self
+            .mute_state
+            .when(move |upd| upd != &state && upd != &state.processing_state());
         async move {
             subscription.await.map_err(|_| {
                 tracerr::new!(MediaConnectionsError::MuteStateDropped)
@@ -584,7 +584,8 @@ impl Sender {
     /// Resolves with `Ok(())` when underlying [`MuteState`] transits into
     /// requested `is_muted` state.
     ///
-    /// Resolves with `Err(MediaConnectionsError::WrongMuteStateChange)` if
+    /// Resolves with
+    /// `Err(MediaConnectionsError::MuteStateTransitsIntoOppositeState)` if
     /// [`MuteState`] transits into opposite to provided `is_muted` state.
     pub fn when_is_muted_with_cancellation(
         &self,
