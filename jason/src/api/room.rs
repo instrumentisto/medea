@@ -9,7 +9,8 @@ use std::{
 
 use derive_more::Display;
 use futures::{
-    channel::mpsc, future, stream, Future, FutureExt as _, StreamExt as _,
+    channel::mpsc, future, stream, AsyncReadExt, Future, FutureExt as _,
+    StreamExt as _,
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -606,12 +607,26 @@ impl InnerRoom {
                             )
                         })
                         .unzip();
+                    let already_toggling_tracks_subscription: Vec<_> = peer
+                        .get_senders_by_kind_and_mute_state(
+                            kind,
+                            needed_mute_state.proccessing_state(),
+                        )
+                        .into_iter()
+                        .map(|sender| sender.on_mute_state(needed_mute_state))
+                        .collect();
 
-                    rpc.send_command(Command::UpdateTracks {
-                        peer_id: peer.id(),
-                        tracks_patches,
-                    });
-                    future::join_all(sender_mute_state_changed)
+                    if !tracks_patches.is_empty() {
+                        rpc.send_command(Command::UpdateTracks {
+                            peer_id: peer.id(),
+                            tracks_patches,
+                        });
+                    }
+
+                    future::join(
+                        future::join_all(sender_mute_state_changed),
+                        future::join_all(already_toggling_tracks_subscription),
+                    )
                 })
                 .collect();
             future::join_all(peer_mute_state_changed).await;
