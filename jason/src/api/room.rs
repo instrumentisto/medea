@@ -39,6 +39,8 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::peer::MediaConnectionsError;
+use futures::future::{Either, LocalBoxFuture};
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -143,6 +145,9 @@ enum RoomError {
     /// Returned if [`MediaTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
+
+    #[display(fmt = "Some MediaConnectionsError: {}", _0)]
+    MediaConnections(#[js(cause)] MediaConnectionsError),
 }
 
 impl From<RpcClientError> for RoomError {
@@ -168,6 +173,12 @@ impl From<PeerError> for RoomError {
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
             InvalidTrackPatch(id) => Self::FailedTrackPatch(id),
         }
+    }
+}
+
+impl From<MediaConnectionsError> for RoomError {
+    fn from(err: MediaConnectionsError) -> Self {
+        Self::MediaConnections(err)
     }
 }
 
@@ -253,7 +264,9 @@ impl RoomHandle {
             .is_all_peers_in_mute_state(kind, MuteState::from(is_muted))
         {
             let fut = inner.borrow().toggle_mute(is_muted, kind);
-            fut.await;
+            fut.await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                .map_err(|e| JsValue::from(JasonError::from(e)))?;
         }
 
         Ok(())
@@ -574,7 +587,7 @@ impl InnerRoom {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
-    ) -> impl Future<Output = ()> {
+    ) -> impl Future<Output = Result<(), Traced<RoomError>>> {
         let peers = self.peers.get_all();
         let rpc = self.rpc.clone();
         async move {
@@ -582,10 +595,7 @@ impl InnerRoom {
                 .iter()
                 .map(|peer| {
                     let needed_mute_state = MuteState::from(is_muted);
-                    let (tracks_patches, sender_mute_state_changed): (
-                        Vec<_>,
-                        Vec<_>,
-                    ) = peer
+                    let tracks_patches: Vec<_> = peer
                         .get_senders_by_kind_and_mute_state(
                             kind,
                             needed_mute_state.opposite_state(),
@@ -601,20 +611,16 @@ impl InnerRoom {
                                 needed_mute_state.proccessing_state(),
                             );
 
-                            (
-                                track_update,
-                                sender.on_mute_state(needed_mute_state),
-                            )
+                            track_update
                         })
-                        .unzip();
-                    let already_toggling_tracks_subscription: Vec<_> = peer
-                        .get_senders_by_kind_and_mute_state(
-                            kind,
-                            needed_mute_state.proccessing_state(),
-                        )
-                        .into_iter()
-                        .map(|sender| sender.on_mute_state(needed_mute_state))
                         .collect();
+                    let mut track_mute_state_change_subscriptions: Vec<_> =
+                        peer.get_senders(kind)
+                            .into_iter()
+                            .map(|sender| {
+                                sender.on_next_mute_state(needed_mute_state)
+                            })
+                            .collect();
 
                     if !tracks_patches.is_empty() {
                         rpc.send_command(Command::UpdateTracks {
@@ -623,13 +629,16 @@ impl InnerRoom {
                         });
                     }
 
-                    future::join(
-                        future::join_all(sender_mute_state_changed),
-                        future::join_all(already_toggling_tracks_subscription),
-                    )
+                    future::join_all(track_mute_state_change_subscriptions)
                 })
                 .collect();
-            future::join_all(peer_mute_state_changed).await;
+            future::join_all(peer_mute_state_changed)
+                .await
+                .into_iter()
+                .flat_map(|res| res.into_iter())
+                .collect::<Result<Vec<_>, _>>()
+                .map(|_| ())
+                .map_err(tracerr::map_from_and_wrap!())
         }
     }
 

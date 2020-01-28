@@ -922,6 +922,7 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
+        std::thread::sleep_ms(1000);
         if let PeerStateMachine::Stable(peer) =
             self.peers.get_peer_by_id(peer_id).unwrap()
         {

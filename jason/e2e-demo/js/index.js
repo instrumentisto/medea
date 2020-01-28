@@ -334,6 +334,7 @@ window.onload = async function() {
   async function newRoom() {
     jason = new rust.Jason();
     room = await jason.init_room();
+    window.room = room;
 
     try {
       const stream = await getStream(audioSelect, videoSelect);
@@ -438,25 +439,33 @@ window.onload = async function() {
     let isVideoMuted = false;
 
     muteAudio.addEventListener('click', async () => {
-      if (isAudioMuted) {
-        await room.unmute_audio();
-        isAudioMuted = false;
-        muteAudio.textContent = "Mute audio";
-      } else {
-        await room.mute_audio();
-        isAudioMuted = true;
-        muteAudio.textContent = "Unmute audio";
+      try {
+        if (isAudioMuted) {
+          await room.unmute_audio();
+          isAudioMuted = false;
+          muteAudio.textContent = "Mute audio";
+        } else {
+          await room.mute_audio();
+          isAudioMuted = true;
+          muteAudio.textContent = "Unmute audio";
+        }        
+      } catch (e) {
+        console.error(e.message());
       }
     });
     muteVideo.addEventListener('click', async () => {
-      if (isVideoMuted) {
-        await room.unmute_video();
-        isVideoMuted = false;
-        muteVideo.textContent = "Mute video";
-      } else {
-        await room.mute_video();
-        isVideoMuted = true;
-        muteVideo.textContent = "Unmute video";
+      try {
+        if (isVideoMuted) {
+          await room.unmute_video();
+          isVideoMuted = false;
+          muteVideo.textContent = "Mute video";
+        } else {
+          await room.mute_video();
+          isVideoMuted = true;
+          muteVideo.textContent = "Unmute video";
+        }
+      } catch (e) {
+        console.error(e.message());
       }
     });
     closeApp.addEventListener('click', () => {

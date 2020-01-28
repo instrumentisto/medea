@@ -376,6 +376,10 @@ impl PeerConnection {
             .get_senders_by_kind_and_mute_state(kind, mute_state)
     }
 
+    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
+        self.media_connections.get_senders(kind)
+    }
+
     /// Track id to mid relations of all send tracks of this
     /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
     /// directly from registered [`RTCRtpTransceiver`][2]s, and are being

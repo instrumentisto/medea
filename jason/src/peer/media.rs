@@ -27,6 +27,7 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
+use futures::future::Either;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -59,9 +60,13 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// [`MuteState`] of [`MediaTrack`] was dropped.
-    #[display(fmt = "'MuteState' of 'MediaTrack' was dropped.")]
+    /// [`MuteState`] of [`Sender`] was dropped.
+    #[display(fmt = "'MuteState' of 'Sender' was dropped.")]
     MuteStateDropped,
+
+    /// Wrong [`MuteState`] change of [`Sender`].
+    #[display(fmt = "Wrong 'MuteState' change of 'Sender'.")]
+    WrongMuteStateChange,
 }
 
 impl From<Dropped> for MediaConnectionsError {
@@ -123,6 +128,14 @@ impl MediaConnections {
             .borrow()
             .iter_senders_with_kind(kind)
             .filter(|sender| sender.mute_state() == mute_state)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .iter_senders_with_kind(kind)
             .cloned()
             .collect()
     }
@@ -536,7 +549,7 @@ impl Sender {
 
     /// Resolves when [`MuteState`] of underlying [`MediaTrack`] of this
     /// [`Sender`] will become equal to provided [`MuteState`].
-    pub fn on_mute_state(
+    fn on_mute_state(
         &self,
         state: MuteState,
     ) -> impl Future<Output = Result<()>> {
@@ -545,6 +558,42 @@ impl Sender {
             subscription.await.map_err(|_| {
                 tracerr::new!(MediaConnectionsError::MuteStateDropped)
             })
+        }
+    }
+
+    fn on_mute_state_not(
+        &self,
+        state: MuteState,
+    ) -> impl Future<Output = Result<()>> {
+        let subscription = self.mute_state.when(move |upd| {
+            upd != &state && upd != &state.proccessing_state()
+        });
+        async move {
+            subscription.await.map_err(|_| {
+                tracerr::new!(MediaConnectionsError::MuteStateDropped)
+            })
+        }
+    }
+
+    pub fn on_next_mute_state(
+        &self,
+        state: MuteState,
+    ) -> impl Future<Output = Result<()>> {
+        let needed_mute_state_change = self.on_mute_state(state);
+        let wrong_mute_state_change = self.on_mute_state_not(state);
+
+        async move {
+            let res = future::select(
+                Box::pin(needed_mute_state_change),
+                Box::pin(wrong_mute_state_change),
+            )
+            .await;
+            match res {
+                Either::Left(_) => Ok(()),
+                Either::Right(_) => Err(tracerr::new!(
+                    MediaConnectionsError::WrongMuteStateChange
+                )),
+            }
         }
     }
 
