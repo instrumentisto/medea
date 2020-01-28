@@ -924,9 +924,7 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let PeerStateMachine::Stable(peer) =
-            self.peers.get_peer_by_id(peer_id).unwrap()
-        {
+        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
             let member_id = peer.member_id();
             Ok(Box::new(
                 self.members
@@ -940,7 +938,7 @@ impl CommandHandler for Room {
                     .into_actor(self),
             ))
         } else {
-            todo!()
+            Ok(Box::new(future::ok(()).into_actor(self)))
         }
     }
 }
