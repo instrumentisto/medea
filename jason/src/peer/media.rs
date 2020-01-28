@@ -60,13 +60,15 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// [`MuteState`] of [`Sender`] was dropped.
+    /// Occurs when [`MuteState`] of [`Sender`] was dropped.
     #[display(fmt = "'MuteState' of 'Sender' was dropped.")]
     MuteStateDropped,
 
-    /// Wrong [`MuteState`] change of [`Sender`].
-    #[display(fmt = "Wrong 'MuteState' change of 'Sender'.")]
-    WrongMuteStateChange,
+    /// Occurs when [`MuteState`] of [`Sender`] transits into opposite to
+    /// expected [`MuteState`].
+    #[display(fmt = "'MuteState' of 'Sender' transits into opposite to \
+                     expected `MuteState'")]
+    MuteStateTransitsIntoOppositeState,
 }
 
 impl From<Dropped> for MediaConnectionsError {
@@ -132,6 +134,8 @@ impl MediaConnections {
             .collect()
     }
 
+    /// Returns all [`Sender`]s from this [`MediaConnections`] with provided
+    /// [`TransceiverKind`].
     pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
@@ -561,7 +565,9 @@ impl Sender {
         }
     }
 
-    fn on_mute_state_not(
+    /// Resolves when [`MuteState`] transits not into provided [`MuteState`]
+    /// or not into [`MuteState::opposite_state`] of provided [`MuteState`].
+    fn when_mute_state_not(
         &self,
         state: MuteState,
     ) -> impl Future<Output = Result<()>> {
@@ -575,12 +581,18 @@ impl Sender {
         }
     }
 
-    pub fn on_next_mute_state(
+    /// Resolves with `Ok(())` when underlying [`MuteState`] transits into
+    /// requested `is_muted` state.
+    ///
+    /// Resolves with `Err(MediaConnectionsError::WrongMuteStateChange)` if
+    /// [`MuteState`] transits into opposite to provided `is_muted` state.
+    pub fn when_is_muted_with_cancellation(
         &self,
-        state: MuteState,
+        is_muted: bool,
     ) -> impl Future<Output = Result<()>> {
-        let needed_mute_state_change = self.on_mute_state(state);
-        let wrong_mute_state_change = self.on_mute_state_not(state);
+        let expected_state = MuteState::from(is_muted);
+        let needed_mute_state_change = self.on_mute_state(expected_state);
+        let wrong_mute_state_change = self.when_mute_state_not(expected_state);
 
         async move {
             let res = future::select(
@@ -591,7 +603,7 @@ impl Sender {
             match res {
                 Either::Left(_) => Ok(()),
                 Either::Right(_) => Err(tracerr::new!(
-                    MediaConnectionsError::WrongMuteStateChange
+                    MediaConnectionsError::MuteStateTransitsIntoOppositeState
                 )),
             }
         }

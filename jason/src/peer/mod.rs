@@ -376,6 +376,8 @@ impl PeerConnection {
             .get_senders_by_kind_and_mute_state(kind, mute_state)
     }
 
+    /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
+    /// [`TransceiverKind`].
     pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
         self.media_connections.get_senders(kind)
     }

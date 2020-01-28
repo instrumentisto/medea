@@ -9,8 +9,7 @@ use std::{
 
 use derive_more::Display;
 use futures::{
-    channel::mpsc, future, stream, AsyncReadExt, Future, FutureExt as _,
-    StreamExt as _,
+    channel::mpsc, future, stream, Future, FutureExt as _, StreamExt as _,
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -25,8 +24,9 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, MediaStreamHandle, MuteState, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, TransceiverKind,
+        MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -39,8 +39,6 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::peer::MediaConnectionsError;
-use futures::future::{Either, LocalBoxFuture};
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -181,10 +179,6 @@ impl From<MediaConnectionsError> for RoomError {
         Self::MediaConnections(err)
     }
 }
-
-// TODO:
-//  room.mute_audio();
-//  room.mute_audio();
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -614,13 +608,14 @@ impl InnerRoom {
                             track_update
                         })
                         .collect();
-                    let mut track_mute_state_change_subscriptions: Vec<_> =
-                        peer.get_senders(kind)
-                            .into_iter()
-                            .map(|sender| {
-                                sender.on_next_mute_state(needed_mute_state)
-                            })
-                            .collect();
+
+                    let track_mute_state_change_subscriptions: Vec<_> = peer
+                        .get_senders(kind)
+                        .into_iter()
+                        .map(|sender| {
+                            sender.when_is_muted_with_cancellation(is_muted)
+                        })
+                        .collect();
 
                     if !tracks_patches.is_empty() {
                         rpc.send_command(Command::UpdateTracks {
@@ -635,7 +630,7 @@ impl InnerRoom {
             future::join_all(peer_mute_state_changed)
                 .await
                 .into_iter()
-                .flat_map(|res| res.into_iter())
+                .flat_map(IntoIterator::into_iter)
                 .collect::<Result<Vec<_>, _>>()
                 .map(|_| ())
                 .map_err(tracerr::map_from_and_wrap!())

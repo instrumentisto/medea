@@ -334,7 +334,6 @@ window.onload = async function() {
   async function newRoom() {
     jason = new rust.Jason();
     room = await jason.init_room();
-    window.room = room;
 
     try {
       const stream = await getStream(audioSelect, videoSelect);
@@ -448,7 +447,7 @@ window.onload = async function() {
           await room.mute_audio();
           isAudioMuted = true;
           muteAudio.textContent = "Unmute audio";
-        }        
+        }
       } catch (e) {
         console.error(e.message());
       }
