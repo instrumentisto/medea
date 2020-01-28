@@ -228,6 +228,7 @@ pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 /// ```
 ///
 /// [`Cell`]: std::cell::Cell
+#[derive(Debug)]
 pub struct ObservableCell<D>(RefCell<Observable<D>>);
 
 impl<D> ObservableCell<D>
@@ -588,7 +589,9 @@ where
     D: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "ObservableField {{ data: {:?} }}", self.data)
+        f.debug_struct("ObservableField")
+            .field("data", &self.data)
+            .finish()
     }
 }
 

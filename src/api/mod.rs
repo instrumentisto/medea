@@ -46,6 +46,6 @@ pub trait RpcServer: Debug + Send {
 #[cfg(test)]
 impl Debug for MockRpcServer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "MockRpcServer")
+        f.debug_struct("MockRpcServer").finish()
     }
 }
