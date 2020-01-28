@@ -79,7 +79,7 @@ mod room {
             .unwrap()
             .build_request("");
 
-        client.create(create_room.clone());
+        client.create(create_room.clone()).await;
 
         if let Err(err) = client.try_create(create_room).await {
             assert_eq!(err.code, ErrorCode::RoomAlreadyExists as u32)
@@ -116,7 +116,7 @@ mod member {
         const TEST_NAME: &str = "create-member";
 
         let mut client = ControlClient::new().await;
-        client.create(create_room_req(TEST_NAME));
+        client.create(create_room_req(TEST_NAME)).await;
 
         let add_member = MemberBuilder::default()
             .id("test-member")
