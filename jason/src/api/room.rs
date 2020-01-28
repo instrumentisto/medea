@@ -170,6 +170,10 @@ impl From<PeerError> for RoomError {
     }
 }
 
+// TODO:
+//  room.mute_audio();
+//  room.mute_audio();
+
 /// JS side handle to `Room` where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
@@ -573,12 +577,15 @@ impl InnerRoom {
         let peers = self.peers.get_all();
         let rpc = self.rpc.clone();
         async move {
-            let subscriptions: Vec<_> = peers
+            let peer_mute_state_changed: Vec<_> = peers
                 .iter()
                 .map(|peer| {
                     let needed_mute_state = MuteState::from(is_muted);
-                    let (tracks_patches, subscriptions): (Vec<_>, Vec<_>) =
-                        peer.get_senders_by_kind_and_mute_state(
+                    let (tracks_patches, sender_mute_state_changed): (
+                        Vec<_>,
+                        Vec<_>,
+                    ) = peer
+                        .get_senders_by_kind_and_mute_state(
                             kind,
                             needed_mute_state.opposite_state(),
                         )
@@ -592,19 +599,22 @@ impl InnerRoom {
                             sender.change_mute_state(
                                 needed_mute_state.proccessing_state(),
                             );
-                            let fut = sender.on_mute_state(needed_mute_state);
 
-                            (track_update, fut)
+                            (
+                                track_update,
+                                sender.on_mute_state(needed_mute_state),
+                            )
                         })
                         .unzip();
+
                     rpc.send_command(Command::UpdateTracks {
                         peer_id: peer.id(),
                         tracks_patches,
                     });
-                    future::join_all(subscriptions)
+                    future::join_all(sender_mute_state_changed)
                 })
                 .collect();
-            future::join_all(subscriptions).await;
+            future::join_all(peer_mute_state_changed).await;
         }
     }
 
