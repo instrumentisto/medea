@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, future::Either};
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -17,6 +17,7 @@ use wasm_bindgen_test::*;
 use crate::{
     get_test_tracks, resolve_after, wait_and_check_test_result, MockNavigator,
 };
+use medea_jason::peer::{MuteState, TransceiverKind};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -97,6 +98,209 @@ async fn mute_unmute_video() {
     assert!(!peer.is_send_video_enabled());
     assert!(JsFuture::from(handle.unmute_video()).await.is_ok());
     assert!(peer.is_send_video_enabled());
+}
+
+/// Tests that two simultaneous calls of [`RoomHandle::mute_audio`] method will
+/// be resolved normally.
+///
+/// # Algorithm
+///
+/// 1. Create [`Room`] in [`MuteState::NotMuted`].
+///
+/// 2. Call [`RoomHandle::mute_audio`] simultaneous twice.
+///
+/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
+///    is in [`MuteState::Muted`].
+#[wasm_bindgen_test]
+async fn join_two_audio_mutes() {
+    let (room, peer) = get_test_room_and_exist_peer(6);
+    let (audio_track, video_track) = get_test_tracks(false, false);
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    let handle = room.new_handle();
+    let (first, second) = futures::future::join(
+        JsFuture::from(handle.mute_audio()),
+        JsFuture::from(handle.mute_audio()),
+    )
+    .await;
+    first.unwrap();
+    second.unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Audio,
+        MuteState::Muted
+    ));
+}
+
+/// Tests that two simultaneous calls of [`RoomHandle::mute_video`] method will
+/// be resolved normally.
+///
+/// # Algorithm
+///
+/// 1. Create [`Room`] in [`MuteState::NotMuted`].
+///
+/// 2. Call [`RoomHandle::mute_video`] simultaneous twice.
+///
+/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
+///    is in [`MuteState::Muted`].
+#[wasm_bindgen_test]
+async fn join_two_video_mutes() {
+    let (room, peer) = get_test_room_and_exist_peer(6);
+    let (audio_track, video_track) = get_test_tracks(false, false);
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    let handle = room.new_handle();
+    let (first, second) = futures::future::join(
+        JsFuture::from(handle.mute_video()),
+        JsFuture::from(handle.mute_video()),
+    )
+    .await;
+    first.unwrap();
+    second.unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Video,
+        MuteState::Muted
+    ));
+}
+
+/// Tests that two simultaneous calls of [`RoomHandle::mute_audio`] and
+/// [`RoomHandle::unmute_audio`] not goes into an infinite loop. Also,
+/// [`RoomHandle::unmute_audio`] should be dismissed.
+///
+/// # Algorithm
+///
+/// 1. Create [`Room`] in [`MuteState::NotMuted`].
+///
+/// 2. Call [`RoomHandle::mute_audio`] and [`RoomHandle::unmute_audio`]
+///    simultaneous.
+///
+/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
+///    is in [`MuteState::Muted`].
+#[wasm_bindgen_test]
+async fn join_mute_and_unmute_audio() {
+    let (room, peer) = get_test_room_and_exist_peer(5);
+    let (audio_track, video_track) = get_test_tracks(false, false);
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Audio,
+        MuteState::NotMuted
+    ));
+
+    let handle = room.new_handle();
+    let (mute_video_result, unmute_video_result) = futures::future::join(
+        JsFuture::from(handle.mute_audio()),
+        JsFuture::from(handle.unmute_audio()),
+    )
+    .await;
+    mute_video_result.unwrap();
+    unmute_video_result.unwrap_err();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Audio,
+        MuteState::Muted
+    ));
+}
+
+/// Tests that two simultaneous calls of [`RoomHandle::mute_video`] and
+/// [`RoomHandle::unmute_video`] not goes into an infinite loop. Also,
+/// [`RoomHandle::unmute_video`] should be dismissed.
+///
+/// # Algorithm
+///
+/// 1. Create [`Room`] in [`MuteState::NotMuted`].
+///
+/// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
+///    simultaneous.
+///
+/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
+///    is in [`MuteState::Muted`].
+#[wasm_bindgen_test]
+async fn join_mute_and_unmute_video() {
+    let (room, peer) = get_test_room_and_exist_peer(5);
+    let (audio_track, video_track) = get_test_tracks(false, false);
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Video,
+        MuteState::NotMuted
+    ));
+
+    let handle = room.new_handle();
+    let (mute_video_result, unmute_video_result) = futures::future::join(
+        JsFuture::from(handle.mute_video()),
+        JsFuture::from(handle.unmute_video()),
+    )
+    .await;
+    mute_video_result.unwrap();
+    unmute_video_result.unwrap_err();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Video,
+        MuteState::Muted
+    ));
+}
+
+/// Tests that two simultaneous calls of [`RoomHandle::mute_video`] and
+/// [`RoomHandle::unmute_video`] on [`Room`] with video in
+/// [`MuteState::Muted`] not goes into an infinite loop.
+///
+/// # Algorithm
+///
+/// 1. Create [`Room`] video tracks in [`MuteState::Muted`].
+///
+/// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
+///    simultaneous.
+///
+/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
+///    is in [`MuteState::NotMuted`].
+#[wasm_bindgen_test]
+async fn join_unmute_and_mute_audio() {
+    let (room, peer) = get_test_room_and_exist_peer(7);
+    let (audio_track, video_track) = get_test_tracks(false, false);
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Audio,
+        MuteState::NotMuted
+    ));
+
+    let handle = room.new_handle();
+    JsFuture::from(handle.mute_audio()).await.unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Audio,
+        MuteState::Muted
+    ));
+
+    let (mute_audio_result, unmute_audio_result) = futures::future::join(
+        JsFuture::from(handle.mute_audio()),
+        JsFuture::from(handle.unmute_audio()),
+    )
+    .await;
+    mute_audio_result.unwrap();
+    unmute_audio_result.unwrap();
+
+    assert!(peer.is_all_senders_in_mute_state(
+        TransceiverKind::Audio,
+        MuteState::NotMuted
+    ));
 }
 
 fn get_test_room_and_new_peer(
