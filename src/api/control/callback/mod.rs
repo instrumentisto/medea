@@ -4,7 +4,9 @@ pub mod clients;
 pub mod service;
 pub mod url;
 
+use actix::Message;
 use chrono::{DateTime, Utc};
+use clients::CallbackClientError;
 use derive_more::From;
 use medea_control_api_proto::grpc::medea_callback::{
     on_leave::Reason as OnLeaveReasonProto,
@@ -96,7 +98,8 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 ///
 /// [`CallbackClient::send`]:
 /// crate::api::control::callback::clients::CallbackClient::send
-#[derive(Debug)]
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), CallbackClientError>")]
 pub struct CallbackRequest {
     /// FID (Full ID) of element with which event was occurred.
     fid: StatefulFid,

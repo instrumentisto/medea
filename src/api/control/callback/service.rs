@@ -2,7 +2,7 @@
 
 use std::{collections::hash_map::HashMap, fmt::Debug, sync::Arc};
 
-use actix::Arbiter;
+use actix::{Arbiter, Recipient};
 use parking_lot::RwLock;
 
 use crate::{
@@ -13,10 +13,11 @@ use crate::{
     log::prelude::*,
 };
 
-use super::{
-    clients::{build_client, CallbackClient},
-    CallbackRequest,
+use super::{clients::build_client, CallbackRequest};
+use crate::api::control::callback::clients::{
+    CallbackClient, CallbackClientError,
 };
+use futures::{future::BoxFuture, Future};
 
 /// Service which stores and lazily creates [`CallbackRequest`] clients.
 #[derive(Clone, Debug, Default)]
@@ -28,6 +29,30 @@ pub struct CallbackService(
 );
 
 impl CallbackService {
+    async fn send_request(
+        &self,
+        request: CallbackRequest,
+        callback_url: CallbackUrl,
+    ) -> Result<(), CallbackClientError> {
+        info!(
+            "Sending CallbackRequest [{:?}] to [{}]",
+            request, callback_url
+        );
+
+        let read_lock = self.0.read();
+        if let Some(client) = read_lock.get(&callback_url) {
+            client.send(request).await?;
+        } else {
+            drop(read_lock);
+
+            let mut new_client = build_client(&callback_url).await?;
+            let send = new_client.send(request).await?;
+            self.0.write().insert(callback_url, Box::new(new_client));
+        };
+
+        Ok(())
+    }
+
     /// Asynchronously sends [`CallbackEvent`] for provided [`StatefulFid`] to
     /// [`CallbackClient`].
     ///
@@ -40,24 +65,11 @@ impl CallbackService {
         fid: StatefulFid,
         event: T,
     ) {
-        let inner = self.0.clone();
+        let this = self.clone();
         Arbiter::spawn(async move {
             let req = CallbackRequest::new(fid, event.into());
-            info!("Sending CallbackRequest [{:?}] to [{}]", req, callback_url);
 
-            let mut read_lock = inner.write();
-            let send_request =
-                if let Some(client) = read_lock.get_mut(&callback_url) {
-                    client.send(req).await
-                } else {
-                    drop(read_lock);
-                    let mut new_client = build_client(&callback_url).await;
-                    let send = new_client.send(req).await;
-                    inner.write().insert(callback_url, Box::new(new_client));
-                    send
-                };
-
-            if let Err(e) = send_request {
+            if let Err(e) = this.send_request(req, callback_url).await {
                 error!("Failed to send callback because {:?}.", e);
             }
         })
