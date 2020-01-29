@@ -2,22 +2,22 @@
 
 use std::{collections::hash_map::HashMap, fmt::Debug, sync::Arc};
 
-use actix::{Arbiter, Recipient};
+use actix::Arbiter;
 use parking_lot::RwLock;
 
 use crate::{
     api::control::{
-        callback::{url::CallbackUrl, CallbackEvent},
+        callback::{
+            clients::{CallbackClient, CallbackClientError},
+            url::CallbackUrl,
+            CallbackEvent,
+        },
         refs::StatefulFid,
     },
     log::prelude::*,
 };
 
 use super::{clients::build_client, CallbackRequest};
-use crate::api::control::callback::clients::{
-    CallbackClient, CallbackClientError,
-};
-use futures::{future::BoxFuture, Future};
 
 /// Service which stores and lazily creates [`CallbackRequest`] clients.
 #[derive(Clone, Debug, Default)]
@@ -45,8 +45,8 @@ impl CallbackService {
         } else {
             drop(read_lock);
 
-            let mut new_client = build_client(&callback_url).await?;
-            let send = new_client.send(request).await?;
+            let new_client = build_client(&callback_url).await?;
+            new_client.send(request).await?;
             self.0.write().insert(callback_url, Box::new(new_client));
         };
 

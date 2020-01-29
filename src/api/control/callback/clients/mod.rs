@@ -4,15 +4,14 @@ pub mod grpc;
 
 use std::fmt::Debug;
 
+use actix::Actor;
 use derive_more::From;
-use futures::future::{BoxFuture, LocalBoxFuture};
+use futures::future::LocalBoxFuture;
 
 use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},
     log::prelude::*,
 };
-use actix::{Actor, Addr, Recipient};
-use std::sync::Arc;
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
 #[derive(Debug, From)]

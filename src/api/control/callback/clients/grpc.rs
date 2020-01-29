@@ -1,25 +1,20 @@
 //! Implementation of gRPC client for sending [`CallbackRequest`]s.
 
-use std::{fmt, sync::Arc};
+use std::{cell::RefCell, fmt, rc::Rc};
 
-use futures::future::{BoxFuture, FutureExt as _, LocalBoxFuture};
+use futures::future::LocalBoxFuture;
 #[rustfmt::skip]
 use medea_control_api_proto::grpc::medea_callback::{
     callback_client::CallbackClient as ProtoCallbackClient
 };
-use futures::{Future, TryFutureExt};
+use actix::{Actor, ActorFuture, Addr, Context, Handler, WrapFuture};
+use tonic::transport::Channel;
 
 use crate::api::control::callback::{
     clients::{CallbackClient, CallbackClientError},
     url::GrpcCallbackUrl,
     CallbackRequest,
 };
-use actix::{Actor, ActorFuture, Addr, Context, Handler, WrapFuture};
-use actix_web::dev::Service;
-use failure::_core::pin::Pin;
-use parking_lot::Mutex;
-use std::{cell::RefCell, rc::Rc};
-use tonic::transport::Channel;
 
 /// gRPC client for sending [`CallbackRequest`]s.
 pub struct GrpcCallbackClient {
@@ -50,7 +45,7 @@ impl Handler<CallbackRequest> for GrpcCallbackClient {
     fn handle(
         &mut self,
         msg: CallbackRequest,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let client = Rc::clone(&self.client);
         Box::new(
