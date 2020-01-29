@@ -5,8 +5,7 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
-use medea_control_api_proto::grpc::medea as medea_grpc_control_api;
-use medea_grpc_control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
+use medea_control_api_proto::grpc::medea as proto;
 use serde::Deserialize;
 
 use crate::api::control::{refs::SrcUri, TryFromProtobufError};
@@ -28,10 +27,12 @@ pub struct WebRtcPlayEndpoint {
     pub force_relay: bool,
 }
 
-impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
+impl TryFrom<&proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
     type Error = TryFromProtobufError;
 
-    fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: &proto::WebRtcPlayEndpoint,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             src: SrcUri::try_from(value.src.clone())?,
             force_relay: value.force_relay,

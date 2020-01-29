@@ -12,11 +12,7 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
-use medea_control_api_proto::grpc::medea::{
-    element::El as RootElProto,
-    room::{element::El as RoomElProto, Element as ElementProto},
-    Element as RootElementProto, Member as MemberProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 
 use crate::{
     api::control::{
@@ -510,8 +506,8 @@ pub fn parse_members(
     Ok(members)
 }
 
-impl Into<MemberProto> for Member {
-    fn into(self) -> MemberProto {
+impl Into<proto::Member> for Member {
+    fn into(self) -> proto::Member {
         let member_pipeline = self
             .sinks()
             .into_iter()
@@ -522,7 +518,8 @@ impl Into<MemberProto> for Member {
                     .map(|(id, publish)| (id.to_string(), publish.into())),
             )
             .collect();
-        MemberProto {
+
+        proto::Member {
             id: self.id().to_string(),
             credentials: self.credentials(),
             on_leave: self
@@ -538,18 +535,18 @@ impl Into<MemberProto> for Member {
     }
 }
 
-impl Into<ElementProto> for Member {
-    fn into(self) -> ElementProto {
-        ElementProto {
-            el: Some(RoomElProto::Member(self.into())),
+impl Into<proto::room::Element> for Member {
+    fn into(self) -> proto::room::Element {
+        proto::room::Element {
+            el: Some(proto::room::element::El::Member(self.into())),
         }
     }
 }
 
-impl Into<RootElementProto> for Member {
-    fn into(self) -> RootElementProto {
-        RootElementProto {
-            el: Some(RootElProto::Member(self.into())),
+impl Into<proto::Element> for Member {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::Member(self.into())),
         }
     }
 }

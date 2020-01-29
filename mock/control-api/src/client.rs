@@ -3,11 +3,8 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use medea_control_api_proto::grpc::medea::{
-    control_api_client::ControlApiClient,
-    create_request::El as CreateRequestElProto, CreateRequest, CreateResponse,
-    GetResponse, IdRequest, Response,
-};
+use medea_control_api_proto::grpc::medea as proto;
+use proto::control_api_client::ControlApiClient;
 use tonic::{transport::Channel, Status};
 
 use crate::api::Element;
@@ -46,9 +43,9 @@ impl Into<String> for Fid {
     }
 }
 
-/// Returns new [`IdRequest`] with provided FIDs.
-fn id_request(ids: Vec<String>) -> IdRequest {
-    IdRequest { fid: ids }
+/// Returns new [`proto::IdRequest`] with provided FIDs.
+fn id_request(ids: Vec<String>) -> proto::IdRequest {
+    proto::IdRequest { fid: ids }
 }
 
 /// Client for [Medea]'s [Control API].
@@ -95,22 +92,19 @@ impl ControlClient {
         id: String,
         fid: Fid,
         element: Element,
-    ) -> Result<CreateResponse, Status> {
+    ) -> Result<proto::CreateResponse, Status> {
+        use proto::create_request::El::*;
         let el = match element {
-            Element::Room(room) => {
-                CreateRequestElProto::Room(room.into_proto(id))
-            }
-            Element::Member(member) => {
-                CreateRequestElProto::Member(member.into_proto(id))
-            }
+            Element::Room(room) => Room(room.into_proto(id)),
+            Element::Member(member) => Member(member.into_proto(id)),
             Element::WebRtcPlayEndpoint(webrtc_play) => {
-                CreateRequestElProto::WebrtcPlay(webrtc_play.into_proto(id))
+                WebrtcPlay(webrtc_play.into_proto(id))
             }
             Element::WebRtcPublishEndpoint(webrtc_pub) => {
-                CreateRequestElProto::WebrtcPub(webrtc_pub.into_proto(id))
+                WebrtcPub(webrtc_pub.into_proto(id))
             }
         };
-        let req = CreateRequest {
+        let req = proto::CreateRequest {
             parent_fid: fid.into(),
             el: Some(el),
         };
@@ -125,7 +119,10 @@ impl ControlClient {
     }
 
     /// Gets element from Control API by FID.
-    pub async fn get(&mut self, fid: Fid) -> Result<GetResponse, Status> {
+    pub async fn get(
+        &mut self,
+        fid: Fid,
+    ) -> Result<proto::GetResponse, Status> {
         let req = id_request(vec![fid.into()]);
 
         self.get_client()
@@ -136,7 +133,10 @@ impl ControlClient {
     }
 
     /// Deletes element from Control API by FID.
-    pub async fn delete(&mut self, fid: Fid) -> Result<Response, Status> {
+    pub async fn delete(
+        &mut self,
+        fid: Fid,
+    ) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.into()]);
 
         self.get_client()

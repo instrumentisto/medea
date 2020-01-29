@@ -16,13 +16,7 @@ use actix_web::{
     App, HttpResponse, HttpServer,
 };
 use clap::ArgMatches;
-use medea_control_api_proto::grpc::medea::{
-    element::El as ElementOneOf,
-    room::{element::El as RoomElementOneOf, Element as RoomElementProto},
-    CreateResponse as CreateResponseProto, Element as ElementProto,
-    Error as ErrorProto, GetResponse as GetResponseProto,
-    Response as ResponseProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -240,7 +234,7 @@ pub struct ErrorResponse {
     pub element: String,
 }
 
-impl Into<ErrorResponse> for ErrorProto {
+impl Into<ErrorResponse> for proto::Error {
     fn into(self) -> ErrorResponse {
         ErrorResponse {
             code: self.code,
@@ -304,16 +298,16 @@ impl_into_http_response!(CreateResponse);
 impl_into_http_response!(Response);
 impl_into_http_response!(SingleGetResponse);
 
-impl From<ResponseProto> for Response {
-    fn from(resp: ResponseProto) -> Self {
+impl From<proto::Response> for Response {
+    fn from(resp: proto::Response) -> Self {
         Self {
             error: resp.error.map(|e| e.into()),
         }
     }
 }
 
-impl From<CreateResponseProto> for CreateResponse {
-    fn from(resp: CreateResponseProto) -> Self {
+impl From<proto::CreateResponse> for CreateResponse {
+    fn from(resp: proto::CreateResponse) -> Self {
         if let Some(error) = resp.error {
             Self {
                 sids: None,
@@ -342,34 +336,40 @@ pub enum Element {
 
 impl Element {
     #[must_use]
-    pub fn into_proto(self, id: String) -> RoomElementProto {
+    pub fn into_proto(self, id: String) -> proto::room::Element {
         let el = match self {
-            Self::Member(m) => RoomElementOneOf::Member(m.into_proto(id)),
+            Self::Member(m) => {
+                proto::room::element::El::Member(m.into_proto(id))
+            }
             _ => unimplemented!(),
         };
-        RoomElementProto { el: Some(el) }
+        proto::room::Element { el: Some(el) }
     }
 }
 
-impl From<ElementProto> for Element {
-    fn from(proto: ElementProto) -> Self {
+impl From<proto::Element> for Element {
+    fn from(proto: proto::Element) -> Self {
+        use proto::element::El::*;
+
         match proto.el.unwrap() {
-            ElementOneOf::Room(room) => Self::Room(room.into()),
-            ElementOneOf::Member(member) => Self::Member(member.into()),
-            ElementOneOf::WebrtcPub(webrtc_pub) => {
+            Room(room) => Self::Room(room.into()),
+            Member(member) => Self::Member(member.into()),
+            WebrtcPub(webrtc_pub) => {
                 Self::WebRtcPublishEndpoint(webrtc_pub.into())
             }
-            ElementOneOf::WebrtcPlay(webrtc_play) => {
+            WebrtcPlay(webrtc_play) => {
                 Self::WebRtcPlayEndpoint(webrtc_play.into())
             }
         }
     }
 }
 
-impl From<RoomElementProto> for Element {
-    fn from(proto: RoomElementProto) -> Self {
+impl From<proto::room::Element> for Element {
+    fn from(proto: proto::room::Element) -> Self {
         match proto.el.unwrap() {
-            RoomElementOneOf::Member(member) => Self::Member(member.into()),
+            proto::room::element::El::Member(member) => {
+                Self::Member(member.into())
+            }
             _ => unimplemented!(
                 "Currently Control API mock server supports only Member \
                  element in Room pipeline."
@@ -393,8 +393,8 @@ pub struct SingleGetResponse {
     pub error: Option<ErrorResponse>,
 }
 
-impl From<GetResponseProto> for SingleGetResponse {
-    fn from(proto: GetResponseProto) -> Self {
+impl From<proto::GetResponse> for SingleGetResponse {
+    fn from(proto: proto::GetResponse) -> Self {
         if let Some(error) = proto.error {
             Self {
                 element: None,

@@ -6,11 +6,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 use medea::api::control::error_codes::ErrorCode;
-use medea_control_api_proto::grpc::medea::{
-    element::El as RootEl, member::element::El as MemberEl,
-    room::element::El as RoomEl,
-    web_rtc_publish_endpoint::P2p as WebRtcPublishEndpoint_P2P,
-};
+use medea_control_api_proto::grpc::medea as proto;
 
 use super::{
     create_room_req, ControlClient, MemberBuilder, RoomBuilder,
@@ -19,7 +15,6 @@ use super::{
 
 mod room {
     use super::*;
-    use crate::grpc_control_api::Elem;
 
     #[actix_rt::test]
     async fn room() {
@@ -36,12 +31,12 @@ mod room {
             &format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME)
         );
 
-        let mut get_resp = client.get(TEST_NAME).await;
+        let get_resp = client.get(TEST_NAME).await;
         let mut room = get_resp.take_room();
 
         let responder = room.pipeline.remove("responder").unwrap();
         let responder = match responder.el.unwrap() {
-            RoomEl::Member(member) => member,
+            proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
         assert_eq!(responder.credentials.as_str(), "test");
@@ -49,7 +44,7 @@ mod room {
         assert_eq!(responder_pipeline.len(), 1);
         let responder_play = responder_pipeline.remove("play").unwrap();
         let responder_play = match responder_play.el.unwrap() {
-            MemberEl::WebrtcPlay(play) => play,
+            proto::member::element::El::WebrtcPlay(play) => play,
             _ => panic!(),
         };
         assert_eq!(
@@ -59,7 +54,7 @@ mod room {
 
         let publisher = room.pipeline.remove("publisher").unwrap();
         let publisher = match publisher.el.unwrap() {
-            RoomEl::Member(member) => member,
+            proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
         assert_ne!(publisher.credentials.as_str(), "test");
@@ -199,7 +194,7 @@ mod member {
     async fn element_id_mismatch() {
         let mut client = ControlClient::new().await;
 
-        let mut create_member = MemberBuilder::default()
+        let create_member = MemberBuilder::default()
             .id("asd")
             .build()
             .unwrap()
@@ -226,7 +221,7 @@ mod endpoint {
 
         let create_req = WebRtcPublishEndpointBuilder::default()
             .id("publish")
-            .p2p_mode(WebRtcPublishEndpoint_P2P::Never)
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Never)
             .build()
             .unwrap()
             .build_request(format!("{}/responder", TEST_NAME));
@@ -238,7 +233,10 @@ mod endpoint {
             .get(&format!("{}/responder/publish", TEST_NAME))
             .await
             .take_webrtc_pub();
-        assert_eq!(endpoint.p2p, WebRtcPublishEndpoint_P2P::Never as i32);
+        assert_eq!(
+            endpoint.p2p,
+            proto::web_rtc_publish_endpoint::P2p::Never as i32
+        );
     }
 
     #[actix_rt::test]
@@ -257,7 +255,7 @@ mod endpoint {
 
         let create_play = WebRtcPublishEndpointBuilder::default()
             .id("publish")
-            .p2p_mode(WebRtcPublishEndpoint_P2P::Always)
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
             .build()
             .unwrap()
             .build_request(format!("{}/member", TEST_NAME));
@@ -277,7 +275,7 @@ mod endpoint {
 
         let create_publish = WebRtcPublishEndpointBuilder::default()
             .id("publish")
-            .p2p_mode(WebRtcPublishEndpoint_P2P::Always)
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
             .build()
             .unwrap()
             .build_request(format!("{}/member", TEST_NAME));
@@ -306,7 +304,7 @@ mod endpoint {
 
         let create_endpoint = WebRtcPublishEndpointBuilder::default()
             .id("publish")
-            .p2p_mode(WebRtcPublishEndpoint_P2P::Always)
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
             .build()
             .unwrap()
             .build_request(format!("{}/member", TEST_NAME));
@@ -356,7 +354,7 @@ mod endpoint {
 
         let create_endpoint = WebRtcPublishEndpointBuilder::default()
             .id("asd")
-            .p2p_mode(WebRtcPublishEndpoint_P2P::Always)
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
             .build()
             .unwrap()
             .build_request("qwe");

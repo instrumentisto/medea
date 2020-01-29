@@ -8,12 +8,8 @@ pub mod webrtc_publish_endpoint;
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
+use medea_control_api_proto::grpc::medea as proto;
 use serde::Deserialize;
-
-use medea_control_api_proto::grpc::medea::{
-    create_request::El as ElementProto,
-    member::element::El as MemberElementProto,
-};
 
 use super::{member::MemberElement, TryFromProtobufError};
 
@@ -70,13 +66,14 @@ impl Into<MemberElement> for EndpointSpec {
     }
 }
 
-impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
+impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
     type Error = TryFromProtobufError;
 
     fn try_from(
-        (_, proto): (Id, MemberElementProto),
+        (_, proto): (Id, proto::member::element::El),
     ) -> Result<Self, Self::Error> {
-        use MemberElementProto::*;
+        use proto::member::element::El::*;
+
         match proto {
             WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
@@ -90,11 +87,13 @@ impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
     }
 }
 
-impl TryFrom<(Id, ElementProto)> for EndpointSpec {
+impl TryFrom<(Id, proto::create_request::El)> for EndpointSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from((id, proto): (Id, ElementProto)) -> Result<Self, Self::Error> {
-        use ElementProto::*;
+    fn try_from(
+        (id, proto): (Id, proto::create_request::El),
+    ) -> Result<Self, Self::Error> {
+        use proto::create_request::El::*;
         match proto {
             WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;

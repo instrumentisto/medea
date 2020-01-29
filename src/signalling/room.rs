@@ -15,9 +15,7 @@ use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
-use medea_control_api_proto::grpc::medea::{
-    element::El as RootElProto, Element as ElementProto, Room as RoomProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 
 use crate::{
     api::{
@@ -927,25 +925,25 @@ impl Actor for Room {
     }
 }
 
-impl Into<RoomProto> for &mut Room {
-    fn into(self) -> RoomProto {
+impl Into<proto::Room> for &mut Room {
+    fn into(self) -> proto::Room {
         let pipeline = self
             .members
             .members()
             .into_iter()
             .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
-        RoomProto {
+        proto::Room {
             id: self.id().to_string(),
             pipeline,
         }
     }
 }
 
-impl Into<ElementProto> for &mut Room {
-    fn into(self) -> ElementProto {
-        ElementProto {
-            el: Some(RootElProto::Room(self.into())),
+impl Into<proto::Element> for &mut Room {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::Room(self.into())),
         }
     }
 }
@@ -958,23 +956,24 @@ impl Into<ElementProto> for &mut Room {
 /// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.
 #[derive(Message)]
-#[rtype(result = "Result<HashMap<StatefulFid, ElementProto>, RoomError>")]
+#[rtype(result = "Result<HashMap<StatefulFid, proto::Element>, RoomError>")]
 pub struct SerializeProto(pub Vec<StatefulFid>);
 
 impl Handler<SerializeProto> for Room {
-    type Result = Result<HashMap<StatefulFid, ElementProto>, RoomError>;
+    type Result = Result<HashMap<StatefulFid, proto::Element>, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeProto,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let mut serialized: HashMap<StatefulFid, ElementProto> = HashMap::new();
+        let mut serialized: HashMap<StatefulFid, proto::Element> =
+            HashMap::new();
         for fid in msg.0 {
             match &fid {
                 StatefulFid::Room(room_fid) => {
                     if room_fid.room_id() == &self.id {
-                        let current_room: ElementProto = self.into();
+                        let current_room: proto::Element = self.into();
                         serialized.insert(fid, current_room);
                     } else {
                         return Err(RoomError::WrongRoomId(

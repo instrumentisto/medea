@@ -5,10 +5,7 @@
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::medea::{
-    web_rtc_publish_endpoint::P2p as WebRtcPublishEndpointP2pProto,
-    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(
@@ -29,22 +26,26 @@ pub enum P2pMode {
     IfPossible,
 }
 
-impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
-    fn from(value: WebRtcPublishEndpointP2pProto) -> Self {
+impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
+    fn from(value: proto::web_rtc_publish_endpoint::P2p) -> Self {
+        use proto::web_rtc_publish_endpoint::P2p::*;
+
         match value {
-            WebRtcPublishEndpointP2pProto::Always => Self::Always,
-            WebRtcPublishEndpointP2pProto::IfPossible => Self::IfPossible,
-            WebRtcPublishEndpointP2pProto::Never => Self::Never,
+            Always => Self::Always,
+            IfPossible => Self::IfPossible,
+            Never => Self::Never,
         }
     }
 }
 
-impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
-    fn into(self) -> WebRtcPublishEndpointP2pProto {
+impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
+    fn into(self) -> proto::web_rtc_publish_endpoint::P2p {
+        use proto::web_rtc_publish_endpoint::P2p::*;
+
         match self {
-            Self::Always => WebRtcPublishEndpointP2pProto::Always,
-            Self::IfPossible => WebRtcPublishEndpointP2pProto::IfPossible,
-            Self::Never => WebRtcPublishEndpointP2pProto::Never,
+            Self::Always => Always,
+            Self::IfPossible => IfPossible,
+            Self::Never => Never,
         }
     }
 }
@@ -61,11 +62,11 @@ pub struct WebRtcPublishEndpoint {
     pub force_relay: bool,
 }
 
-impl From<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    fn from(value: &WebRtcPublishEndpointProto) -> Self {
+impl From<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
+    fn from(value: &proto::WebRtcPublishEndpoint) -> Self {
         Self {
             p2p: P2pMode::from(
-                WebRtcPublishEndpointP2pProto::from_i32(value.p2p)
+                proto::web_rtc_publish_endpoint::P2p::from_i32(value.p2p)
                     .unwrap_or_default(),
             ),
             force_relay: value.force_relay,

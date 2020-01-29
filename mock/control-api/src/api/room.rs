@@ -2,10 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::medea::{
-    room::{element::El as RoomElementOneOfEl, Element as RoomElementProto},
-    Room as RoomProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 use serde::{Deserialize, Serialize};
 
 use super::member::Member;
@@ -24,16 +21,16 @@ pub struct Room {
 }
 
 impl Room {
-    /// Converts [`Room`] into protobuf [`RoomProto`].
+    /// Converts [`Room`] into protobuf [`proto::Room`].
     #[must_use]
-    pub fn into_proto(self, id: String) -> RoomProto {
+    pub fn into_proto(self, id: String) -> proto::Room {
         let room_elements = self
             .pipeline
             .into_iter()
             .map(|(id, member)| (id.clone(), member.into_proto(id)))
             .collect();
 
-        RoomProto {
+        proto::Room {
             id,
             pipeline: room_elements,
         }
@@ -49,26 +46,30 @@ pub enum RoomElement {
 
 impl RoomElement {
     #[must_use]
-    pub fn into_proto(self, id: String) -> RoomElementProto {
+    pub fn into_proto(self, id: String) -> proto::room::Element {
         let el = match self {
-            Self::Member(m) => RoomElementOneOfEl::Member(m.into_proto(id)),
+            Self::Member(m) => {
+                proto::room::element::El::Member(m.into_proto(id))
+            }
         };
 
-        RoomElementProto { el: Some(el) }
+        proto::room::Element { el: Some(el) }
     }
 }
 
-impl From<RoomElementProto> for RoomElement {
-    fn from(proto: RoomElementProto) -> Self {
+impl From<proto::room::Element> for RoomElement {
+    fn from(proto: proto::room::Element) -> Self {
         match proto.el.unwrap() {
-            RoomElementOneOfEl::Member(member) => Self::Member(member.into()),
+            proto::room::element::El::Member(member) => {
+                Self::Member(member.into())
+            }
             _ => unimplemented!(),
         }
     }
 }
 
-impl From<RoomProto> for Room {
-    fn from(proto: RoomProto) -> Self {
+impl From<proto::Room> for Room {
+    fn from(proto: proto::Room) -> Self {
         let pipeline = proto
             .pipeline
             .into_iter()

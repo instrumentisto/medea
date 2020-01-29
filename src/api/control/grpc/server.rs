@@ -11,14 +11,13 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
-use medea_control_api_proto::grpc::medea::{
-    control_api_server::{
+use medea_control_api_proto::grpc::{
+    medea as proto,
+    medea::control_api_server::{
         ControlApi, ControlApiServer as TonicControlApiServer,
     },
-    create_request::El as CreateRequestOneof,
-    CreateRequest, CreateResponse, Element, GetResponse, IdRequest, Response,
 };
-use tonic::transport::Server;
+use tonic::{transport::Server, Status};
 
 use crate::{
     api::control::{
@@ -40,7 +39,6 @@ use crate::{
     },
     AppContext,
 };
-use tonic::Status;
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -132,10 +130,10 @@ impl ControlApiService {
         .boxed()
     }
 
-    /// Creates element based on provided [`CreateRequest`].
+    /// Creates element based on provided [`proto::CreateRequest`].
     pub fn create_element(
         &self,
-        req: CreateRequest,
+        req: proto::CreateRequest,
     ) -> BoxFuture<'static, Result<Sids, ErrorResponse>> {
         let unparsed_parent_fid = req.parent_fid;
         let elem = if let Some(elem) = req.el {
@@ -164,7 +162,7 @@ impl ControlApiService {
 
         match parent_fid {
             StatefulFid::Room(parent_fid) => match elem {
-                CreateRequestOneof::Member(member) => {
+                proto::create_request::El::Member(member) => {
                     let id: MemberId = member.id.clone().into();
                     match MemberSpec::try_from(member)
                         .map_err(ErrorResponse::from)
@@ -184,12 +182,12 @@ impl ControlApiService {
             },
             StatefulFid::Member(parent_fid) => {
                 let (endpoint, id) = match elem {
-                    CreateRequestOneof::WebrtcPlay(play) => (
+                    proto::create_request::El::WebrtcPlay(play) => (
                         WebRtcPlayEndpoint::try_from(&play)
                             .map(EndpointSpec::from),
                         play.id.into(),
                     ),
-                    CreateRequestOneof::WebrtcPub(publish) => (
+                    proto::create_request::El::WebrtcPub(publish) => (
                         Ok(WebRtcPublishEndpoint::from(&publish))
                             .map(EndpointSpec::from),
                         publish.id.into(),
@@ -218,10 +216,10 @@ impl ControlApiService {
         }
     }
 
-    /// Deletes element by [`IdRequest`].
+    /// Deletes element by [`proto::IdRequest`].
     pub fn delete_element(
         &self,
-        req: IdRequest,
+        req: proto::IdRequest,
     ) -> BoxFuture<'static, Result<(), ErrorResponse>> {
         let room_service = self.room_service.clone();
         async move {
@@ -243,12 +241,15 @@ impl ControlApiService {
         .boxed()
     }
 
-    /// Returns requested by [`IdRequest`] [`Element`]s serialized to protobuf.
+    /// Returns requested by [`proto::IdRequest`] [`proto::Element`]s serialized
+    /// to protobuf.
     pub fn get_element(
         &self,
-        req: IdRequest,
-    ) -> BoxFuture<'static, Result<HashMap<String, Element>, ErrorResponse>>
-    {
+        req: proto::IdRequest,
+    ) -> BoxFuture<
+        'static,
+        Result<HashMap<String, proto::Element>, ErrorResponse>,
+    > {
         let room_service = self.room_service.clone();
         async move {
             let mut fids = Vec::new();
@@ -277,13 +278,13 @@ impl ControlApiService {
 impl ControlApi for ControlApiService {
     async fn create(
         &self,
-        request: tonic::Request<CreateRequest>,
-    ) -> Result<tonic::Response<CreateResponse>, Status> {
+        request: tonic::Request<proto::CreateRequest>,
+    ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
         debug!("Create Request: {:?}", request);
         let create_response =
             match self.create_element(request.into_inner()).await {
-                Ok(sid) => CreateResponse { sid, error: None },
-                Err(err) => CreateResponse {
+                Ok(sid) => proto::CreateResponse { sid, error: None },
+                Err(err) => proto::CreateResponse {
                     sid: HashMap::new(),
                     error: Some(err.into()),
                 },
@@ -294,11 +295,11 @@ impl ControlApi for ControlApiService {
 
     async fn delete(
         &self,
-        request: tonic::Request<IdRequest>,
-    ) -> Result<tonic::Response<Response>, Status> {
+        request: tonic::Request<proto::IdRequest>,
+    ) -> Result<tonic::Response<proto::Response>, Status> {
         let response = match self.delete_element(request.into_inner()).await {
-            Ok(_) => Response { error: None },
-            Err(e) => Response {
+            Ok(_) => proto::Response { error: None },
+            Err(e) => proto::Response {
                 error: Some(e.into()),
             },
         };
@@ -308,14 +309,14 @@ impl ControlApi for ControlApiService {
 
     async fn get(
         &self,
-        request: tonic::Request<IdRequest>,
-    ) -> Result<tonic::Response<GetResponse>, Status> {
+        request: tonic::Request<proto::IdRequest>,
+    ) -> Result<tonic::Response<proto::GetResponse>, Status> {
         let response = match self.get_element(request.into_inner()).await {
-            Ok(elements) => GetResponse {
+            Ok(elements) => proto::GetResponse {
                 elements,
                 error: None,
             },
-            Err(e) => GetResponse {
+            Err(e) => proto::GetResponse {
                 elements: HashMap::new(),
                 error: Some(e.into()),
             },

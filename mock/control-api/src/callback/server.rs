@@ -7,10 +7,10 @@ use std::sync::{Arc, Mutex};
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use clap::ArgMatches;
 use medea_control_api_proto::grpc::medea_callback::{
+    self as proto,
     callback_server::{
         Callback as CallbackService, CallbackServer as TonicCallbackServer,
     },
-    Request, Response,
 };
 use tonic::transport::Server;
 
@@ -54,15 +54,15 @@ impl GrpcCallbackService {
 impl CallbackService for GrpcCallbackService {
     async fn on_event(
         &self,
-        request: tonic::Request<Request>,
-    ) -> Result<tonic::Response<Response>, tonic::Status> {
+        request: tonic::Request<proto::Request>,
+    ) -> Result<tonic::Response<proto::Response>, tonic::Status> {
         info!("Callback request received: [{:?}]", request);
         self.events
             .lock()
             .unwrap()
             .push(request.into_inner().into());
 
-        Ok(tonic::Response::new(Response {}))
+        Ok(tonic::Response::new(proto::Response {}))
     }
 }
 

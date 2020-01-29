@@ -5,10 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_control_api_proto::grpc::medea::{
-    create_request::El as ElementProto, room::element::El as RoomElementProto,
-    Member as MemberProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
@@ -145,10 +142,10 @@ fn generate_member_credentials() -> String {
         .collect()
 }
 
-impl TryFrom<MemberProto> for MemberSpec {
+impl TryFrom<proto::Member> for MemberSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(member: MemberProto) -> Result<Self, Self::Error> {
+    fn try_from(member: proto::Member) -> Result<Self, Self::Error> {
         let mut pipeline = HashMap::new();
         for (id, member_element) in member.pipeline {
             if let Some(elem) = member_element.el {
@@ -192,15 +189,17 @@ impl TryFrom<MemberProto> for MemberSpec {
 }
 
 macro_rules! impl_try_from_proto_for_member {
-    ($proto:tt) => {
+    ($proto:path) => {
         impl TryFrom<(Id, $proto)> for MemberSpec {
             type Error = TryFromProtobufError;
 
             fn try_from(
                 (id, proto): (Id, $proto),
             ) -> Result<Self, Self::Error> {
+                use $proto as proto_el;
+
                 match proto {
-                    $proto::Member(member) => Self::try_from(member),
+                    proto_el::Member(member) => Self::try_from(member),
                     _ => Err(TryFromProtobufError::ExpectedOtherElement(
                         String::from("Member"),
                         id.to_string(),
@@ -211,8 +210,8 @@ macro_rules! impl_try_from_proto_for_member {
     };
 }
 
-impl_try_from_proto_for_member!(RoomElementProto);
-impl_try_from_proto_for_member!(ElementProto);
+impl_try_from_proto_for_member!(proto::room::element::El);
+impl_try_from_proto_for_member!(proto::create_request::El);
 
 impl TryFrom<&RoomElement> for MemberSpec {
     type Error = TryFromElementError;

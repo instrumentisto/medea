@@ -56,7 +56,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
 
     let mut control_client = ControlClient::new().await;
 
-    let mut create_room = RoomBuilder::default()
+    let create_room = RoomBuilder::default()
         .id(TEST_NAME)
         .add_member(
             MemberBuilder::default()
@@ -234,7 +234,7 @@ async fn signalling_starts_in_loopback_scenario() {
 async fn peers_removed_on_delete_member() {
     const TEST_NAME: &str = "delete-member-check-peers-removed";
 
-    let mut control_client = Rc::new(RefCell::new(ControlClient::new().await));
+    let control_client = Rc::new(RefCell::new(ControlClient::new().await));
 
     let create_room = RoomBuilder::default()
         .id(TEST_NAME)

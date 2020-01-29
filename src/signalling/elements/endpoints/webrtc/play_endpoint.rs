@@ -6,11 +6,7 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_control_api_proto::grpc::medea::{
-    element::El as RootElProto,
-    member::{element::El as MemberElProto, Element as ElementProto},
-    Element as RootElementProto, WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 
 use crate::{
     api::control::{
@@ -208,17 +204,17 @@ impl WeakWebRtcPlayEndpoint {
     }
 }
 
-impl Into<ElementProto> for WebRtcPlayEndpoint {
-    fn into(self) -> ElementProto {
-        ElementProto {
-            el: Some(MemberElProto::WebrtcPlay(self.into())),
+impl Into<proto::member::Element> for WebRtcPlayEndpoint {
+    fn into(self) -> proto::member::Element {
+        proto::member::Element {
+            el: Some(proto::member::element::El::WebrtcPlay(self.into())),
         }
     }
 }
 
-impl Into<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
-    fn into(self) -> WebRtcPlayEndpointProto {
-        WebRtcPlayEndpointProto {
+impl Into<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
+    fn into(self) -> proto::WebRtcPlayEndpoint {
+        proto::WebRtcPlayEndpoint {
             on_start: String::new(),
             on_stop: String::new(),
             src: self.src_uri().to_string(),
@@ -228,10 +224,10 @@ impl Into<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
-impl Into<RootElementProto> for WebRtcPlayEndpoint {
-    fn into(self) -> RootElementProto {
-        RootElementProto {
-            el: Some(RootElProto::WebrtcPlay(self.into())),
+impl Into<proto::Element> for WebRtcPlayEndpoint {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::WebrtcPlay(self.into())),
         }
     }
 }

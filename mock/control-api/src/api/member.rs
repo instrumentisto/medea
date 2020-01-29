@@ -2,10 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::medea::{
-    room::{element::El as RoomElementOneOfProto, Element as RoomElementProto},
-    Member as MemberProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
@@ -39,16 +36,16 @@ pub struct Member {
 }
 
 impl Member {
-    /// Converts [`Member`] into protobuf [`MemberProto`].
+    /// Converts [`Member`] into protobuf [`proto::Member`].
     #[must_use]
-    pub fn into_proto(self, id: String) -> MemberProto {
+    pub fn into_proto(self, id: String) -> proto::Member {
         let member_elements = self
             .pipeline
             .into_iter()
             .map(|(id, endpoint)| (id.clone(), endpoint.into_proto(id)))
             .collect();
 
-        MemberProto {
+        proto::Member {
             pipeline: member_elements,
             id,
             credentials: self.credentials.unwrap_or_default(),
@@ -57,17 +54,17 @@ impl Member {
         }
     }
 
-    /// Converts [`Member`] into protobuf [`RoomElementProto`].
+    /// Converts [`Member`] into protobuf [`proto::room::Element`].
     #[must_use]
-    pub fn into_room_el_proto(self, id: String) -> RoomElementProto {
-        RoomElementProto {
-            el: Some(RoomElementOneOfProto::Member(self.into_proto(id))),
+    pub fn into_room_el_proto(self, id: String) -> proto::room::Element {
+        proto::room::Element {
+            el: Some(proto::room::element::El::Member(self.into_proto(id))),
         }
     }
 }
 
-impl From<MemberProto> for Member {
-    fn from(proto: MemberProto) -> Self {
+impl From<proto::Member> for Member {
+    fn from(proto: proto::Member) -> Self {
         let member_pipeline = proto
             .pipeline
             .into_iter()

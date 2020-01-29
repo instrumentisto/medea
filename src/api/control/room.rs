@@ -5,10 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-#[rustfmt::skip]
-use medea_control_api_proto::grpc::medea::{
-    create_request::El as ElementProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
@@ -54,12 +51,14 @@ pub struct RoomSpec {
     pub pipeline: Pipeline<MemberId, RoomElement>,
 }
 
-impl TryFrom<ElementProto> for RoomSpec {
+impl TryFrom<proto::create_request::El> for RoomSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(proto: ElementProto) -> Result<Self, Self::Error> {
+    fn try_from(proto: proto::create_request::El) -> Result<Self, Self::Error> {
+        use proto::create_request::El;
+
         let id = match proto {
-            ElementProto::Room(room) => {
+            El::Room(room) => {
                 let mut pipeline = HashMap::new();
                 for (id, room_element) in room.pipeline {
                     if let Some(elem) = room_element.el {
@@ -77,9 +76,9 @@ impl TryFrom<ElementProto> for RoomSpec {
                     pipeline,
                 });
             }
-            ElementProto::Member(member) => member.id,
-            ElementProto::WebrtcPub(webrtc_pub) => webrtc_pub.id,
-            ElementProto::WebrtcPlay(webrtc_play) => webrtc_play.id,
+            El::Member(member) => member.id,
+            El::WebrtcPub(webrtc_pub) => webrtc_pub.id,
+            El::WebrtcPlay(webrtc_play) => webrtc_play.id,
         };
 
         Err(TryFromProtobufError::ExpectedOtherElement(

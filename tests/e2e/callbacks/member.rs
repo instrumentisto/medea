@@ -5,9 +5,7 @@ use std::time::Duration;
 use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::medea_callback::{
-    on_leave::Reason as OnLeaveReason, request::Event as EventProto, Request,
-};
+use medea_control_api_proto::grpc::medea_callback as proto;
 
 use crate::{
     callbacks::{GetCallbacks, GrpcCallbackServer},
@@ -83,7 +81,8 @@ async fn on_join() {
     let on_joins_count = callbacks
         .into_iter()
         .filter(|r| {
-            if let EventProto::OnJoin(_) = r.event.as_ref().unwrap() {
+            if let proto::request::Event::OnJoin(_) = r.event.as_ref().unwrap()
+            {
                 true
             } else {
                 false
@@ -104,7 +103,7 @@ async fn on_join() {
 /// 3. Wait `300ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
-/// [`OnLeaveReason::DISONNECTED`].
+/// [`proto::on_leave::Reason::DISONNECTED`].
 #[actix_rt::test]
 async fn on_leave_normally_disconnected() {
     const TEST_NAME: &str = "member_callback_on_leave";
@@ -117,14 +116,16 @@ async fn on_leave_normally_disconnected() {
 
     let on_leaves_count = callbacks
         .into_iter()
-        .filter_map(|mut req| {
-            if let Some(EventProto::OnLeave(on_leave)) = req.event {
+        .filter_map(|req| {
+            if let Some(proto::request::Event::OnLeave(on_leave)) = req.event {
                 Some(on_leave.reason)
             } else {
                 None
             }
         })
-        .filter(|reason| reason == &(OnLeaveReason::Disconnected as i32))
+        .filter(|reason| {
+            reason == &(proto::on_leave::Reason::Disconnected as i32)
+        })
         .count();
     assert_eq!(on_leaves_count, 1);
 }
@@ -140,7 +141,7 @@ async fn on_leave_normally_disconnected() {
 /// 3. Wait `3000ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
-/// [`OnLeaveReason::LOST_CONNECTION`].
+/// [`proto::on_leave::Reason::LOST_CONNECTION`].
 #[actix_rt::test]
 async fn on_leave_on_connection_loss() {
     const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";
@@ -154,14 +155,16 @@ async fn on_leave_on_connection_loss() {
 
     let on_leaves_count = callbacks
         .into_iter()
-        .filter_map(|mut req| {
-            if let Some(EventProto::OnLeave(on_leave)) = req.event {
+        .filter_map(|req| {
+            if let Some(proto::request::Event::OnLeave(on_leave)) = req.event {
                 Some(on_leave.reason)
             } else {
                 None
             }
         })
-        .filter(|reason| reason == &(OnLeaveReason::LostConnection as i32))
+        .filter(|reason| {
+            reason == &(proto::on_leave::Reason::LostConnection as i32)
+        })
         .count();
     assert_eq!(on_leaves_count, 1);
 }

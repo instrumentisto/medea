@@ -8,11 +8,7 @@ use actix::Message;
 use chrono::{DateTime, Utc};
 use clients::CallbackClientError;
 use derive_more::From;
-use medea_control_api_proto::grpc::medea_callback::{
-    on_leave::Reason as OnLeaveReasonProto,
-    request::Event as RequestOneofEventProto, OnJoin as OnJoinProto, OnJoin,
-    OnLeave as OnLeaveProto, Request as CallbackRequestProto,
-};
+use medea_control_api_proto::grpc::medea_callback as proto;
 
 use crate::api::control::refs::StatefulFid;
 
@@ -30,10 +26,10 @@ impl OnLeaveEvent {
     }
 }
 
-impl Into<OnLeaveProto> for OnLeaveEvent {
-    fn into(self) -> OnLeaveProto {
-        let on_leave: OnLeaveReasonProto = self.reason.into();
-        OnLeaveProto {
+impl Into<proto::OnLeave> for OnLeaveEvent {
+    fn into(self) -> proto::OnLeave {
+        let on_leave: proto::on_leave::Reason = self.reason.into();
+        proto::OnLeave {
             reason: on_leave as i32,
         }
     }
@@ -52,12 +48,12 @@ pub enum OnLeaveReason {
     ServerShutdown,
 }
 
-impl Into<OnLeaveReasonProto> for OnLeaveReason {
-    fn into(self) -> OnLeaveReasonProto {
+impl Into<proto::on_leave::Reason> for OnLeaveReason {
+    fn into(self) -> proto::on_leave::Reason {
         match self {
-            Self::LostConnection => OnLeaveReasonProto::LostConnection,
-            Self::ServerShutdown => OnLeaveReasonProto::ServerShutdown,
-            Self::Disconnected => OnLeaveReasonProto::Disconnected,
+            Self::LostConnection => proto::on_leave::Reason::LostConnection,
+            Self::ServerShutdown => proto::on_leave::Reason::ServerShutdown,
+            Self::Disconnected => proto::on_leave::Reason::Disconnected,
         }
     }
 }
@@ -66,9 +62,9 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
 #[derive(Debug)]
 pub struct OnJoinEvent;
 
-impl Into<OnJoinProto> for OnJoinEvent {
-    fn into(self) -> OnJoin {
-        OnJoinProto {}
+impl Into<proto::OnJoin> for OnJoinEvent {
+    fn into(self) -> proto::OnJoin {
+        proto::OnJoin {}
     }
 }
 
@@ -79,14 +75,14 @@ pub enum CallbackEvent {
     OnLeave(OnLeaveEvent),
 }
 
-impl Into<RequestOneofEventProto> for CallbackEvent {
-    fn into(self) -> RequestOneofEventProto {
+impl Into<proto::request::Event> for CallbackEvent {
+    fn into(self) -> proto::request::Event {
         match self {
             Self::OnJoin(on_join) => {
-                RequestOneofEventProto::OnJoin(on_join.into())
+                proto::request::Event::OnJoin(on_join.into())
             }
             Self::OnLeave(on_leave) => {
-                RequestOneofEventProto::OnLeave(on_leave.into())
+                proto::request::Event::OnLeave(on_leave.into())
             }
         }
     }
@@ -123,9 +119,9 @@ impl CallbackRequest {
     }
 }
 
-impl Into<CallbackRequestProto> for CallbackRequest {
-    fn into(self) -> CallbackRequestProto {
-        CallbackRequestProto {
+impl Into<proto::Request> for CallbackRequest {
+    fn into(self) -> proto::Request {
+        proto::Request {
             event: Some(self.event.into()),
             fid: self.fid.to_string(),
             at: self.at.to_rfc3339(),

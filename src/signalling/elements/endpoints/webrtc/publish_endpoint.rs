@@ -7,13 +7,7 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_control_api_proto::grpc::medea::{
-    element::El as RootElProto,
-    member::{element::El as MemberElProto, Element as ElementProto},
-    web_rtc_publish_endpoint::P2p as WebRtcPublishEndpointP2pProto,
-    Element as RootElementProto,
-    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-};
+use medea_control_api_proto::grpc::medea as proto;
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::{
@@ -245,10 +239,10 @@ impl WeakWebRtcPublishEndpoint {
     }
 }
 
-impl Into<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    fn into(self) -> WebRtcPublishEndpointProto {
-        let p2p: WebRtcPublishEndpointP2pProto = self.p2p().into();
-        WebRtcPublishEndpointProto {
+impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::WebRtcPublishEndpoint {
+        let p2p: proto::web_rtc_publish_endpoint::P2p = self.p2p().into();
+        proto::WebRtcPublishEndpoint {
             p2p: p2p as i32,
             id: self.id().to_string(),
             force_relay: self.is_force_relayed(),
@@ -258,18 +252,18 @@ impl Into<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     }
 }
 
-impl Into<ElementProto> for WebRtcPublishEndpoint {
-    fn into(self) -> ElementProto {
-        ElementProto {
-            el: Some(MemberElProto::WebrtcPub(self.into())),
+impl Into<proto::member::Element> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::member::Element {
+        proto::member::Element {
+            el: Some(proto::member::element::El::WebrtcPub(self.into())),
         }
     }
 }
 
-impl Into<RootElementProto> for WebRtcPublishEndpoint {
-    fn into(self) -> RootElementProto {
-        RootElementProto {
-            el: Some(RootElProto::WebrtcPub(self.into())),
+impl Into<proto::Element> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::WebrtcPub(self.into())),
         }
     }
 }
