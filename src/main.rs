@@ -15,6 +15,43 @@ use medea::{
     AppContext,
 };
 
+/// Runs [`parking_log`] deadlock detector.
+///
+/// When feature `deadlock_detection` is enabled, deadlocks of
+/// [`parking_lot::Mutex`], [`parking_lot::RwLock`],
+/// [`parking_lot::ReentrantMutex`] will be printed into logs.
+///
+/// This is _experimental_ feature and disable by default.
+#[cfg(feature = "deadlock_detection")]
+fn run_deadlock_detector() {
+    use std::{thread, time::Duration};
+
+    use parking_lot::deadlock;
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(10));
+        let deadlocks = deadlock::check_deadlock();
+        if deadlocks.is_empty() {
+            continue;
+        }
+
+        deadlocks
+            .iter()
+            .enumerate()
+            .flat_map(|(i, threads)| {
+                threads.iter().map(move |thread| (i, thread))
+            })
+            .for_each(|(i, t)| {
+                println!(
+                    "Deadlock #{}\nThread ID {:#?}\n{:#?}",
+                    i,
+                    t.thread_id(),
+                    t.backtrace()
+                )
+            });
+    });
+}
+
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
     let config = Conf::parse()?;
@@ -27,32 +64,10 @@ fn main() -> Result<(), Error> {
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init()?;
 
-    info!("{:?}", config);
-
     #[cfg(feature = "deadlock_detection")]
-    {
-        // only for #[cfg]
-        use parking_lot::deadlock;
-        use std::{thread, time::Duration};
+    run_deadlock_detector();
 
-        // Create a background thread which checks for deadlocks every 10s
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_secs(10));
-            let deadlocks = deadlock::check_deadlock();
-            if deadlocks.is_empty() {
-                continue;
-            }
-
-            println!("{} deadlocks detected", deadlocks.len());
-            for (i, threads) in deadlocks.iter().enumerate() {
-                println!("Deadlock #{}", i);
-                for t in threads {
-                    println!("Thread Id {:#?}", t.thread_id());
-                    println!("{:#?}", t.backtrace());
-                }
-            }
-        });
-    } // only for #[cfg]
+    info!("{:?}", config);
 
     let sys = System::new("medea");
     Arbiter::spawn(

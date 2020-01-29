@@ -326,7 +326,7 @@ impl ControlApi for ControlApiService {
     }
 }
 
-/// Actor wrapper for [`grpcio`] gRPC server which provides dynamic [Control
+/// Actor wrapper for [`tonic`] gRPC server which provides dynamic [Control
 /// API].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
@@ -353,7 +353,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
              shutting down.",
         );
         if let Some(grpc_shutdown) = self.0.take() {
-            grpc_shutdown.send(()).unwrap();
+            grpc_shutdown.send(()).ok();
         }
     }
 }

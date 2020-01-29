@@ -57,7 +57,6 @@ async fn main() {
     let _log_guard = init_logger();
 
     let callback_server = callback::server::run(&opts).await;
-    println!("Starting medea-control-api-mock.");
     api::run(&opts, callback_server).await;
 }
 

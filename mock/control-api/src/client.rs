@@ -53,14 +53,15 @@ fn id_request(ids: Vec<String>) -> proto::IdRequest {
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
 pub struct ControlClient {
+    /// Address of the Medea's Control API.
     medea_addr: String,
 
-    /// [`grpcio`] gRPC client for Medea Control API.
+    /// [`tonic`] gRPC client for Medea Control API.
     grpc_client: Option<ControlApiClient<Channel>>,
 }
 
 impl ControlClient {
-    /// Creates new client for Medea's Control API.
+    /// Creates a new client for Medea's Control API.
     ///
     /// __Note that call of this function doesn't checks availability of Control
     /// API gRPC server. Availability will be checked only on sending request to
@@ -73,16 +74,20 @@ impl ControlClient {
         }
     }
 
+    /// Returns mutable reference to a [`ControlApiClient`].
+    ///
+    /// If [`ControlClient::grpc_client`] is `None` then new
+    /// [`ControlApiClient`] will be created.
     async fn get_client(&mut self) -> &mut ControlApiClient<Channel> {
-        let qq = &mut self.grpc_client;
-        if let Some(client) = qq {
+        let grpc_client = &mut self.grpc_client;
+        if let Some(client) = grpc_client {
             client
         } else {
-            let client =
-                new_grpcio_control_api_client(self.medea_addr.clone()).await;
-            *qq = Some(client);
+            let new_client =
+                new_control_api_client(self.medea_addr.clone()).await;
+            *grpc_client = Some(new_client);
 
-            qq.as_mut().unwrap()
+            grpc_client.as_mut().unwrap()
         }
     }
 
@@ -94,6 +99,7 @@ impl ControlClient {
         element: Element,
     ) -> Result<proto::CreateResponse, Status> {
         use proto::create_request::El::*;
+
         let el = match element {
             Element::Room(room) => Room(room.into_proto(id)),
             Element::Member(member) => Member(member.into_proto(id)),
@@ -108,8 +114,6 @@ impl ControlClient {
             parent_fid: fid.into(),
             el: Some(el),
         };
-
-        println!("\n\n\n\n\n{:?}\n\n\n\n\n\n", req);
 
         self.get_client()
             .await
@@ -147,9 +151,7 @@ impl ControlClient {
     }
 }
 
-/// Returns new [`grpcio`] gRPC client for Control API.
-async fn new_grpcio_control_api_client(
-    addr: String,
-) -> ControlApiClient<Channel> {
+/// Returns new [`tonic`] gRPC client for Control API.
+async fn new_control_api_client(addr: String) -> ControlApiClient<Channel> {
     ControlApiClient::connect(addr).await.unwrap()
 }

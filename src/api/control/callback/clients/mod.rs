@@ -16,11 +16,14 @@ use crate::{
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
 #[derive(Debug, From)]
 pub enum CallbackClientError {
-    /// [`grpcio`] failed to send [`CallbackRequest`].
+    /// [`tonic`] failed to send [`CallbackRequest`].
     Tonic(tonic::Status),
 
+    /// [`MailboxError`] while sending [`CallbackRequest`] to a
+    /// [`CallbackClient`] [`Actor`].
     Mailbox(actix::MailboxError),
 
+    /// Error while creating new [`CallbackClient`].
     TonicTransport(tonic::transport::Error),
 }
 
@@ -36,7 +39,7 @@ pub trait CallbackClient: Debug + Send + Sync {
 pub async fn build_client(
     url: &CallbackUrl,
 ) -> Result<impl CallbackClient, CallbackClientError> {
-    info!("Creating CallbackClient for url: {}", url);
+    info!("Creating CallbackClient for URL: {}", url);
     match &url {
         CallbackUrl::Grpc(grpc_url) => {
             Ok(grpc::GrpcCallbackClient::new(grpc_url).await?.start())

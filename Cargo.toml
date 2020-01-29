@@ -26,8 +26,7 @@ members = [
 lto = "thin"
 
 [features]
-deadlock_detection = []
-default = ["deadlock_detection"]
+deadlock_detection = ["parking_lot/deadlock_detection"]
 
 [dependencies]
 actix = "0.9"
@@ -42,12 +41,11 @@ derive_more = "0.99"
 dotenv = "0.15"
 failure = "0.1"
 futures = { version = "0.3", features = ["compat"] }
-grpcio = { version = "0.4", features = ["openssl"] }
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
-protobuf = "2.7"
+parking_lot = "0.10"
 rand = "0.7"
 redis = "0.14"
 rust-crypto = "0.2"
@@ -64,7 +62,6 @@ tokio = { version = "0.2", features = ["signal", "time"] }
 tonic = "0.1"
 toml = "0.5"
 url = "2.1"
-parking_lot = { version = "0.10", features = ["deadlock_detection"] }
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]

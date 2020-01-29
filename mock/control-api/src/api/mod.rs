@@ -6,7 +6,7 @@ pub mod endpoint;
 pub mod member;
 pub mod room;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Mutex};
 
 use actix::Addr;
 use actix_cors::Cors;
@@ -30,7 +30,6 @@ use self::{
     member::Member,
     room::Room,
 };
-use std::sync::Mutex;
 
 /// Context of [`actix_web`] server.
 pub struct Context {

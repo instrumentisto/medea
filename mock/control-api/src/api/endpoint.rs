@@ -26,6 +26,7 @@ impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     fn from(proto: proto::web_rtc_publish_endpoint::P2p) -> Self {
         use proto::web_rtc_publish_endpoint::P2p::*;
+
         match proto {
             Always => Self::Always,
             IfPossible => Self::IfPossible,
@@ -134,7 +135,7 @@ impl Endpoint {
     /// Converts [`Endpoint`] into protobuf [`proto::member::Element`].
     #[must_use]
     pub fn into_proto(self, id: String) -> proto::member::Element {
-        let oneof = match self {
+        let el = match self {
             Self::WebRtcPlayEndpoint(spec) => {
                 proto::member::element::El::WebrtcPlay(spec.into_proto(id))
             }
@@ -143,7 +144,7 @@ impl Endpoint {
             }
         };
 
-        proto::member::Element { el: Some(oneof) }
+        proto::member::Element { el: Some(el) }
     }
 }
 

@@ -19,7 +19,7 @@ use crate::{callback::CallbackItem, prelude::*};
 /// Type which used in [`GrpcCallbackServer`] for [`CallbackItem`] storing.
 type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
 
-/// [`Actor`] wrapper for [`grpcio`] server.
+/// [`Actor`] wrapper for [`tonic`] gRPC server.
 ///
 /// Also this [`Actor`] can return all received callbacks
 /// with [`GetCallbacks`] [`Message`].
@@ -30,8 +30,6 @@ pub struct GrpcCallbackServer {
 
 impl Actor for GrpcCallbackServer {
     type Context = Context<Self>;
-
-    fn started(&mut self, _ctx: &mut Self::Context) {}
 }
 
 /// Implementation for [`CallbackService`] gRPC service.

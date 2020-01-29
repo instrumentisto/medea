@@ -40,7 +40,7 @@ impl Handler<GetCallbacks> for GrpcCallbackServer {
     }
 }
 
-/// [`grpcio`] server for receiving callbacks.
+/// [`tonic`] server for receiving callbacks.
 #[derive(Clone)]
 pub struct CallbackServer {
     callbacks: CallbackItems,
@@ -59,6 +59,7 @@ impl Callback for CallbackServer {
         request: tonic::Request<proto::Request>,
     ) -> Result<tonic::Response<proto::Response>, Status> {
         self.callbacks.lock().unwrap().push(request.into_inner());
+
         Ok(tonic::Response::new(proto::Response {}))
     }
 }
