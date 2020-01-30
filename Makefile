@@ -920,4 +920,5 @@ wait.port:
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.control up.coturn up.demo up.dev up.jason up.medea \
+        wait.port \
         yarn
