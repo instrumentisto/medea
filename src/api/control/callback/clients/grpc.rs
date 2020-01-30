@@ -1,6 +1,6 @@
 //! Implementation of gRPC client for sending [`CallbackRequest`]s.
 
-use std::{cell::RefCell, fmt, rc::Rc};
+use std::fmt;
 
 use futures::future::LocalBoxFuture;
 #[rustfmt::skip]
@@ -19,7 +19,7 @@ use crate::api::control::callback::{
 /// gRPC client for sending [`CallbackRequest`]s.
 pub struct GrpcCallbackClient {
     /// [`tonic`] gRPC client of Control API Callback service.
-    client: Rc<RefCell<ProtoCallbackClient<Channel>>>,
+    client: ProtoCallbackClient<Channel>,
 }
 
 pub type ActFuture<O> =
@@ -47,13 +47,10 @@ impl Handler<CallbackRequest> for GrpcCallbackClient {
         msg: CallbackRequest,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let client = Rc::clone(&self.client);
+        let mut client = self.client.clone();
         Box::new(
             async move {
-                client
-                    .borrow_mut()
-                    .on_event(tonic::Request::new(msg.into()))
-                    .await?;
+                client.on_event(tonic::Request::new(msg.into())).await?;
 
                 Ok(())
             }
@@ -79,8 +76,7 @@ impl GrpcCallbackClient {
         addr: &GrpcCallbackUrl,
     ) -> Result<Self, CallbackClientError> {
         let addr = addr.addr();
-        let client =
-            Rc::new(RefCell::new(ProtoCallbackClient::connect(addr).await?));
+        let client = ProtoCallbackClient::connect(addr).await?;
 
         Ok(Self { client })
     }

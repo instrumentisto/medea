@@ -64,7 +64,6 @@ impl ControlClient {
     /// __Note that call of this function doesn't checks availability of Control
     /// API gRPC server. Availability will be checked only on sending request to
     /// gRPC server.__
-    #[must_use]
     pub async fn new(
         medea_addr: String,
     ) -> Result<Self, tonic::transport::Error> {
