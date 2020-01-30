@@ -73,6 +73,7 @@ impl ControlClient {
         })
     }
 
+    /// Returns [`ControlApiClient`] of this [`ControlClient`].
     fn get_client(&self) -> ControlApiClient<Channel> {
         self.grpc_client.clone()
     }

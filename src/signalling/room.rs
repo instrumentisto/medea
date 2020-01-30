@@ -925,7 +925,7 @@ impl Actor for Room {
     }
 }
 
-impl Into<proto::Room> for &mut Room {
+impl Into<proto::Room> for &Room {
     fn into(self) -> proto::Room {
         let pipeline = self
             .members
@@ -940,7 +940,7 @@ impl Into<proto::Room> for &mut Room {
     }
 }
 
-impl Into<proto::Element> for &mut Room {
+impl Into<proto::Element> for &Room {
     fn into(self) -> proto::Element {
         proto::Element {
             el: Some(proto::element::El::Room(self.into())),
@@ -973,7 +973,7 @@ impl Handler<SerializeProto> for Room {
             match &fid {
                 StatefulFid::Room(room_fid) => {
                     if room_fid.room_id() == &self.id {
-                        let current_room: proto::Element = self.into();
+                        let current_room: proto::Element = (&*self).into();
                         serialized.insert(fid, current_room);
                     } else {
                         return Err(RoomError::WrongRoomId(
