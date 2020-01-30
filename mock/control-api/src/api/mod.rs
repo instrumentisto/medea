@@ -6,7 +6,7 @@ pub mod endpoint;
 pub mod member;
 pub mod room;
 
-use std::{collections::HashMap, sync::Mutex};
+use std::collections::HashMap;
 
 use actix::Addr;
 use actix_cors::Cors;
@@ -37,7 +37,7 @@ pub struct Context {
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Medea]: https://github.com/instrumentisto/medea
-    client: Mutex<ControlClient>,
+    client: ControlClient,
 
     /// gRPC server which receives Control API callbacks.
     callback_server: Addr<GrpcCallbackServer>,
@@ -51,12 +51,13 @@ pub async fn run(
     callback_server_addr: Addr<GrpcCallbackServer>,
 ) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
+    let client = ControlClient::new(medea_addr).await.unwrap();
     HttpServer::new(move || {
         debug!("Running HTTP server...");
         App::new()
             .wrap(Cors::new().finish())
             .data(Context {
-                client: Mutex::new(ControlClient::new(medea_addr.clone())),
+                client: client.clone(),
                 callback_server: callback_server_addr.clone(),
             })
             .wrap(middleware::Logger::default())
@@ -111,8 +112,6 @@ macro_rules! gen_request_macro {
                 ) -> Result<HttpResponse, ()> {
                     state
                         .client
-                        .lock()
-                        .unwrap()
                         .$call_fn(path.into_inner().into())
                         .await
                         .map_err(|e| error!("{:?}", e))
@@ -177,8 +176,6 @@ mod create {
     ) -> Result<HttpResponse, ()> {
         state
             .client
-            .lock()
-            .unwrap()
             .create(path.into_inner(), Fid::from(()), data.0)
             .await
             .map_err(|e| error!("{:?}", e))
@@ -193,8 +190,6 @@ mod create {
         let uri = path.into_inner();
         state
             .client
-            .lock()
-            .unwrap()
             .create(uri.1, Fid::from(uri.0), data.0)
             .await
             .map_err(|e| error!("{:?}", e))
@@ -209,8 +204,6 @@ mod create {
         let uri = path.into_inner();
         state
             .client
-            .lock()
-            .unwrap()
             .create(uri.2, Fid::from((uri.0, uri.1)), data.0)
             .await
             .map_err(|e| error!("{:?}", e))

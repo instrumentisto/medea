@@ -52,12 +52,10 @@ fn id_request(ids: Vec<String>) -> proto::IdRequest {
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
+#[derive(Clone)]
 pub struct ControlClient {
-    /// Address of the Medea's Control API.
-    medea_addr: String,
-
     /// [`tonic`] gRPC client for Medea Control API.
-    grpc_client: Option<ControlApiClient<Channel>>,
+    grpc_client: ControlApiClient<Channel>,
 }
 
 impl ControlClient {
@@ -67,33 +65,22 @@ impl ControlClient {
     /// API gRPC server. Availability will be checked only on sending request to
     /// gRPC server.__
     #[must_use]
-    pub fn new(medea_addr: String) -> Self {
-        Self {
-            medea_addr,
-            grpc_client: None,
-        }
+    pub async fn new(
+        medea_addr: String,
+    ) -> Result<Self, tonic::transport::Error> {
+        let client = ControlApiClient::connect(medea_addr).await?;
+        Ok(Self {
+            grpc_client: client,
+        })
     }
 
-    /// Returns mutable reference to a [`ControlApiClient`].
-    ///
-    /// If [`ControlClient::grpc_client`] is `None` then new
-    /// [`ControlApiClient`] will be created.
-    async fn get_client(&mut self) -> &mut ControlApiClient<Channel> {
-        let grpc_client = &mut self.grpc_client;
-        if let Some(client) = grpc_client {
-            client
-        } else {
-            let new_client =
-                new_control_api_client(self.medea_addr.clone()).await;
-            *grpc_client = Some(new_client);
-
-            grpc_client.as_mut().unwrap()
-        }
+    fn get_client(&self) -> ControlApiClient<Channel> {
+        self.grpc_client.clone()
     }
 
     /// Creates provided element with gRPC Control API.
     pub async fn create(
-        &mut self,
+        &self,
         id: String,
         fid: Fid,
         element: Element,
@@ -116,42 +103,28 @@ impl ControlClient {
         };
 
         self.get_client()
-            .await
             .create(tonic::Request::new(req))
             .await
             .map(tonic::Response::into_inner)
     }
 
     /// Gets element from Control API by FID.
-    pub async fn get(
-        &mut self,
-        fid: Fid,
-    ) -> Result<proto::GetResponse, Status> {
+    pub async fn get(&self, fid: Fid) -> Result<proto::GetResponse, Status> {
         let req = id_request(vec![fid.into()]);
 
         self.get_client()
-            .await
             .get(tonic::Request::new(req))
             .await
             .map(tonic::Response::into_inner)
     }
 
     /// Deletes element from Control API by FID.
-    pub async fn delete(
-        &mut self,
-        fid: Fid,
-    ) -> Result<proto::Response, Status> {
+    pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.into()]);
 
         self.get_client()
-            .await
             .delete(tonic::Request::new(req))
             .await
             .map(tonic::Response::into_inner)
     }
-}
-
-/// Returns new [`tonic`] gRPC client for Control API.
-async fn new_control_api_client(addr: String) -> ControlApiClient<Channel> {
-    ControlApiClient::connect(addr).await.unwrap()
 }

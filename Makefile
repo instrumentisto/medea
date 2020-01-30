@@ -147,6 +147,7 @@ down.medea: docker.down.medea
 #  make up.control
 
 up.control:
+	make wait.port port=6565
 	cargo run -p medea-control-api-mock
 
 
@@ -880,6 +881,21 @@ define minikube.boot.download
 		https://raw.githubusercontent.com/instrumentisto/toolchain/master/minikube/bootstrap.sh
 	@chmod +x $(HOME)/.minikube/bootstrap.sh
 endef
+
+
+
+
+###########
+# Helpers #
+###########
+
+# Wait for an open port.
+#
+# Usage:
+#   make wait.port [port=<port>]
+
+wait.port:
+	while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$(port)"; do sleep 1; done
 
 
 
