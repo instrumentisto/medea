@@ -5,7 +5,7 @@ use std::{
     future::Future, rc::Rc,
 };
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
@@ -123,12 +123,12 @@ impl MediaConnections {
     pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: MuteState,
+        mute_state: FinalizedMuteState,
     ) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
             .iter_senders_with_kind(kind)
-            .filter(|sender| sender.mute_state() == mute_state)
+            .filter(|sender| sender.mute_state() == mute_state.into())
             .cloned()
             .collect()
     }
@@ -148,10 +148,10 @@ impl MediaConnections {
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: MuteState,
+        mute_state: FinalizedMuteState,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.mute_state() != mute_state {
+            if sender.mute_state() != mute_state.into() {
                 return false;
             }
         }
@@ -396,48 +396,109 @@ impl MediaConnections {
 
 /// Mute state of [`Sender`].
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum MuteState {
+pub enum FinalizedMuteState {
     /// [`Sender`] is not muted.
     NotMuted,
-
-    /// [`Sender`] should be unmuted, but awaits server permission.
-    Unmuting,
-
-    /// [`Sender`] should be muted, but awaits server permission.
-    Muting,
 
     /// [`Sender`] is muted.
     Muted,
 }
 
-impl MuteState {
-    /// Returns [`MuteState`] which should be set while transition to this
-    /// [`MuteState`].
-    pub fn processing_state(self) -> Self {
+impl FinalizedMuteState {
+    pub fn into_progress(self) -> ProgressingMuteState {
         match self {
-            Self::NotMuted => Self::Unmuting,
-            Self::Muted => Self::Muting,
-            _ => self,
+            Self::NotMuted => ProgressingMuteState::Muting(self),
+            Self::Muted => ProgressingMuteState::Unmuting(self),
         }
     }
 
-    /// Returns opposite [`MuteState`] of this [`MuteState`].
-    pub fn opposite_state(self) -> Self {
+    pub fn opposite(self) -> FinalizedMuteState {
         match self {
-            Self::Muted => Self::NotMuted,
             Self::NotMuted => Self::Muted,
-            Self::Unmuting => Self::Muting,
-            Self::Muting => Self::Unmuting,
+            Self::Muted => Self::NotMuted,
         }
     }
 }
 
-impl From<bool> for MuteState {
+impl From<bool> for FinalizedMuteState {
     fn from(is_muted: bool) -> Self {
         if is_muted {
             Self::Muted
         } else {
             Self::NotMuted
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProgressingMuteState {
+    /// [`Sender`] should be unmuted, but awaits server permission.
+    Unmuting(FinalizedMuteState),
+
+    /// [`Sender`] should be muted, but awaits server permission.
+    Muting(FinalizedMuteState),
+}
+
+impl ProgressingMuteState {
+    pub fn flip(self) -> Self {
+        match self {
+            Self::Unmuting(finalized) => Self::Muting(finalized),
+            Self::Muting(finalized) => Self::Unmuting(finalized),
+        }
+    }
+
+    pub fn finalized(self) -> FinalizedMuteState {
+        match self {
+            ProgressingMuteState::Unmuting(_) => FinalizedMuteState::NotMuted,
+            ProgressingMuteState::Muting(_) => FinalizedMuteState::Muted,
+        }
+    }
+
+    pub fn change_finalized(self, finalized: FinalizedMuteState) -> ProgressingMuteState {
+        match self {
+            ProgressingMuteState::Unmuting(_) => ProgressingMuteState::Unmuting(finalized),
+            ProgressingMuteState::Muting(_) => ProgressingMuteState::Muting(finalized),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, From, PartialEq)]
+pub enum MuteState {
+    InProgress(ProgressingMuteState),
+    Final(FinalizedMuteState),
+}
+
+impl MuteState {
+    pub fn is_in_progress(&self) -> bool {
+        match self {
+            MuteState::InProgress(_) => true,
+            MuteState::Final(_) => false,
+        }
+    }
+
+    pub fn is_final(&self) -> bool {
+        match self {
+            MuteState::Final(_) => true,
+            MuteState::InProgress(_) => false,
+        }
+    }
+
+    pub fn progress(self, needed_state: FinalizedMuteState) -> Self {
+        if self == needed_state.into() {
+            return self;
+        }
+
+        match self {
+            MuteState::Final(finalized) => {
+                finalized.into_progress().into()
+            }
+            MuteState::InProgress(progressing) => {
+                if progressing.finalized() == needed_state {
+                    self
+                } else {
+                    progressing.flip().into()
+                }
+            }
         }
     }
 }
@@ -462,7 +523,7 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-        mute_state: MuteState,
+        mute_state: FinalizedMuteState,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -473,7 +534,7 @@ impl Sender {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let mute_state = ObservableCell::new(mute_state);
+        let mute_state = ObservableCell::new(mute_state.into());
         let mut subscription = mute_state.subscribe();
         let this = Rc::new(Self {
             track_id,
@@ -485,12 +546,14 @@ impl Sender {
         let weak_this = Rc::downgrade(&this);
         spawn_local(async move {
             while let Some(mute_state_update) = subscription.next().await {
-                if let Some(this) = weak_this.upgrade() {
-                    if let Some(track) = this.track.borrow().as_ref() {
-                        track.set_enabled_by_mute_state(mute_state_update);
+                if let MuteState::Final(finalized) = mute_state_update {
+                    if let Some(this) = weak_this.upgrade() {
+                        if let Some(track) = this.track.borrow().as_ref() {
+                            track.set_enabled_by_mute_state(finalized);
+                        }
+                    } else {
+                        break;
                     }
-                } else {
-                    break;
                 }
             }
         });
@@ -535,72 +598,38 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
-        track.set_enabled_by_mute_state(sender.mute_state());
+        if let MuteState::Final(finalized) = sender.mute_state() {
+            track.set_enabled_by_mute_state(finalized);
+        }
         sender.track.borrow_mut().replace(track);
 
         Ok(())
     }
 
-    /// Changes [`MuteState`] of this [`Sender`].
-    pub fn change_mute_state(&self, new_state: MuteState) {
-        self.mute_state.set(new_state)
-    }
-
     /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
     fn is_track_enabled(&self) -> bool {
-        self.mute_state.get() == MuteState::NotMuted
+        self.mute_state.get() == FinalizedMuteState::NotMuted.into()
     }
 
-    /// Resolves when [`MuteState`] of this
-    /// [`Sender`] will become equal to provided [`MuteState`].
-    fn on_mute_state(
-        &self,
-        state: MuteState,
-    ) -> impl Future<Output = Result<()>> {
-        let subscription = self.mute_state.when_eq(state);
-        async move {
-            subscription.await.map_err(|_| {
-                tracerr::new!(MediaConnectionsError::MuteStateDropped)
-            })
-        }
+    pub fn progress_mute_state(&self, needed_state: FinalizedMuteState) {
+        let current_mute_state = self.mute_state.get();
+        self.mute_state.set(current_mute_state.progress(needed_state));
     }
 
-    /// Resolves when [`MuteState`] transits not into provided [`MuteState`]
-    /// or not into [`MuteState::opposite_state`] of provided [`MuteState`].
-    fn when_mute_state_not(
+    pub fn when_finalized_with(
         &self,
-        state: MuteState,
+        needed_state: FinalizedMuteState,
     ) -> impl Future<Output = Result<()>> {
-        let subscription = self
+        let successful_mute_state =
+            self.mute_state.when_eq(MuteState::Final(needed_state));
+        let failure_mute_state = self
             .mute_state
-            .when(move |upd| upd != &state && upd != &state.processing_state());
-        async move {
-            subscription.await.map_err(|_| {
-                tracerr::new!(MediaConnectionsError::MuteStateDropped)
-            })
-        }
-    }
-
-    /// Resolves with `Ok(())` when underlying [`MuteState`] transits into
-    /// requested `is_muted` state.
-    ///
-    /// Resolves with
-    /// `Err(MediaConnectionsError::MuteStateTransitsIntoOppositeState)` if
-    /// [`MuteState`] transits into opposite to provided `is_muted` state.
-    pub fn when_is_muted_with_cancellation(
-        &self,
-        is_muted: bool,
-    ) -> impl Future<Output = Result<()>> {
-        let expected_state = MuteState::from(is_muted);
-        let needed_mute_state_change = self.on_mute_state(expected_state);
-        let wrong_mute_state_change = self.when_mute_state_not(expected_state);
+            .when_eq(MuteState::Final(needed_state.opposite()));
 
         async move {
-            let res = future::select(
-                Box::pin(needed_mute_state_change),
-                Box::pin(wrong_mute_state_change),
-            )
-            .await;
+            let res =
+                future::select(successful_mute_state, failure_mute_state).await;
+
             match res {
                 Either::Left(_) => Ok(()),
                 Either::Right(_) => Err(tracerr::new!(
@@ -614,7 +643,21 @@ impl Sender {
     /// [`medea_client_api_proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
         if let Some(is_muted) = track.is_muted {
-            self.mute_state.set(is_muted.into());
+            let new_mute_state = FinalizedMuteState::from(is_muted);
+            let current_mute_state = self.mute_state.get();
+
+            let mute_state_update: MuteState = match current_mute_state {
+                MuteState::Final(_) => new_mute_state.into(),
+                MuteState::InProgress(progressing) => {
+                    if progressing.finalized() == new_mute_state {
+                        new_mute_state.into()
+                    } else {
+                        progressing.change_finalized(new_mute_state).into()
+                    }
+                }
+            };
+
+            self.mute_state.set(mute_state_update);
         }
     }
 }

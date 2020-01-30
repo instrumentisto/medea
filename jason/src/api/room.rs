@@ -39,6 +39,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::peer::FinalizedMuteState;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -257,7 +258,7 @@ impl RoomHandle {
         let inner = upgrade_or_detached!(self.0, JsValue)?;
         while !inner
             .borrow()
-            .is_all_peers_in_mute_state(kind, MuteState::from(is_muted))
+            .is_all_peers_in_mute_state(kind, FinalizedMuteState::from(is_muted))
         {
             let fut = inner.borrow().toggle_mute(is_muted, kind);
             fut.await
@@ -590,11 +591,11 @@ impl InnerRoom {
             let peer_mute_state_changed: Vec<_> = peers
                 .iter()
                 .map(|peer| {
-                    let needed_mute_state = MuteState::from(is_muted);
+                    let needed_mute_state = FinalizedMuteState::from(is_muted);
                     let tracks_patches: Vec<_> = peer
                         .get_senders_by_kind_and_mute_state(
                             kind,
-                            needed_mute_state.opposite_state(),
+                            needed_mute_state.opposite(),
                         )
                         .into_iter()
                         .map(|sender| {
@@ -603,8 +604,8 @@ impl InnerRoom {
                                 id,
                                 is_muted: Some(is_muted),
                             };
-                            sender.change_mute_state(
-                                needed_mute_state.processing_state(),
+                            sender.progress_mute_state(
+                                needed_mute_state,
                             );
 
                             track_update
@@ -615,7 +616,7 @@ impl InnerRoom {
                         .get_senders(kind)
                         .into_iter()
                         .map(|sender| {
-                            sender.when_is_muted_with_cancellation(is_muted)
+                            sender.when_finalized_with(needed_mute_state)
                         })
                         .collect();
 
@@ -644,7 +645,7 @@ impl InnerRoom {
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: MuteState,
+        mute_state: FinalizedMuteState,
     ) -> bool {
         self.peers
             .get_all()

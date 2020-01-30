@@ -40,7 +40,7 @@ pub use self::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
         TransceiverDirection, TransceiverKind,
     },
-    media::{MediaConnections, MediaConnectionsError, MuteState},
+    media::{MediaConnections, MediaConnectionsError, MuteState, FinalizedMuteState, ProgressingMuteState},
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
@@ -243,7 +243,7 @@ impl PeerConnection {
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: MuteState,
+        mute_state: FinalizedMuteState,
     ) -> bool {
         self.media_connections
             .is_all_senders_in_mute_state(kind, mute_state)
@@ -370,7 +370,7 @@ impl PeerConnection {
     pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: MuteState,
+        mute_state: FinalizedMuteState,
     ) -> Vec<Rc<Sender>> {
         self.media_connections
             .get_senders_by_kind_and_mute_state(kind, mute_state)
