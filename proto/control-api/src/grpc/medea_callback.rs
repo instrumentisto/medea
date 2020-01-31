@@ -8,7 +8,7 @@ pub struct Request {
     #[prost(string, tag="2")]
     pub at: std::string::String,
     /// Occurred callback event.
-    #[prost(oneof="request::Event", tags="3, 4")]
+    #[prost(oneof="request::Event", tags="3, 4, 5, 6")]
     pub event: ::std::option::Option<request::Event>,
 }
 pub mod request {
@@ -19,7 +19,17 @@ pub mod request {
         OnJoin(super::OnJoin),
         #[prost(message, tag="4")]
         OnLeave(super::OnLeave),
+        #[prost(message, tag="5")]
+        OnPlay(super::OnPlay),
+        #[prost(message, tag="6")]
+        OnStop(super::OnStop),
     }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OnPlay {
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OnStop {
 }
 /// Empty response of the Callback service.
 ///

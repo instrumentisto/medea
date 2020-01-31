@@ -190,6 +190,8 @@ impl Member {
                     publisher.downgrade(),
                     this_member.downgrade(),
                     spec_play_endpoint.force_relay,
+                    spec_play_endpoint.on_start.clone(),
+                    spec_play_endpoint.on_stop.clone(),
                 );
 
                 self.insert_sink(new_play_endpoint.clone());
@@ -210,6 +212,8 @@ impl Member {
                     new_publish.downgrade(),
                     this_member.downgrade(),
                     spec_play_endpoint.force_relay,
+                    spec_play_endpoint.on_start.clone(),
+                    spec_play_endpoint.on_stop.clone(),
                 );
 
                 new_publish.add_sink(new_self_play.downgrade());
@@ -378,6 +382,8 @@ impl Member {
             src.downgrade(),
             member.downgrade(),
             spec.force_relay,
+            spec.on_start,
+            spec.on_stop,
         );
 
         src.add_sink(sink.downgrade());

@@ -628,6 +628,8 @@ impl Room {
             src.downgrade(),
             member.downgrade(),
             spec.force_relay,
+            spec.on_start,
+            spec.on_stop,
         );
 
         src.add_sink(sink.downgrade());
@@ -703,6 +705,8 @@ impl Room {
                 src.downgrade(),
                 signalling_member.downgrade(),
                 play.force_relay,
+                play.on_start.clone(),
+                play.on_stop.clone(),
             );
 
             signalling_member.insert_sink(sink);

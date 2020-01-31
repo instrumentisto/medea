@@ -19,6 +19,7 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
+use crate::api::control::callback::url::CallbackUrl;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -48,6 +49,10 @@ struct WebRtcPlayEndpointInner {
     /// Indicator whether only `relay` ICE candidates are allowed for this
     /// [`WebRtcPlayEndpoint`].
     is_force_relayed: bool,
+
+    on_start: Option<CallbackUrl>,
+
+    on_stop: Option<CallbackUrl>,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -102,6 +107,8 @@ impl WebRtcPlayEndpoint {
         publisher: WeakWebRtcPublishEndpoint,
         owner: WeakMember,
         is_force_relayed: bool,
+        on_start: Option<CallbackUrl>,
+        on_stop: Option<CallbackUrl>,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPlayEndpointInner {
             id,
@@ -110,6 +117,8 @@ impl WebRtcPlayEndpoint {
             owner,
             peer_id: None,
             is_force_relayed,
+            on_start,
+            on_stop,
         })))
     }
 

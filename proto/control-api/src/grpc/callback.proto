@@ -21,8 +21,14 @@ message Request {
   oneof event {
     OnJoin on_join = 3;
     OnLeave on_leave = 4;
+    OnPlay on_play = 5;
+    OnStop on_stop = 6;
   }
 }
+
+message OnPlay {}
+
+message OnStop {}
 
 // Empty response of the Callback service.
 //
