@@ -40,7 +40,7 @@ pub use self::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
         TransceiverDirection, TransceiverKind,
     },
-    media::{MediaConnections, MediaConnectionsError, MuteState, FinalizedMuteState, ProgressingMuteState},
+    media::{FinalizedMuteState, MediaConnections, MediaConnectionsError},
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,

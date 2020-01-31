@@ -2,7 +2,7 @@
 
 use std::{
     borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
-    future::Future, rc::Rc,
+    future::Future, rc::Rc, time::Duration,
 };
 
 use derive_more::{Display, From};
@@ -18,7 +18,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{JsCaused, JsError},
+    utils::{delay_for, JsCaused, JsError},
 };
 
 use super::{
@@ -405,14 +405,16 @@ pub enum FinalizedMuteState {
 }
 
 impl FinalizedMuteState {
-    pub fn into_progress(self) -> ProgressingMuteState {
+    /// Converts this [`FinalizedMuteState`] into [`ProgressingMuteState`].
+    fn into_progress(self) -> ProgressingMuteState {
         match self {
             Self::NotMuted => ProgressingMuteState::Muting(self),
             Self::Muted => ProgressingMuteState::Unmuting(self),
         }
     }
 
-    pub fn opposite(self) -> FinalizedMuteState {
+    /// Returns opposite [`FinalizedMuteState`] of this [`FinalizedMuteState`].
+    pub fn opposite(self) -> Self {
         match self {
             Self::NotMuted => Self::Muted,
             Self::Muted => Self::NotMuted,
@@ -431,7 +433,7 @@ impl From<bool> for FinalizedMuteState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ProgressingMuteState {
+enum ProgressingMuteState {
     /// [`Sender`] should be unmuted, but awaits server permission.
     Unmuting(FinalizedMuteState),
 
@@ -440,65 +442,73 @@ pub enum ProgressingMuteState {
 }
 
 impl ProgressingMuteState {
-    pub fn flip(self) -> Self {
+    /// Swaps current [`ProgressingMuteState`] with opposite one.
+    pub fn swap(self) -> Self {
         match self {
             Self::Unmuting(finalized) => Self::Muting(finalized),
             Self::Muting(finalized) => Self::Unmuting(finalized),
         }
     }
 
-    pub fn finalized(self) -> FinalizedMuteState {
+    /// Returns intention which this [`ProgressingMuteState`] indicates.
+    pub fn intention(self) -> FinalizedMuteState {
         match self {
-            ProgressingMuteState::Unmuting(_) => FinalizedMuteState::NotMuted,
-            ProgressingMuteState::Muting(_) => FinalizedMuteState::Muted,
+            Self::Unmuting(_) => FinalizedMuteState::NotMuted,
+            Self::Muting(_) => FinalizedMuteState::Muted,
         }
     }
 
-    pub fn change_finalized(self, finalized: FinalizedMuteState) -> ProgressingMuteState {
+    /// Updates [`FinalizedMuteState`] of this [`ProgressingMuteState`].
+    pub fn change_finalized(self, finalized: FinalizedMuteState) -> Self {
         match self {
-            ProgressingMuteState::Unmuting(_) => ProgressingMuteState::Unmuting(finalized),
-            ProgressingMuteState::Muting(_) => ProgressingMuteState::Muting(finalized),
+            Self::Unmuting(_) => Self::Unmuting(finalized),
+            Self::Muting(_) => Self::Muting(finalized),
+        }
+    }
+
+    /// Returns [`FinalizedMuteState`] of this [`ProgressingMuteState`].
+    pub fn finalize(self) -> FinalizedMuteState {
+        match self {
+            Self::Unmuting(finalized) | Self::Muting(finalized) => finalized,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, From, PartialEq)]
-pub enum MuteState {
+enum MuteState {
     InProgress(ProgressingMuteState),
     Final(FinalizedMuteState),
 }
 
 impl MuteState {
-    pub fn is_in_progress(&self) -> bool {
-        match self {
-            MuteState::InProgress(_) => true,
-            MuteState::Final(_) => false,
-        }
-    }
-
-    pub fn is_final(&self) -> bool {
-        match self {
-            MuteState::Final(_) => true,
-            MuteState::InProgress(_) => false,
-        }
-    }
-
+    /// Transforms current [`MuteState`] into [`MuteState::InProgress`] state
+    /// which will should be transformed into provided
+    /// [`FinalizedMuteState`].
     pub fn progress(self, needed_state: FinalizedMuteState) -> Self {
         if self == needed_state.into() {
             return self;
         }
 
         match self {
-            MuteState::Final(finalized) => {
-                finalized.into_progress().into()
-            }
-            MuteState::InProgress(progressing) => {
-                if progressing.finalized() == needed_state {
+            Self::Final(finalized) => finalized.into_progress().into(),
+            Self::InProgress(progressing) => {
+                if progressing.intention() == needed_state {
                     self
                 } else {
-                    progressing.flip().into()
+                    progressing.swap().into()
                 }
             }
+        }
+    }
+
+    /// Returns [`FinalizedMuteState`] of this [`MuteState`].
+    ///
+    /// If current [`MuteState`] is [`MuteState::InProgress`] then
+    /// [`FinalizedState`] will be get from [`ProgressingState`] finalized.
+    pub fn finalize(self) -> Self {
+        match self {
+            Self::Final(_) => self,
+            Self::InProgress(progressing) => progressing.finalize().into(),
         }
     }
 }
@@ -546,14 +556,44 @@ impl Sender {
         let weak_this = Rc::downgrade(&this);
         spawn_local(async move {
             while let Some(mute_state_update) = subscription.next().await {
-                if let MuteState::Final(finalized) = mute_state_update {
-                    if let Some(this) = weak_this.upgrade() {
-                        if let Some(track) = this.track.borrow().as_ref() {
-                            track.set_enabled_by_mute_state(finalized);
+                if let Some(this) = weak_this.upgrade() {
+                    match mute_state_update {
+                        MuteState::Final(finalized) => {
+                            if let Some(track) = this.track.borrow().as_ref() {
+                                track.set_enabled_by_mute_state(finalized);
+                            }
                         }
-                    } else {
-                        break;
+                        MuteState::InProgress(_) => {
+                            let weak_this = Rc::downgrade(&this);
+                            spawn_local(async move {
+                                let mut in_progress_subscription =
+                                    this.mute_state.subscribe().skip(1);
+                                let timeout = Box::pin(delay_for(
+                                    Duration::from_secs(5).into(),
+                                ));
+                                match future::select(
+                                    in_progress_subscription.next(),
+                                    timeout,
+                                )
+                                .await
+                                {
+                                    Either::Left(_) => (),
+                                    Either::Right(_) => {
+                                        if let Some(this) = weak_this.upgrade()
+                                        {
+                                            let finalized = this
+                                                .mute_state
+                                                .get()
+                                                .finalize();
+                                            this.mute_state.set(finalized);
+                                        }
+                                    }
+                                }
+                            });
+                        }
                     }
+                } else {
+                    break;
                 }
             }
         });
@@ -572,7 +612,7 @@ impl Sender {
     }
 
     /// Returns [`MuteState`] of this [`Sender`].
-    pub fn mute_state(&self) -> MuteState {
+    fn mute_state(&self) -> MuteState {
         self.mute_state.get()
     }
 
@@ -611,11 +651,22 @@ impl Sender {
         self.mute_state.get() == FinalizedMuteState::NotMuted.into()
     }
 
+    /// Sets current [`MuteState`] to [`MuteState::InProgress`].
     pub fn progress_mute_state(&self, needed_state: FinalizedMuteState) {
         let current_mute_state = self.mute_state.get();
-        self.mute_state.set(current_mute_state.progress(needed_state));
+        self.mute_state
+            .set(current_mute_state.progress(needed_state));
     }
 
+    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
+    /// [`Sender`] will be [`MuteState::Final`].
+    ///
+    /// `Ok(())` will be returned if [`Sender`]'s [`MuteState`] transits into
+    /// requested [`FinalizedMuteState`].
+    ///
+    /// `Err(MuteStateTransitsIntoOppositeState)` will be returned if
+    /// [`Sender`]'s [`MuteState`] transits into opposite to
+    /// requested [`FinalizedMuteState`].
     pub fn when_finalized_with(
         &self,
         needed_state: FinalizedMuteState,
@@ -649,7 +700,7 @@ impl Sender {
             let mute_state_update: MuteState = match current_mute_state {
                 MuteState::Final(_) => new_mute_state.into(),
                 MuteState::InProgress(progressing) => {
-                    if progressing.finalized() == new_mute_state {
+                    if progressing.intention() == new_mute_state {
                         new_mute_state.into()
                     } else {
                         progressing.change_finalized(new_mute_state).into()

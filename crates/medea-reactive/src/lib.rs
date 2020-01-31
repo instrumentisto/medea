@@ -569,8 +569,7 @@ impl<D: Clone> OnObservableFieldModification<D>
                 }
             }
             UniversalSubscriber::Subscribe(sender) => {
-                sender.unbounded_send(data.clone()).unwrap();
-                true
+                sender.unbounded_send(data.clone()).is_ok()
             }
         });
     }

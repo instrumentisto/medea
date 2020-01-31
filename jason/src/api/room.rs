@@ -24,9 +24,9 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        TransceiverKind,
+        FinalizedMuteState, MediaConnectionsError, MediaStream,
+        MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
+        PeerRepository, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -39,7 +39,6 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::peer::FinalizedMuteState;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -256,10 +255,10 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JsValue> {
         let inner = upgrade_or_detached!(self.0, JsValue)?;
-        while !inner
-            .borrow()
-            .is_all_peers_in_mute_state(kind, FinalizedMuteState::from(is_muted))
-        {
+        while !inner.borrow().is_all_peers_in_mute_state(
+            kind,
+            FinalizedMuteState::from(is_muted),
+        ) {
             let fut = inner.borrow().toggle_mute(is_muted, kind);
             fut.await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
@@ -604,9 +603,7 @@ impl InnerRoom {
                                 id,
                                 is_muted: Some(is_muted),
                             };
-                            sender.progress_mute_state(
-                                needed_mute_state,
-                            );
+                            sender.progress_mute_state(needed_mute_state);
 
                             track_update
                         })
