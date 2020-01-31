@@ -166,12 +166,17 @@ impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         use PeerError::*;
         match err {
-            MediaConnections(_) | StreamRequest(_) => {
-                Self::InvalidLocalStream(err)
+            MediaConnections(ref media_connections_err) => {
+                match media_connections_err {
+                    MediaConnectionsError::InvalidTrackPatch(id) => {
+                        Self::FailedTrackPatch(*id)
+                    }
+                    _ => Self::InvalidLocalStream(err),
+                }
             }
+            StreamRequest(_) => Self::InvalidLocalStream(err),
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
-            InvalidTrackPatch(id) => Self::FailedTrackPatch(id),
         }
     }
 }
@@ -821,7 +826,7 @@ impl EventHandler for InnerRoom {
     /// Updates [`Track`]s of this [`Room`].
     fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
         if let Some(peer) = self.peers.get(peer_id) {
-            if let Err(err) = peer.update_tracks(tracks) {
+            if let Err(err) = peer.update_senders(tracks) {
                 JasonError::from(err).print();
             }
         } else {

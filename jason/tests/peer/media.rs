@@ -2,11 +2,12 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use medea_client_api_proto::TrackId;
+use medea_client_api_proto::{TrackId, TrackPatch};
 use medea_jason::{
     media::MediaManager,
     peer::{
-        MediaConnections, MuteState, RtcPeerConnection, SimpleStreamRequest,
+        FinalizedMuteState, MediaConnections, RtcPeerConnection,
+        SimpleStreamRequest,
     },
 };
 use wasm_bindgen_test::*;
@@ -42,11 +43,11 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .change_mute_state(MuteState::from(!enabled_audio));
+        .progress_mute_state(FinalizedMuteState::from(!enabled_audio));
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .change_mute_state(MuteState::from(!enabled_video));
+        .progress_mute_state(FinalizedMuteState::from(!enabled_video));
 
     (media_connections, audio_track_id, video_track_id)
 }
@@ -90,24 +91,48 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.mute_state(), MuteState::NotMuted);
-    assert_eq!(video_track.mute_state(), MuteState::NotMuted);
+    assert!(!audio_track.is_track_muted());
+    assert!(!video_track.is_track_muted());
 
-    audio_track.change_mute_state(MuteState::Muted);
-    assert_eq!(audio_track.mute_state(), MuteState::Muted);
-    assert_eq!(video_track.mute_state(), MuteState::NotMuted);
+    audio_track.progress_mute_state(FinalizedMuteState::Muted);
+    media_connections
+        .update_senders(vec![TrackPatch {
+            id: audio_track_id,
+            is_muted: Some(true),
+        }])
+        .unwrap();
+    assert!(audio_track.is_track_muted());
+    assert!(!video_track.is_track_muted());
 
-    video_track.change_mute_state(MuteState::Muted);
-    assert_eq!(audio_track.mute_state(), MuteState::Muted);
-    assert_eq!(video_track.mute_state(), MuteState::Muted);
+    video_track.progress_mute_state(FinalizedMuteState::Muted);
+    media_connections
+        .update_senders(vec![TrackPatch {
+            id: video_track_id,
+            is_muted: Some(true),
+        }])
+        .unwrap();
+    assert!(audio_track.is_track_muted());
+    assert!(video_track.is_track_muted());
 
-    audio_track.change_mute_state(MuteState::NotMuted);
-    assert_eq!(audio_track.mute_state(), MuteState::NotMuted);
-    assert_eq!(video_track.mute_state(), MuteState::Muted);
+    audio_track.progress_mute_state(FinalizedMuteState::NotMuted);
+    media_connections
+        .update_senders(vec![TrackPatch {
+            id: audio_track_id,
+            is_muted: Some(false),
+        }])
+        .unwrap();
+    assert!(!audio_track.is_track_muted());
+    assert!(video_track.is_track_muted());
 
-    video_track.change_mute_state(MuteState::NotMuted);
-    assert_eq!(audio_track.mute_state(), MuteState::NotMuted);
-    assert_eq!(video_track.mute_state(), MuteState::NotMuted);
+    video_track.progress_mute_state(FinalizedMuteState::NotMuted);
+    media_connections
+        .update_senders(vec![TrackPatch {
+            id: video_track_id,
+            is_muted: Some(false),
+        }])
+        .unwrap();
+    assert!(!audio_track.is_track_muted());
+    assert!(!video_track.is_track_muted());
 }
 
 #[wasm_bindgen_test]
@@ -120,8 +145,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.mute_state(), MuteState::Muted);
-    assert_eq!(video_track.mute_state(), MuteState::NotMuted);
+    assert!(audio_track.is_track_muted());
+    assert!(!video_track.is_track_muted());
 }
 
 #[wasm_bindgen_test]
@@ -134,6 +159,6 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert_eq!(audio_track.mute_state(), MuteState::NotMuted);
-    assert_eq!(video_track.mute_state(), MuteState::Muted);
+    assert!(!audio_track.is_track_muted());
+    assert!(video_track.is_track_muted());
 }

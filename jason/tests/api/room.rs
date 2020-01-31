@@ -8,7 +8,7 @@ use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
     peer::{
-        MockPeerRepository, MuteState, PeerConnection, PeerEvent,
+        FinalizedMuteState, MockPeerRepository, PeerConnection, PeerEvent,
         TransceiverKind,
     },
     rpc::MockRpcClient,
@@ -133,7 +133,7 @@ async fn join_two_audio_mutes() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        MuteState::Muted
+        FinalizedMuteState::Muted
     ));
 }
 
@@ -168,7 +168,7 @@ async fn join_two_video_mutes() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
-        MuteState::Muted
+        FinalizedMuteState::Muted
     ));
 }
 
@@ -196,7 +196,7 @@ async fn join_mute_and_unmute_audio() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        MuteState::NotMuted
+        FinalizedMuteState::NotMuted
     ));
 
     let handle = room.new_handle();
@@ -210,7 +210,7 @@ async fn join_mute_and_unmute_audio() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        MuteState::Muted
+        FinalizedMuteState::Muted
     ));
 }
 
@@ -238,7 +238,7 @@ async fn join_mute_and_unmute_video() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
-        MuteState::NotMuted
+        FinalizedMuteState::NotMuted
     ));
 
     let handle = room.new_handle();
@@ -252,7 +252,7 @@ async fn join_mute_and_unmute_video() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
-        MuteState::Muted
+        FinalizedMuteState::Muted
     ));
 }
 
@@ -280,7 +280,7 @@ async fn join_unmute_and_mute_audio() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        MuteState::NotMuted
+        FinalizedMuteState::NotMuted
     ));
 
     let handle = room.new_handle();
@@ -288,7 +288,7 @@ async fn join_unmute_and_mute_audio() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        MuteState::Muted
+        FinalizedMuteState::Muted
     ));
 
     let (mute_audio_result, unmute_audio_result) = futures::future::join(
@@ -301,7 +301,7 @@ async fn join_unmute_and_mute_audio() {
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        MuteState::NotMuted
+        FinalizedMuteState::NotMuted
     ));
 }
 

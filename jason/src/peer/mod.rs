@@ -70,10 +70,6 @@ pub enum PeerError {
     /// parsing [`MediaStream`].
     #[display(fmt = "{}", _0)]
     StreamRequest(#[js(cause)] StreamRequestError),
-
-    /// Invalid [`medea_client_api_proto::TrackPatch`] for [`MediaTrack`].
-    #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
-    InvalidTrackPatch(TrackId),
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
@@ -256,18 +252,11 @@ impl PeerConnection {
 
     /// Updates [`Sender`]s of this [`PeerConnection`] with
     /// [`medea_client_api_proto::TrackPatch`].
-    pub fn update_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
-        for track_proto in tracks {
-            let track = self
-                .media_connections
-                .get_sender_by_id(track_proto.id)
-                .ok_or_else(|| {
-                    tracerr::new!(PeerError::InvalidTrackPatch(track_proto.id))
-                })?;
-            track.update(&track_proto);
-        }
-
-        Ok(())
+    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+        Ok(self
+            .media_connections
+            .update_senders(tracks)
+            .map_err(tracerr::map_from_and_wrap!())?)
     }
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.

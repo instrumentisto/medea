@@ -68,6 +68,10 @@ pub enum MediaConnectionsError {
     #[display(fmt = "'MuteState' of 'Sender' transits into opposite to \
                      expected `MuteState'")]
     MuteStateTransitsIntoOppositeState,
+
+    /// Invalid [`medea_client_api_proto::TrackPatch`] for [`MediaTrack`].
+    #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
+    InvalidTrackPatch(TrackId),
 }
 
 impl From<Dropped> for MediaConnectionsError {
@@ -164,7 +168,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .skip_while(|s| s.is_track_enabled())
+            .skip_while(|s| !s.is_track_muted())
             .next()
             .is_none()
     }
@@ -175,7 +179,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .skip_while(|s| s.is_track_enabled())
+            .skip_while(|s| !s.is_track_muted())
             .next()
             .is_none()
     }
@@ -247,6 +251,22 @@ impl MediaConnections {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Updates [`Sender`]s of this [`PeerConnection`] with
+    /// [`medea_client_api_proto::TrackPatch`].
+    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+        for track_proto in tracks {
+            let track =
+                self.get_sender_by_id(track_proto.id).ok_or_else(|| {
+                    tracerr::new!(MediaConnectionsError::InvalidTrackPatch(
+                        track_proto.id
+                    ))
+                })?;
+            track.update(&track_proto);
+        }
+
         Ok(())
     }
 
@@ -647,8 +667,8 @@ impl Sender {
     }
 
     /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
-    fn is_track_enabled(&self) -> bool {
-        self.mute_state.get() == FinalizedMuteState::NotMuted.into()
+    pub fn is_track_muted(&self) -> bool {
+        self.mute_state.get() == FinalizedMuteState::Muted.into()
     }
 
     /// Sets current [`MuteState`] to [`MuteState::InProgress`].
