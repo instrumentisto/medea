@@ -73,6 +73,8 @@ pub enum TryFromProtobufError {
 
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
+
+    CallbackNotSupportedInNotRelayMode,
 }
 
 impl From<SrcParseError> for TryFromProtobufError {

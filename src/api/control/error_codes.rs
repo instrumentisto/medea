@@ -279,6 +279,15 @@ pub enum ErrorCode {
     #[display(fmt = "Invalid callback URL.")]
     InvalidCallbackUrl = 1022,
 
+    /// `on_start` and `on_stop` callbacks of `WebRtcPlayEndpoint`
+    /// not supported while `relay_mode` is not `true`.
+    ///
+    /// Code: __1033__.
+    #[display(fmt = "'on_start' and 'on_stop' callbacks of \
+                     'WebRtcPlayEndpoint' not supported while 'relay_mode' \
+                     is not 'true'.")]
+    CallbackNotSupportedInNotRelayMode = 1023,
+
     /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
@@ -338,6 +347,9 @@ impl From<TryFromProtobufError> for ErrorResponse {
                 String::from("No element was provided"),
                 Some(id),
             ),
+            CallbackNotSupportedInNotRelayMode => {
+                Self::without_id(ErrorCode::CallbackNotSupportedInNotRelayMode)
+            }
         }
     }
 }
