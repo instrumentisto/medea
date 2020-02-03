@@ -1,9 +1,12 @@
 //! Service which stores and lazily creates [`CallbackRequest`] clients.
 
-use std::{collections::hash_map::HashMap, fmt::Debug, sync::Arc};
+use std::{
+    collections::hash_map::HashMap,
+    fmt::Debug,
+    sync::{Arc, RwLock},
+};
 
 use actix::Arbiter;
-use parking_lot::RwLock;
 
 use crate::{
     api::control::{
@@ -19,13 +22,15 @@ use crate::{
 
 use super::{clients::build_client, CallbackRequest};
 
+// TODO: wrap in actor
+
 /// Service which stores and lazily creates [`CallbackRequest`] clients.
 #[derive(Clone, Debug, Default)]
 pub struct CallbackService(
     // TODO: Hashmap entries are not dropped anywhere. some kind of
     //       [expiring map](https://github.com/jhalterman/expiringmap)
     //       would fit here.
-    Arc<RwLock<HashMap<CallbackUrl, Box<dyn CallbackClient>>>>,
+    Arc<RwLock<HashMap<CallbackUrl, Arc<dyn CallbackClient>>>>,
 );
 
 impl CallbackService {
@@ -39,16 +44,29 @@ impl CallbackService {
             request, callback_url
         );
 
-        let read_lock = self.0.read();
-        if let Some(client) = read_lock.get(&callback_url) {
-            client.send(request).await?;
+        // TODO: refactor this when there will be some trustworthy thread safe
+        //       HashMap with atomic `compute if absent`.
+        let read_lock = self.0.read().unwrap();
+        let client = if let Some(client) = read_lock.get(&callback_url) {
+            Arc::clone(client)
         } else {
             drop(read_lock);
 
-            let new_client = build_client(&callback_url).await?;
-            new_client.send(request).await?;
-            self.0.write().insert(callback_url, Box::new(new_client));
+            // We are building client while holding write lock to avoid races,
+            // that can lead to creating multiple clients to same uri.
+            let mut write_lock = self.0.write().unwrap();
+            if let Some(client) = write_lock.get(&callback_url) {
+                Arc::clone(client)
+            } else {
+                let new_client: Arc<dyn CallbackClient> =
+                    Arc::new(build_client(&callback_url).await?);
+                write_lock.insert(callback_url, Arc::clone(&new_client));
+
+                new_client
+            }
         };
+
+        client.send(request).await?;
 
         Ok(())
     }

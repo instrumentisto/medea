@@ -4,8 +4,9 @@ use std::time::Duration;
 
 use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
-use medea_client_api_proto::Event;
+use medea_client_api_proto::Event as RpcEvent;
 use medea_control_api_proto::grpc::medea_callback as proto;
+use proto::request::Event;
 
 use crate::{
     callbacks::{GetCallbacks, GrpcCallbackServer},
@@ -51,7 +52,7 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
     let create_response = control_client.create(member).await;
 
     let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
+        move |_: &RpcEvent, _: &mut Context<TestMember>, _: Vec<&RpcEvent>| {};
     let deadline = Some(Duration::from_secs(5));
     let client = TestMember::connect(
         create_response.get(name).unwrap(),
@@ -81,8 +82,7 @@ async fn on_join() {
     let on_joins_count = callbacks
         .into_iter()
         .filter(|r| {
-            if let proto::request::Event::OnJoin(_) = r.event.as_ref().unwrap()
-            {
+            if let Some(Event::OnJoin(_)) = &r.event {
                 true
             } else {
                 false
@@ -117,7 +117,7 @@ async fn on_leave_normally_disconnected() {
     let on_leaves_count = callbacks
         .into_iter()
         .filter_map(|req| {
-            if let Some(proto::request::Event::OnLeave(on_leave)) = req.event {
+            if let Some(Event::OnLeave(on_leave)) = req.event {
                 Some(on_leave.reason)
             } else {
                 None
@@ -156,7 +156,7 @@ async fn on_leave_on_connection_loss() {
     let on_leaves_count = callbacks
         .into_iter()
         .filter_map(|req| {
-            if let Some(proto::request::Event::OnLeave(on_leave)) = req.event {
+            if let Some(Event::OnLeave(on_leave)) = req.event {
                 Some(on_leave.reason)
             } else {
                 None

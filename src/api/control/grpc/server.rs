@@ -8,6 +8,7 @@ use std::{
 };
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
+use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
@@ -274,7 +275,7 @@ impl ControlApiService {
     }
 }
 
-#[tonic::async_trait]
+#[async_trait]
 impl ControlApi for ControlApiService {
     async fn create(
         &self,

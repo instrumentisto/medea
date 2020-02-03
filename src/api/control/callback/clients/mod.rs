@@ -4,9 +4,8 @@ pub mod grpc;
 
 use std::fmt::Debug;
 
-use actix::Actor;
+use async_trait::async_trait;
 use derive_more::From;
-use futures::future::LocalBoxFuture;
 
 use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},
@@ -19,19 +18,16 @@ pub enum CallbackClientError {
     /// [`tonic`] failed to send [`CallbackRequest`].
     Tonic(tonic::Status),
 
-    /// [`MailboxError`] while sending [`CallbackRequest`] to a
-    /// [`CallbackClient`] [`Actor`].
-    Mailbox(actix::MailboxError),
-
     /// Error while creating new [`CallbackClient`].
     TonicTransport(tonic::transport::Error),
 }
 
+#[async_trait]
 pub trait CallbackClient: Debug + Send + Sync {
-    fn send(
+    async fn send(
         &self,
         request: CallbackRequest,
-    ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>>;
+    ) -> Result<(), CallbackClientError>;
 }
 
 /// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
@@ -42,7 +38,7 @@ pub async fn build_client(
     info!("Creating CallbackClient for URL: {}", url);
     match &url {
         CallbackUrl::Grpc(grpc_url) => {
-            Ok(grpc::GrpcCallbackClient::new(grpc_url).await?.start())
+            grpc::GrpcCallbackClient::new(grpc_url).await
         }
     }
 }

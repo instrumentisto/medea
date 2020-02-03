@@ -8,6 +8,8 @@
 use medea::api::control::error_codes::ErrorCode;
 use medea_control_api_proto::grpc::medea as proto;
 
+use crate::grpc_control_api::{take_member, take_room, take_webrtc_pub};
+
 use super::{
     create_room_req, ControlClient, MemberBuilder, RoomBuilder,
     WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
@@ -31,8 +33,7 @@ mod room {
             &format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME)
         );
 
-        let get_resp = client.get(TEST_NAME).await;
-        let mut room = get_resp.take_room();
+        let mut room = take_room(client.get(TEST_NAME).await);
 
         let responder = room.pipeline.remove("responder").unwrap();
         let responder = match responder.el.unwrap() {
@@ -135,10 +136,8 @@ mod member {
             format!("ws://127.0.0.1:8080/ws/{}/test-member/qwerty", TEST_NAME)
         );
 
-        let member = client
-            .get(&format!("{}/test-member", TEST_NAME))
-            .await
-            .take_member();
+        let member = client.get(&format!("{}/test-member", TEST_NAME)).await;
+        let member = take_member(member);
         assert_eq!(member.pipeline.len(), 1);
         assert_eq!(member.credentials.as_str(), "qwerty");
     }
@@ -231,8 +230,8 @@ mod endpoint {
 
         let endpoint = client
             .get(&format!("{}/responder/publish", TEST_NAME))
-            .await
-            .take_webrtc_pub();
+            .await;
+        let endpoint = take_webrtc_pub(endpoint);
         assert_eq!(
             endpoint.p2p,
             proto::web_rtc_publish_endpoint::P2p::Never as i32
