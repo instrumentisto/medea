@@ -414,7 +414,7 @@ impl MediaConnections {
     }
 }
 
-/// Mute state of [`Sender`].
+/// Final mute state of [`Sender`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FinalizedMuteState {
     /// [`Sender`] is not muted.
@@ -452,6 +452,12 @@ impl From<bool> for FinalizedMuteState {
     }
 }
 
+/// Mute state in state of transition.
+///
+/// [`FinalizedMuteState`] which stored in [`ProgressingMuteState`] variants
+/// is state which we already received from a server, but we still waiting for
+/// needed state update. If needed a state update wouldn't be received, the
+/// stored [`FinalizedMuteState`] will be applied.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ProgressingMuteState {
     /// [`Sender`] should be unmuted, but awaits server permission.
@@ -494,9 +500,13 @@ impl ProgressingMuteState {
     }
 }
 
+/// All mute states in which [`Sender`] can be.
 #[derive(Debug, Clone, Copy, From, PartialEq)]
 enum MuteState {
+    /// Mute state in state of transition.
     InProgress(ProgressingMuteState),
+
+    /// Final mute state of [`Sender`].
     Final(FinalizedMuteState),
 }
 
@@ -589,7 +599,7 @@ impl Sender {
                                 let mut in_progress_subscription =
                                     this.mute_state.subscribe().skip(1);
                                 let timeout = Box::pin(delay_for(
-                                    Duration::from_secs(5).into(),
+                                    Duration::from_secs(10).into(),
                                 ));
                                 match future::select(
                                     in_progress_subscription.next(),
@@ -658,9 +668,11 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
-        if let MuteState::Final(finalized) = sender.mute_state() {
-            track.set_enabled_by_mute_state(finalized);
-        }
+        let finalized_mute_state = match sender.mute_state() {
+            MuteState::Final(finalized) => finalized,
+            MuteState::InProgress(progressing) => progressing.finalize(),
+        };
+        track.set_enabled_by_mute_state(finalized_mute_state);
         sender.track.borrow_mut().replace(track);
 
         Ok(())
