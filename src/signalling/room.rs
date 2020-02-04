@@ -595,10 +595,10 @@ impl Room {
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
     ///
-    /// Returns [`RoomError::EndpointAlreadyExists`] when
-    /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
-    ///
     /// # Errors
+    ///
+    /// Will return [`RoomError::EndpointAlreadyExists`] when
+    /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
     ///
     /// Will return [`RoomError::ParticipantServiceErr`] if `Member` with
     /// provided [`MemberId`] not exists.
@@ -665,9 +665,6 @@ impl Room {
     ///
     /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].
-    ///
-    /// Returns [`RoomError::MemberAlreadyExists`] when
-    /// [`Member`]'s ID already presented in [`ParticipantService`].
     ///
     /// # Errors
     ///
