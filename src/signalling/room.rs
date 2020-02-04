@@ -25,8 +25,8 @@ use crate::{
         },
         control::{
             callback::{
-                service::CallbackService, OnJoinEvent, OnLeaveEvent,
-                OnLeaveReason,
+                clients::CallbackClientFactoryImpl, service::CallbackService,
+                OnJoinEvent, OnLeaveEvent, OnLeaveReason,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -160,7 +160,7 @@ pub struct Room {
     /// Service for sending [`CallbackEvent`]s.
     ///
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
-    callbacks: CallbackService,
+    callbacks: CallbackService<CallbackClientFactoryImpl>,
 
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
     /// [`RpcConnection`] authorization, establishment, message sending.

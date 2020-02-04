@@ -2,11 +2,11 @@
 
 use std::fmt;
 
-use async_trait::async_trait;
 #[rustfmt::skip]
 use medea_control_api_proto::grpc::medea_callback::{
     callback_client::CallbackClient as ProtoCallbackClient
 };
+use futures::future::LocalBoxFuture;
 use tonic::transport::Channel;
 
 use crate::api::control::callback::{
@@ -36,17 +36,17 @@ impl GrpcCallbackClient {
     }
 }
 
-#[async_trait]
 impl CallbackClient for GrpcCallbackClient {
-    async fn send(
+    fn send(
         &self,
         request: CallbackRequest,
-    ) -> Result<(), CallbackClientError> {
-        self.client
-            .clone()
-            .on_event(tonic::Request::new(request.into()))
-            .await?;
-        Ok(())
+    ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
+        let mut client = self.client.clone();
+
+        Box::pin(async move {
+            client.on_event(tonic::Request::new(request.into())).await?;
+            Ok(())
+        })
     }
 }
 
