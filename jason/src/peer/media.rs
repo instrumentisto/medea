@@ -139,8 +139,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .skip_while(|s| s.is_track_enabled())
-            .next()
+            .find(|s| !s.is_track_enabled())
             .is_none()
     }
 
@@ -150,8 +149,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .skip_while(|s| s.is_track_enabled())
-            .next()
+            .find(|s| !s.is_track_enabled())
             .is_none()
     }
 
@@ -510,6 +508,6 @@ impl Receiver {
         if self.mid.is_none() && self.transceiver.is_some() {
             self.mid = self.transceiver.as_ref().unwrap().mid()
         }
-        self.mid.as_ref().map(String::as_str)
+        self.mid.as_deref()
     }
 }
