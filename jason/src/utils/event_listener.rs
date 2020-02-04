@@ -29,6 +29,10 @@ where
     A: FromWasmAbi + 'static,
 {
     /// Creates new [`EventListener`] from a given [`FnMut`] `closure`.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`EventListenerBindError`] if [`EventListener`] bound fails.
     pub fn new_mut<F>(
         target: Rc<T>,
         event_name: &'static str,
@@ -56,6 +60,10 @@ where
     }
 
     /// Creates new [`EventListener`] from a given [`FnOnce`] `closure`.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`EventListenerBindError`] if [`EventListener`] bound fails.
     pub fn new_once<F>(
         target: Rc<T>,
         event_name: &'static str,

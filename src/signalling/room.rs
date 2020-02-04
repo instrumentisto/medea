@@ -178,7 +178,9 @@ pub struct Room {
 impl Room {
     /// Creates new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when errs while `Element`
+    /// # Errors
+    ///
+    /// Will return [`RoomError::BadRoomSpec`] when errs while `Element`
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
@@ -542,6 +544,11 @@ impl Room {
     ///
     /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RoomError::ParticipantServiceErr`] if [`Member`] with
+    /// provided [`MemberId`] not found in [`ParticipantService`].
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -590,6 +597,11 @@ impl Room {
     ///
     /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RoomError::ParticipantServiceErr`] if `Member` with
+    /// provided [`MemberId`] not exists.
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -656,6 +668,11 @@ impl Room {
     ///
     /// Returns [`RoomError::MemberAlreadyExists`] when
     /// [`Member`]'s ID already presented in [`ParticipantService`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RoomError::MemberAlreadyExists`] if `Member` with
+    /// provided [`MemberId`] already exists in [`ParticipantService`].
     pub fn create_member(
         &mut self,
         id: MemberId,

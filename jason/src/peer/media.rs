@@ -157,6 +157,17 @@ impl MediaConnections {
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`MediaConnectionsError::SendersWithoutMids`] if some
+    /// [`Sender`] doesn't have [`mid`].
+    ///
+    /// Will return [`MediaConnectionsError::ReceiversWithoutMids`] if some
+    /// [`Receiver`] doesn't have [`mid`].
+    ///
+    /// [`mid`]:
+    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let mut s = self.0.borrow_mut();
         let mut mids =
@@ -188,8 +199,10 @@ impl MediaConnections {
     /// and [`Receiver`]s for each new [`Track`], and updates [`Track`] if
     /// its settings has been changed.
     ///
-    /// Returns [`StreamRequest`] in case a new local [`MediaStream`]
-    /// is required.
+    /// # Errors
+    ///
+    /// Will return [`MediaConnectionsError`] if some error happen while
+    /// creating new [`Sender`] or [`Receiver`].
     // TODO: Doesnt really updates anything, but only generates new senders
     //       and receivers atm.
     pub fn update_tracks<I: IntoIterator<Item = Track>>(

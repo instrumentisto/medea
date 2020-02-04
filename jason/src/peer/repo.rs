@@ -18,6 +18,11 @@ pub trait PeerRepository {
     /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
     ///
     /// [`PeerConnection`] can be created with muted audio or video [`Track`]s.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`PeerError`] if error while creating [`PeerConnection`]
+    /// happens.
     fn create_peer(
         &mut self,
         id: PeerId,

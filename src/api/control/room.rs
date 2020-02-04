@@ -90,6 +90,11 @@ impl TryFrom<proto::create_request::El> for RoomSpec {
 
 impl RoomSpec {
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`TryFromElementError::NotMember`] if not [`MemberSpec`]
+    /// was found in a this [`RoomSpec`]'s pipeline.
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, MemberSpec>, TryFromElementError> {

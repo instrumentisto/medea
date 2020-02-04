@@ -310,6 +310,11 @@ pub trait RpcTransport {
     fn set_close_reason(&self, reason: ClientDisconnect);
 
     /// Sends given [`ClientMsg`] to a server.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`TransportError`] if some error while [`ClientMsg`] sending
+    /// happens.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
     /// Subscribes to a [`RpcTransport`]'s [`State`] changes.

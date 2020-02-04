@@ -391,6 +391,11 @@ impl DeleteElements<Unvalidated> {
 
     /// Validates request. It must have at least one fid, all fids must share
     /// same [`RoomId`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RoomServiceError::EmptyUrisList`] if [`DeleteElements`]
+    /// consists of an empty [`Vec`] of [`StatefulFid`]s.
     pub fn validate(
         self,
     ) -> Result<DeleteElements<Validated>, RoomServiceError> {

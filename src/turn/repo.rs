@@ -32,6 +32,10 @@ pub struct TurnDatabase {
 
 impl TurnDatabase {
     /// Creates new [`TurnDatabase`].
+    ///
+    /// # Errors
+    ///
+    /// Will return [`TurnDatabaseErr`] if authentication in [Redis] was failed.
     pub fn new<S: IntoConnectionInfo + Clone>(
         conn_timeout: Duration,
         conn_info: S,
