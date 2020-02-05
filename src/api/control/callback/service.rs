@@ -21,21 +21,22 @@ use crate::{
     log::prelude::*,
 };
 
-type CallbackClientArc = Arc<Box<dyn CallbackClient>>;
-
 /// Service which stores and lazily creates [`CallbackRequest`] clients.
 #[derive(Debug, Default)]
-pub struct CallbackService<B>(
+pub struct CallbackService<B> {
     // TODO: Hashmap entries are not dropped anywhere. some kind of
     //       [expiring map](https://github.com/jhalterman/expiringmap)
     //       would fit here.
-    Arc<RwLock<HashMap<CallbackUrl, CallbackClientArc>>>,
-    PhantomData<B>,
-);
+    clients: Arc<RwLock<HashMap<CallbackUrl, Arc<dyn CallbackClient>>>>,
+    _factory: PhantomData<B>,
+}
 
 impl<B> Clone for CallbackService<B> {
     fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1)
+        Self {
+            clients: self.clients.clone(),
+            _factory: PhantomData,
+        }
     }
 }
 
@@ -50,20 +51,22 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
             request, callback_url
         );
 
-        let read_lock = self.0.read().await;
+        let read_lock = self.clients.read().await;
         let client = if let Some(client) = read_lock.get(&callback_url) {
             Arc::clone(client)
         } else {
             drop(read_lock);
-
-            // We are building client while holding write lock to avoid races,
-            // that can lead to creating multiple clients to same uri.
-            let mut write_lock = self.0.write().await;
+            let mut write_lock = self.clients.write().await;
+            // Double checked locking is kinda redundant atm, since this future
+            // is !Send, but lets leave it this way for additional
+            // future-proofness.
             if let Some(client) = write_lock.get(&callback_url) {
                 Arc::clone(client)
             } else {
-                let new_client: CallbackClientArc =
-                    Arc::new(B::build(callback_url.clone()).await?);
+                // We are building client while holding write lock to
+                // avoid races, that can lead to creating
+                // multiple clients to same uri.
+                let new_client = B::build(callback_url.clone()).await?;
                 write_lock.insert(callback_url, Arc::clone(&new_client));
 
                 new_client
@@ -102,8 +105,9 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
 mod tests {
     use std::{convert::TryFrom as _, time::Duration};
 
-    use futures::channel::oneshot;
+    use futures::{future, FutureExt};
     use serial_test_derive::serial;
+    use tokio::time;
 
     use crate::api::control::callback::{
         clients::{MockCallbackClient, MockCallbackClientFactory},
@@ -125,76 +129,45 @@ mod tests {
         CallbackUrl::try_from("grpc://127.0.0.1:6565".to_string()).unwrap()
     }
 
-    /// Tests that only 1 [`CallbackClient`] will be created on 10 calls of
-    /// [`CallbackService::send_request`].
+    /// Tests that only 1 [`CallbackClient`] will be created if we perform
+    /// multiple concurrent request.
     #[actix_rt::test]
     #[serial]
     async fn only_one_client_will_be_created() {
-        const SEND_COUNT: usize = 10;
+        const SEND_COUNT: usize = 20;
 
         let mut client_mock = MockCallbackClient::new();
-        client_mock
-            .expect_send()
-            .times(SEND_COUNT)
-            .returning(|_| Box::pin(async { Ok(()) }));
-
-        let client_builder_ctx = MockCallbackClientFactory::build_context();
-        client_builder_ctx.expect().times(1).return_once(move |_| {
-            Box::pin(async move {
-                Ok(Box::new(client_mock) as Box<dyn CallbackClient>)
-            })
+        client_mock.expect_send().times(SEND_COUNT).returning(|_| {
+            async {
+                time::delay_for(Duration::from_millis(50)).await;
+                Ok(())
+            }
+            .boxed_local()
         });
 
-        let callback_service =
-            CallbackService::<MockCallbackClientFactory>::default();
-        for _ in 0..SEND_COUNT {
-            callback_service
-                .send_request(callback_request(), callback_url())
-                .await
-                .unwrap();
-        }
-    }
-
-    /// Tests that two simultaneous calls of [`CallbackService::send_request`]
-    /// from two threads will create only one [`CallbackClient`].
-    #[actix_rt::test]
-    #[serial]
-    async fn only_one_client_will_be_created_on_multithread() {
-        let mut client_mock = MockCallbackClient::new();
-        client_mock
-            .expect_send()
-            .times(2)
-            .returning(|_| Box::pin(async { Ok(()) }));
-
         let client_builder_ctx = MockCallbackClientFactory::build_context();
         client_builder_ctx.expect().times(1).return_once(move |_| {
-            Box::pin(async move {
-                tokio::time::delay_for(Duration::from_millis(50)).await;
-                Ok(Box::new(client_mock) as Box<dyn CallbackClient>)
-            })
+            async move {
+                time::delay_for(Duration::from_millis(50)).await;
+                Ok(Arc::new(client_mock) as Arc<dyn CallbackClient>)
+            }
+            .boxed_local()
         });
 
         let callback_service =
             CallbackService::<MockCallbackClientFactory>::default();
 
-        let (wait_for_another_arbiter_tx, wait_for_another_arbiter_rx) =
-            oneshot::channel();
-        let another_arbiter_callback_service = callback_service.clone();
-        Arbiter::new().exec_fn(move || {
-            futures::executor::block_on(Box::pin(async move {
-                another_arbiter_callback_service
-                    .send_request(callback_request(), callback_url())
-                    .await
-                    .unwrap();
-                wait_for_another_arbiter_tx.send(()).unwrap();
-            }))
-        });
-
-        callback_service
-            .send_request(callback_request(), callback_url())
-            .await
-            .unwrap();
-
-        wait_for_another_arbiter_rx.await.unwrap();
+        let tasks: Vec<_> = (0..SEND_COUNT)
+            .map(|_| callback_service.clone())
+            .map(|service| {
+                async move {
+                    service
+                        .send_request(callback_request(), callback_url())
+                        .await
+                }
+                .boxed_local()
+            })
+            .collect();
+        future::join_all(tasks).await;
     }
 }
