@@ -2,9 +2,8 @@
 
 pub mod grpc;
 
-use std::fmt::Debug;
+use std::fmt;
 
-use actix::Actor;
 use derive_more::From;
 use futures::future::LocalBoxFuture;
 
@@ -13,36 +12,57 @@ use crate::{
     log::prelude::*,
 };
 
+type Result<T> = std::result::Result<T, CallbackClientError>;
+
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
 #[derive(Debug, From)]
 pub enum CallbackClientError {
     /// [`tonic`] failed to send [`CallbackRequest`].
     Tonic(tonic::Status),
 
-    /// [`MailboxError`] while sending [`CallbackRequest`] to a
-    /// [`CallbackClient`] [`Actor`].
-    Mailbox(actix::MailboxError),
-
     /// Error while creating new [`CallbackClient`].
     TonicTransport(tonic::transport::Error),
 }
 
-pub trait CallbackClient: Debug + Send + Sync {
+#[cfg_attr(test, mockall::automock)]
+pub trait CallbackClient: fmt::Debug + Send + Sync {
+    /// Sends provided [`CallbackRequest`].
     fn send(
         &self,
         request: CallbackRequest,
-    ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>>;
+    ) -> LocalBoxFuture<'static, Result<()>>;
 }
 
-/// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
-#[inline]
-pub async fn build_client(
-    url: &CallbackUrl,
-) -> Result<impl CallbackClient, CallbackClientError> {
-    info!("Creating CallbackClient for URL: {}", url);
-    match &url {
-        CallbackUrl::Grpc(grpc_url) => {
-            Ok(grpc::GrpcCallbackClient::new(grpc_url).await?.start())
+#[cfg(test)]
+impl_debug_by_struct_name!(MockCallbackClient);
+
+/// Factory for a [`CallbackClient`]s.
+#[cfg_attr(test, mockall::automock)]
+pub trait CallbackClientFactory {
+    /// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
+    fn build(
+        url: CallbackUrl,
+    ) -> LocalBoxFuture<'static, Result<Box<dyn CallbackClient>>>;
+}
+
+#[cfg(test)]
+impl_debug_by_struct_name!(MockCallbackClientFactory);
+
+/// Implementation of the [`CallbackClientFactory`].
+#[derive(Clone, Debug, Default)]
+pub struct CallbackClientFactoryImpl;
+
+impl CallbackClientFactory for CallbackClientFactoryImpl {
+    #[inline]
+    fn build(
+        url: CallbackUrl,
+    ) -> LocalBoxFuture<'static, Result<Box<dyn CallbackClient>>> {
+        info!("Creating CallbackClient for URL: {}", url);
+        match url {
+            CallbackUrl::Grpc(grpc_url) => Box::pin(async move {
+                Ok(Box::new(grpc::GrpcCallbackClient::new(&grpc_url).await?)
+                    as Box<dyn CallbackClient>)
+            }),
         }
     }
 }

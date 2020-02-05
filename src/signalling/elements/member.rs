@@ -392,6 +392,11 @@ impl Member {
 
     /// Lookups [`WebRtcPublishEndpoint`] and [`WebRtcPlayEndpoint`] at one
     /// moment by ID.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`MemberError::EndpointNotFound`] if `Endpoint` with
+    /// provided ID not found.
     pub fn get_endpoint_by_id(
         &self,
         id: String,
@@ -462,6 +467,13 @@ impl WeakMember {
 /// loads all related to this [`Member`]s sources and sinks endpoints.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
+///
+/// # Errors
+///
+/// Will return [`MembersLoadError::TryFromError`] if some error happens while
+/// converting getting [`MemberSpec`]s from [`RoomSpec`].
+///
+/// Will return [`MembersLoadError`] if error while [`Member`] loading happens.
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {

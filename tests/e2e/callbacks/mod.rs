@@ -5,6 +5,7 @@ mod member;
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
+use async_trait::async_trait;
 use medea_control_api_proto::grpc::medea_callback::{
     self as proto,
     callback_server::{Callback, CallbackServer as TonicCallbackServer},
@@ -52,7 +53,7 @@ impl CallbackServer {
     }
 }
 
-#[tonic::async_trait]
+#[async_trait]
 impl Callback for CallbackServer {
     async fn on_event(
         &self,

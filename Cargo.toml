@@ -25,9 +25,6 @@ members = [
 [profile.release]
 lto = "thin"
 
-[features]
-deadlock_detection = ["parking_lot/deadlock_detection"]
-
 [dependencies]
 actix = "0.9"
 actix-web = "2.0"
@@ -45,7 +42,6 @@ humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
-parking_lot = "0.10"
 rand = "0.7"
 redis = "0.14"
 rust-crypto = "0.2"

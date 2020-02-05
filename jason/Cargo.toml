@@ -69,3 +69,8 @@ wee_alloc = { version = "0.4", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+
+[metadata]
+# TODO: remove this when https://github.com/rustwasm/wasm-pack/issues/782
+#       issue will be resolved.
+wasm-opt = false

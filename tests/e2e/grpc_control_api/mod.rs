@@ -15,28 +15,24 @@ use medea_control_api_proto::grpc::medea::{
 };
 use tonic::transport::Channel;
 
-pub struct TakeableElement(pub proto::Element);
-
 macro_rules! gen_elem_take_fn {
-        ($name:tt -> $variant:tt($output:ty)) => {
-            pub fn $name(self) -> $output {
-                match self.0.el.unwrap() {
-                    proto::element::El::$variant(elem) => elem,
-                    _ => panic!("Not {} element!", stringify!($variant)),
-                }
+    ($name:tt -> $variant:tt($output:ty)) => {
+        pub fn $name(el: proto::Element) -> $output {
+            match el.el.unwrap() {
+                proto::element::El::$variant(elem) => elem,
+                _ => panic!("Not {} element!", stringify!($variant)),
             }
-        };
+        }
+    };
 }
 
-impl TakeableElement {
-    gen_elem_take_fn!(take_room -> Room(proto::Room));
+gen_elem_take_fn!(take_room -> Room(proto::Room));
 
-    gen_elem_take_fn!(take_member -> Member(proto::Member));
+gen_elem_take_fn!(take_member -> Member(proto::Member));
 
-    gen_elem_take_fn!(
+gen_elem_take_fn!(
         take_webrtc_pub -> WebrtcPub(proto::WebRtcPublishEndpoint)
     );
-}
 
 /// Client for [Medea]'s gRPC [Control API].
 ///
@@ -66,7 +62,7 @@ impl ControlClient {
     ///
     /// - if [`GetResponse`] has error
     /// - if connection with server failed
-    pub async fn get(&mut self, uri: &str) -> TakeableElement {
+    pub async fn get(&mut self, uri: &str) -> proto::Element {
         let room = vec![uri.to_string()];
         let get_room_request = proto::IdRequest { fid: room };
 
@@ -74,8 +70,7 @@ impl ControlClient {
         if let Some(err) = resp.error {
             panic!("{:?}", err);
         }
-
-        TakeableElement(resp.elements.remove(&uri.to_string()).unwrap())
+        resp.elements.remove(&uri.to_string()).unwrap()
     }
 
     /// Tries to get some [`proto::Element`] by local URI.
@@ -94,7 +89,6 @@ impl ControlClient {
         if let Some(e) = resp.error {
             return Err(e);
         }
-
         Ok(resp.elements.remove(&uri.to_string()).unwrap())
     }
 
@@ -141,7 +135,7 @@ impl ControlClient {
     /// - if [`Response`] has error
     /// - if connection with server failed.
     pub async fn delete(&mut self, ids: &[&str]) -> Result<(), proto::Error> {
-        let delete_ids = ids.iter().map(|id| id.to_string()).collect();
+        let delete_ids = ids.iter().map(|id| (*id).to_string()).collect();
         let delete_req = proto::IdRequest { fid: delete_ids };
 
         let resp = self.0.delete(delete_req).await.unwrap().into_inner();
