@@ -127,12 +127,12 @@ impl MediaConnections {
     pub fn get_senders_by_kind_and_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: FinalizedMuteState,
+        f: impl Fn(MuteState) -> bool,
     ) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
             .iter_senders_with_kind(kind)
-            .filter(|sender| sender.mute_state() == mute_state.into())
+            .filter(move |sender| (f)(sender.mute_state()))
             .cloned()
             .collect()
     }
@@ -426,7 +426,7 @@ pub enum FinalizedMuteState {
 
 impl FinalizedMuteState {
     /// Converts this [`FinalizedMuteState`] into [`ProgressingMuteState`].
-    fn into_progress(self) -> ProgressingMuteState {
+    pub fn into_progress(self) -> ProgressingMuteState {
         match self {
             Self::NotMuted => ProgressingMuteState::Muting(self),
             Self::Muted => ProgressingMuteState::Unmuting(self),
@@ -459,7 +459,7 @@ impl From<bool> for FinalizedMuteState {
 /// needed state update. If needed a state update wouldn't be received, the
 /// stored [`FinalizedMuteState`] will be applied.
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum ProgressingMuteState {
+pub enum ProgressingMuteState {
     /// [`Sender`] should be unmuted, but awaits server permission.
     Unmuting(FinalizedMuteState),
 
@@ -502,7 +502,7 @@ impl ProgressingMuteState {
 
 /// All mute states in which [`Sender`] can be.
 #[derive(Debug, Clone, Copy, From, PartialEq)]
-enum MuteState {
+pub enum MuteState {
     /// Mute state in state of transition.
     InProgress(ProgressingMuteState),
 
