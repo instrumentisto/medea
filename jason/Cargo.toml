@@ -16,10 +16,13 @@ exclude = ["/demo/", "/e2e-demo/"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-# TODO: uncomment this when https://github.com/rustwasm/wasm-pack/issues/782
+[profile.release]
+opt-level = "s"  # Tell `rustc` to optimize for small code size.
+
+# TODO: remove this when https://github.com/rustwasm/wasm-pack/issues/782
 #       issue will be resolved.
-#[profile.release]
-#opt-level = "s"  # Tell `rustc` to optimize for small code size.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
 
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
@@ -71,8 +74,3 @@ wee_alloc = { version = "0.4", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
-
-[metadata]
-# TODO: remove this when https://github.com/rustwasm/wasm-pack/issues/782
-#       issue will be resolved.
-wasm-opt = false
