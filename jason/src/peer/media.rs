@@ -455,7 +455,7 @@ impl From<bool> for FinalizedMuteState {
 /// Mute state in state of transition.
 ///
 /// [`FinalizedMuteState`] which stored in [`ProgressingMuteState`] variants
-/// is state which we already received from a server, but we still waiting for
+/// is state which we already have, but we still waiting for
 /// needed state update. If needed a state update wouldn't be received, the
 /// stored [`FinalizedMuteState`] will be applied.
 #[derive(Debug, Clone, Copy, PartialEq)]
