@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::{channel::mpsc, future::Either};
+use futures::channel::mpsc;
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -184,7 +184,7 @@ async fn join_two_video_mutes() {
 ///    simultaneous.
 ///
 /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
-///    is in [`MuteState::Muted`].
+///    is stayed in [`MuteState::NotMuted`].
 #[wasm_bindgen_test]
 async fn join_mute_and_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(5);
@@ -205,12 +205,12 @@ async fn join_mute_and_unmute_audio() {
         JsFuture::from(handle.unmute_audio()),
     )
     .await;
-    mute_video_result.unwrap();
-    unmute_video_result.unwrap_err();
+    mute_video_result.unwrap_err();
+    unmute_video_result.unwrap();
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
-        FinalizedMuteState::Muted
+        FinalizedMuteState::NotMuted
     ));
 }
 
@@ -226,7 +226,7 @@ async fn join_mute_and_unmute_audio() {
 ///    simultaneous.
 ///
 /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
-///    is in [`MuteState::Muted`].
+///    is stayed in [`MuteState::NotMuted`].
 #[wasm_bindgen_test]
 async fn join_mute_and_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer(5);
@@ -247,12 +247,12 @@ async fn join_mute_and_unmute_video() {
         JsFuture::from(handle.unmute_video()),
     )
     .await;
-    mute_video_result.unwrap();
-    unmute_video_result.unwrap_err();
+    mute_video_result.unwrap_err();
+    unmute_video_result.unwrap();
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
-        FinalizedMuteState::Muted
+        FinalizedMuteState::NotMuted
     ));
 }
 
