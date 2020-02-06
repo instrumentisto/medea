@@ -16,8 +16,10 @@ exclude = ["/demo/", "/e2e-demo/"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-opt-level = "s"  # Tell `rustc` to optimize for small code size.
+# TODO: uncomment this when https://github.com/rustwasm/wasm-pack/issues/782
+#       issue will be resolved.
+#[profile.release]
+#opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
