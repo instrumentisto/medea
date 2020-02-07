@@ -1,6 +1,6 @@
 //! `Endpoint` related methods and entities.
 
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 /// P2P mode of [`WebRtcPublishEndpoint`].

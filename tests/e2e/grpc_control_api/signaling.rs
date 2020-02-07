@@ -12,7 +12,7 @@ use std::{
 use actix::{Arbiter, Context};
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::medea::web_rtc_publish_endpoint::P2p;
+use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
 use tokio::time::timeout;
 
 use crate::{grpc_control_api::ControlClient, signalling::TestMember};

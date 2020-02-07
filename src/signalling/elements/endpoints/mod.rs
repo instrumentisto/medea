@@ -5,7 +5,7 @@
 pub mod webrtc;
 
 use derive_more::From;
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 
 /// Enum which can store all kinds of [Medea] endpoints.
 ///

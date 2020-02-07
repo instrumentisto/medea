@@ -7,7 +7,7 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::{

@@ -6,7 +6,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 use medea::api::control::error_codes::ErrorCode;
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::grpc_control_api::{take_member, take_room, take_webrtc_pub};
 

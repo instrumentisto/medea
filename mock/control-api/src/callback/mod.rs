@@ -2,7 +2,7 @@
 
 pub mod server;
 
-use medea_control_api_proto::grpc::medea_callback as proto;
+use medea_control_api_proto::grpc::callback as proto;
 use serde::Serialize;
 
 /// All callbacks which can happen.
@@ -51,7 +51,7 @@ impl From<proto::Request> for CallbackItem {
 
 /// `on_join` callback's related entities and implementations.
 mod join {
-    use medea_control_api_proto::grpc::medea_callback as proto;
+    use medea_control_api_proto::grpc::callback as proto;
     use serde::Serialize;
 
     /// `OnJoin` callback for Control API.
@@ -67,7 +67,7 @@ mod join {
 
 /// `on_leave` callback's related entities and implementations.
 mod leave {
-    use medea_control_api_proto::grpc::medea_callback as proto;
+    use medea_control_api_proto::grpc::callback as proto;
     use serde::Serialize;
 
     /// `OnLeave` callback of Control API.

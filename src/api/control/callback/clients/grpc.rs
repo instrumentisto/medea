@@ -3,7 +3,7 @@
 use std::fmt;
 
 #[rustfmt::skip]
-use medea_control_api_proto::grpc::medea_callback::{
+use medea_control_api_proto::grpc::callback::{
     callback_client::CallbackClient as ProtoCallbackClient
 };
 use futures::future::{FutureExt, LocalBoxFuture};

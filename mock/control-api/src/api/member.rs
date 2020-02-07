@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;

@@ -5,7 +5,7 @@
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(

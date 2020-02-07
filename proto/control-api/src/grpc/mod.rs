@@ -1,6 +1,6 @@
 #![allow(clippy::pedantic)]
 
 #[rustfmt::skip]
-pub mod medea;
+pub mod api;
 #[rustfmt::skip]
-pub mod medea_callback;
+pub mod callback;

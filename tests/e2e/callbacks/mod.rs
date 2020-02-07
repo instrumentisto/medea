@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use async_trait::async_trait;
-use medea_control_api_proto::grpc::medea_callback::{
+use medea_control_api_proto::grpc::callback::{
     self as proto,
     callback_server::{Callback, CallbackServer as TonicCallbackServer},
 };
