@@ -82,9 +82,6 @@ struct MemberInner {
     /// Credentials for this [`Member`].
     credentials: String,
 
-    /// [`IceUser`] of this [`Member`].
-    ice_user: Option<IceUser>,
-
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
 
@@ -103,7 +100,6 @@ impl Member {
             srcs: HashMap::new(),
             sinks: HashMap::new(),
             credentials,
-            ice_user: None,
             room_id,
             on_leave: None,
             on_join: None,
@@ -272,21 +268,6 @@ impl Member {
             .filter_map(|p| p.peer_id().map(|id| (id, p)))
             .filter(|(id, _)| peer_ids.contains(&id))
             .for_each(|(_, p)| p.reset());
-    }
-
-    /// Returns list of [`IceServer`] for this [`Member`].
-    pub fn servers_list(&self) -> Option<Vec<IceServer>> {
-        self.0.borrow().ice_user.as_ref().map(IceUser::servers_list)
-    }
-
-    /// Returns and sets to `None` [`IceUser`] of this [`Member`].
-    pub fn take_ice_user(&self) -> Option<IceUser> {
-        self.0.borrow_mut().ice_user.take()
-    }
-
-    /// Replaces and returns [`IceUser`] of this [`Member`].
-    pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
-        self.0.borrow_mut().ice_user.replace(new_ice_user)
     }
 
     /// Returns [`MemberId`] of this [`Member`].

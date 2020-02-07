@@ -11,6 +11,8 @@ use serde::Serialize;
 pub enum CallbackEvent {
     OnJoin(join::OnJoin),
     OnLeave(leave::OnLeave),
+    OnStart(on_start::OnStart),
+    OnStop(on_stop::OnStop),
 }
 
 impl From<proto::request::Event> for CallbackEvent {
@@ -21,6 +23,12 @@ impl From<proto::request::Event> for CallbackEvent {
             }
             proto::request::Event::OnJoin(on_join) => {
                 Self::OnJoin(on_join.into())
+            }
+            proto::request::Event::OnStart(on_start) => {
+                Self::OnStart(on_start.into())
+            }
+            proto::request::Event::OnStop(on_stop) => {
+                Self::OnStop(on_stop.into())
             }
         }
     }
@@ -60,6 +68,32 @@ mod join {
 
     impl From<proto::OnJoin> for OnJoin {
         fn from(_: proto::OnJoin) -> Self {
+            Self
+        }
+    }
+}
+
+mod on_start {
+    use super::*;
+
+    #[derive(Clone, Serialize)]
+    pub struct OnStart;
+
+    impl From<proto::OnStart> for OnStart {
+        fn from(_: proto::OnStart) -> Self {
+            Self
+        }
+    }
+}
+
+mod on_stop {
+    use super::*;
+
+    #[derive(Clone, Serialize)]
+    pub struct OnStop;
+
+    impl From<proto::OnStop> for OnStop {
+        fn from(_: proto::OnStop) -> Self {
             Self
         }
     }

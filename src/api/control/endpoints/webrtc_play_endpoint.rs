@@ -39,11 +39,11 @@ impl TryFrom<&proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
         value: &proto::WebRtcPlayEndpoint,
     ) -> Result<Self, Self::Error> {
         let on_start = Some(value.on_start.clone())
-            .filter(String::is_empty)
+            .filter(|s| !s.is_empty())
             .map(CallbackUrl::try_from)
             .transpose()?;
         let on_stop = Some(value.on_stop.clone())
-            .filter(String::is_empty)
+            .filter(|s| !s.is_empty())
             .map(CallbackUrl::try_from)
             .transpose()?;
 

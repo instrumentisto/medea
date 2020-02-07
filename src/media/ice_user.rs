@@ -2,9 +2,9 @@
 //!
 //! [coturn]: https://github.com/coturn/coturn
 
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, PeerId};
 
-use crate::api::control::RoomId;
+use crate::api::control::{EndpointId, RoomId};
 
 /// Credentials on Turn server.
 #[derive(Clone, Debug)]
@@ -26,12 +26,12 @@ impl IceUser {
     pub fn build(
         address: String,
         room_id: &RoomId,
-        name: &str,
+        peer_id: PeerId,
         pass: String,
     ) -> Self {
         Self {
             address,
-            user: format!("{}_{}", room_id, name),
+            user: format!("{}_{}", room_id, peer_id),
             pass,
             is_static: false,
         }

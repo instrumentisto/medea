@@ -20,13 +20,13 @@ pub mod request {
         #[prost(message, tag="4")]
         OnLeave(super::OnLeave),
         #[prost(message, tag="5")]
-        OnPlay(super::OnPlay),
+        OnStart(super::OnStart),
         #[prost(message, tag="6")]
         OnStop(super::OnStop),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct OnPlay {
+pub struct OnStart {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStop {

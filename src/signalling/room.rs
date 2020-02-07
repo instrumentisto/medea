@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{
     Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _,
+    Message, WrapFuture as _, WrapFuture,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -57,6 +57,7 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
+use futures::TryFutureExt;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -188,7 +189,10 @@ impl Room {
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
-            peers: PeerRepository::from(HashMap::new()),
+            peers: PeerRepository::new(
+                room_spec.id().clone(),
+                context.turn_service.clone(),
+            ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
@@ -236,26 +240,26 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        let ice_servers = self
-            .members
-            .get_member(&member_id)?
-            .servers_list()
-            .ok_or_else(|| {
-            RoomError::NoTurnCredentials(member_id.clone())
-        })?;
-        let peer_created = Event::PeerCreated {
-            peer_id: sender.id(),
-            sdp_offer: None,
-            tracks: sender.tracks(),
-            ice_servers,
-            force_relay: sender.is_force_relayed(),
-        };
+        let sender_peer_id = sender.id();
         self.peers.add_peer(sender);
-        Ok(Box::new(
-            self.members
-                .send_event_to_member(member_id, peer_created)
-                .into_actor(self),
-        ))
+        let fut = self.peers.get_ice_user(sender_peer_id);
+
+        Ok(Box::new(fut.into_actor(self).then(
+            move |ice_user, this, ctx| {
+                let sender = this.peers.get_peer_by_id(sender_peer_id).unwrap();
+                let peer_created = Event::PeerCreated {
+                    peer_id: sender.id(),
+                    sdp_offer: None,
+                    tracks: sender.tracks(),
+                    ice_servers: ice_user.servers_list(),
+                    force_relay: sender.is_force_relayed(),
+                };
+
+                this.members
+                    .send_event_to_member(member_id, peer_created)
+                    .into_actor(this)
+            },
+        )))
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
@@ -815,30 +819,29 @@ impl CommandHandler for Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-        let ice_servers = self
-            .members
-            .get_member(&to_member_id)?
-            .servers_list()
-            .ok_or_else(|| {
-                RoomError::NoTurnCredentials(to_member_id.clone())
-            })?;
-
-        let event = Event::PeerCreated {
-            peer_id: to_peer.id(),
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-            ice_servers,
-            force_relay: to_peer.is_force_relayed(),
-        };
+        let to_peer_id = to_peer.id();
 
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
 
-        Ok(Box::new(
-            self.members
-                .send_event_to_member(to_member_id, event)
-                .into_actor(self),
-        ))
+        let fut = self.peers.get_ice_user(to_peer_id);
+
+        Ok(Box::new(fut.into_actor(self).then(
+            move |ice_user, this, ctx| {
+                let to_peer = this.peers.get_peer_by_id(to_peer_id).unwrap();
+                let event = Event::PeerCreated {
+                    peer_id: to_peer.id(),
+                    sdp_offer: Some(sdp_offer),
+                    tracks: to_peer.tracks(),
+                    ice_servers: ice_user.servers_list(),
+                    force_relay: to_peer.is_force_relayed(),
+                };
+
+                this.members
+                    .send_event_to_member(to_member_id, event)
+                    .into_actor(this)
+            },
+        )))
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided

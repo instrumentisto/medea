@@ -12,11 +12,13 @@ use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::control::{EndpointId, RoomId},
     conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
+use medea_client_api_proto::PeerId;
+use std::collections::HashMap;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -49,8 +51,8 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Generates and registers Turn credentials.
     async fn create(
         &self,
-        member_id: MemberId,
         room_id: RoomId,
+        peer_id: PeerId,
         policy: UnreachablePolicy,
     ) -> Result<IceUser, TurnServiceErr>;
 
@@ -102,14 +104,14 @@ impl TurnAuthService for Service {
     /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
     async fn create(
         &self,
-        member_id: MemberId,
         room_id: RoomId,
+        peer_id: PeerId,
         policy: UnreachablePolicy,
     ) -> Result<IceUser, TurnServiceErr> {
         let ice_user = IceUser::build(
             self.turn_address.clone(),
             &room_id,
-            &member_id.0,
+            peer_id,
             Self::generate_pass(TURN_PASS_LEN),
         );
 

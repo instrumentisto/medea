@@ -71,6 +71,7 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
+#[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
