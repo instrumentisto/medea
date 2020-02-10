@@ -11,7 +11,10 @@ use medea::{
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
     signalling::{room_repo::RoomRepository, room_service::RoomService},
-    turn::new_turn_auth_service,
+    turn::{
+        coturn_stats::{new_coturn_stats_watcher, CoturnStatsWatcher},
+        new_turn_auth_service,
+    },
     AppContext,
 };
 
@@ -33,6 +36,8 @@ fn main() -> Result<(), Error> {
     Arbiter::spawn(
         async move {
             let turn_service = new_turn_auth_service(&config.turn)?;
+            let coturn_stats_watcher =
+                new_coturn_stats_watcher(&config.turn).unwrap().start();
             let graceful_shutdown =
                 GracefulShutdown::new(config.shutdown.timeout).start();
             let app_context = AppContext::new(config.clone(), turn_service);
