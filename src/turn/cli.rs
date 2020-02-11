@@ -27,10 +27,7 @@ pub struct CoturnTelnetClient {
 
 impl CoturnTelnetClient {
     /// Creates new [`CoturnTelnetClient`].
-    pub fn new(
-        addr: (String, u16),
-        pass: String,
-    ) -> Result<Self, CoturnCliError> {
+    pub fn new(addr: (String, u16), pass: String) -> Self {
         let manager = Manager::new(addr, pass);
         // TODO: to conf
         let config = PoolConfig {
@@ -41,9 +38,9 @@ impl CoturnTelnetClient {
                 recycle: Some(Duration::from_secs(5)),
             },
         };
-        Ok(Self {
+        Self {
             pool: Pool::from_config(manager, config),
-        })
+        }
     }
 
     /// Forcefully closes provided [`IceUser`]s sessions on Coturn server.

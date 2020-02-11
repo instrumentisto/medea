@@ -21,26 +21,26 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use deadpool::managed;
 
 use crate::connection::{CoturnTelnetConnection, CoturnTelnetError};
 
-/// A type alias for using [`deadpool::managed::Pool`] with
+/// A type alias for using `deadpool::managed::Pool` with
 /// [`CoturnTelnetConnection`].
-pub type Pool =
-    deadpool::managed::Pool<CoturnTelnetConnection, CoturnTelnetError>;
+pub type Pool = managed::Pool<CoturnTelnetConnection, CoturnTelnetError>;
 
-/// A type alias for using [`deadpool::managed::PoolError`] with
+/// A type alias for using `deadpool::managed::PoolError` with
 /// [`CoturnTelnetConnection`].
-pub type PoolError = deadpool::managed::PoolError<CoturnTelnetError>;
+pub type PoolError = managed::PoolError<CoturnTelnetError>;
 
-/// A type alias for using [`deadpool::managed::Object`] with
+/// A type alias for using `deadpool::managed::Object` with
 /// [`CoturnTelnetConnection`].
 pub type Connection =
-    deadpool::managed::Object<CoturnTelnetConnection, CoturnTelnetError>;
+    managed::Object<CoturnTelnetConnection, CoturnTelnetError>;
 
-type RecycleResult = deadpool::managed::RecycleResult<CoturnTelnetError>;
+type RecycleResult = managed::RecycleResult<CoturnTelnetError>;
 
-/// The manager for creating and recycling Coturn telnet connections
+/// The manager for creating and recycling Coturn telnet connections.
 pub struct Manager {
     addr: (String, u16),
     pass: Bytes,
@@ -56,9 +56,7 @@ impl Manager {
 }
 
 #[async_trait]
-impl deadpool::managed::Manager<CoturnTelnetConnection, CoturnTelnetError>
-    for Manager
-{
+impl managed::Manager<CoturnTelnetConnection, CoturnTelnetError> for Manager {
     async fn create(
         &self,
     ) -> Result<CoturnTelnetConnection, CoturnTelnetError> {

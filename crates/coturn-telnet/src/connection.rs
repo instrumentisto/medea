@@ -45,7 +45,7 @@ impl From<CoturnCliCodecError> for CoturnTelnetError {
 
 /// Asynchronous connection to remote [Coturn] server telnet interface. You can
 /// use this directly, but it is recommended to use this with connection pool
-/// from `crate::pool`, which takes care of connection life cycle.
+/// from [`crate::pool::Pool`], which takes care of connection life cycle.
 ///
 /// [Coturn]: https://github.com/coturn/coturn.
 pub struct CoturnTelnetConnection(Framed<TcpStream, CoturnCliCodec>);

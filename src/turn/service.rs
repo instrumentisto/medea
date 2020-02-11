@@ -173,7 +173,7 @@ pub fn new_turn_auth_service<'a>(
     let coturn_cli = CoturnTelnetClient::new(
         (cf.cli.ip.to_string(), cf.cli.port),
         cf.cli.pass.clone(),
-    )?;
+    );
 
     let turn_service = Service {
         turn_db,
