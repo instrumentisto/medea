@@ -12,7 +12,9 @@ use serde::Deserialize;
 use crate::api::control::{
     callback::url::CallbackUrl,
     endpoints::{
-        webrtc_play_endpoint::WebRtcPlayEndpoint,
+        webrtc_play_endpoint::{
+            Unvalidated, Validated, ValidationError, WebRtcPlayEndpoint,
+        },
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
     },
     pipeline::Pipeline,
@@ -32,7 +34,7 @@ pub struct Id(pub String);
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum MemberElement {
+pub enum MemberElement<T> {
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
@@ -43,14 +45,30 @@ pub enum MemberElement {
     /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
     /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
-    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+    #[serde(bound = "T: From<Unvalidated> + Default")]
+    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint<T> },
+}
+
+impl MemberElement<Unvalidated> {
+    pub fn validate(self) -> Result<MemberElement<Validated>, ValidationError> {
+        match self {
+            MemberElement::WebRtcPublishEndpoint { spec } => {
+                Ok(MemberElement::WebRtcPublishEndpoint { spec })
+            }
+            MemberElement::WebRtcPlayEndpoint { spec } => {
+                Ok(MemberElement::WebRtcPlayEndpoint {
+                    spec: spec.validate()?,
+                })
+            }
+        }
+    }
 }
 
 /// Newtype for [`RoomElement::Member`] variant.
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    pipeline: Pipeline<EndpointId, MemberElement>,
+    pipeline: Pipeline<EndpointId, MemberElement<Validated>>,
 
     /// Credentials to authorize `Member` with.
     credentials: String,
@@ -62,8 +80,8 @@ pub struct MemberSpec {
     on_leave: Option<CallbackUrl>,
 }
 
-impl Into<RoomElement> for MemberSpec {
-    fn into(self) -> RoomElement {
+impl Into<RoomElement<Validated>> for MemberSpec {
+    fn into(self) -> RoomElement<Validated> {
         RoomElement::Member {
             spec: self.pipeline,
             credentials: self.credentials,
@@ -77,7 +95,8 @@ impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(
         &self,
-    ) -> impl Iterator<Item = (WebRtcPlayId, &WebRtcPlayEndpoint)> {
+    ) -> impl Iterator<Item = (WebRtcPlayId, &WebRtcPlayEndpoint<Validated>)>
+    {
         self.pipeline.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPlayEndpoint { spec } => {
                 Some((id.clone().into(), spec))
@@ -213,12 +232,12 @@ macro_rules! impl_try_from_proto_for_member {
 impl_try_from_proto_for_member!(proto::room::element::El);
 impl_try_from_proto_for_member!(proto::create_request::El);
 
-impl TryFrom<&RoomElement> for MemberSpec {
+impl TryFrom<&RoomElement<Validated>> for MemberSpec {
     type Error = TryFromElementError;
 
     // TODO: delete this allow when some new RoomElement will be added.
     #[allow(unreachable_patterns)]
-    fn try_from(from: &RoomElement) -> Result<Self, Self::Error> {
+    fn try_from(from: &RoomElement<Validated>) -> Result<Self, Self::Error> {
         match from {
             RoomElement::Member {
                 spec,

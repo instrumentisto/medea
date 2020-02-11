@@ -17,6 +17,9 @@ use super::{
     pipeline::Pipeline,
     MemberId, RootElement, TryFromElementError,
 };
+use crate::api::control::endpoints::webrtc_play_endpoint::{
+    Unvalidated, Validated, ValidationError,
+};
 
 /// ID of [`Room`].
 ///
@@ -29,15 +32,43 @@ pub struct Id(pub String);
 /// [`Room`]: crate::signalling::room::Room
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum RoomElement {
+pub enum RoomElement<T> {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
-        spec: Pipeline<EndpointId, MemberElement>,
+        #[serde(bound = "T: From<Unvalidated> + Default")]
+        spec: Pipeline<EndpointId, MemberElement<T>>,
         credentials: String,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
     },
+}
+
+impl RoomElement<Unvalidated> {
+    pub fn validate(self) -> Result<RoomElement<Validated>, ValidationError> {
+        match self {
+            RoomElement::Member {
+                spec,
+                credentials,
+                on_leave,
+                on_join,
+            } => {
+                let validated_spec = spec
+                    .into_iter()
+                    .map(|(key, value)| {
+                        value.validate().map(move |res| (key, res))
+                    })
+                    .collect::<Result<HashMap<_, _>, _>>()?;
+
+                Ok(RoomElement::Member {
+                    credentials,
+                    on_leave,
+                    on_join,
+                    spec: Pipeline::new(validated_spec),
+                })
+            }
+        }
+    }
 }
 
 /// [Control API]'s `Room` element specification.
@@ -48,7 +79,7 @@ pub enum RoomElement {
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Pipeline<MemberId, RoomElement>,
+    pub pipeline: Pipeline<MemberId, RoomElement<Validated>>,
 }
 
 impl TryFrom<proto::create_request::El> for RoomSpec {
@@ -114,12 +145,12 @@ impl RoomSpec {
     }
 }
 
-impl TryFrom<&RootElement> for RoomSpec {
+impl TryFrom<&RootElement<Validated>> for RoomSpec {
     type Error = TryFromElementError;
 
     // TODO: delete this allow when some new RootElement will be added.
     #[allow(unreachable_patterns)]
-    fn try_from(from: &RootElement) -> Result<Self, Self::Error> {
+    fn try_from(from: &RootElement<Validated>) -> Result<Self, Self::Error> {
         match from {
             RootElement::Room { id, spec } => Ok(Self {
                 id: id.clone(),

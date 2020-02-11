@@ -13,6 +13,7 @@ use serde::Deserialize;
 
 use super::{member::MemberElement, TryFromProtobufError};
 
+use crate::api::control::endpoints::webrtc_play_endpoint::Validated;
 #[doc(inline)]
 pub use webrtc_play_endpoint::{WebRtcPlayEndpoint, WebRtcPlayId};
 #[doc(inline)]
@@ -50,11 +51,11 @@ pub enum EndpointSpec {
     WebRtcPublish(WebRtcPublishEndpoint),
 
     /// [`WebRtcPlayEndpoint`] element.
-    WebRtcPlay(WebRtcPlayEndpoint),
+    WebRtcPlay(WebRtcPlayEndpoint<Validated>),
 }
 
-impl Into<MemberElement> for EndpointSpec {
-    fn into(self) -> MemberElement {
+impl Into<MemberElement<Validated>> for EndpointSpec {
+    fn into(self) -> MemberElement<Validated> {
         match self {
             Self::WebRtcPublish(e) => {
                 MemberElement::WebRtcPublishEndpoint { spec: e }

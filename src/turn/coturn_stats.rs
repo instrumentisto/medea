@@ -151,11 +151,9 @@ impl CoturnAllocationEvent {
                     )),
                 }
             }
-            _ => {
-                Err(CoturnEventParseError::UnsupportedEventType(
-                    event_type.to_string(),
-                ))
-            }
+            _ => Err(CoturnEventParseError::UnsupportedEventType(
+                event_type.to_string(),
+            )),
         }
     }
 }
@@ -237,7 +235,10 @@ pub enum CoturnEventParseError {
     FieldNotFoundInTrafficUpdate(String),
 
     /// Failed to parse traffic event stat metadata.
-    #[display(fmt = "Failed to parse traffic stat '{}' from traffic event.", _0)]
+    #[display(
+        fmt = "Failed to parse traffic stat '{}' from traffic event.",
+        _0
+    )]
     FailedToParseTrafficMap(String),
 
     /// Status is empty.

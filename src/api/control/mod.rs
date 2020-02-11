@@ -38,6 +38,10 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
+use crate::api::control::endpoints::webrtc_play_endpoint::{
+    Unvalidated, Validated, ValidationError,
+};
+use std::collections::HashMap;
 
 /// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]
@@ -75,6 +79,8 @@ pub enum TryFromProtobufError {
     CallbackUrlParseErr(CallbackUrlParseError),
 
     CallbackNotSupportedInNotRelayMode,
+
+    SpecValidationError(ValidationError),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
@@ -89,18 +95,45 @@ impl From<CallbackUrlParseError> for TryFromProtobufError {
     }
 }
 
+impl From<ValidationError> for TryFromProtobufError {
+    fn from(from: ValidationError) -> Self {
+        Self::SpecValidationError(from)
+    }
+}
+
 /// Root elements of [Control API] spec.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum RootElement {
+pub enum RootElement<T> {
     /// Represents [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room {
         id: RoomId,
-        spec: Pipeline<MemberId, RoomElement>,
+        #[serde(bound = "T: From<Unvalidated> + Default")]
+        spec: Pipeline<MemberId, RoomElement<T>>,
     },
+}
+
+impl RootElement<Unvalidated> {
+    pub fn validate(self) -> Result<RootElement<Validated>, ValidationError> {
+        match self {
+            RootElement::Room { id, spec } => {
+                let validated_spec = spec
+                    .into_iter()
+                    .map(|(key, value)| {
+                        value.validate().map(move |res| (key, res))
+                    })
+                    .collect::<Result<HashMap<_, _>, _>>()?;
+
+                Ok(RootElement::Room {
+                    id,
+                    spec: Pipeline::new(validated_spec),
+                })
+            }
+        }
+    }
 }
 
 /// Errors that can occur when we try transform some spec from `Element`.
@@ -156,6 +189,8 @@ pub enum LoadStaticControlSpecsError {
     /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
     YamlDeserializationError(serde_yaml::Error),
+
+    SpecValidationError(ValidationError),
 }
 
 impl From<std::io::Error> for LoadStaticControlSpecsError {
@@ -173,6 +208,12 @@ impl From<TryFromElementError> for LoadStaticControlSpecsError {
 impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
     fn from(err: serde_yaml::Error) -> Self {
         Self::YamlDeserializationError(err)
+    }
+}
+
+impl From<ValidationError> for LoadStaticControlSpecsError {
+    fn from(err: ValidationError) -> Self {
+        Self::SpecValidationError(err)
     }
 }
 
@@ -194,8 +235,8 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let parsed: RootElement = serde_yaml::from_str(&buf)?;
-    let room = RoomSpec::try_from(&parsed)?;
+    let unvalidated: RootElement<Unvalidated> = serde_yaml::from_str(&buf)?;
+    let room = RoomSpec::try_from(&unvalidated.validate()?)?;
     Ok(room)
 }
 

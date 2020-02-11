@@ -5,12 +5,14 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
+use failure::Fail;
 use medea_control_api_proto::grpc::medea as proto;
 use serde::{de::Deserializer, Deserialize};
 
 use crate::api::control::{
     callback::url::CallbackUrl, refs::SrcUri, TryFromProtobufError,
 };
+use std::marker::PhantomData;
 
 /// ID of [`WebRtcPlayEndpoint`].
 #[derive(
@@ -18,9 +20,20 @@ use crate::api::control::{
 )]
 pub struct WebRtcPlayId(String);
 
+#[derive(Debug, Default, Clone)]
+pub struct Unvalidated;
+
+#[derive(Debug, Clone)]
+pub struct Validated;
+
+#[derive(Debug, Fail, Display)]
+pub enum ValidationError {
+    ForceRelayShouldBeEnabled,
+}
+
 /// Media element which is able to play media data for client via WebRTC.
-#[derive(Clone, Debug)]
-pub struct WebRtcPlayEndpoint {
+#[derive(Clone, Deserialize, Debug)]
+pub struct WebRtcPlayEndpoint<T> {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SrcUri,
 
@@ -30,9 +43,33 @@ pub struct WebRtcPlayEndpoint {
 
     /// Option to relay all media through a TURN server forcibly.
     pub force_relay: bool,
+
+    #[serde(skip)]
+    #[serde(bound = "T: From<Unvalidated> + Default")]
+    _validation_state: T,
 }
 
-impl TryFrom<&proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
+impl WebRtcPlayEndpoint<Unvalidated> {
+    pub fn validate(
+        self,
+    ) -> Result<WebRtcPlayEndpoint<Validated>, ValidationError> {
+        if !self.force_relay
+            && (self.on_start.is_some() || self.on_stop.is_some())
+        {
+            Err(ValidationError::ForceRelayShouldBeEnabled)
+        } else {
+            Ok(WebRtcPlayEndpoint {
+                src: self.src,
+                on_start: self.on_start,
+                on_stop: self.on_stop,
+                force_relay: self.force_relay,
+                _validation_state: Validated,
+            })
+        }
+    }
+}
+
+impl TryFrom<&proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint<Validated> {
     type Error = TryFromProtobufError;
 
     fn try_from(
@@ -47,91 +84,14 @@ impl TryFrom<&proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
             .map(CallbackUrl::try_from)
             .transpose()?;
 
-        if !value.force_relay && (on_start.is_some() || on_stop.is_some()) {
-            return Err(
-                TryFromProtobufError::CallbackNotSupportedInNotRelayMode,
-            );
-        }
-
-        Ok(Self {
+        let unvalidated = WebRtcPlayEndpoint {
             src: SrcUri::try_from(value.src.clone())?,
             force_relay: value.force_relay,
             on_stop,
             on_start,
-        })
-    }
-}
-
-impl<'de> Deserialize<'de> for WebRtcPlayEndpoint {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
-
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ClientMsg [{:?}]",
-                &ev
-            ))
-        })?;
-
-        let src = map
-            .get("src")
-            .ok_or_else(|| D::Error::custom(format!("missing field `src`")))?;
-        let src = SrcUri::deserialize(src).map_err(|e| {
-            D::Error::custom(format!(
-                "error while deserialization of `src` field: {:?}",
-                e
-            ))
-        })?;
-        let force_relay = map
-            .get("force_relay")
-            .and_then(|force_relay| force_relay.as_bool())
-            .unwrap_or_default();
-
-        let on_start = if let Some(on_start) = map.get("on_start") {
-            if !force_relay {
-                return Err(D::Error::custom(format!(
-                    "`on_start` callback not supported while `force_relay` != \
-                     `true`"
-                )));
-            } else {
-                Some(CallbackUrl::deserialize(on_start).map_err(|e| {
-                    D::Error::custom(format!(
-                        "error while deserialization of `on_start` field: {:?}",
-                        e
-                    ))
-                })?)
-            }
-        } else {
-            None
+            _validation_state: Unvalidated,
         };
 
-        let on_stop = if let Some(on_stop) = map.get("on_stop") {
-            if !force_relay {
-                return Err(D::Error::custom(format!(
-                    "`on_stop` callback not supported while `force_relay` != \
-                     `true`"
-                )));
-            } else {
-                Some(CallbackUrl::deserialize(on_stop).map_err(|e| {
-                    D::Error::custom(format!(
-                        "error while deserialization of `on_stop` field: {:?}",
-                        e
-                    ))
-                })?)
-            }
-        } else {
-            None
-        };
-
-        Ok(Self {
-            src,
-            force_relay,
-            on_start,
-            on_stop,
-        })
+        Ok(unvalidated.validate()?)
     }
 }

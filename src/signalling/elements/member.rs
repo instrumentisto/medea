@@ -30,6 +30,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use crate::api::control::endpoints::webrtc_play_endpoint::Validated;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -353,7 +354,7 @@ impl Member {
     pub fn create_sink(
         member: &Rc<Self>,
         id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec,
+        spec: WebRtcPlayEndpointSpec<Validated>,
     ) {
         let src = member.get_src_by_id(&spec.src.endpoint_id).unwrap();
 

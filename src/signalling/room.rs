@@ -29,6 +29,7 @@ use crate::{
                 OnJoinEvent, OnLeaveEvent, OnLeaveReason,
             },
             endpoints::{
+                webrtc_play_endpoint::Validated,
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
@@ -610,7 +611,7 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec,
+        spec: WebRtcPlayEndpointSpec<Validated>,
         ctx: &mut Context<Self>,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;

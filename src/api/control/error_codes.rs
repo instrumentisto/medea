@@ -12,6 +12,7 @@ use medea_control_api_proto::grpc::medea as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrlParseError,
+        endpoints::webrtc_play_endpoint::ValidationError,
         grpc::server::GrpcControlApiError,
         refs::{
             fid::ParseFidError, local_uri::LocalUriParseError,
@@ -348,6 +349,19 @@ impl From<TryFromProtobufError> for ErrorResponse {
                 Some(id),
             ),
             CallbackNotSupportedInNotRelayMode => {
+                Self::without_id(ErrorCode::CallbackNotSupportedInNotRelayMode)
+            }
+            SpecValidationError(e) => e.into(),
+        }
+    }
+}
+
+impl From<ValidationError> for ErrorResponse {
+    fn from(err: ValidationError) -> Self {
+        use ValidationError::*;
+
+        match err {
+            ForceRelayShouldBeEnabled => {
                 Self::without_id(ErrorCode::CallbackNotSupportedInNotRelayMode)
             }
         }

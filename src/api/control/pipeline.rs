@@ -9,6 +9,7 @@ use std::{
 };
 
 use serde::Deserialize;
+use std::collections::hash_map::IntoIter;
 
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
@@ -42,5 +43,15 @@ impl<'a, K: Eq + Hash, V> IntoIterator for &'a Pipeline<K, V> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.pipeline.iter()
+    }
+}
+
+impl<K: Eq + Hash, V> IntoIterator for Pipeline<K, V> {
+    type IntoIter = IntoIter<K, V>;
+    type Item = (K, V);
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.pipeline.into_iter()
     }
 }
