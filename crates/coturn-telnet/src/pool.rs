@@ -6,17 +6,21 @@
 //! # Example
 //!
 //! ```rust
+//! use std::ops::DerefMut;
 //! use coturn_telnet::{Manager, Pool};
 //!
-//! let mgr = Manager::new((String::from("localhost", 5766)), "turn")
-//!               .unwrap();
-//! let pool = Pool::new(mgr, 16);
-//! let mut conn = pool.get().await.unwrap();
+//! let mut rt = tokio::runtime::Runtime::new().unwrap();
+//! rt.block_on(async {
+//!     let mgr = Manager::new((String::from("localhost"), 5766), "turn");
+//!     let pool = Pool::new(mgr, 16);
 //!
-//! conn.deref_mut()
-//!     .print_sessions(String::from("username"))
-//!     .await
-//!     .unwrap();
+//!     let mut conn = pool.get().await.unwrap();
+//!
+//!     conn.deref_mut()
+//!         .print_sessions(String::from("username"))
+//!         .await
+//!         .unwrap();
+//! });
 //! ```
 
 use async_trait::async_trait;
