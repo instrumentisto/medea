@@ -125,6 +125,24 @@
 # Default:
 #   connection_timeout = "5s"
 
+[turn.cli]
+# Coturn server host.
+#
+# Env var: MEDEA_TURN__CLI__HOST
+# Default:
+#   host = "127.0.0.1"
+
+# Port of Coturn's Redis database for client connections.
+#
+# Env var: MEDEA_TURN__CLI__PORT
+# Default:
+#   port = 5766
+
+# Port of Coturn's Redis database for client connections.
+#
+# Env var: MEDEA_TURN__CLI__PASS
+# Default:
+#   pass = "turn"
 
 
 

@@ -1,7 +1,7 @@
 //! Abstraction over remote Redis database used to store Turn server
 //! credentials.
 
-use std::{fmt, future::Future, time::Duration};
+use std::{fmt, time::Duration};
 
 use crypto::{digest::Digest, md5::Md5};
 use deadpool::managed::{PoolConfig, Timeouts};
@@ -21,8 +21,11 @@ pub enum TurnDatabaseErr {
     RedisError(RedisError),
 }
 
-// Abstraction over remote Redis database used to store Turn server
-// credentials.
+/// Abstraction over remote Redis database used to store Turn server
+/// credentials.
+///
+/// This struct can be cloned and transferred across thread boundaries.
+#[derive(Clone)]
 pub struct TurnDatabase {
     pool: Pool,
 }
@@ -48,10 +51,7 @@ impl TurnDatabase {
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.
-    pub fn insert(
-        &mut self,
-        user: &IceUser,
-    ) -> impl Future<Output = Result<(), TurnDatabaseErr>> {
+    pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
         debug!("Store ICE user: {:?}", user);
 
         let key = format!("turn/realm/medea/user/{}/key", user.user());
@@ -61,34 +61,34 @@ impl TurnDatabase {
         hasher.input_str(&value);
         let result = hasher.result_str();
 
-        let pool = self.pool.clone();
-        async move {
-            let mut conn = pool.get().await?;
-            Ok(cmd("SET")
-                .arg(key)
-                .arg(result)
-                .query_async(&mut conn)
-                .await?)
-        }
+        let mut conn = self.pool.get().await?;
+        Ok(cmd("SET")
+            .arg(key)
+            .arg(result)
+            .query_async(&mut conn)
+            .await?)
     }
 
     /// Deletes batch of provided [`IceUser`]s.
-    pub fn remove(
-        &mut self,
-        users: &[IceUser],
-    ) -> impl Future<Output = Result<(), TurnDatabaseErr>> {
+    ///
+    /// No-op if empty batch is provided.
+    pub async fn remove(
+        &self,
+        users: &[&IceUser],
+    ) -> Result<(), TurnDatabaseErr> {
         debug!("Remove ICE users: {:?}", users);
 
-        let delete_keys: Vec<_> = users
+        if users.is_empty() {
+            return Ok(());
+        }
+
+        let keys: Vec<_> = users
             .iter()
             .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
             .collect();
 
-        let pool = self.pool.clone();
-        async move {
-            let mut conn = pool.get().await?;
-            Ok(cmd("DEL").arg(delete_keys).query_async(&mut conn).await?)
-        }
+        let mut conn = self.pool.get().await?;
+        Ok(cmd("DEL").arg(keys).query_async(&mut conn).await?)
     }
 }
 

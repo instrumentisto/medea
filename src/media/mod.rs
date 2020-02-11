@@ -6,7 +6,7 @@ pub mod track;
 
 #[doc(inline)]
 pub use self::{
-    ice_user::IceUser,
+    ice_user::{IceUser, IceUsername},
     peer::{
         New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,

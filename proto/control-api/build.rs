@@ -66,17 +66,14 @@ mod grpc {
         /// Loads [`ProtoNames`] from [`GRPC_DIR`] directory.
         pub fn load() -> io::Result<Self> {
             let proto_names = fs::read_dir(GRPC_DIR)?
-                .into_iter()
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .map(|entry| entry.path())
                 .filter(|path| {
-                    path.extension()
-                        .map(|ext| {
-                            path.is_file()
-                                && ext.to_string_lossy() == Cow::from("proto")
-                        })
-                        .unwrap_or(false)
+                    path.extension().map_or(false, |ext| {
+                        path.is_file()
+                            && ext.to_string_lossy() == Cow::from("proto")
+                    })
                 })
                 .filter_map(|path| {
                     path.file_stem()

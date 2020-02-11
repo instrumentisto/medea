@@ -7,6 +7,8 @@
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
+// TODO: REVERT ME BEFORE MERGE!!!
+#![allow(clippy::missing_errors_doc)]
 
 #[macro_use]
 pub mod utils;

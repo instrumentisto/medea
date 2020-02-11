@@ -15,6 +15,8 @@ use smart_default::SmartDefault;
 pub struct Turn {
     /// Database settings
     pub db: Db,
+    /// Coturn cli connection settings.
+    pub cli: CoturnCli,
     /// Host of STUN/TURN server. Defaults to `localhost`.
     #[default = "localhost"]
     pub host: Cow<'static, str>,
@@ -67,6 +69,23 @@ pub struct Redis {
     #[default(Duration::from_secs(5))]
     #[serde(with = "humantime_serde")]
     pub connection_timeout: Duration,
+}
+
+/// Setting of [coturn] server telnet interface.
+///
+/// [coturn]: https://github.com/coturn/coturn
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct CoturnCli {
+    /// Coturn server IP address. Defaults to `127.0.0.1`.
+    #[default(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
+    pub ip: IpAddr,
+    /// Coturn server port. Defaults to `5766`.
+    #[default = 5766]
+    pub port: u16,
+    /// Password for authorize on Coturn server telnet interface.
+    #[default(String::from("turn"))]
+    pub pass: String,
 }
 
 #[cfg(test)]

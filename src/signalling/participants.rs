@@ -243,22 +243,29 @@ impl ParticipantService {
                     .map(move |_| Ok(member)),
             ))
         } else {
+            let turn_service = self.turn_service.clone();
+            let cloned_member_id = member_id.clone();
+            let room_id = self.room_id.clone();
             Box::new(
-                wrap_future(self.turn_service.create(
-                    member_id.clone(),
-                    self.room_id.clone(),
-                    UnreachablePolicy::ReturnErr,
-                ))
-                .map(
-                    |result, room: &mut Room, _| match result {
+                wrap_future(async move {
+                    turn_service
+                        .create(
+                            cloned_member_id,
+                            room_id,
+                            UnreachablePolicy::ReturnErr,
+                        )
+                        .await
+                })
+                .map(move |result, room: &mut Room, _| {
+                    match result {
                         Ok(ice_user) => {
                             room.members.insert_connection(member_id, conn);
                             member.replace_ice_user(ice_user);
                             Ok(member)
                         }
                         Err(e) => Err(ParticipantServiceErr::from(e)),
-                    },
-                ),
+                    }
+                }),
             )
         }
     }
@@ -328,8 +335,10 @@ impl ParticipantService {
         match self.get_member_by_id(&member_id) {
             None => future::ok(()).boxed_local(),
             Some(member) => {
-                if let Some(ice_user) = member.take_ice_user() {
-                    self.turn_service.delete(vec![ice_user])
+                if let Some(turn_user) = member.take_ice_user() {
+                    let turn_service = self.turn_service.clone();
+                    async move { turn_service.delete(&[turn_user]).await }
+                        .boxed_local()
                 } else {
                     future::ok(()).boxed_local()
                 }
@@ -363,16 +372,18 @@ impl ParticipantService {
             ));
 
         // deleting all IceUsers
-        let ice_users = self
+        let ice_users: Vec<_> = self
             .members
             .values()
             .filter_map(Member::take_ice_user)
             .collect();
 
-        let delete_ice_users = self
-            .turn_service
-            .delete(ice_users)
-            .map_err(|err| error!("Error removing IceUsers {:?}", err));
+        let turn_service = self.turn_service.clone();
+        let delete_ice_users = async move {
+            if let Err(e) = turn_service.delete(ice_users.as_slice()).await {
+                error!("Error removing IceUser {:?}", e)
+            };
+        };
 
         future::join(close_rpc_connections, delete_ice_users)
             .map(|_| ())
@@ -402,12 +413,12 @@ impl ParticipantService {
 
         if let Some(member) = self.members.remove(member_id) {
             if let Some(ice_user) = member.take_ice_user() {
-                wrap_future::<_, Room>(
-                    self.turn_service
-                        .delete(vec![ice_user])
-                        .map_err(|e| error!("Error removing IceUser {:?}", e))
-                        .map(|_| ()),
-                )
+                let turn_service = self.turn_service.clone();
+                wrap_future::<_, Room>(async move {
+                    if let Err(e) = turn_service.delete(&[ice_user]).await {
+                        error!("Error removing IceUser {:?}", e)
+                    }
+                })
                 .spawn(ctx);
             }
         }

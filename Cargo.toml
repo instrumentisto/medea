@@ -16,6 +16,7 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 [workspace]
 members = [
     "crates/medea-macro",
+    "crates/coturn-telnet",
     "jason",
     "mock/control-api",
     "proto/client-api",
@@ -32,6 +33,7 @@ actix-web-actors = "2.0"
 async-trait = "0.1"
 chrono = "0.4"
 config = "0.10"
+coturn-telnet = {path = "crates/coturn-telnet"}
 deadpool = "0.5"
 deadpool-redis = "0.5"
 derive_more = "0.99"
@@ -45,7 +47,7 @@ medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
 protobuf = "2.7"
 rand = "0.7"
-redis = "0.14"
+redis = "0.15"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
