@@ -175,6 +175,14 @@ impl PeerConnection {
     /// this peer.
     ///
     /// Provided `ice_servers` will be used by created [`RtcPeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::RtcPeerConnection`] if [`RtcPeerConnection`]
+    /// creating fails.
+    ///
+    /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
+    /// [`RtcPeerConnection`] can't be set.
     pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -348,8 +356,11 @@ impl PeerConnection {
     /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
     /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
     /// allocated on sdp update.
+    ///
+    /// # Errors
+    ///
     /// Errors if finds transceiver without mid, so must be called after setting
-    /// local description if offerrer, and remote if answerer.
+    /// local description if offerer, and remote if answerer.
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface

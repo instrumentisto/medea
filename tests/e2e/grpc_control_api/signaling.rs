@@ -9,10 +9,10 @@ use std::{
     time::Duration,
 };
 
-use actix::Context;
+use actix::{Arbiter, Context};
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
+use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
 use tokio::time::timeout;
 
 use crate::{grpc_control_api::ControlClient, signalling::TestMember};
@@ -54,7 +54,7 @@ fn done_on_both_peers_created() -> (
 async fn signalling_starts_when_create_play_member_after_pub_member() {
     const TEST_NAME: &str = "create-play-member-after-pub-member";
 
-    let control_client = ControlClient::new();
+    let mut control_client = ControlClient::new().await;
 
     let create_room = RoomBuilder::default()
         .id(TEST_NAME)
@@ -65,7 +65,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .p2p_mode(P2p::Always)
                         .build()
                         .unwrap(),
                 )
@@ -76,7 +76,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         .unwrap()
         .build_request("");
 
-    control_client.create(&create_room);
+    control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
     let deadline = Some(Duration::from_secs(5));
@@ -102,7 +102,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         .unwrap()
         .build_request(TEST_NAME);
 
-    control_client.create(&create_play_member);
+    control_client.create(create_play_member).await;
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", TEST_NAME),
         Box::new(on_event),
@@ -118,7 +118,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     const TEST_NAME: &str =
         "signalling_starts_when_create_play_endpoint_after_pub_member";
 
-    let control_client = ControlClient::new();
+    let mut control_client = ControlClient::new().await;
 
     let create_room = RoomBuilder::default()
         .id(TEST_NAME)
@@ -129,7 +129,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .p2p_mode(P2p::Always)
                         .build()
                         .unwrap(),
                 )
@@ -140,7 +140,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         .unwrap()
         .build_request("");
 
-    control_client.create(&create_room);
+    control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
     let deadline = Some(Duration::from_secs(5));
@@ -158,7 +158,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         .build()
         .unwrap()
         .build_request(TEST_NAME);
-    control_client.create(&create_second_member);
+    control_client.create(create_second_member).await;
 
     let create_play = WebRtcPlayEndpointBuilder::default()
         .id("play")
@@ -167,7 +167,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         .unwrap()
         .build_request(format!("{}/responder", TEST_NAME));
 
-    control_client.create(&create_play);
+    control_client.create(create_play).await;
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", TEST_NAME),
@@ -183,7 +183,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 async fn signalling_starts_in_loopback_scenario() {
     const TEST_NAME: &str = "signalling_starts_in_loopback_scenario";
 
-    let control_client = ControlClient::new();
+    let mut control_client = ControlClient::new().await;
 
     let create_room = RoomBuilder::default()
         .id(TEST_NAME)
@@ -194,7 +194,7 @@ async fn signalling_starts_in_loopback_scenario() {
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .p2p_mode(P2p::Always)
                         .build()
                         .unwrap(),
                 )
@@ -205,7 +205,7 @@ async fn signalling_starts_in_loopback_scenario() {
         .unwrap()
         .build_request("");
 
-    control_client.create(&create_room);
+    control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
 
@@ -225,7 +225,7 @@ async fn signalling_starts_in_loopback_scenario() {
         .unwrap()
         .build_request(format!("{}/publisher", TEST_NAME));
 
-    control_client.create(&create_play);
+    control_client.create(create_play).await;
 
     done.await;
 }
@@ -234,7 +234,7 @@ async fn signalling_starts_in_loopback_scenario() {
 async fn peers_removed_on_delete_member() {
     const TEST_NAME: &str = "delete-member-check-peers-removed";
 
-    let control_client = ControlClient::new();
+    let control_client = Rc::new(RefCell::new(ControlClient::new().await));
 
     let create_room = RoomBuilder::default()
         .id(TEST_NAME)
@@ -245,7 +245,7 @@ async fn peers_removed_on_delete_member() {
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .p2p_mode(P2p::Always)
                         .build()
                         .unwrap(),
                 )
@@ -270,7 +270,7 @@ async fn peers_removed_on_delete_member() {
         .unwrap()
         .build_request("");
 
-    control_client.create(&create_room);
+    control_client.borrow_mut().create(create_room).await;
 
     let peers_created = Rc::new(Cell::new(0));
     let on_event =
@@ -279,9 +279,14 @@ async fn peers_removed_on_delete_member() {
                 Event::PeerCreated { .. } => {
                     peers_created.set(peers_created.get() + 1);
                     if peers_created.get() == 2 {
-                        control_client
-                            .delete(&[&format!("{}/responder", TEST_NAME)])
-                            .unwrap();
+                        let client = control_client.clone();
+                        Arbiter::spawn(async move {
+                            client
+                                .borrow_mut()
+                                .delete(&[&format!("{}/responder", TEST_NAME)])
+                                .await
+                                .unwrap();
+                        })
                     }
                 }
                 Event::PeersRemoved { .. } => {

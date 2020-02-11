@@ -22,8 +22,9 @@ impl GrpcCallbackUrl {
     /// If you wish to get address with protocol - just use [`Display`]
     /// implementation.
     #[inline]
-    pub fn addr(&self) -> &str {
-        &self.0
+    pub fn addr(&self) -> String {
+        // TODO: Do not hardcode protocol.
+        format!("http://{}", self.0)
     }
 }
 
@@ -108,10 +109,10 @@ mod tests {
     #[test]
     fn successful_parse_grpc_url() {
         for (url, expected_callback_url) in &[
-            ("grpc://127.0.0.1:9090", "127.0.0.1:9090"),
-            ("grpc://example.com:9090", "example.com:9090"),
-            ("grpc://example.com", "example.com"),
-            ("grpc://127.0.0.1", "127.0.0.1"),
+            ("grpc://127.0.0.1:9090", "http://127.0.0.1:9090"),
+            ("grpc://example.com:9090", "http://example.com:9090"),
+            ("grpc://example.com", "http://example.com"),
+            ("grpc://127.0.0.1", "http://127.0.0.1"),
         ] {
             let callback_url =
                 CallbackUrl::try_from((*url).to_string()).unwrap();

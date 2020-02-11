@@ -1,11 +1,6 @@
-#![allow(
-    bare_trait_objects,
-    clippy::cargo,
-    clippy::nursery,
-    clippy::pedantic,
-)]
+#![allow(clippy::pedantic)]
 
+#[rustfmt::skip]
 pub mod api;
-pub mod api_grpc;
+#[rustfmt::skip]
 pub mod callback;
-pub mod callback_grpc;

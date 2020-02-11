@@ -14,12 +14,11 @@ categories = ["api-bindings", "network-programming"]
 
 [features]
 default = ["grpc"]
-grpc = ["futures", "grpcio", "protobuf", "protoc-grpcio"]
+grpc = ["prost", "tonic-build", "tonic"]
 
 [dependencies]
-futures = { version = "0.1", optional = true }
-grpcio = { version = "0.4", optional = true }
-protobuf = { version = "2.8", optional = true }
+prost = { version = "0.6", optional = true }
+tonic = { version = "0.1", optional = true }
 
 [build-dependencies]
-protoc-grpcio = { version = "1.1", optional = true }
+tonic-build = { version = "0.1", optional = true}

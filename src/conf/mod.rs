@@ -62,6 +62,10 @@ impl Conf {
     /// - configuration file, the name of which is given as a command line
     ///   parameter or environment variable;
     /// - environment variables.
+    ///
+    /// # Errors
+    ///
+    /// Errors if parsing fails.
     pub fn parse() -> Result<Self, Error> {
         let mut cfg = Config::new();
 

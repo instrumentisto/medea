@@ -47,7 +47,8 @@ fn main() -> Result<(), Error> {
 
             medea::api::control::start_static_rooms(&room_service).await?;
 
-            let grpc_server = grpc::server::run(room_service, &app_context);
+            let grpc_server =
+                grpc::server::run(room_service, &app_context).await;
             let server = Server::run(room_repo, config)?;
 
             shutdown::subscribe(

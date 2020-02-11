@@ -5,10 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-#[rustfmt::skip]
-use medea_control_api_proto::grpc::api::{
-    CreateRequest_oneof_el as ElementProto,
-};
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
@@ -54,14 +51,16 @@ pub struct RoomSpec {
     pub pipeline: Pipeline<MemberId, RoomElement>,
 }
 
-impl TryFrom<ElementProto> for RoomSpec {
+impl TryFrom<proto::create_request::El> for RoomSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(proto: ElementProto) -> Result<Self, Self::Error> {
+    fn try_from(proto: proto::create_request::El) -> Result<Self, Self::Error> {
+        use proto::create_request::El;
+
         let id = match proto {
-            ElementProto::room(mut room) => {
+            El::Room(room) => {
                 let mut pipeline = HashMap::new();
-                for (id, room_element) in room.take_pipeline() {
+                for (id, room_element) in room.pipeline {
                     if let Some(elem) = room_element.el {
                         let member =
                             MemberSpec::try_from((MemberId(id.clone()), elem))?;
@@ -73,13 +72,13 @@ impl TryFrom<ElementProto> for RoomSpec {
 
                 let pipeline = Pipeline::new(pipeline);
                 return Ok(Self {
-                    id: room.take_id().into(),
+                    id: room.id.into(),
                     pipeline,
                 });
             }
-            ElementProto::member(mut member) => member.take_id(),
-            ElementProto::webrtc_pub(mut webrtc_pub) => webrtc_pub.take_id(),
-            ElementProto::webrtc_play(mut webrtc_play) => webrtc_play.take_id(),
+            El::Member(member) => member.id,
+            El::WebrtcPub(webrtc_pub) => webrtc_pub.id,
+            El::WebrtcPlay(webrtc_play) => webrtc_play.id,
         };
 
         Err(TryFromProtobufError::ExpectedOtherElement(
@@ -91,6 +90,11 @@ impl TryFrom<ElementProto> for RoomSpec {
 
 impl RoomSpec {
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`TryFromElementError::NotMember`] if no [`MemberSpec`]
+    /// was found in this [`RoomSpec`]'s pipeline.
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, MemberSpec>, TryFromElementError> {

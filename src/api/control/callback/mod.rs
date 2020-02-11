@@ -4,13 +4,11 @@ pub mod clients;
 pub mod service;
 pub mod url;
 
+use actix::Message;
 use chrono::{DateTime, Utc};
+use clients::CallbackClientError;
 use derive_more::From;
-use medea_control_api_proto::grpc::callback::{
-    OnJoin as OnJoinProto, OnJoin, OnLeave as OnLeaveProto,
-    OnLeave_Reason as OnLeaveReasonProto, Request as CallbackRequestProto,
-    Request_oneof_event as RequestOneofEventProto,
-};
+use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
 
@@ -28,11 +26,12 @@ impl OnLeaveEvent {
     }
 }
 
-impl Into<OnLeaveProto> for OnLeaveEvent {
-    fn into(self) -> OnLeaveProto {
-        let mut proto = OnLeaveProto::new();
-        proto.set_reason(self.reason.into());
-        proto
+impl Into<proto::OnLeave> for OnLeaveEvent {
+    fn into(self) -> proto::OnLeave {
+        let on_leave: proto::on_leave::Reason = self.reason.into();
+        proto::OnLeave {
+            reason: on_leave as i32,
+        }
     }
 }
 
@@ -49,12 +48,12 @@ pub enum OnLeaveReason {
     ServerShutdown,
 }
 
-impl Into<OnLeaveReasonProto> for OnLeaveReason {
-    fn into(self) -> OnLeaveReasonProto {
+impl Into<proto::on_leave::Reason> for OnLeaveReason {
+    fn into(self) -> proto::on_leave::Reason {
         match self {
-            Self::LostConnection => OnLeaveReasonProto::LOST_CONNECTION,
-            Self::ServerShutdown => OnLeaveReasonProto::SERVER_SHUTDOWN,
-            Self::Disconnected => OnLeaveReasonProto::DISCONNECTED,
+            Self::LostConnection => proto::on_leave::Reason::LostConnection,
+            Self::ServerShutdown => proto::on_leave::Reason::ServerShutdown,
+            Self::Disconnected => proto::on_leave::Reason::Disconnected,
         }
     }
 }
@@ -63,9 +62,9 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
 #[derive(Debug)]
 pub struct OnJoinEvent;
 
-impl Into<OnJoinProto> for OnJoinEvent {
-    fn into(self) -> OnJoin {
-        OnJoinProto::new()
+impl Into<proto::OnJoin> for OnJoinEvent {
+    fn into(self) -> proto::OnJoin {
+        proto::OnJoin {}
     }
 }
 
@@ -76,14 +75,14 @@ pub enum CallbackEvent {
     OnLeave(OnLeaveEvent),
 }
 
-impl Into<RequestOneofEventProto> for CallbackEvent {
-    fn into(self) -> RequestOneofEventProto {
+impl Into<proto::request::Event> for CallbackEvent {
+    fn into(self) -> proto::request::Event {
         match self {
             Self::OnJoin(on_join) => {
-                RequestOneofEventProto::on_join(on_join.into())
+                proto::request::Event::OnJoin(on_join.into())
             }
             Self::OnLeave(on_leave) => {
-                RequestOneofEventProto::on_leave(on_leave.into())
+                proto::request::Event::OnLeave(on_leave.into())
             }
         }
     }
@@ -95,7 +94,8 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 ///
 /// [`CallbackClient::send`]:
 /// crate::api::control::callback::clients::CallbackClient::send
-#[derive(Debug)]
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), CallbackClientError>")]
 pub struct CallbackRequest {
     /// FID (Full ID) of element with which event was occurred.
     fid: StatefulFid,
@@ -119,12 +119,12 @@ impl CallbackRequest {
     }
 }
 
-impl Into<CallbackRequestProto> for CallbackRequest {
-    fn into(self) -> CallbackRequestProto {
-        let mut proto = CallbackRequestProto::new();
-        proto.event = Some(self.event.into());
-        proto.set_fid(self.fid.to_string());
-        proto.set_at(self.at.to_rfc3339());
-        proto
+impl Into<proto::Request> for CallbackRequest {
+    fn into(self) -> proto::Request {
+        proto::Request {
+            event: Some(self.event.into()),
+            fid: self.fid.to_string(),
+            at: self.at.to_rfc3339(),
+        }
     }
 }

@@ -16,14 +16,7 @@ use actix_web::{
     App, HttpResponse, HttpServer,
 };
 use clap::ArgMatches;
-use futures::Future;
-use medea_control_api_proto::grpc::api::{
-    CreateResponse as CreateResponseProto, Element as ElementProto,
-    Element_oneof_el as ElementOneOf, Error as ErrorProto,
-    GetResponse as GetResponseProto, Response as ResponseProto,
-    Room_Element as RoomElementProto,
-    Room_Element_oneof_el as RoomElementOneOf,
-};
+use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -53,42 +46,48 @@ pub struct Context {
 /// Run REST [Control API] server mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub fn run(args: &ArgMatches, callback_server_addr: Addr<GrpcCallbackServer>) {
+pub async fn run(
+    args: &ArgMatches<'static>,
+    callback_server_addr: Addr<GrpcCallbackServer>,
+) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
+    let client = ControlClient::new(medea_addr).await.unwrap();
     HttpServer::new(move || {
+        debug!("Running HTTP server...");
         App::new()
-            .wrap(Cors::new())
+            .wrap(Cors::new().finish())
             .data(Context {
-                client: ControlClient::new(&medea_addr),
+                client: client.clone(),
                 callback_server: callback_server_addr.clone(),
             })
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/control-api/{a}")
-                    .route(web::post().to_async(create::create1))
-                    .route(web::get().to_async(get::get1))
-                    .route(web::delete().to_async(delete::delete1)),
+                    .route(web::post().to(create::create1))
+                    .route(web::get().to(get::get1))
+                    .route(web::delete().to(delete::delete1)),
             )
             .service(
                 web::resource("/control-api/{a}/{b}")
-                    .route(web::post().to_async(create::create2))
-                    .route(web::get().to_async(get::get2))
-                    .route(web::delete().to_async(delete::delete2)),
+                    .route(web::post().to(create::create2))
+                    .route(web::get().to(get::get2))
+                    .route(web::delete().to(delete::delete2)),
             )
             .service(
                 web::resource("/control-api/{a}/{b}/{c}")
-                    .route(web::post().to_async(create::create3))
-                    .route(web::get().to_async(get::get3))
-                    .route(web::delete().to_async(delete::delete3)),
+                    .route(web::post().to(create::create3))
+                    .route(web::get().to(get::get3))
+                    .route(web::delete().to(delete::delete3)),
             )
             .service(
-                web::resource("/callbacks")
-                    .route(web::get().to_async(get_callbacks)),
+                web::resource("/callbacks").route(web::get().to(get_callbacks)),
             )
     })
     .bind(args.value_of("addr").unwrap())
     .unwrap()
-    .start();
+    .run()
+    .await
+    .unwrap();
 }
 
 /// Generates `request` macro which will generate [`actix_web`] request handler
@@ -107,13 +106,14 @@ macro_rules! gen_request_macro {
         /// `$uri_tuple` - type of path which will be provided by [`actix_web`].
         macro_rules! request {
             ($name:tt, $uri_tuple:ty) => {
-                pub fn $name(
+                pub async fn $name(
                     path: actix_web::web::Path<$uri_tuple>,
                     state: Data<Context>,
-                ) -> impl Future<Item = HttpResponse, Error = ()> {
+                ) -> Result<HttpResponse, ()> {
                     state
                         .client
                         .$call_fn(path.into_inner().into())
+                        .await
                         .map_err(|e| error!("{:?}", e))
                         .map(|r| <$resp>::from(r).into())
                 }
@@ -125,12 +125,11 @@ macro_rules! gen_request_macro {
 /// [`actix_web`] REST API endpoint which returns all
 /// [`Callback`]s received by this mock server.
 #[allow(clippy::needless_pass_by_value)]
-pub fn get_callbacks(
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
+pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
     state
         .callback_server
         .send(GetCallbackItems)
+        .await
         .map_err(|e| warn!("GrpcCallbackServer mailbox error. {:?}", e))
         .map(|callbacks| HttpResponse::Ok().json(&callbacks.unwrap()))
 }
@@ -170,40 +169,43 @@ mod get {
 mod create {
     use super::*;
 
-    pub fn create1(
+    pub async fn create1(
         path: actix_web::web::Path<String>,
         state: Data<Context>,
         data: Json<Element>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
+    ) -> Result<HttpResponse, ()> {
         state
             .client
             .create(path.into_inner(), Fid::from(()), data.0)
+            .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }
 
-    pub fn create2(
+    pub async fn create2(
         path: actix_web::web::Path<(String, String)>,
         state: Data<Context>,
         data: Json<Element>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
+    ) -> Result<HttpResponse, ()> {
         let uri = path.into_inner();
         state
             .client
             .create(uri.1, Fid::from(uri.0), data.0)
+            .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }
 
-    pub fn create3(
+    pub async fn create3(
         path: actix_web::web::Path<(String, String, String)>,
         state: Data<Context>,
         data: Json<Element>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
+    ) -> Result<HttpResponse, ()> {
         let uri = path.into_inner();
         state
             .client
             .create(uri.2, Fid::from((uri.0, uri.1)), data.0)
+            .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }
@@ -224,12 +226,12 @@ pub struct ErrorResponse {
     pub element: String,
 }
 
-impl Into<ErrorResponse> for ErrorProto {
-    fn into(mut self) -> ErrorResponse {
+impl Into<ErrorResponse> for proto::Error {
+    fn into(self) -> ErrorResponse {
         ErrorResponse {
-            code: self.get_code(),
-            text: self.take_text(),
-            element: self.take_element(),
+            code: self.code,
+            text: self.text,
+            element: self.element,
         }
     }
 }
@@ -288,28 +290,24 @@ impl_into_http_response!(CreateResponse);
 impl_into_http_response!(Response);
 impl_into_http_response!(SingleGetResponse);
 
-impl From<ResponseProto> for Response {
-    fn from(mut resp: ResponseProto) -> Self {
-        if resp.has_error() {
-            Self {
-                error: Some(resp.take_error().into()),
-            }
-        } else {
-            Self { error: None }
+impl From<proto::Response> for Response {
+    fn from(resp: proto::Response) -> Self {
+        Self {
+            error: resp.error.map(Into::into),
         }
     }
 }
 
-impl From<CreateResponseProto> for CreateResponse {
-    fn from(mut resp: CreateResponseProto) -> Self {
-        if resp.has_error() {
+impl From<proto::CreateResponse> for CreateResponse {
+    fn from(resp: proto::CreateResponse) -> Self {
+        if let Some(error) = resp.error {
             Self {
                 sids: None,
-                error: Some(resp.take_error().into()),
+                error: Some(error.into()),
             }
         } else {
             Self {
-                sids: Some(resp.take_sid()),
+                sids: Some(resp.sid),
                 error: None,
             }
         }
@@ -330,35 +328,39 @@ pub enum Element {
 
 impl Element {
     #[must_use]
-    pub fn into_proto(self, id: String) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        match self {
-            Self::Member(m) => proto.set_member(m.into_proto(id)),
+    pub fn into_proto(self, id: String) -> proto::room::Element {
+        let el = match self {
+            Self::Member(m) => {
+                proto::room::element::El::Member(m.into_proto(id))
+            }
             _ => unimplemented!(),
-        }
-        proto
+        };
+        proto::room::Element { el: Some(el) }
     }
 }
 
-impl From<ElementProto> for Element {
-    fn from(proto: ElementProto) -> Self {
+impl From<proto::Element> for Element {
+    fn from(proto: proto::Element) -> Self {
+        use proto::element::El::*;
         match proto.el.unwrap() {
-            ElementOneOf::room(room) => Self::Room(room.into()),
-            ElementOneOf::member(member) => Self::Member(member.into()),
-            ElementOneOf::webrtc_pub(webrtc_pub) => {
+            Room(room) => Self::Room(room.into()),
+            Member(member) => Self::Member(member.into()),
+            WebrtcPub(webrtc_pub) => {
                 Self::WebRtcPublishEndpoint(webrtc_pub.into())
             }
-            ElementOneOf::webrtc_play(webrtc_play) => {
+            WebrtcPlay(webrtc_play) => {
                 Self::WebRtcPlayEndpoint(webrtc_play.into())
             }
         }
     }
 }
 
-impl From<RoomElementProto> for Element {
-    fn from(proto: RoomElementProto) -> Self {
+impl From<proto::room::Element> for Element {
+    fn from(proto: proto::room::Element) -> Self {
         match proto.el.unwrap() {
-            RoomElementOneOf::member(member) => Self::Member(member.into()),
+            proto::room::element::El::Member(member) => {
+                Self::Member(member.into())
+            }
             _ => unimplemented!(
                 "Currently Control API mock server supports only Member \
                  element in Room pipeline."
@@ -382,18 +384,18 @@ pub struct SingleGetResponse {
     pub error: Option<ErrorResponse>,
 }
 
-impl From<GetResponseProto> for SingleGetResponse {
-    fn from(mut proto: GetResponseProto) -> Self {
-        if proto.has_error() {
+impl From<proto::GetResponse> for SingleGetResponse {
+    fn from(proto: proto::GetResponse) -> Self {
+        if let Some(error) = proto.error {
             Self {
                 element: None,
-                error: Some(proto.take_error().into()),
+                error: Some(error.into()),
             }
         } else {
             Self {
                 error: None,
                 element: proto
-                    .take_elements()
+                    .elements
                     .into_iter()
                     .map(|(_, e)| e.into())
                     .next(),

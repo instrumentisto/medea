@@ -211,6 +211,11 @@ pub struct RtcPeerConnection {
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RTCPeerConnectionError::PeerCreationError`] if
+    /// [`SysRtcPeerConnection`] creation fails.
     pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
@@ -239,6 +244,11 @@ impl RtcPeerConnection {
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
     /// [`ontrack` callback][2]).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
@@ -269,6 +279,11 @@ impl RtcPeerConnection {
 
     /// Sets handler for [`RtcPeerConnectionIceEvent`] event
     /// (see [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
@@ -308,6 +323,11 @@ impl RtcPeerConnection {
     }
 
     /// Sets handler for [`iceconnectionstatechange`][1] event.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
     pub fn on_ice_connection_state_change<F>(&self, f: Option<F>) -> Result<()>

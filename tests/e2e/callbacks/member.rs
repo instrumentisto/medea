@@ -4,10 +4,9 @@ use std::time::Duration;
 
 use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
-use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::callback::{
-    OnLeave_Reason as OnLeaveReason, Request,
-};
+use medea_client_api_proto::Event as RpcEvent;
+use medea_control_api_proto::grpc::callback as proto;
+use proto::request::Event;
 
 use crate::{
     callbacks::{GetCallbacks, GrpcCallbackServer},
@@ -36,7 +35,7 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// will receive all callbacks from Medea.
 async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
     let callback_server = super::run(port);
-    let control_client = ControlClient::new();
+    let mut control_client = ControlClient::new().await;
     let member = RoomBuilder::default()
         .id(name)
         .add_member(
@@ -50,10 +49,10 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
         .build()
         .unwrap()
         .build_request(String::new());
-    let create_response = control_client.create(&member);
+    let create_response = control_client.create(member).await;
 
     let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
+        move |_: &RpcEvent, _: &mut Context<TestMember>, _: Vec<&RpcEvent>| {};
     let deadline = Some(Duration::from_secs(5));
     let client = TestMember::connect(
         create_response.get(name).unwrap(),
@@ -80,8 +79,16 @@ async fn on_join() {
     let (_, callback_server) = callback_test(TEST_NAME, 9096).await;
     delay_for(Duration::from_millis(300)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
-    let on_joins_count =
-        callbacks.into_iter().filter(Request::has_on_join).count();
+    let on_joins_count = callbacks
+        .into_iter()
+        .filter(|r| {
+            if let Some(Event::OnJoin(_)) = &r.event {
+                true
+            } else {
+                false
+            }
+        })
+        .count();
     assert_eq!(on_joins_count, 1);
 }
 
@@ -96,7 +103,7 @@ async fn on_join() {
 /// 3. Wait `300ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
-/// [`OnLeaveReason::DISONNECTED`].
+/// [`proto::on_leave::Reason::DISONNECTED`].
 #[actix_rt::test]
 async fn on_leave_normally_disconnected() {
     const TEST_NAME: &str = "member_callback_on_leave";
@@ -109,14 +116,16 @@ async fn on_leave_normally_disconnected() {
 
     let on_leaves_count = callbacks
         .into_iter()
-        .filter_map(|mut req| {
-            if req.has_on_leave() {
-                Some(req.take_on_leave().reason)
+        .filter_map(|req| {
+            if let Some(Event::OnLeave(on_leave)) = req.event {
+                Some(on_leave.reason)
             } else {
                 None
             }
         })
-        .filter(|reason| reason == &OnLeaveReason::DISCONNECTED)
+        .filter(|reason| {
+            reason == &(proto::on_leave::Reason::Disconnected as i32)
+        })
         .count();
     assert_eq!(on_leaves_count, 1);
 }
@@ -132,7 +141,7 @@ async fn on_leave_normally_disconnected() {
 /// 3. Wait `3000ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
-/// [`OnLeaveReason::LOST_CONNECTION`].
+/// [`proto::on_leave::Reason::LOST_CONNECTION`].
 #[actix_rt::test]
 async fn on_leave_on_connection_loss() {
     const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";
@@ -146,14 +155,16 @@ async fn on_leave_on_connection_loss() {
 
     let on_leaves_count = callbacks
         .into_iter()
-        .filter_map(|mut req| {
-            if req.has_on_leave() {
-                Some(req.take_on_leave().reason)
+        .filter_map(|req| {
+            if let Some(Event::OnLeave(on_leave)) = req.event {
+                Some(on_leave.reason)
             } else {
                 None
             }
         })
-        .filter(|reason| reason == &OnLeaveReason::LOST_CONNECTION)
+        .filter(|reason| {
+            reason == &(proto::on_leave::Reason::LostConnection as i32)
+        })
         .count();
     assert_eq!(on_leaves_count, 1);
 }

@@ -68,6 +68,11 @@ impl PeerRepository {
     }
 
     /// Returns borrowed [`PeerStateMachine`] by its ID.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn get_peer_by_id(
         &self,
         peer_id: PeerId,
@@ -138,6 +143,11 @@ impl PeerRepository {
     }
 
     /// Returns borrowed [`Peer`] by its ID.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn get_inner_peer_by_id<'a, S>(
         &'a self,
         peer_id: PeerId,
@@ -165,6 +175,11 @@ impl PeerRepository {
     }
 
     /// Returns owned [`Peer`] by its ID.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn take_inner_peer<S>(
         &mut self,
         peer_id: PeerId,

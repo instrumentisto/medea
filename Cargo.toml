@@ -38,14 +38,12 @@ derive_more = "0.99"
 dotenv = "0.15"
 failure = "0.1"
 futures = { version = "0.3", features = ["compat"] }
-grpcio = { version = "0.4", features = ["openssl"] }
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
-protobuf = "2.7"
 rand = "0.7"
-redis = "0.14"
+redis = "0.15"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -57,6 +55,7 @@ slog-scope = "4.1"
 slog-stdlog = "4.0"
 smart-default = "0.6"
 tokio = { version = "0.2", features = ["signal", "time"] }
+tonic = "0.1"
 toml = "0.5"
 url = "2.1"
 [dependencies.slog]
