@@ -47,7 +47,7 @@ impl CoturnAllocationEvent {
         body: String,
     ) -> Result<Self, CoturnEventParseError> {
         match event_type {
-            "total_traffic" => {
+            "total_traffic" | "traffic" => {
                 let mut items: HashMap<&str, u64> = body
                     .split(", ")
                     .map(|i| {
@@ -97,69 +97,21 @@ impl CoturnAllocationEvent {
                     )
                 })?;
 
-                Ok(CoturnAllocationEvent::TotalTraffic {
-                    received_bytes,
-                    received_packets,
-                    sent_bytes,
-                    sent_packets,
-                })
-            }
-            "traffic" => {
-                let mut items: HashMap<&str, u64> = body
-                    .split(", ")
-                    .map(|i| {
-                        let mut splitted_item = i.split('=');
-                        let key = splitted_item.next().ok_or_else(|| {
-                            CoturnEventParseError::FailedToParseTrafficMap(
-                                body.clone(),
-                            )
-                        })?;
-                        let value: u64 = splitted_item
-                            .next()
-                            .ok_or_else(|| {
-                                CoturnEventParseError::FailedToParseTrafficMap(
-                                    body.clone(),
-                                )
-                            })?
-                            .parse()
-                            .map_err(|_| {
-                                CoturnEventParseError::FailedToParseTrafficMap(
-                                    body.clone(),
-                                )
-                            })?;
-
-                        Ok((key, value))
+                if event_type == "total_traffic" {
+                    Ok(CoturnAllocationEvent::TotalTraffic {
+                        received_bytes,
+                        received_packets,
+                        sent_bytes,
+                        sent_packets,
                     })
-                    .collect::<Result<_, _>>()?;
-
-                let received_packets =
-                    items.remove("rcvp").ok_or_else(|| {
-                        CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                            "rcvp".to_string(),
-                        )
-                    })?;
-                let received_bytes = items.remove("rcvb").ok_or_else(|| {
-                    CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                        "rcvb".to_string(),
-                    )
-                })?;
-                let sent_packets = items.remove("sentp").ok_or_else(|| {
-                    CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                        "sentp".to_string(),
-                    )
-                })?;
-                let sent_bytes = items.remove("sentb").ok_or_else(|| {
-                    CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                        "sentb".to_string(),
-                    )
-                })?;
-
-                Ok(CoturnAllocationEvent::Traffic {
-                    received_bytes,
-                    received_packets,
-                    sent_bytes,
-                    sent_packets,
-                })
+                } else {
+                    Ok(CoturnAllocationEvent::Traffic {
+                        received_bytes,
+                        received_packets,
+                        sent_bytes,
+                        sent_packets,
+                    })
+                }
             }
             "status" => {
                 let mut splitted = body.split(' ');
@@ -200,7 +152,6 @@ impl CoturnAllocationEvent {
                 }
             }
             _ => {
-                debug!("Body: {}", body);
                 Err(CoturnEventParseError::UnsupportedEventType(
                     event_type.to_string(),
                 ))
@@ -271,20 +222,57 @@ impl CoturnEvent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display)]
 pub enum CoturnEventParseError {
+    /// Unsupported allocation status.
+    #[display(fmt = "Unsupported allocation status: {}", _0)]
     UnsupportedStatus(String),
+
+    /// Unsupported allocation event type.
+    #[display(fmt = "Unsupported allocation event type: {}", _0)]
     UnsupportedEventType(String),
+
+    /// Some traffic stats event's field not found.
+    #[display(fmt = "Field {} not found in traffic event", _0)]
     FieldNotFoundInTrafficUpdate(String),
+
+    /// Failed to parse traffic event stat metadata.
+    #[display(fmt = "Failed to parse traffic stat '{}' from traffic event.", _0)]
     FailedToParseTrafficMap(String),
+
+    /// Status is empty.
+    #[display(fmt = "Status is empty.")]
     EmptyStatus,
+
+    /// Status doesn't have metadata.
+    #[display(fmt = "Status doesn't have metadata.")]
     NoMetadataInStatus,
+
+    /// Allocation lifetime parsing failed.
+    #[display(fmt = "Allocation lifetime parsing failed.")]
     FailedLifetimeParsing,
+
+    /// Redis channel info is empty.
+    #[display(fmt = "Redis channel info is empty.")]
     NoChannelInfo,
+
+    /// No user metadata.
+    #[display(fmt = "No user metadata.")]
     NoUserInfo,
+
+    /// No MemberId metadata.
+    #[display(fmt = "No MemberId metadata.")]
     NoMemberId,
+
+    /// No PeerId metadata.
+    #[display(fmt = "No PeerId metadata.")]
     NoPeerId,
+
+    /// No allocation ID metadata.
+    #[display(fmt = "No allocation ID metadata.")]
     NoAllocationId,
+
+    #[display(fmt = "No event type.")]
     NoEventType,
 }
 
