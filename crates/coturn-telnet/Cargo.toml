@@ -2,7 +2,7 @@
 name = "coturn-telnet"
 version = "0.1.0-dev"
 edition = "2018"
-description = "Coturn TURN server telnet cli client"
+description = "Coturn TURN server telnet client"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MIT/Apache-2.0"
 documentation = "https://docs.rs/coturn-telnet"

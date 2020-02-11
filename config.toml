@@ -128,7 +128,7 @@
 [turn.cli]
 # Coturn server host.
 #
-# Env var: MEDEA_TURN__CLI__HOST
+# Env var: MEDEA_TURN__CLI__IP
 # Default:
 #   host = "127.0.0.1"
 
@@ -144,7 +144,24 @@
 # Default:
 #   pass = "turn"
 
+[turn.cli.timeouts]
+# Timeout when waiting for an available connection.
+#
+# Env var: MEDEA_TURN__CLI__TIMEOUTS__WAIT
+# Default:
+#   wait = "5s"
 
+# Timeout when creating a new connection.
+#
+# Env var: MEDEA_TURN__CLI__TIMEOUTS__CREATE
+# Default:
+#   create = "5s"
+
+# Timeout when recycling connection.
+#
+# Env var: MEDEA_TURN__CLI__TIMEOUTS__RECYCLE
+# Default:
+#   recycle = "5s"
 
 [log]
 # Maximum allowed level of application log entries.

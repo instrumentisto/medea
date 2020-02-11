@@ -7,7 +7,7 @@ coturn-telnet
 [API Docs](https://docs.rs/coturn-telnet) |
 [Changelog](https://github.com/instrumentisto/medea/blob/master/crates/coturn-telnet/CHANGELOG.md)
 
-[Coturn] telnet cli client implementation.
+[Coturn] telnet admin interface client implementation.
 
 
 

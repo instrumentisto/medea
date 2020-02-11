@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use deadpool::managed::Timeouts as PoolTimeouts;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -15,7 +16,7 @@ use smart_default::SmartDefault;
 pub struct Turn {
     /// Database settings
     pub db: Db,
-    /// Coturn cli connection settings.
+    /// Coturn telnet connection settings.
     pub cli: CoturnCli,
     /// Host of STUN/TURN server. Defaults to `localhost`.
     #[default = "localhost"]
@@ -86,6 +87,35 @@ pub struct CoturnCli {
     /// Password for authorize on Coturn server telnet interface.
     #[default(String::from("turn"))]
     pub pass: String,
+    /// Coturn connection timeouts.
+    pub timeouts: Timeouts,
+}
+
+/// [Deadpool] connection pool timeouts.
+///
+/// [Deadpool]: https://crates.io/crates/deadpool
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct Timeouts {
+    #[default(Some(Duration::from_secs(5)))]
+    #[serde(with = "humantime_serde")]
+    pub wait: Option<Duration>,
+    #[default(Some(Duration::from_secs(5)))]
+    #[serde(with = "humantime_serde")]
+    pub create: Option<Duration>,
+    #[default(Some(Duration::from_secs(5)))]
+    #[serde(with = "humantime_serde")]
+    pub recycle: Option<Duration>,
+}
+
+impl Into<PoolTimeouts> for &Timeouts {
+    fn into(self) -> PoolTimeouts {
+        PoolTimeouts {
+            wait: self.wait,
+            create: self.create,
+            recycle: self.recycle
+        }
+    }
 }
 
 #[cfg(test)]
@@ -157,14 +187,39 @@ mod spec {
 
     #[test]
     #[serial]
-    fn turn_conf() {
+    fn coturn_cli() {
         let default_conf = Conf::default();
-        let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__HOST" => "example.com",
-            "MEDEA_TURN__PORT" => "1234",
+        let env_conf:Conf = overrided_by_env_conf!(
+            "MEDEA_TURN__CLI__IP" => "4.4.4.4",
+            "MEDEA_TURN__CLI__PORT" => "1234",
+            "MEDEA_TURN__CLI__PASS" => "clipass",
         );
 
-        assert_ne!(default_conf.turn.host, env_conf.turn.host);
-        assert_ne!(default_conf.turn.port, env_conf.turn.port);
+        assert_ne!(default_conf.turn.cli.ip, env_conf.turn.cli.ip);
+        assert_ne!(default_conf.turn.cli.port, env_conf.turn.cli.port);
+        assert_ne!(default_conf.turn.cli.pass, env_conf.turn.cli.pass);
+
+        assert_eq!(env_conf.turn.cli.ip, Ipv4Addr::new(4, 4, 4, 4));
+        assert_eq!(env_conf.turn.cli.port, 1234);
+        assert_eq!(env_conf.turn.cli.pass, "clipass");
+    }
+
+    #[test]
+    #[serial]
+    fn coturn_cli_timeouts() {
+        let default_conf = Conf::default();
+        let env_conf:Conf = overrided_by_env_conf!(
+            "MEDEA_TURN__CLI__TIMEOUTS__WAIT" => "1s",
+            "MEDEA_TURN__CLI__TIMEOUTS__CREATE" => "2s",
+            "MEDEA_TURN__CLI__TIMEOUTS__RECYCLE" => "3s",
+        );
+
+        assert_ne!(default_conf.turn.cli.timeouts.wait, env_conf.turn.cli.timeouts.wait);
+        assert_ne!(default_conf.turn.cli.timeouts.create, env_conf.turn.cli.timeouts.create);
+        assert_ne!(default_conf.turn.cli.timeouts.recycle, env_conf.turn.cli.timeouts.recycle);
+
+        assert_eq!(env_conf.turn.cli.timeouts.wait, Some(Duration::from_secs(1)));
+        assert_eq!(env_conf.turn.cli.timeouts.create, Some(Duration::from_secs(2)));
+        assert_eq!(env_conf.turn.cli.timeouts.recycle, Some(Duration::from_secs(3)));
     }
 }
