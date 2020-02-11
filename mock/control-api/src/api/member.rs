@@ -2,9 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::api::{
-    Member as MemberProto, Room_Element as RoomElementProto,
-};
+use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
@@ -38,69 +36,47 @@ pub struct Member {
 }
 
 impl Member {
-    /// Converts [`Member`] into protobuf [`MemberProto`].
+    /// Converts [`Member`] into protobuf [`proto::Member`].
     #[must_use]
-    pub fn into_proto(self, id: String) -> MemberProto {
-        let mut proto = MemberProto::new();
-        let mut members_elements = HashMap::new();
-        for (id, endpoint) in self.pipeline {
-            members_elements.insert(id.clone(), endpoint.into_proto(id));
-        }
-        proto.set_id(id);
-        proto.set_pipeline(members_elements);
-        if let Some(on_leave) = self.on_leave {
-            proto.set_on_leave(on_leave);
-        }
-        if let Some(on_join) = self.on_join {
-            proto.set_on_join(on_join);
-        }
+    pub fn into_proto(self, id: String) -> proto::Member {
+        let member_elements = self
+            .pipeline
+            .into_iter()
+            .map(|(id, endpoint)| (id.clone(), endpoint.into_proto(id)))
+            .collect();
 
-        if let Some(credentials) = self.credentials {
-            proto.set_credentials(credentials);
+        proto::Member {
+            pipeline: member_elements,
+            id,
+            credentials: self.credentials.unwrap_or_default(),
+            on_join: self.on_join.unwrap_or_default(),
+            on_leave: self.on_leave.unwrap_or_default(),
         }
-
-        proto
     }
 
-    /// Converts [`Member`] into protobuf [`RoomElementProto`].
+    /// Converts [`Member`] into protobuf [`proto::room::Element`].
     #[must_use]
-    pub fn into_room_el_proto(self, id: String) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        proto.set_member(self.into_proto(id));
-        proto
+    pub fn into_room_el_proto(self, id: String) -> proto::room::Element {
+        proto::room::Element {
+            el: Some(proto::room::element::El::Member(self.into_proto(id))),
+        }
     }
 }
 
-impl From<MemberProto> for Member {
-    fn from(mut proto: MemberProto) -> Self {
-        let mut member_pipeline = HashMap::new();
-        for (id, endpoint) in proto.take_pipeline() {
-            member_pipeline.insert(id, endpoint.into());
-        }
-
-        let on_leave = {
-            let on_leave = proto.take_on_leave();
-            if on_leave.is_empty() {
-                None
-            } else {
-                Some(on_leave)
-            }
-        };
-        let on_join = {
-            let on_join = proto.take_on_join();
-            if on_join.is_empty() {
-                None
-            } else {
-                Some(on_join)
-            }
-        };
+impl From<proto::Member> for Member {
+    fn from(proto: proto::Member) -> Self {
+        let member_pipeline = proto
+            .pipeline
+            .into_iter()
+            .map(|(id, endpoint)| (id, endpoint.into()))
+            .collect();
 
         Self {
-            id: proto.take_id(),
+            id: proto.id,
             pipeline: member_pipeline,
-            credentials: Some(proto.take_credentials()),
-            on_join,
-            on_leave,
+            credentials: Some(proto.credentials),
+            on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
+            on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
         }
     }
 }

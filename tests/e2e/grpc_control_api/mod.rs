@@ -7,27 +7,38 @@ mod create;
 mod delete;
 mod signaling;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use derive_builder::*;
-use grpcio::{ChannelBuilder, EnvBuilder};
-use medea_control_api_proto::grpc::{
-    api::{
-        CreateRequest, Element, Error, IdRequest, Member as GrpcMember,
-        Member_Element, Room as GrpcRoom, Room_Element,
-        WebRtcPlayEndpoint as GrpcWebRtcPlayEndpoint,
-        WebRtcPublishEndpoint as GrpcWebRtcPublishEndpoint,
-        WebRtcPublishEndpoint_P2P,
-    },
-    api_grpc::ControlApiClient,
+use medea_control_api_proto::grpc::api::{
+    self as proto, control_api_client::ControlApiClient,
 };
-use protobuf::RepeatedField;
+use tonic::transport::Channel;
+
+macro_rules! gen_elem_take_fn {
+    ($name:tt -> $variant:tt($output:ty)) => {
+        pub fn $name(el: proto::Element) -> $output {
+            match el.el.unwrap() {
+                proto::element::El::$variant(elem) => elem,
+                _ => panic!("Not {} element!", stringify!($variant)),
+            }
+        }
+    };
+}
+
+gen_elem_take_fn!(take_room -> Room(proto::Room));
+
+gen_elem_take_fn!(take_member -> Member(proto::Member));
+
+gen_elem_take_fn!(
+        take_webrtc_pub -> WebrtcPub(proto::WebRtcPublishEndpoint)
+    );
 
 /// Client for [Medea]'s gRPC [Control API].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 #[derive(Clone)]
-pub struct ControlClient(ControlApiClient);
+pub struct ControlClient(ControlApiClient<Channel>);
 
 impl ControlClient {
     /// Create new [`ControlClient`].
@@ -37,97 +48,99 @@ impl ControlClient {
     /// Note that this function don't connects to the server. This mean that
     /// when you call [`ControlClient::new`] and server not working you will
     /// don't know it until try to send something with this client.
-    pub fn new() -> Self {
-        let env = Arc::new(EnvBuilder::new().build());
-        let ch = ChannelBuilder::new(env).connect("127.0.0.1:6565");
-        Self(ControlApiClient::new(ch))
+    pub async fn new() -> Self {
+        Self(
+            ControlApiClient::connect("http://127.0.0.1:6565")
+                .await
+                .unwrap(),
+        )
     }
 
-    /// Gets some [`Element`] by local URI.
+    /// Gets some [`proto::Element`] by local URI.
     ///
     /// # Panics
     ///
     /// - if [`GetResponse`] has error
     /// - if connection with server failed
-    pub fn get(&self, uri: &str) -> Element {
-        let mut get_room_request = IdRequest::new();
-        let mut room = RepeatedField::new();
-        room.push(uri.to_string());
-        get_room_request.set_fid(room);
+    pub async fn get(&mut self, uri: &str) -> proto::Element {
+        let room = vec![uri.to_string()];
+        let get_room_request = proto::IdRequest { fid: room };
 
-        let mut resp = self.0.get(&get_room_request).unwrap();
-        if resp.has_error() {
-            panic!("{:?}", resp.get_error());
+        let mut resp = self.0.get(get_room_request).await.unwrap().into_inner();
+        if let Some(err) = resp.error {
+            panic!("{:?}", err);
         }
-        resp.take_elements().remove(&uri.to_string()).unwrap()
+        resp.elements.remove(&uri.to_string()).unwrap()
     }
 
-    /// Tries to get some [`Element`] by local URI.
+    /// Tries to get some [`proto::Element`] by local URI.
     ///
     /// # Panics
     ///
     /// - if connection with server failed.
-    pub fn try_get(&self, uri: &str) -> Result<Element, Error> {
-        let mut get_room_request = IdRequest::new();
-        let mut room = RepeatedField::new();
-        room.push(uri.to_string());
-        get_room_request.set_fid(room);
+    pub async fn try_get(
+        &mut self,
+        uri: &str,
+    ) -> Result<proto::Element, proto::Error> {
+        let room = vec![uri.to_string()];
+        let get_room_request = proto::IdRequest { fid: room };
 
-        let mut resp = self.0.get(&get_room_request).unwrap();
-        if resp.has_error() {
-            return Err(resp.take_error());
+        let mut resp = self.0.get(get_room_request).await.unwrap().into_inner();
+        if let Some(e) = resp.error {
+            return Err(e);
         }
-        Ok(resp.take_elements().remove(&uri.to_string()).unwrap())
+        Ok(resp.elements.remove(&uri.to_string()).unwrap())
     }
 
-    /// Creates `Element` and returns it sids.
+    /// Creates `proto::Element` and returns it sids.
     ///
     /// # Panics
     ///
     /// - if [`CreateResponse`] has error.
     /// - if connection with server failed.
-    pub fn create(&self, req: &CreateRequest) -> HashMap<String, String> {
-        let resp = self.0.create(&req).unwrap();
-        if resp.has_error() {
-            panic!("{:?}", resp.get_error());
+    pub async fn create(
+        &mut self,
+        req: proto::CreateRequest,
+    ) -> HashMap<String, String> {
+        let resp = self.0.create(req).await.unwrap().into_inner();
+        if let Some(e) = resp.error {
+            panic!("{:?}", e);
         }
 
         resp.sid
     }
 
-    /// Tries to create `Element` and returns it sids.
+    /// Tries to create `proto::Element` and returns it sids.
     ///
     /// # Panics
     ///
     /// - if connection with server failed.
-    pub fn try_create(
-        &self,
-        req: &CreateRequest,
-    ) -> Result<HashMap<String, String>, Error> {
-        let mut resp = self.0.create(&req).unwrap();
+    pub async fn try_create(
+        &mut self,
+        req: proto::CreateRequest,
+    ) -> Result<HashMap<String, String>, proto::Error> {
+        let resp = self.0.create(req).await.unwrap().into_inner();
 
-        if resp.has_error() {
-            Err(resp.take_error())
+        if let Some(e) = resp.error {
+            Err(e)
         } else {
             Ok(resp.sid)
         }
     }
 
-    /// Deletes `Element`s by local URIs.
+    /// Deletes `proto::Element`s by local URIs.
     ///
     /// # Panics
     ///
     /// - if [`Response`] has error
     /// - if connection with server failed.
-    pub fn delete(&self, ids: &[&str]) -> Result<(), Error> {
-        let mut delete_req = IdRequest::new();
-        let mut delete_ids = RepeatedField::new();
-        ids.iter().for_each(|id| delete_ids.push((*id).to_string()));
-        delete_req.set_fid(delete_ids);
+    pub async fn delete(&mut self, ids: &[&str]) -> Result<(), proto::Error> {
+        let delete_ids = ids.iter().map(|id| (*id).to_string()).collect();
+        let delete_req = proto::IdRequest { fid: delete_ids };
 
-        let mut resp = self.0.delete(&delete_req).unwrap();
-        if resp.has_error() {
-            Err(resp.take_error())
+        let resp = self.0.delete(delete_req).await.unwrap().into_inner();
+        if let Some(e) = resp.error {
+            Err(e)
         } else {
             Ok(())
         }
@@ -144,26 +157,30 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn build_request<T: Into<String>>(self, uri: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
+    pub fn build_request<T: Into<String>>(
+        self,
+        uri: T,
+    ) -> proto::CreateRequest {
+        let members = self
+            .members
+            .into_iter()
+            .map(|(id, member)| {
+                let room_element = proto::room::Element {
+                    el: Some(proto::room::element::El::Member(member.into())),
+                };
 
-        let mut grpc_room = GrpcRoom::new();
-        let mut members = HashMap::new();
+                (id, room_element)
+            })
+            .collect();
+        let grpc_room = proto::Room {
+            id: self.id,
+            pipeline: members,
+        };
 
-        for (id, member) in self.members {
-            let mut room_element = Room_Element::new();
-            room_element.set_member(member.into());
-
-            members.insert(id, room_element);
+        proto::CreateRequest {
+            parent_fid: uri.into(),
+            el: Some(proto::create_request::El::Room(grpc_room)),
         }
-
-        grpc_room.set_id(self.id);
-        grpc_room.set_pipeline(members);
-
-        request.set_parent_fid(uri.into());
-        request.set_room(grpc_room);
-
-        request
     }
 }
 
@@ -196,41 +213,30 @@ pub struct Member {
     on_leave: Option<String>,
 }
 
-impl Into<GrpcMember> for Member {
-    fn into(self) -> GrpcMember {
-        let mut grpc_member = GrpcMember::new();
+impl Into<proto::Member> for Member {
+    fn into(self) -> proto::Member {
+        let pipeline = self
+            .endpoints
+            .into_iter()
+            .map(|(id, element)| (id, element.into()))
+            .collect();
 
-        let mut pipeline = HashMap::new();
-
-        for (id, element) in self.endpoints {
-            pipeline.insert(id, element.into());
+        proto::Member {
+            id: self.id,
+            pipeline,
+            on_leave: self.on_leave.unwrap_or_default(),
+            on_join: self.on_join.unwrap_or_default(),
+            credentials: self.credentials.unwrap_or_default(),
         }
-
-        if let Some(credentials) = self.credentials {
-            grpc_member.set_credentials(credentials)
-        }
-
-        grpc_member.set_pipeline(pipeline);
-        grpc_member.set_id(self.id);
-        if let Some(on_join) = self.on_join {
-            grpc_member.set_on_join(on_join)
-        }
-        if let Some(on_leave) = self.on_leave {
-            grpc_member.set_on_leave(on_leave)
-        }
-
-        grpc_member
     }
 }
 
 impl Member {
-    fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
-
-        request.set_parent_fid(url.into());
-        request.set_member(self.into());
-
-        request
+    fn build_request<T: Into<String>>(self, url: T) -> proto::CreateRequest {
+        proto::CreateRequest {
+            parent_fid: url.into(),
+            el: Some(proto::create_request::El::Member(self.into())),
+        }
     }
 }
 
@@ -260,20 +266,20 @@ impl Endpoint {
     }
 }
 
-impl Into<Member_Element> for Endpoint {
-    fn into(self) -> Member_Element {
-        let mut member_elem = Member_Element::new();
-
-        match self {
+impl Into<proto::member::Element> for Endpoint {
+    fn into(self) -> proto::member::Element {
+        let member_el = match self {
             Self::WebRtcPlayElement(element) => {
-                member_elem.set_webrtc_play(element.into());
+                proto::member::element::El::WebrtcPlay(element.into())
             }
             Self::WebRtcPublishElement(element) => {
-                member_elem.set_webrtc_pub(element.into())
+                proto::member::element::El::WebrtcPub(element.into())
             }
-        }
+        };
 
-        member_elem
+        proto::member::Element {
+            el: Some(member_el),
+        }
     }
 }
 
@@ -285,23 +291,26 @@ pub struct WebRtcPlayEndpoint {
 }
 
 impl WebRtcPlayEndpoint {
-    pub fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
-
-        request.set_parent_fid(url.into());
-        request.set_webrtc_play(self.into());
-
-        request
+    pub fn build_request<T: Into<String>>(
+        self,
+        url: T,
+    ) -> proto::CreateRequest {
+        proto::CreateRequest {
+            el: Some(proto::create_request::El::WebrtcPlay(self.into())),
+            parent_fid: url.into(),
+        }
     }
 }
 
-impl Into<GrpcWebRtcPlayEndpoint> for WebRtcPlayEndpoint {
-    fn into(self) -> GrpcWebRtcPlayEndpoint {
-        let mut endpoint = GrpcWebRtcPlayEndpoint::new();
-        endpoint.set_src(self.src);
-        endpoint.set_id(self.id);
-
-        endpoint
+impl Into<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
+    fn into(self) -> proto::WebRtcPlayEndpoint {
+        proto::WebRtcPlayEndpoint {
+            src: self.src,
+            on_start: String::new(),
+            on_stop: String::new(),
+            id: self.id,
+            force_relay: false,
+        }
     }
 }
 
@@ -315,27 +324,30 @@ impl Into<Endpoint> for WebRtcPlayEndpoint {
 #[builder(setter(into))]
 pub struct WebRtcPublishEndpoint {
     id: String,
-    p2p_mode: WebRtcPublishEndpoint_P2P,
+    p2p_mode: proto::web_rtc_publish_endpoint::P2p,
 }
 
 impl WebRtcPublishEndpoint {
-    pub fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
-        let mut request = CreateRequest::default();
-
-        request.set_parent_fid(url.into());
-        request.set_webrtc_pub(self.into());
-
-        request
+    pub fn build_request<T: Into<String>>(
+        self,
+        url: T,
+    ) -> proto::CreateRequest {
+        proto::CreateRequest {
+            el: Some(proto::create_request::El::WebrtcPub(self.into())),
+            parent_fid: url.into(),
+        }
     }
 }
 
-impl Into<GrpcWebRtcPublishEndpoint> for WebRtcPublishEndpoint {
-    fn into(self) -> GrpcWebRtcPublishEndpoint {
-        let mut endpoint = GrpcWebRtcPublishEndpoint::new();
-        endpoint.set_p2p(self.p2p_mode);
-        endpoint.set_id(self.id);
-
-        endpoint
+impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::WebRtcPublishEndpoint {
+        proto::WebRtcPublishEndpoint {
+            p2p: self.p2p_mode as i32,
+            on_start: String::default(),
+            on_stop: String::default(),
+            id: self.id,
+            force_relay: bool::default(),
+        }
     }
 }
 
@@ -345,10 +357,10 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
     }
 }
 
-/// Creates [`CreateRequest`] for creating `Room` element with provided `Room`
-/// ID.
+/// Creates [`proto::CreateRequest`] for creating `Room` element with provided
+/// `Room` ID.
 ///
-/// # Spec of `Room` which will be created with this [`CreateRequest`]
+/// # Spec of `Room` which will be created with this [`proto::CreateRequest`]
 ///
 /// ```yaml
 /// kind: Room
@@ -373,7 +385,7 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
 ///             spec:
 ///               src: "local://{{ room_id }}/publisher/publish"
 /// ```
-fn create_room_req(room_id: &str) -> CreateRequest {
+fn create_room_req(room_id: &str) -> proto::CreateRequest {
     RoomBuilder::default()
         .id(room_id.to_string())
         .add_member(
@@ -382,7 +394,7 @@ fn create_room_req(room_id: &str) -> CreateRequest {
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
                         .build()
                         .unwrap(),
                 )

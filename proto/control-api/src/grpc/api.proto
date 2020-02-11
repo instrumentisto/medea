@@ -2,7 +2,7 @@
 
 syntax = "proto3";
 
-package medea;
+package api;
 
 // Media server's Control API service.
 service ControlApi {

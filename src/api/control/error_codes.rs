@@ -7,7 +7,7 @@
 use std::string::ToString;
 
 use derive_more::Display;
-use medea_control_api_proto::grpc::api::Error as ErrorProto;
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
@@ -101,26 +101,19 @@ impl ErrorResponse {
     }
 }
 
-impl Into<ErrorProto> for ErrorResponse {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-
-        if let Some(additional_text) = &self.explanation {
-            error.set_text(format!(
-                "{} {}",
-                self.error_code.to_string(),
-                additional_text
-            ));
+impl Into<proto::Error> for ErrorResponse {
+    fn into(self) -> proto::Error {
+        let text = if let Some(additional_text) = &self.explanation {
+            format!("{} {}", self.error_code.to_string(), additional_text)
         } else {
-            error.set_text(self.error_code.to_string());
+            self.error_code.to_string()
+        };
+        proto::Error {
+            doc: String::new(),
+            text,
+            element: self.element_id.unwrap_or_default(),
+            code: self.error_code as u32,
         }
-
-        if let Some(id) = self.element_id {
-            error.set_element(id);
-        }
-        error.set_code(self.error_code as u32);
-
-        error
     }
 }
 

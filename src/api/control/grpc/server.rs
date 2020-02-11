@@ -5,24 +5,20 @@
 use std::{
     collections::HashMap,
     convert::{From, TryFrom},
-    sync::Arc,
 };
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
+use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::{
-    compat::Future01CompatExt as _,
-    future::{self, BoxFuture, FutureExt as _, TryFutureExt as _},
-};
-use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
+use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
 use medea_control_api_proto::grpc::{
-    api::{
-        CreateRequest, CreateRequest_oneof_el as CreateRequestOneof,
-        CreateResponse, Element, GetResponse, IdRequest, Response,
+    api as proto,
+    api::control_api_server::{
+        ControlApi, ControlApiServer as TonicControlApiServer,
     },
-    api_grpc::{create_control_api, ControlApi},
 };
+use tonic::{transport::Server, Status};
 
 use crate::{
     api::control::{
@@ -42,7 +38,6 @@ use crate::{
         CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
         Get, RoomService, RoomServiceError, Sids,
     },
-    utils::ResponseAnyFuture,
     AppContext,
 };
 
@@ -136,12 +131,12 @@ impl ControlApiService {
         .boxed()
     }
 
-    /// Creates element based on provided [`CreateRequest`].
+    /// Creates element based on provided [`proto::CreateRequest`].
     pub fn create_element(
         &self,
-        mut req: CreateRequest,
+        req: proto::CreateRequest,
     ) -> BoxFuture<'static, Result<Sids, ErrorResponse>> {
-        let unparsed_parent_fid = req.take_parent_fid();
+        let unparsed_parent_fid = req.parent_fid;
         let elem = if let Some(elem) = req.el {
             elem
         } else {
@@ -168,8 +163,8 @@ impl ControlApiService {
 
         match parent_fid {
             StatefulFid::Room(parent_fid) => match elem {
-                CreateRequestOneof::member(mut member) => {
-                    let id: MemberId = member.take_id().into();
+                proto::create_request::El::Member(member) => {
+                    let id: MemberId = member.id.clone().into();
                     match MemberSpec::try_from(member)
                         .map_err(ErrorResponse::from)
                     {
@@ -188,15 +183,15 @@ impl ControlApiService {
             },
             StatefulFid::Member(parent_fid) => {
                 let (endpoint, id) = match elem {
-                    CreateRequestOneof::webrtc_play(mut play) => (
+                    proto::create_request::El::WebrtcPlay(play) => (
                         WebRtcPlayEndpoint::try_from(&play)
                             .map(EndpointSpec::from),
-                        play.take_id().into(),
+                        play.id.into(),
                     ),
-                    CreateRequestOneof::webrtc_pub(mut publish) => (
+                    proto::create_request::El::WebrtcPub(publish) => (
                         Ok(WebRtcPublishEndpoint::from(&publish))
                             .map(EndpointSpec::from),
-                        publish.take_id().into(),
+                        publish.id.into(),
                     ),
                     _ => {
                         return future::err(ErrorResponse::new(
@@ -222,15 +217,15 @@ impl ControlApiService {
         }
     }
 
-    /// Deletes element by [`IdRequest`].
+    /// Deletes element by [`proto::IdRequest`].
     pub fn delete_element(
         &self,
-        mut req: IdRequest,
+        req: proto::IdRequest,
     ) -> BoxFuture<'static, Result<(), ErrorResponse>> {
         let room_service = self.room_service.clone();
         async move {
             let mut delete_elements_msg = DeleteElements::new();
-            for id in req.take_fid().into_iter() {
+            for id in req.fid {
                 let fid = StatefulFid::try_from(id)?;
                 delete_elements_msg.add_fid(fid);
             }
@@ -247,16 +242,19 @@ impl ControlApiService {
         .boxed()
     }
 
-    /// Returns requested by [`IdRequest`] [`Element`]s serialized to protobuf.
+    /// Returns requested by [`proto::IdRequest`] [`proto::Element`]s serialized
+    /// to protobuf.
     pub fn get_element(
         &self,
-        mut req: IdRequest,
-    ) -> BoxFuture<'static, Result<HashMap<String, Element>, ErrorResponse>>
-    {
+        req: proto::IdRequest,
+    ) -> BoxFuture<
+        'static,
+        Result<HashMap<String, proto::Element>, ErrorResponse>,
+    > {
         let room_service = self.room_service.clone();
         async move {
             let mut fids = Vec::new();
-            for id in req.take_fid().into_iter() {
+            for id in req.fid {
                 let fid = StatefulFid::try_from(id)?;
                 fids.push(fid);
             }
@@ -277,122 +275,71 @@ impl ControlApiService {
     }
 }
 
+#[async_trait]
 impl ControlApi for ControlApiService {
-    /// Implementation for `Create` method of gRPC [Control API].
-    ///
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    fn create(
-        &mut self,
-        ctx: RpcContext,
-        req: CreateRequest,
-        sink: UnarySink<CreateResponse>,
-    ) {
-        let creating = self.create_element(req);
-        ctx.spawn(
-            async {
-                let mut response = CreateResponse::new();
-                match creating.await {
-                    Ok(sid) => {
-                        response.set_sid(sid);
-                    }
-                    Err(e) => response.set_error(e.into()),
-                }
-                if let Err(err) = sink.success(response).compat().await {
-                    warn!(
-                        "Error while sending Create response by gRPC. {:?}",
-                        err,
-                    )
-                }
-                Ok(())
-            }
-            .boxed()
-            .compat(),
-        );
+    async fn create(
+        &self,
+        request: tonic::Request<proto::CreateRequest>,
+    ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
+        debug!("Create Request: {:?}", request);
+        let create_response =
+            match self.create_element(request.into_inner()).await {
+                Ok(sid) => proto::CreateResponse { sid, error: None },
+                Err(err) => proto::CreateResponse {
+                    sid: HashMap::new(),
+                    error: Some(err.into()),
+                },
+            };
+        Ok(tonic::Response::new(create_response))
     }
 
-    /// Implementation for `Delete` method of gRPC [Control API].
-    ///
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    fn delete(
-        &mut self,
-        ctx: RpcContext,
-        req: IdRequest,
-        sink: UnarySink<Response>,
-    ) {
-        let deleting = self.delete_element(req);
-        ctx.spawn(
-            async {
-                let mut response = Response::new();
-                if let Err(e) = deleting.await {
-                    response.set_error(e.into());
-                }
-                if let Err(err) = sink.success(response).compat().await {
-                    warn!(
-                        "Error while sending response on 'Delete' request by \
-                         gRPC: {:?}",
-                        err,
-                    )
-                }
-                Ok(())
-            }
-            .boxed()
-            .compat(),
-        );
+    async fn delete(
+        &self,
+        request: tonic::Request<proto::IdRequest>,
+    ) -> Result<tonic::Response<proto::Response>, Status> {
+        let response = match self.delete_element(request.into_inner()).await {
+            Ok(_) => proto::Response { error: None },
+            Err(e) => proto::Response {
+                error: Some(e.into()),
+            },
+        };
+        Ok(tonic::Response::new(response))
     }
 
-    /// Implementation for `Get` method of gRPC [Control API].
-    ///
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    fn get(
-        &mut self,
-        ctx: RpcContext,
-        req: IdRequest,
-        sink: UnarySink<GetResponse>,
-    ) {
-        let getting = self.get_element(req);
-        ctx.spawn(
-            async {
-                let mut response = GetResponse::new();
-                match getting.await {
-                    Ok(elements) => {
-                        response.set_elements(elements);
-                    }
-                    Err(e) => {
-                        response.set_error(e.into());
-                    }
-                }
-                if let Err(err) = sink.success(response).compat().await {
-                    warn!(
-                        "Error while sending response on 'Get' request by \
-                         gRPC: {:?}",
-                        err
-                    )
-                }
-                Ok(())
-            }
-            .boxed()
-            .compat(),
-        );
+    async fn get(
+        &self,
+        request: tonic::Request<proto::IdRequest>,
+    ) -> Result<tonic::Response<proto::GetResponse>, Status> {
+        let response = match self.get_element(request.into_inner()).await {
+            Ok(elements) => proto::GetResponse {
+                elements,
+                error: None,
+            },
+            Err(e) => proto::GetResponse {
+                elements: HashMap::new(),
+                error: Some(e.into()),
+            },
+        };
+        Ok(tonic::Response::new(response))
     }
 }
 
-/// Actor wrapper for [`grpcio`] gRPC server which provides dynamic [Control
+/// Actor wrapper for [`tonic`] gRPC server which provides dynamic [Control
 /// API].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub struct GrpcServer(Server);
+pub struct GrpcServer(Option<futures::channel::oneshot::Sender<()>>);
 
 impl Actor for GrpcServer {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        self.0.start();
         info!("gRPC Control API server started.");
     }
 }
 
 impl Handler<ShutdownGracefully> for GrpcServer {
-    type Result = ResponseAnyFuture<()>;
+    type Result = ();
 
     fn handle(
         &mut self,
@@ -403,44 +350,44 @@ impl Handler<ShutdownGracefully> for GrpcServer {
             "gRPC Control API server received ShutdownGracefully message so \
              shutting down.",
         );
-        ResponseAnyFuture(
-            self.0
-                .shutdown()
-                .compat()
-                .map_err(|e| {
-                    warn!(
-                        "Error while graceful shutdown of gRPC Control API \
-                         server: {:?}",
-                        e,
-                    )
-                })
-                .map(|_| ())
-                .boxed_local(),
-        )
+        if let Some(grpc_shutdown) = self.0.take() {
+            grpc_shutdown.send(()).ok();
+        }
     }
 }
 
 /// Run gRPC [Control API] server in actix actor.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub fn run(room_repo: Addr<RoomService>, app: &AppContext) -> Addr<GrpcServer> {
+pub async fn run(
+    room_repo: Addr<RoomService>,
+    app: &AppContext,
+) -> Addr<GrpcServer> {
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;
-    let cq_count = 2;
 
-    let service = create_control_api(ControlApiService {
+    let service = TonicControlApiServer::new(ControlApiService {
         public_url: app.config.server.client.http.public_url.clone(),
         room_service: room_repo,
     });
-    let env = Arc::new(Environment::new(cq_count));
 
     info!("Starting gRPC server on {}:{}", bind_ip, bind_port);
 
-    let server = ServerBuilder::new(env)
-        .register_service(service)
-        .bind(bind_ip, bind_port)
-        .build()
-        .unwrap();
+    let (grpc_shutdown_tx, grpc_shutdown_rx) =
+        futures::channel::oneshot::channel();
 
-    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| GrpcServer(server))
+    let addr = format!("{}:{}", bind_ip, bind_port).parse().unwrap();
+    Arbiter::spawn(async move {
+        Server::builder()
+            .add_service(service)
+            .serve_with_shutdown(addr, async move {
+                grpc_shutdown_rx.await.ok();
+            })
+            .await
+            .unwrap();
+    });
+
+    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| {
+        GrpcServer(Some(grpc_shutdown_tx))
+    })
 }

@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_control_api_proto::grpc::api::Element as ElementProto;
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
@@ -391,6 +391,11 @@ impl DeleteElements<Unvalidated> {
 
     /// Validates request. It must have at least one fid, all fids must share
     /// same [`RoomId`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomServiceError::EmptyUrisList`] if [`DeleteElements`]
+    /// consists of an empty [`Vec`] of [`StatefulFid`]s.
     pub fn validate(
         self,
     ) -> Result<DeleteElements<Validated>, RoomServiceError> {
@@ -490,7 +495,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
 
 /// Serialized to protobuf `Element`s which will be returned from [`Get`] on
 /// success result.
-type SerializedElements = HashMap<StatefulFid, ElementProto>;
+type SerializedElements = HashMap<StatefulFid, proto::Element>;
 
 /// Message which returns serialized to protobuf objects by provided
 /// [`Fid`].

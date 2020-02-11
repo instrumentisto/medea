@@ -114,6 +114,10 @@ pub struct ParticipantService {
 
 impl ParticipantService {
     /// Creates new [`ParticipantService`] from [`RoomSpec`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MemberLoadError`] if [`RoomSpec`] transformation fails.
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
@@ -144,8 +148,10 @@ impl ParticipantService {
 
     /// Lookups [`Member`] by [`MemberId`].
     ///
-    /// Returns [`ParticipantServiceErr::ParticipantNotFound`] if [`Member`] not
-    /// found.
+    /// # Errors
+    ///
+    /// Errors with [`ParticipantServiceErr::ParticipantNotFound`] if no
+    /// [`Member`] was found.
     pub fn get_member(
         &self,
         id: &MemberId,
@@ -165,10 +171,12 @@ impl ParticipantService {
 
     /// Lookups [`Member`] by provided [`MemberId`] and credentials.
     ///
-    /// Returns [`AuthorizationError::MemberNotExists`] if lookup by
-    /// [`MemberId`] failed.
+    /// # Errors
     ///
-    /// Returns [`AuthorizationError::InvalidCredentials`] if [`Member`]
+    /// Errors with [`AuthorizationError::MemberNotExists`] if lookup by
+    /// [`MemberId`] fails.
+    ///
+    /// Errors with [`AuthorizationError::InvalidCredentials`] if [`Member`]
     /// was found, but incorrect credentials were provided.
     pub fn get_member_by_id_and_credentials(
         &self,

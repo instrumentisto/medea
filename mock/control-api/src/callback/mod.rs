@@ -2,9 +2,7 @@
 
 pub mod server;
 
-use medea_control_api_proto::grpc::callback::{
-    Request as CallbackProto, Request_oneof_event as CallbackEventProto,
-};
+use medea_control_api_proto::grpc::callback as proto;
 use serde::Serialize;
 
 /// All callbacks which can happen.
@@ -15,13 +13,13 @@ pub enum CallbackEvent {
     OnLeave(leave::OnLeave),
 }
 
-impl From<CallbackEventProto> for CallbackEvent {
-    fn from(proto: CallbackEventProto) -> Self {
+impl From<proto::request::Event> for CallbackEvent {
+    fn from(proto: proto::request::Event) -> Self {
         match proto {
-            CallbackEventProto::on_leave(on_leave) => {
+            proto::request::Event::OnLeave(on_leave) => {
                 Self::OnLeave(on_leave.into())
             }
-            CallbackEventProto::on_join(on_join) => {
+            proto::request::Event::OnJoin(on_join) => {
                 Self::OnJoin(on_join.into())
             }
         }
@@ -41,11 +39,11 @@ pub struct CallbackItem {
     at: String,
 }
 
-impl From<CallbackProto> for CallbackItem {
-    fn from(mut proto: CallbackProto) -> Self {
+impl From<proto::Request> for CallbackItem {
+    fn from(proto: proto::Request) -> Self {
         Self {
-            fid: proto.take_fid(),
-            at: proto.take_at(),
+            fid: proto.fid,
+            at: proto.at,
             event: proto.event.unwrap().into(),
         }
     }
@@ -53,15 +51,15 @@ impl From<CallbackProto> for CallbackItem {
 
 /// `on_join` callback's related entities and implementations.
 mod join {
-    use medea_control_api_proto::grpc::callback::OnJoin as OnJoinProto;
+    use medea_control_api_proto::grpc::callback as proto;
     use serde::Serialize;
 
     /// `OnJoin` callback for Control API.
     #[derive(Clone, Serialize)]
     pub struct OnJoin;
 
-    impl From<OnJoinProto> for OnJoin {
-        fn from(_: OnJoinProto) -> Self {
+    impl From<proto::OnJoin> for OnJoin {
+        fn from(_: proto::OnJoin) -> Self {
             Self
         }
     }
@@ -69,9 +67,7 @@ mod join {
 
 /// `on_leave` callback's related entities and implementations.
 mod leave {
-    use medea_control_api_proto::grpc::callback::{
-        OnLeave as OnLeaveProto, OnLeave_Reason as OnLeaveReasonProto,
-    };
+    use medea_control_api_proto::grpc::callback as proto;
     use serde::Serialize;
 
     /// `OnLeave` callback of Control API.
@@ -81,10 +77,12 @@ mod leave {
         reason: OnLeaveReason,
     }
 
-    impl From<OnLeaveProto> for OnLeave {
-        fn from(proto: OnLeaveProto) -> Self {
+    impl From<proto::OnLeave> for OnLeave {
+        fn from(proto: proto::OnLeave) -> Self {
             Self {
-                reason: proto.get_reason().into(),
+                reason: proto::on_leave::Reason::from_i32(proto.reason)
+                    .unwrap_or_default()
+                    .into(),
             }
         }
     }
@@ -102,12 +100,13 @@ mod leave {
         ServerShutdown,
     }
 
-    impl From<OnLeaveReasonProto> for OnLeaveReason {
-        fn from(proto: OnLeaveReasonProto) -> Self {
+    impl From<proto::on_leave::Reason> for OnLeaveReason {
+        fn from(proto: proto::on_leave::Reason) -> Self {
+            use proto::on_leave::Reason::*;
             match proto {
-                OnLeaveReasonProto::SERVER_SHUTDOWN => Self::ServerShutdown,
-                OnLeaveReasonProto::LOST_CONNECTION => Self::LostConnection,
-                OnLeaveReasonProto::DISCONNECTED => Self::Disconnected,
+                ServerShutdown => Self::ServerShutdown,
+                LostConnection => Self::LostConnection,
+                Disconnected => Self::Disconnected,
             }
         }
     }

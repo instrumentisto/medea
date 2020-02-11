@@ -7,10 +7,7 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_control_api_proto::grpc::api::{
-    Element as RootElementProto, Member_Element as ElementProto,
-    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-};
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::{
@@ -242,25 +239,31 @@ impl WeakWebRtcPublishEndpoint {
     }
 }
 
-impl Into<ElementProto> for WebRtcPublishEndpoint {
-    fn into(self) -> ElementProto {
-        let mut element = ElementProto::new();
-        let mut publish = WebRtcPublishEndpointProto::new();
-        publish.set_p2p(self.p2p().into());
-        publish.set_id(self.id().to_string());
-        publish.set_force_relay(self.is_force_relayed());
-        element.set_webrtc_pub(publish);
-
-        element
+impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::WebRtcPublishEndpoint {
+        let p2p: proto::web_rtc_publish_endpoint::P2p = self.p2p().into();
+        proto::WebRtcPublishEndpoint {
+            p2p: p2p as i32,
+            id: self.id().to_string(),
+            force_relay: self.is_force_relayed(),
+            on_stop: String::new(),
+            on_start: String::new(),
+        }
     }
 }
 
-impl Into<RootElementProto> for WebRtcPublishEndpoint {
-    fn into(self) -> RootElementProto {
-        let mut element = RootElementProto::new();
-        let mut member_element: ElementProto = self.into();
-        let endpoint = member_element.take_webrtc_pub();
-        element.set_webrtc_pub(endpoint);
-        element
+impl Into<proto::member::Element> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::member::Element {
+        proto::member::Element {
+            el: Some(proto::member::element::El::WebrtcPub(self.into())),
+        }
+    }
+}
+
+impl Into<proto::Element> for WebRtcPublishEndpoint {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::WebrtcPub(self.into())),
+        }
     }
 }
