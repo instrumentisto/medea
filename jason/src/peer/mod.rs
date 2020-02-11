@@ -263,6 +263,11 @@ impl PeerConnection {
 
     /// Updates [`Sender`]s of this [`PeerConnection`] with
     /// [`medea_client_api_proto::TrackPatch`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
+    /// [`MediaTrack`] with ID from [`TrackPatch`] is not exists.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         Ok(self
             .media_connections

@@ -266,6 +266,11 @@ impl MediaConnections {
 
     /// Updates [`Sender`]s of this [`PeerConnection`] with
     /// [`medea_client_api_proto::TrackPatch`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
+    /// [`MediaTrack`] with ID from [`TrackPatch`] is not exists.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
             let track =
@@ -481,8 +486,8 @@ impl ProgressingMuteState {
     /// Swaps current [`ProgressingMuteState`] with opposite one.
     pub fn swap(self) -> Self {
         match self {
-            Self::Unmuting(finalized) => Self::Muting(finalized),
-            Self::Muting(finalized) => Self::Unmuting(finalized),
+            Self::Unmuting(available) => Self::Muting(available),
+            Self::Muting(available) => Self::Unmuting(available),
         }
     }
 
@@ -495,17 +500,22 @@ impl ProgressingMuteState {
     }
 
     /// Updates [`FinalizedMuteState`] of this [`ProgressingMuteState`].
-    pub fn change_finalized(self, finalized: FinalizedMuteState) -> Self {
+    pub fn change_available_state(
+        self,
+        available_state: FinalizedMuteState,
+    ) -> Self {
         match self {
-            Self::Unmuting(_) => Self::Unmuting(finalized),
-            Self::Muting(_) => Self::Muting(finalized),
+            Self::Unmuting(_) => Self::Unmuting(available_state),
+            Self::Muting(_) => Self::Muting(available_state),
         }
     }
 
     /// Returns [`FinalizedMuteState`] of this [`ProgressingMuteState`].
-    pub fn finalize(self) -> FinalizedMuteState {
+    pub fn finalize_with_available_state(self) -> FinalizedMuteState {
         match self {
-            Self::Unmuting(finalized) | Self::Muting(finalized) => finalized,
+            Self::Unmuting(available_state) | Self::Muting(available_state) => {
+                available_state
+            }
         }
     }
 }
@@ -548,7 +558,9 @@ impl MuteState {
     pub fn finalize(self) -> Self {
         match self {
             Self::Final(_) => self,
-            Self::InProgress(progressing) => progressing.finalize().into(),
+            Self::InProgress(progressing) => {
+                progressing.finalize_with_available_state().into()
+            }
         }
     }
 }
@@ -680,7 +692,9 @@ impl Sender {
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
         let finalized_mute_state = match sender.mute_state() {
             MuteState::Final(finalized) => finalized,
-            MuteState::InProgress(progressing) => progressing.finalize(),
+            MuteState::InProgress(progressing) => {
+                progressing.finalize_with_available_state()
+            }
         };
         track.set_enabled_by_mute_state(finalized_mute_state);
         sender.track.borrow_mut().replace(track);
@@ -745,7 +759,9 @@ impl Sender {
                     if progressing.intention() == new_mute_state {
                         new_mute_state.into()
                     } else {
-                        progressing.change_finalized(new_mute_state).into()
+                        progressing
+                            .change_available_state(new_mute_state)
+                            .into()
                     }
                 }
             };
