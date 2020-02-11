@@ -145,19 +145,22 @@
 #   pass = "turn"
 
 [turn.cli.timeouts]
-# Timeout when waiting for an available connection.
+# Timeout when waiting for an available connection. 0 means no timeout and is
+# not recommended.
 #
 # Env var: MEDEA_TURN__CLI__TIMEOUTS__WAIT
 # Default:
 #   wait = "5s"
 
-# Timeout when creating a new connection.
+# Timeout when creating a new connection. 0 means no timeout and is not
+# recommended.
 #
 # Env var: MEDEA_TURN__CLI__TIMEOUTS__CREATE
 # Default:
 #   create = "5s"
 
-# Timeout when recycling connection.
+# Timeout when recycling connection. 0 means no timeout and  is not
+# recommended.
 #
 # Env var: MEDEA_TURN__CLI__TIMEOUTS__RECYCLE
 # Default:

@@ -110,10 +110,31 @@ pub struct Timeouts {
 
 impl Into<PoolTimeouts> for &Timeouts {
     fn into(self) -> PoolTimeouts {
+        let wait = self.wait.and_then(|wait| {
+            if wait.as_nanos() == 0 {
+                None
+            } else {
+                Some(wait)
+            }
+        });
+        let create = self.create.and_then(|create| {
+            if create.as_nanos() == 0 {
+                None
+            } else {
+                Some(create)
+            }
+        });
+        let recycle = self.recycle.and_then(|recycle| {
+            if recycle.as_nanos() == 0 {
+                None
+            } else {
+                Some(recycle)
+            }
+        });
         PoolTimeouts {
-            wait: self.wait,
-            create: self.create,
-            recycle: self.recycle
+            wait,
+            create,
+            recycle,
         }
     }
 }
@@ -125,6 +146,8 @@ mod spec {
     use serial_test_derive::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
+
+    use super::*;
 
     #[test]
     #[serial]
@@ -189,7 +212,7 @@ mod spec {
     #[serial]
     fn coturn_cli() {
         let default_conf = Conf::default();
-        let env_conf:Conf = overrided_by_env_conf!(
+        let env_conf: Conf = overrided_by_env_conf!(
             "MEDEA_TURN__CLI__IP" => "4.4.4.4",
             "MEDEA_TURN__CLI__PORT" => "1234",
             "MEDEA_TURN__CLI__PASS" => "clipass",
@@ -208,18 +231,51 @@ mod spec {
     #[serial]
     fn coturn_cli_timeouts() {
         let default_conf = Conf::default();
-        let env_conf:Conf = overrided_by_env_conf!(
+        let env_conf: Conf = overrided_by_env_conf!(
             "MEDEA_TURN__CLI__TIMEOUTS__WAIT" => "1s",
             "MEDEA_TURN__CLI__TIMEOUTS__CREATE" => "2s",
             "MEDEA_TURN__CLI__TIMEOUTS__RECYCLE" => "3s",
         );
 
-        assert_ne!(default_conf.turn.cli.timeouts.wait, env_conf.turn.cli.timeouts.wait);
-        assert_ne!(default_conf.turn.cli.timeouts.create, env_conf.turn.cli.timeouts.create);
-        assert_ne!(default_conf.turn.cli.timeouts.recycle, env_conf.turn.cli.timeouts.recycle);
+        assert_ne!(
+            default_conf.turn.cli.timeouts.wait,
+            env_conf.turn.cli.timeouts.wait
+        );
+        assert_ne!(
+            default_conf.turn.cli.timeouts.create,
+            env_conf.turn.cli.timeouts.create
+        );
+        assert_ne!(
+            default_conf.turn.cli.timeouts.recycle,
+            env_conf.turn.cli.timeouts.recycle
+        );
 
-        assert_eq!(env_conf.turn.cli.timeouts.wait, Some(Duration::from_secs(1)));
-        assert_eq!(env_conf.turn.cli.timeouts.create, Some(Duration::from_secs(2)));
-        assert_eq!(env_conf.turn.cli.timeouts.recycle, Some(Duration::from_secs(3)));
+        assert_eq!(
+            env_conf.turn.cli.timeouts.wait,
+            Some(Duration::from_secs(1))
+        );
+        assert_eq!(
+            env_conf.turn.cli.timeouts.create,
+            Some(Duration::from_secs(2))
+        );
+        assert_eq!(
+            env_conf.turn.cli.timeouts.recycle,
+            Some(Duration::from_secs(3))
+        );
+    }
+
+    #[test]
+    fn into_pool_timeouts() {
+        let timeouts = Timeouts {
+            wait: None,
+            create: Some(Duration::from_secs(0)),
+            recycle: Some(Duration::from_secs(2)),
+        };
+
+        let timeouts: PoolTimeouts = (&timeouts).into();
+
+        assert!(timeouts.wait.is_none());
+        assert!(timeouts.create.is_none());
+        assert_eq!(timeouts.recycle, Some(Duration::from_secs(2)));
     }
 }
