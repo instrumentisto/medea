@@ -68,6 +68,7 @@ pub struct Redis {
     /// The database number to use. This is usually 0.
     #[default = 0]
     pub db_number: i64,
+    //TODO: replace with PoolConfig
     /// The duration to wait to start a connection before returning err.
     #[default(Duration::from_secs(5))]
     #[serde(with = "humantime_serde")]
@@ -241,53 +242,55 @@ mod spec {
 
     #[test]
     #[serial]
-    fn coturn_cli_timeouts() {
+    fn coturn_cli_pool() {
         let default_conf = Conf::default();
         let env_conf: Conf = overrided_by_env_conf!(
-            "MEDEA_TURN__CLI__TIMEOUTS__WAIT" => "1s",
-            "MEDEA_TURN__CLI__TIMEOUTS__CREATE" => "2s",
-            "MEDEA_TURN__CLI__TIMEOUTS__RECYCLE" => "3s",
+            "MEDEA_TURN__CLI__POOL__MAX_SIZE" => "10",
+            "MEDEA_TURN__CLI__POOL__WAIT" => "1s",
+            "MEDEA_TURN__CLI__POOL__CREATE" => "2s",
+            "MEDEA_TURN__CLI__POLL__RECYCLE" => "3s",
         );
 
         assert_ne!(
-            default_conf.turn.cli.timeouts.wait,
-            env_conf.turn.cli.timeouts.wait
+            default_conf.turn.cli.pool.max_size,
+            env_conf.turn.cli.pool.max_size
         );
         assert_ne!(
-            default_conf.turn.cli.timeouts.create,
-            env_conf.turn.cli.timeouts.create
+            default_conf.turn.cli.pool.wait,
+            env_conf.turn.cli.pool.wait
         );
         assert_ne!(
-            default_conf.turn.cli.timeouts.recycle,
-            env_conf.turn.cli.timeouts.recycle
+            default_conf.turn.cli.pool.create,
+            env_conf.turn.cli.pool.create
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.recycle,
+            env_conf.turn.cli.pool.recycle
         );
 
+        assert_eq!(env_conf.turn.cli.pool.max_size, 10);
+        assert_eq!(env_conf.turn.cli.pool.wait, Some(Duration::from_secs(1)));
+        assert_eq!(env_conf.turn.cli.pool.create, Some(Duration::from_secs(2)));
         assert_eq!(
-            env_conf.turn.cli.timeouts.wait,
-            Some(Duration::from_secs(1))
-        );
-        assert_eq!(
-            env_conf.turn.cli.timeouts.create,
-            Some(Duration::from_secs(2))
-        );
-        assert_eq!(
-            env_conf.turn.cli.timeouts.recycle,
+            env_conf.turn.cli.pool.recycle,
             Some(Duration::from_secs(3))
         );
     }
 
     #[test]
-    fn into_pool_timeouts() {
-        let timeouts = Timeouts {
+    fn into_pool_config() {
+        let pool_config = PoolConfig {
+            max_size: 6,
             wait: None,
             create: Some(Duration::from_secs(0)),
             recycle: Some(Duration::from_secs(2)),
         };
 
-        let timeouts: PoolTimeouts = (&timeouts).into();
+        let pool_config: DeadpoolPoolConfig = pool_config.into();
 
-        assert!(timeouts.wait.is_none());
-        assert!(timeouts.create.is_none());
-        assert_eq!(timeouts.recycle, Some(Duration::from_secs(2)));
+        assert_eq!(pool_config.max_size, 6);
+        assert!(pool_config.timeouts.wait.is_none());
+        assert!(pool_config.timeouts.create.is_none());
+        assert_eq!(pool_config.timeouts.recycle, Some(Duration::from_secs(2)));
     }
 }
