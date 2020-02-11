@@ -39,7 +39,8 @@ pub enum MemberElement<T> {
     /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
     /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
-    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
+    #[serde(bound = "T: From<Unvalidated> + Default")]
+    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint<T> },
 
     /// Represent [`WebRtcPlayEndpoint`].
     /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
@@ -53,7 +54,9 @@ impl MemberElement<Unvalidated> {
     pub fn validate(self) -> Result<MemberElement<Validated>, ValidationError> {
         match self {
             MemberElement::WebRtcPublishEndpoint { spec } => {
-                Ok(MemberElement::WebRtcPublishEndpoint { spec })
+                Ok(MemberElement::WebRtcPublishEndpoint {
+                    spec: spec.validate()?,
+                })
             }
             MemberElement::WebRtcPlayEndpoint { spec } => {
                 Ok(MemberElement::WebRtcPlayEndpoint {
@@ -109,7 +112,7 @@ impl MemberSpec {
     pub fn get_publish_endpoint_by_id(
         &self,
         id: WebRtcPublishId,
-    ) -> Option<&WebRtcPublishEndpoint> {
+    ) -> Option<&WebRtcPublishEndpoint<Validated>> {
         let e = self.pipeline.get(&id.into())?;
         if let MemberElement::WebRtcPublishEndpoint { spec } = e {
             Some(spec)
@@ -121,7 +124,8 @@ impl MemberSpec {
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint)> {
+    ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint<Validated>)>
+    {
         self.pipeline.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPublishEndpoint { spec } => {
                 Some((id.clone().into(), spec))

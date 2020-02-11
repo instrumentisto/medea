@@ -558,7 +558,7 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         publish_id: WebRtcPublishId,
-        spec: &WebRtcPublishEndpointSpec,
+        spec: &WebRtcPublishEndpointSpec<Validated>,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;
 

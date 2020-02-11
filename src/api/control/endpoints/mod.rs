@@ -48,7 +48,7 @@ impl_from_into!(WebRtcPlayId);
 #[derive(Debug, From)]
 pub enum EndpointSpec {
     /// [`WebRtcPublishEndpoint`] element.
-    WebRtcPublish(WebRtcPublishEndpoint),
+    WebRtcPublish(WebRtcPublishEndpoint<Validated>),
 
     /// [`WebRtcPlayEndpoint`] element.
     WebRtcPlay(WebRtcPlayEndpoint<Validated>),
@@ -81,7 +81,7 @@ impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
                 Ok(Self::WebRtcPlay(play))
             }
             WebrtcPub(elem) => {
-                let publish = WebRtcPublishEndpoint::from(&elem);
+                let publish = WebRtcPublishEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPublish(publish))
             }
         }
@@ -101,7 +101,7 @@ impl TryFrom<(Id, proto::create_request::El)> for EndpointSpec {
                 Ok(Self::WebRtcPlay(play))
             }
             WebrtcPub(elem) => {
-                let publish = WebRtcPublishEndpoint::from(&elem);
+                let publish = WebRtcPublishEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPublish(publish))
             }
             Member(_) | Room(_) => {

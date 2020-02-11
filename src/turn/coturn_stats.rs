@@ -46,8 +46,11 @@ impl CoturnAllocationEvent {
         event_type: &str,
         body: String,
     ) -> Result<Self, CoturnEventParseError> {
+        const TOTAL_TRAFFIC: &str = "total_traffic";
+        const TRAFFIC: &str = "traffic";
+
         match event_type {
-            "total_traffic" | "traffic" => {
+            TOTAL_TRAFFIC | TRAFFIC => {
                 let mut items: HashMap<&str, u64> = body
                     .split(", ")
                     .map(|i| {
@@ -97,7 +100,7 @@ impl CoturnAllocationEvent {
                     )
                 })?;
 
-                if event_type == "total_traffic" {
+                if event_type == TOTAL_TRAFFIC {
                     Ok(CoturnAllocationEvent::TotalTraffic {
                         received_bytes,
                         received_packets,
