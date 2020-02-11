@@ -214,7 +214,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Will return [`RTCPeerConnectionError::PeerCreationError`] if
+    /// Errors with [`RTCPeerConnectionError::PeerCreationError`] if
     /// [`SysRtcPeerConnection`] creation fails.
     pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
     where
@@ -247,7 +247,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
@@ -282,7 +282,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent

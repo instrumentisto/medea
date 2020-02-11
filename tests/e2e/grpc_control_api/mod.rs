@@ -10,7 +10,7 @@ mod signaling;
 use std::collections::HashMap;
 
 use derive_builder::*;
-use medea_control_api_proto::grpc::medea::{
+use medea_control_api_proto::grpc::api::{
     self as proto, control_api_client::ControlApiClient,
 };
 use tonic::transport::Channel;

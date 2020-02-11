@@ -12,7 +12,7 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
@@ -377,8 +377,8 @@ impl Member {
     ///
     /// # Errors
     ///
-    /// Will return [`MemberError::EndpointNotFound`] if `Endpoint` with
-    /// provided ID not found.
+    /// Errors with [`MemberError::EndpointNotFound`] if no [`Endpoint`] with
+    /// provided ID was found.
     pub fn get_endpoint_by_id(
         &self,
         id: String,
@@ -452,10 +452,10 @@ impl WeakMember {
 ///
 /// # Errors
 ///
-/// Will return [`MembersLoadError::TryFromError`] if some error happens while
-/// converting getting [`MemberSpec`]s from [`RoomSpec`].
+/// Errors with [`MembersLoadError::TryFromError`] if converting [`MemberSpec`]s
+/// from [`RoomSpec`].
 ///
-/// Will return [`MembersLoadError`] if error while [`Member`] loading happens.
+/// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {

@@ -5,7 +5,7 @@ use std::time::Duration;
 use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
 use medea_client_api_proto::Event as RpcEvent;
-use medea_control_api_proto::grpc::medea_callback as proto;
+use medea_control_api_proto::grpc::callback as proto;
 use proto::request::Event;
 
 use crate::{

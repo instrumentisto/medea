@@ -1,9 +1,6 @@
-#![allow(
-    bare_trait_objects,
-    clippy::cargo,
-    clippy::nursery,
-    clippy::pedantic,
-)]
+#![allow(clippy::pedantic)]
 
-pub mod medea;
-pub mod medea_callback;
+#[rustfmt::skip]
+pub mod api;
+#[rustfmt::skip]
+pub mod callback;

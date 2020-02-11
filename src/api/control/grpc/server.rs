@@ -13,8 +13,8 @@ use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
 use medea_control_api_proto::grpc::{
-    medea as proto,
-    medea::control_api_server::{
+    api as proto,
+    api::control_api_server::{
         ControlApi, ControlApiServer as TonicControlApiServer,
     },
 };

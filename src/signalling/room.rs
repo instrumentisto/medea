@@ -15,7 +15,7 @@ use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::{
@@ -182,8 +182,8 @@ impl Room {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::BadRoomSpec`] when errs while `Element`
-    /// transformation happens.
+    /// Errors with [`RoomError::BadRoomSpec`] if [`RoomSpec`] transformation
+    /// fails.
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
@@ -552,8 +552,8 @@ impl Room {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::ParticipantServiceErr`] if [`Member`] with
-    /// provided [`MemberId`] not found in [`ParticipantService`].
+    /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
+    /// provided [`MemberId`] was not found in [`ParticipantService`].
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -602,11 +602,11 @@ impl Room {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::EndpointAlreadyExists`] when
+    /// Errors with [`RoomError::EndpointAlreadyExists`] if
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
     ///
-    /// Will return [`RoomError::ParticipantServiceErr`] if `Member` with
-    /// provided [`MemberId`] not exists.
+    /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
+    /// provided [`MemberId`] doesn't exist.
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -675,7 +675,7 @@ impl Room {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::MemberAlreadyExists`] if `Member` with
+    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
     /// provided [`MemberId`] already exists in [`ParticipantService`].
     pub fn create_member(
         &mut self,

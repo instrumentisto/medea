@@ -2,10 +2,10 @@
 
 pub mod grpc;
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use derive_more::From;
-use futures::future::LocalBoxFuture;
+use futures::future::{FutureExt, LocalBoxFuture};
 
 use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},
@@ -42,7 +42,7 @@ pub trait CallbackClientFactory {
     /// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
     fn build(
         url: CallbackUrl,
-    ) -> LocalBoxFuture<'static, Result<Box<dyn CallbackClient>>>;
+    ) -> LocalBoxFuture<'static, Result<Arc<dyn CallbackClient>>>;
 }
 
 #[cfg(test)]
@@ -56,13 +56,14 @@ impl CallbackClientFactory for CallbackClientFactoryImpl {
     #[inline]
     fn build(
         url: CallbackUrl,
-    ) -> LocalBoxFuture<'static, Result<Box<dyn CallbackClient>>> {
+    ) -> LocalBoxFuture<'static, Result<Arc<dyn CallbackClient>>> {
         info!("Creating CallbackClient for URL: {}", url);
         match url {
-            CallbackUrl::Grpc(grpc_url) => Box::pin(async move {
-                Ok(Box::new(grpc::GrpcCallbackClient::new(&grpc_url).await?)
-                    as Box<dyn CallbackClient>)
-            }),
+            CallbackUrl::Grpc(grpc_url) => async move {
+                Ok(Arc::new(grpc::GrpcCallbackClient::new(&grpc_url).await?)
+                    as Arc<dyn CallbackClient>)
+            }
+            .boxed_local(),
         }
     }
 }

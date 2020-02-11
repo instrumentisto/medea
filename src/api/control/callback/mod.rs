@@ -8,7 +8,7 @@ use actix::Message;
 use chrono::{DateTime, Utc};
 use clients::CallbackClientError;
 use derive_more::From;
-use medea_control_api_proto::grpc::medea_callback as proto;
+use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
 

@@ -3,7 +3,7 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 use proto::control_api_client::ControlApiClient;
 use tonic::{transport::Channel, Status};
 
@@ -111,7 +111,6 @@ impl ControlClient {
     /// Gets element from Control API by FID.
     pub async fn get(&self, fid: Fid) -> Result<proto::GetResponse, Status> {
         let req = id_request(vec![fid.into()]);
-
         self.get_client()
             .get(tonic::Request::new(req))
             .await
@@ -121,7 +120,6 @@ impl ControlClient {
     /// Deletes element from Control API by FID.
     pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.into()]);
-
         self.get_client()
             .delete(tonic::Request::new(req))
             .await

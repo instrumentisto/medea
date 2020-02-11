@@ -19,6 +19,11 @@ crate-type = ["cdylib", "rlib"]
 [profile.release]
 opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
+# TODO: Remove this when https://github.com/rustwasm/wasm-pack/issues/782
+#       issue will be resolved.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]

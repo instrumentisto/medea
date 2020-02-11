@@ -23,6 +23,7 @@ impl GrpcCallbackUrl {
     /// implementation.
     #[inline]
     pub fn addr(&self) -> String {
+        // TODO: Do not hardcode protocol.
         format!("http://{}", self.0)
     }
 }

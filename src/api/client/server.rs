@@ -106,8 +106,7 @@ impl Server {
     ///
     /// # Errors
     ///
-    /// Will return [`io::Error`] if some error while binding [`HttpServer`]
-    /// happens.
+    /// Errors if binding [`HttpServer`] to a listening address fails.
     pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
         let server_addr = config.server.client.http.bind_addr();
 

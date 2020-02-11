@@ -3,10 +3,10 @@
 use std::fmt;
 
 #[rustfmt::skip]
-use medea_control_api_proto::grpc::medea_callback::{
+use medea_control_api_proto::grpc::callback::{
     callback_client::CallbackClient as ProtoCallbackClient
 };
-use futures::future::LocalBoxFuture;
+use futures::future::{FutureExt, LocalBoxFuture};
 use tonic::transport::Channel;
 
 use crate::api::control::callback::{
@@ -31,7 +31,6 @@ impl GrpcCallbackClient {
     ) -> Result<Self, CallbackClientError> {
         let addr = addr.addr();
         let client = ProtoCallbackClient::connect(addr).await?;
-
         Ok(Self { client })
     }
 }
@@ -42,7 +41,6 @@ impl CallbackClient for GrpcCallbackClient {
         request: CallbackRequest,
     ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
         let mut client = self.client.clone();
-
         Box::pin(async move {
             client.on_event(tonic::Request::new(request.into())).await?;
             Ok(())

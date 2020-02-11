@@ -5,7 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
@@ -124,8 +124,8 @@ impl RoomSpec {
     ///
     /// # Errors
     ///
-    /// Will return [`TryFromElementError::NotMember`] if not [`MemberSpec`]
-    /// was found in a this [`RoomSpec`]'s pipeline.
+    /// Errors with [`TryFromElementError::NotMember`] if no [`MemberSpec`]
+    /// was found in this [`RoomSpec`]'s pipeline.
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, MemberSpec>, TryFromElementError> {

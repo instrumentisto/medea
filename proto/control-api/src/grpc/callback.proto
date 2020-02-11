@@ -2,7 +2,7 @@
 
 syntax = "proto3";
 
-package medea_callback;
+package callback;
 
 // Service for receiving callbacks from Medea media server.
 service Callback {

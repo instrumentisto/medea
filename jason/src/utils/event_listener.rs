@@ -32,7 +32,7 @@ where
     ///
     /// # Errors
     ///
-    /// Will return [`EventListenerBindError`] if [`EventListener`] bound fails.
+    /// Errors if [`EventListener`] bound fails.
     pub fn new_mut<F>(
         target: Rc<T>,
         event_name: &'static str,
@@ -63,7 +63,7 @@ where
     ///
     /// # Errors
     ///
-    /// Will return [`EventListenerBindError`] if [`EventListener`] bound fails.
+    /// Errors if [`EventListener`] bound fails.
     pub fn new_once<F>(
         target: Rc<T>,
         event_name: &'static str,

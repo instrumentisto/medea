@@ -8,7 +8,7 @@ pub mod webrtc_publish_endpoint;
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
-use medea_control_api_proto::grpc::medea as proto;
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use super::{member::MemberElement, TryFromProtobufError};
@@ -74,7 +74,6 @@ impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
         (_, proto): (Id, proto::member::element::El),
     ) -> Result<Self, Self::Error> {
         use proto::member::element::El::*;
-
         match proto {
             WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;

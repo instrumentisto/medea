@@ -6,8 +6,8 @@ use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
 use failure::Fail;
-use medea_control_api_proto::grpc::medea as proto;
-use serde::{de::Deserializer, Deserialize};
+use medea_control_api_proto::grpc::api as proto;
+use serde::Deserialize;
 
 use crate::api::control::{
     callback::url::CallbackUrl, refs::SrcUri, TryFromProtobufError,
@@ -42,6 +42,7 @@ pub struct WebRtcPlayEndpoint<T> {
     pub on_stop: Option<CallbackUrl>,
 
     /// Option to relay all media through a TURN server forcibly.
+    #[serde(default)]
     pub force_relay: bool,
 
     #[serde(skip)]
