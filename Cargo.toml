@@ -33,7 +33,7 @@ actix-web-actors = "2.0"
 async-trait = "0.1"
 chrono = "0.4"
 config = "0.10"
-coturn-telnet = {path = "crates/coturn-telnet"}
+coturn-telnet = { path = "crates/coturn-telnet" }
 deadpool = "0.5"
 deadpool-redis = "0.5"
 derive_more = "0.99"

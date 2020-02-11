@@ -70,6 +70,7 @@ struct Service {
     /// Turn credentials repository.
     turn_db: TurnDatabase,
 
+    /// Connection to Coturn server admin interface.
     coturn_cli: CoturnTelnetClient,
 
     /// TurnAuthRepo password.
@@ -131,7 +132,7 @@ impl TurnAuthService for Service {
     }
 
     /// Deletes provided [`IceUser`]s from [`TurnDatabase`] and closes their
-    /// sessions on Coturn.
+    /// sessions on Coturn TURN server.
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
         if users.is_empty() {
             return Ok(());

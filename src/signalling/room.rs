@@ -248,7 +248,7 @@ impl Room {
             sdp_offer: None,
             tracks: sender.tracks(),
             ice_servers,
-            force_relay: true,
+            force_relay: sender.is_force_relayed(),
         };
         self.peers.add_peer(sender);
         Ok(Box::new(
@@ -824,7 +824,7 @@ impl CommandHandler for Room {
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
-            force_relay: true,
+            force_relay: to_peer.is_force_relayed(),
         };
 
         self.peers.add_peer(from_peer);

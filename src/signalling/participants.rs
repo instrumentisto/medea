@@ -343,9 +343,9 @@ impl ParticipantService {
         match self.get_member_by_id(&member_id) {
             None => future::ok(()).boxed_local(),
             Some(member) => {
-                if let Some(turn_user) = member.take_ice_user() {
+                if let Some(ice_user) = member.take_ice_user() {
                     let turn_service = self.turn_service.clone();
-                    async move { turn_service.delete(&[turn_user]).await }
+                    async move { turn_service.delete(&[ice_user]).await }
                         .boxed_local()
                 } else {
                     future::ok(()).boxed_local()
@@ -389,7 +389,7 @@ impl ParticipantService {
         let turn_service = self.turn_service.clone();
         let delete_ice_users = async move {
             if let Err(e) = turn_service.delete(ice_users.as_slice()).await {
-                error!("Error removing IceUser {:?}", e)
+                error!("Error removing IceUsers {:?}", e)
             };
         };
 

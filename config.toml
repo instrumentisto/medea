@@ -165,10 +165,10 @@
 # Default:
 #   create = "5s"
 
-# Timeout when recycling connection. 0 means no timeout and  is not
+# Timeout when recycling connection. 0 means no timeout and is not
 # recommended.
 #
-# Env var: MEDEA_TURN__CLI__POLL__RECYCLE
+# Env var: MEDEA_TURN__CLI__POOL__RECYCLE
 # Default:
 #   recycle = "5s"
 

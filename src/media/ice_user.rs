@@ -7,6 +7,7 @@ use medea_client_api_proto::IceServer;
 
 use crate::api::control::RoomId;
 
+/// Username for authorization on Turn server.
 #[derive(AsRef, Clone, Debug, Display, From, Into)]
 #[as_ref(forward)]
 pub struct IceUsername(String);
