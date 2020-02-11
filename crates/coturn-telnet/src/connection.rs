@@ -12,14 +12,15 @@ use crate::codec::{
     CoturnResponseParseError,
 };
 
+/// Any errors that can be thrown from [`CoturnTelnetConnection`].
 #[derive(Debug, derive_more::Display, derive_more::From)]
 pub enum CoturnTelnetError {
     /// Underlying transport encountered [`io::Error`]. You should try
-    /// recreating [`CoturnTelnetClient`].
+    /// recreating [`CoturnTelnetConnection`].
     #[display(fmt = "Underlying transport encountered IoError: {}", _0)]
     IoError(io::Error),
     /// Underlying stream exhausted. You should try recreating
-    /// [`CoturnTelnetClient`].
+    /// [`CoturnTelnetConnection`].
     #[display(fmt = "Disconnected from Coturn telnet server")]
     Disconnected,
     /// Unable to parse response from Coturn telnet server. This is
@@ -45,7 +46,7 @@ impl From<CoturnCliCodecError> for CoturnTelnetError {
 
 /// Asynchronous connection to remote [Coturn] server telnet interface. You can
 /// use this directly, but it is recommended to use this with connection pool
-/// from [`crate::pool::Pool`], which takes care of connection life cycle.
+/// from [`crate::pool::Pool`], which takes care of connection lifecycle.
 ///
 /// [Coturn]: https://github.com/coturn/coturn.
 pub struct CoturnTelnetConnection(Framed<TcpStream, CoturnCliCodec>);
@@ -66,7 +67,7 @@ impl CoturnTelnetConnection {
 
     /// Returns session ids associated with provided username.
     ///
-    /// 1. Sends [`CoturnTelnetClientError::PrintSessions`] with provided
+    /// 1. Sends [`CoturnCliRequest::PrintSessions`] with provided
     /// username.
     /// 2. Awaits for [`CoturnCliResponse::Sessions`].
     pub async fn print_sessions(
@@ -131,7 +132,7 @@ impl CoturnTelnetConnection {
         Ok(())
     }
 
-    /// Authenticates [`CoturnTelnetClient`].
+    /// Authenticates [`CoturnTelnetConnection`].
     ///
     /// 1. Awaits for [`CoturnCliResponse::EnterPassword`].
     /// 2. Sends [`CoturnCliRequest::Auth`].

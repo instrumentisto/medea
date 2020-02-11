@@ -145,6 +145,8 @@ impl Into<Bytes> for CoturnCliRequest {
     }
 }
 
+/// Errors that can happen while decoding bytes received to
+/// [`CoturnCliResponse`].
 #[derive(Debug)]
 pub enum CoturnCliCodecError {
     IoError(io::Error),
