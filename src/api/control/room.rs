@@ -93,8 +93,8 @@ impl RoomSpec {
     ///
     /// # Errors
     ///
-    /// Will return [`TryFromElementError::NotMember`] if not [`MemberSpec`]
-    /// was found in a this [`RoomSpec`]'s pipeline.
+    /// Errors with [`TryFromElementError::NotMember`] if no [`MemberSpec`]
+    /// was found in this [`RoomSpec`]'s pipeline.
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, MemberSpec>, TryFromElementError> {

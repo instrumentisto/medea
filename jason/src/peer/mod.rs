@@ -178,10 +178,10 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Will return [`PeerError::RtcPeerConnection`] if [`RtcPeerConnection`]
+    /// Errors with [`PeerError::RtcPeerConnection`] if [`RtcPeerConnection`]
     /// creating fails.
     ///
-    /// Will return [`PeerError::RtcPeerConnection`] if some callback of
+    /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
     /// [`RtcPeerConnection`] can't be set.
     pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
@@ -360,7 +360,7 @@ impl PeerConnection {
     /// # Errors
     ///
     /// Errors if finds transceiver without mid, so must be called after setting
-    /// local description if offerrer, and remote if answerer.
+    /// local description if offerer, and remote if answerer.
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface

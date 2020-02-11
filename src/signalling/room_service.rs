@@ -394,7 +394,7 @@ impl DeleteElements<Unvalidated> {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomServiceError::EmptyUrisList`] if [`DeleteElements`]
+    /// Errors with [`RoomServiceError::EmptyUrisList`] if [`DeleteElements`]
     /// consists of an empty [`Vec`] of [`StatefulFid`]s.
     pub fn validate(
         self,

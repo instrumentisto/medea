@@ -197,7 +197,6 @@ macro_rules! impl_try_from_proto_for_member {
                 (id, proto): (Id, $proto),
             ) -> Result<Self, Self::Error> {
                 use $proto as proto_el;
-
                 match proto {
                     proto_el::Member(member) => Self::try_from(member),
                     _ => Err(TryFromProtobufError::ExpectedOtherElement(

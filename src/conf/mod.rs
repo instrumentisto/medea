@@ -65,7 +65,7 @@ impl Conf {
     ///
     /// # Errors
     ///
-    /// Will return [`Error`] if some error while parsing happens.
+    /// Errors if parsing fails.
     pub fn parse() -> Result<Self, Error> {
         let mut cfg = Config::new();
 

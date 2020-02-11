@@ -327,16 +327,16 @@ impl Peer<WaitLocalSdp> {
         }
     }
 
-    /// Sets tracks [`mid`]s.
+    /// Sets tracks [mid]s.
     ///
-    /// Provided [`mid`]s must have entries for all [`Peer`]s tracks.
+    /// Provided [mid]s must have entries for all [`Peer`]s tracks.
     ///
     /// # Errors
     ///
-    /// Will return [`PeerError::MidsMismatch`] if `Peer` is sending `Track`
-    /// without providing its [`mid`].
+    /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
+    /// [`MediaTrack`] without providing its [mid].
     ///
-    /// [`mid`]:
+    /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn set_mids(
         &mut self,
@@ -382,14 +382,14 @@ impl Peer<WaitLocalHaveRemote> {
 }
 
 impl Peer<Stable> {
-    /// Returns [`mid`]s of this [`Peer`].
+    /// Returns [mid]s of this [`Peer`].
     ///
     /// # Errors
     ///
-    /// Will return [`PeerError::MidsMismatch`] if `Peer` is sending `Track`
-    /// without providing its [`mid`].
+    /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
+    /// [`MediaTrack`] without providing its [mid].
     ///
-    /// [`mid`]:
+    /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, PeerError> {
         let mut mids = HashMap::with_capacity(self.context.senders.len());

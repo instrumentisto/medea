@@ -14,7 +14,6 @@ pub enum P2pMode {
 impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     fn into(self) -> proto::web_rtc_publish_endpoint::P2p {
         use proto::web_rtc_publish_endpoint::P2p::*;
-
         match self {
             Self::Always => Always,
             Self::IfPossible => IfPossible,
@@ -26,7 +25,6 @@ impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     fn from(proto: proto::web_rtc_publish_endpoint::P2p) -> Self {
         use proto::web_rtc_publish_endpoint::P2p::*;
-
         match proto {
             Always => Self::Always,
             IfPossible => Self::IfPossible,
@@ -143,7 +141,6 @@ impl Endpoint {
                 proto::member::element::El::WebrtcPub(spec.into_proto(id))
             }
         };
-
         proto::member::Element { el: Some(el) }
     }
 }

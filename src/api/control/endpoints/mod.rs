@@ -73,7 +73,6 @@ impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
         (_, proto): (Id, proto::member::element::El),
     ) -> Result<Self, Self::Error> {
         use proto::member::element::El::*;
-
         match proto {
             WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;

@@ -21,8 +21,7 @@ pub trait PeerRepository {
     ///
     /// # Errors
     ///
-    /// Will return [`PeerError`] if error while creating [`PeerConnection`]
-    /// happens.
+    /// Errors if creating [`PeerConnection`] fails.
     fn create_peer(
         &mut self,
         id: PeerId,

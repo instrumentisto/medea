@@ -71,8 +71,8 @@ impl PeerRepository {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::PeerNotFound`] if requested [`PeerId`]
-    /// not exists in [`PeerRepository`].
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn get_peer_by_id(
         &self,
         peer_id: PeerId,
@@ -146,8 +146,8 @@ impl PeerRepository {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::PeerNotFound`] if requested [`PeerId`]
-    /// not exists in [`PeerRepository`].
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn get_inner_peer_by_id<'a, S>(
         &'a self,
         peer_id: PeerId,
@@ -178,8 +178,8 @@ impl PeerRepository {
     ///
     /// # Errors
     ///
-    /// Will return [`RoomError::PeerNotFound`] if requested [`PeerId`]
-    /// not exists in [`PeerRepository`].
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn take_inner_peer<S>(
         &mut self,
         peer_id: PeerId,

@@ -138,8 +138,8 @@ impl TurnAuthService for Service {
 ///
 /// # Errors
 ///
-/// Will return [`TurnServiceErr::TurnAuthRepoErr`] if authentication in [Redis]
-/// was failed.
+/// Errors with [`TurnServiceErr::TurnAuthRepoErr`] if authentication in Redis
+/// fails.
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {

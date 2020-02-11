@@ -313,8 +313,7 @@ pub trait RpcTransport {
     ///
     /// # Errors
     ///
-    /// Will return [`TransportError`] if some error while [`ClientMsg`] sending
-    /// happens.
+    /// Errors if sending [`ClientMsg`] fails.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
     /// Subscribes to a [`RpcTransport`]'s [`State`] changes.

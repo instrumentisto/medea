@@ -293,7 +293,7 @@ impl_into_http_response!(SingleGetResponse);
 impl From<proto::Response> for Response {
     fn from(resp: proto::Response) -> Self {
         Self {
-            error: resp.error.map(|e| e.into()),
+            error: resp.error.map(Into::into),
         }
     }
 }
@@ -342,7 +342,6 @@ impl Element {
 impl From<proto::Element> for Element {
     fn from(proto: proto::Element) -> Self {
         use proto::element::El::*;
-
         match proto.el.unwrap() {
             Room(room) => Self::Room(room.into()),
             Member(member) => Self::Member(member.into()),

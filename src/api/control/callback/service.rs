@@ -58,8 +58,8 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
             drop(read_lock);
             let mut write_lock = self.clients.write().await;
             // Double checked locking is kinda redundant atm, since this future
-            // is !Send, but lets leave it this way for additional
-            // future-proofness.
+            // is `!Send`, but lets leave it this way for additional
+            // future-proofing.
             if let Some(client) = write_lock.get(&callback_url) {
                 Arc::clone(client)
             } else {
@@ -93,7 +93,6 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
         let this = self.clone();
         Arbiter::spawn(async move {
             let req = CallbackRequest::new(fid, event.into());
-
             if let Err(e) = this.send_request(req, callback_url).await {
                 error!("Failed to send callback because {:?}.", e);
             }

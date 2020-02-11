@@ -45,7 +45,7 @@ macro_rules! hashmap {
 /// Generates [`Debug`] implementation for a provided structure with name of
 /// this structure.
 ///
-/// In debug print of this structure will be printed just name of the provided
+/// In debug print of this structure will be printed just a name of the provided
 /// structure.
 ///
 /// # Example

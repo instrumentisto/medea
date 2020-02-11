@@ -31,7 +31,6 @@ impl GrpcCallbackClient {
     ) -> Result<Self, CallbackClientError> {
         let addr = addr.addr();
         let client = ProtoCallbackClient::connect(addr).await?;
-
         Ok(Self { client })
     }
 }
@@ -42,7 +41,6 @@ impl CallbackClient for GrpcCallbackClient {
         request: CallbackRequest,
     ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
         let mut client = self.client.clone();
-
         async move {
             client.on_event(tonic::Request::new(request.into())).await?;
             Ok(())

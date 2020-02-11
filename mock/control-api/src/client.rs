@@ -111,7 +111,6 @@ impl ControlClient {
     /// Gets element from Control API by FID.
     pub async fn get(&self, fid: Fid) -> Result<proto::GetResponse, Status> {
         let req = id_request(vec![fid.into()]);
-
         self.get_client()
             .get(tonic::Request::new(req))
             .await
@@ -121,7 +120,6 @@ impl ControlClient {
     /// Deletes element from Control API by FID.
     pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.into()]);
-
         self.get_client()
             .delete(tonic::Request::new(req))
             .await

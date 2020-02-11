@@ -103,7 +103,6 @@ mod leave {
     impl From<proto::on_leave::Reason> for OnLeaveReason {
         fn from(proto: proto::on_leave::Reason) -> Self {
             use proto::on_leave::Reason::*;
-
             match proto {
                 ServerShutdown => Self::ServerShutdown,
                 LostConnection => Self::LostConnection,

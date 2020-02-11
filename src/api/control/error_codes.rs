@@ -108,7 +108,6 @@ impl Into<proto::Error> for ErrorResponse {
         } else {
             self.error_code.to_string()
         };
-
         proto::Error {
             doc: String::new(),
             text,

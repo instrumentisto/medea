@@ -178,14 +178,14 @@ impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
 ///
 /// # Errors
 ///
-/// Will return [`LoadStaticControlSpecError::IoError`] if reading of provided
+/// Errors with [`LoadStaticControlSpecError::IoError`] if reading of provided
 /// [`Path`] to file fails.
 ///
-/// Will return [`LoadStaticControlSpecsError::YamlDeserializationError`] if
+/// Errors with [`LoadStaticControlSpecsError::YamlDeserializationError`] if
 /// YAML deserialization fails.
 ///
-/// Will return [`LoadStaticControlSpecsError::TryFromElementError`] if
-/// [`RoomSpec`] convertation fails.
+/// Errors with [`LoadStaticControlSpecsError::TryFromElementError`] if
+/// [`RoomSpec`] conversation fails.
 pub fn load_from_yaml_file<P: AsRef<Path>>(
     path: P,
 ) -> Result<RoomSpec, LoadStaticControlSpecsError> {
@@ -201,8 +201,8 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
 ///
 /// # Errors
 ///
-/// Will return [`LoadStateControlSpecsError::SpecDirReadError`] if error while
-/// reading provided [`Path`] happened.
+/// Errors with [`LoadStateControlSpecsError::SpecDirReadError`] if reading
+/// provided [`Path`] fails.
 pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     path: P,
 ) -> Result<Vec<RoomSpec>, LoadStaticControlSpecsError> {
