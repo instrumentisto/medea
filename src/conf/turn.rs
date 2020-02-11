@@ -6,7 +6,9 @@ use std::{
     time::Duration,
 };
 
-use deadpool::managed::Timeouts as PoolTimeouts;
+use deadpool::managed::{
+    PoolConfig as DeadpoolPoolConfig, Timeouts as DeadpoolTimeouts,
+};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -87,29 +89,35 @@ pub struct CoturnCli {
     /// Password for authorize on Coturn server telnet interface.
     #[default(String::from("turn"))]
     pub pass: String,
-    /// Coturn connection timeouts.
-    pub timeouts: Timeouts,
+    /// Connection pool config.
+    pub pool: PoolConfig,
 }
 
-/// [Deadpool] connection pool timeouts.
+/// [Deadpool] connection pool config.
 ///
 /// [Deadpool]: https://crates.io/crates/deadpool
-#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
-pub struct Timeouts {
+pub struct PoolConfig {
+    /// Maximum size of the pool
+    #[default = 16]
+    pub max_size: usize,
+    /// Timeout when waiting for available connection to become available.
     #[default(Some(Duration::from_secs(5)))]
     #[serde(with = "humantime_serde")]
     pub wait: Option<Duration>,
+    /// Timeout when creating a new connection.
     #[default(Some(Duration::from_secs(5)))]
     #[serde(with = "humantime_serde")]
     pub create: Option<Duration>,
+    /// Timeout when recycling connection.
     #[default(Some(Duration::from_secs(5)))]
     #[serde(with = "humantime_serde")]
     pub recycle: Option<Duration>,
 }
 
-impl Into<PoolTimeouts> for &Timeouts {
-    fn into(self) -> PoolTimeouts {
+impl Into<DeadpoolPoolConfig> for PoolConfig {
+    fn into(self) -> DeadpoolPoolConfig {
         let wait = self.wait.and_then(|wait| {
             if wait.as_nanos() == 0 {
                 None
@@ -131,10 +139,14 @@ impl Into<PoolTimeouts> for &Timeouts {
                 Some(recycle)
             }
         });
-        PoolTimeouts {
-            wait,
-            create,
-            recycle,
+
+        DeadpoolPoolConfig {
+            max_size: self.max_size,
+            timeouts: DeadpoolTimeouts {
+                wait,
+                create,
+                recycle,
+            },
         }
     }
 }

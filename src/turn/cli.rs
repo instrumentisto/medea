@@ -1,7 +1,7 @@
-use std::{fmt, ops::DerefMut, time::Duration};
+use std::{fmt, ops::DerefMut};
 
 use coturn_telnet::{CoturnTelnetError, Manager, Pool, PoolError};
-use deadpool::managed::{PoolConfig, Timeouts};
+use deadpool::managed::PoolConfig;
 use derive_more::{Display, From};
 use failure::Fail;
 
@@ -21,26 +21,16 @@ pub enum CoturnCliError {
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(Clone)]
-pub struct CoturnTelnetClient {
-    pool: Pool,
-}
+pub struct CoturnTelnetClient(Pool);
 
 impl CoturnTelnetClient {
     /// Creates new [`CoturnTelnetClient`].
-    pub fn new(addr: (String, u16), pass: String) -> Self {
-        let manager = Manager::new(addr, pass);
-        // TODO: to conf
-        let config = PoolConfig {
-            max_size: 16,
-            timeouts: Timeouts {
-                wait: Some(Duration::from_secs(5)),
-                create: Some(Duration::from_secs(5)),
-                recycle: Some(Duration::from_secs(5)),
-            },
-        };
-        Self {
-            pool: Pool::from_config(manager, config),
-        }
+    pub fn new(
+        addr: (String, u16),
+        pass: String,
+        pool_config: PoolConfig,
+    ) -> Self {
+        Self(Pool::from_config(Manager::new(addr, pass), pool_config))
     }
 
     /// Forcefully closes provided [`IceUser`]s sessions on Coturn server.
@@ -48,7 +38,7 @@ impl CoturnTelnetClient {
         &self,
         users: &[&IceUser],
     ) -> Result<(), CoturnCliError> {
-        let mut connection = self.pool.get().await?;
+        let mut connection = self.0.get().await?;
         for user in users {
             let sessions = connection
                 .deref_mut()
@@ -64,7 +54,7 @@ impl CoturnTelnetClient {
 impl fmt::Debug for CoturnTelnetClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CoturnTelnetClient")
-            .field("pool", &self.pool.status())
+            .field("pool", &self.0.status())
             .finish()
     }
 }
