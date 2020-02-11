@@ -268,13 +268,13 @@ mod spec {
             env_conf.turn.cli.pool.recycle
         );
 
-//        assert_eq!(env_conf.turn.cli.pool.max_size, 10);
-//        assert_eq!(env_conf.turn.cli.pool.wait, Some(Duration::from_secs(1)));
-//        assert_eq!(env_conf.turn.cli.pool.create, Some(Duration::from_secs(2)));
-//        assert_eq!(
-//            env_conf.turn.cli.pool.recycle,
-//            Some(Duration::from_secs(3))
-//        );
+        assert_eq!(env_conf.turn.cli.pool.max_size, 10);
+        assert_eq!(env_conf.turn.cli.pool.wait, Some(Duration::from_secs(1)));
+        assert_eq!(env_conf.turn.cli.pool.create, Some(Duration::from_secs(2)));
+        assert_eq!(
+            env_conf.turn.cli.pool.recycle,
+            Some(Duration::from_secs(3))
+        );
     }
 
     #[test]
