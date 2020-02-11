@@ -20,9 +20,9 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.40
-CHROME_VERSION := 78.0
-FIREFOX_VERSION := 71.0
+RUST_VER := 1.41
+CHROME_VERSION := 79.0
+FIREFOX_VERSION := 72.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -150,6 +150,7 @@ down.medea: docker.down.medea
 #  make up.control
 
 up.control:
+	make wait.port port=6565
 	cargo run -p medea-control-api-mock
 
 
@@ -401,6 +402,21 @@ endif
 ifeq ($(up),yes)
 	-make down
 endif
+
+
+
+####################
+# Waiting commands #
+####################
+
+# Waits for some port on localhost to become open.
+#
+# Usage:
+#   make wait.port [port=<port>]
+
+wait.port:
+	while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$(port)"; \
+		do sleep 1; done
 
 
 
@@ -908,4 +924,5 @@ endef
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.control up.coturn up.demo up.dev up.jason up.medea \
+        wait.port \
         yarn

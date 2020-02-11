@@ -2,10 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::api::{
-    Room as RoomProto, Room_Element as RoomElementProto,
-    Room_Element_oneof_el as RoomElementOneOfEl,
-};
+use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 use super::member::Member;
@@ -24,18 +21,17 @@ pub struct Room {
 }
 
 impl Room {
-    /// Converts [`Room`] into protobuf [`RoomProto`].
+    /// Converts [`Room`] into protobuf [`proto::Room`].
     #[must_use]
-    pub fn into_proto(self, id: String) -> RoomProto {
-        let mut proto = RoomProto::new();
-        let mut room_elements = HashMap::new();
-        for (id, member) in self.pipeline {
-            room_elements.insert(id.clone(), member.into_proto(id));
+    pub fn into_proto(self, id: String) -> proto::Room {
+        proto::Room {
+            id,
+            pipeline: self
+                .pipeline
+                .into_iter()
+                .map(|(id, member)| (id.clone(), member.into_proto(id)))
+                .collect(),
         }
-        proto.set_id(id);
-        proto.set_pipeline(room_elements);
-
-        proto
     }
 }
 
@@ -48,32 +44,36 @@ pub enum RoomElement {
 
 impl RoomElement {
     #[must_use]
-    pub fn into_proto(self, id: String) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        match self {
-            Self::Member(m) => proto.set_member(m.into_proto(id)),
-        }
-
-        proto
+    pub fn into_proto(self, id: String) -> proto::room::Element {
+        let el = match self {
+            Self::Member(m) => {
+                proto::room::element::El::Member(m.into_proto(id))
+            }
+        };
+        proto::room::Element { el: Some(el) }
     }
 }
 
-impl From<RoomElementProto> for RoomElement {
-    fn from(proto: RoomElementProto) -> Self {
+impl From<proto::room::Element> for RoomElement {
+    fn from(proto: proto::room::Element) -> Self {
         match proto.el.unwrap() {
-            RoomElementOneOfEl::member(member) => Self::Member(member.into()),
+            proto::room::element::El::Member(member) => {
+                Self::Member(member.into())
+            }
             _ => unimplemented!(),
         }
     }
 }
 
-impl From<RoomProto> for Room {
-    fn from(mut proto: RoomProto) -> Self {
-        let mut pipeline = HashMap::new();
-        for (id, member) in proto.take_pipeline() {
-            pipeline.insert(id, member.into());
+impl From<proto::Room> for Room {
+    fn from(proto: proto::Room) -> Self {
+        Self {
+            id: proto.id,
+            pipeline: proto
+                .pipeline
+                .into_iter()
+                .map(|(id, member)| (id, member.into()))
+                .collect(),
         }
-        let id = proto.take_id();
-        Self { id, pipeline }
     }
 }

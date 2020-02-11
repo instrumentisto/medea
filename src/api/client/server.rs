@@ -103,6 +103,10 @@ pub struct Server(ActixServer);
 
 impl Server {
     /// Starts Client API HTTP server.
+    ///
+    /// # Errors
+    ///
+    /// Errors if binding [`HttpServer`] to a listening address fails.
     pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
         let server_addr = config.server.client.http.bind_addr();
 

@@ -16,9 +16,7 @@ use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
     TrackPatch,
 };
-use medea_control_api_proto::grpc::api::{
-    Element as ElementProto, Room as RoomProto,
-};
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::{
@@ -28,8 +26,8 @@ use crate::{
         },
         control::{
             callback::{
-                service::CallbackService, OnJoinEvent, OnLeaveEvent,
-                OnLeaveReason,
+                clients::CallbackClientFactoryImpl, service::CallbackService,
+                OnJoinEvent, OnLeaveEvent, OnLeaveReason,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -163,7 +161,7 @@ pub struct Room {
     /// Service for sending [`CallbackEvent`]s.
     ///
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
-    callbacks: CallbackService,
+    callbacks: CallbackService<CallbackClientFactoryImpl>,
 
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
     /// [`RpcConnection`] authorization, establishment, message sending.
@@ -181,8 +179,10 @@ pub struct Room {
 impl Room {
     /// Creates new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when errs while `Element`
-    /// transformation happens.
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::BadRoomSpec`] if [`RoomSpec`] transformation
+    /// fails.
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
@@ -545,6 +545,11 @@ impl Room {
     ///
     /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
+    /// provided [`MemberId`] was not found in [`ParticipantService`].
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -591,8 +596,13 @@ impl Room {
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
     ///
-    /// Returns [`RoomError::EndpointAlreadyExists`] when
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::EndpointAlreadyExists`] if
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
+    ///
+    /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
+    /// provided [`MemberId`] doesn't exist.
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -657,8 +667,10 @@ impl Room {
     /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].
     ///
-    /// Returns [`RoomError::MemberAlreadyExists`] when
-    /// [`Member`]'s ID already presented in [`ParticipantService`].
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
+    /// provided [`MemberId`] already exists in [`ParticipantService`].
     pub fn create_member(
         &mut self,
         id: MemberId,
@@ -953,23 +965,26 @@ impl Actor for Room {
     }
 }
 
-impl Into<ElementProto> for &mut Room {
-    fn into(self) -> ElementProto {
-        let mut element = ElementProto::new();
-        let mut room = RoomProto::new();
-
+impl Into<proto::Room> for &Room {
+    fn into(self) -> proto::Room {
         let pipeline = self
             .members
             .members()
             .into_iter()
             .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
+        proto::Room {
+            id: self.id().to_string(),
+            pipeline,
+        }
+    }
+}
 
-        room.set_pipeline(pipeline);
-        room.set_id(self.id().to_string());
-        element.set_room(room);
-
-        element
+impl Into<proto::Element> for &Room {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::Room(self.into())),
+        }
     }
 }
 
@@ -981,23 +996,24 @@ impl Into<ElementProto> for &mut Room {
 /// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.
 #[derive(Message)]
-#[rtype(result = "Result<HashMap<StatefulFid, ElementProto>, RoomError>")]
+#[rtype(result = "Result<HashMap<StatefulFid, proto::Element>, RoomError>")]
 pub struct SerializeProto(pub Vec<StatefulFid>);
 
 impl Handler<SerializeProto> for Room {
-    type Result = Result<HashMap<StatefulFid, ElementProto>, RoomError>;
+    type Result = Result<HashMap<StatefulFid, proto::Element>, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeProto,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let mut serialized: HashMap<StatefulFid, ElementProto> = HashMap::new();
+        let mut serialized: HashMap<StatefulFid, proto::Element> =
+            HashMap::new();
         for fid in msg.0 {
             match &fid {
                 StatefulFid::Room(room_fid) => {
                     if room_fid.room_id() == &self.id {
-                        let current_room: ElementProto = self.into();
+                        let current_room: proto::Element = (&*self).into();
                         serialized.insert(fid, current_room);
                     } else {
                         return Err(RoomError::WrongRoomId(

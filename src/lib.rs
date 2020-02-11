@@ -19,7 +19,10 @@ pub mod turn;
 use std::sync::Arc;
 
 use crate::{
-    api::control::callback::service::CallbackService, conf::Conf,
+    api::control::callback::{
+        clients::CallbackClientFactoryImpl, service::CallbackService,
+    },
+    conf::Conf,
     turn::TurnAuthService,
 };
 
@@ -37,7 +40,7 @@ pub struct AppContext {
     /// Service for sending [`CallbackEvent`]s.
     ///
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
-    pub callbacks: CallbackService,
+    pub callbacks: CallbackService<CallbackClientFactoryImpl>,
 }
 
 impl AppContext {
