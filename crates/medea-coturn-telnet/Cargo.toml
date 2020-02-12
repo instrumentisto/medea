@@ -1,13 +1,13 @@
 [package]
-name = "coturn-telnet"
+name = "medea-coturn-telnet"
 version = "0.1.0-dev"
 edition = "2018"
 description = "Coturn TURN server telnet client"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MIT/Apache-2.0"
-documentation = "https://docs.rs/coturn-telnet"
-homepage = "https://github.com/instrumentisto/medea/tree/master/crates/coturn-telnet"
-repository = "https://github.com/instrumentisto/medea/tree/master/crates/coturn-telnet"
+documentation = "https://docs.rs/medea-coturn-telnet"
+homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-coturn-telnet"
+repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-coturn-telnet"
 readme = "README.md"
 keywords = ["coturn", "telnet", "cli"]
 categories = ["web-programming"]

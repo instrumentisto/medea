@@ -16,7 +16,7 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 [workspace]
 members = [
     "crates/medea-macro",
-    "crates/coturn-telnet",
+    "crates/medea-coturn-telnet",
     "jason",
     "mock/control-api",
     "proto/client-api",
@@ -33,7 +33,7 @@ actix-web-actors = "2.0"
 async-trait = "0.1"
 chrono = "0.4"
 config = "0.10"
-coturn-telnet = { path = "crates/coturn-telnet" }
+medea-coturn-telnet = { path = "crates/medea-coturn-telnet" }
 deadpool = "0.5"
 deadpool-redis = "0.5"
 derive_more = "0.99"
