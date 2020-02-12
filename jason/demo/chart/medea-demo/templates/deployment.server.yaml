@@ -62,6 +62,8 @@ spec:
               value: {{ $coturn.conf.listening_port | quote }}
             - name: MEDEA_TURN__DB__REDIS__PORT
               value: {{ $coturnDb.conf.port | quote }}
+            - name: MEDEA_TURN__CLI__PORT
+              value: {{ $coturn.conf.cli_port | quote }}
           envFrom:
             - secretRef:
                 name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
@@ -94,7 +96,7 @@ spec:
           imagePullPolicy: {{ $controlMock.image.pullPolicy | quote }}
           args:
             - --addr=0.0.0.0:{{ $controlMock.conf.bind_port | int }}
-            - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port | int }}
+            - --medea-addr=http://127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port | int }}
           env:
             - name: RUST_LOG
               value: {{ $controlMock.conf.log.level | quote }}
