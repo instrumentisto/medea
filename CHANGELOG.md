@@ -38,6 +38,7 @@ All user visible changes to this project will be documented in this file. This p
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79](/../../pull/79)).
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
+    - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84](/../../pull/84));
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
     - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
 - Testing:
