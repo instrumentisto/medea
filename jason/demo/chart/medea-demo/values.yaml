@@ -29,6 +29,8 @@ server:
       db:
         redis:
           db_number: 0
+      cli:
+        port: 5766
 
   deployment:
     revisionHistoryLimit: 0
@@ -82,6 +84,8 @@ server:
     # Coturn TURN server configuration.
     conf:
       listening_port: 3478
+      cli_port: 5766
+      cli_pass: turn
       # IP adress to be used by Coturn as `external-ip`.
       # If empty then `status.hostIP` of Pod will be used.
       external_ip: ""
