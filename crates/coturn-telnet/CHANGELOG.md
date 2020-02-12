@@ -11,12 +11,13 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Asynchronous [Coturn] client.
-- Connection pool.
-- Requests:
+- Asynchronous [Coturn] client ([#84]).
+- Connection pool ([#84]).
+- Requests ([#84]):
     - `ps [username]`, that prints sessions, with optional exact user match.
     - `cs <session-id>`, that forcefully cancels session.
 
+[#28]: /../../pull/84
 
 
 

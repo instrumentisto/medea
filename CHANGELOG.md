@@ -42,6 +42,8 @@ All user visible changes to this project will be documented in this file. This p
     - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
 - Testing:
     - E2E tests for signalling ([#28]).
+- Turn server integration:
+    - Turn sessions cancellation ([#84](/../../pull/84)).
 
 [#28]: /../../pull/28
 [#33]: /../../pull/33
