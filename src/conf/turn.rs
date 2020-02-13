@@ -6,6 +6,9 @@ use std::{
     time::Duration,
 };
 
+use deadpool::managed::{
+    PoolConfig as DeadpoolPoolConfig, Timeouts as DeadpoolTimeouts,
+};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -15,6 +18,8 @@ use smart_default::SmartDefault;
 pub struct Turn {
     /// Database settings
     pub db: Db,
+    /// Coturn telnet connection settings.
+    pub cli: CoturnCli,
     /// Host of STUN/TURN server. Defaults to `localhost`.
     #[default = "localhost"]
     pub host: Cow<'static, str>,
@@ -63,10 +68,88 @@ pub struct Redis {
     /// The database number to use. This is usually 0.
     #[default = 0]
     pub db_number: i64,
+    // TODO: replace with PoolConfig
     /// The duration to wait to start a connection before returning err.
     #[default(Duration::from_secs(5))]
     #[serde(with = "humantime_serde")]
     pub connection_timeout: Duration,
+}
+
+/// Settings of [Coturn] server telnet interface.
+///
+/// [Coturn]: https://github.com/coturn/coturn
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct CoturnCli {
+    /// Coturn server cli IP address. Defaults to `127.0.0.1`.
+    #[default(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
+    pub ip: IpAddr,
+    /// Coturn server cli port. Defaults to `5766`.
+    #[default = 5766]
+    pub port: u16,
+    /// Password for authorize on Coturn server telnet interface.
+    #[default(String::from("turn"))]
+    pub pass: String,
+    /// Connection pool config.
+    pub pool: PoolConfig,
+}
+
+/// [Deadpool] connection pool config.
+///
+/// [Deadpool]: https://crates.io/crates/deadpool
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct PoolConfig {
+    /// Maximum size of the pool
+    #[default = 16]
+    pub max_size: usize,
+    /// Timeout when waiting for available connection to become available.
+    #[default(Some(Duration::from_secs(5)))]
+    #[serde(with = "humantime_serde")]
+    pub wait: Option<Duration>,
+    /// Timeout when creating a new connection.
+    #[default(Some(Duration::from_secs(5)))]
+    #[serde(with = "humantime_serde")]
+    pub create: Option<Duration>,
+    /// Timeout when recycling connection.
+    #[default(Some(Duration::from_secs(5)))]
+    #[serde(with = "humantime_serde")]
+    pub recycle: Option<Duration>,
+}
+
+impl Into<DeadpoolPoolConfig> for PoolConfig {
+    fn into(self) -> DeadpoolPoolConfig {
+        let wait = self.wait.and_then(|wait| {
+            if wait.as_nanos() == 0 {
+                None
+            } else {
+                Some(wait)
+            }
+        });
+        let create = self.create.and_then(|create| {
+            if create.as_nanos() == 0 {
+                None
+            } else {
+                Some(create)
+            }
+        });
+        let recycle = self.recycle.and_then(|recycle| {
+            if recycle.as_nanos() == 0 {
+                None
+            } else {
+                Some(recycle)
+            }
+        });
+
+        DeadpoolPoolConfig {
+            max_size: self.max_size,
+            timeouts: DeadpoolTimeouts {
+                wait,
+                create,
+                recycle,
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -76,6 +159,8 @@ mod spec {
     use serial_test_derive::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
+
+    use super::*;
 
     #[test]
     #[serial]
@@ -138,14 +223,74 @@ mod spec {
 
     #[test]
     #[serial]
-    fn turn_conf() {
+    fn coturn_cli() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__HOST" => "example.com",
-            "MEDEA_TURN__PORT" => "1234",
+            "MEDEA_TURN__CLI__IP" => "4.4.4.4",
+            "MEDEA_TURN__CLI__PORT" => "1234",
+            "MEDEA_TURN__CLI__PASS" => "clipass",
         );
 
-        assert_ne!(default_conf.turn.host, env_conf.turn.host);
-        assert_ne!(default_conf.turn.port, env_conf.turn.port);
+        assert_ne!(default_conf.turn.cli.ip, env_conf.turn.cli.ip);
+        assert_ne!(default_conf.turn.cli.port, env_conf.turn.cli.port);
+        assert_ne!(default_conf.turn.cli.pass, env_conf.turn.cli.pass);
+
+        assert_eq!(env_conf.turn.cli.ip, Ipv4Addr::new(4, 4, 4, 4));
+        assert_eq!(env_conf.turn.cli.port, 1234);
+        assert_eq!(env_conf.turn.cli.pass, "clipass");
+    }
+
+    #[test]
+    #[serial]
+    fn coturn_cli_pool() {
+        let default_conf = Conf::default();
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__CLI__POOL__MAX_SIZE" => "10",
+            "MEDEA_TURN__CLI__POOL__WAIT" => "1s",
+            "MEDEA_TURN__CLI__POOL__CREATE" => "2s",
+            "MEDEA_TURN__CLI__POOL__RECYCLE" => "3s",
+        );
+
+        assert_ne!(
+            default_conf.turn.cli.pool.max_size,
+            env_conf.turn.cli.pool.max_size
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.wait,
+            env_conf.turn.cli.pool.wait
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.create,
+            env_conf.turn.cli.pool.create
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.recycle,
+            env_conf.turn.cli.pool.recycle
+        );
+
+        assert_eq!(env_conf.turn.cli.pool.max_size, 10);
+        assert_eq!(env_conf.turn.cli.pool.wait, Some(Duration::from_secs(1)));
+        assert_eq!(env_conf.turn.cli.pool.create, Some(Duration::from_secs(2)));
+        assert_eq!(
+            env_conf.turn.cli.pool.recycle,
+            Some(Duration::from_secs(3))
+        );
+    }
+
+    #[test]
+    fn into_pool_config() {
+        let pool_config = PoolConfig {
+            max_size: 6,
+            wait: None,
+            create: Some(Duration::from_secs(0)),
+            recycle: Some(Duration::from_secs(2)),
+        };
+
+        let pool_config: DeadpoolPoolConfig = pool_config.into();
+
+        assert_eq!(pool_config.max_size, 6);
+        assert!(pool_config.timeouts.wait.is_none());
+        assert!(pool_config.timeouts.create.is_none());
+        assert_eq!(pool_config.timeouts.recycle, Some(Duration::from_secs(2)));
     }
 }

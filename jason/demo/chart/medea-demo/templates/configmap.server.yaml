@@ -23,7 +23,6 @@ data:
     {{- $coturnConf := .Values.server.coturn.conf }}
     lt-cred-mech
     fingerprint
-    no-cli
     no-tls
     no-dtls
     realm=medea

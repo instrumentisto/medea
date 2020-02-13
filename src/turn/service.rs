@@ -16,7 +16,10 @@ use crate::{
     conf,
     log::prelude::*,
     media::IceUser,
-    turn::repo::{TurnDatabase, TurnDatabaseErr},
+    turn::{
+        cli::{CoturnCliError, CoturnTelnetClient},
+        repo::{TurnDatabase, TurnDatabaseErr},
+    },
 };
 use actix::{Actor, AsyncContext, StreamHandler};
 use futures::channel::mpsc;
@@ -30,6 +33,9 @@ static TURN_PASS_LEN: usize = 16;
 pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
+
+    #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
+    CoturnCLiErr(CoturnCliError),
 
     #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     #[from(ignore)]
@@ -68,6 +74,9 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 struct Service {
     /// Turn credentials repository.
     turn_db: TurnDatabase,
+
+    /// Connection to Coturn server admin interface.
+    coturn_cli: CoturnTelnetClient,
 
     /// TurnAuthRepo password.
     db_pass: String,
@@ -127,7 +136,8 @@ impl TurnAuthService for Service {
         }
     }
 
-    /// Deletes provided [`IceUser`]s from [`TurnDatabase`].
+    /// Deletes provided [`IceUser`]s from [`TurnDatabase`] and closes their
+    /// sessions on Coturn TURN server.
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
         if users.is_empty() {
             return Ok(());
@@ -135,7 +145,9 @@ impl TurnAuthService for Service {
 
         // leave only non static users
         let users = users.iter().filter(|u| !u.is_static()).collect::<Vec<_>>();
-        Ok(self.turn_db.remove(users.as_slice()).await?)
+        self.turn_db.remove(users.as_slice()).await?;
+        self.coturn_cli.delete_sessions(users.as_slice()).await?;
+        Ok(())
     }
 }
 
@@ -164,8 +176,15 @@ pub fn new_turn_auth_service<'a>(
         },
     )?;
 
+    let coturn_cli = CoturnTelnetClient::new(
+        (cf.cli.ip.to_string(), cf.cli.port),
+        cf.cli.pass.clone(),
+        cf.cli.pool.into(),
+    );
+
     let turn_service = Service {
         turn_db,
+        coturn_cli,
         db_pass: cf.db.redis.pass.clone(),
         turn_address: cf.addr(),
         turn_username: cf.user.clone(),

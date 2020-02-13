@@ -30,6 +30,8 @@ server:
       pullPolicy: Always
     conf:
       listening_port: 9934
+      cli_port: 5766
+      cli_pass: changeme
 
   coturn-db:
     image:
