@@ -5,9 +5,9 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,should_panic
 //! use std::ops::DerefMut;
-//! use coturn_telnet::{Manager, Pool};
+//! use medea_coturn_telnet::{Manager, Pool};
 //!
 //! let mut rt = tokio::runtime::Runtime::new().unwrap();
 //! rt.block_on(async {
