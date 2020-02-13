@@ -9,6 +9,7 @@
 pub mod codec;
 pub mod connection;
 pub mod pool;
+pub mod sessions_parser;
 
 pub use connection::{CoturnTelnetConnection, CoturnTelnetError};
 pub use pool::{Connection, Manager, Pool, PoolError};

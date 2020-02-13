@@ -44,7 +44,8 @@ impl CoturnTelnetClient {
                 .deref_mut()
                 .print_sessions(user.user().clone().into())
                 .await?;
-            connection.deref_mut().delete_sessions(sessions).await?;
+            let sessions_ids = sessions.into_iter().map(|session| session.id);
+            connection.deref_mut().delete_sessions(sessions_ids).await?;
         }
 
         Ok(())

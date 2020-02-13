@@ -7,9 +7,12 @@ use futures::{SinkExt, StreamExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 
-use crate::codec::{
-    CoturnCliCodec, CoturnCliCodecError, CoturnCliRequest, CoturnCliResponse,
-    CoturnResponseParseError,
+use crate::{
+    codec::{
+        CoturnCliCodec, CoturnCliCodecError, CoturnCliRequest,
+        CoturnCliResponse, CoturnResponseParseError,
+    },
+    sessions_parser::{Session, SessionId},
 };
 
 /// Any errors that can be thrown from [`CoturnTelnetConnection`].
@@ -73,7 +76,7 @@ impl CoturnTelnetConnection {
     pub async fn print_sessions(
         &mut self,
         username: String,
-    ) -> Result<Vec<String>, CoturnTelnetError> {
+    ) -> Result<Vec<Session>, CoturnTelnetError> {
         // Send `CoturnCliRequest::PrintSessions`.
         self.0
             .send(CoturnCliRequest::PrintSessions(username))
@@ -122,12 +125,12 @@ impl CoturnTelnetConnection {
     /// For each provided session id:
     /// 1. Sends [`CoturnCliRequest::CloseSession`] with specified session id.
     /// 2. Awaits for [`CoturnCliResponse::Ready`].
-    pub async fn delete_sessions<T: IntoIterator<Item = String>>(
+    pub async fn delete_sessions<T: IntoIterator<Item = SessionId>>(
         &mut self,
         session_ids: T,
     ) -> Result<(), CoturnTelnetError> {
         for session_id in session_ids {
-            self.delete_session(session_id).await?;
+            self.delete_session(session_id.to_string()).await?;
         }
         Ok(())
     }

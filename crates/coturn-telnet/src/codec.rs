@@ -15,6 +15,8 @@ use bytes::{BufMut as _, Bytes, BytesMut};
 use regex::Regex;
 use tokio_util::codec::{Decoder, Encoder};
 
+use crate::sessions_parser::{parse_sessions, Session};
+
 // Cursor is received when telnet server has finished writing response and is
 // ready to receive new requests.
 static CURSOR: &str = "> ";
@@ -36,7 +38,7 @@ lazy_static::lazy_static! {
 }
 
 /// Messages that can be received from Coturn telnet server.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum CoturnCliResponse {
     /// Current telnet connection requires authentication. Next message sent to
     /// server should be [`CoturnCliRequest::Auth`].
@@ -50,7 +52,7 @@ pub enum CoturnCliResponse {
     /// Answer to [`CoturnCliRequest::PrintSessions`], contains list of session
     /// ids associated with username provided in
     /// [`CoturnCliRequest::PrintSessions`] message.
-    Sessions(Vec<String>),
+    Sessions(Vec<Session>),
 
     /// Coturn telnet server did not recognized last command.
     UnknownCommand,
@@ -95,17 +97,9 @@ impl TryFrom<BytesMut> for CoturnCliResponse {
         }
 
         if IS_SESSIONS_REGEX.is_match(msg) {
-            let mut session_ids: Vec<String> = Vec::new();
-            for mat in EXTRACT_SESSIONS_REGEX.captures_iter(msg) {
-                if let Some(id) = mat.get(1) {
-                    session_ids.push(id.as_str().to_owned());
-                } else {
-                    return Err(CoturnResponseParseError::BadResponseFormat(
-                        msg.to_owned(),
-                    ));
-                }
-            }
-            return Ok(CoturnCliResponse::Sessions(session_ids));
+            let (_, sessions) = parse_sessions(&msg).unwrap();
+
+            return Ok(CoturnCliResponse::Sessions(sessions));
         }
 
         Err(CoturnResponseParseError::CannotDetermineResponseType(
