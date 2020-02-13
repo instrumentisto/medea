@@ -1,9 +1,9 @@
 use std::{fmt, ops::DerefMut};
 
-use coturn_telnet::{CoturnTelnetError, Manager, Pool, PoolError};
 use deadpool::managed::PoolConfig;
 use derive_more::{Display, From};
 use failure::Fail;
+use medea_coturn_telnet::{CoturnTelnetError, Manager, Pool, PoolError};
 
 use crate::media::IceUser;
 
