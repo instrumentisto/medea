@@ -5,8 +5,7 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
-use medea_control_api_proto::grpc::api as medea_grpc_control_api;
-use medea_grpc_control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{refs::SrcUri, TryFromProtobufError};
@@ -22,14 +21,21 @@ pub struct WebRtcPlayId(String);
 pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SrcUri,
+
+    /// Option to relay all media through a TURN server forcibly.
+    #[serde(default)]
+    pub force_relay: bool,
 }
 
-impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
+impl TryFrom<&proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
     type Error = TryFromProtobufError;
 
-    fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: &proto::WebRtcPlayEndpoint,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            src: SrcUri::try_from(value.get_src().to_owned())?,
+            src: SrcUri::try_from(value.src.clone())?,
+            force_relay: value.force_relay,
         })
     }
 }

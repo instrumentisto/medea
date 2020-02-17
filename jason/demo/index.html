@@ -4,19 +4,20 @@
   <title>Chat</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fakerator@0.3.0/dist/fakerator.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
   <script type="module">
     import init, {
       Jason,
-      MediaStreamConstraints, AudioTrackConstraints, VideoTrackConstraints,
+      MediaStreamConstraints, AudioTrackConstraints, DeviceVideoTrackConstraints, DisplayVideoTrackConstraints
     } from './js/medea_jason.js';
 
     let inited = false;
     const controlUrl = document.location.protocol + "//" +
                        document.location.host + "/control-api/";
+    var isForceRelay = false;
 
     async function createRoom(roomId) {
       try {
@@ -40,6 +41,7 @@
         publish: {
           kind: 'WebRtcPublishEndpoint',
           p2p: 'Always',
+          force_relay: isForceRelay,
         },
       };
 
@@ -51,6 +53,7 @@
         pipeline["play-" + memberId] = {
           kind: 'WebRtcPlayEndpoint',
           src: 'local://' + roomId + '/' + memberId + "/publish",
+          force_relay: isForceRelay,
         };
       }
 
@@ -72,6 +75,7 @@
           data: {
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
+            force_relay: controlRoom.data.element.pipeline[id].pipeline.publish.force_relay,
           }
         })
       }
@@ -94,6 +98,7 @@
           || "disable";
         const device_infos = await jason.media_manager().enumerate_devices();
         console.log('Available input and output devices:', device_infos);
+
         for (const device_info of device_infos) {
           const option = document.createElement('option');
           option.value = device_info.device_id();
@@ -109,22 +114,38 @@
             video_select.append(option);
           }
         }
+
+        const option = document.createElement('option');
+        option.value = "screen";
+        option.text = "screen";
+        video_select.append(option);
       }
 
       async function getStream(audio_select, video_select) {
+
         let constraints = new MediaStreamConstraints();
+
         let audio = new AudioTrackConstraints();
         let audioSource = audio_select.options[audio_select.selectedIndex];
         if (audioSource) {
           audio.device_id(audioSource.value);
         }
         constraints.audio(audio);
-        let video = new VideoTrackConstraints();
+
         let videoSource = video_select.options[video_select.selectedIndex];
         if (videoSource) {
-          video.device_id(videoSource.value);
+          if (videoSource.value === "screen") {
+            let video = new DisplayVideoTrackConstraints();
+            constraints.display_video(video);
+          } else {
+            let video = new DeviceVideoTrackConstraints();
+            video.device_id(videoSource.value);
+            constraints.device_video(video);
+          }
+        } else {
+          constraints.device_video(new DeviceVideoTrackConstraints());
         }
-        constraints.video(video);
+
         return await jason.media_manager().init_local_stream(constraints);
       }
 
@@ -136,10 +157,11 @@
       let audioSelect = document.getElementById('connect__select-device_audio');
       let videoSelect = document.getElementById('connect__select-device_video');
       let localVideo = document.getElementById('local-video__video');
+      let isForceRelayCheckbox = document.getElementById("is_force_relay");
 
       let joinCallerButton = document.getElementById('join__join');
       let usernameInput = document.getElementById('join__username');
-      usernameInput.value = faker.name.firstName();
+      usernameInput.value = Fakerator().names.firstNameM();
 
       let room = await jason.init_room();
 
@@ -177,6 +199,7 @@
           let videoDiv = document.getElementById("remote-videos");
           let video = document.createElement("video");
           video.srcObject = stream.get_media_stream();
+          video.controls = "true";
           video.style.maxWidth = "100%";
 
           let innerVideoDiv = document.createElement("div");
@@ -188,7 +211,23 @@
         });
       });
 
+      let connectionState = document.getElementById('connection-state__state');
+      room.on_connection_loss(async (reconnectHandle) => {
+        connectionState.className = 'badge badge-warning';
+        connectionState.textContent = 'Reconnecting';
+
+        try {
+          await reconnectHandle.reconnect_with_backoff(500, 2.0, 10000);
+          connectionState.className = 'badge badge-success';
+          connectionState.textContent = 'Connected';
+        } catch (e) {
+          console.error(e);
+        }
+      });
+
       room.on_close(function (on_closed) {
+        connectionState.className = 'badge badge-danger';
+        connectionState.textContent = "Closed";
         alert(
           `Call was ended.
           Reason: ${on_closed.reason()};
@@ -231,6 +270,9 @@
           connectBtnsDiv.style.display = 'none';
           controlBtns.style.display = 'block';
 
+          isForceRelay = isForceRelayCheckbox.checked;
+          isForceRelayCheckbox.disabled = true;
+
           try {
             let username = usernameInput.value;
             try {
@@ -245,6 +287,8 @@
             await axios.delete(controlUrl + roomId + '/' + username);
             console.log("Creating new member.");
             await room.join(await addNewMember(roomId, username));
+            connectionState.className = 'badge badge-success';
+            connectionState.textContent = 'Connected';
 
           } catch (e) {
             logError("Join to room failed", e);
@@ -344,8 +388,18 @@
         </div>
 
         <div id="control" class="input-group mb-3" style="display: none">
-            <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
-            <button class="btn btn-info" id="control__mute_video">Mute video</button>
+          <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
+          <button class="btn btn-info" id="control__mute_video">Mute video</button>
+        </div>
+
+        <div>
+          <span>Connection state: </span>
+          <span id="connection-state__state" class="badge badge-danger">Closed</span>
+        </div>
+
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="checkbox" id="is_force_relay" value="true">
+          <label class="form-check-label" for="is_force_relay">Force TURN relay</label>
         </div>
 
       </div>

@@ -2,6 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashSet},
+    mem,
     time::Duration,
 };
 
@@ -9,12 +10,13 @@ use std::{
 use actix::AsyncContext;
 use actix::{
     prelude::{Actor, Context},
-    Addr, Handler, Message, Recipient, ResponseFuture, System,
+    Addr, ContextFutureSpawner as _, Handler, Message, Recipient, System,
+    WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::{future, stream::iter_ok, Future, Stream};
-use tokio::util::FutureExt as _;
+use futures::{future, stream, FutureExt as _, StreamExt as _};
+use tokio::time::timeout;
 
 use crate::log::prelude::*;
 
@@ -26,7 +28,7 @@ pub struct Priority(pub u8);
 /// Message that [`Subscriber`] is informed with to perform its graceful
 /// shutdown.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "()")]
 pub struct ShutdownGracefully;
 
 /// Service which listens incoming OS signals and performs graceful
@@ -45,7 +47,7 @@ enum State {
     /// Service is up and listening to OS signals.
     Listening,
     /// Service is performing graceful shutdown at the moment.
-    InProgress,
+    ShuttingDown,
 }
 
 impl GracefulShutdown {
@@ -67,25 +69,29 @@ impl Actor for GracefulShutdown {
     fn started(&mut self, _: &mut Self::Context) {
         warn!(
             "Graceful shutdown is disabled: only UNIX signals are supported, \
-             and current playform is not UNIX"
+             and current platform is not UNIX"
         );
     }
 
     #[cfg(unix)]
     fn started(&mut self, ctx: &mut Self::Context) {
-        use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-        for s in &[SIGHUP, SIGINT, SIGQUIT, SIGTERM] {
-            ctx.add_message_stream(
-                Signal::new(*s)
-                    .flatten_stream()
-                    .map(OsSignal)
-                    .map_err(|_| error!("Error getting shutdown signal")),
-            );
-        }
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let mut register_sig = |kind: SignalKind, num: i32| match signal(kind) {
+            Ok(sig_stream) => {
+                ctx.add_message_stream(sig_stream.map(move |_| OsSignal(num)));
+            }
+            Err(e) => error!("Cannot register OsSignal: {:?}", e),
+        };
+
+        register_sig(SignalKind::hangup(), 1);
+        register_sig(SignalKind::interrupt(), 2);
+        register_sig(SignalKind::quit(), 3);
+        register_sig(SignalKind::terminate(), 15);
     }
 
     fn stopped(&mut self, _: &mut Self::Context) {
-        if let State::Listening = self.state {
+        if let State::ShuttingDown = self.state {
             info!("Graceful shutdown has been completed");
         }
     }
@@ -94,21 +100,21 @@ impl Actor for GracefulShutdown {
 /// Message that is received by [`GracefulShutdown`] shutdown service when
 /// the process receives an OS signal.
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "()")]
 struct OsSignal(i32);
 
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ResponseFuture<(), ()>;
+    type Result = ();
 
-    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, sig: OsSignal, ctx: &mut Context<Self>) {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
-            State::InProgress => {
-                return Box::new(future::ok(()));
+            State::ShuttingDown => {
+                return;
             }
             State::Listening => {
-                self.state = State::InProgress;
+                self.state = State::ShuttingDown;
             }
         }
 
@@ -116,40 +122,42 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return Box::new(future::ok(()));
+            return;
         }
 
-        let by_priority: Vec<_> = self
-            .subs
-            .values()
+        let subs = mem::replace(&mut self.subs, BTreeMap::new());
+        let ordered_subs: Vec<_> = subs
+            .into_iter()
             .rev()
-            .map(|addrs| {
+            .map(|(_, addrs)| {
                 let addrs: Vec<_> = addrs
-                    .iter()
-                    .map(|addr| {
-                        addr.send(ShutdownGracefully).map(|_| ()).or_else(|e| {
+                    .into_iter()
+                    .map(|addr| async move {
+                        if let Err(e) = addr.send(ShutdownGracefully).await {
                             error!("Error requesting shutdown: {}", e);
-                            future::ok::<(), ()>(())
-                        })
+                        };
                     })
                     .collect();
                 future::join_all(addrs)
             })
             .collect();
 
-        Box::new(
-            iter_ok::<_, ()>(by_priority)
-                .for_each(|row| row.map(|_| ()))
-                .timeout(self.timeout)
-                .map_err(|_| {
-                    error!("Graceful shutdown has timed out, stopping system");
-                    System::current().stop()
-                })
-                .map(|_| {
-                    info!("Graceful shutdown succeeded, stopping system");
-                    System::current().stop()
-                }),
-        )
+        let deadline = self.timeout;
+        async move {
+            let wait_finish = timeout(
+                deadline,
+                stream::iter(ordered_subs).for_each(|row| row.map(|_| ())),
+            )
+            .await;
+            if wait_finish.is_ok() {
+                info!("Graceful shutdown succeeded, stopping system");
+            } else {
+                error!("Graceful shutdown has timed out, stopping system");
+            }
+            System::current().stop()
+        }
+        .into_actor(self)
+        .wait(ctx);
     }
 }
 
@@ -179,7 +187,7 @@ impl Handler<Subscribe> for GracefulShutdown {
     ///
     /// Returns [`ShuttingDownError`] if shutdown happens at the moment.
     fn handle(&mut self, m: Subscribe, _: &mut Context<Self>) -> Self::Result {
-        if let State::InProgress = self.state {
+        if let State::ShuttingDown = self.state {
             return Err(ShuttingDownError);
         }
         let addrs = self.subs.entry(m.0.priority).or_insert_with(HashSet::new);

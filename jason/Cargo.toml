@@ -19,6 +19,11 @@ crate-type = ["cdylib", "rlib"]
 [profile.release]
 opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
+# TODO: Remove this when https://github.com/rustwasm/wasm-pack/issues/782
+#       issue will be resolved.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
@@ -56,6 +61,7 @@ wee_alloc = { version = "0.4", optional = true }
         "RtcIceCandidate", "RtcIceCandidateInit",
         "RtcIceConnectionState",
         "RtcIceServer",
+        "RtcIceTransportPolicy",
         "RtcPeerConnection", "RtcPeerConnectionIceEvent",
         "RtcRtpReceiver", "RtcRtpSender",
         "RtcRtpTransceiver", "RtcRtpTransceiverDirection",

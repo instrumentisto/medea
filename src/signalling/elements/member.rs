@@ -12,10 +12,7 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
-use medea_control_api_proto::grpc::api::{
-    Element as RootElementProto, Member as MemberProto,
-    Room_Element as ElementProto,
-};
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
@@ -192,6 +189,7 @@ impl Member {
                     spec_play_endpoint.src.clone(),
                     publisher.downgrade(),
                     this_member.downgrade(),
+                    spec_play_endpoint.force_relay,
                 );
 
                 self.insert_sink(new_play_endpoint.clone());
@@ -201,8 +199,9 @@ impl Member {
                 let new_publish_id = spec_play_endpoint.src.endpoint_id.clone();
                 let new_publish = WebRtcPublishEndpoint::new(
                     new_publish_id,
-                    publisher_endpoint.p2p.clone(),
+                    publisher_endpoint.p2p,
                     publisher_member.downgrade(),
+                    publisher_endpoint.force_relay,
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -210,6 +209,7 @@ impl Member {
                     spec_play_endpoint.src.clone(),
                     new_publish.downgrade(),
                     this_member.downgrade(),
+                    spec_play_endpoint.force_relay,
                 );
 
                 new_publish.add_sink(new_self_play.downgrade());
@@ -228,8 +228,9 @@ impl Member {
             .for_each(|(endpoint_id, e)| {
                 self.insert_src(WebRtcPublishEndpoint::new(
                     endpoint_id,
-                    e.p2p.clone(),
+                    e.p2p,
                     this_member.downgrade(),
+                    e.force_relay,
                 ));
             });
 
@@ -376,6 +377,7 @@ impl Member {
             spec.src,
             src.downgrade(),
             member.downgrade(),
+            spec.force_relay,
         );
 
         src.add_sink(sink.downgrade());
@@ -384,6 +386,11 @@ impl Member {
 
     /// Lookups [`WebRtcPublishEndpoint`] and [`WebRtcPlayEndpoint`] at one
     /// moment by ID.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MemberError::EndpointNotFound`] if no [`Endpoint`] with
+    /// provided ID was found.
     pub fn get_endpoint_by_id(
         &self,
         id: String,
@@ -454,6 +461,13 @@ impl WeakMember {
 /// loads all related to this [`Member`]s sources and sinks endpoints.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
+///
+/// # Errors
+///
+/// Errors with [`MembersLoadError::TryFromError`] if converting [`MemberSpec`]s
+/// from [`RoomSpec`].
+///
+/// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
@@ -504,44 +518,48 @@ pub fn parse_members(
     Ok(members)
 }
 
-impl Into<ElementProto> for Member {
-    fn into(self) -> ElementProto {
-        let mut element = ElementProto::new();
-        let mut member = MemberProto::new();
+impl Into<proto::Member> for Member {
+    fn into(self) -> proto::Member {
+        let member_pipeline = self
+            .sinks()
+            .into_iter()
+            .map(|(id, play)| (id.to_string(), play.into()))
+            .chain(
+                self.srcs()
+                    .into_iter()
+                    .map(|(id, publish)| (id.to_string(), publish.into())),
+            )
+            .collect();
 
-        let mut member_pipeline = HashMap::new();
-        for (id, play) in self.sinks() {
-            member_pipeline.insert(id.to_string(), play.into());
+        proto::Member {
+            id: self.id().to_string(),
+            credentials: self.credentials(),
+            on_leave: self
+                .get_on_leave()
+                .map(|c| c.to_string())
+                .unwrap_or_default(),
+            on_join: self
+                .get_on_join()
+                .map(|c| c.to_string())
+                .unwrap_or_default(),
+            pipeline: member_pipeline,
         }
-        for (id, publish) in self.srcs() {
-            member_pipeline.insert(id.to_string(), publish.into());
-        }
-        member.set_pipeline(member_pipeline);
-
-        member.set_id(self.id().to_string());
-        member.set_credentials(self.credentials());
-        if let Some(on_leave) = self.get_on_leave() {
-            member.set_on_leave(on_leave.to_string());
-        }
-        if let Some(on_join) = self.get_on_join() {
-            member.set_on_join(on_join.to_string());
-        }
-
-        element.set_member(member);
-
-        element
     }
 }
 
-impl Into<RootElementProto> for Member {
-    fn into(self) -> RootElementProto {
-        let mut member_element: ElementProto = self.into();
-        let member = member_element.take_member();
+impl Into<proto::room::Element> for Member {
+    fn into(self) -> proto::room::Element {
+        proto::room::Element {
+            el: Some(proto::room::element::El::Member(self.into())),
+        }
+    }
+}
 
-        let mut element = RootElementProto::new();
-        element.set_member(member);
-
-        element
+impl Into<proto::Element> for Member {
+    fn into(self) -> proto::Element {
+        proto::Element {
+            el: Some(proto::element::El::Member(self.into())),
+        }
     }
 }
 

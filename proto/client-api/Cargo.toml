@@ -1,6 +1,6 @@
 [package]
 name = "medea-client-api-proto"
-version = "0.1.1-dev"
+version = "0.2.0-dev"
 edition = "2018"
 description = "Client API protocol implementation for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]

@@ -6,10 +6,10 @@ use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
-    RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
-    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
-    RtcTrackEvent,
+    RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
+    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
+    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
+    RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
@@ -211,12 +211,23 @@ pub struct RtcPeerConnection {
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
-    pub fn new<I>(ice_servers: I) -> Result<Self>
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RTCPeerConnectionError::PeerCreationError`] if
+    /// [`SysRtcPeerConnection`] creation fails.
+    pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
         // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
+        let policy = if is_force_relayed {
+            RtcIceTransportPolicy::Relay
+        } else {
+            RtcIceTransportPolicy::All
+        };
+        peer_conf.ice_transport_policy(policy);
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
             .map_err(Into::into)
@@ -233,6 +244,11 @@ impl RtcPeerConnection {
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
     /// [`ontrack` callback][2]).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
@@ -263,6 +279,11 @@ impl RtcPeerConnection {
 
     /// Sets handler for [`RtcPeerConnectionIceEvent`] event
     /// (see [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
@@ -302,6 +323,11 @@ impl RtcPeerConnection {
     }
 
     /// Sets handler for [`iceconnectionstatechange`][1] event.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
     pub fn on_ice_connection_state_change<F>(&self, f: Option<F>) -> Result<()>

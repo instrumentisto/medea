@@ -2,7 +2,7 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -57,6 +57,14 @@ pub enum MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
+/// Indicator of audio being switched on or off.
+#[derive(Clone, Copy, Debug, Display, Eq, From, PartialEq)]
+pub struct EnabledAudio(pub bool);
+
+/// Indicator of video being switched on or off.
+#[derive(Clone, Copy, Debug, Display, Eq, From, PartialEq)]
+pub struct EnabledVideo(pub bool);
+
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
@@ -70,10 +78,20 @@ struct InnerMediaConnections {
     receivers: HashMap<TrackId, Receiver>,
 
     /// Are senders audio tracks muted or not.
-    enabled_audio: bool,
+    enabled_audio: EnabledAudio,
 
     /// Are senders video tracks muted or not.
-    enabled_video: bool,
+    enabled_video: EnabledVideo,
+}
+
+impl InnerMediaConnections {
+    /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`].
+    pub fn iter_senders_with_kind(
+        &self,
+        kind: TransceiverKind,
+    ) -> impl Iterator<Item = &Rc<Sender>> {
+        self.senders.values().filter(move |s| s.kind() == kind)
+    }
 }
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
@@ -85,8 +103,8 @@ impl MediaConnections {
     #[inline]
     pub fn new(
         peer: Rc<RtcPeerConnection>,
-        enabled_audio: bool,
-        enabled_video: bool,
+        enabled_audio: EnabledAudio,
+        enabled_video: EnabledVideo,
     ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
@@ -97,34 +115,57 @@ impl MediaConnections {
         }))
     }
 
-    /// Enables or disables all [`Sender`]s with specified [`TransceiverKind`]
-    /// [`MediaTrack`]s.
-    pub fn toggle_send_media(&self, kind: TransceiverKind, enabled: bool) {
-        let mut s = self.0.borrow_mut();
-        match kind {
-            TransceiverKind::Audio => s.enabled_audio = enabled,
-            TransceiverKind::Video => s.enabled_video = enabled,
-        };
-        s.senders
-            .values()
-            .filter(|s| s.kind() == kind)
-            .for_each(|s| s.set_track_enabled(enabled))
+    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Audio`].
+    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
+        self.0.borrow_mut().enabled_audio = enabled;
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Audio)
+            .for_each(|s| s.set_track_enabled(enabled.0));
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
-    /// [`TransceiverKind`] are enabled or `false` otherwise.
-    pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
-        let conn = self.0.borrow();
-        for s in conn.senders.values().filter(|s| s.kind() == kind) {
-            if !s.is_track_enabled() {
-                return false;
-            }
-        }
-        true
+    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Video`].
+    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
+        self.0.borrow_mut().enabled_video = enabled;
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Video)
+            .for_each(|s| s.set_track_enabled(enabled.0));
+    }
+
+    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
+    pub fn is_send_audio_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Audio)
+            .find(|s| !s.is_track_enabled())
+            .is_none()
+    }
+
+    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
+    pub fn is_send_video_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_senders_with_kind(TransceiverKind::Video)
+            .find(|s| !s.is_track_enabled())
+            .is_none()
     }
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::SendersWithoutMids`] if some
+    /// [`Sender`] doesn't have [mid].
+    ///
+    /// Errors with [`MediaConnectionsError::ReceiversWithoutMids`] if some
+    /// [`Receiver`] doesn't have [mid].
+    ///
+    /// [mid]:
+    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let mut s = self.0.borrow_mut();
         let mut mids =
@@ -156,8 +197,9 @@ impl MediaConnections {
     /// and [`Receiver`]s for each new [`Track`], and updates [`Track`] if
     /// its settings has been changed.
     ///
-    /// Returns [`StreamRequest`] in case a new local [`MediaStream`]
-    /// is required.
+    /// # Errors
+    ///
+    /// Errors if creating new [`Sender`] or [`Receiver`] fails.
     // TODO: Doesnt really updates anything, but only generates new senders
     //       and receivers atm.
     pub fn update_tracks<I: IntoIterator<Item = Track>>(
@@ -204,14 +246,14 @@ impl MediaConnections {
     }
 
     /// Inserts tracks from a provided [`MediaStream`] into [`Sender`]s
-    /// basing on track IDs.
+    /// based on track IDs.
     ///
-    /// Enables or disables tracks in provided [`MediaStream`] basing on current
+    /// Enables or disables tracks in provided [`MediaStream`] based on current
     /// media connections state.
     ///
     /// Provided [`MediaStream`] must have all required [`MediaTrack`]s.
     /// [`MediaTrack`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
-    /// via [`replaceTrack` method][1], so changing [`RtcRtpTransceiver`]
+    /// via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
@@ -465,6 +507,6 @@ impl Receiver {
         if self.mid.is_none() && self.transceiver.is_some() {
             self.mid = self.transceiver.as_ref().unwrap().mid()
         }
-        self.mid.as_ref().map(String::as_str)
+        self.mid.as_deref()
     }
 }

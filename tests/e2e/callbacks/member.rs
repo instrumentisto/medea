@@ -2,11 +2,11 @@
 
 use std::time::Duration;
 
-use actix::{Addr, Arbiter, Context, System};
+use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
-use futures::Future;
-use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::callback::OnLeave_Reason as OnLeaveReason;
+use medea_client_api_proto::Event as RpcEvent;
+use medea_control_api_proto::grpc::callback as proto;
+use proto::request::Event;
 
 use crate::{
     callbacks::{GetCallbacks, GrpcCallbackServer},
@@ -24,7 +24,7 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// id: {{ PROVIDED NAME }}
 /// spec:
 ///    pipeline:
-///      test-member:
+///      {{ PROVIDED NAME }}:
 ///        kind: Member
 ///        on_join: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
 ///        on_leave: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
@@ -33,17 +33,14 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// Then, returns [`Future`] which resolves with [`TestMember`]
 /// connected to created `Room` and [`GrpcCallbackServer`] which
 /// will receive all callbacks from Medea.
-fn callback_test(
-    name: &str,
-    port: u16,
-) -> impl Future<Item = CallbackTestItem, Error = ()> {
+async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
     let callback_server = super::run(port);
-    let control_client = ControlClient::new();
+    let mut control_client = ControlClient::new().await;
     let member = RoomBuilder::default()
         .id(name)
         .add_member(
             MemberBuilder::default()
-                .id("test-member")
+                .id(String::from(name))
                 .on_leave(format!("grpc://127.0.0.1:{}", port))
                 .on_join(format!("grpc://127.0.0.1:{}", port))
                 .build()
@@ -52,17 +49,18 @@ fn callback_test(
         .build()
         .unwrap()
         .build_request(String::new());
-    let create_response = control_client.create(&member);
+    let create_response = control_client.create(member).await;
 
     let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
+        move |_: &RpcEvent, _: &mut Context<TestMember>, _: Vec<&RpcEvent>| {};
     let deadline = Some(Duration::from_secs(5));
-    TestMember::connect(
-        create_response.get("test-member").unwrap(),
+    let client = TestMember::connect(
+        create_response.get(name).unwrap(),
         Box::new(on_event),
         deadline,
     )
-    .map(move |client| (client, callback_server))
+    .await;
+    (client, callback_server)
 }
 
 /// Checks that `on_join` callback works.
@@ -71,32 +69,27 @@ fn callback_test(
 ///
 /// 1. Start test callback server and connect [`TestMember`] to it.
 ///
-/// 2. Wait `50ms`.
+/// 2. Wait `300ms`.
 ///
 /// 3. Check that test callback server receives `on_join` callback.
-#[test]
-fn on_join() {
+#[actix_rt::test]
+async fn on_join() {
     const TEST_NAME: &str = "member_callback_on_join";
-    let sys = System::new(TEST_NAME);
 
-    Arbiter::spawn(
-        callback_test(TEST_NAME, 9099)
-            .and_then(move |(_, callback_server)| {
-                std::thread::sleep(Duration::from_millis(50));
-                callback_server.send(GetCallbacks).map_err(|_| ())
-            })
-            .map(|callbacks_result| {
-                let on_joins_count = callbacks_result
-                    .unwrap()
-                    .into_iter()
-                    .filter(|req| req.has_on_join())
-                    .count();
-                assert_eq!(on_joins_count, 1);
-                System::current().stop();
-            }),
-    );
-
-    sys.run().unwrap()
+    let (_, callback_server) = callback_test(TEST_NAME, 9096).await;
+    delay_for(Duration::from_millis(300)).await;
+    let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
+    let on_joins_count = callbacks
+        .into_iter()
+        .filter(|r| {
+            if let Some(Event::OnJoin(_)) = &r.event {
+                true
+            } else {
+                false
+            }
+        })
+        .count();
+    assert_eq!(on_joins_count, 1);
 }
 
 /// Checks that `on_leave` callback works on normal client disconnect.
@@ -107,41 +100,34 @@ fn on_join() {
 ///
 /// 2. Close [`TestMember`]'s socket with [`CloseCode::Normal`].
 ///
-/// 3. Wait `50ms`.
+/// 3. Wait `300ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
-/// [`OnLeaveReason::DISONNECTED`].
-#[test]
-fn on_leave_normally_disconnected() {
+/// [`proto::on_leave::Reason::DISONNECTED`].
+#[actix_rt::test]
+async fn on_leave_normally_disconnected() {
     const TEST_NAME: &str = "member_callback_on_leave";
-    let sys = System::new(TEST_NAME);
 
-    Arbiter::spawn(
-        callback_test(TEST_NAME, 9098)
-            .and_then(|(client, callback_server)| {
-                client
-                    .send(CloseSocket(CloseCode::Normal))
-                    .map_err(|e| panic!("{:?}", e))
-                    .map(move |_| callback_server)
-            })
-            .and_then(move |callback_server| {
-                std::thread::sleep(Duration::from_millis(50));
-                callback_server.send(GetCallbacks).map_err(|_| ())
-            })
-            .map(|callbacks_result| {
-                let on_leaves_count = callbacks_result
-                    .unwrap()
-                    .into_iter()
-                    .filter(|req| req.has_on_leave())
-                    .map(|mut req| req.take_on_leave().reason)
-                    .filter(|reason| reason == &OnLeaveReason::DISCONNECTED)
-                    .count();
-                assert_eq!(on_leaves_count, 1);
-                System::current().stop();
-            }),
-    );
+    let (client, callback_server) = callback_test(TEST_NAME, 9097).await;
+    client.send(CloseSocket(CloseCode::Normal)).await.unwrap();
+    delay_for(Duration::from_millis(300)).await;
 
-    sys.run().unwrap()
+    let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
+
+    let on_leaves_count = callbacks
+        .into_iter()
+        .filter_map(|req| {
+            if let Some(Event::OnLeave(on_leave)) = req.event {
+                Some(on_leave.reason)
+            } else {
+                None
+            }
+        })
+        .filter(|reason| {
+            reason == &(proto::on_leave::Reason::Disconnected as i32)
+        })
+        .count();
+    assert_eq!(on_leaves_count, 1);
 }
 
 /// Checks that `on_leave` callback works when connection with client was lost.
@@ -152,40 +138,33 @@ fn on_leave_normally_disconnected() {
 ///
 /// 2. Close [`TestMember`]'s socket with [`CloseCode::Abnormal`].
 ///
-/// 3. Wait `50ms`.
+/// 3. Wait `3000ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
-/// [`OnLeaveReason::LOST_CONNECTION`].
-#[test]
-fn on_leave_on_connection_loss() {
+/// [`proto::on_leave::Reason::LOST_CONNECTION`].
+#[actix_rt::test]
+async fn on_leave_on_connection_loss() {
     const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";
-    let sys = System::new(TEST_NAME);
 
-    Arbiter::spawn(
-        callback_test(TEST_NAME, 9096)
-            .and_then(|(client, callback_server)| {
-                client
-                    .send(CloseSocket(CloseCode::Abnormal))
-                    .map_err(|e| panic!("{:?}", e))
-                    .map(move |_| callback_server)
-            })
-            .and_then(move |callback_server| {
-                // Wait for 'idle_timeout'.
-                std::thread::sleep(Duration::from_millis(1100));
-                callback_server.send(GetCallbacks).map_err(|_| ())
-            })
-            .map(|callbacks_result| {
-                let on_leaves_count = callbacks_result
-                    .unwrap()
-                    .into_iter()
-                    .filter(|req| req.has_on_leave())
-                    .map(|mut req| req.take_on_leave().reason)
-                    .filter(|reason| reason == &OnLeaveReason::LOST_CONNECTION)
-                    .count();
-                assert_eq!(on_leaves_count, 1);
-                System::current().stop();
-            }),
-    );
+    let (client, callback_server) = callback_test(TEST_NAME, 9098).await;
 
-    sys.run().unwrap()
+    client.send(CloseSocket(CloseCode::Abnormal)).await.unwrap();
+    delay_for(Duration::from_millis(300)).await;
+
+    let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
+
+    let on_leaves_count = callbacks
+        .into_iter()
+        .filter_map(|req| {
+            if let Some(Event::OnLeave(on_leave)) = req.event {
+                Some(on_leave.reason)
+            } else {
+                None
+            }
+        })
+        .filter(|reason| {
+            reason == &(proto::on_leave::Reason::LostConnection as i32)
+        })
+        .count();
+    assert_eq!(on_leaves_count, 1);
 }

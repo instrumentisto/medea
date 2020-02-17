@@ -106,7 +106,23 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`].
+    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`] wrapper.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`StreamRequestError::InvalidAudioTrack`] if some audio
+    /// [`MediaTrack`] from provided [`SysMediaStream`] not satisfies
+    /// contained constrains.
+    ///
+    /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if provided
+    /// [`SysMediaStream`] doesn't have expected audio [`MediaTrack`].
+    ///
+    /// Errors with [`StreamRequestError::InvalidVideoTrack`] if some video
+    /// [`MediaTrack`] from provided [`SysMediaStream`] not satisfies
+    /// contained constrains.
+    ///
+    /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
+    /// [`SysMediaStream`] doesn't have expected video [`MediaTrack`].
     pub fn parse_stream(&self, stream: &SysMediaStream) -> Result<MediaStream> {
         use StreamRequestError::*;
 

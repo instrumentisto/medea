@@ -161,7 +161,7 @@ mod specs {
             "//member_id/endpoint_id",
             "/member_id",
         ] {
-            match StatefulFid::try_from(fid_str.to_string()) {
+            match StatefulFid::try_from((*fid_str).to_string()) {
                 Ok(f) => unreachable!("Unexpected successful parse: {}", f),
                 Err(e) => match e {
                     ParseFidError::MissingPath(_) => (),
@@ -178,7 +178,7 @@ mod specs {
             "room_id/member_id/endpoint_id/",
             "room_id/member_id/endpoint_id////",
         ] {
-            match StatefulFid::try_from(fid_str.to_string()) {
+            match StatefulFid::try_from((*fid_str).to_string()) {
                 Ok(f) => unreachable!("Unexpected successful parse: {}", f),
                 Err(e) => match e {
                     ParseFidError::TooManyPaths(_) => (),
@@ -244,8 +244,8 @@ mod specs {
             "room_id/member_id",
             "room_id/member_id/endpoint_id",
         ] {
-            let fid = StatefulFid::try_from(fid_str.to_string()).unwrap();
-            assert_eq!(fid_str.to_string(), fid.to_string());
+            let fid = StatefulFid::try_from((*fid_str).to_string()).unwrap();
+            assert_eq!((*fid_str).to_string(), fid.to_string());
         }
     }
 }

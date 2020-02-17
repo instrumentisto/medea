@@ -28,6 +28,7 @@ pub struct TrackId(pub u64);
 #[cfg(feature = "medea")]
 pub trait Incrementable {
     /// Returns current value + 1.
+    #[must_use]
     fn incr(&self) -> Self;
 }
 
@@ -35,6 +36,11 @@ pub trait Incrementable {
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {
+            // TODO: Remove `clippy::must_use_candidate` once the issue below is
+            //       resolved:
+            //       https://github.com/rust-lang/rust-clippy/issues/4779
+            #[allow(clippy::must_use_candidate)]
+            #[inline]
             fn incr(&self) -> Self {
                 Self(self.0 + 1)
             }
@@ -48,26 +54,48 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
-    /// `pong` message that server answers with to WebSocket client in response
-    /// to received `ping` message.
-    Pong(u64),
+    /// `ping` message that `Media Server` is expected to send to `Client`
+    /// periodically for probing its aliveness.
+    Ping(u64),
+
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
     Event(Event),
+
+    /// `Media Server` notifies `Client` about necessity to update its RPC
+    /// settings.
+    RpcSettings(RpcSettings),
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
+/// RPC settings of `Client` received from `Media Server`.
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RpcSettings {
+    /// Timeout of considering `Client` as lost by `Media Server` when it
+    /// doesn't receive [`ClientMsg::Pong`].
+    ///
+    /// Unit: millisecond.
+    pub idle_timeout_ms: u64,
+
+    /// Interval that `Media Server` sends [`ServerMsg::Ping`] with.
+    ///
+    /// Unit: millisecond.
+    pub ping_interval_ms: u64,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
-    /// `ping` message that WebSocket client is expected to send to the server
-    /// periodically.
-    Ping(u64),
-    /// Request of `Web Client` to change the state on `Media Server`.
+    /// `pong` message that `Client` answers with to `Media Server` in response
+    /// to received [`ServerMsg::Ping`].
+    Pong(u64),
+
+    /// Request of `Client` to change the state on `Media Server`.
     Command(Command),
 }
 
@@ -75,9 +103,9 @@ pub enum ClientMsg {
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "command", content = "data")]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
@@ -108,8 +136,8 @@ pub enum Command {
 /// Web Client's Peer Connection metrics.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug)]
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
@@ -118,8 +146,8 @@ pub enum PeerMetrics {
 /// Peer Connection's ICE connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug)]
 pub enum IceConnectionState {
     New,
     Checking,
@@ -180,7 +208,9 @@ pub enum Event {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
+        force_relay: bool,
     },
+
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
@@ -272,9 +302,9 @@ impl Serialize for ClientMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            Self::Ping(n) => {
-                let mut ping = serializer.serialize_struct("ping", 1)?;
-                ping.serialize_field("ping", n)?;
+            Self::Pong(n) => {
+                let mut ping = serializer.serialize_struct("pong", 1)?;
+                ping.serialize_field("pong", n)?;
                 ping.end()
             }
             Self::Command(command) => command.serialize(serializer),
@@ -288,27 +318,30 @@ impl<'de> Deserialize<'de> for ClientMsg {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
+        use serde::de::Error as _;
 
         let ev = serde_json::Value::deserialize(deserializer)?;
         let map = ev.as_object().ok_or_else(|| {
-            Error::custom(format!("unable to deser ClientMsg [{:?}]", &ev))
+            D::Error::custom(format!(
+                "unable to deserialize ClientMsg [{:?}]",
+                &ev
+            ))
         })?;
 
-        if let Some(v) = map.get("ping") {
+        if let Some(v) = map.get("pong") {
             let n = v.as_u64().ok_or_else(|| {
-                Error::custom(format!(
-                    "unable to deser ClientMsg::Ping [{:?}]",
+                D::Error::custom(format!(
+                    "unable to deserialize ClientMsg::Pong [{:?}]",
                     &ev
                 ))
             })?;
 
-            Ok(Self::Ping(n))
+            Ok(Self::Pong(n))
         } else {
             let command =
                 serde_json::from_value::<Command>(ev).map_err(|e| {
-                    Error::custom(format!(
-                        "unable to deser ClientMsg::Command [{:?}]",
+                    D::Error::custom(format!(
+                        "unable to deserialize ClientMsg::Command [{:?}]",
                         e
                     ))
                 })?;
@@ -326,12 +359,15 @@ impl Serialize for ServerMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            Self::Pong(n) => {
-                let mut ping = serializer.serialize_struct("pong", 1)?;
-                ping.serialize_field("pong", n)?;
+            Self::Ping(n) => {
+                let mut ping = serializer.serialize_struct("ping", 1)?;
+                ping.serialize_field("ping", n)?;
                 ping.end()
             }
             Self::Event(command) => command.serialize(serializer),
+            Self::RpcSettings(rpc_settings) => {
+                rpc_settings.serialize(serializer)
+            }
         }
     }
 }
@@ -342,30 +378,39 @@ impl<'de> Deserialize<'de> for ServerMsg {
     where
         D: Deserializer<'de>,
     {
-        use serde::de::Error;
+        use serde::de::Error as _;
 
         let ev = serde_json::Value::deserialize(deserializer)?;
         let map = ev.as_object().ok_or_else(|| {
-            Error::custom(format!("unable to deser ServerMsg [{:?}]", &ev))
+            D::Error::custom(format!(
+                "unable to deserialize ServerMsg [{:?}]",
+                &ev
+            ))
         })?;
 
-        if let Some(v) = map.get("pong") {
+        if let Some(v) = map.get("ping") {
             let n = v.as_u64().ok_or_else(|| {
-                Error::custom(format!(
-                    "unable to deser ServerMsg::Pong [{:?}]",
+                D::Error::custom(format!(
+                    "unable to deserialize ServerMsg::Ping [{:?}]",
                     &ev
                 ))
             })?;
 
-            Ok(Self::Pong(n))
+            Ok(Self::Ping(n))
         } else {
-            let event = serde_json::from_value::<Event>(ev).map_err(|e| {
-                Error::custom(format!(
-                    "unable to deser ServerMsg::Event [{:?}]",
-                    e
-                ))
-            })?;
-            Ok(Self::Event(event))
+            let msg = serde_json::from_value::<Event>(ev.clone())
+                .map(Self::Event)
+                .or_else(move |_| {
+                    serde_json::from_value::<RpcSettings>(ev)
+                        .map(Self::RpcSettings)
+                })
+                .map_err(|e| {
+                    D::Error::custom(format!(
+                        "unable to deserialize ServerMsg [{:?}]",
+                        e
+                    ))
+                })?;
+            Ok(msg)
         }
     }
 }
@@ -405,7 +450,7 @@ mod test {
 
     #[test]
     fn ping() {
-        let ping = ClientMsg::Ping(15);
+        let ping = ServerMsg::Ping(15);
         let ping_str = "{\"ping\":15}";
 
         assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
@@ -442,7 +487,7 @@ mod test {
 
     #[test]
     fn pong() {
-        let pong = ServerMsg::Pong(5);
+        let pong = ClientMsg::Pong(5);
         let pong_str = "{\"pong\":5}";
 
         assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());

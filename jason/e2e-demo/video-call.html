@@ -205,6 +205,28 @@
     .control-debug__table-result>table>tr>th {
       font-weight: normal;
     }
+
+    .connection-loss-notification {
+      right: 50px;
+      top: 50px;
+      position: absolute;
+      background: #fff;
+      padding: 10px;
+      border-radius: 3px;
+      font-size: 11pt;
+    }
+
+    .connection-loss-notification__msg {
+      display: block;
+    }
+
+    .connection-loss-notification__manual-reconnect {
+      display: block;
+      color: #49668C;
+      text-align: center;
+      cursor: pointer;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -260,6 +282,11 @@
 
       <div class="webrtc-play-endpoint-spec toggle-content is-visible">
         <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
+        <span>Is relay:</span>
+        <select class="webrtc-play-endpoint-spec__force-relay">
+          <option value="false">false</option>
+          <option value="true">true</option>
+        </select>
       </div>
 
       <div class="webrtc-publish-endpoint-spec toggle-content">
@@ -268,6 +295,11 @@
           <option value="Always">Always</option>
           <option value="IfPossible">If possible</option>
           <option value="Never">Never</option>
+        </select>
+        <span>Is relay:</span>
+        <select class="webrtc-publish-endpoint-spec__force-relay">
+          <option value="false">false</option>
+          <option value="true">true</option>
         </select>
       </div>
 
@@ -341,6 +373,12 @@
 
       <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
+
+  <div class="connection-loss-notification toggle-content">
+    <span class="connection-loss-notification__msg">Connection lost.</span>
+    <span>Trying to reconnect with backoff...</span>
+    <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
   </div>
 
   <div class="control-debug-menu__toggle">

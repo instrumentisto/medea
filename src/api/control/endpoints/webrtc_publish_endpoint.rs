@@ -5,10 +5,7 @@
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::api::{
-    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-    WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
-};
+use medea_control_api_proto::grpc::api as proto;
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(
@@ -17,7 +14,7 @@ use medea_control_api_proto::grpc::api::{
 pub struct WebRtcPublishId(String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Copy, Deserialize, Debug)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
@@ -29,22 +26,24 @@ pub enum P2pMode {
     IfPossible,
 }
 
-impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
-    fn from(value: WebRtcPublishEndpointP2pProto) -> Self {
+impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
+    fn from(value: proto::web_rtc_publish_endpoint::P2p) -> Self {
+        use proto::web_rtc_publish_endpoint::P2p::*;
         match value {
-            WebRtcPublishEndpointP2pProto::ALWAYS => Self::Always,
-            WebRtcPublishEndpointP2pProto::IF_POSSIBLE => Self::IfPossible,
-            WebRtcPublishEndpointP2pProto::NEVER => Self::Never,
+            Always => Self::Always,
+            IfPossible => Self::IfPossible,
+            Never => Self::Never,
         }
     }
 }
 
-impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
-    fn into(self) -> WebRtcPublishEndpointP2pProto {
+impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
+    fn into(self) -> proto::web_rtc_publish_endpoint::P2p {
+        use proto::web_rtc_publish_endpoint::P2p::*;
         match self {
-            Self::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
-            Self::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
-            Self::Never => WebRtcPublishEndpointP2pProto::NEVER,
+            Self::Always => Always,
+            Self::IfPossible => IfPossible,
+            Self::Never => Never,
         }
     }
 }
@@ -55,12 +54,20 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
+
+    /// Option to relay all media through a TURN server forcibly.
+    #[serde(default)]
+    pub force_relay: bool,
 }
 
-impl From<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    fn from(value: &WebRtcPublishEndpointProto) -> Self {
+impl From<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
+    fn from(value: &proto::WebRtcPublishEndpoint) -> Self {
         Self {
-            p2p: P2pMode::from(value.get_p2p()),
+            p2p: P2pMode::from(
+                proto::web_rtc_publish_endpoint::P2p::from_i32(value.p2p)
+                    .unwrap_or_default(),
+            ),
+            force_relay: value.force_relay,
         }
     }
 }

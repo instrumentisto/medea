@@ -3,7 +3,9 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-#![allow(clippy::module_name_repetitions)]
+// TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
+//       https://github.com/rust-lang/rust-clippy/issues/4779
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 pub mod api;
 pub mod callback;
@@ -17,7 +19,8 @@ use clap::{
 use slog::{o, Drain};
 use slog_scope::GlobalLoggerGuard;
 
-fn main() {
+#[actix_rt::main]
+async fn main() {
     dotenv::dotenv().ok();
 
     let opts = app_from_crate!()
@@ -31,7 +34,7 @@ fn main() {
         .arg(
             Arg::with_name("medea_addr")
                 .help("Address to Medea's gRPC control API.")
-                .default_value("0.0.0.0:6565")
+                .default_value("http://0.0.0.0:6565")
                 .long("medea-addr")
                 .short("m"),
         )
@@ -53,10 +56,8 @@ fn main() {
 
     let _log_guard = init_logger();
 
-    let sys = actix::System::new("control-api-mock");
-    let callback_server = callback::server::run(&opts);
-    api::run(&opts, callback_server);
-    sys.run().unwrap();
+    let callback_server = callback::server::run(&opts).await;
+    api::run(&opts, callback_server).await;
 }
 
 /// Initializes [`slog`] logger which will output logs with [`slog_term`]'s

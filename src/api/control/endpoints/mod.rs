@@ -8,12 +8,8 @@ pub mod webrtc_publish_endpoint;
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
-
-use medea_control_api_proto::grpc::api::{
-    CreateRequest_oneof_el as ElementProto,
-    Member_Element_oneof_el as MemberElementProto,
-};
 
 use super::{member::MemberElement, TryFromProtobufError};
 
@@ -70,19 +66,19 @@ impl Into<MemberElement> for EndpointSpec {
     }
 }
 
-impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
+impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
     type Error = TryFromProtobufError;
 
     fn try_from(
-        (_, proto): (Id, MemberElementProto),
+        (_, proto): (Id, proto::member::element::El),
     ) -> Result<Self, Self::Error> {
-        use MemberElementProto::*;
+        use proto::member::element::El::*;
         match proto {
-            webrtc_play(elem) => {
+            WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPlay(play))
             }
-            webrtc_pub(elem) => {
+            WebrtcPub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
             }
@@ -90,21 +86,23 @@ impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
     }
 }
 
-impl TryFrom<(Id, ElementProto)> for EndpointSpec {
+impl TryFrom<(Id, proto::create_request::El)> for EndpointSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from((id, proto): (Id, ElementProto)) -> Result<Self, Self::Error> {
-        use ElementProto::*;
+    fn try_from(
+        (id, proto): (Id, proto::create_request::El),
+    ) -> Result<Self, Self::Error> {
+        use proto::create_request::El::*;
         match proto {
-            webrtc_play(elem) => {
+            WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPlay(play))
             }
-            webrtc_pub(elem) => {
+            WebrtcPub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
             }
-            member(_) | room(_) => {
+            Member(_) | Room(_) => {
                 Err(TryFromProtobufError::ExpectedOtherElement(
                     String::from("Endpoint"),
                     id.0,

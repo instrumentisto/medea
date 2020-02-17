@@ -12,7 +12,6 @@ use url::{ParseError, Url};
 /// without anything else (protocol e.g.).
 ///
 /// In [`Display`] implementation protocol will be added to this address.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Display, Eq, PartialEq, Hash)]
 #[display(fmt = "grpc://{}", _0)]
 pub struct GrpcCallbackUrl(String);
@@ -23,13 +22,13 @@ impl GrpcCallbackUrl {
     /// If you wish to get address with protocol - just use [`Display`]
     /// implementation.
     #[inline]
-    pub fn addr(&self) -> &str {
-        &self.0
+    pub fn addr(&self) -> String {
+        // TODO: Do not hardcode protocol.
+        format!("http://{}", self.0)
     }
 }
 
 /// All callback URLs which supported by Medea.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, derive_more::Display, Debug, Eq, PartialEq, Hash)]
 pub enum CallbackUrl {
     /// gRPC callbacks type.
@@ -110,17 +109,18 @@ mod tests {
     #[test]
     fn successful_parse_grpc_url() {
         for (url, expected_callback_url) in &[
-            ("grpc://127.0.0.1:9090", "127.0.0.1:9090"),
-            ("grpc://example.com:9090", "example.com:9090"),
-            ("grpc://example.com", "example.com"),
-            ("grpc://127.0.0.1", "127.0.0.1"),
+            ("grpc://127.0.0.1:9090", "http://127.0.0.1:9090"),
+            ("grpc://example.com:9090", "http://example.com:9090"),
+            ("grpc://example.com", "http://example.com"),
+            ("grpc://127.0.0.1", "http://127.0.0.1"),
         ] {
-            let callback_url = CallbackUrl::try_from(url.to_string()).unwrap();
+            let callback_url =
+                CallbackUrl::try_from((*url).to_string()).unwrap();
             match callback_url {
                 CallbackUrl::Grpc(grpc_callback_url) => {
                     assert_eq!(
                         grpc_callback_url.addr(),
-                        expected_callback_url.to_string()
+                        (*expected_callback_url).to_string()
                     );
                 }
             }
@@ -134,7 +134,7 @@ mod tests {
             "asdf://127.0.0.1",
             "asdf://127.0.0.1:9090",
         ] {
-            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
+            let err = CallbackUrl::try_from((*url).to_string()).unwrap_err();
             match err {
                 CallbackUrlParseError::UnsupportedScheme => {}
                 _ => {
@@ -152,7 +152,7 @@ mod tests {
             "example.com",
             "example.com:9090",
         ] {
-            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
+            let err = CallbackUrl::try_from((*url).to_string()).unwrap_err();
             match err {
                 CallbackUrlParseError::UrlParseErr(e) => match e {
                     ParseError::RelativeUrlWithoutBase => {}

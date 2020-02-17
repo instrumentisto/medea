@@ -1,60 +1,61 @@
 //! Abstraction over remote Redis database used to store Turn server
 //! credentials.
-use std::time::Duration;
 
-use bb8::{Pool, RunError};
-use bb8_redis::{RedisConnectionManager, RedisPool};
+use std::{fmt, time::Duration};
+
 use crypto::{digest::Digest, md5::Md5};
-use derive_more::Display;
+use deadpool::managed::{PoolConfig, Timeouts};
+use deadpool_redis::{cmd, Pool, PoolError};
+use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::Future;
-use redis::{ConnectionInfo, RedisError};
-use tokio::prelude::*;
+use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{log::prelude::*, media::IceUser};
 
-#[derive(Debug, Display, Fail)]
+#[derive(Debug, Display, Fail, From)]
 pub enum TurnDatabaseErr {
+    #[display(fmt = "Couldn't get connection from pool: {}", _0)]
+    PoolError(PoolError),
+
     #[display(fmt = "Redis returned error: {}", _0)]
     RedisError(RedisError),
 }
 
-impl From<RedisError> for TurnDatabaseErr {
-    fn from(err: RedisError) -> Self {
-        Self::RedisError(err)
-    }
-}
-
-// Abstraction over remote Redis database used to store Turn server
-// credentials.
-#[derive(Debug)]
+/// Abstraction over remote Redis database used to store Turn server
+/// credentials.
+///
+/// This struct can be cloned and transferred across thread boundaries.
+#[derive(Clone)]
 pub struct TurnDatabase {
-    pool: RedisPool,
+    pool: Pool,
 }
 
 impl TurnDatabase {
     /// Creates new [`TurnDatabase`].
-    pub fn new<S: Into<ConnectionInfo> + Clone>(
+    ///
+    /// # Errors
+    ///
+    /// Errors if authentication in Redis fails.
+    pub fn new<S: IntoConnectionInfo + Clone>(
         conn_timeout: Duration,
         conn_info: S,
-    ) -> impl Future<Item = Self, Error = TurnDatabaseErr> {
-        future::lazy(move || redis::Client::open(conn_info.into()))
-            .and_then(RedisConnectionManager::new)
-            .and_then(move |conn_mngr| {
-                Pool::builder()
-                    .connection_timeout(conn_timeout)
-                    .build(conn_mngr)
-            })
-            .map(RedisPool::new)
-            .map(|pool| Self { pool })
-            .map_err(TurnDatabaseErr::from)
+    ) -> Result<Self, TurnDatabaseErr> {
+        let manager = deadpool_redis::Manager::new(conn_info)?;
+        let config = PoolConfig {
+            max_size: 16, // TODO: configure via conf
+            timeouts: Timeouts {
+                wait: None,
+                create: Some(conn_timeout),
+                recycle: None,
+            },
+        };
+        Ok(Self {
+            pool: Pool::from_config(manager, config),
+        })
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.
-    pub fn insert(
-        &mut self,
-        user: &IceUser,
-    ) -> impl Future<Item = (), Error = RunError<TurnDatabaseErr>> {
+    pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
         debug!("Store ICE user: {:?}", user);
 
         let key = format!("turn/realm/medea/user/{}/key", user.user());
@@ -64,34 +65,41 @@ impl TurnDatabase {
         hasher.input_str(&value);
         let result = hasher.result_str();
 
-        self.pool.run(|connection| {
-            redis::cmd("SET")
-                .arg(key)
-                .arg(result)
-                .query_async(connection)
-                .map_err(TurnDatabaseErr::RedisError)
-        })
+        let mut conn = self.pool.get().await?;
+        Ok(cmd("SET")
+            .arg(key)
+            .arg(result)
+            .query_async(&mut conn)
+            .await?)
     }
 
     /// Deletes batch of provided [`IceUser`]s.
-    pub fn remove(
-        &mut self,
-        users: &[IceUser],
-    ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
+    ///
+    /// No-op if empty batch is provided.
+    pub async fn remove(
+        &self,
+        users: &[&IceUser],
+    ) -> Result<(), TurnDatabaseErr> {
         debug!("Remove ICE users: {:?}", users);
-        let mut delete_keys = Vec::with_capacity(users.len());
 
-        for user in users {
-            delete_keys
-                .push(format!("turn/realm/medea/user/{}/key", user.user()));
+        if users.is_empty() {
+            return Ok(());
         }
 
-        self.pool.run(|connection| {
-            redis::cmd("DEL")
-                .arg(delete_keys)
-                .to_owned()
-                .query_async(connection)
-                .map_err(TurnDatabaseErr::RedisError)
-        })
+        let keys: Vec<_> = users
+            .iter()
+            .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
+            .collect();
+
+        let mut conn = self.pool.get().await?;
+        Ok(cmd("DEL").arg(keys).query_async(&mut conn).await?)
+    }
+}
+
+impl fmt::Debug for TurnDatabase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TurnDatabase")
+            .field("pool", &self.pool.status())
+            .finish()
     }
 }

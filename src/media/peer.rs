@@ -70,6 +70,7 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -151,6 +152,7 @@ pub struct Context {
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
+    is_force_relayed: bool,
 }
 
 /// [RTCPeerConnection] representation.
@@ -223,6 +225,11 @@ impl<T> Peer<T> {
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
+
+    /// Indicates whether all media is forcibly relayed through a TURN server.
+    pub fn is_force_relayed(&self) -> bool {
+        self.context.is_force_relayed
+    }
 }
 
 impl Peer<New> {
@@ -234,6 +241,7 @@ impl Peer<New> {
         member_id: MemberId,
         partner_peer: Id,
         partner_member: MemberId,
+        is_force_relayed: bool,
     ) -> Self {
         let context = Context {
             id,
@@ -244,6 +252,7 @@ impl Peer<New> {
             sdp_answer: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
+            is_force_relayed,
         };
         Self {
             context,
@@ -318,9 +327,17 @@ impl Peer<WaitLocalSdp> {
         }
     }
 
-    /// Sets tracks `mids`.
+    /// Sets tracks [mid]s.
     ///
-    /// Provided `mids` must have entries for all [`Peer`]s tracks.
+    /// Provided [mid]s must have entries for all [`Peer`]s tracks.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
+    /// [`MediaTrack`] without providing its [mid].
+    ///
+    /// [mid]:
+    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn set_mids(
         &mut self,
         mut mids: HashMap<TrackId, String>,
@@ -365,6 +382,15 @@ impl Peer<WaitLocalHaveRemote> {
 }
 
 impl Peer<Stable> {
+    /// Returns [mid]s of this [`Peer`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
+    /// [`MediaTrack`] without providing its [mid].
+    ///
+    /// [mid]:
+    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, PeerError> {
         let mut mids = HashMap::with_capacity(self.context.senders.len());
         for (track_id, track) in &self.context.senders {

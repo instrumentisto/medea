@@ -10,13 +10,14 @@ repository = "https://github.com/instrumentisto/medea"
 publish = false
 
 [dependencies]
-actix = "0.8"
-actix-cors = "0.1"
-actix-web = "1.0"
+actix = "0.9"
+actix-rt = "1.0"
+actix-cors = "0.2"
+actix-web = "2.0"
 clap = "2.33"
 dotenv = "0.13"
 futures = "0.1"
-grpcio = "0.4"
+tonic = "0.1"
 medea-control-api-proto = { path = "../../proto/control-api" }
 protobuf = "2.7"
 serde = { version = "1.0", features = ["derive"] }
