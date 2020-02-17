@@ -26,7 +26,6 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
-    peer::media::Sender,
     utils::{console_error, JsCaused, JsError},
 };
 
@@ -42,7 +41,7 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, StableMuteState,
+        MuteStateTransition, Sender, StableMuteState,
     },
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
