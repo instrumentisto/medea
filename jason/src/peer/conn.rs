@@ -152,18 +152,18 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to create SDP offer: {}", _0)]
     CreateOfferFailed(JsError),
 
-    /// Occurs when handler failed to bind to some [`RTCPeerConnection`] event.
+    /// Occurs when handler failed to bind to some [`RtcPeerConnection`] event.
     /// Not really supposed to ever happen.
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
     /// Occurs if the local description associated with the
-    /// [`RTCPeerConnection`] cannot be changed.
+    /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set local SDP description: {}", _0)]
     SetLocalDescriptionFailed(JsError),
 
     /// Occurs if the description of the remote end of the
-    /// [`RTCPeerConnection`] cannot be changed.
+    /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set remote SDP description: {}", _0)]
     SetRemoteDescriptionFailed(JsError),
 }

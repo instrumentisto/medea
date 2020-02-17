@@ -1,15 +1,17 @@
-//! Media tracks.
+//! [`crate::peer::PeerConnection`] media management.
+
+mod mute_state;
 
 use std::{
     borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
     future::Future, rc::Rc, time::Duration,
 };
 
-use derive_more::{Display, From};
+use derive_more::Display;
 use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use medea_reactive::{Dropped, ObservableCell};
+use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
@@ -27,6 +29,8 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
+
+pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -83,8 +87,6 @@ impl From<Dropped> for MediaConnectionsError {
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
-// TODO: few fields were deleted, they were used to mute tracks that
-//       were added after mute_room call how do we handle this now?
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
@@ -122,21 +124,6 @@ impl MediaConnections {
         }))
     }
 
-    /// Returns all [`Sender`]s with provided [`TransceiverKind`] and
-    /// [`MuteState`] from this [`MediaConnections`].
-    pub fn get_senders_by_kind_and_mute_state(
-        &self,
-        kind: TransceiverKind,
-        f: impl Fn(MuteState) -> bool,
-    ) -> Vec<Rc<Sender>> {
-        self.0
-            .borrow()
-            .iter_senders_with_kind(kind)
-            .filter(move |sender| (f)(sender.mute_state()))
-            .cloned()
-            .collect()
-    }
-
     /// Returns all [`Sender`]s from this [`MediaConnections`] with provided
     /// [`TransceiverKind`].
     pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
@@ -152,7 +139,7 @@ impl MediaConnections {
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: FinalizedMuteState,
+        mute_state: StableMuteState,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
             if sender.mute_state() != mute_state.into() {
@@ -162,7 +149,7 @@ impl MediaConnections {
         true
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// Returns `true` if all [`MediaTrack`]s of all [`Sender`]s with
     /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
@@ -172,7 +159,7 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// Returns `true` if all [`MediaTrack`]s of all [`Sender`]s with
     /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
@@ -187,10 +174,10 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaConnectionsError::SendersWithoutMids`] if some
+    /// Errors with [`MediaConnectionsError::SendersWithoutMid`] if some
     /// [`Sender`] doesn't have [mid].
     ///
-    /// Errors with [`MediaConnectionsError::ReceiversWithoutMids`] if some
+    /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
     /// [mid]:
@@ -264,13 +251,13 @@ impl MediaConnections {
         Ok(())
     }
 
-    /// Updates [`Sender`]s of this [`PeerConnection`] with
+    /// Updates [`Sender`]s of this [`super::PeerConnection`] with
     /// [`medea_client_api_proto::TrackPatch`].
     ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaTrack`] with ID from [`TrackPatch`] is not exists.
+    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] is not exists.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
             let track =
@@ -429,142 +416,6 @@ impl MediaConnections {
     }
 }
 
-/// Final mute state of [`Sender`].
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum FinalizedMuteState {
-    /// [`Sender`] is not muted.
-    NotMuted,
-
-    /// [`Sender`] is muted.
-    Muted,
-}
-
-impl FinalizedMuteState {
-    /// Converts this [`FinalizedMuteState`] into [`ProgressingMuteState`].
-    pub fn into_progress(self) -> ProgressingMuteState {
-        match self {
-            Self::NotMuted => ProgressingMuteState::Muting(self),
-            Self::Muted => ProgressingMuteState::Unmuting(self),
-        }
-    }
-
-    /// Returns opposite [`FinalizedMuteState`] of this [`FinalizedMuteState`].
-    pub fn opposite(self) -> Self {
-        match self {
-            Self::NotMuted => Self::Muted,
-            Self::Muted => Self::NotMuted,
-        }
-    }
-}
-
-impl From<bool> for FinalizedMuteState {
-    fn from(is_muted: bool) -> Self {
-        if is_muted {
-            Self::Muted
-        } else {
-            Self::NotMuted
-        }
-    }
-}
-
-/// Mute state in state of transition.
-///
-/// [`FinalizedMuteState`] which stored in [`ProgressingMuteState`] variants
-/// is state which we already have, but we still waiting for
-/// needed state update. If needed a state update wouldn't be received, the
-/// stored [`FinalizedMuteState`] will be applied.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ProgressingMuteState {
-    /// [`Sender`] should be unmuted, but awaits server permission.
-    Unmuting(FinalizedMuteState),
-
-    /// [`Sender`] should be muted, but awaits server permission.
-    Muting(FinalizedMuteState),
-}
-
-impl ProgressingMuteState {
-    /// Swaps current [`ProgressingMuteState`] with opposite one.
-    pub fn swap(self) -> Self {
-        match self {
-            Self::Unmuting(available) => Self::Muting(available),
-            Self::Muting(available) => Self::Unmuting(available),
-        }
-    }
-
-    /// Returns intention which this [`ProgressingMuteState`] indicates.
-    pub fn intention(self) -> FinalizedMuteState {
-        match self {
-            Self::Unmuting(_) => FinalizedMuteState::NotMuted,
-            Self::Muting(_) => FinalizedMuteState::Muted,
-        }
-    }
-
-    /// Updates [`FinalizedMuteState`] of this [`ProgressingMuteState`].
-    pub fn change_available_state(
-        self,
-        available_state: FinalizedMuteState,
-    ) -> Self {
-        match self {
-            Self::Unmuting(_) => Self::Unmuting(available_state),
-            Self::Muting(_) => Self::Muting(available_state),
-        }
-    }
-
-    /// Returns [`FinalizedMuteState`] of this [`ProgressingMuteState`].
-    pub fn finalize_with_available_state(self) -> FinalizedMuteState {
-        match self {
-            Self::Unmuting(available_state) | Self::Muting(available_state) => {
-                available_state
-            }
-        }
-    }
-}
-
-/// All mute states in which [`Sender`] can be.
-#[derive(Debug, Clone, Copy, From, PartialEq)]
-pub enum MuteState {
-    /// Mute state in state of transition.
-    InProgress(ProgressingMuteState),
-
-    /// Final mute state of [`Sender`].
-    Final(FinalizedMuteState),
-}
-
-impl MuteState {
-    /// Transforms current [`MuteState`] into [`MuteState::InProgress`] state
-    /// which will should be transformed into provided
-    /// [`FinalizedMuteState`].
-    pub fn progress(self, needed_state: FinalizedMuteState) -> Self {
-        if self == needed_state.into() {
-            return self;
-        }
-
-        match self {
-            Self::Final(finalized) => finalized.into_progress().into(),
-            Self::InProgress(progressing) => {
-                if progressing.intention() == needed_state {
-                    self
-                } else {
-                    progressing.swap().into()
-                }
-            }
-        }
-    }
-
-    /// Returns [`FinalizedMuteState`] of this [`MuteState`].
-    ///
-    /// If current [`MuteState`] is [`MuteState::InProgress`] then
-    /// [`FinalizedState`] will be get from [`ProgressingState`] finalized.
-    pub fn finalize(self) -> Self {
-        match self {
-            Self::Final(_) => self,
-            Self::InProgress(progressing) => {
-                progressing.finalize_with_available_state().into()
-            }
-        }
-    }
-}
-
 /// Representation of a local [`MediaTrack`] that is being sent to some remote
 /// peer.
 pub struct Sender {
@@ -585,7 +436,7 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-        mute_state: FinalizedMuteState,
+        mute_state: StableMuteState,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -610,12 +461,12 @@ impl Sender {
             while let Some(mute_state_update) = subscription.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     match mute_state_update {
-                        MuteState::Final(finalized) => {
+                        MuteState::Stable(stable) => {
                             if let Some(track) = this.track.borrow().as_ref() {
-                                track.set_enabled_by_mute_state(finalized);
+                                track.set_enabled_by_mute_state(stable);
                             }
                         }
-                        MuteState::InProgress(_) => {
+                        MuteState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {
                                 let mut in_progress_subscription =
@@ -633,11 +484,11 @@ impl Sender {
                                     Either::Right(_) => {
                                         if let Some(this) = weak_this.upgrade()
                                         {
-                                            let finalized = this
+                                            let stable = this
                                                 .mute_state
                                                 .get()
-                                                .finalize();
-                                            this.mute_state.set(finalized);
+                                                .cancel_transition();
+                                            this.mute_state.set(stable);
                                         }
                                     }
                                 }
@@ -659,12 +510,12 @@ impl Sender {
     }
 
     /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
-    fn kind(&self) -> TransceiverKind {
+    pub fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
     }
 
     /// Returns [`MuteState`] of this [`Sender`].
-    fn mute_state(&self) -> MuteState {
+    pub fn mute_state(&self) -> MuteState {
         self.mute_state.get()
     }
 
@@ -690,13 +541,11 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
-        let finalized_mute_state = match sender.mute_state() {
-            MuteState::Final(finalized) => finalized,
-            MuteState::InProgress(progressing) => {
-                progressing.finalize_with_available_state()
-            }
+        let stable_mute_state = match sender.mute_state() {
+            MuteState::Stable(stable) => stable,
+            MuteState::Transition(transition) => transition.into_inner(),
         };
-        track.set_enabled_by_mute_state(finalized_mute_state);
+        track.set_enabled_by_mute_state(stable_mute_state);
         sender.track.borrow_mut().replace(track);
 
         Ok(())
@@ -704,45 +553,47 @@ impl Sender {
 
     /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
     pub fn is_track_muted(&self) -> bool {
-        self.mute_state.get() == FinalizedMuteState::Muted.into()
+        self.mute_state.get() == StableMuteState::Muted.into()
     }
 
-    /// Sets current [`MuteState`] to [`MuteState::InProgress`].
-    pub fn progress_mute_state(&self, needed_state: FinalizedMuteState) {
+    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    pub fn mute_state_transition_to(&self, desired_state: StableMuteState) {
         let current_mute_state = self.mute_state.get();
         self.mute_state
-            .set(current_mute_state.progress(needed_state));
+            .set(current_mute_state.transition_to(desired_state));
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Final`].
+    /// [`Sender`] will be [`MuteState::Stable`] or sender is dropped.
     ///
     /// `Ok(())` will be returned if [`Sender`]'s [`MuteState`] transits into
-    /// requested [`FinalizedMuteState`].
+    /// requested [`StableMuteState`] or [`Sender`] gets dropped.
     ///
     /// `Err(MuteStateTransitsIntoOppositeState)` will be returned if
     /// [`Sender`]'s [`MuteState`] transits into opposite to
-    /// requested [`FinalizedMuteState`].
-    pub fn when_finalized_with(
+    /// requested [`StableMuteState`].
+    pub fn when_mute_state_stable(
         &self,
-        needed_state: FinalizedMuteState,
+        desired_state: StableMuteState,
     ) -> impl Future<Output = Result<()>> {
-        let successful_mute_state =
-            self.mute_state.when_eq(MuteState::Final(needed_state));
-        let failure_mute_state = self
-            .mute_state
-            .when_eq(MuteState::Final(needed_state.opposite()));
-
+        let mut mute_states = self.mute_state.subscribe();
         async move {
-            let res =
-                future::select(successful_mute_state, failure_mute_state).await;
-
-            match res {
-                Either::Left(_) => Ok(()),
-                Either::Right(_) => Err(tracerr::new!(
-                    MediaConnectionsError::MuteStateTransitsIntoOppositeState
-                )),
+            while let Some(state) = mute_states.next().await {
+                match state {
+                    MuteState::Transition(_) => continue,
+                    MuteState::Stable(state) => {
+                        if state == desired_state {
+                            return Ok(());
+                        } else {
+                            return Err(tracerr::new!(
+                                MediaConnectionsError::
+                                MuteStateTransitsIntoOppositeState
+                            ));
+                        }
+                    }
+                }
             }
+            Ok(())
         }
     }
 
@@ -750,18 +601,16 @@ impl Sender {
     /// [`medea_client_api_proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
         if let Some(is_muted) = track.is_muted {
-            let new_mute_state = FinalizedMuteState::from(is_muted);
+            let new_mute_state = StableMuteState::from(is_muted);
             let current_mute_state = self.mute_state.get();
 
             let mute_state_update: MuteState = match current_mute_state {
-                MuteState::Final(_) => new_mute_state.into(),
-                MuteState::InProgress(progressing) => {
-                    if progressing.intention() == new_mute_state {
+                MuteState::Stable(_) => new_mute_state.into(),
+                MuteState::Transition(transition) => {
+                    if transition.intended() == new_mute_state {
                         new_mute_state.into()
                     } else {
-                        progressing
-                            .change_available_state(new_mute_state)
-                            .into()
+                        transition.set_inner(new_mute_state).into()
                     }
                 }
             };

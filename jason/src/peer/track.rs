@@ -7,7 +7,7 @@ use std::rc::Rc;
 use medea_client_api_proto::TrackId as Id;
 use web_sys::MediaStreamTrack;
 
-use crate::{media::TrackConstraints, peer::FinalizedMuteState};
+use crate::{media::TrackConstraints, peer::StableMuteState};
 
 /// Representation of [MediaStreamTrack][1].
 ///
@@ -39,7 +39,7 @@ impl MediaTrack {
         &self.track
     }
 
-    /// Returns [`MediaType`] of this [`MediaTrack`].
+    /// Returns [`TrackConstraints`] of this [`MediaTrack`].
     pub fn caps(&self) -> &TrackConstraints {
         &self.caps
     }
@@ -54,13 +54,14 @@ impl MediaTrack {
         self.track.set_enabled(enabled)
     }
 
-    /// Sets [`MediaStreamTrack`] enabled based on provided [`MuteState`].
-    pub fn set_enabled_by_mute_state(&self, mute_state: FinalizedMuteState) {
+    /// Sets [`MediaStreamTrack`] enabled property based on provided
+    /// [`super::MuteState`].
+    pub fn set_enabled_by_mute_state(&self, mute_state: StableMuteState) {
         match mute_state {
-            FinalizedMuteState::Muted => {
+            StableMuteState::Muted => {
                 self.set_enabled(false);
             }
-            FinalizedMuteState::NotMuted => {
+            StableMuteState::NotMuted => {
                 self.set_enabled(true);
             }
         }

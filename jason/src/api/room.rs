@@ -24,9 +24,9 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        FinalizedMuteState, MediaConnectionsError, MediaStream,
-        MediaStreamHandle, MuteState, PeerError, PeerEvent, PeerEventHandler,
-        PeerRepository, TransceiverKind,
+        MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        StableMuteState, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -260,10 +260,10 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JsValue> {
         let inner = upgrade_or_detached!(self.0, JsValue)?;
-        while !inner.borrow().is_all_peers_in_mute_state(
-            kind,
-            FinalizedMuteState::from(is_muted),
-        ) {
+        while !inner
+            .borrow()
+            .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
+        {
             let fut = inner.borrow().toggle_mute(is_muted, kind);
             fut.await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
@@ -337,8 +337,8 @@ impl RoomHandle {
         )
     }
 
-    /// Injects local media stream for all created and new [`PeerConnection`]s
-    /// in this [`Room`].
+    /// Injects local media stream for all created and new
+    /// [`crate::peer::PeerConnection`]s in this [`Room`].
     pub fn inject_local_stream(
         &self,
         stream: SysMediaStream,
@@ -388,8 +388,8 @@ impl RoomHandle {
     }
 }
 
-/// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
-/// handles media server events, etc).
+/// [`Room`] where all the media happens (manages concrete
+/// [`crate::peer::PeerConnection`]s, handles media server events, etc).
 ///
 /// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
@@ -584,6 +584,7 @@ impl InnerRoom {
 
     /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
     /// [`PeerConnection`]s in this [`Room`].
+    #[allow(clippy::filter_map)]
     fn toggle_mute(
         &self,
         is_muted: bool,
@@ -595,38 +596,32 @@ impl InnerRoom {
             let peer_mute_state_changed: Vec<_> = peers
                 .iter()
                 .map(|peer| {
-                    let needed_mute_state = FinalizedMuteState::from(is_muted);
+                    let desired_state = StableMuteState::from(is_muted);
                     let tracks_patches: Vec<_> = peer
-                        .get_senders_by_kind_and_mute_state(
-                            kind,
-                            |mute_state| match mute_state {
-                                MuteState::InProgress(progressing) => {
-                                    progressing.intention()
-                                        == needed_mute_state.opposite()
-                                }
-                                MuteState::Final(finalized) => {
-                                    finalized == needed_mute_state.opposite()
-                                }
-                            },
-                        )
+                        .get_senders(kind)
                         .into_iter()
+                        .filter(|sender| match sender.mute_state() {
+                            MuteState::Transition(transition) => {
+                                transition.intended() != desired_state
+                            }
+                            MuteState::Stable(stable) => {
+                                stable != desired_state
+                            }
+                        })
                         .map(|sender| {
-                            let id = sender.track_id();
-                            let track_update = TrackPatch {
-                                id,
+                            sender.mute_state_transition_to(desired_state);
+                            TrackPatch {
+                                id: sender.track_id(),
                                 is_muted: Some(is_muted),
-                            };
-                            sender.progress_mute_state(needed_mute_state);
-
-                            track_update
+                            }
                         })
                         .collect();
 
-                    let track_mute_state_change_subscriptions: Vec<_> = peer
+                    let wait_state_change: Vec<_> = peer
                         .get_senders(kind)
                         .into_iter()
                         .map(|sender| {
-                            sender.when_finalized_with(needed_mute_state)
+                            sender.when_mute_state_stable(desired_state)
                         })
                         .collect();
 
@@ -637,7 +632,7 @@ impl InnerRoom {
                         });
                     }
 
-                    future::join_all(track_mute_state_change_subscriptions)
+                    future::join_all(wait_state_change)
                 })
                 .collect();
             future::join_all(peer_mute_state_changed)
@@ -655,15 +650,12 @@ impl InnerRoom {
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: FinalizedMuteState,
+        mute_state: StableMuteState,
     ) -> bool {
         self.peers
             .get_all()
             .into_iter()
-            .skip_while(|peer| {
-                peer.is_all_senders_in_mute_state(kind, mute_state)
-            })
-            .next()
+            .find(|peer| !peer.is_all_senders_in_mute_state(kind, mute_state))
             .is_none()
     }
 

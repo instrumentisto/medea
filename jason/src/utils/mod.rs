@@ -138,7 +138,7 @@ where
         .map_or_else(|| None, into)
 }
 
-/// [`Future`] which resolves after the provided [`JsDuration`].
+/// [`std::future::Future`] which resolves after the provided [`JsDuration`].
 pub async fn delay_for(delay_ms: JsDuration) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()

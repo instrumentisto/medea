@@ -14,8 +14,6 @@ pub trait PeerRepository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided
     /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
     ///
-    /// [`PeerConnection`] can be created with muted audio or video [`Track`]s.
-    ///
     /// # Errors
     ///
     /// Errors if creating [`PeerConnection`] fails.

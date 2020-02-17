@@ -33,11 +33,11 @@ impl Drop for TaskHandle {
     }
 }
 
-/// Idle timeout of [`RpcClient`].
+/// Idle timeout of [`super::RpcClient`].
 #[derive(Debug, Copy, Clone)]
 pub struct IdleTimeout(pub JsDuration);
 
-/// Ping interval of [`RpcClient`].
+/// Ping interval of [`super::RpcClient`].
 #[derive(Debug, Copy, Clone, Mul)]
 pub struct PingInterval(pub JsDuration);
 

@@ -41,8 +41,8 @@ pub use self::{
         TransceiverDirection, TransceiverKind,
     },
     media::{
-        FinalizedMuteState, MediaConnections, MediaConnectionsError, MuteState,
-        ProgressingMuteState,
+        MediaConnections, MediaConnectionsError, MuteState,
+        MuteStateTransition, StableMuteState,
     },
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
@@ -154,7 +154,8 @@ pub struct PeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
-    /// [`Sender`]s and [`Receivers`] of this [`RtcPeerConnection`].
+    /// [`Sender`]s and [`self::media::Receiver`]s of this
+    /// [`RtcPeerConnection`].
     media_connections: Rc<MediaConnections>,
 
     /// [`MediaManager`] that will be used to acquire local [`MediaStream`]s.
@@ -250,7 +251,7 @@ impl PeerConnection {
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
-        mute_state: FinalizedMuteState,
+        mute_state: StableMuteState,
     ) -> bool {
         self.media_connections
             .is_all_senders_in_mute_state(kind, mute_state)
@@ -267,7 +268,7 @@ impl PeerConnection {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaTrack`] with ID from [`TrackPatch`] is not exists.
+    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] is not exists.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         Ok(self
             .media_connections
@@ -368,17 +369,6 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
-    }
-
-    /// Returns all [`Sender`]s with provided [`TransceiverKind`] and
-    /// [`MuteState`] from this [`PeerConnection`].
-    pub fn get_senders_by_kind_and_mute_state(
-        &self,
-        kind: TransceiverKind,
-        f: impl Fn(MuteState) -> bool,
-    ) -> Vec<Rc<Sender>> {
-        self.media_connections
-            .get_senders_by_kind_and_mute_state(kind, f)
     }
 
     /// Returns all [`Sender`]s from this [`PeerConnection`] with provided

@@ -6,8 +6,8 @@ use medea_client_api_proto::{TrackId, TrackPatch};
 use medea_jason::{
     media::MediaManager,
     peer::{
-        FinalizedMuteState, MediaConnections, RtcPeerConnection,
-        SimpleStreamRequest,
+        MediaConnections, RtcPeerConnection, SimpleStreamRequest,
+        StableMuteState,
     },
 };
 use wasm_bindgen_test::*;
@@ -43,11 +43,11 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .progress_mute_state(FinalizedMuteState::from(!enabled_audio));
+        .mute_state_transition_to(StableMuteState::from(!enabled_audio));
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .progress_mute_state(FinalizedMuteState::from(!enabled_video));
+        .mute_state_transition_to(StableMuteState::from(!enabled_video));
 
     (media_connections, audio_track_id, video_track_id)
 }
@@ -94,7 +94,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!audio_track.is_track_muted());
     assert!(!video_track.is_track_muted());
 
-    audio_track.progress_mute_state(FinalizedMuteState::Muted);
+    audio_track.mute_state_transition_to(StableMuteState::Muted);
     media_connections
         .update_senders(vec![TrackPatch {
             id: audio_track_id,
@@ -104,7 +104,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(audio_track.is_track_muted());
     assert!(!video_track.is_track_muted());
 
-    video_track.progress_mute_state(FinalizedMuteState::Muted);
+    video_track.mute_state_transition_to(StableMuteState::Muted);
     media_connections
         .update_senders(vec![TrackPatch {
             id: video_track_id,
@@ -114,7 +114,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(audio_track.is_track_muted());
     assert!(video_track.is_track_muted());
 
-    audio_track.progress_mute_state(FinalizedMuteState::NotMuted);
+    audio_track.mute_state_transition_to(StableMuteState::NotMuted);
     media_connections
         .update_senders(vec![TrackPatch {
             id: audio_track_id,
@@ -124,7 +124,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!audio_track.is_track_muted());
     assert!(video_track.is_track_muted());
 
-    video_track.progress_mute_state(FinalizedMuteState::NotMuted);
+    video_track.mute_state_transition_to(StableMuteState::NotMuted);
     media_connections
         .update_senders(vec![TrackPatch {
             id: video_track_id,
