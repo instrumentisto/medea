@@ -545,7 +545,10 @@ impl Sender {
             MuteState::Stable(stable) => stable,
             MuteState::Transition(transition) => transition.into_inner(),
         };
-        track.set_enabled_by_mute_state(stable_mute_state);
+
+        // TODO: this is temporary disabled, until we resolve case of muting
+        //       senders, that were added after user muted room.
+//        track.set_enabled_by_mute_state(stable_mute_state);
         sender.track.borrow_mut().replace(track);
 
         Ok(())
