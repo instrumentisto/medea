@@ -801,3 +801,138 @@ mod rpc_close_reason_on_room_drop {
         );
     }
 }
+
+mod patches_generation {
+    use std::collections::HashMap;
+
+    use futures::StreamExt;
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatch,
+        VideoSettings,
+    };
+    use wasm_bindgen_futures::spawn_local;
+
+    use crate::get_jason_error;
+
+    use super::*;
+
+    async fn get_test_room_with_rpc_mock(
+        peers_count: u64,
+    ) -> (Room, mpsc::UnboundedReceiver<Command>) {
+        let mut repo = Box::new(MockPeerRepository::new());
+
+        let mut peers = HashMap::new();
+        for i in 0..peers_count {
+            let (tx, _rx) = mpsc::unbounded();
+            let audio_track_id = TrackId(i + 1);
+            let video_track_id = TrackId(i + 2);
+            let audio_track = Track {
+                id: audio_track_id,
+                is_muted: false,
+                media_type: MediaType::Audio(AudioSettings {}),
+                direction: Direction::Send {
+                    receivers: Vec::new(),
+                    mid: None,
+                },
+            };
+            let video_track = Track {
+                id: video_track_id,
+                is_muted: false,
+                media_type: MediaType::Video(VideoSettings {}),
+                direction: Direction::Send {
+                    receivers: Vec::new(),
+                    mid: None,
+                },
+            };
+            let tracks = vec![audio_track, video_track];
+            let peer_id = PeerId(i + 1);
+
+            let peer = Rc::new(
+                PeerConnection::new(
+                    peer_id,
+                    tx,
+                    vec![],
+                    Rc::new(MediaManager::default()),
+                    false,
+                )
+                .unwrap(),
+            );
+
+            peer.get_offer(tracks, None).await.unwrap();
+
+            peers.insert(peer_id, peer);
+        }
+
+        let repo_get_all: Vec<_> =
+            peers.iter().map(|(_, peer)| Rc::clone(peer)).collect();
+        repo.expect_get_all()
+            .returning_st(move || repo_get_all.clone());
+        repo.expect_get()
+            .returning_st(move |id| peers.get(&id).cloned());
+
+        let mut rpc = MockRpcClient::new();
+        let (command_tx, mut command_rx) = mpsc::unbounded();
+        rpc.expect_send_command().returning(move |command| {
+            command_tx.unbounded_send(command);
+        });
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(futures::stream::pending()));
+        rpc.expect_unsub().return_once(|| ());
+        rpc.expect_set_close_reason().return_once(|_| ());
+
+        (Room::new(Rc::new(rpc), repo), command_rx)
+    }
+
+    #[wasm_bindgen_test]
+    async fn track_patch_for_all_video() {
+        let (room, mut command_rx) = get_test_room_with_rpc_mock(1).await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await;
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                }]
+            }
+        );
+    }
+
+    #[wasm_bindgen_test]
+    async fn track_patch_for_many_tracks() {
+        let (room, mut command_rx) = get_test_room_with_rpc_mock(2).await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await;
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                }]
+            }
+        );
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(2),
+                tracks_patches: vec![TrackPatch {
+                    id: TrackId(2),
+                    is_muted: Some(true),
+                }]
+            }
+        );
+    }
+}
