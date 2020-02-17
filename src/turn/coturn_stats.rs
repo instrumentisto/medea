@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
 use rand::{distributions::Alphanumeric, Rng};
-use redis::{ConnectionInfo, IntoConnectionInfo, PubSub};
 
 use crate::{
     api::control::{EndpointId, MemberId, RoomId},
@@ -13,31 +12,84 @@ use crate::{
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
-use actix::{Actor, AsyncContext, StreamHandler};
+use actix::{Actor, AsyncContext, StreamHandler, WrapFuture};
 use futures::channel::mpsc;
 use medea_client_api_proto::PeerId;
+use medea_coturn_telnet::sessions_parser::TrafficUsage;
+use redis::{ConnectionInfo, IntoConnectionInfo, PubSub};
 use std::{collections::HashMap, time::Duration};
+
+#[derive(Clone, Debug)]
+pub struct Traffic {
+    pub received_packets: u64,
+    pub received_bytes: u64,
+    pub sent_packets: u64,
+    pub sent_bytes: u64,
+}
+
+impl Traffic {
+    pub fn parse(body: String) -> Result<Self, CoturnEventParseError> {
+        let mut items: HashMap<&str, u64> = body
+            .split(", ")
+            .map(|i| {
+                let mut splitted_item = i.split('=');
+                let key = splitted_item.next().ok_or_else(|| {
+                    CoturnEventParseError::FailedToParseTrafficMap(body.clone())
+                })?;
+                let value: u64 = splitted_item
+                    .next()
+                    .ok_or_else(|| {
+                        CoturnEventParseError::FailedToParseTrafficMap(
+                            body.clone(),
+                        )
+                    })?
+                    .parse()
+                    .map_err(|_| {
+                        CoturnEventParseError::FailedToParseTrafficMap(
+                            body.clone(),
+                        )
+                    })?;
+
+                Ok((key, value))
+            })
+            .collect::<Result<_, _>>()?;
+
+        let received_packets = items.remove("rcvp").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "rcvp".to_string(),
+            )
+        })?;
+        let received_bytes = items.remove("rcvb").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "rcvb".to_string(),
+            )
+        })?;
+        let sent_packets = items.remove("sentp").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "sentp".to_string(),
+            )
+        })?;
+        let sent_bytes = items.remove("sentb").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "sentb".to_string(),
+            )
+        })?;
+
+        Ok(Self {
+            received_packets,
+            received_bytes,
+            sent_packets,
+            sent_bytes,
+        })
+    }
+}
 
 #[derive(Debug)]
 pub enum CoturnAllocationEvent {
-    New {
-        lifetime: Duration,
-    },
-    Refreshed {
-        lifetime: Duration,
-    },
-    Traffic {
-        received_packets: u64,
-        received_bytes: u64,
-        sent_packets: u64,
-        sent_bytes: u64,
-    },
-    TotalTraffic {
-        received_packets: u64,
-        received_bytes: u64,
-        sent_packets: u64,
-        sent_bytes: u64,
-    },
+    New { lifetime: Duration },
+    Refreshed { lifetime: Duration },
+    Traffic { traffic: Traffic },
+    TotalTraffic { traffic: Traffic },
     Deleted,
 }
 
@@ -46,76 +98,13 @@ impl CoturnAllocationEvent {
         event_type: &str,
         body: String,
     ) -> Result<Self, CoturnEventParseError> {
-        const TOTAL_TRAFFIC: &str = "total_traffic";
-        const TRAFFIC: &str = "traffic";
-
         match event_type {
-            TOTAL_TRAFFIC | TRAFFIC => {
-                let mut items: HashMap<&str, u64> = body
-                    .split(", ")
-                    .map(|i| {
-                        let mut splitted_item = i.split('=');
-                        let key = splitted_item.next().ok_or_else(|| {
-                            CoturnEventParseError::FailedToParseTrafficMap(
-                                body.clone(),
-                            )
-                        })?;
-                        let value: u64 = splitted_item
-                            .next()
-                            .ok_or_else(|| {
-                                CoturnEventParseError::FailedToParseTrafficMap(
-                                    body.clone(),
-                                )
-                            })?
-                            .parse()
-                            .map_err(|_| {
-                                CoturnEventParseError::FailedToParseTrafficMap(
-                                    body.clone(),
-                                )
-                            })?;
-
-                        Ok((key, value))
-                    })
-                    .collect::<Result<_, _>>()?;
-
-                let received_packets =
-                    items.remove("rcvp").ok_or_else(|| {
-                        CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                            "rcvp".to_string(),
-                        )
-                    })?;
-                let received_bytes = items.remove("rcvb").ok_or_else(|| {
-                    CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                        "rcvb".to_string(),
-                    )
-                })?;
-                let sent_packets = items.remove("sentp").ok_or_else(|| {
-                    CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                        "sentp".to_string(),
-                    )
-                })?;
-                let sent_bytes = items.remove("sentb").ok_or_else(|| {
-                    CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                        "sentb".to_string(),
-                    )
-                })?;
-
-                if event_type == TOTAL_TRAFFIC {
-                    Ok(CoturnAllocationEvent::TotalTraffic {
-                        received_bytes,
-                        received_packets,
-                        sent_bytes,
-                        sent_packets,
-                    })
-                } else {
-                    Ok(CoturnAllocationEvent::Traffic {
-                        received_bytes,
-                        received_packets,
-                        sent_bytes,
-                        sent_packets,
-                    })
-                }
-            }
+            "total_traffic" => Ok(CoturnAllocationEvent::TotalTraffic {
+                traffic: Traffic::parse(body)?,
+            }),
+            "traffic" => Ok(CoturnAllocationEvent::Traffic {
+                traffic: Traffic::parse(body)?,
+            }),
             "status" => {
                 let mut splitted = body.split(' ');
                 let status = splitted
@@ -164,7 +153,7 @@ impl CoturnAllocationEvent {
 #[derive(Debug)]
 pub struct CoturnEvent {
     event: CoturnAllocationEvent,
-    member_id: MemberId,
+    room_id: RoomId,
     peer_id: PeerId,
     allocation_id: u64,
 }
@@ -176,12 +165,12 @@ impl CoturnEvent {
             .map_err(|_| CoturnEventParseError::NoChannelInfo)?;
         let mut channel_splitted = channel.split('/').skip(4);
 
-        let (member_id, peer_id) = {
+        let (room_id, peer_id) = {
             let user = channel_splitted
                 .next()
                 .ok_or(CoturnEventParseError::NoUserInfo)?;
             let mut user_splitted = user.split('_');
-            let member_id = MemberId(
+            let room_id = RoomId(
                 user_splitted
                     .next()
                     .ok_or(CoturnEventParseError::NoMemberId)?
@@ -195,7 +184,7 @@ impl CoturnEvent {
                     .map_err(|_| CoturnEventParseError::NoPeerId)?,
             );
 
-            (member_id, peer_id)
+            (room_id, peer_id)
         };
 
         let mut channel_splitted = channel_splitted.skip(1);
@@ -216,7 +205,7 @@ impl CoturnEvent {
 
         Ok(CoturnEvent {
             event,
-            member_id,
+            room_id,
             peer_id,
             allocation_id,
         })

@@ -67,14 +67,42 @@ pub struct Session {
     pub relay_addr: String,
     pub fingreprints_enforced: bool,
     pub mobile: bool,
-    pub usage_rp: String,
-    pub usage_rb: String,
-    pub usage_sp: String,
-    pub usage_sb: String,
+    pub traffic_usage: TrafficUsage,
     pub rate_sent: String,
     pub rate_receive: String,
     pub total_rate: String,
     pub peers: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TrafficUsage {
+    pub received_packets: u64,
+    pub received_bytes: u64,
+    pub sent_packets: u64,
+    pub sent_bytes: u64,
+}
+
+impl TrafficUsage {
+    pub fn parse(input: &str) -> IResult<&str, Self> {
+        let (input, rp) = coturn_stat(input, "rp=")?;
+        let received_packets = rp.parse().unwrap();
+        let (input, rb) = coturn_stat(input, "rb=")?;
+        let received_bytes = rb.parse().unwrap();
+        let (input, sp) = coturn_stat(input, "sp=")?;
+        let sent_packets = sp.parse().unwrap();
+        let (input, sb) = coturn_stat(input, "sb=")?;
+        let sent_bytes = sb.parse().unwrap();
+
+        Ok((
+            input,
+            Self {
+                received_packets,
+                received_bytes,
+                sent_packets,
+                sent_bytes,
+            },
+        ))
+    }
 }
 
 fn parse_session(input: &str) -> IResult<&str, Session> {
@@ -122,10 +150,7 @@ fn parse_session(input: &str) -> IResult<&str, Session> {
     let (input, mobile) = alpha1(input)?;
 
     let (input, _) = coturn_field_name(input, "usage:")?;
-    let (input, rp) = coturn_stat(input, "rp=")?;
-    let (input, rb) = coturn_stat(input, "rb=")?;
-    let (input, sp) = coturn_stat(input, "sp=")?;
-    let (input, sb) = coturn_stat(input, "sb=")?;
+    let (input, traffic_usage) = TrafficUsage::parse(input)?;
 
     let (input, _) = coturn_field_name(input, "rate:")?;
     let (input, rate_receive) = coturn_stat(input, "r=")?;
@@ -156,10 +181,7 @@ fn parse_session(input: &str) -> IResult<&str, Session> {
         relay_addr: relay_addr.to_string(),
         fingreprints_enforced: coturn_bool_to_bool(fingreprints_enforced),
         mobile: coturn_bool_to_bool(mobile),
-        usage_rp: rp.to_string(),
-        usage_rb: rb.to_string(),
-        usage_sp: sp.to_string(),
-        usage_sb: sb.to_string(),
+        traffic_usage,
         rate_receive: rate_receive.to_string(),
         rate_sent: rate_sent.to_string(),
         total_rate: total_rate.to_string(),

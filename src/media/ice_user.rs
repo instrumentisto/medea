@@ -2,8 +2,8 @@
 //!
 //! [coturn]: https://github.com/coturn/coturn
 
-use medea_client_api_proto::{IceServer, PeerId};
 use derive_more::{AsRef, Display, From, Into};
+use medea_client_api_proto::{IceServer, PeerId};
 
 use crate::api::control::{EndpointId, RoomId};
 
