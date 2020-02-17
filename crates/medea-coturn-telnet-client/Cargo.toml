@@ -1,0 +1,27 @@
+[package]
+name = "medea-coturn-telnet-client"
+version = "0.1.0-dev"
+edition = "2018"
+description = "Coturn TURN server telnet client"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+license = "BlueOak-1.0.0"
+documentation = "https://docs.rs/medea-coturn-telnet-client"
+homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-coturn-telnet-client"
+repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-coturn-telnet-client"
+readme = "README.md"
+keywords = ["coturn", "telnet", "cli"]
+categories = ["web-programming"]
+
+[dependencies]
+async-trait = "0.1"
+bytes = "0.5"
+deadpool = { version = "0.5", default-features = false , features = ["managed"]}
+derive_more = "0.99"
+futures = "0.3"
+once_cell = "1.3.1"
+regex = "1.3"
+tokio = { version = "0.2", features = ["dns", "macros", "tcp"] }
+tokio-util = { version = "0.2", features = ["codec"] }
+
+[dev-dependencies]
+tokio-test = "0.2"

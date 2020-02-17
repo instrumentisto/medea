@@ -3,7 +3,7 @@ use std::{fmt, ops::DerefMut};
 use deadpool::managed::PoolConfig;
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_coturn_telnet::{CoturnTelnetError, Manager, Pool, PoolError};
+use medea_coturn_telnet_client::{CoturnTelnetError, Manager, Pool, PoolError};
 
 use crate::media::IceUser;
 

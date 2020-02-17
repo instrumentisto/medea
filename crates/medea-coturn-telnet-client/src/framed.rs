@@ -12,6 +12,7 @@ use std::{
 };
 
 use bytes::{BufMut as _, Bytes, BytesMut};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -25,15 +26,13 @@ static NEED_PASS: &str = "Enter password: \r\n";
 /// Received when telnet server did not recognized last command.
 static UNKNOWN_COMMAND: &str = "Unknown command\r\n\r\n";
 
-lazy_static::lazy_static! {
-    // Used to check is message can be parsed to CoturnCliResponse::Sessions.
-    static ref IS_SESSIONS_REGEX: Regex =
-        Regex::new(r#"Total sessions: \d"#).unwrap();
+// Used to check is message can be parsed to CoturnCliResponse::Sessions.
+static IS_SESSIONS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"Total sessions: \d"#).unwrap());
 
-    // Used to extract session ids from CoturnCliResponse::Sessions.
-    static ref EXTRACT_SESSIONS_REGEX: Regex =
-        Regex::new(r"\d\) id=(.*),").unwrap();
-}
+// Used to extract session ids from CoturnCliResponse::Sessions.
+static EXTRACT_SESSIONS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\d\) id=(.*),").unwrap());
 
 /// Messages that can be received from Coturn telnet server.
 #[derive(Clone, Debug, PartialEq)]
@@ -115,6 +114,7 @@ impl TryFrom<BytesMut> for CoturnCliResponse {
 }
 
 /// Messages that can be sent to Coturn telnet client.
+#[derive(Debug)]
 pub enum CoturnCliRequest {
     /// Request to authenticate. Contains password. Should be sent when
     /// [`CoturnCliResponse::EnterPassword`] is received.
@@ -149,7 +149,11 @@ impl Into<Bytes> for CoturnCliRequest {
 /// [`CoturnCliResponse`].
 #[derive(Debug)]
 pub enum CoturnCliCodecError {
+    /// Errors that can happen while preforming I/O operations.
     IoError(io::Error),
+
+    /// Errors that can happen when parsing message received from Coturn via
+    /// telnet connection.
     CannotParseResponse(CoturnResponseParseError),
 }
 
@@ -169,7 +173,7 @@ impl From<CoturnResponseParseError> for CoturnCliCodecError {
 /// [Coturn] server telnet interface.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
-#[derive(Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct CoturnCliCodec;
 
 impl Decoder for CoturnCliCodec {
@@ -245,46 +249,74 @@ mod test {
     #[tokio::test]
     async fn parse_sessions() {
         let mut codec = CoturnCliCodec::default();
-        let mut greeting = "\r\n    1) id=007000000000000001, user
-         <bb_Ralph>:\r\n      realm: medea\r\n      started 49 secs ago\r\n
-         expiring in 551 secs\r\n      client protocol UDP, relay protocol
-         UDP\r\n      client addr 192.168.31.183:39514, server addr
-         127.0.0.1:3478\r\n      relay addr 127.0.0.1:55869\r\n
-         fingerprints enforced: OFF\r\n      mobile: OFF\r\n      usage: rp=6,
-         rb=480, sp=4, sb=440\r\n       rate: r=0, s=0, total=0 (bytes per
-         sec)\r\n\r\n    2) id=010000000000000002, user <bb_Ralph>:\r\n
-         realm: medea\r\n      started 49 secs ago\r\n      expiring in 551
-         secs\r\n      client protocol TCP, relay protocol UDP\r\n      client
-         addr [::1]:33710, server addr [::1]:3478\r\n      relay addr
-         [::1]:60216\r\n      fingerprints enforced: OFF\r\n      mobile:
-         OFF\r\n      usage: rp=4, rb=348, sp=3, sb=336\r\n       rate: r=0,
-         s=0, total=0 (bytes per sec)\r\n      peers:\r\n          ::1\r\n\r\n
-         3) id=000000000000000001, user <bb_Ralph>:\r\n      realm: medea\r\n
-         started 49 secs ago\r\n      expiring in 551 secs\r\n      client
-         protocol UDP, relay protocol UDP\r\n      client addr
-         192.168.31.183:59996, server addr 127.0.0.1:3478\r\n      relay addr
-         127.0.0.1:54289\r\n      fingerprints enforced: OFF\r\n      mobile:
-         OFF\r\n      usage: rp=5, rb=344, sp=4, sb=440\r\n       rate: r=0,
-         s=0, total=0 (bytes per sec)\r\n\r\n    4) id=005000000000000001,
-         user <bb_Ralph>:\r\n      realm: medea\r\n      started 49 secs
-         ago\r\n      expiring in 551 secs\r\n      client protocol TCP, relay
-         protocol UDP\r\n      client addr [::1]:33712, server addr
-         [::1]:3478\r\n      relay addr [::1]:52934\r\n      fingerprints
-         enforced: OFF\r\n      mobile: OFF\r\n      usage: rp=12288,
-         rb=10012764, sp=12288, sb=10022892\r\n       rate: r=222505,
-         s=222730, total=445235 (bytes per sec)\r\n      peers:\r\n
-         ::1\r\n          [::1]:62869\r\n\r\n  Total sessions: 4\r\n\r\n> "
-            .into();
+        let mut sessions_message = "
+    1) id=010000000000000001, user <777_Mireya>:
+      realm: medea
+      started 545 secs ago
+      expiring in 171 secs
+      client protocol TCP, relay protocol UDP
+      client addr [::1]:56278, server addr [::1]:3478
+      relay addr [::1]:58490
+      fingerprints enforced: OFF
+      mobile: OFF
+      usage: rp=878759, rb=704147763, sp=878425, sb=705869096
+       rate: r=1299165, s=1302341, total=2601506 (bytes per sec)
+      peers:
+          ::1
+          [::1]:65282
 
-        match codec.decode(&mut greeting).unwrap().unwrap() {
+    2) id=001000000000000002, user <777_Mireya>:
+      realm: medea
+      started 545 secs ago
+      expiring in 171 secs
+      client protocol UDP, relay protocol UDP
+      client addr 192.168.31.183:45096, server addr 127.0.0.1:3478
+      relay addr 127.0.0.1:57758
+      fingerprints enforced: OFF
+      mobile: OFF
+      usage: rp=16, rb=1080, sp=15, sb=1568
+       rate: r=0, s=0, total=0 (bytes per sec)
+
+    3) id=011000000000000002, user <777_Mireya>:
+      realm: medea
+      started 545 secs ago
+      expiring in 171 secs
+      client protocol UDP, relay protocol UDP
+      client addr 192.168.31.183:39916, server addr 127.0.0.1:3478
+      relay addr 127.0.0.1:55028
+      fingerprints enforced: OFF
+      mobile: OFF
+      usage: rp=17, rb=1212, sp=15, sb=1568
+       rate: r=0, s=0, total=0 (bytes per sec)
+
+    4) id=011000000000000003, user <777_Mireya>:
+      realm: medea
+      started 545 secs ago
+      expiring in 171 secs
+      client protocol TCP, relay protocol UDP
+      client addr [::1]:56276, server addr [::1]:3478
+      relay addr [::1]:61957
+      fingerprints enforced: OFF
+      mobile: OFF
+      usage: rp=155, rb=21184, sp=154, sb=23228
+       rate: r=0, s=0, total=0 (bytes per sec)
+      peers:
+          ::1
+
+  Total sessions: 4
+
+> "
+        .into();
+
+        match codec.decode(&mut sessions_message).unwrap().unwrap() {
             CoturnCliResponse::Sessions(sessions) => {
                 assert_eq!(
                     sessions,
                     vec![
-                        "007000000000000001",
-                        "010000000000000002",
-                        "000000000000000001",
-                        "005000000000000001"
+                        "010000000000000001",
+                        "001000000000000002",
+                        "011000000000000002",
+                        "011000000000000003"
                     ]
                 );
             }

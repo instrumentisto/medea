@@ -7,7 +7,7 @@ use futures::{SinkExt, StreamExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 
-use crate::codec::{
+use crate::framed::{
     CoturnCliCodec, CoturnCliCodecError, CoturnCliRequest, CoturnCliResponse,
     CoturnResponseParseError,
 };
@@ -49,11 +49,16 @@ impl From<CoturnCliCodecError> for CoturnTelnetError {
 /// from [`crate::pool::Pool`], which takes care of connection lifecycle.
 ///
 /// [Coturn]: https://github.com/coturn/coturn.
+#[derive(Debug)]
 pub struct CoturnTelnetConnection(Framed<TcpStream, CoturnCliCodec>);
 
 impl CoturnTelnetConnection {
     /// Opens a telnet connection to a remote host using a `TcpStream` and
     /// performs authentication.
+    ///
+    /// # Errors
+    ///
+    /// Errors if could not open [`TcpStream`] or authentication failed.
     pub async fn connect<A: ToSocketAddrs, B: Into<Bytes>>(
         addr: A,
         pass: B,
@@ -70,6 +75,14 @@ impl CoturnTelnetConnection {
     /// 1. Sends [`CoturnCliRequest::PrintSessions`] with provided
     /// username.
     /// 2. Awaits for [`CoturnCliResponse::Sessions`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if:
+    /// 1. Unable to send message to remote.
+    /// 2. Transport error while waiting for server response.
+    /// 3. Received unexpected (not [`CoturnCliResponse::Sessions`]) response
+    /// from remote.
     pub async fn print_sessions(
         &mut self,
         username: String,
@@ -96,6 +109,14 @@ impl CoturnTelnetConnection {
     ///
     /// 1. Sends [`CoturnCliRequest::CloseSession`] with specified session id.
     /// 2. Awaits for [`CoturnCliResponse::Ready`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if:
+    /// 1. Unable to send message to remote.
+    /// 2. Transport error while waiting for server response.
+    /// 3. Received unexpected (not [`CoturnCliResponse::Ready`]) response from
+    /// remote.
     pub async fn delete_session(
         &mut self,
         session_id: String,
@@ -122,6 +143,14 @@ impl CoturnTelnetConnection {
     /// For each provided session id:
     /// 1. Sends [`CoturnCliRequest::CloseSession`] with specified session id.
     /// 2. Awaits for [`CoturnCliResponse::Ready`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if:
+    /// 1. Unable to send message to remote.
+    /// 2. Transport error while waiting for server response.
+    /// 3. Received unexpected (not [`CoturnCliResponse::Ready`]) response from
+    /// remote.
     pub async fn delete_sessions<T: IntoIterator<Item = String>>(
         &mut self,
         session_ids: T,
@@ -137,6 +166,14 @@ impl CoturnTelnetConnection {
     /// 1. Awaits for [`CoturnCliResponse::EnterPassword`].
     /// 2. Sends [`CoturnCliRequest::Auth`].
     /// 3. Awaits for [`CoturnCliResponse::Ready`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if:
+    /// 1. Transport error while waiting for server response.
+    /// 2. First message received is not [`CoturnCliResponse::EnterPassword`].
+    /// 3. Unable to send message to remote.
+    /// 4. Second message received is not [`CoturnCliResponse::Ready`].
     async fn auth(&mut self, pass: Bytes) -> Result<(), CoturnTelnetError> {
         // Wait for `CoturnCliResponse::EnterPassword`;
         let response = self
@@ -169,6 +206,13 @@ impl CoturnTelnetConnection {
     }
 
     /// Pings Coturn telnet server.
+    ///
+    /// # Errors
+    ///
+    /// Errors if:
+    /// 1. Unable to send message to remote.
+    /// 2. Transport error while waiting for server response.
+    /// 3. First message received is not [`CoturnCliResponse::UnknownCommand`].
     pub async fn ping(&mut self) -> Result<(), CoturnTelnetError> {
         self.0.send(CoturnCliRequest::Ping).await?;
 

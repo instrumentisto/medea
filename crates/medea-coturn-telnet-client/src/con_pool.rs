@@ -5,13 +5,13 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,should_panic
 //! use std::ops::DerefMut;
-//! use coturn_telnet::{Manager, Pool};
+//! use medea_coturn_telnet_client::{Manager, Pool};
 //!
 //! let mut rt = tokio::runtime::Runtime::new().unwrap();
 //! rt.block_on(async {
-//!     let mgr = Manager::new((String::from("localhost"), 5766), "turn");
+//!     let mgr = Manager::new((String::from("localhost"), 1234), "turn");
 //!     let pool = Pool::new(mgr, 16);
 //!
 //!     let mut conn = pool.get().await.unwrap();
@@ -27,7 +27,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use deadpool::managed;
 
-use crate::connection::{CoturnTelnetConnection, CoturnTelnetError};
+use crate::client::{CoturnTelnetConnection, CoturnTelnetError};
 
 /// A type alias for using `deadpool::managed::Pool` with
 /// [`CoturnTelnetConnection`].
@@ -45,12 +45,14 @@ pub type Connection =
 type RecycleResult = managed::RecycleResult<CoturnTelnetError>;
 
 /// The manager for creating and recycling Coturn telnet connections.
+#[derive(Debug)]
 pub struct Manager {
     addr: (String, u16),
     pass: Bytes,
 }
 
 impl Manager {
+    /// Creates [`Manager`].
     pub fn new<P: Into<Bytes>>(addr: (String, u16), pass: P) -> Self {
         Self {
             addr,

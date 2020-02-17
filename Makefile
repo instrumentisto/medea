@@ -40,6 +40,9 @@ endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
 endif
+ifeq ($(crate),medea-coturn-telnet-client)
+crate-dir = "crates/medea-coturn-telnet-client"
+endif
 
 
 
@@ -346,6 +349,7 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
+	@make test.unit crate=medea-coturn-telnet-client
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
