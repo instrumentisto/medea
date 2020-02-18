@@ -103,9 +103,8 @@ pub enum ClientMsg {
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "command", content = "data")]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
@@ -142,8 +141,7 @@ pub enum Command {
 /// Web Client's Peer Connection metrics.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
@@ -152,8 +150,7 @@ pub enum PeerMetrics {
 /// Peer Connection's ICE connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IceConnectionState {
     New,
     Checking,

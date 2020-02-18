@@ -17,9 +17,7 @@ use medea_jason::{
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
-use crate::{
-    get_test_tracks, wait_and_check_test_result, MockNavigator,
-};
+use crate::{get_test_tracks, wait_and_check_test_result, MockNavigator};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -342,7 +340,7 @@ fn get_test_room_and_new_peer(
     (room, peer)
 }
 
-// TODO: allow muting before peer init
+// TODO: Allow muting before Peer init (instrumentisto/medea#85).
 //
 //#[wasm_bindgen_test]
 // async fn mute_audio_room_before_init_peer() {
@@ -800,6 +798,246 @@ mod rpc_close_reason_on_room_drop {
             ClientDisconnect::RoomClosed,
             "Room sets RPC close reason '{:?}' instead of 'RoomClosed.",
             close_reason,
+        );
+    }
+}
+
+/// Tests for [`TrackPatch`] generation in [`Room`].
+mod patches_generation {
+    use std::collections::HashMap;
+
+    use futures::StreamExt;
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatch,
+        VideoSettings,
+    };
+    use wasm_bindgen_futures::spawn_local;
+
+    use crate::await_with_timeout;
+
+    use super::*;
+
+    /// Returns [`Room`] with mocked [`PeerRepository`] with provided count of
+    /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
+    /// sent from this [`Room`].
+    ///
+    /// `audio_track_muted_state_fn`'s output will be used as `is_muted` value
+    /// for all audio [`Track`]s.
+    async fn get_room_and_commands_receiver(
+        peers_count: u64,
+        audio_track_muted_state_fn: impl Fn(u64) -> bool,
+    ) -> (Room, mpsc::UnboundedReceiver<Command>) {
+        let mut repo = Box::new(MockPeerRepository::new());
+
+        let mut peers = HashMap::new();
+        for i in 0..peers_count {
+            let (tx, _rx) = mpsc::unbounded();
+            let audio_track_id = TrackId(i + 1);
+            let video_track_id = TrackId(i + 2);
+            let audio_track = Track {
+                id: audio_track_id,
+                is_muted: (audio_track_muted_state_fn)(i),
+                media_type: MediaType::Audio(AudioSettings {}),
+                direction: Direction::Send {
+                    receivers: Vec::new(),
+                    mid: None,
+                },
+            };
+            let video_track = Track {
+                id: video_track_id,
+                is_muted: false,
+                media_type: MediaType::Video(VideoSettings {}),
+                direction: Direction::Send {
+                    receivers: Vec::new(),
+                    mid: None,
+                },
+            };
+            let tracks = vec![audio_track, video_track];
+            let peer_id = PeerId(i + 1);
+
+            let peer = Rc::new(
+                PeerConnection::new(
+                    peer_id,
+                    tx,
+                    vec![],
+                    Rc::new(MediaManager::default()),
+                    false,
+                )
+                .unwrap(),
+            );
+
+            peer.get_offer(tracks, None).await.unwrap();
+
+            peers.insert(peer_id, peer);
+        }
+
+        let repo_get_all: Vec<_> =
+            peers.iter().map(|(_, peer)| Rc::clone(peer)).collect();
+        repo.expect_get_all()
+            .returning_st(move || repo_get_all.clone());
+        repo.expect_get()
+            .returning_st(move |id| peers.get(&id).cloned());
+
+        let mut rpc = MockRpcClient::new();
+        let (command_tx, command_rx) = mpsc::unbounded();
+        rpc.expect_send_command().returning(move |command| {
+            command_tx.unbounded_send(command).unwrap();
+        });
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(futures::stream::pending()));
+        rpc.expect_unsub().return_once(|| ());
+        rpc.expect_set_close_reason().return_once(|_| ());
+
+        (Room::new(Rc::new(rpc), repo), command_rx)
+    }
+
+    /// Tests that [`Room`] normally generates [`TrackPatch`]s when have one
+    /// [`PeerConnection`] with one unmuted video [`Track`] and one unmuted
+    /// audio [`Track`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Get mock of [`Room`] and [`Command`]s receiver of this [`Room`] with
+    ///    one [`PeerConnection`]s.
+    ///
+    /// 2. Call [`RoomHandle::mute_audio`].
+    ///
+    /// 3. Check that [`Room`] tries to send one [`Command::UpdateTracks`] with
+    ///    one [`TrackPatch`] for audio [`Track`].
+    #[wasm_bindgen_test]
+    async fn track_patch_for_all_video() {
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(1, |_| false).await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                }]
+            }
+        );
+    }
+
+    /// Tests that [`Room`] normally generates [`TrackPatch`]s when have two
+    /// [`PeerConnection`] with one unmuted video [`Track`] and one unmuted
+    /// audio [`Track`] in both [`PeerConnection`]s.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Get mock of [`Room`] and [`Command`]s receiver of this [`Room`] with
+    ///    two [`PeerConnection`]s.
+    ///
+    /// 2. Call [`RoomHandle::mute_audio`].
+    ///
+    /// 3. Check that [`Room`] tries to send two [`Command::UpdateTracks`] for
+    ///    unmuted [`PeerConnection`]s. [`PeerConnection`]s.
+    #[wasm_bindgen_test]
+    async fn track_patch_for_many_tracks() {
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(2, |_| false).await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+        });
+
+        let mut commands = HashMap::new();
+        for _ in 0..2i32 {
+            let command = command_rx.next().await.unwrap();
+            match command {
+                Command::UpdateTracks {
+                    peer_id,
+                    tracks_patches,
+                } => {
+                    commands.insert(peer_id, tracks_patches);
+                }
+                _ => (),
+            }
+        }
+
+        assert_eq!(
+            commands.remove(&PeerId(1)).unwrap(),
+            vec![TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            }]
+        );
+
+        assert_eq!(
+            commands.remove(&PeerId(2)).unwrap(),
+            vec![TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(true),
+            }]
+        );
+    }
+
+    /// Tests that [`Room`] wouldn't generate [`TrackPatch`]s for already
+    /// unmuted [`PeerConnection`]s.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Get mock of [`Room`] and [`Command`]s receiver of this [`Room`] with
+    ///    two [`PeerConnection`]s.
+    ///
+    /// 2. Call [`RoomHandle::unmute_audio`].
+    ///
+    /// 3. Check that [`Room`] doesn't send [`Command::UpdateTracks`] with
+    ///    [`RpcClient`].
+    #[wasm_bindgen_test]
+    async fn try_to_unmute_unmuted() {
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(2, |_| false).await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.unmute_audio()).await.unwrap();
+        });
+
+        assert!(await_with_timeout(Box::pin(command_rx.next()), 5)
+            .await
+            .is_err());
+    }
+
+    /// Tests that [`Room`] will generate [`Command::UpdateTracks`] only for
+    /// unmuted [`PeerConnection`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Get mock of [`Room`] and [`Command`]s receiver of this [`Room`] with
+    ///    one unmuted [`PeerConnection`]s and one muted [`PeerConnection`].
+    ///
+    /// 2. Call [`RoomHandle::mute_audio`].
+    ///
+    /// 3. Check that [`Room`] tries to send [`Command::UpdateTracks`] only for
+    ///    unmuted [`PeerConnection`].
+    #[wasm_bindgen_test]
+    async fn mute_room_with_one_muted_track() {
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(2, |i| i % 2 == 0).await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(2),
+                tracks_patches: vec![TrackPatch {
+                    id: TrackId(2),
+                    is_muted: Some(true),
+                }]
+            }
         );
     }
 }
