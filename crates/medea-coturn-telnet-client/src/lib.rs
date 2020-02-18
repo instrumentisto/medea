@@ -1,10 +1,14 @@
-//! Implements client to access [Coturn] telnet cli. You can use
-//! [`CoturnTelnetConnection`] directly, but it is recommended to use connection
-//! pool based on [deadpool] that will take care of connection lifecycle.
+//! [Telnet] client implementation to access [Coturn] admin interface (cli).
+//!
+//! You may use [`CoturnTelnetConnection`] directly, but it is recommended
+//! to use connections pool (based on [deadpool]) that will take care of
+//! connections lifecycle. Enable `pool` feature for that.
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 //! [deadpool]: https://crates.io/crates/deadpool
+//! [Telnet]: https://en.wikipedia.org/wiki/Telnet
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(
     intra_doc_link_resolution_failure,
     missing_debug_implementations,
@@ -27,10 +31,10 @@
 )]
 
 pub mod client;
-pub mod con_pool;
-pub mod framed;
+#[cfg(feature = "pool")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pool")))]
+pub mod pool;
+pub mod proto;
 
 #[doc(inline)]
-pub use client::{CoturnTelnetConnection, CoturnTelnetError};
-#[doc(inline)]
-pub use con_pool::{Connection, Manager, Pool, PoolError};
+pub use self::client::{CoturnTelnetConnection, CoturnTelnetError};

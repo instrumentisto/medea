@@ -1,9 +1,7 @@
-//! Contains definitions for messages sent to [Coturn] server telnet interface
-//! [`CoturnCliRequest`], messages received from Coturn server telnet interface:
-//! [`CoturnCliResponse`]. [`CoturnCliCodec`] which encodes and decodes those
-//! messages.
+//! [Telnet] messages to operate with [Coturn] and their encoding.
 //!
 //! [Coturn]: https://github.com/coturn/coturn
+//! [Telnet]: https://en.wikipedia.org/wiki/Telnet
 
 use std::{
     convert::TryFrom,
@@ -12,74 +10,106 @@ use std::{
 };
 
 use bytes::{BufMut as _, Bytes, BytesMut};
+use derive_more::{Display, From};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use tokio_util::codec::{Decoder, Encoder};
 
-// Cursor is received when telnet server has finished writing response and is
-// ready to receive new requests.
+/// [`CURSOR`] is received whenever [Telnet] server has finished writing
+/// response and is ready to receive new requests.
+///
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
 static CURSOR: &str = "> ";
 
-// Received when telnet server awaits for password.
+/// Received whenever [Telnet] server awaits for password.
+///
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
 static NEED_PASS: &str = "Enter password: \r\n";
 
-/// Received when telnet server did not recognized last command.
+/// Received whenever [Telnet] server didn't recognized last command.
+///
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
 static UNKNOWN_COMMAND: &str = "Unknown command\r\n\r\n";
 
-// Used to check is message can be parsed to CoturnCliResponse::Sessions.
+/// Regular expression to check if message can be parsed as
+/// [`CoturnCliResponse::Sessions`].
 static IS_SESSIONS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"Total sessions: \d"#).unwrap());
 
-// Used to extract session ids from CoturnCliResponse::Sessions.
+/// Regular expression to extract session IDs from
+/// [`CoturnCliResponse::Sessions`].
 static EXTRACT_SESSIONS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\d\) id=(.*),").unwrap());
 
-/// Messages that can be received from Coturn telnet server.
-#[derive(Clone, Debug, PartialEq)]
+/// Message that is received from [Coturn] server via [Telnet].
+///
+/// [Coturn]: https://github.com/coturn/coturn
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CoturnCliResponse {
-    /// Current telnet connection requires authentication. Next message sent to
-    /// server should be [`CoturnCliRequest::Auth`].
+    /// Current [Telnet] connection requires authentication.
+    ///
+    /// Next message sent to server should be [`CoturnCliRequest::Auth`].
+    ///
+    /// [Telnet]: https://en.wikipedia.org/wiki/Telnet
     EnterPassword,
 
-    /// Coturn server finished processing latest telnet request and is ready to
-    /// accept next. You should wait for this message after sending request
-    /// to make sure that request succeeded.
+    /// [Coturn] server has finished processing latest [Telnet] request and
+    /// is ready to accept the next one.
+    ///
+    /// You should wait for this message after sending request to make sure
+    /// that the request has succeeded.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    /// [Telnet]: https://en.wikipedia.org/wiki/Telnet
     Ready,
 
-    /// Answer to [`CoturnCliRequest::PrintSessions`], contains list of session
-    /// ids associated with username provided in
+    /// Answer to [`CoturnCliRequest::PrintSessions`], which contains list of
+    /// session IDs associated with the provided username in
     /// [`CoturnCliRequest::PrintSessions`] message.
     Sessions(Vec<String>),
 
-    /// Coturn telnet server did not recognized last command.
+    /// [Coturn] server hasn't recognized last [Telnet] command.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    /// [Telnet]: https://en.wikipedia.org/wiki/Telnet
     UnknownCommand,
 }
 
-/// Errors that can happen when parsing message received from Coturn via telnet
-/// connection.
-#[derive(Debug)]
+/// Errors that can happen when parsing message received from [Coturn] via
+/// [Telnet] connection.
+///
+/// [Coturn]: https://github.com/coturn/coturn
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
+#[derive(Debug, Display, From)] // TODO: derive(Error) with derive_more
 pub enum CoturnResponseParseError {
-    /// Could not represent byte slice as `String`.
-    BadString(Utf8Error),
-
-    /// Could not determine concrete response type.
-    CannotDetermineResponseType(String),
-
-    /// Could not parse provided bytes to determined response type.
+    /// Couldn't parse provided bytes to determined response type.
+    #[display(fmt = "Bad response format: {}", _0)]
+    #[from(ignore)]
     BadResponseFormat(String),
+
+    /// Failed to determine concrete response type.
+    #[display(fmt = "Bad response type: {}", _0)]
+    #[from(ignore)]
+    BadResponseType(String),
+
+    /// Failed to represent provided bytes as [`String`].
+    #[display(fmt = "Cannot convert to String: {}", _0)]
+    BadString(Utf8Error),
 }
 
 impl TryFrom<BytesMut> for CoturnCliResponse {
     type Error = CoturnResponseParseError;
 
     fn try_from(mut msg: BytesMut) -> Result<Self, Self::Error> {
+        use CoturnResponseParseError::*;
+
         // delete cursor if message ends with it
         if msg.ends_with(CURSOR.as_bytes()) {
             msg.truncate(msg.len() - CURSOR.as_bytes().len());
         }
 
-        let msg =
-            from_utf8(&msg).map_err(CoturnResponseParseError::BadString)?;
+        let msg = from_utf8(&msg)?;
 
         if msg.is_empty() {
             return Ok(CoturnCliResponse::Ready);
@@ -94,86 +124,79 @@ impl TryFrom<BytesMut> for CoturnCliResponse {
         }
 
         if IS_SESSIONS_REGEX.is_match(msg) {
-            let mut session_ids: Vec<String> = Vec::new();
+            let mut ids: Vec<String> = Vec::new();
             for mat in EXTRACT_SESSIONS_REGEX.captures_iter(msg) {
                 if let Some(id) = mat.get(1) {
-                    session_ids.push(id.as_str().to_owned());
+                    ids.push(id.as_str().to_owned());
                 } else {
-                    return Err(CoturnResponseParseError::BadResponseFormat(
-                        msg.to_owned(),
-                    ));
+                    return Err(BadResponseFormat(msg.to_owned()));
                 }
             }
-            return Ok(CoturnCliResponse::Sessions(session_ids));
+            return Ok(CoturnCliResponse::Sessions(ids));
         }
 
-        Err(CoturnResponseParseError::CannotDetermineResponseType(
-            msg.to_owned(),
-        ))
+        Err(BadResponseType(msg.to_owned()))
     }
 }
 
-/// Messages that can be sent to Coturn telnet client.
-#[derive(Debug)]
+/// Messages that can be sent to [Coturn] server via [Telnet].
+///
+/// [Coturn]: https://github.com/coturn/coturn
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CoturnCliRequest {
-    /// Request to authenticate. Contains password. Should be sent when
+    /// Authentication request. Contains password. Should be sent when
     /// [`CoturnCliResponse::EnterPassword`] is received.
     Auth(Bytes),
 
-    /// Get Coturn session ids by username.
+    /// Request to retrieve [Coturn] session IDs by username.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
     PrintSessions(String),
 
-    /// Close Coturn session by its id.
+    /// Close [Coturn] session by its ID.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
     CloseSession(String),
 
-    /// Ping
+    /// Ping request.
     Ping,
 }
 
-impl Into<Bytes> for CoturnCliRequest {
-    fn into(self) -> Bytes {
-        match self {
-            CoturnCliRequest::Auth(pass) => pass,
-            CoturnCliRequest::PrintSessions(username) => {
-                format!("ps {}", username).into()
-            }
-            CoturnCliRequest::CloseSession(session_id) => {
-                format!("cs {}", session_id).into()
-            }
-            CoturnCliRequest::Ping => "ping".into(),
+impl From<CoturnCliRequest> for Bytes {
+    fn from(req: CoturnCliRequest) -> Self {
+        use CoturnCliRequest::*;
+        match req {
+            Auth(pass) => pass,
+            PrintSessions(username) => format!("ps {}", username).into(),
+            CloseSession(session_id) => format!("cs {}", session_id).into(),
+            Ping => "ping".into(),
         }
     }
 }
 
-/// Errors that can happen while decoding bytes received to
+/// Errors that can happen while decoding bytes received as
 /// [`CoturnCliResponse`].
-#[derive(Debug)]
+#[derive(Debug, Display, From)] // TODO: derive(Error) with derive_more
 pub enum CoturnCliCodecError {
-    /// Errors that can happen while preforming I/O operations.
-    IoError(io::Error),
+    /// Failed to perform I/O operation.
+    #[display(fmt = "I/O operation failed: {}", _0)]
+    IoFailed(io::Error),
 
-    /// Errors that can happen when parsing message received from Coturn via
-    /// telnet connection.
-    CannotParseResponse(CoturnResponseParseError),
+    /// Failed to parse received response from [Coturn].
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    #[display(fmt = "Cannot parse response: {}", _0)]
+    BadResponse(CoturnResponseParseError),
 }
 
-impl From<io::Error> for CoturnCliCodecError {
-    fn from(err: io::Error) -> Self {
-        CoturnCliCodecError::IoError(err)
-    }
-}
-
-impl From<CoturnResponseParseError> for CoturnCliCodecError {
-    fn from(err: CoturnResponseParseError) -> Self {
-        CoturnCliCodecError::CannotParseResponse(err)
-    }
-}
-
-/// Adapter that encodes requests and decodes responses received from or sent to
-/// [Coturn] server telnet interface.
+/// Adapter for encoding [`CoturnCliRequest`]s and decoding
+/// [`CoturnCliResponse`]s received from or sent to
+/// [Coturn] server via [Telnet] interface.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
-#[derive(Copy, Clone, Default, Debug)]
+/// [Telnet]: https://en.wikipedia.org/wiki/Telnet
+#[derive(Clone, Copy, Debug, Default)]
 pub struct CoturnCliCodec;
 
 impl Decoder for CoturnCliCodec {
@@ -213,32 +236,38 @@ impl Encoder for CoturnCliCodec {
 }
 
 #[cfg(test)]
-mod test {
-
-    use bytes::BytesMut;
-
+mod spec {
     use super::*;
 
     #[tokio::test]
-    async fn parse_greeting() {
+    async fn parses_greeting() {
         let mut codec = CoturnCliCodec::default();
-        let mut greeting: BytesMut = "TURN Server\r\nCoturn-4.5.1.1 'dan \
-                                      Eider'\r\n\r\nType '?' for \
-                                      help\r\nEnter password: \r\n"
+        #[rustfmt::skip]
+        let mut greeting = "\
+        TURN Server\r\n\
+        Coturn-4.5.1.1 'dan Eider'\r\n\
+        \r\n\
+        Type '?' for help\r\n\
+        Enter password: \r\n"
             .into();
 
-        assert_eq!(
-            codec.decode(&mut greeting).unwrap().unwrap(),
-            CoturnCliResponse::EnterPassword
-        );
+        let decoded = codec
+            .decode(&mut greeting)
+            .expect("Failed to decode")
+            .unwrap();
+        assert_eq!(decoded, CoturnCliResponse::EnterPassword);
     }
 
     #[tokio::test]
-    async fn parse_empty_sessions() {
+    async fn parses_empty_sessions() {
         let mut codec = CoturnCliCodec::default();
         let mut greeting = "\r\n  Total sessions: 0\r\n\r\n> ".into();
 
-        match codec.decode(&mut greeting).unwrap().unwrap() {
+        match codec
+            .decode(&mut greeting)
+            .expect("Failed to decode")
+            .unwrap()
+        {
             CoturnCliResponse::Sessions(sessions) => {
                 assert!(sessions.is_empty());
             }
@@ -247,9 +276,9 @@ mod test {
     }
 
     #[tokio::test]
-    async fn parse_sessions() {
+    async fn parses_sessions() {
         let mut codec = CoturnCliCodec::default();
-        let mut sessions_message = "
+        let mut message = "
     1) id=010000000000000001, user <777_Mireya>:
       realm: medea
       started 545 secs ago
@@ -308,7 +337,11 @@ mod test {
 > "
         .into();
 
-        match codec.decode(&mut sessions_message).unwrap().unwrap() {
+        match codec
+            .decode(&mut message)
+            .expect("Failed to decode")
+            .unwrap()
+        {
             CoturnCliResponse::Sessions(sessions) => {
                 assert_eq!(
                     sessions,
@@ -316,8 +349,8 @@ mod test {
                         "010000000000000001",
                         "001000000000000002",
                         "011000000000000002",
-                        "011000000000000003"
-                    ]
+                        "011000000000000003",
+                    ],
                 );
             }
             _ => unreachable!(),
