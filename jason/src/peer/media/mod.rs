@@ -547,7 +547,7 @@ impl Sender {
         };
 
         // TODO: this is temporary disabled, until we resolve case of muting
-        //       senders, that were added after user muted room.
+        //       senders, that were added after muting room.
 //        track.set_enabled_by_mute_state(stable_mute_state);
         sender.track.borrow_mut().replace(track);
 
