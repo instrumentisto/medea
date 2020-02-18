@@ -181,6 +181,7 @@ pub mod test {
     #[derive(Clone, Copy, Debug)]
     struct TurnAuthServiceMock;
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     #[async_trait]
     impl TurnAuthService for TurnAuthServiceMock {
         async fn create(

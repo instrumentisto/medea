@@ -11,7 +11,7 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{self, FutureExt as _, LocalBoxFuture};
+use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
@@ -356,7 +356,7 @@ impl Room {
         match self.send_peer_created(first_peer, second_peer) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
                 if res.is_ok() {
-                    return Box::new(future::ready(()).into_actor(this));
+                    return Box::new(actix::fut::ready(()));
                 }
                 error!(
                     "Failed connect peers, because {}. Room [id = {}] will be \
@@ -438,7 +438,7 @@ impl Room {
                     match e {
                         RoomError::ConnectionNotExists(_)
                         | RoomError::UnableToSendEvent(_) => {
-                            Box::new(future::ready(()).into_actor(this))
+                            Box::new(actix::fut::ready(()))
                         }
                         _ => {
                             error!(
@@ -450,7 +450,7 @@ impl Room {
                         }
                     }
                 } else {
-                    Box::new(future::ready(()).into_actor(this))
+                    Box::new(actix::fut::ready(()))
                 }
             },
         ))
@@ -817,8 +817,12 @@ impl RpcServer for Addr<Room> {
     }
 
     /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
-    fn send_command(&self, msg: Command) -> LocalBoxFuture<'static, ()> {
-        self.send(CommandMessage::from(msg))
+    fn send_command(
+        &self,
+        member_id: MemberId,
+        msg: Command,
+    ) -> LocalBoxFuture<'static, ()> {
+        self.send(CommandMessage::new(member_id, msg))
             .map(|res| {
                 if let Err(e) = res {
                     error!("Failed to send CommandMessage cause {:?}", e);
@@ -923,7 +927,7 @@ impl CommandHandler for Room {
         // TODO: add E2E test
         if candidate.candidate.is_empty() {
             warn!("Empty candidate from Peer: {}, ignoring", from_peer_id);
-            return Ok(Box::new(future::ok(()).into_actor(self)));
+            return Ok(Box::new(actix::fut::ok(())));
         }
 
         let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
@@ -966,7 +970,7 @@ impl CommandHandler for Room {
         _peer_id: PeerId,
         _candidate: PeerMetrics,
     ) -> Self::Output {
-        Ok(Box::new(future::ok(()).into_actor(self)))
+        Ok(Box::new(actix::fut::ok(())))
     }
 }
 
@@ -1082,33 +1086,38 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        if let Err(err) = self.validate_command(&msg) {
-            info!(
-                "Command from Member [{}], failed validation cause: {}",
-                msg.member_id, err
-            );
-        };
-
-        let fut = match Command::from(msg).dispatch_with(self) {
-            Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
-                if let Err(e) = res {
+        let fut = match self.validate_command(&msg) {
+            Ok(_) => match msg.command.dispatch_with(self) {
+                Ok(res) => {
+                    Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
+                        if let Err(e) = res {
+                            error!(
+                                "Failed handle command, because {}. Room [id \
+                                 = {}] will be stopped.",
+                                e, this.id,
+                            );
+                            this.close_gracefully(ctx)
+                        } else {
+                            Box::new(actix::fut::ready(()))
+                        }
+                    }))
+                }
+                Err(err) => {
                     error!(
                         "Failed handle command, because {}. Room [id = {}] \
                          will be stopped.",
-                        e, this.id,
+                        err, self.id,
                     );
-                    this.close_gracefully(ctx)
-                } else {
-                    Box::new(future::ready(()).into_actor(this))
+                    self.close_gracefully(ctx)
                 }
-            })),
+            },
             Err(err) => {
-                error!(
-                    "Failed handle command, because {}. Room [id = {}] will \
-                     be stopped.",
-                    err, self.id,
+                warn!(
+                    "Ignoring Command from Member [{}] that failed validation \
+                     cause: {}",
+                    msg.member_id, err
                 );
-                self.close_gracefully(ctx)
+                Box::new(actix::fut::ready(()))
             }
         };
         ResponseActAnyFuture(fut)
@@ -1369,41 +1378,69 @@ mod test {
 
     #[test]
     fn command_validation_peer_not_found() {
-
         let mut room = empty_room();
 
-        let member1 = MemberSpec::new(Pipeline::new(HashMap::new()), String::from("w/e"), None, None);
+        let member1 = MemberSpec::new(
+            Pipeline::new(HashMap::new()),
+            String::from("w/e"),
+            None,
+            None,
+        );
 
-        room.create_member(MemberId(String::from("member1")), &member1).unwrap();
+        room.create_member(MemberId(String::from("member1")), &member1)
+            .unwrap();
 
-        let no_such_peer = CommandMessage::new(MemberId(String::from("member1")), Command::SetIceCandidate { peer_id: PeerId(1), candidate: IceCandidate {
-            candidate: "".to_string(),
-            sdp_m_line_index: None,
-            sdp_mid: None
-        } });
+        let no_such_peer = CommandMessage::new(
+            MemberId(String::from("member1")),
+            Command::SetIceCandidate {
+                peer_id: PeerId(1),
+                candidate: IceCandidate {
+                    candidate: "".to_string(),
+                    sdp_m_line_index: None,
+                    sdp_mid: None,
+                },
+            },
+        );
 
         let validation = room.validate_command(&no_such_peer);
 
-        assert_eq!(validation, Err(CommandValidationError::PeerNotFound(PeerId(1))));
+        assert_eq!(
+            validation,
+            Err(CommandValidationError::PeerNotFound(PeerId(1)))
+        );
     }
 
     #[test]
     fn command_validation_peer_does_not_belong_to_member() {
-
         let mut room = empty_room();
 
-        let member1 = MemberSpec::new(Pipeline::new(HashMap::new()), String::from("w/e"), None, None);
+        let member1 = MemberSpec::new(
+            Pipeline::new(HashMap::new()),
+            String::from("w/e"),
+            None,
+            None,
+        );
 
-        room.create_member(MemberId(String::from("member1")), &member1).unwrap();
+        room.create_member(MemberId(String::from("member1")), &member1)
+            .unwrap();
 
-        let no_such_peer = CommandMessage::new(MemberId(String::from("member1")), Command::SetIceCandidate { peer_id: PeerId(1), candidate: IceCandidate {
-            candidate: "".to_string(),
-            sdp_m_line_index: None,
-            sdp_mid: None
-        } });
+        let no_such_peer = CommandMessage::new(
+            MemberId(String::from("member1")),
+            Command::SetIceCandidate {
+                peer_id: PeerId(1),
+                candidate: IceCandidate {
+                    candidate: "".to_string(),
+                    sdp_m_line_index: None,
+                    sdp_mid: None,
+                },
+            },
+        );
 
         let validation = room.validate_command(&no_such_peer);
 
-        assert_eq!(validation, Err(CommandValidationError::PeerNotFound(PeerId(1))));
+        assert_eq!(
+            validation,
+            Err(CommandValidationError::PeerNotFound(PeerId(1)))
+        );
     }
 }

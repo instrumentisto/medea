@@ -20,6 +20,7 @@ pub struct CommandMessage {
 }
 
 impl CommandMessage {
+    /// Creates [`CommandMessage`].
     pub fn new(member_id: MemberId, command: Command) -> Self {
         Self { member_id, command }
     }

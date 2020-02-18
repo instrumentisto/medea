@@ -74,7 +74,7 @@ impl Into<RoomElement> for MemberSpec {
 }
 
 impl MemberSpec {
-
+    /// Creates [`MemberSpec`].
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
         credentials: String,
