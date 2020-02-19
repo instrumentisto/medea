@@ -6,7 +6,7 @@ labels: {}
 server:
   image:
     repository: instrumentisto/medea
-    tag: latest
+    tag: edge
     pullPolicy: IfNotPresent
 
   # Medea media server configuration:
@@ -64,7 +64,7 @@ server:
   control-mock:
     image:
       repository: instrumentisto/medea-control-api-mock
-      tag: latest
+      tag: edge
       pullPolicy: IfNotPresent
 
     # Medea's Control API mock server configuration.
@@ -81,10 +81,13 @@ server:
 
     # Coturn TURN server configuration.
     conf:
-      listening_port: 3478
-      # IP adress to be used by Coturn as `external-ip`.
+      listening-port: 3478
+      # Admin interface (CLI management) configuration.
+      cli-port: 5766
+      cli-password: turn
+      # IP address to be used by Coturn as external.
       # If empty then `status.hostIP` of Pod will be used.
-      external_ip: ""
+      external-ip: ""
 
     extraArgs: []
       # - --verbose

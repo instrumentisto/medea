@@ -79,6 +79,11 @@ jobs:
       rust: stable
       script: make test.unit crate=medea-macro
 
+    - name: unit medea-coturn-telnet-client (stable)
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea-coturn-telnet-client
+
     - name: unit medea-client-api-proto (stable)
       stage: test
       rust: stable

@@ -1,10 +1,6 @@
 //! STUN/TURN server settings.
 
-use std::{
-    borrow::Cow,
-    net::{IpAddr, Ipv4Addr},
-    time::Duration,
-};
+use std::{borrow::Cow, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
@@ -13,20 +9,35 @@ use smart_default::SmartDefault;
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Turn {
-    /// Database settings
-    pub db: Db,
-    /// Host of STUN/TURN server. Defaults to `localhost`.
+    /// Host of STUN/TURN server.
+    ///
+    /// Defaults to `localhost`.
     #[default = "localhost"]
     pub host: Cow<'static, str>,
-    /// Port to connect TURN server. Defaults to `3478`.
+
+    /// Port of TURN server.
+    ///
+    /// Defaults to `3478`.
     #[default = 3478]
     pub port: u16,
-    /// Username for authorize on TURN server.
-    #[default(String::from("USER"))]
-    pub user: String,
-    /// Password for authorize on TURN server.
-    #[default(String::from("PASS"))]
-    pub pass: String,
+
+    /// Name of static user to authenticate on TURN server as.
+    ///
+    /// Defaults to `USER`.
+    #[default = "USER"]
+    pub user: Cow<'static, str>,
+
+    /// Password of static user to authenticate on TURN server with.
+    ///
+    /// Defaults to `PASS`.
+    #[default = "PASS"]
+    pub pass: Cow<'static, str>,
+
+    /// Database settings
+    pub db: Db,
+
+    /// Admin interface settings.
+    pub cli: CoturnCli,
 }
 
 impl Turn {
@@ -40,78 +51,185 @@ impl Turn {
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Db {
-    /// Redis server settings.
+    /// [Redis] database settings.
+    ///
+    /// [Redis]: https://redis.io
     pub redis: Redis,
 }
 
-/// Setting of [Redis] server which used by [coturn].
+/// Setting of [Redis] database server which backs [Coturn] storage.
 ///
-/// [Redis]: https://redis.io/
-/// [coturn]: https://github.com/coturn/coturn
+/// [Coturn]: https://github.com/coturn/coturn
+/// [Redis]: https://redis.io
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Redis {
-    /// IP address Redis server. Defaults to `127.0.0.1`.
-    #[default(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
-    pub ip: IpAddr,
-    /// Port to connect Redis server. Defaults to `6379`.
+    /// Host of Redis database server.
+    ///
+    /// Defaults to `127.0.0.1`.
+    #[default = "127.0.0.1"]
+    pub host: Cow<'static, str>,
+
+    /// Port of Redis database server for client connections.
+    ///
+    /// Defaults to `6379`.
     #[default = 6379]
     pub port: u16,
-    /// Password for authorize on Redis server.
-    #[default(String::from("turn"))]
-    pub pass: String,
-    /// The database number to use. This is usually 0.
+
+    /// Password to authenticate on Redis database server with.
+    ///
+    /// Defaults to `turn`.
+    #[default = "turn"]
+    pub pass: Cow<'static, str>,
+
+    /// The Redis database number to use. This is usually `0`.
+    ///
+    /// Defaults to `0`.
     #[default = 0]
     pub db_number: i64,
-    /// The duration to wait to start a connection before returning err.
+
+    // TODO: replace with PoolConfig
+    /// Timeout for establishing connection with Redis database server.
     #[default(Duration::from_secs(5))]
     #[serde(with = "humantime_serde")]
-    pub connection_timeout: Duration,
+    pub connect_timeout: Duration,
+}
+
+/// Settings of [Coturn]'s admin interface.
+///
+/// [Coturn]: https://github.com/coturn/coturn
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct CoturnCli {
+    /// Host of admin interface.
+    ///
+    /// Defaults to `127.0.0.1`.
+    #[default = "127.0.0.1"]
+    pub host: Cow<'static, str>,
+
+    /// Port of interface for [Telnet] connections.
+    ///
+    /// Defaults to `5766`.
+    ///
+    /// [Telnet]: https://en.wikipedia.org/wiki/Telnet
+    #[default = 5766]
+    pub port: u16,
+
+    /// Password to authenticate on admin interface with.
+    ///
+    /// Defaults to `turn`.
+    #[default = "turn"]
+    pub pass: Cow<'static, str>,
+
+    /// Settings for pool of connections with admin interface.
+    pub pool: PoolConfig,
+}
+
+/// Settings for pool of connections with [Coturn]'s admin interface.
+///
+/// [Coturn]: https://github.com/coturn/coturn
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct PoolConfig {
+    /// Maximum size of the pool.
+    ///
+    /// Defaults to `16`.
+    #[default = 16]
+    pub max_size: usize,
+
+    /// Waiting timeout for an available connection in the pool.
+    ///
+    /// Defaults to `2s`.
+    #[default(Duration::from_secs(2))]
+    #[serde(with = "humantime_serde")]
+    pub wait_timeout: Duration,
+
+    /// Timeout for establishing connection.
+    ///
+    /// Defaults to `2s`.
+    #[default(Duration::from_secs(2))]
+    #[serde(with = "humantime_serde")]
+    pub connect_timeout: Duration,
+
+    /// Timeout for recycling established connection.
+    ///
+    /// Defaults to `2s`.
+    #[default(Duration::from_secs(2))]
+    #[serde(with = "humantime_serde")]
+    pub recycle_timeout: Duration,
+}
+
+impl From<PoolConfig> for deadpool::managed::PoolConfig {
+    fn from(cfg: PoolConfig) -> Self {
+        Self {
+            max_size: cfg.max_size,
+            timeouts: deadpool::managed::Timeouts {
+                wait: if cfg.wait_timeout.as_nanos() == 0 {
+                    None
+                } else {
+                    Some(cfg.wait_timeout)
+                },
+                create: if cfg.connect_timeout.as_nanos() == 0 {
+                    None
+                } else {
+                    Some(cfg.connect_timeout)
+                },
+                recycle: if cfg.recycle_timeout.as_nanos() == 0 {
+                    None
+                } else {
+                    Some(cfg.recycle_timeout)
+                },
+            },
+        }
+    }
 }
 
 #[cfg(test)]
 mod spec {
-    use std::{net::Ipv4Addr, time::Duration};
-
     use serial_test_derive::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
+
+    use super::*;
 
     #[test]
     #[serial]
     fn redis_db_overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__DB__REDIS__IP" => "5.5.5.5",
+            "MEDEA_TURN__DB__REDIS__HOST" => "5.5.5.5",
             "MEDEA_TURN__DB__REDIS__PORT" => "1234",
             "MEDEA_TURN__DB__REDIS__PASS" => "hellofellow",
             "MEDEA_TURN__DB__REDIS__DB_NUMBER" => "10",
-            "MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT" => "10s",
+            "MEDEA_TURN__DB__REDIS__CONNECT_TIMEOUT" => "10s",
         );
 
-        assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
+        assert_ne!(
+            default_conf.turn.db.redis.host,
+            env_conf.turn.db.redis.host,
+        );
         assert_ne!(
             default_conf.turn.db.redis.port,
-            env_conf.turn.db.redis.port
+            env_conf.turn.db.redis.port,
         );
         assert_ne!(
             default_conf.turn.db.redis.pass,
-            env_conf.turn.db.redis.pass
+            env_conf.turn.db.redis.pass,
         );
         assert_ne!(
             default_conf.turn.db.redis.db_number,
-            env_conf.turn.db.redis.db_number
+            env_conf.turn.db.redis.db_number,
         );
         assert_ne!(
-            default_conf.turn.db.redis.connection_timeout,
-            env_conf.turn.db.redis.connection_timeout
+            default_conf.turn.db.redis.connect_timeout,
+            env_conf.turn.db.redis.connect_timeout,
         );
 
-        assert_eq!(env_conf.turn.db.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.db.redis.host, "5.5.5.5");
         assert_eq!(env_conf.turn.db.redis.port, 1234);
         assert_eq!(
-            env_conf.turn.db.redis.connection_timeout,
-            Duration::from_secs(10)
+            env_conf.turn.db.redis.connect_timeout,
+            Duration::from_secs(10),
         );
     }
 
@@ -138,14 +256,76 @@ mod spec {
 
     #[test]
     #[serial]
-    fn turn_conf() {
+    fn coturn_cli() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__HOST" => "example.com",
-            "MEDEA_TURN__PORT" => "1234",
+            "MEDEA_TURN__CLI__HOST" => "4.4.4.4",
+            "MEDEA_TURN__CLI__PORT" => "1234",
+            "MEDEA_TURN__CLI__PASS" => "clipass",
         );
 
-        assert_ne!(default_conf.turn.host, env_conf.turn.host);
-        assert_ne!(default_conf.turn.port, env_conf.turn.port);
+        assert_ne!(default_conf.turn.cli.host, env_conf.turn.cli.host);
+        assert_ne!(default_conf.turn.cli.port, env_conf.turn.cli.port);
+        assert_ne!(default_conf.turn.cli.pass, env_conf.turn.cli.pass);
+
+        assert_eq!(env_conf.turn.cli.host, "4.4.4.4");
+        assert_eq!(env_conf.turn.cli.port, 1234);
+        assert_eq!(env_conf.turn.cli.pass, "clipass");
+    }
+
+    #[test]
+    #[serial]
+    fn coturn_cli_pool() {
+        let default_conf = Conf::default();
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__CLI__POOL__MAX_SIZE" => "10",
+            "MEDEA_TURN__CLI__POOL__WAIT_TIMEOUT" => "1s",
+            "MEDEA_TURN__CLI__POOL__CONNECT_TIMEOUT" => "4s",
+            "MEDEA_TURN__CLI__POOL__RECYCLE_TIMEOUT" => "3s",
+        );
+
+        assert_ne!(
+            default_conf.turn.cli.pool.max_size,
+            env_conf.turn.cli.pool.max_size,
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.wait_timeout,
+            env_conf.turn.cli.pool.wait_timeout,
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.connect_timeout,
+            env_conf.turn.cli.pool.connect_timeout,
+        );
+        assert_ne!(
+            default_conf.turn.cli.pool.recycle_timeout,
+            env_conf.turn.cli.pool.recycle_timeout,
+        );
+
+        assert_eq!(env_conf.turn.cli.pool.max_size, 10);
+        assert_eq!(env_conf.turn.cli.pool.wait_timeout, Duration::from_secs(1));
+        assert_eq!(
+            env_conf.turn.cli.pool.connect_timeout,
+            Duration::from_secs(4),
+        );
+        assert_eq!(
+            env_conf.turn.cli.pool.recycle_timeout,
+            Duration::from_secs(3),
+        );
+    }
+
+    #[test]
+    fn into_deadpool_pool_config() {
+        let pool_cfg = PoolConfig {
+            max_size: 6,
+            wait_timeout: Duration::default(),
+            connect_timeout: Duration::from_secs(0),
+            recycle_timeout: Duration::from_secs(3),
+        };
+        let pool_cfg: deadpool::managed::PoolConfig = pool_cfg.into();
+
+        assert_eq!(pool_cfg.max_size, 6);
+        assert!(pool_cfg.timeouts.wait.is_none());
+        assert!(pool_cfg.timeouts.create.is_none());
+        assert_eq!(pool_cfg.timeouts.recycle, Some(Duration::from_secs(3)));
     }
 }

@@ -12,7 +12,6 @@ server:
       client:
         http:
           public_url: wss://medea-demo.test/ws
-
     turn:
       host: medea-demo.test
 

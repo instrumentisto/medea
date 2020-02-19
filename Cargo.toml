@@ -15,6 +15,7 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 
 [workspace]
 members = [
+    "crates/medea-coturn-telnet-client",
     "crates/medea-macro",
     "crates/medea-reactive",
     "jason",
@@ -31,6 +32,7 @@ actix = "0.9"
 actix-web = "2.0"
 actix-web-actors = "2.0"
 async-trait = "0.1"
+bytes = "0.5"
 chrono = "0.4"
 config = "0.10"
 deadpool = "0.5"
@@ -59,6 +61,9 @@ tokio = { version = "0.2", features = ["signal", "time"] }
 tonic = "0.1"
 toml = "0.5"
 url = "2.1"
+[dependencies.medea-coturn-telnet-client]
+    path = "crates/medea-coturn-telnet-client"
+    features = ["pool"]
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]
