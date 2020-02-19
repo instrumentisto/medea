@@ -1,6 +1,6 @@
-//! Implementation of managing [coturn] [TURN] server.
+//! Implementation of managing [Coturn] [TURN] server.
 //!
-//! [coturn]: https://github.com/coturn/coturn
+//! [Coturn]: https://github.com/coturn/coturn
 //! [TURN]: https://webrtcglossary.com/turn/
 
 use std::{fmt, sync::Arc};
@@ -29,8 +29,8 @@ pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
 
-    #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
-    CoturnCLiErr(CoturnCliError),
+    #[display(fmt = "Error operating CoturnTelnetClient: {}", _0)]
+    CoturnCliErr(CoturnCliError),
 
     #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     #[from(ignore)]
@@ -70,7 +70,9 @@ struct Service {
     /// Turn credentials repository.
     turn_db: TurnDatabase,
 
-    /// Connection to Coturn server admin interface.
+    /// Client of [Coturn] server admin interface.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
     coturn_cli: CoturnTelnetClient,
 
     /// TurnAuthRepo password.
@@ -132,7 +134,9 @@ impl TurnAuthService for Service {
     }
 
     /// Deletes provided [`IceUser`]s from [`TurnDatabase`] and closes their
-    /// sessions on Coturn TURN server.
+    /// sessions on [Coturn] server.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
         if users.is_empty() {
             return Ok(());
@@ -172,7 +176,7 @@ pub fn new_turn_auth_service<'a>(
     )?;
 
     let coturn_cli = CoturnTelnetClient::new(
-        (cf.cli.host.to_string(), cf.cli.port),
+        (cf.cli.host.clone(), cf.cli.port),
         cf.cli.pass.to_string(),
         cf.cli.pool.into(),
     );

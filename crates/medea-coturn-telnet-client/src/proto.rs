@@ -95,7 +95,7 @@ pub enum CoturnResponseParseError {
 
     /// Failed to represent provided bytes as [`String`].
     #[display(fmt = "Cannot convert to String: {}", _0)]
-    BadString(Utf8Error),
+    NonUtf8String(Utf8Error),
 }
 
 impl TryFrom<BytesMut> for CoturnCliResponse {

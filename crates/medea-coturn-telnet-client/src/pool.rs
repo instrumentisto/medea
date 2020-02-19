@@ -37,7 +37,7 @@ pub type Pool = managed::Pool<CoturnTelnetConnection, CoturnTelnetError>;
 
 /// Type alias for using [`deadpool::managed::PoolError`] with
 /// [`CoturnTelnetConnection`].
-pub type PoolError = managed::PoolError<CoturnTelnetError>;
+pub type Error = managed::PoolError<CoturnTelnetError>;
 
 /// Type alias for using [`deadpool::managed::Object`] with
 /// [`CoturnTelnetConnection`].
