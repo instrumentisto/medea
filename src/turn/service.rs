@@ -1,6 +1,6 @@
-//! Implementation of managing [coturn] [TURN] server.
+//! Implementation of managing [Coturn] [TURN] server.
 //!
-//! [coturn]: https://github.com/coturn/coturn
+//! [Coturn]: https://github.com/coturn/coturn
 //! [TURN]: https://webrtcglossary.com/turn/
 
 use std::{fmt, sync::Arc};
@@ -15,7 +15,10 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     media::IceUser,
-    turn::repo::{TurnDatabase, TurnDatabaseErr},
+    turn::{
+        cli::{CoturnCliError, CoturnTelnetClient},
+        repo::{TurnDatabase, TurnDatabaseErr},
+    },
 };
 
 static TURN_PASS_LEN: usize = 16;
@@ -25,6 +28,9 @@ static TURN_PASS_LEN: usize = 16;
 pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
+
+    #[display(fmt = "Error operating CoturnTelnetClient: {}", _0)]
+    CoturnCliErr(CoturnCliError),
 
     #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     #[from(ignore)]
@@ -63,6 +69,11 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 struct Service {
     /// Turn credentials repository.
     turn_db: TurnDatabase,
+
+    /// Client of [Coturn] server admin interface.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    coturn_cli: CoturnTelnetClient,
 
     /// TurnAuthRepo password.
     db_pass: String,
@@ -122,7 +133,10 @@ impl TurnAuthService for Service {
         }
     }
 
-    /// Deletes provided [`IceUser`]s from [`TurnDatabase`].
+    /// Deletes provided [`IceUser`]s from [`TurnDatabase`] and closes their
+    /// sessions on [Coturn] server.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
         if users.is_empty() {
             return Ok(());
@@ -130,7 +144,9 @@ impl TurnAuthService for Service {
 
         // leave only non static users
         let users = users.iter().filter(|u| !u.is_static()).collect::<Vec<_>>();
-        Ok(self.turn_db.remove(users.as_slice()).await?)
+        self.turn_db.remove(users.as_slice()).await?;
+        self.coturn_cli.delete_sessions(users.as_slice()).await?;
+        Ok(())
     }
 }
 
@@ -144,27 +160,34 @@ pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
     let turn_db = TurnDatabase::new(
-        cf.db.redis.connection_timeout,
+        cf.db.redis.connect_timeout,
         ConnectionInfo {
             addr: Box::new(redis::ConnectionAddr::Tcp(
-                cf.db.redis.ip.to_string(),
+                cf.db.redis.host.to_string(),
                 cf.db.redis.port,
             )),
             db: cf.db.redis.db_number,
             passwd: if cf.db.redis.pass.is_empty() {
                 None
             } else {
-                Some(cf.db.redis.pass.clone())
+                Some(cf.db.redis.pass.to_string())
             },
         },
     )?;
 
+    let coturn_cli = CoturnTelnetClient::new(
+        (cf.cli.host.clone(), cf.cli.port),
+        cf.cli.pass.to_string(),
+        cf.cli.pool.into(),
+    );
+
     let turn_service = Service {
         turn_db,
-        db_pass: cf.db.redis.pass.clone(),
+        coturn_cli,
+        db_pass: cf.db.redis.pass.to_string(),
         turn_address: cf.addr(),
-        turn_username: cf.user.clone(),
-        turn_password: cf.pass.clone(),
+        turn_username: cf.user.to_string(),
+        turn_password: cf.pass.to_string(),
     };
 
     Ok(Arc::new(turn_service))

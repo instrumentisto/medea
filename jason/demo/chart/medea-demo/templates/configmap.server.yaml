@@ -15,19 +15,30 @@ metadata:
 data:
   medea.toml: |
     {{- $medeaConf := .Values.server.conf | toJson | fromJson }}
-    {{- $_ := unset $medeaConf.turn "pass" }}
-    {{- $_ := unset $medeaConf.turn.db.redis "pass" }}
+    {{- if $medeaConf.turn }}
+      {{- $_ := unset $medeaConf.turn "pass" }}
+      {{- if $medeaConf.turn.db }}
+        {{- if $medeaConf.turn.db.redis }}
+          {{- $_ := unset $medeaConf.turn.db.redis "host" }}
+          {{- $_ := unset $medeaConf.turn.db.redis "pass" }}
+        {{- end }}
+      {{- end }}
+      {{- if $medeaConf.turn.cli }}
+        {{- $_ := unset $medeaConf.turn.cli "host" }}
+        {{- $_ := unset $medeaConf.turn.cli "pass" }}
+      {{- end }}
+    {{- end }}
     {{- toToml $medeaConf | nindent 4 }}
 
   turnserver.conf: |
     {{- $coturnConf := .Values.server.coturn.conf }}
     lt-cred-mech
     fingerprint
-    no-cli
     no-tls
     no-dtls
     realm=medea
-    listening-port={{ $coturnConf.listening_port | int }}
+    listening-port={{ index $coturnConf "listening-port" | int }}
+    cli-port={{ index $coturnConf "cli-port" | int }}
 
   redis.conf: |
     {{- $redisConf := index .Values "server" "coturn-db" "conf" | toJson | fromJson }}
