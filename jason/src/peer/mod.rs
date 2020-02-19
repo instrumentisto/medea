@@ -234,6 +234,14 @@ impl PeerConnection {
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
+        // Bind to `connectionstatechange` event.
+        let id = peer.id;
+        let sender = peer.peer_events_sender.clone();
+        peer.peer
+            .on_connection_state_change(Some(move |ice_connection_state| {
+            }))
+            .map_err(tracerr::map_from_and_wrap!())?;
+
         // Bind to `track` event.
         let id = peer.id;
         let media_connections = Rc::clone(&peer.media_connections);

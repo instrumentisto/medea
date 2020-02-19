@@ -158,6 +158,20 @@ pub enum IceConnectionState {
     Closed,
 }
 
+/// Peer Connection's connection state.
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug)]
+pub enum PeerConnectionState {
+    Closed,
+    Failed,
+    Disconnected,
+    New,
+    Connecting,
+    Connected,
+}
+
 /// Reason of disconnecting Web Client from Media Server.
 #[derive(Copy, Clone, Debug, Deserialize, Display, Serialize, Eq, PartialEq)]
 pub enum CloseReason {

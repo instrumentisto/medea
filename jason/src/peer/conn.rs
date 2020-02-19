@@ -1,8 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, PeerConnectionState};
 use tracerr::Traced;
+use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
@@ -14,7 +15,9 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, EventListenerBindError, JsCaused, JsError},
+    utils::{
+        console_error, EventListener, EventListenerBindError, JsCaused, JsError,
+    },
 };
 
 use super::ice_server::RtcIceServers;
@@ -197,6 +200,19 @@ pub struct RtcPeerConnection {
     on_ice_connection_state_changed:
         RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
 
+    /// [`connectionstatechange`][2] callback of [RTCPeerConnection][1].
+    ///
+    /// This fires whenever the aggregate state of the connection changes. The
+    /// aggregate state is a combination of the states of all of the individual
+    /// network transports being used by the connection.
+    ///
+    /// Implemented in Chrome and Safari.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
+    on_connection_state_changed:
+        RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
+
     /// [`ontrack`][2] callback of [RTCPeerConnection][1] to handle
     /// [`track`][3] event. It fires when [RTCPeerConnection][1] receives
     /// new [MediaStreamTrack][4] from remote peer.
@@ -238,6 +254,7 @@ impl RtcPeerConnection {
             peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
+            on_connection_state_changed: RefCell::new(None),
             on_track: RefCell::new(None),
         })
     }
@@ -348,6 +365,56 @@ impl RtcPeerConnection {
                         "iceconnectionstatechange",
                         move |_| {
                             f(peer.ice_connection_state());
+                        },
+                    )
+                    .map_err(tracerr::map_from_and_wrap!())?,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Sets handler for [`connectionstatechange`][1] event.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
+    /// [`EventListener`] binding fails. This error can be ignored, since this
+    /// event is only implemented in Chrome and Safari.
+    ///
+    /// Tracking issue for FF:
+    /// https://bugzilla.mozilla.org/show_bug.cgi?id=1265827
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
+    pub fn on_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
+    where
+        F: 'static + FnMut(PeerConnectionState),
+    {
+        let mut on_connection_state_changed =
+            self.on_connection_state_changed.borrow_mut();
+        match f {
+            None => {
+                on_connection_state_changed.take();
+            }
+            Some(mut f) => {
+                let peer = Rc::clone(&self.peer);
+                on_connection_state_changed.replace(
+                    EventListener::new_mut(
+                        Rc::clone(&self.peer),
+                        "connectionstatechange",
+                        move |_| {
+                            match get_peer_connection_state(&peer) {
+                                Ok(state) => {
+                                    console_error(format!(
+                                        "connectionstatechange: {}",
+                                        state,
+                                    ))
+                                    //                                    f();
+                                }
+                                Err(err) => {
+                                    console_error(format!("AZAAZAZ: {:?}", err))
+                                }
+                            }
                         },
                     )
                     .map_err(tracerr::map_from_and_wrap!())?,
@@ -524,6 +591,20 @@ impl Drop for RtcPeerConnection {
         self.on_track.borrow_mut().take();
         self.on_ice_candidate.borrow_mut().take();
         self.on_ice_connection_state_changed.borrow_mut().take();
+        self.on_connection_state_changed.borrow_mut().take();
         self.peer.close();
     }
+}
+
+/// Calls [RTCPeerConnection.connectionState][1] getter.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-peerconnection-connection-state
+#[wasm_bindgen(inline_js = "export function get_peer_connection_state(peer) \
+                            { return peer.connectionState }")]
+extern "C" {
+    #[allow(clippy::needless_pass_by_value)]
+    #[wasm_bindgen(catch)]
+    fn get_peer_connection_state(
+        peer: &SysRtcPeerConnection,
+    ) -> std::result::Result<String, JsValue>;
 }
