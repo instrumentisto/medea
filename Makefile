@@ -41,7 +41,7 @@ ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
 endif
 ifeq ($(crate),medea-coturn-telnet-client)
-crate-dir = "crates/medea-coturn-telnet-client"
+crate-dir = crates/medea-coturn-telnet-client
 endif
 
 
@@ -346,10 +346,11 @@ webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-coturn-telnet-client
 	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-control-api-proto
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
-	@make test.unit crate=medea-coturn-telnet-client
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
@@ -368,7 +369,7 @@ else
 endif
 else
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+	cargo test -p $(test-unit-crate) --all-features
 endif
 endif
 endif

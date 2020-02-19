@@ -15,8 +15,8 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 
 [workspace]
 members = [
-    "crates/medea-macro",
     "crates/medea-coturn-telnet-client",
+    "crates/medea-macro",
     "jason",
     "mock/control-api",
     "proto/client-api",
@@ -33,7 +33,6 @@ actix-web-actors = "2.0"
 async-trait = "0.1"
 chrono = "0.4"
 config = "0.10"
-medea-coturn-telnet-client = { path = "crates/medea-coturn-telnet-client" }
 deadpool = "0.5"
 deadpool-redis = "0.5"
 derive_more = "0.99"
@@ -43,6 +42,7 @@ futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
+medea-coturn-telnet-client = { path = "crates/medea-coturn-telnet-client" }
 medea-macro = { path = "crates/medea-macro" }
 rand = "0.7"
 redis = "0.15"
