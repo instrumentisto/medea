@@ -10,7 +10,7 @@ use deadpool::managed::PoolConfig;
 use derive_more::{Display, From};
 use failure::Fail;
 use medea_coturn_telnet_client::{
-    pool::{Manager as PoolManager, Pool, Error as PoolError},
+    pool::{Error as PoolError, Manager as PoolManager, Pool},
     CoturnTelnetError,
 };
 

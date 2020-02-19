@@ -144,12 +144,31 @@
 //! # })
 //! ```
 
-#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
-#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(
+    intra_doc_link_resolution_failure,
+    missing_debug_implementations,
+    nonstandard_style,
+    rust_2018_idioms,
+    trivial_casts,
+    trivial_numeric_casts
+)]
+#![forbid(unsafe_code)]
+#![warn(
+    deprecated_in_future,
+    missing_copy_implementations,
+    missing_docs,
+    unreachable_pub,
+    unused_import_braces,
+    unused_labels,
+    unused_lifetimes,
+    unused_qualifications,
+    unused_results
+)]
 
 use std::{
     cell::{Ref, RefCell},
-    fmt::{self, Debug, Error, Formatter},
+    fmt::{Debug, Display, Error, Formatter},
     ops::{Deref, DerefMut},
 };
 
@@ -246,7 +265,7 @@ where
     }
 
     /// Returns immutable reference to a underlying data.
-    pub fn borrow(&self) -> Ref<D> {
+    pub fn borrow(&self) -> Ref<'_, D> {
         let reference = self.0.borrow();
         Ref::map(reference, |observable| observable.deref())
     }
@@ -327,7 +346,7 @@ where
     /// mutable reference to a underlying data.
     pub fn mutate<F>(&self, f: F)
     where
-        F: FnOnce(MutObservableFieldGuard<D, DefaultSubscribers<D>>),
+        F: FnOnce(MutObservableFieldGuard<'_, D, DefaultSubscribers<D>>),
     {
         (f)(self.0.borrow_mut().borrow_mut());
     }
@@ -465,7 +484,7 @@ where
 pub trait OnObservableFieldModification<D> {
     /// This function will be called on every [`ObservableField`] modification.
     ///
-    /// On this function call subsciber which implements
+    /// On this function call subscriber which implements
     /// [`OnObservableFieldModification`] should send a update to a [`Stream`]
     /// or resolve [`Future`].
     ///
@@ -506,10 +525,29 @@ pub enum UniversalSubscriber<D> {
     Subscribe(mpsc::UnboundedSender<D>),
 }
 
+impl<D> Debug for UniversalSubscriber<D> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match *self {
+            UniversalSubscriber::When { .. } => {
+                write!(f, "UniversalSubscriber::When")
+            }
+            UniversalSubscriber::Subscribe(_) => {
+                write!(f, "UniversalSubscriber::Subscribe")
+            }
+        }
+    }
+}
+
 /// Error will be sent to all subscribers when this [`ObservableField`] is
 /// dropped.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Dropped;
+
+impl Display for Dropped {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        Debug::fmt(self, f)
+    }
+}
 
 impl From<oneshot::Canceled> for Dropped {
     fn from(_: oneshot::Canceled) -> Self {
@@ -562,7 +600,7 @@ impl<D: Clone> OnObservableFieldModification<D>
         self.borrow_mut().retain(|sub| match sub {
             UniversalSubscriber::When { assert_fn, sender } => {
                 if (assert_fn)(data) {
-                    sender.borrow_mut().take().unwrap().send(()).ok();
+                    let _ = sender.borrow_mut().take().unwrap().send(());
                     false
                 } else {
                     true
@@ -583,7 +621,7 @@ impl<D, S> Deref for ObservableField<D, S> {
     }
 }
 
-impl<D, S> fmt::Debug for ObservableField<D, S>
+impl<D, S> Debug for ObservableField<D, S>
 where
     D: Debug,
 {
@@ -594,9 +632,9 @@ where
     }
 }
 
-impl<D, S> fmt::Display for ObservableField<D, S>
+impl<D, S> Display for ObservableField<D, S>
 where
-    D: fmt::Display,
+    D: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "{}", self.data)
@@ -609,6 +647,7 @@ where
 /// When this object will be [`Drop`]ped check for modification will be
 /// performed. If data was changed, then
 /// [`OnObservableFieldModification::on_modify`] will be called.
+#[derive(Debug)]
 pub struct MutObservableFieldGuard<'a, D, S>
 where
     S: OnObservableFieldModification<D>,

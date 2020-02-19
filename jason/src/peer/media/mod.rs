@@ -541,14 +541,15 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
-        let stable_mute_state = match sender.mute_state() {
-            MuteState::Stable(stable) => stable,
-            MuteState::Transition(transition) => transition.into_inner(),
-        };
-
         // TODO: this is temporary disabled, until we resolve case of muting
         //       senders, that were added after muting room.
-//        track.set_enabled_by_mute_state(stable_mute_state);
+        //       (instrumentisto/medea#85)
+
+        //        let stable_mute_state = match sender.mute_state() {
+        //            MuteState::Stable(stable) => stable,
+        //            MuteState::Transition(transition) =>
+        // transition.into_inner(),        };
+        //        track.set_enabled_by_mute_state(stable_mute_state);
         sender.track.borrow_mut().replace(track);
 
         Ok(())
