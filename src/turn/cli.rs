@@ -1,9 +1,12 @@
-use std::{fmt, ops::DerefMut};
+use std::fmt;
 
 use deadpool::managed::PoolConfig;
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_coturn_telnet_client::{CoturnTelnetError, Manager, Pool, PoolError};
+use medea_coturn_telnet_client::{
+    pool::{Manager as PoolManager, Pool, PoolError},
+    CoturnTelnetError,
+};
 
 use crate::media::IceUser;
 
@@ -11,6 +14,7 @@ use crate::media::IceUser;
 pub enum CoturnCliError {
     #[display(fmt = "Couldn't get connection from pool: {}", _0)]
     PoolError(PoolError),
+
     #[display(fmt = "Coturn telnet connection returned error: {}", _0)]
     CliError(CoturnTelnetError),
 }
@@ -30,7 +34,10 @@ impl CoturnTelnetClient {
         pass: String,
         pool_config: PoolConfig,
     ) -> Self {
-        Self(Pool::from_config(Manager::new(addr, pass), pool_config))
+        Self(Pool::from_config(
+            PoolManager::new(addr.0, addr.1, pass),
+            pool_config,
+        ))
     }
 
     /// Forcefully closes provided [`IceUser`]s sessions on Coturn server.
@@ -38,13 +45,11 @@ impl CoturnTelnetClient {
         &self,
         users: &[&IceUser],
     ) -> Result<(), CoturnCliError> {
-        let mut connection = self.0.get().await?;
+        let mut conn = self.0.get().await?;
         for user in users {
-            let sessions = connection
-                .deref_mut()
-                .print_sessions(user.user().clone().into())
-                .await?;
-            connection.deref_mut().delete_sessions(sessions).await?;
+            let sessions =
+                conn.print_sessions(user.user().clone().into()).await?;
+            conn.delete_sessions(sessions).await?;
         }
 
         Ok(())

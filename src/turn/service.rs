@@ -156,34 +156,34 @@ pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
     let turn_db = TurnDatabase::new(
-        cf.db.redis.connection_timeout,
+        cf.db.redis.connect_timeout,
         ConnectionInfo {
             addr: Box::new(redis::ConnectionAddr::Tcp(
-                cf.db.redis.ip.to_string(),
+                cf.db.redis.host.to_string(),
                 cf.db.redis.port,
             )),
             db: cf.db.redis.db_number,
             passwd: if cf.db.redis.pass.is_empty() {
                 None
             } else {
-                Some(cf.db.redis.pass.clone())
+                Some(cf.db.redis.pass.to_string())
             },
         },
     )?;
 
     let coturn_cli = CoturnTelnetClient::new(
-        (cf.cli.ip.to_string(), cf.cli.port),
-        cf.cli.pass.clone(),
+        (cf.cli.host.to_string(), cf.cli.port),
+        cf.cli.pass.to_string(),
         cf.cli.pool.into(),
     );
 
     let turn_service = Service {
         turn_db,
         coturn_cli,
-        db_pass: cf.db.redis.pass.clone(),
+        db_pass: cf.db.redis.pass.to_string(),
         turn_address: cf.addr(),
-        turn_username: cf.user.clone(),
-        turn_password: cf.pass.clone(),
+        turn_username: cf.user.to_string(),
+        turn_password: cf.pass.to_string(),
     };
 
     Ok(Arc::new(turn_service))

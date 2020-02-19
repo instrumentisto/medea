@@ -42,7 +42,6 @@ futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
-medea-coturn-telnet-client = { path = "crates/medea-coturn-telnet-client" }
 medea-macro = { path = "crates/medea-macro" }
 rand = "0.7"
 redis = "0.15"
@@ -60,6 +59,9 @@ tokio = { version = "0.2", features = ["signal", "time"] }
 tonic = "0.1"
 toml = "0.5"
 url = "2.1"
+[dependencies.medea-coturn-telnet-client]
+    path = "crates/medea-coturn-telnet-client"
+    features = ["pool"]
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]

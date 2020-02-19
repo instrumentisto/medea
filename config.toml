@@ -18,6 +18,7 @@
 # Default:
 #   bind_port = 8080
 
+
 [server.control.grpc]
 # IP address to bind Control API gRPC server to.
 #
@@ -69,44 +70,45 @@
 
 
 [turn]
-# Turn server host.
+# Host of STUN/TURN server.
 #
 # Env var: MEDEA_TURN__HOST
 # Default:
 #   host = "localhost"
 
-# Turn server port.
+# Port of TURN server.
 #
 # Env var: MEDEA_TURN__PORT
 # Default:
 #   port = 3478
 
-# Static user on Turn server.
+# Name of static user to authenticate on TURN server as.
 #
 # Env var: MEDEA_TURN__USER
 # Default:
 #   user = "USER"
 
-# Static user password on Turn server.
+# Password of static user to authenticate on TURN server with.
 #
 # Env var: MEDEA_TURN__PASS
 # Default:
 #   pass = "PASS"
 
+
 [turn.db.redis]
-# Host of Coturn's Redis database.
+# Host of Coturn's Redis database server.
 #
 # Env var: MEDEA_TURN__DB__REDIS__HOST
 # Default:
 #   host = "127.0.0.1"
 
-# Port of Coturn's Redis database for client connections.
+# Port of Coturn's Redis database server for client connections.
 #
 # Env var: MEDEA_TURN__DB__REDIS__PORT
 # Default:
 #   port = 6379
 
-# Password to connect to Coturn's Redis database with.
+# Password to authenticate on Coturn's Redis database server with.
 #
 # Env var: MEDEA_TURN__DB__REDIS__PASS
 # Default:
@@ -120,56 +122,60 @@
 
 # Timeout for establishing connection with Coturn's Redis database.
 #
-# Env var: MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT
+# Env var: MEDEA_TURN__DB__REDIS__CONNECT_TIMEOUT
 # Default:
-#   connection_timeout = "5s"
+#   connect_timeout = "5s"
+
 
 [turn.cli]
-# Coturn server host.
+# Host of Coturn's admin interface.
 #
-# Env var: MEDEA_TURN__CLI__IP
+# Env var: MEDEA_TURN__CLI__HOST
 # Default:
 #   host = "127.0.0.1"
 
-# Port of Coturn's Redis database for client connections.
+# Port of Coturn's admin interface for Telnet connections.
 #
 # Env var: MEDEA_TURN__CLI__PORT
 # Default:
 #   port = 5766
 
-# Port of Coturn's Redis database for client connections.
+# Password to authenticate on Coturn's admin interface with.
 #
 # Env var: MEDEA_TURN__CLI__PASS
 # Default:
 #   pass = "turn"
 
 [turn.cli.pool]
-# Maximum connection pool size.
+# Maximum pool size of connections to Coturn's admin interface.
 #
 # Env var: MEDEA_TURN__CLI__POOL__MAX_SIZE
 # Default:
 #   max_size = 16
 
-# Timeout when waiting for an available connection. 0 means no timeout and is
-# not recommended.
+# Waiting timeout for an available connection with Coturn's admin interface.
 #
-# Env var: MEDEA_TURN__CLI__POOL__WAIT
+# "0" means no timeout and is not recommended.
+#
+# Env var: MEDEA_TURN__CLI__POOL__WAIT_TIMEOUT
 # Default:
-#   wait = "5s"
+#   wait_timeout = "2s"
 
-# Timeout when creating a new connection. 0 means no timeout and is not
-# recommended.
+# Timeout for establishing connection with Coturn's admin interface.
 #
-# Env var: MEDEA_TURN__CLI__POOL__CREATE
+# "0" means no timeout and is not recommended.
+#
+# Env var: MEDEA_TURN__CLI__POOL__CONNECT_TIMEOUT
 # Default:
-#   create = "5s"
+#   connect_timeout = "2s"
 
-# Timeout when recycling connection. 0 means no timeout and is not
-# recommended.
+# Timeout for recycling established connection with Coturn's admin interface.
 #
-# Env var: MEDEA_TURN__CLI__POOL__RECYCLE
+# "0" means no timeout and is not recommended.
+#
+# Env var: MEDEA_TURN__CLI__POOL__RECYCLE_TIMEOUT
 # Default:
-#   recycle = "5s"
+#   recycle_timeout = "2s"
 
 
 
