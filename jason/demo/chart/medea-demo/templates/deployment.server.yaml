@@ -50,8 +50,8 @@ spec:
       tolerations: {{- toYaml . | nindent 8 }}
     {{- end }}
       containers:
-      {{- $coturnDb := index .Values "server" "coturn-db" }}
       {{- $coturn := .Values.server.coturn }}
+      {{- $coturnDb := index .Values "server" "coturn-db" }}
         - name: medea
           image: {{ printf "%s:%s" .Values.server.image.repository .Values.server.image.tag | quote }}
           imagePullPolicy: {{ .Values.server.image.pullPolicy | quote }}
@@ -59,9 +59,11 @@ spec:
             - name: MEDEA_CONF
               value: /etc/medea.toml
             - name: MEDEA_TURN__PORT
-              value: {{ $coturn.conf.listening_port | quote }}
+              value: {{ index $coturn "conf" "listening-port" | quote }}
             - name: MEDEA_TURN__DB__REDIS__PORT
               value: {{ $coturnDb.conf.port | quote }}
+            - name: MEDEA_TURN__CLI__PORT
+              value: {{ index $coturn "conf" "cli-port" | quote }}
           envFrom:
             - secretRef:
                 name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
@@ -94,7 +96,7 @@ spec:
           imagePullPolicy: {{ $controlMock.image.pullPolicy | quote }}
           args:
             - --addr=0.0.0.0:{{ $controlMock.conf.bind_port | int }}
-            - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port | int }}
+            - --medea-addr=http://127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port | int }}
           env:
             - name: RUST_LOG
               value: {{ $controlMock.conf.log.level | quote }}
@@ -113,13 +115,14 @@ spec:
             - --relay-ip=$(EXTERNAL_IP)
             - --redis-userdb=ip=127.0.0.1 port={{ $coturnDb.conf.port | int }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN__DB__REDIS__PASS)
             - --user={{ .Values.server.conf.turn.user }}:$(MEDEA_TURN__PASS)
+            - --cli-password=$(MEDEA_TURN__CLI__PASS)
           {{- with $coturn.extraArgs }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
             - name: EXTERNAL_IP
-            {{- if $coturn.conf.external_ip }}
-              value: {{ $coturn.conf.external_ip | quote }}
+            {{- if index $coturn "conf" "external-ip" }}
+              value: {{ index $coturn "conf" "external-ip" | quote }}
             {{- else }}
               valueFrom:
                 fieldRef:
@@ -135,12 +138,17 @@ spec:
                 secretKeyRef:
                   name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
                   key: MEDEA_TURN__DB__REDIS__PASS
+            - name: MEDEA_TURN__CLI__PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
+                  key: MEDEA_TURN__CLI__PASS
           ports:
             - name: turn
-              containerPort: {{ $coturn.conf.listening_port | int }}
+              containerPort: {{ index $coturn "conf" "listening-port" | int }}
               protocol: TCP
             - name: turn-udp
-              containerPort: {{ $coturn.conf.listening_port | int }}
+              containerPort: {{ index $coturn "conf" "listening-port" | int }}
               protocol: UDP
           volumeMounts:
             - name: conf
@@ -154,11 +162,11 @@ spec:
         {{- end }}
           livenessProbe:
             tcpSocket:
-              port: {{ $coturn.conf.listening_port | int }}
+              port: {{ index $coturn "conf" "listening-port" | int }}
             initialDelaySeconds: 3
           readinessProbe:
             tcpSocket:
-              port: {{ $coturn.conf.listening_port | int }}
+              port: {{ index $coturn "conf" "listening-port" | int }}
             initialDelaySeconds: 5
         - name: coturn-db
           image: {{ printf "%s:%s" $coturnDb.image.repository $coturnDb.image.tag | quote }}

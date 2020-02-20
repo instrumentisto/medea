@@ -30,9 +30,7 @@ gen_elem_take_fn!(take_room -> Room(proto::Room));
 
 gen_elem_take_fn!(take_member -> Member(proto::Member));
 
-gen_elem_take_fn!(
-    take_webrtc_pub -> WebrtcPub(proto::WebRtcPublishEndpoint)
-);
+gen_elem_take_fn!(take_webrtc_pub -> WebrtcPub(proto::WebRtcPublishEndpoint));
 
 /// Client for [Medea]'s gRPC [Control API].
 ///

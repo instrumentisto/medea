@@ -21,8 +21,8 @@ DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.41
-CHROME_VERSION := 79.0
-FIREFOX_VERSION := 72.0
+CHROME_VERSION := 80.0
+FIREFOX_VERSION := 73.0.1
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -39,6 +39,12 @@ crate-dir = mock/control-api
 endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
+endif
+ifeq ($(crate),medea-reactive)
+crate-dir = "crates/medea-reactive"
+endif
+ifeq ($(crate),medea-coturn-telnet-client)
+crate-dir = crates/medea-coturn-telnet-client
 endif
 
 
@@ -334,8 +340,9 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|<crate-name>)]
-#	               [crate=medea-jason [browser=(chrome|firefox|default)]]
+#	make test.unit [( [crate=@all]
+#	                | crate=(medea|<crate-name>)
+#	                | crate=medea-jason [browser=(chrome|firefox|default)] )]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
@@ -343,7 +350,10 @@ webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-reactive
+	@make test.unit crate=medea-coturn-telnet-client
 	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-control-api-proto
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
@@ -364,7 +374,7 @@ else
 endif
 else
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+	cargo test -p $(test-unit-crate) --all-features
 endif
 endif
 endif
@@ -373,12 +383,12 @@ endif
 # Run Rust E2E tests of project.
 #
 # Usage:
-# 	make test.e2e [up=no]
-#	              [up=yes [dockerized=no [debug=(yes|no)]]
-#	                      [dockerized=yes [TAG=(dev|<docker-tag>)]
-#	                                      [registry=<registry-host>]
-#	                                      [log=(no|yes)]]
-#	                      [wait=(5|<seconds>)]]
+#	make test.e2e [( [up=no]
+#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
+#	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
+#	                                          [registry=<registry-host>]
+#	                                          [log=(no|yes)] )]
+#	                        [wait=(5|<seconds>)] )]
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
@@ -677,11 +687,12 @@ docker.up.demo: docker.down.demo
 # Run Medea media server in Docker Compose environment.
 #
 # Usage:
-#	make docker.up.medea [dockerized=no [debug=(yes|no)] [background=(no|yes)]]
-#	                     [dockerized=yes [TAG=(dev|<docker-tag>)]
-#	                                     [registry=<registry-host>]]
-#	                                     [background=no]
-#	                                     [background=yes [log=(no|yes)]]]
+#	make docker.up.medea [( [dockerized=no] [debug=(yes|no)]
+#	                                        [background=(no|yes)]
+#	                      | dockerized=yes [TAG=(dev|<docker-tag>)]
+#	                                       [registry=<registry-host>]]
+#	                                       [( [background=no]
+#	                                        | background=yes [log=(no|yes)] )])]
 
 docker-up-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
@@ -756,10 +767,10 @@ helm:
 # Usage:
 #	make helm.down [chart=medea-demo] [release=<release-name>]
 #	               [cluster=(minikube|staging)]
-#	               [check=(yes|no)]
+#	               [check=(no|yes)]
 
 helm.down:
-ifneq ($(check),no)
+ifeq ($(check),yes)
 	$(if $(shell helm $(helm-cluster-args) list | grep '$(helm-release)'),\
 		helm $(helm-cluster-args) uninstall $(helm-release) ,\
 		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
@@ -831,9 +842,12 @@ endif
 #
 # Usage:
 #	make helm.up [chart=medea-demo] [release=<release-name>]
-#	             [atomic=(no|yes)] [force=(no|yes)] [wait=(yes|no)]
-#	             [cluster=minikube [rebuild=(no|yes) [no-cache=(no|yes)]]]
-#	             [cluster=staging]
+#	             [force=(no|yes)]
+#	             [( [atomic=no] [wait=(yes|no)]
+#	              | atomic=yes )]
+#	             [( [cluster=minikube] [( [rebuild=no]
+#	                                    | rebuild=yes [no-cache=(no|yes)] )]
+#	              | cluster=staging )]
 
 helm.up:
 ifeq ($(wildcard $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml),)

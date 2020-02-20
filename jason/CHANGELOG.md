@@ -25,7 +25,7 @@ All user visible changes to this project will be documented in this file. This p
 
 - Media management:
     - Library API:
-        - Mute/unmute local video/audio ([#40](/../../pull/40)):
+        - Mute/unmute local video/audio ([#40](/../../pull/40), [#81]):
             - `Room.mute_audio()`;
             - `Room.unmute_audio()`;
             - `Room.mute_video()`;
@@ -53,7 +53,8 @@ All user visible changes to this project will be documented in this file. This p
     - `RpcClient` and `RpcTransport` reconnection ([#75]).
 - Signalling:
     - Emitting of RPC commands:
-        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71)).
+        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71));
+        - `ApplyTracks` for muting/unmuting ([#81]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -67,6 +68,7 @@ All user visible changes to this project will be documented in this file. This p
 [#54]: /../../pull/54
 [#55]: /../../pull/55
 [#75]: /../../pull/75
+[#81]: /../../pull/81
 
 
 

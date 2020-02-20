@@ -139,6 +139,8 @@ where
 }
 
 /// [`Future`] which resolves after the provided [`JsDuration`].
+///
+/// [`Future`]: std::future::Future
 pub async fn delay_for(delay_ms: JsDuration) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()

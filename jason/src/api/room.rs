@@ -8,11 +8,14 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, stream, Future, FutureExt as _, StreamExt as _};
+use futures::{
+    channel::mpsc, future, stream, Future, FutureExt as _, StreamExt as _,
+};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
+    IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -21,8 +24,9 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        EnabledAudio, EnabledVideo, MediaStream, MediaStreamHandle, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository,
+        MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        StableMuteState, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -135,6 +139,15 @@ enum RoomError {
     /// [`Connection`] with remote [`Member`].
     #[display(fmt = "Remote stream from unknown peer")]
     UnknownRemotePeer,
+
+    /// Returned if [`MediaTrack`] update failed.
+    #[display(fmt = "Failed to update Track with {} ID.", _0)]
+    FailedTrackPatch(TrackId),
+
+    /// Typically, returned if [`RoomHandle::mute_audio`]-like functions called
+    /// simultaneously.
+    #[display(fmt = "Some MediaConnectionsError: {}", _0)]
+    MediaConnections(#[js(cause)] MediaConnectionsError),
 }
 
 impl From<RpcClientError> for RoomError {
@@ -153,12 +166,23 @@ impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         use PeerError::*;
         match err {
-            MediaConnections(_) | StreamRequest(_) => {
-                Self::InvalidLocalStream(err)
-            }
+            MediaConnections(ref e) => match e {
+                MediaConnectionsError::InvalidTrackPatch(id) => {
+                    Self::FailedTrackPatch(*id)
+                }
+                _ => Self::InvalidLocalStream(err),
+            },
+            StreamRequest(_) => Self::InvalidLocalStream(err),
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
         }
+    }
+}
+
+impl From<MediaConnectionsError> for RoomError {
+    #[inline]
+    fn from(e: MediaConnectionsError) -> Self {
+        Self::MediaConnections(e)
     }
 }
 
@@ -225,6 +249,26 @@ impl RoomHandle {
 
             Ok(())
         }
+    }
+
+    /// Calls [`InnerRoom::toggle_mute`] until all [`PeerConnection`]s of this
+    /// [`Room`] will have same [`MuteState`] as requested.
+    async fn toggle_mute(
+        &self,
+        is_muted: bool,
+        kind: TransceiverKind,
+    ) -> Result<(), JsValue> {
+        let inner = upgrade_or_detached!(self.0, JsValue)?;
+        while !inner
+            .borrow()
+            .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
+        {
+            let fut = inner.borrow().toggle_mute(is_muted, kind);
+            fut.await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+        }
+        Ok(())
     }
 }
 
@@ -293,6 +337,8 @@ impl RoomHandle {
 
     /// Injects local media stream for all created and new [`PeerConnection`]s
     /// in this [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     pub fn inject_local_stream(
         &self,
         stream: SysMediaStream,
@@ -301,31 +347,39 @@ impl RoomHandle {
             .map(|inner| inner.borrow_mut().inject_local_stream(stream))
     }
 
-    /// Mutes outbound audio in this room.
-    pub fn mute_audio(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_audio(EnabledAudio(false))
+    /// Mutes outbound audio in this [`Room`].
+    pub fn mute_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(true, TransceiverKind::Audio).await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
-    /// Unmutes outbound audio in this room.
-    pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_audio(EnabledAudio(true))
+    /// Unmutes outbound audio in this [`Room`].
+    pub fn unmute_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(false, TransceiverKind::Audio).await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
-    /// Mutes outbound video in this room.
-    pub fn mute_video(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_video(EnabledVideo(false))
+    /// Mutes outbound video in this [`Room`].
+    pub fn mute_video(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(true, TransceiverKind::Video).await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
-    /// Unmutes outbound video in this room.
-    pub fn unmute_video(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.borrow_mut().toggle_send_video(EnabledVideo(true))
+    /// Unmutes outbound video in this [`Room`].
+    pub fn unmute_video(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(false, TransceiverKind::Video).await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 }
@@ -336,6 +390,8 @@ impl RoomHandle {
 /// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
+///
+/// [`PeerConnection`]: crate::peer::PeerConnection
 pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
@@ -451,12 +507,6 @@ struct InnerRoom {
     /// Callback to be invoked when [`RpcClient`] loses connection.
     on_connection_loss: Callback<ReconnectHandle>,
 
-    /// Indicates if outgoing audio is enabled in this [`Room`].
-    enabled_audio: EnabledAudio,
-
-    /// Indicates if outgoing video is enabled in this [`Room`].
-    enabled_video: EnabledVideo,
-
     /// JS callback which will be called when this [`Room`] will be closed.
     on_close: Rc<Callback<RoomCloseReason>>,
 
@@ -487,8 +537,6 @@ impl InnerRoom {
             on_local_stream: Callback::default(),
             on_connection_loss: Callback::default(),
             on_failed_local_stream: Rc::new(Callback::default()),
-            enabled_audio: EnabledAudio(true),
-            enabled_video: EnabledVideo(true),
             on_close: Rc::new(Callback::default()),
             close_reason: CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
@@ -532,22 +580,82 @@ impl InnerRoom {
         }
     }
 
-    /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
-    /// [`Room`] manage.
-    fn toggle_send_audio(&mut self, enabled: EnabledAudio) {
-        for peer in self.peers.get_all() {
-            peer.toggle_send_audio(enabled);
+    /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
+    /// [`PeerConnection`]s in this [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
+    #[allow(clippy::filter_map)]
+    fn toggle_mute(
+        &self,
+        is_muted: bool,
+        kind: TransceiverKind,
+    ) -> impl Future<Output = Result<(), Traced<RoomError>>> {
+        let peers = self.peers.get_all();
+        let rpc = self.rpc.clone();
+        async move {
+            let peer_mute_state_changed: Vec<_> = peers
+                .iter()
+                .map(|peer| {
+                    let desired_state = StableMuteState::from(is_muted);
+                    let tracks_patches: Vec<_> = peer
+                        .get_senders(kind)
+                        .into_iter()
+                        .filter(|sender| match sender.mute_state() {
+                            MuteState::Transition(t) => {
+                                t.intended() != desired_state
+                            }
+                            MuteState::Stable(s) => s != desired_state,
+                        })
+                        .map(|sender| {
+                            sender.mute_state_transition_to(desired_state);
+                            TrackPatch {
+                                id: sender.track_id(),
+                                is_muted: Some(is_muted),
+                            }
+                        })
+                        .collect();
+
+                    let wait_state_change: Vec<_> = peer
+                        .get_senders(kind)
+                        .into_iter()
+                        .map(|sender| {
+                            sender.when_mute_state_stable(desired_state)
+                        })
+                        .collect();
+
+                    if !tracks_patches.is_empty() {
+                        rpc.send_command(Command::UpdateTracks {
+                            peer_id: peer.id(),
+                            tracks_patches,
+                        });
+                    }
+
+                    future::join_all(wait_state_change)
+                })
+                .collect();
+
+            future::join_all(peer_mute_state_changed)
+                .await
+                .into_iter()
+                .flat_map(IntoIterator::into_iter)
+                .collect::<Result<Vec<_>, _>>()
+                .map(|_| ())
+                .map_err(tracerr::map_from_and_wrap!())
         }
-        self.enabled_audio = enabled;
     }
 
-    /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
-    /// [`Room`] manage.
-    fn toggle_send_video(&mut self, enabled: EnabledVideo) {
-        for peer in self.peers.get_all() {
-            peer.toggle_send_video(enabled);
-        }
-        self.enabled_video = enabled;
+    /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
+    /// [`MuteState`].
+    pub fn is_all_peers_in_mute_state(
+        &self,
+        kind: TransceiverKind,
+        mute_state: StableMuteState,
+    ) -> bool {
+        self.peers
+            .get_all()
+            .into_iter()
+            .find(|p| !p.is_all_senders_in_mute_state(kind, mute_state))
+            .is_none()
     }
 
     /// Injects given local stream into all [`PeerConnection`]s of this [`Room`]
@@ -597,8 +705,6 @@ impl EventHandler for InnerRoom {
                 peer_id,
                 ice_servers,
                 self.peer_event_sender.clone(),
-                self.enabled_audio,
-                self.enabled_video,
                 is_force_relayed,
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
@@ -713,7 +819,19 @@ impl EventHandler for InnerRoom {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
-        })
+        });
+    }
+
+    /// Updates [`Track`]s of this [`Room`].
+    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            if let Err(err) = peer.update_senders(tracks) {
+                JasonError::from(err).print();
+            }
+        } else {
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
     }
 }
 
