@@ -2,7 +2,7 @@
 name = "medea-reactive"
 version = "0.1.0-dev"
 edition = "2018"
-description = "Containers to which data modifications you can subscribe."
+description = "Reactive mutable data containers"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "BlueOak-1.0.0"
 documentation = "https://docs.rs/medea-reactive"
@@ -10,10 +10,11 @@ homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-rea
 repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-reactive"
 readme = "README.md"
 keywords = ["medea", "reactive", "reactivity", "observable"]
-categories = ["asynchronous"]
+categories = ["asynchronous", "data-structures"]
 
 [dependencies]
 futures = "0.3"
 
-[dev-dependencies]
-tokio = { version = "0.2", features = ["macros", "test-util", "rt-core", "rt-util", "time"] }
+[dev-dependencies.tokio]
+    version = "0.2"
+    features = ["macros", "rt-core", "rt-util", "test-util", "time"]

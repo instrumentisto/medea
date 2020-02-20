@@ -350,12 +350,12 @@ webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-reactive
 	@make test.unit crate=medea-coturn-telnet-client
 	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-control-api-proto
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
-	@make test.unit crate=medea-reactive
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea

@@ -41,7 +41,8 @@ COPY jason/Cargo.toml /app/jason/
 COPY Cargo.toml Cargo.lock /app/
 WORKDIR /app/
 RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
- && mkdir -p crates/medea-reactive/src/ && touch crates/medea-reactive/src/lib.rs \
+ && mkdir -p crates/medea-reactive/src/ \
+ && touch crates/medea-reactive/src/lib.rs \
  && mkdir -p crates/medea-coturn-telnet-client/src/ \
  && touch crates/medea-coturn-telnet-client/src/lib.rs \
  && mkdir -p mock/control-api/src/ && touch mock/control-api/src/lib.rs \

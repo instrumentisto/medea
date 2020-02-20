@@ -10,7 +10,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
-use medea_reactive::{Dropped, ObservableCell};
+use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -78,8 +78,9 @@ pub enum MediaConnectionsError {
     InvalidTrackPatch(TrackId),
 }
 
-impl From<Dropped> for MediaConnectionsError {
-    fn from(_: Dropped) -> Self {
+impl From<DroppedError> for MediaConnectionsError {
+    #[inline]
+    fn from(_: DroppedError) -> Self {
         Self::MuteStateDropped
     }
 }

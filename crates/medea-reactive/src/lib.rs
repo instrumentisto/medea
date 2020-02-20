@@ -1,32 +1,30 @@
-//! Containers to which data modifications you can subscribe.
+//! Reactive mutable data containers.
 //!
-//! # Basic iteraction with a `ObservableField`
+//! # Basic iteraction with an `ObservableField`
 //!
 //! ## With primitive
 //!
 //! ```
 //! use medea_reactive::Observable;
 //!
-//! // Create a reactive field with 'u32' data inside.
+//! // Create a reactive field with `u32` data inside.
 //! let mut foo = Observable::new(0u32);
 //!
-//! // If you want to get data which held by 'ObservableField' you can
-//! // just deref 'ObservableField' container:
+//! // If you want to get data inside `ObservableField`, you may just deref it:
 //! assert_eq!(*foo + 100, 100);
 //!
-//! // If you want to modify data which 'ObservableField' holds, you should use
-//! // '.borrow_mut()':
+//! // If you want to modify data inside `ObservableField`, you should use
+//! // `.borrow_mut()`:
 //! *foo.borrow_mut() = 0;
 //! assert_eq!(*foo, 0);
 //! ```
 //!
-//! ## With object
+//! ## With custom type
 //!
 //! ```
 //! use medea_reactive::Observable;
 //!
-//! // 'ObservableField' only works with objects which implements
-//! // 'Clone' and 'PartialEq'.
+//! // `ObservableField` requires type to implement `Clone` and `PartialEq`.
 //! #[derive(Clone, PartialEq)]
 //! struct Foo(u32);
 //!
@@ -45,16 +43,18 @@
 //! }
 //!
 //! let mut foo = Observable::new(Foo::new());
-//! // You can transparently call methods of object which stored by
-//! // 'ObservableField' if they not mutate.
+//!
+//! // You can transparently call methods of type inside `ObservableField`
+//! // if they don't mutate.
 //! assert_eq!(foo.current_num(), 0);
-//! // If you want to call mutable method of object which stored by
-//! // 'ObservableField' you should call '.borrow_mut()' before it.
+//!
+//! // If you want to call mutable method of type inside `ObservableField`,
+//! // you should use '.borrow_mut()' for it.
 //! foo.borrow_mut().increase();
 //! assert_eq!(foo.current_num(), 1);
 //! ```
 //!
-//! # Subscription on all `ObservableField` data modification
+//! # Subscription to all `ObservableField` data modifications
 //!
 //! ```
 //! use medea_reactive::Observable;
@@ -62,27 +62,27 @@
 //!
 //! # executor::block_on(async {
 //! let mut foo = Observable::new(0u32);
-//! // Subscribe on all field modifications:
+//! // Subscribe to all value modifications:
 //! let mut foo_changes_stream = foo.subscribe();
 //!
-//! // Initial 'ObservableField' field data will be sent as modification:
+//! // Initial `ObservableField` field data will be sent as modification:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
 //!
-//! // Modify 'ObservableField' field:
+//! // Modify `ObservableField` field:
 //! *foo.borrow_mut() = 1;
 //! // Receive modification update:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 1);
 //!
 //! // On this mutable borrow, field actually not changed:
 //! *foo.borrow_mut() = 1;
-//! // After this we really modify value:
+//! // After this we really modify the value:
 //! *foo.borrow_mut() = 2;
-//! // Only real modification was sent to the modification subscriber:
+//! // Only real modification has been sent to subscribers:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 2);
 //! # });
 //! ```
 //!
-//! # Subscription on concrete `ObservableField` data modification
+//! # Subscription to concrete `ObservableField` data modification
 //!
 //! ```
 //! use medea_reactive::Observable;
@@ -91,21 +91,21 @@
 //! # executor::block_on(async {
 //! let mut foo = Observable::new(0u32);
 //!
-//! // Create future which will be resolved when foo will become one:
+//! // Create `Future` which will resolve when `foo` will contain `1`:
 //! let when_foo_will_be_one = foo.when_eq(1);
 //! *foo.borrow_mut() = 1;
-//! // Future resolves because value was become 1.
+//! // `Future` resolves because value has become `1`.
 //! when_foo_will_be_one.await.unwrap();
 //!
 //! // Or you can define your own resolve logic:
-//! let when_foo_will_be_greated_than_5 = foo.when(|foo_upd| foo_upd > &5);
+//! let when_foo_will_be_gt_5 = foo.when(|foo_upd| foo_upd > &5);
 //! *foo.borrow_mut() = 6;
-//! // Future resolves because value was become greater than 5.
-//! when_foo_will_be_greated_than_5.await.unwrap();
+//! // `Future` resolves because value has become greater than `5`.
+//! when_foo_will_be_gt_5.await.unwrap();
 //! # });
 //! ```
 //!
-//! # Hold mutable reference of `ObservableField`
+//! # Holding mutable reference to `ObservableField`
 //!
 //! ```
 //! use medea_reactive::Observable;
@@ -114,33 +114,32 @@
 //! # executor::block_on(async {
 //! let mut foo = Observable::new(0u32);
 //!
-//! // Subscribe on all 'foo' changes:
+//! // Subscribe to all `foo` changes:
 //! let mut foo_changes_stream = foo.subscribe();
-//! // Just skip initial 'ObservableField' value:
+//! // Just skip initial `ObservableField` value:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 0);
-//! // And hold mutable reference in variable:
+//! // And hold mutable reference in a binding:
 //! let mut foo_mut_ref = foo.borrow_mut();
+//!
 //! // First change:
 //! *foo_mut_ref = 100;
 //! // Second change:
 //! *foo_mut_ref = 200;
-//! // Drop mutable reference because only on mutable reference drop changes
-//! // will be checked:
+//! // Drop mutable reference, because only on drop its changes will be checked:
 //! drop(foo_mut_ref);
-//! // Only last change was sent into change stream:
+//! // Only last change was sent into changes `Stream`:
 //! assert_eq!(foo_changes_stream.next().await.unwrap(), 200);
 //!
 //! let mut foo_changes_subscription = foo.subscribe();
 //! let mut foo_mut_ref = foo.borrow_mut();
-//! // Really change data of 'ObservableField' here:
+//! // Really change data of `ObservableField` here:
 //! *foo_mut_ref = 100;
-//! // But at the end we're reverted to a original value:
+//! // But at the end we're reverted to the original value:
 //! *foo_mut_ref = 200;
-//! // Drop mutable reference because only on mutable reference drop changes
-//! // will be checked:
+//! // Drop mutable reference, because only on drop its changes will be checked:
 //! drop(foo_mut_ref);
-//! // No changes will be sent into 'foo_change_subscription' stream,
-//! // because only last value checked.
+//! // No changes will be sent into `foo_change_subscription` `Stream`,
+//! // because only last value has been checked.
 //! # })
 //! ```
 
@@ -168,7 +167,7 @@
 
 use std::{
     cell::{Ref, RefCell},
-    fmt::{Debug, Display, Error, Formatter},
+    fmt,
     ops::{Deref, DerefMut},
 };
 
@@ -179,32 +178,33 @@ use futures::{
     StreamExt as _,
 };
 
+/// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 
-/// [`ObservableField`] with which you can only subscribe on changes
-/// ([`ObservableField::subscribe`]) and on concrete changes
+/// [`ObservableField`] that allows to subscribe to all changes
+/// ([`ObservableField::subscribe`]) and to concrete changes
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 
-/// Observable analog for the [`Cell`].
+/// Observable analogue of [`Cell`].
 ///
-/// Subscription on changes works same as [`ObservableField`],
-/// but working with underlying data of [`ObservableCell`] is differs.
+/// Subscription to changes works the same way as [`ObservableField`],
+/// but working with underlying data of [`ObservableCell`] is different.
 ///
-/// # `ObservableCell` underlying data accessing
+/// # `ObservableCell` underlying data access
 ///
-/// ## For copyable types
+/// ## For `Copy` types
 ///
 /// ```
 /// use medea_reactive::ObservableCell;
 ///
 /// let foo = ObservableCell::new(0i32);
 ///
-/// // If data implements 'Copy' then you can get copy of current value:
+/// // If data implements `Copy` then you can get a copy of the current value:
 /// assert_eq!(foo.get(), 0);
 /// ```
 ///
-/// ## Reference to a underlying data
+/// ## Reference to an underlying data
 ///
 /// ```
 /// use medea_reactive::ObservableCell;
@@ -225,7 +225,7 @@ pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 /// assert_eq!(foo.borrow().get_num(), 100);
 /// ```
 ///
-/// # `ObservableCell` data mutating
+/// # Mutation of an underlying data
 ///
 /// ```
 /// use medea_reactive::ObservableCell;
@@ -236,7 +236,7 @@ pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 /// foo.set(100);
 /// assert_eq!(foo.get(), 100);
 ///
-/// // Or replace data with new data and get old data:
+/// // Or replace data with new data and get the old data:
 /// let old_value = foo.replace(200);
 /// assert_eq!(old_value, 100);
 /// assert_eq!(foo.get(), 200);
@@ -254,30 +254,34 @@ impl<D> ObservableCell<D>
 where
     D: 'static,
 {
-    /// Returns new [`ObservableCell`] on which mutations you can
-    /// subscribe, also you can subscribe on concrete mutation
-    /// with [`ObservableCell::when`] and [`ObservableCell::when_eq`].
+    /// Returns new [`ObservableCell`] with subscribable mutations.
     ///
-    /// This container can mutate internally. Read docs of [`ObservableCell`]
+    /// Also, you can subscribe to concrete mutation with
+    /// [`ObservableCell::when`] or [`ObservableCell::when_eq`] methods.
+    ///
+    /// This container can mutate internally. See [`ObservableCell`] docs
     /// for more info.
+    #[inline]
     pub fn new(data: D) -> Self {
         Self(RefCell::new(Observable::new(data)))
     }
 
-    /// Returns immutable reference to a underlying data.
+    /// Returns immutable reference to an underlying data.
+    #[inline]
     pub fn borrow(&self) -> Ref<'_, D> {
         let reference = self.0.borrow();
         Ref::map(reference, |observable| observable.deref())
     }
 
-    /// Returns [`Future`] which will be resolved only on modification with
-    /// which your `assert_fn` returned `true`.
+    /// Returns [`Future`] which will resolve only on modifications that
+    /// the given `assert_fn` returns `true` on.
     ///
     /// [`Future`]: std::future::Future
+    #[inline]
     pub fn when<F>(
         &self,
         assert_fn: F,
-    ) -> LocalBoxFuture<'static, Result<(), Dropped>>
+    ) -> LocalBoxFuture<'static, Result<(), DroppedError>>
     where
         F: Fn(&D) -> bool + 'static,
     {
@@ -289,7 +293,8 @@ impl<D> ObservableCell<D>
 where
     D: Copy + 'static,
 {
-    /// Returns copy of underlying data.
+    /// Returns copy of an underlying data.
+    #[inline]
     pub fn get(&self) -> D {
         **self.0.borrow()
     }
@@ -302,6 +307,7 @@ where
     /// Returns [`Stream`] into which underlying data updates will be emitted.
     ///
     /// [`Stream`]: futures::Stream
+    #[inline]
     pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         self.0.borrow().subscribe()
     }
@@ -311,14 +317,15 @@ impl<D> ObservableCell<D>
 where
     D: PartialEq + 'static,
 {
-    /// Returns [`Future`] which will be resolved only when data of this
-    /// [`ObservableCell`] will become equal to provided `should_be`.
+    /// Returns [`Future`] which will resolve only when data of this
+    /// [`ObservableCell`] will become equal to the provided `should_be` value.
     ///
     /// [`Future`]: std::future::Future
+    #[inline]
     pub fn when_eq(
         &self,
         should_be: D,
-    ) -> LocalBoxFuture<'static, Result<(), Dropped>> {
+    ) -> LocalBoxFuture<'static, Result<(), DroppedError>> {
         self.0.borrow().when_eq(should_be)
     }
 }
@@ -327,23 +334,26 @@ impl<D> ObservableCell<D>
 where
     D: Clone + PartialEq + 'static,
 {
-    /// Sets the contained value.
+    /// Sets the `new_data` value as an underlying data.
+    #[inline]
     pub fn set(&self, new_data: D) {
         *self.0.borrow_mut().borrow_mut() = new_data;
     }
 
-    /// Replaces the contained value, and returns it.
+    /// Replaces the contained underlying data with the given `new_data` value,
+    /// and returns the old one.
+    #[inline]
     pub fn replace(&self, mut new_data: D) -> D {
         std::mem::swap(
             self.0.borrow_mut().borrow_mut().deref_mut(),
             &mut new_data,
         );
-
         new_data
     }
 
-    /// Updates the contained value using a function to which will be provided
-    /// mutable reference to a underlying data.
+    /// Updates an underlying data using the provided function, which will
+    /// accept a mutable reference to an underlying data.
+    #[inline]
     pub fn mutate<F>(&self, f: F)
     where
         F: FnOnce(MutObservableFieldGuard<'_, D, DefaultSubscribers<D>>),
@@ -352,21 +362,21 @@ where
     }
 }
 
-/// A reactive cell which will emit all modification to the subscribers.
+/// Reactive cell which emits all modifications to its subscribers.
 ///
-/// You can subscribe to this field modifications with
-/// [`ObservableField::subscribe`].
+/// Subscribing to this field modifications is done with
+/// [`ObservableField::subscribe`] method.
 ///
-/// If you want to get [`Future`] which will be resolved only when data of this
-/// field will become equal to some data, you can use [`ObservableField::when`]
-/// or [`ObservableField::when_eq`].
+/// If you want to get [`Future`] which will resolved only when an underlying
+/// data of this field will become equal to some value, you can use
+/// [`ObservableField::when`] or [`ObservableField::when_eq`] methods.
 ///
 /// [`Future`]: std::future::Future
 pub struct ObservableField<D, S> {
-    /// Data which stored by this [`ObservableField`].
+    /// Data which is stored by this [`ObservableField`].
     data: D,
 
-    /// Subscribers on [`ObservableField`]'s data mutations.
+    /// Subscribers to [`ObservableField`]'s data mutations.
     subs: S,
 }
 
@@ -374,9 +384,11 @@ impl<D> ObservableField<D, RefCell<Vec<UniversalSubscriber<D>>>>
 where
     D: 'static,
 {
-    /// Returns new [`ObservableField`] on which mutations you can
-    /// subscribe, also you can subscribe on concrete mutation
-    /// with [`ObservableField::when`] and [`ObservableField::when_eq`].
+    /// Returns new [`ObservableField`] with subscribable mutations.
+    ///
+    /// Also you can subscribe to concrete mutations with
+    /// [`ObservableField::when`] and [`ObservableField::when_eq`] methods.
+    #[inline]
     pub fn new(data: D) -> Self {
         Self {
             data,
@@ -392,6 +404,7 @@ where
 {
     /// Creates new [`ObservableField`] with custom [`Subscribable`]
     /// implementation.
+    #[inline]
     pub fn new_with_custom(data: D, subs: S) -> Self {
         Self { data, subs }
     }
@@ -402,14 +415,14 @@ where
     D: 'static,
     S: Whenable<D>,
 {
-    /// Returns [`Future`] which will be resolved only on modification with
-    /// which your `assert_fn` returned `true`.
+    /// Returns [`Future`] which will resolve only on modifications that
+    /// the given `assert_fn` returns `true` on.
     ///
     /// [`Future`]: std::future::Future
     pub fn when<F>(
         &self,
         assert_fn: F,
-    ) -> LocalBoxFuture<'static, Result<(), Dropped>>
+    ) -> LocalBoxFuture<'static, Result<(), DroppedError>>
     where
         F: Fn(&D) -> bool + 'static,
     {
@@ -442,14 +455,16 @@ where
     D: PartialEq + 'static,
     S: Whenable<D>,
 {
-    /// Returns [`Future`] which will be resolved only when data of this
-    /// [`ObservableField`] will become equal to provided `should_be`.
+    /// Returns [`Future`] which will resolve only when an underlying data of
+    /// this [`ObservableField`] will become equal to the provided `should_be`
+    /// value.
     ///
     /// [`Future`]: std::future::Future
+    #[inline]
     pub fn when_eq(
         &self,
         should_be: D,
-    ) -> LocalBoxFuture<'static, Result<(), Dropped>> {
+    ) -> LocalBoxFuture<'static, Result<(), DroppedError>> {
         self.when(move |data| data == &should_be)
     }
 }
@@ -460,9 +475,9 @@ where
     D: Clone + PartialEq,
 {
     /// Returns [`MutObservableFieldGuard`] which can be mutably dereferenced to
-    /// underlying data.
+    /// an underlying data.
     ///
-    /// If some mutation of data happened between calling
+    /// If some mutation of data happens between calling
     /// [`ObservableField::borrow_mut`] and dropping of
     /// [`MutObservableFieldGuard`], then all subscribers of this
     /// [`ObservableField`] will be notified about this.
@@ -470,6 +485,7 @@ where
     /// Notification about mutation will be sent only if this field __really__
     /// changed. This will be checked with [`PartialEq`] implementation of
     /// underlying data.
+    #[inline]
     pub fn borrow_mut(&mut self) -> MutObservableFieldGuard<'_, D, S> {
         MutObservableFieldGuard {
             value_before_mutation: self.data.clone(),
@@ -479,54 +495,54 @@ where
     }
 }
 
-/// With this trait you can catch all unique modification of a
+/// Abstraction over catching all unique modifications of an
 /// [`ObservableField`].
 pub trait OnObservableFieldModification<D> {
-    /// This function will be called on every [`ObservableField`] modification.
+    /// This function will be called on each [`ObservableField`]'s modification.
     ///
-    /// On this function call subscriber which implements
-    /// [`OnObservableFieldModification`] should send a update to a [`Stream`]
+    /// On this function call subscriber (which implements
+    /// [`OnObservableFieldModification`]) should send an update to [`Stream`]
     /// or resolve [`Future`].
     ///
-    /// [`Stream`]: futures::Stream
     /// [`Future`]: std::future::Future
+    /// [`Stream`]: futures::Stream
     fn on_modify(&mut self, data: &D);
 }
 
-/// With this trait you can implement [`ObservableField::subscribe`] functional
-/// for some object.
+/// Abstraction of [`ObservableField::subscribe`] implementation for some
+/// custom type.
 pub trait Subscribable<D: 'static> {
     /// This function will be called on [`ObservableField::subscribe`].
     ///
-    /// Should return [`LocalBoxStream`] to which will be sent data updates.
+    /// Should return [`LocalBoxStream`] to which data updates will be sent.
     fn subscribe(&self) -> LocalBoxStream<'static, D>;
 }
 
-/// Subscriber which implements [`Subscribable`] and [`Whenable`] in
-/// [`Vec`].
+/// Subscriber that implements [`Subscribable`] and [`Whenable`] in [`Vec`].
 ///
 /// This structure should be wrapped into [`Vec`].
 pub enum UniversalSubscriber<D> {
     /// Subscriber for [`Whenable`].
     When {
         /// [`oneshot::Sender`] with which [`Whenable::when`]'s [`Future`] will
-        /// be resolved.
+        /// resolve.
         ///
         /// [`Future`]: std::future::Future
         sender: RefCell<Option<oneshot::Sender<()>>>,
 
         /// Function with which will be checked that [`Whenable::when`]'s
-        /// [`Future`] should be resolved.
+        /// [`Future`] should resolve.
         ///
         /// [`Future`]: std::future::Future
         assert_fn: Box<dyn Fn(&D) -> bool>,
     },
+
     /// Subscriber for [`Subscribable`].
     Subscribe(mpsc::UnboundedSender<D>),
 }
 
-impl<D> Debug for UniversalSubscriber<D> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+impl<D> fmt::Debug for UniversalSubscriber<D> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             UniversalSubscriber::When { .. } => {
                 write!(f, "UniversalSubscriber::When")
@@ -538,25 +554,27 @@ impl<D> Debug for UniversalSubscriber<D> {
     }
 }
 
-/// Error will be sent to all subscribers when this [`ObservableField`] is
+/// Error that is sent to all subscribers when this [`ObservableField`] is
 /// dropped.
 #[derive(Clone, Copy, Debug)]
-pub struct Dropped;
+pub struct DroppedError;
 
-impl Display for Dropped {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        Debug::fmt(self, f)
+impl fmt::Display for DroppedError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Observable value has been dropped")
     }
 }
 
-impl From<oneshot::Canceled> for Dropped {
+impl From<oneshot::Canceled> for DroppedError {
+    #[inline]
     fn from(_: oneshot::Canceled) -> Self {
         Self
     }
 }
 
-/// With this trait you can implement [`ObservableField::when`] and
-/// [`ObservableField::when_eq`] functional for some object.
+/// Abstraction over [`ObservableField::when`] and [`ObservableField::when_eq`]
+/// implementations for custom types.
 pub trait Whenable<D: 'static> {
     /// This function will be called on [`ObservableField::when`].
     ///
@@ -565,7 +583,7 @@ pub trait Whenable<D: 'static> {
     fn when(
         &self,
         assert_fn: Box<dyn Fn(&D) -> bool>,
-    ) -> LocalBoxFuture<'static, Result<(), Dropped>>;
+    ) -> LocalBoxFuture<'static, Result<(), DroppedError>>;
 }
 
 #[allow(clippy::use_self)]
@@ -573,13 +591,12 @@ impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     fn when(
         &self,
         assert_fn: Box<dyn Fn(&D) -> bool>,
-    ) -> LocalBoxFuture<'static, Result<(), Dropped>> {
+    ) -> LocalBoxFuture<'static, Result<(), DroppedError>> {
         let (tx, rx) = oneshot::channel();
         self.borrow_mut().push(UniversalSubscriber::When {
             sender: RefCell::new(Some(tx)),
             assert_fn,
         });
-
         Box::pin(async move { Ok(rx.await?) })
     }
 }
@@ -588,7 +605,6 @@ impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let (tx, rx) = mpsc::unbounded();
         self.borrow_mut().push(UniversalSubscriber::Subscribe(tx));
-
         Box::pin(rx)
     }
 }
@@ -616,50 +632,52 @@ impl<D: Clone> OnObservableFieldModification<D>
 impl<D, S> Deref for ObservableField<D, S> {
     type Target = D;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.data
     }
 }
 
-impl<D, S> Debug for ObservableField<D, S>
+impl<D, S> fmt::Debug for ObservableField<D, S>
 where
-    D: Debug,
+    D: fmt::Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ObservableField")
             .field("data", &self.data)
             .finish()
     }
 }
 
-impl<D, S> Display for ObservableField<D, S>
+impl<D, S> fmt::Display for ObservableField<D, S>
 where
-    D: Display,
+    D: fmt::Display,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.data)
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.data, f)
     }
 }
 
-/// Mutable [`ObservableField`] reference which you can get by calling
+/// Mutable [`ObservableField`] reference returned by
 /// [`ObservableField::borrow_mut`].
 ///
-/// When this object will be [`Drop`]ped check for modification will be
-/// performed. If data was changed, then
-/// [`OnObservableFieldModification::on_modify`] will be called.
+/// When this guard is [`Drop`]ped, a check for modifications will be performed.
+/// If data was changed, then [`OnObservableFieldModification::on_modify`] will
+/// be called.
 #[derive(Debug)]
 pub struct MutObservableFieldGuard<'a, D, S>
 where
     S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
-    /// Data which stored by this [`ObservableField`].
+    /// Data stored by this [`ObservableField`].
     data: &'a mut D,
 
-    /// Subscribers on [`ObservableField`]'s data mutations.
+    /// Subscribers to [`ObservableField`]'s data mutations.
     subs: &'a mut S,
 
-    /// Data which stored by this [`ObservableField`] before mutation.
+    /// Data stored by this [`ObservableField`] before mutation.
     value_before_mutation: D,
 }
 
@@ -670,6 +688,7 @@ where
 {
     type Target = D;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.data
     }
@@ -680,6 +699,7 @@ where
     S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data
     }
@@ -690,6 +710,7 @@ where
     S: OnObservableFieldModification<D>,
     D: PartialEq,
 {
+    #[inline]
     fn drop(&mut self) {
         if self.data != &self.value_before_mutation {
             self.subs.on_modify(&self.data);
@@ -698,7 +719,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod spec {
     use std::{cell::RefCell, time::Duration};
 
     use futures::{
@@ -725,20 +746,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn subscribe_sends_current_data() {
+    async fn subscriber_receives_current_data() {
         let field = Observable::new(9i32);
         let current_data = field.subscribe().next().await.unwrap();
         assert_eq!(current_data, 9);
     }
 
     #[tokio::test]
-    async fn when_eq_resolves_if_value_already_eq() {
+    async fn when_eq_resolves_if_value_eq_already() {
         let field = Observable::new(9i32);
         field.when_eq(9i32).await.unwrap();
     }
 
     #[tokio::test]
-    async fn when_eq_dont_resolves_if_value_is_not_eq() {
+    async fn when_eq_doesnt_resolve_if_value_is_not_eq() {
         let field = Observable::new(9i32);
         await_future_with_timeout(
             field.when_eq(0i32),
@@ -750,7 +771,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn current_value_provided_into_assert_fn_on_when_call() {
+    async fn current_value_is_provided_into_assert_fn_on_when_call() {
         let field = Observable::new(9i32);
 
         await_future_with_timeout(
@@ -763,7 +784,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn value_updates_is_sended_to_subs() {
+    async fn value_updates_are_sent_to_subs() {
         task::LocalSet::new()
             .run_until(async move {
                 let mut field = Observable::new(0i32);
@@ -852,7 +873,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stream_ends_when_reactive_field_dropped() {
+    async fn stream_ends_when_reactive_field_is_dropped() {
         let field = Observable::new(0i32);
         let subscription = field.subscribe();
         drop(field);
@@ -874,7 +895,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn only_last_update_should_be_send_to_the_subscribers() {
+    async fn only_last_update_should_be_sent_to_subscribers() {
         let mut field = Observable::new(0i32);
         let subscription = field.subscribe();
         let mut field_mut_guard = field.borrow_mut();
@@ -900,9 +921,9 @@ mod tests {
     }
 
     mod observable_cell {
-        use super::*;
-
         use crate::ObservableCell;
+
+        use super::*;
 
         #[tokio::test]
         async fn subscription_works() {
