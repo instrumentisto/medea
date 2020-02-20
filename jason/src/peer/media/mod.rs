@@ -456,6 +456,8 @@ impl Sender {
             transceiver,
             mute_state,
         });
+
+        // TODO: remove when refactor muting to dropping tracks.
         let weak_this = Rc::downgrade(&this);
         spawn_local(async move {
             while let Some(mute_state_update) = subscription.next().await {
@@ -469,13 +471,13 @@ impl Sender {
                         MuteState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {
-                                let mut in_progress_subscription =
+                                let mut transitions =
                                     this.mute_state.subscribe().skip(1);
                                 let timeout = Box::pin(delay_for(
                                     Duration::from_secs(10).into(),
                                 ));
                                 match future::select(
-                                    in_progress_subscription.next(),
+                                    transitions.next(),
                                     timeout,
                                 )
                                 .await
