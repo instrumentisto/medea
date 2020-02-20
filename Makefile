@@ -761,10 +761,10 @@ helm:
 # Usage:
 #	make helm.down [chart=medea-demo] [release=<release-name>]
 #	               [cluster=(minikube|staging)]
-#	               [check=(yes|no)]
+#	               [check=(no|yes)]
 
 helm.down:
-ifneq ($(check),no)
+ifeq ($(check),yes)
 	$(if $(shell helm $(helm-cluster-args) list | grep '$(helm-release)'),\
 		helm $(helm-cluster-args) uninstall $(helm-release) ,\
 		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
