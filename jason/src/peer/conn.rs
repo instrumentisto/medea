@@ -250,6 +250,19 @@ impl RtcPeerConnection {
             .map_err(RTCPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
+        match get_peer_connection_state(&peer) {
+            Ok(state) => {
+                console_error(format!(
+                    "connectionstatechange: {}",
+                    state,
+                ))
+                //                                    f();
+            }
+            Err(err) => {
+                console_error(format!("AZAAZAZ: {:?}", err))
+            }
+        };
+
         Ok(Self {
             peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
