@@ -153,8 +153,9 @@ pub struct PeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
-    /// [`Sender`]s and [`self::media::Receiver`]s of this
-    /// [`RtcPeerConnection`].
+    /// [`Sender`]s and [`Receiver`]s of this [`RtcPeerConnection`].
+    ///
+    /// [`Receiver`]: self::media::Receiver
     media_connections: Rc<MediaConnections>,
 
     /// [`MediaManager`] that will be used to acquire local [`MediaStream`]s.
@@ -246,7 +247,8 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
-    /// provided [`MuteState`].
+    /// the provided `mute_state`.
+    #[inline]
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
@@ -257,17 +259,18 @@ impl PeerConnection {
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
+    #[inline]
     pub fn id(&self) -> PeerId {
         self.id
     }
 
     /// Updates [`Sender`]s of this [`PeerConnection`] with
-    /// [`medea_client_api_proto::TrackPatch`].
+    /// [`proto::TrackPatch`].
     ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] is not exists.
+    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         Ok(self
             .media_connections
@@ -372,6 +375,7 @@ impl PeerConnection {
 
     /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
     /// [`TransceiverKind`].
+    #[inline]
     pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
         self.media_connections.get_senders(kind)
     }

@@ -102,6 +102,7 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
 }
 
 impl From<&DirectionProto> for TransceiverDirection {
+    #[inline]
     fn from(proto: &DirectionProto) -> Self {
         match proto {
             DirectionProto::Recv { .. } => Self::Recvonly,

@@ -64,13 +64,13 @@ pub enum MediaConnectionsError {
     InvalidMediaTrack,
 
     /// Occurs when [`MuteState`] of [`Sender`] was dropped.
-    #[display(fmt = "'MuteState' of 'Sender' was dropped.")]
+    #[display(fmt = "MuteState of Sender was dropped.")]
     MuteStateDropped,
 
     /// Occurs when [`MuteState`] of [`Sender`] transits into opposite to
     /// expected [`MuteState`].
-    #[display(fmt = "'MuteState' of 'Sender' transits into opposite to \
-                     expected `MuteState'")]
+    #[display(fmt = "MuteState of Sender transits into opposite to expected \
+                     MuteState")]
     MuteStateTransitsIntoOppositeState,
 
     /// Invalid [`medea_client_api_proto::TrackPatch`] for [`MediaTrack`].
@@ -253,12 +253,12 @@ impl MediaConnections {
     }
 
     /// Updates [`Sender`]s of this [`super::PeerConnection`] with
-    /// [`medea_client_api_proto::TrackPatch`].
+    /// [`proto::TrackPatch`].
     ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] is not exists.
+    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
             let track =
@@ -269,7 +269,6 @@ impl MediaConnections {
                 })?;
             track.update(&track_proto);
         }
-
         Ok(())
     }
 
@@ -398,6 +397,7 @@ impl MediaConnections {
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
+    #[inline]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.0.borrow().senders.get(&id).cloned()
     }
@@ -406,11 +406,10 @@ impl MediaConnections {
     /// [`TrackId`].
     pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<MediaTrack>> {
         let inner = self.0.borrow();
-
         inner
             .senders
             .get(&id)
-            .and_then(|sender| sender.track.borrow().clone())
+            .and_then(|s| s.track.borrow().clone())
             .or_else(|| {
                 inner.receivers.get(&id).and_then(|recv| recv.track.clone())
             })
@@ -571,14 +570,16 @@ impl Sender {
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or sender is dropped.
+    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
     ///
-    /// `Ok(())` will be returned if [`Sender`]'s [`MuteState`] transits into
-    /// requested [`StableMuteState`] or [`Sender`] gets dropped.
+    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
+    /// or the [`Sender`] is dropped.
     ///
-    /// `Err(MuteStateTransitsIntoOppositeState)` will be returned if
-    /// [`Sender`]'s [`MuteState`] transits into opposite to
-    /// requested [`StableMuteState`].
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// the `desired_state`.
     pub fn when_mute_state_stable(
         &self,
         desired_state: StableMuteState,
@@ -588,8 +589,8 @@ impl Sender {
             while let Some(state) = mute_states.next().await {
                 match state {
                     MuteState::Transition(_) => continue,
-                    MuteState::Stable(state) => {
-                        if state == desired_state {
+                    MuteState::Stable(s) => {
+                        if s == desired_state {
                             return Ok(());
                         } else {
                             return Err(tracerr::new!(
@@ -604,8 +605,7 @@ impl Sender {
         }
     }
 
-    /// Updates this [`Track`] based on provided
-    /// [`medea_client_api_proto::TrackPatch`].
+    /// Updates this [`Track`] basing on the provided [`proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
         if track.id != self.track_id {
             return;
@@ -617,11 +617,11 @@ impl Sender {
 
             let mute_state_update: MuteState = match current_mute_state {
                 MuteState::Stable(_) => new_mute_state.into(),
-                MuteState::Transition(transition) => {
-                    if transition.intended() == new_mute_state {
+                MuteState::Transition(t) => {
+                    if t.intended() == new_mute_state {
                         new_mute_state.into()
                     } else {
-                        transition.set_inner(new_mute_state).into()
+                        t.set_inner(new_mute_state).into()
                     }
                 }
             };

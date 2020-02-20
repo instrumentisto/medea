@@ -1,19 +1,24 @@
-//! [`crate::peer::PeerConnection`]s [`super::Sender`] mute state.
+//! [`PeerConnection`]s [`Sender`] mute state.
+//!
+//! [`PeerConnection`]: crate::peer::PeerConnection
 
 use derive_more::From;
 
-/// All mute states in which [`super::Sender`] can be.
-#[derive(Debug, Clone, Copy, From, PartialEq)]
+/// All mute states in which [`Sender`] can be.
+///
+/// [`Sender`]: super::Sender
+#[derive(Clone, Copy, Debug, From, Eq, PartialEq)]
 pub enum MuteState {
-    /// Mute state in state of transition.
+    /// State of transition.
     Transition(MuteStateTransition),
 
-    /// Stable mute state of [`super::Sender`].
+    /// Stable state.
     Stable(StableMuteState),
 }
 
 impl MuteState {
-    /// Is mute state stable (not in transition state).
+    /// Indicates whether [`MuteState`] is stable (not in transition).
+    #[inline]
     pub fn is_stable(self) -> bool {
         match self {
             MuteState::Stable(_) => true,
@@ -21,13 +26,14 @@ impl MuteState {
         }
     }
 
-    /// Starts transition into desired state changing state to
-    /// [`MuteState::Transition`], no-op if already in desired state.
+    /// Starts transition into the `desired_state` changing the state to
+    /// [`MuteState::Transition`].
+    ///
+    /// No-op if already in the `desired_state`.
     pub fn transition_to(self, desired_state: StableMuteState) -> Self {
         if self == desired_state.into() {
             return self;
         }
-
         match self {
             Self::Stable(stable) => stable.start_transition().into(),
             Self::Transition(transition) => {
@@ -49,28 +55,36 @@ impl MuteState {
     }
 
     /// Cancels ongoing transition if any.
+    #[inline]
     pub fn cancel_transition(self) -> Self {
         match self {
             Self::Stable(_) => self,
-            Self::Transition(transition) => transition.into_inner().into(),
+            Self::Transition(t) => t.into_inner().into(),
         }
     }
 }
 
 /// Stable [`MuteState`].
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMuteState {
-    /// [`super::Sender`] is not muted.
+    /// [`Sender`] is not muted.
+    ///
+    /// [`Sender`]: super::Sender
     NotMuted,
 
-    /// [`super::Sender`] is muted.
+    /// [`Sender`] is muted.
+    ///
+    /// [`Sender`]: super::Sender
     Muted,
 }
 
 impl StableMuteState {
     /// Converts this [`StableMuteState`] into [`MuteStateTransition`].
+    ///
     /// [`StableMuteState::NotMuted`] => [`MuteStateTransition::Muting`].
+    ///
     /// [`StableMuteState::Muted`] => [`MuteStateTransition::Unmuting`].
+    #[inline]
     pub fn start_transition(self) -> MuteStateTransition {
         match self {
             Self::NotMuted => MuteStateTransition::Muting(self),
@@ -80,6 +94,7 @@ impl StableMuteState {
 }
 
 impl From<bool> for StableMuteState {
+    #[inline]
     fn from(is_muted: bool) -> Self {
         if is_muted {
             Self::Muted
@@ -89,23 +104,28 @@ impl From<bool> for StableMuteState {
     }
 }
 
-/// [`MuteState`] in state of transition to another [`StableMuteState`] state.
+/// [`MuteState`] in transition to another [`StableMuteState`].
 ///
-/// [`StableMuteState`] which stored in [`MuteStateTransition`] variants
-/// is state which we already have, but we still waiting for
-/// needed state update. If needed a state update wouldn't be received, the
-/// stored [`StableMuteState`] will be applied.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// [`StableMuteState`] which is stored in [`MuteStateTransition`] variants
+/// is a state which we already have, but we still waiting for a desired state
+/// update. If desired state update won't be received, then the stored
+/// [`StableMuteState`] will be applied.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MuteStateTransition {
-    /// [`super::Sender`] should be unmuted, but awaits server permission.
+    /// [`Sender`] should be unmuted, but awaits server permission.
+    ///
+    /// [`Sender`]: super::Sender
     Unmuting(StableMuteState),
 
-    /// [`super::Sender`] should be muted, but awaits server permission.
+    /// [`Sender`] should be muted, but awaits server permission.
+    ///
+    /// [`Sender`]: super::Sender
     Muting(StableMuteState),
 }
 
 impl MuteStateTransition {
     /// Returns intention which this [`MuteStateTransition`] indicates.
+    #[inline]
     pub fn intended(self) -> StableMuteState {
         match self {
             Self::Unmuting(_) => StableMuteState::NotMuted,
@@ -113,7 +133,8 @@ impl MuteStateTransition {
         }
     }
 
-    /// Updates inner [`StableMuteState`] state.
+    /// Sets inner [`StableMuteState`].
+    #[inline]
     pub fn set_inner(self, inner: StableMuteState) -> Self {
         match self {
             Self::Unmuting(_) => Self::Unmuting(inner),
@@ -121,12 +142,11 @@ impl MuteStateTransition {
         }
     }
 
-    /// Returns inner [`StableMuteState`] state.
+    /// Returns inner [`StableMuteState`].
+    #[inline]
     pub fn into_inner(self) -> StableMuteState {
         match self {
-            Self::Unmuting(available_state) | Self::Muting(available_state) => {
-                available_state
-            }
+            Self::Unmuting(s) | Self::Muting(s) => s,
         }
     }
 }

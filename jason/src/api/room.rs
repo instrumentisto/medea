@@ -144,8 +144,8 @@ enum RoomError {
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
-    /// Typically, returned if [`RoomHandle::mute_audio`] like functions called
-    /// simultaneous.
+    /// Typically, returned if [`RoomHandle::mute_audio`]-like functions called
+    /// simultaneously.
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
 }
@@ -166,14 +166,12 @@ impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         use PeerError::*;
         match err {
-            MediaConnections(ref media_connections_err) => {
-                match media_connections_err {
-                    MediaConnectionsError::InvalidTrackPatch(id) => {
-                        Self::FailedTrackPatch(*id)
-                    }
-                    _ => Self::InvalidLocalStream(err),
+            MediaConnections(ref e) => match e {
+                MediaConnectionsError::InvalidTrackPatch(id) => {
+                    Self::FailedTrackPatch(*id)
                 }
-            }
+                _ => Self::InvalidLocalStream(err),
+            },
             StreamRequest(_) => Self::InvalidLocalStream(err),
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
@@ -182,8 +180,9 @@ impl From<PeerError> for RoomError {
 }
 
 impl From<MediaConnectionsError> for RoomError {
-    fn from(err: MediaConnectionsError) -> Self {
-        Self::MediaConnections(err)
+    #[inline]
+    fn from(e: MediaConnectionsError) -> Self {
+        Self::MediaConnections(e)
     }
 }
 
@@ -269,7 +268,6 @@ impl RoomHandle {
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
         }
-
         Ok(())
     }
 }
@@ -337,8 +335,10 @@ impl RoomHandle {
         )
     }
 
-    /// Injects local media stream for all created and new
-    /// [`crate::peer::PeerConnection`]s in this [`Room`].
+    /// Injects local media stream for all created and new [`PeerConnection`]s
+    /// in this [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     pub fn inject_local_stream(
         &self,
         stream: SysMediaStream,
@@ -352,7 +352,6 @@ impl RoomHandle {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.toggle_mute(true, TransceiverKind::Audio).await?;
-
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -362,7 +361,6 @@ impl RoomHandle {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.toggle_mute(false, TransceiverKind::Audio).await?;
-
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -372,7 +370,6 @@ impl RoomHandle {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.toggle_mute(true, TransceiverKind::Video).await?;
-
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -382,18 +379,19 @@ impl RoomHandle {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.toggle_mute(false, TransceiverKind::Video).await?;
-
             Ok(JsValue::UNDEFINED)
         })
     }
 }
 
-/// [`Room`] where all the media happens (manages concrete
-/// [`crate::peer::PeerConnection`]s, handles media server events, etc).
+/// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
+/// handles media server events, etc).
 ///
 /// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
+///
+/// [`PeerConnection`]: crate::peer::PeerConnection
 pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
@@ -584,6 +582,8 @@ impl InnerRoom {
 
     /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
     /// [`PeerConnection`]s in this [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     #[allow(clippy::filter_map)]
     fn toggle_mute(
         &self,
@@ -601,12 +601,10 @@ impl InnerRoom {
                         .get_senders(kind)
                         .into_iter()
                         .filter(|sender| match sender.mute_state() {
-                            MuteState::Transition(transition) => {
-                                transition.intended() != desired_state
+                            MuteState::Transition(t) => {
+                                t.intended() != desired_state
                             }
-                            MuteState::Stable(stable) => {
-                                stable != desired_state
-                            }
+                            MuteState::Stable(s) => s != desired_state,
                         })
                         .map(|sender| {
                             sender.mute_state_transition_to(desired_state);
@@ -635,6 +633,7 @@ impl InnerRoom {
                     future::join_all(wait_state_change)
                 })
                 .collect();
+
             future::join_all(peer_mute_state_changed)
                 .await
                 .into_iter()
@@ -655,7 +654,7 @@ impl InnerRoom {
         self.peers
             .get_all()
             .into_iter()
-            .find(|peer| !peer.is_all_senders_in_mute_state(kind, mute_state))
+            .find(|p| !p.is_all_senders_in_mute_state(kind, mute_state))
             .is_none()
     }
 

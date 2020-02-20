@@ -143,7 +143,6 @@
 //! # })
 //! ```
 
-#![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(
     intra_doc_link_resolution_failure,
     missing_debug_implementations,

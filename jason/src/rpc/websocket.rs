@@ -23,7 +23,9 @@ use super::{
     ClientDisconnect, CloseMsg, ClosedStateReason, RpcTransport, State,
 };
 
-/// Errors that may occur when working with [`super::WebSocketRpcClient`].
+/// Errors that may occur when working with [`WebSocketRpcClient`].
+///
+/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Clone, Debug, Display, JsCaused)]
 pub enum TransportError {
     /// Occurs when the port to which the connection is being attempted
