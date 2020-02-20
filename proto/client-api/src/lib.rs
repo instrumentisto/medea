@@ -54,7 +54,7 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Clone, Debug)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -72,7 +72,7 @@ pub enum ServerMsg {
 }
 
 /// RPC settings of `Client` received from `Media Server`.
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RpcSettings {
     /// Timeout of considering `Client` as lost by `Media Server` when it
@@ -261,7 +261,7 @@ pub struct Track {
 }
 
 /// Path to existing [`Track`] and field which can be updated.
-#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct TrackPatch {
     pub id: TrackId,
