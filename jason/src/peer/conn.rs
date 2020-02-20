@@ -3,7 +3,8 @@ use std::{cell::RefCell, rc::Rc};
 use derive_more::Display;
 use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen::{JsCast, closure::Closure, JsValue, prelude::*};
+use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
     RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
@@ -14,7 +15,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, EventListenerBindError, JsCaused, JsError},
+    utils::{EventListener, EventListenerBindError, JsCaused, JsError, window, console_error},
 };
 
 use super::ice_server::RtcIceServers;
@@ -244,8 +245,25 @@ impl RtcPeerConnection {
             .map_err(RTCPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
+        let peer = Rc::new(peer);
+
+
+        let peer_clone = Rc::clone(&peer);
+        let a = Closure::wrap(Box::new(move || {
+            let another_peer_clone = Rc::clone(&peer_clone);
+            spawn_local(async move {
+                let stats = JsFuture::from(another_peer_clone.get_stats())
+                    .await.unwrap();
+                asd(&stats);
+//                js_sys::JSON::stringify
+//                console_error(&stats);
+            });
+        }) as Box<dyn Fn()>);
+        window().set_interval_with_callback_and_timeout_and_arguments_0(a.as_ref().unchecked_ref(), 1000).unwrap();
+        a.forget();
+
         Ok(Self {
-            peer: Rc::new(peer),
+            peer,
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_track: RefCell::new(None),
@@ -536,4 +554,12 @@ impl Drop for RtcPeerConnection {
         self.on_ice_connection_state_changed.borrow_mut().take();
         self.peer.close();
     }
+}
+
+
+#[wasm_bindgen(inline_js = "export function asd(arg) { window.asd = arg; }")]
+extern "C" {
+    fn asd(
+        arg: &JsValue,
+    );
 }
