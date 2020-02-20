@@ -755,11 +755,14 @@ impl Room {
         &self,
         command: &CommandMessage,
     ) -> Result<(), CommandValidationError> {
+        use Command::*;
+
         let peer_id = match command.command {
-            Command::MakeSdpOffer { peer_id, .. }
-            | Command::MakeSdpAnswer { peer_id, .. }
-            | Command::SetIceCandidate { peer_id, .. }
-            | Command::AddPeerConnectionMetrics { peer_id, .. } => peer_id,
+            MakeSdpOffer { peer_id, .. }
+            | MakeSdpAnswer { peer_id, .. }
+            | SetIceCandidate { peer_id, .. }
+            | AddPeerConnectionMetrics { peer_id, .. }
+            | UpdateTracks { peer_id, .. } => peer_id,
         };
 
         let peer = self
@@ -995,7 +998,7 @@ impl CommandHandler for Room {
                     .into_actor(self),
             ))
         } else {
-            Ok(Box::new(future::ok(()).into_actor(self)))
+            Ok(Box::new(actix::fut::ok(())))
         }
     }
 }
