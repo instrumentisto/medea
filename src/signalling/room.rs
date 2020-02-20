@@ -929,15 +929,15 @@ impl CommandHandler for Room {
         Ok(Box::new(future::ok(()).into_actor(self)))
     }
 
-    /// Sends [`Event::TracksUpdated`] with data from received
+    /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            let member_id = peer.member_id();
+        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
+            let member_id = p.member_id();
             Ok(Box::new(
                 self.members
                     .send_event_to_member(

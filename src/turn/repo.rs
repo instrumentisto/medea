@@ -58,8 +58,8 @@ impl TurnDatabase {
     ///
     /// # Errors
     ///
-    /// Errors if unable to get redis connection from pool, or redis request
-    /// fails.
+    /// Errors if unable to establish connection with database, or database
+    /// request fails.
     pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
         debug!("Store ICE user: {:?}", user);
 
@@ -84,8 +84,8 @@ impl TurnDatabase {
     ///
     /// # Errors
     ///
-    /// Errors if unable to get redis connection from pool, or redis request
-    /// fails.
+    /// Errors if unable to establish connection with database, or database
+    /// request fails.
     pub async fn remove(
         &self,
         users: &[&IceUser],
