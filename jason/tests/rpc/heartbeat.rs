@@ -81,7 +81,7 @@ async fn on_idle_works() {
         IdleTimeout(Duration::from_millis(100).into()),
     );
 
-    await_with_timeout(Box::pin(hb.on_idle().next()), 110)
+    await_with_timeout(Box::pin(hb.on_idle().next()), 120)
         .await
         .unwrap()
         .unwrap();

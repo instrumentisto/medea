@@ -23,7 +23,9 @@ use super::{
     ClientDisconnect, CloseMsg, ClosedStateReason, RpcTransport, State,
 };
 
-/// Errors that may occur when working with [`WebSocket`].
+/// Errors that may occur when working with [`WebSocketRpcClient`].
+///
+/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Clone, Debug, Display, JsCaused)]
 pub enum TransportError {
     /// Occurs when the port to which the connection is being attempted
@@ -35,7 +37,7 @@ pub enum TransportError {
     #[display(fmt = "Failed to init WebSocket")]
     InitSocket,
 
-    /// Occurs when [`ClientMessage`] cannot be parsed.
+    /// Occurs when [`ClientMsg`] cannot be parsed.
     #[display(fmt = "Failed to parse client message: {}", _0)]
     ParseClientMessage(Rc<serde_json::error::Error>),
 
@@ -51,8 +53,10 @@ pub enum TransportError {
     #[display(fmt = "Failed to send message: {}", _0)]
     SendMessage(JsError),
 
-    /// Occurs when handler failed to bind to some [`WebSocket`] event. Not
+    /// Occurs when handler failed to bind to some [WebSocket] event. Not
     /// really supposed to ever happen.
+    ///
+    /// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
     #[display(fmt = "Failed to bind to WebSocket event: {}", _0)]
     WebSocketEventBindError(EventListenerBindError),
 

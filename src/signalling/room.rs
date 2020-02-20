@@ -14,6 +14,7 @@ use failure::Fail;
 use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
+    TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -926,6 +927,31 @@ impl CommandHandler for Room {
         _candidate: PeerMetrics,
     ) -> Self::Output {
         Ok(Box::new(future::ok(()).into_actor(self)))
+    }
+
+    /// Sends [`Event::TracksUpdated`] with data from the received
+    /// [`Command::UpdateTracks`].
+    fn on_update_tracks(
+        &mut self,
+        peer_id: PeerId,
+        tracks_patches: Vec<TrackPatch>,
+    ) -> Self::Output {
+        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
+            let member_id = p.member_id();
+            Ok(Box::new(
+                self.members
+                    .send_event_to_member(
+                        member_id,
+                        Event::TracksUpdated {
+                            peer_id,
+                            tracks_patches,
+                        },
+                    )
+                    .into_actor(self),
+            ))
+        } else {
+            Ok(Box::new(future::ok(()).into_actor(self)))
+        }
     }
 }
 

@@ -21,8 +21,8 @@ DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.41
-CHROME_VERSION := 79.0
-FIREFOX_VERSION := 72.0
+CHROME_VERSION := 80.0
+FIREFOX_VERSION := 73.0.1
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -39,6 +39,9 @@ crate-dir = mock/control-api
 endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
+endif
+ifeq ($(crate),medea-reactive)
+crate-dir = "crates/medea-reactive"
 endif
 ifeq ($(crate),medea-coturn-telnet-client)
 crate-dir = crates/medea-coturn-telnet-client
@@ -347,6 +350,7 @@ webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-reactive
 	@make test.unit crate=medea-coturn-telnet-client
 	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-control-api-proto

@@ -54,7 +54,7 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Clone, Debug)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -72,7 +72,7 @@ pub enum ServerMsg {
 }
 
 /// RPC settings of `Client` received from `Media Server`.
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RpcSettings {
     /// Timeout of considering `Client` as lost by `Media Server` when it
@@ -103,9 +103,8 @@ pub enum ClientMsg {
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "command", content = "data")]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
@@ -131,13 +130,18 @@ pub enum Command {
         peer_id: PeerId,
         metrics: PeerMetrics,
     },
+    /// Web Client asks permission to update [`Track`]s in specified [`Peer`].
+    /// Media Server gives permission by sending [`Event::TracksUpdated`].
+    UpdateTracks {
+        peer_id: PeerId,
+        tracks_patches: Vec<TrackPatch>,
+    },
 }
 
 /// Web Client's Peer Connection metrics.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
@@ -146,8 +150,7 @@ pub enum PeerMetrics {
 /// Peer Connection's ICE connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IceConnectionState {
     New,
     Checking,
@@ -225,6 +228,16 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
+
+    /// Media Server notifies about necessity to update [`Track`]s in specified
+    /// [`Peer`].
+    ///
+    /// Can be used to update existing [`Track`] settings (e.g. change to lower
+    /// video resolution, mute audio).
+    TracksUpdated {
+        peer_id: PeerId,
+        tracks_patches: Vec<TrackPatch>,
+    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -244,6 +257,15 @@ pub struct Track {
     pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
+    pub is_muted: bool,
+}
+
+/// Path to existing [`Track`] and field which can be updated.
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub struct TrackPatch {
+    pub id: TrackId,
+    pub is_muted: Option<bool>,
 }
 
 /// Representation of [RTCIceServer][1] (item of `iceServers` field

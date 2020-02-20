@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -101,6 +101,16 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
     }
 }
 
+impl From<&DirectionProto> for TransceiverDirection {
+    #[inline]
+    fn from(proto: &DirectionProto) -> Self {
+        match proto {
+            DirectionProto::Recv { .. } => Self::Recvonly,
+            DirectionProto::Send { .. } => Self::Sendonly,
+        }
+    }
+}
+
 /// Representation of [RTCSdpType].
 ///
 /// [RTCSdpType]: https://w3.org/TR/webrtc/#dom-rtcsdptype
@@ -143,18 +153,18 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to create SDP offer: {}", _0)]
     CreateOfferFailed(JsError),
 
-    /// Occurs when handler failed to bind to some [`RTCPeerConnection`] event.
+    /// Occurs when handler failed to bind to some [`RtcPeerConnection`] event.
     /// Not really supposed to ever happen.
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
     /// Occurs if the local description associated with the
-    /// [`RTCPeerConnection`] cannot be changed.
+    /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set local SDP description: {}", _0)]
     SetLocalDescriptionFailed(JsError),
 
     /// Occurs if the description of the remote end of the
-    /// [`RTCPeerConnection`] cannot be changed.
+    /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set remote SDP description: {}", _0)]
     SetRemoteDescriptionFailed(JsError),
 }

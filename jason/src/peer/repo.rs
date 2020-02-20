@@ -4,10 +4,7 @@ use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 
-use crate::{
-    media::MediaManager,
-    peer::media::{EnabledAudio, EnabledVideo},
-};
+use crate::media::MediaManager;
 
 use super::{PeerConnection, PeerError, PeerEvent};
 
@@ -17,8 +14,6 @@ pub trait PeerRepository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided
     /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
     ///
-    /// [`PeerConnection`] can be created with muted audio or video [`Track`]s.
-    ///
     /// # Errors
     ///
     /// Errors if creating [`PeerConnection`] fails.
@@ -27,8 +22,6 @@ pub trait PeerRepository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: EnabledAudio,
-        enabled_video: EnabledVideo,
         is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
@@ -70,8 +63,6 @@ impl PeerRepository for Repository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: EnabledAudio,
-        enabled_video: EnabledVideo,
         is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = Rc::new(
@@ -80,8 +71,6 @@ impl PeerRepository for Repository {
                 peer_events_sender,
                 ice_servers,
                 Rc::clone(&self.media_manager),
-                enabled_audio,
-                enabled_video,
                 is_force_relayed,
             )
             .map_err(tracerr::map_from_and_wrap!())?,
@@ -102,7 +91,7 @@ impl PeerRepository for Repository {
         self.peers.remove(&id);
     }
 
-    /// Returns all [`PeerConnection`]s stored in repository.
+    /// Returns all [`PeerConnection`]s stored in a repository.
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
         self.peers.values().cloned().collect()

@@ -437,26 +437,34 @@ window.onload = async function() {
     let isAudioMuted = false;
     let isVideoMuted = false;
 
-    muteAudio.addEventListener('click', () => {
-      if (isAudioMuted) {
-        room.unmute_audio();
-        isAudioMuted = false;
-        muteAudio.textContent = "Mute audio";
-      } else {
-        room.mute_audio();
-        isAudioMuted = true;
-        muteAudio.textContent = "Unmute audio";
+    muteAudio.addEventListener('click', async () => {
+      try {
+        if (isAudioMuted) {
+          await room.unmute_audio();
+          isAudioMuted = false;
+          muteAudio.textContent = "Mute audio";
+        } else {
+          await room.mute_audio();
+          isAudioMuted = true;
+          muteAudio.textContent = "Unmute audio";
+        }
+      } catch (e) {
+        console.error(e.message());
       }
     });
-    muteVideo.addEventListener('click', () => {
-      if (isVideoMuted) {
-        room.unmute_video();
-        isVideoMuted = false;
-        muteVideo.textContent = "Mute video";
-      } else {
-        room.mute_video();
-        isVideoMuted = true;
-        muteVideo.textContent = "Unmute video";
+    muteVideo.addEventListener('click', async () => {
+      try {
+        if (isVideoMuted) {
+          await room.unmute_video();
+          isVideoMuted = false;
+          muteVideo.textContent = "Mute video";
+        } else {
+          await room.mute_video();
+          isVideoMuted = true;
+          muteVideo.textContent = "Unmute video";
+        }
+      } catch (e) {
+        console.error(e.message());
       }
     });
     closeApp.addEventListener('click', () => {
