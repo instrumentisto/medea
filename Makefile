@@ -340,8 +340,9 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|<crate-name>)]
-#	               [crate=medea-jason [browser=(chrome|firefox|default)]]
+#	make test.unit [( [crate=@all]
+#	                | crate=(medea|<crate-name>)
+#	                | crate=medea-jason [browser=(chrome|firefox|default)] )]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
@@ -382,12 +383,12 @@ endif
 # Run Rust E2E tests of project.
 #
 # Usage:
-# 	make test.e2e [up=no]
-#	              [up=yes [dockerized=no [debug=(yes|no)]]
-#	                      [dockerized=yes [TAG=(dev|<docker-tag>)]
-#	                                      [registry=<registry-host>]
-#	                                      [log=(no|yes)]]
-#	                      [wait=(5|<seconds>)]]
+#	make test.e2e [( [up=no]
+#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
+#	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
+#	                                          [registry=<registry-host>]
+#	                                          [log=(no|yes)] )]
+#	                        [wait=(5|<seconds>)] )]
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
@@ -686,11 +687,12 @@ docker.up.demo: docker.down.demo
 # Run Medea media server in Docker Compose environment.
 #
 # Usage:
-#	make docker.up.medea [dockerized=no [debug=(yes|no)] [background=(no|yes)]]
-#	                     [dockerized=yes [TAG=(dev|<docker-tag>)]
-#	                                     [registry=<registry-host>]]
-#	                                     [background=no]
-#	                                     [background=yes [log=(no|yes)]]]
+#	make docker.up.medea [( [dockerized=no] [debug=(yes|no)]
+#	                                        [background=(no|yes)]
+#	                      | dockerized=yes [TAG=(dev|<docker-tag>)]
+#	                                       [registry=<registry-host>]]
+#	                                       [( [background=no]
+#	                                        | background=yes [log=(no|yes)] )])]
 
 docker-up-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
@@ -765,10 +767,10 @@ helm:
 # Usage:
 #	make helm.down [chart=medea-demo] [release=<release-name>]
 #	               [cluster=(minikube|staging)]
-#	               [check=(yes|no)]
+#	               [check=(no|yes)]
 
 helm.down:
-ifneq ($(check),no)
+ifeq ($(check),yes)
 	$(if $(shell helm $(helm-cluster-args) list | grep '$(helm-release)'),\
 		helm $(helm-cluster-args) uninstall $(helm-release) ,\
 		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
@@ -840,9 +842,12 @@ endif
 #
 # Usage:
 #	make helm.up [chart=medea-demo] [release=<release-name>]
-#	             [atomic=(no|yes)] [force=(no|yes)] [wait=(yes|no)]
-#	             [cluster=minikube [rebuild=(no|yes) [no-cache=(no|yes)]]]
-#	             [cluster=staging]
+#	             [force=(no|yes)]
+#	             [( [atomic=no] [wait=(yes|no)]
+#	              | atomic=yes )]
+#	             [( [cluster=minikube] [( [rebuild=no]
+#	                                    | rebuild=yes [no-cache=(no|yes)] )]
+#	              | cluster=staging )]
 
 helm.up:
 ifeq ($(wildcard $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml),)
