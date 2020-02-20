@@ -68,7 +68,7 @@ impl ControlClient {
     ///
     /// # Errors
     ///
-    /// Errors if unable to resolve provided url.
+    /// Errors if unable to resolve the provided `medea_addr`.
     pub async fn new(
         medea_addr: String,
     ) -> Result<Self, tonic::transport::Error> {
