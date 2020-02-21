@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _, WrapFuture,
+    Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
+    Handler, Message, WrapFuture as _, WrapFuture,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -55,6 +55,7 @@ use crate::{
         participants::{ParticipantService, ParticipantServiceErr},
         peers::PeerRepository,
     },
+    turn::coturn_stats::{CoturnStats, EventType, Subscribe},
     utils::ResponseActAnyFuture,
     AppContext,
 };
@@ -175,6 +176,8 @@ pub struct Room {
 
     /// Current state of this [`Room`].
     state: State,
+
+    coturn_stats: Addr<CoturnStats>,
 }
 
 impl Room {
@@ -197,6 +200,7 @@ impl Room {
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
+            coturn_stats: context.coturn_stats.clone(),
         })
     }
 
@@ -344,6 +348,20 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
+        self.coturn_stats.do_send(Subscribe {
+            peer_id: first_peer,
+            partner_peer_id: second_peer,
+            room_id: self.id.clone(),
+            addr: ctx.address(),
+            events_type: HashSet::new(),
+        });
+        self.coturn_stats.do_send(Subscribe {
+            peer_id: second_peer,
+            partner_peer_id: first_peer,
+            room_id: self.id.clone(),
+            addr: ctx.address(),
+            events_type: HashSet::new(),
+        });
         match self.send_peer_created(first_peer, second_peer) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
                 if res.is_ok() {
@@ -1305,5 +1323,24 @@ impl Handler<CreateEndpoint> for Room {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+pub struct OnStartOnStopCallback {
+    pub event: EventType,
+    pub peer_id: PeerId,
+}
+
+impl Handler<OnStartOnStopCallback> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: OnStartOnStopCallback,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        debug!("LOOK AT ME: {:?}", msg);
     }
 }

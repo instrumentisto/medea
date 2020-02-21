@@ -841,7 +841,7 @@ dependencies = [
  "deadpool",
  "futures 0.3.4",
  "log 0.4.8",
- "redis",
+ "redis 0.15.1",
  "serde 1.0.104",
 ]
 
@@ -1508,7 +1508,8 @@ dependencies = [
  "medea-macro",
  "mockall 0.6.0",
  "rand 0.7.3",
- "redis",
+ "redis 0.15.1",
+ "redis 0.15.2-alpha.0",
  "rust-crypto",
  "serde 1.0.104",
  "serde_json",
@@ -2202,6 +2203,24 @@ name = "redis"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eeb1fe3fc011cde97315f370bc88e4db3c23b08709a04915921e02b1d363b20"
+dependencies = [
+ "bytes",
+ "combine",
+ "dtoa",
+ "futures-executor",
+ "futures-util",
+ "itoa",
+ "percent-encoding 2.1.0",
+ "pin-project-lite",
+ "sha1",
+ "tokio",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
+name = "redis"
+version = "0.15.2-alpha.0"
 dependencies = [
  "bytes",
  "combine",

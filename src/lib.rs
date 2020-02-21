@@ -21,8 +21,9 @@ use crate::{
         clients::CallbackClientFactoryImpl, service::CallbackService,
     },
     conf::Conf,
-    turn::TurnAuthService,
+    turn::{coturn_stats::CoturnStats, TurnAuthService},
 };
+use actix::Addr;
 
 /// Global application context.
 #[derive(Clone, Debug)]
@@ -39,16 +40,23 @@ pub struct AppContext {
     ///
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
+
+    pub coturn_stats: Addr<CoturnStats>,
 }
 
 impl AppContext {
     /// Creates new [`AppContext`].
     #[inline]
-    pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
+    pub fn new(
+        config: Conf,
+        turn: Arc<dyn TurnAuthService>,
+        coturn_stats: Addr<CoturnStats>,
+    ) -> Self {
         Self {
             config: Arc::new(config),
             turn_service: turn,
             callbacks: CallbackService::default(),
+            coturn_stats,
         }
     }
 }

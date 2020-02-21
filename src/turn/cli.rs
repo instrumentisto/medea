@@ -6,6 +6,7 @@ use failure::Fail;
 use medea_coturn_telnet::{CoturnTelnetError, Manager, Pool, PoolError};
 
 use crate::media::IceUser;
+use medea_coturn_telnet::sessions_parser::Session;
 
 #[derive(Display, Debug, Fail, From)]
 pub enum CoturnCliError {
@@ -49,6 +50,15 @@ impl CoturnTelnetClient {
         }
 
         Ok(())
+    }
+
+    pub async fn get_sessions(
+        &self,
+        username: String,
+    ) -> Result<Vec<Session>, CoturnCliError> {
+        let mut connection = self.0.get().await?;
+
+        Ok(connection.print_sessions(username).await?)
     }
 }
 

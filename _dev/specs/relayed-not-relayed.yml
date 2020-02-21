@@ -1,0 +1,36 @@
+kind: Room
+id: relayed-not-relayed
+spec:
+  pipeline:
+    relayed-member:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+              force_relay: true
+          play-responder:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-not-relayed/not-relayed-member/publish"
+              force_relay: true
+    not-relayed-member:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+          play-caller:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-not-relayed/relayed-member/publish"

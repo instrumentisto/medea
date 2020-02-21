@@ -31,6 +31,15 @@ impl TryFrom<&str> for Protocol {
     }
 }
 
+impl fmt::Display for Protocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Protocol::Udp => write!(f, "UDP"),
+            Protocol::Tcp => write!(f, "TCP"),
+        }
+    }
+}
+
 const TURN_SESSION_ID_FACTOR: u64 = 1000000000000000;
 
 #[derive(Clone, Copy, Debug)]

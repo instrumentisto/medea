@@ -2,7 +2,7 @@
 //!
 //! [TURN]: https://webrtcglossary.com/turn
 
-mod cli;
+pub mod cli;
 pub mod coturn_stats;
 pub mod repo;
 pub mod service;

@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use actix::Message;
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
@@ -12,14 +13,17 @@ use crate::{
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
-use actix::{Actor, AsyncContext, StreamHandler, WrapFuture};
+use actix::{
+    Actor, ActorFuture, Addr, AsyncContext, Handler, SpawnHandle,
+    StreamHandler, WrapFuture,
+};
 use futures::channel::mpsc;
 use medea_client_api_proto::PeerId;
-use medea_coturn_telnet::sessions_parser::TrafficUsage;
-use redis::{ConnectionInfo, IntoConnectionInfo, PubSub};
+use medea_coturn_telnet::sessions_parser::{Session, TrafficUsage};
+use patched_redis::{ConnectionInfo, IntoConnectionInfo};
 use std::{collections::HashMap, time::Duration};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct Traffic {
     pub received_packets: u64,
     pub received_bytes: u64,
@@ -159,7 +163,9 @@ pub struct CoturnEvent {
 }
 
 impl CoturnEvent {
-    pub fn parse(msg: redis::Msg) -> Result<Self, CoturnEventParseError> {
+    pub fn parse(
+        msg: patched_redis::Msg,
+    ) -> Result<Self, CoturnEventParseError> {
         let channel: String = msg
             .get_channel()
             .map_err(|_| CoturnEventParseError::NoChannelInfo)?;
@@ -273,41 +279,33 @@ pub struct CoturnStatsWatcher {
     client: redis::Client,
 }
 
-impl CoturnStatsWatcher {
-    pub fn new<T: IntoConnectionInfo>(
-        conf: T,
-    ) -> Result<Self, redis::RedisError> {
-        let client = redis::Client::open(conf)?;
+use crate::{
+    media::peer::Context,
+    signalling::{room::OnStartOnStopCallback, Room},
+    turn::{
+        cli::{CoturnCliError, CoturnTelnetClient},
+        coturn_stats::EventType::OnStart,
+    },
+};
+use actix_web::web::patch;
+use futures::{StreamExt, TryFutureExt};
+use patched_redis::Client as RedisClient;
+use redis::Msg;
+use std::{
+    cell::RefCell, collections::HashSet, rc::Rc, thread::JoinHandle,
+    time::Instant,
+};
 
-        Ok(Self { client })
-    }
-}
+pub async fn coturn_watcher_loop(
+    client: patched_redis::Client,
+) -> Result<(), patched_redis::RedisError> {
+    let conn = client.get_async_connection().await?;
+    let mut pusub = conn.into_pubsub();
+    pusub.psubscribe("turn/realm/*/user/*/allocation/*").await?;
+    let mut pubsub_stream = pusub.on_message();
 
-impl Actor for CoturnStatsWatcher {
-    type Context = actix::Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let mut conn = self.client.get_connection().unwrap();
-        let (tx, rx) = mpsc::unbounded();
-        std::thread::spawn(move || {
-            let mut pubsub = conn.as_pubsub();
-            pubsub
-                .psubscribe("turn/realm/*/user/*/allocation/*")
-                .unwrap();
-            loop {
-                let msg = pubsub.get_message().unwrap();
-                if tx.unbounded_send(msg).is_err() {
-                    break;
-                }
-            }
-        });
-        ctx.add_stream(rx);
-    }
-}
-
-impl StreamHandler<redis::Msg> for CoturnStatsWatcher {
-    fn handle(&mut self, item: redis::Msg, ctx: &mut Self::Context) {
-        match CoturnEvent::parse(item) {
+    while let Some(msg) = pubsub_stream.next().await {
+        match CoturnEvent::parse(msg) {
             Ok(event) => {
                 debug!("Coturn stats: {:?}", event);
             }
@@ -316,13 +314,13 @@ impl StreamHandler<redis::Msg> for CoturnStatsWatcher {
             }
         }
     }
+
+    Ok(())
 }
 
-pub fn new_coturn_stats_watcher(
-    cf: &conf::Turn,
-) -> Result<CoturnStatsWatcher, redis::RedisError> {
-    let turn_db = CoturnStatsWatcher::new(ConnectionInfo {
-        addr: Box::new(redis::ConnectionAddr::Tcp(
+pub fn run_coturn_stats_watcher(cf: &conf::Turn) {
+    let connection_info = ConnectionInfo {
+        addr: Box::new(patched_redis::ConnectionAddr::Tcp(
             cf.db.redis.ip.to_string(),
             cf.db.redis.port,
         )),
@@ -332,7 +330,343 @@ pub fn new_coturn_stats_watcher(
         } else {
             Some(cf.db.redis.pass.clone())
         },
-    })?;
+    };
+    let client = patched_redis::Client::open(connection_info).unwrap();
+    actix::spawn(async move {
+        coturn_watcher_loop(client).await.ok();
+    });
+}
 
-    Ok(turn_db)
+#[derive(Debug)]
+pub enum PublisherAllocationState {
+    Stopped,
+    Playing,
+}
+
+// TODO: when this will be Dropped - spawn on_stop event (if state is not
+// PublisherAllocationState::Stopped).
+#[derive(Debug)]
+pub struct PublisherAllocation {
+    allocation_id: u64,
+    peer_id: PeerId,
+    last_update: Instant,
+    prev_sent_bytes: u64,
+    prev_received_bytes: u64,
+    current_sent_bytes: u64,
+    current_received_bytes: u64,
+    state: PublisherAllocationState,
+    // TODO: recipient
+    room_addr: Addr<Room>,
+    events: HashSet<EventType>,
+}
+
+impl PublisherAllocation {
+    pub fn update_traffic(&mut self, traffic: Traffic) {
+        self.update_send_bytes(traffic.sent_bytes);
+        self.update_received_bytes(traffic.received_bytes);
+    }
+
+    fn update_send_bytes(&mut self, sent_bytes: u64) {
+        if self.current_sent_bytes < sent_bytes {
+            self.prev_sent_bytes = self.current_sent_bytes;
+            self.current_sent_bytes = sent_bytes;
+        }
+        self.refresh_last_update();
+    }
+
+    fn update_received_bytes(&mut self, received_bytes: u64) {
+        if self.current_received_bytes < received_bytes {
+            self.prev_received_bytes = self.current_received_bytes;
+            self.current_received_bytes = received_bytes;
+        }
+        self.refresh_last_update();
+    }
+
+    fn refresh_last_update(&mut self) {
+        self.last_update = Instant::now();
+    }
+
+    pub fn on_start(&self) {
+        self.room_addr.do_send(OnStartOnStopCallback {
+            peer_id: self.peer_id,
+            event: EventType::OnStart,
+        });
+    }
+}
+
+impl Drop for PublisherAllocation {
+    fn drop(&mut self) {
+        self.room_addr.do_send(OnStartOnStopCallback {
+            peer_id: self.peer_id,
+            event: EventType::OnStop,
+        })
+    }
+}
+
+#[derive(Eq, PartialEq, Hash, Debug)]
+pub enum EventType {
+    OnStart,
+    OnStop,
+}
+
+type Alloc = Rc<RefCell<PublisherAllocation>>;
+
+#[derive(Debug)]
+pub struct CoturnStats {
+    allocations: HashMap<u64, (Alloc, Option<Alloc>)>,
+    client: patched_redis::Client,
+    // TODO: PeerId -> CoturnUsername
+    awaits_allocation: HashMap<PeerId, Subscribe>,
+    coturn_client: CoturnTelnetClient,
+    relay_allocations_ids: HashMap<PeerId, u64>,
+}
+
+impl CoturnStats {
+    pub fn new(
+        cf: &crate::conf::turn::Turn,
+        coturn_client: CoturnTelnetClient,
+    ) -> Result<Self, patched_redis::RedisError> {
+        let connection_info = ConnectionInfo {
+            addr: Box::new(patched_redis::ConnectionAddr::Tcp(
+                cf.db.redis.ip.to_string(),
+                cf.db.redis.port,
+            )),
+            db: cf.db.redis.db_number,
+            passwd: if cf.db.redis.pass.is_empty() {
+                None
+            } else {
+                Some(cf.db.redis.pass.clone())
+            },
+        };
+        let client = patched_redis::Client::open(connection_info)?;
+
+        Ok(Self {
+            allocations: HashMap::new(),
+            client,
+            awaits_allocation: HashMap::new(),
+            coturn_client,
+            relay_allocations_ids: HashMap::new(),
+        })
+    }
+}
+
+impl Actor for CoturnStats {
+    type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        let (msg_tx, msg_stream) = mpsc::unbounded();
+        let client = self.client.clone();
+
+        ctx.spawn(
+            async move {
+                let conn = client.get_async_connection().await.unwrap();
+                let mut pubsub = conn.into_pubsub();
+                pubsub
+                    .psubscribe("turn/realm/*/user/*/allocation/*")
+                    .await
+                    .unwrap();
+
+                let mut msg_stream = pubsub.on_message();
+                while msg_tx.unbounded_send(msg_stream.next().await).is_ok() {}
+            }
+            .into_actor(self),
+        );
+        ctx.add_stream(msg_stream);
+    }
+}
+
+fn find_relay_session(sessions: Vec<Session>) -> Option<Session> {
+    for session in sessions {
+        if session.peers.len() > 0 {
+            return Some(session);
+        }
+    }
+
+    None
+}
+
+impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
+    fn handle(
+        &mut self,
+        item: Option<patched_redis::Msg>,
+        ctx: &mut Self::Context,
+    ) {
+        if let Some(msg) = item {
+            let event = if let Ok(event) = CoturnEvent::parse(msg) {
+                event
+            } else {
+                return;
+            };
+            let peer_id = event.peer_id;
+
+            match event.event {
+                CoturnAllocationEvent::New { lifetime: _ } => {
+                    if let Some(subscription_request) =
+                        self.awaits_allocation.get(&event.peer_id)
+                    {
+                        let coturn_client = self.coturn_client.clone();
+                        let room_id = subscription_request.room_id.clone();
+                        ctx.spawn(
+                            async move {
+                                let sess = format!("{}_{}", room_id, event.peer_id.to_string());
+                                coturn_client.get_sessions(sess).await
+                            }
+                                .into_actor(self)
+                                .map(move |res, this, ctx| {
+                                    let sessions = res.unwrap();
+                                    let relay_session = if let Some(relay_session) = find_relay_session(sessions){
+                                        relay_session
+                                    } else {
+                                        return;
+                                    };
+                                    let subscription_req = this.awaits_allocation.remove(&peer_id).unwrap();
+                                    let partner_peer_id = subscription_req.partner_peer_id;
+                                    let allocation = Rc::new(RefCell::new(PublisherAllocation {
+                                        allocation_id: relay_session.id.0,
+                                        peer_id,
+                                        state: PublisherAllocationState::Playing,
+                                        current_received_bytes: relay_session.traffic_usage.received_bytes,
+                                        current_sent_bytes: relay_session.traffic_usage.sent_bytes,
+                                        prev_received_bytes: 0,
+                                        prev_sent_bytes: 0,
+                                        events: subscription_req.events_type,
+                                        last_update: Instant::now(),
+                                        room_addr: subscription_req.addr,
+                                    }));
+                                    allocation.borrow_mut().on_start();
+
+                                    if let Some(partner_allocation_id) = this.relay_allocations_ids.get(&partner_peer_id) {
+                                        let partner_allocation_subs = this.allocations
+                                            .get_mut(partner_allocation_id).unwrap();
+                                        let partner_allocation = partner_allocation_subs.0.clone();
+                                        partner_allocation_subs.1 = Some(allocation.clone());
+
+                                        this.allocations.insert(relay_session.id.0, (allocation, Some(partner_allocation)));
+                                    } else {
+                                        this.allocations.insert(relay_session.id.0, (allocation, None));
+                                    }
+                                    this.relay_allocations_ids.insert(peer_id, relay_session.id.0);
+                                })
+                        );
+                    }
+                }
+                CoturnAllocationEvent::Traffic { traffic } => {
+                    if let Some((allocation, partner_allocation)) =
+                        self.allocations.get(&event.allocation_id)
+                    {
+                        allocation.borrow_mut().update_traffic(traffic);
+                        if let Some(partner_allocation) = partner_allocation {
+                            partner_allocation
+                                .borrow_mut()
+                                .update_received_bytes(traffic.sent_bytes);
+                            partner_allocation
+                                .borrow_mut()
+                                .update_send_bytes(traffic.received_bytes);
+                        }
+                    }
+                }
+                CoturnAllocationEvent::Deleted => {
+                    if let Some((allocation, partner_allocation)) =
+                        self.allocations.remove(&event.allocation_id)
+                    {
+                        if let Some(partner_allocation) = partner_allocation {
+                            let partner_allocation_id =
+                                partner_allocation.borrow().allocation_id;
+                            self.allocations.remove(&partner_allocation_id);
+                        }
+                    }
+                }
+                _ => (),
+            }
+        } else {
+            todo!("Implement reconnection logic.")
+        }
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype(result = "Result<(), CoturnCliError>")]
+pub struct Subscribe {
+    // TODO: recipient
+    pub addr: Addr<Room>,
+    pub events_type: HashSet<EventType>,
+    pub room_id: RoomId,
+    pub partner_peer_id: PeerId,
+    pub peer_id: PeerId,
+}
+
+pub type ActFuture<O> = Box<dyn ActorFuture<Actor = CoturnStats, Output = O>>;
+
+impl Handler<Subscribe> for CoturnStats {
+    type Result = ActFuture<Result<(), CoturnCliError>>;
+
+    fn handle(
+        &mut self,
+        msg: Subscribe,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let coturn_client = self.coturn_client.clone();
+        let peer_id = msg.peer_id;
+        let session_id = format!("{}_{}", msg.room_id, msg.peer_id);
+        Box::new(
+            async move { coturn_client.get_sessions(session_id).await }
+                .into_actor(self)
+                .map(move |res, this, ctx| {
+                    let sessions = res?;
+
+                    let relay_session = if let Some(relay_session) =
+                        find_relay_session(sessions)
+                    {
+                        relay_session
+                    } else {
+                        this.awaits_allocation.insert(peer_id, msg);
+                        return Ok(());
+                    };
+                    let subscription_req = msg;
+                    let partner_peer_id = subscription_req.partner_peer_id;
+                    let allocation =
+                        Rc::new(RefCell::new(PublisherAllocation {
+                            allocation_id: relay_session.id.0,
+                            peer_id,
+                            state: PublisherAllocationState::Playing,
+                            current_received_bytes: relay_session
+                                .traffic_usage
+                                .received_bytes,
+                            current_sent_bytes: relay_session
+                                .traffic_usage
+                                .sent_bytes,
+                            prev_received_bytes: 0,
+                            prev_sent_bytes: 0,
+                            events: subscription_req.events_type,
+                            last_update: Instant::now(),
+                            room_addr: subscription_req.addr,
+                        }));
+                    allocation.borrow_mut().on_start();
+
+                    if let Some(partner_allocation_id) =
+                        this.relay_allocations_ids.get(&partner_peer_id)
+                    {
+                        let partner_allocation_subs = this
+                            .allocations
+                            .get_mut(partner_allocation_id)
+                            .unwrap();
+                        let partner_allocation =
+                            partner_allocation_subs.0.clone();
+                        partner_allocation_subs.1 = Some(allocation.clone());
+
+                        this.allocations.insert(
+                            relay_session.id.0,
+                            (allocation, Some(partner_allocation)),
+                        );
+                    } else {
+                        this.allocations
+                            .insert(relay_session.id.0, (allocation, None));
+                    }
+                    this.relay_allocations_ids
+                        .insert(peer_id, relay_session.id.0);
+
+                    Ok(())
+                }),
+        )
+    }
 }
