@@ -448,6 +448,62 @@ impl CoturnStats {
             relay_allocations_ids: HashMap::new(),
         })
     }
+
+    pub fn try_init_allocation(
+        &mut self,
+        sessions: Vec<Session>,
+        peer_id: PeerId,
+    ) -> Result<(), CoturnCliError> {
+        let relay_session =
+            if let Some(relay_session) = find_relay_session(sessions) {
+                relay_session
+            } else {
+                return Ok(());
+            };
+        let subscription_req =
+            if let Some(s) = self.awaits_allocation.remove(&peer_id) {
+                s
+            } else {
+                return Ok(());
+            };
+        let partner_peer_id = subscription_req.partner_peer_id;
+        let allocation = Rc::new(RefCell::new(PublisherAllocation {
+            allocation_id: relay_session.id.0,
+            peer_id,
+            state: PublisherAllocationState::Playing,
+            current_received_bytes: relay_session.traffic_usage.received_bytes,
+            current_sent_bytes: relay_session.traffic_usage.sent_bytes,
+            prev_received_bytes: 0,
+            prev_sent_bytes: 0,
+            events: subscription_req.events_type,
+            last_update: Instant::now(),
+            room_addr: subscription_req.addr,
+        }));
+        allocation.borrow_mut().on_start();
+
+        if let Some(partner_allocation_id) =
+            self.relay_allocations_ids.get(&partner_peer_id)
+        {
+            let partner_allocation_subs = self
+                .allocations
+                .get_mut(partner_allocation_id)
+                .expect("476");
+            let partner_allocation = partner_allocation_subs.0.clone();
+            partner_allocation_subs.1 = Some(allocation.clone());
+
+            self.allocations.insert(
+                relay_session.id.0,
+                (allocation, Some(partner_allocation)),
+            );
+        } else {
+            self.allocations
+                .insert(relay_session.id.0, (allocation, None));
+        }
+        self.relay_allocations_ids
+            .insert(peer_id, relay_session.id.0);
+
+        Ok(())
+    }
 }
 
 impl Actor for CoturnStats {
@@ -508,45 +564,30 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
                         let room_id = subscription_request.room_id.clone();
                         ctx.spawn(
                             async move {
-                                let sess = format!("{}_{}", room_id, event.peer_id.to_string());
+                                tokio::time::delay_for(Duration::from_millis(
+                                    500,
+                                ))
+                                .await;
+                                let sess = format!(
+                                    "{}_{}",
+                                    room_id,
+                                    event.peer_id.to_string()
+                                );
                                 coturn_client.get_sessions(sess).await
                             }
-                                .into_actor(self)
-                                .map(move |res, this, ctx| {
-                                    let sessions = res.unwrap();
-                                    let relay_session = if let Some(relay_session) = find_relay_session(sessions){
-                                        relay_session
-                                    } else {
-                                        return;
-                                    };
-                                    let subscription_req = this.awaits_allocation.remove(&peer_id).unwrap();
-                                    let partner_peer_id = subscription_req.partner_peer_id;
-                                    let allocation = Rc::new(RefCell::new(PublisherAllocation {
-                                        allocation_id: relay_session.id.0,
-                                        peer_id,
-                                        state: PublisherAllocationState::Playing,
-                                        current_received_bytes: relay_session.traffic_usage.received_bytes,
-                                        current_sent_bytes: relay_session.traffic_usage.sent_bytes,
-                                        prev_received_bytes: 0,
-                                        prev_sent_bytes: 0,
-                                        events: subscription_req.events_type,
-                                        last_update: Instant::now(),
-                                        room_addr: subscription_req.addr,
-                                    }));
-                                    allocation.borrow_mut().on_start();
-
-                                    if let Some(partner_allocation_id) = this.relay_allocations_ids.get(&partner_peer_id) {
-                                        let partner_allocation_subs = this.allocations
-                                            .get_mut(partner_allocation_id).unwrap();
-                                        let partner_allocation = partner_allocation_subs.0.clone();
-                                        partner_allocation_subs.1 = Some(allocation.clone());
-
-                                        this.allocations.insert(relay_session.id.0, (allocation, Some(partner_allocation)));
-                                    } else {
-                                        this.allocations.insert(relay_session.id.0, (allocation, None));
+                            .into_actor(self)
+                            .map(
+                                move |res, this, ctx| match res {
+                                    Ok(sessions) => {
+                                        this.try_init_allocation(
+                                            sessions, peer_id,
+                                        );
                                     }
-                                    this.relay_allocations_ids.insert(peer_id, relay_session.id.0);
-                                })
+                                    Err(e) => {
+                                        println!("\n\n{:?}\n\n", e);
+                                    }
+                                },
+                            ),
                         );
                     }
                 }
@@ -562,6 +603,36 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
                             partner_allocation
                                 .borrow_mut()
                                 .update_send_bytes(traffic.received_bytes);
+                        }
+                    } else {
+                        if let Some(subscription_request) =
+                            self.awaits_allocation.get(&event.peer_id)
+                        {
+                            let coturn_client = self.coturn_client.clone();
+                            let room_id = subscription_request.room_id.clone();
+                            ctx.spawn(
+                                async move {
+                                    let sess = format!(
+                                        "{}_{}",
+                                        room_id,
+                                        event.peer_id.to_string()
+                                    );
+                                    coturn_client.get_sessions(sess).await
+                                }
+                                .into_actor(self)
+                                .map(
+                                    move |res, this, ctx| match res {
+                                        Ok(sessions) => {
+                                            this.try_init_allocation(
+                                                sessions, peer_id,
+                                            );
+                                        }
+                                        Err(e) => {
+                                            println!("\n\n{:?}\n\n", e);
+                                        }
+                                    },
+                                ),
+                            );
                         }
                     }
                 }
@@ -608,62 +679,19 @@ impl Handler<Subscribe> for CoturnStats {
         let coturn_client = self.coturn_client.clone();
         let peer_id = msg.peer_id;
         let session_id = format!("{}_{}", msg.room_id, msg.peer_id);
+        self.awaits_allocation.insert(peer_id, msg);
         Box::new(
             async move { coturn_client.get_sessions(session_id).await }
                 .into_actor(self)
                 .map(move |res, this, ctx| {
-                    let sessions = res?;
-
-                    let relay_session = if let Some(relay_session) =
-                        find_relay_session(sessions)
-                    {
-                        relay_session
-                    } else {
-                        this.awaits_allocation.insert(peer_id, msg);
-                        return Ok(());
-                    };
-                    let subscription_req = msg;
-                    let partner_peer_id = subscription_req.partner_peer_id;
-                    let allocation =
-                        Rc::new(RefCell::new(PublisherAllocation {
-                            allocation_id: relay_session.id.0,
-                            peer_id,
-                            state: PublisherAllocationState::Playing,
-                            current_received_bytes: relay_session
-                                .traffic_usage
-                                .received_bytes,
-                            current_sent_bytes: relay_session
-                                .traffic_usage
-                                .sent_bytes,
-                            prev_received_bytes: 0,
-                            prev_sent_bytes: 0,
-                            events: subscription_req.events_type,
-                            last_update: Instant::now(),
-                            room_addr: subscription_req.addr,
-                        }));
-                    allocation.borrow_mut().on_start();
-
-                    if let Some(partner_allocation_id) =
-                        this.relay_allocations_ids.get(&partner_peer_id)
-                    {
-                        let partner_allocation_subs = this
-                            .allocations
-                            .get_mut(partner_allocation_id)
-                            .unwrap();
-                        let partner_allocation =
-                            partner_allocation_subs.0.clone();
-                        partner_allocation_subs.1 = Some(allocation.clone());
-
-                        this.allocations.insert(
-                            relay_session.id.0,
-                            (allocation, Some(partner_allocation)),
-                        );
-                    } else {
-                        this.allocations
-                            .insert(relay_session.id.0, (allocation, None));
+                    match res {
+                        Ok(sessions) => {
+                            this.try_init_allocation(sessions, peer_id);
+                        }
+                        Err(e) => {
+                            println!("\n\n{:?}\n\n", e);
+                        }
                     }
-                    this.relay_allocations_ids
-                        .insert(peer_id, relay_session.id.0);
 
                     Ok(())
                 }),
