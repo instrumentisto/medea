@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2019-??-??
+## TBD [0.2.0] · 2020-??-??
 [0.2.0]: /../../tree/medea-0.2.0
 
 [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
@@ -46,6 +46,11 @@ All user visible changes to this project will be documented in this file. This p
     - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
 - Testing:
     - E2E tests for signalling ([#28]).
+    
+### Fixed
+
+- Signalling:
+    - Room crashing when handling commands with non existent `peer_id` ([#86](/../../pull/86)).
 
 [#28]: /../../pull/28
 [#33]: /../../pull/33
