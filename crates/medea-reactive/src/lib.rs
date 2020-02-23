@@ -760,7 +760,7 @@ mod spec {
     #[tokio::test]
     async fn when_eq_doesnt_resolve_if_value_is_not_eq() {
         let field = Observable::new(9i32);
-        await_future_with_timeout(
+        let _ = await_future_with_timeout(
             field.when_eq(0i32),
             Duration::from_millis(50),
         )
@@ -789,7 +789,7 @@ mod spec {
                 let mut field = Observable::new(0i32);
                 let mut subscription_on_changes = field.subscribe();
 
-                task::spawn_local(async move {
+                let _ = task::spawn_local(async move {
                     for _ in 0..100 {
                         *field.borrow_mut() += 1;
                     }
@@ -814,7 +814,7 @@ mod spec {
                 let mut field = Observable::new(0i32);
                 let subscription = field.when(|change| change == &100);
 
-                task::spawn_local(async move {
+                let _ = task::spawn_local(async move {
                     for _ in 0..100 {
                         *field.borrow_mut() += 1;
                     }
@@ -838,7 +838,7 @@ mod spec {
                 let mut field = Observable::new(0i32);
                 let subscription = field.when_eq(100);
 
-                task::spawn_local(async move {
+                let _ = task::spawn_local(async move {
                     for _ in 0..100 {
                         *field.borrow_mut() += 1;
                     }
@@ -860,7 +860,7 @@ mod spec {
         let field = Observable::new(0i32);
         let subscription = field.when(|change| change == &100);
         drop(field);
-        subscription.await.err().unwrap();
+        let _ = subscription.await.err().unwrap();
     }
 
     #[tokio::test]
@@ -868,7 +868,7 @@ mod spec {
         let field = Observable::new(0i32);
         let subscription = field.when_eq(100);
         drop(field);
-        subscription.await.err().unwrap();
+        let _ = subscription.await.err().unwrap();
     }
 
     #[tokio::test]
@@ -884,7 +884,7 @@ mod spec {
         let mut field = Observable::new(0i32);
         let subscription = field.subscribe();
         *field.borrow_mut() = 0;
-        await_future_with_timeout(
+        let _ = await_future_with_timeout(
             Box::pin(subscription.skip(1).next()),
             Duration::from_millis(50),
         )
@@ -969,7 +969,7 @@ mod spec {
             let mut subscription = field.subscribe();
             assert_eq!(subscription.next().await.unwrap(), 0);
 
-            await_future_with_timeout(
+            let _ = await_future_with_timeout(
                 Box::pin(subscription.next()),
                 Duration::from_millis(10),
             )
@@ -982,7 +982,7 @@ mod spec {
             let field = ObservableCell::new(0i32);
             let when_will_be_5 = field.when_eq(5);
 
-            await_future_with_timeout(
+            let _ = await_future_with_timeout(
                 Box::pin(when_will_be_5),
                 Duration::from_millis(10),
             )
