@@ -200,7 +200,7 @@ pub struct CloseDescription {
 
 /// WebSocket message from Medea to Jason.
 #[dispatchable]
-#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
@@ -243,7 +243,7 @@ pub enum Event {
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
@@ -251,7 +251,7 @@ pub struct IceCandidate {
 }
 
 /// [`Track`] with specified direction.
-#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Track {
     pub id: TrackId,
@@ -274,7 +274,7 @@ pub struct TrackPatch {
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
 /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "medea", derive(Serialize, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct IceServer {
     pub urls: Vec<String>,
@@ -285,7 +285,7 @@ pub struct IceServer {
 }
 
 /// Direction of [`Track`].
-#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
@@ -300,18 +300,18 @@ pub enum Direction {
 }
 
 /// Type of [`Track`].
-#[cfg_attr(feature = "medea", derive(Serialize, Debug, PartialEq, Clone))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[cfg_attr(feature = "medea", derive(Serialize, Clone, Debug, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct AudioSettings {}
 
-#[cfg_attr(feature = "medea", derive(Serialize, Clone, Debug, PartialEq))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct VideoSettings {}
 
