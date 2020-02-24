@@ -53,20 +53,28 @@ pub enum CloseReason {
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq, Serialize)]
 pub enum ClientDisconnect {
     /// [`Room`] was dropped without `close_reason`.
+    ///
+    /// [`Room`]: crate::api::Room
     RoomUnexpectedlyDropped,
 
     /// [`Room`] was normally closed by JS side.
+    ///
+    /// [`Room`]: crate::api::Room
     RoomClosed,
 
     /// [`RpcClient`] was unexpectedly dropped.
+    ///
+    /// [`RpcClient`]: crate::rpc::RpcClient
     RpcClientUnexpectedlyDropped,
 
     /// [`RpcTransport`] was unexpectedly dropped.
+    ///
+    /// [`RpcTransport`]: crate::rpc::RpcTransport
     RpcTransportUnexpectedlyDropped,
 }
 
 impl ClientDisconnect {
-    /// Returns `true` if [`CloseByClientReason`] is considered as error.
+    /// Returns `true` if [`ClientDisconnect`] is considered as error.
     pub fn is_err(self) -> bool {
         match self {
             Self::RoomUnexpectedlyDropped
@@ -92,7 +100,7 @@ pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
     /// Determines by close code `1000` and existence of
-    /// [`RpcConnectionCloseReason`].
+    /// [`CloseByServerReason`].
     Normal(u16, CloseByServerReason),
 
     /// Connection was unexpectedly closed. Consider reconnecting.
@@ -181,7 +189,7 @@ pub enum ClosedStateReason {
 
     /// [`State`] unexpectedly become [`State::Closed`].
     ///
-    /// Considered that this [`StateCloseReason`] will be never provided.
+    /// Considered that this [`ClosedStateReason`] will be never provided.
     Unknown,
 
     /// Indicates that connection with server has never been established.
@@ -231,6 +239,8 @@ pub enum RpcClientError {
 
     /// Occurs if [`Weak`] pointer to the [`RpcClient`] can't be upgraded to
     /// [`Rc`].
+    ///
+    /// [`Weak`]: std::rc::Weak
     #[display(fmt = "RpcClient unexpectedly gone.")]
     RpcClientGone,
 
@@ -273,11 +283,13 @@ pub trait RpcClient {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
-    /// [`Future`] which will be resolved on normal [`RpcClient`] connection
+    /// [`Future`] which will resolve on normal [`RpcClient`] connection
     /// closing.
     ///
     /// This [`Future`] wouldn't be resolved on abnormal closes. On
     /// abnormal close [`RpcClient::on_connection_loss`] will be throwed.
+    ///
+    /// [`Future`]: std::future::Future
     fn on_normal_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
@@ -291,6 +303,9 @@ pub trait RpcClient {
     /// Connection loss is any unexpected [`RpcTransport`] close. In case of
     /// connection loss, JS side user should select reconnection strategy with
     /// [`ReconnectHandle`] (or simply close [`Room`]).
+    ///
+    /// [`Room`]: crate::api::Room
+    /// [`Stream`]: futures::Stream
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
     /// Returns current token with which this [`RpcClient`] was connected.
@@ -416,7 +431,9 @@ impl Inner {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-/// Client API RPC client to talk with server via [`WebSocket`].
+/// Client API RPC client to talk with server via [WebSocket].
+///
+/// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 impl WebSocketRpcClient {

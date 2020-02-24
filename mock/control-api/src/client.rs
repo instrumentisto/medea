@@ -64,6 +64,11 @@ impl ControlClient {
     /// __Note that call of this function doesn't checks availability of Control
     /// API gRPC server. Availability will be checked only on sending request to
     /// gRPC server.__
+    ///
+    ///
+    /// # Errors
+    ///
+    /// Errors if unable to resolve the provided `medea_addr`.
     pub async fn new(
         medea_addr: String,
     ) -> Result<Self, tonic::transport::Error> {
@@ -79,6 +84,10 @@ impl ControlClient {
     }
 
     /// Creates provided element with gRPC Control API.
+    ///
+    /// # Errors
+    ///
+    /// Errors if gRPC request fails.
     pub async fn create(
         &self,
         id: String,
@@ -109,6 +118,10 @@ impl ControlClient {
     }
 
     /// Gets element from Control API by FID.
+    ///
+    /// # Errors
+    ///
+    /// Errors if gRPC request fails.
     pub async fn get(&self, fid: Fid) -> Result<proto::GetResponse, Status> {
         let req = id_request(vec![fid.into()]);
         self.get_client()
@@ -118,6 +131,10 @@ impl ControlClient {
     }
 
     /// Deletes element from Control API by FID.
+    ///
+    /// # Errors
+    ///
+    /// Errors if gRPC request fails.
     pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.into()]);
         self.get_client()

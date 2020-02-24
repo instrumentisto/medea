@@ -55,6 +55,11 @@ impl TurnDatabase {
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.
+    ///
+    /// # Errors
+    ///
+    /// Errors if unable to establish connection with database, or database
+    /// request fails.
     pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
         debug!("Store ICE user: {:?}", user);
 
@@ -76,6 +81,11 @@ impl TurnDatabase {
     /// Deletes batch of provided [`IceUser`]s.
     ///
     /// No-op if empty batch is provided.
+    ///
+    /// # Errors
+    ///
+    /// Errors if unable to establish connection with database, or database
+    /// request fails.
     pub async fn remove(
         &self,
         users: &[&IceUser],

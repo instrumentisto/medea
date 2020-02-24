@@ -17,6 +17,7 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 members = [
     "crates/medea-coturn-telnet-client",
     "crates/medea-macro",
+    "crates/medea-reactive",
     "jason",
     "mock/control-api",
     "proto/client-api",

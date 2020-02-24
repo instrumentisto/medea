@@ -343,7 +343,7 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 #[wasm_bindgen]
 #[allow(clippy::unused_self)]
 impl MediaManagerHandle {
-    /// Returns the JS array of [`MediaDeviceInfo`] objects.
+    /// Returns the JS array of [`InputDeviceInfo`] objects.
     pub fn enumerate_devices(&self) -> Promise {
         future_to_promise(async {
             InnerMediaManager::enumerate_devices()
