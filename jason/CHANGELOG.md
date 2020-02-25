@@ -54,7 +54,8 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71));
-        - `ApplyTracks` for muting/unmuting ([#81]).
+        - `ApplyTracks` for muting/unmuting ([#81]);
+        - `AddPeerConnectionMetrics` with `PeerConnectionState` ([#87](/../../pull/87)).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])

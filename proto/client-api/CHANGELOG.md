@@ -25,7 +25,8 @@ All user visible changes to this project will be documented in this file. This p
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71));
 - `RpcSettings` server message ([#75](/../../pull/75));
 - `force_relay` field to `PeerCreated` event ([#79](/../../pull/79));
-- `UpdateTracks` command and `TracksUpdated` event ([#81](/../../pull/81)).
+- `UpdateTracks` command and `TracksUpdated` event ([#81](/../../pull/81));
+- `PeerConnectionState` metric to the `AddPeerConnectionMetrics` client command ([#87](/../../pull/87)).
 
 [#28]: /../../pull/28
 
