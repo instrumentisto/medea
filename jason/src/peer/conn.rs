@@ -416,10 +416,10 @@ impl RtcPeerConnection {
                         "connectionstatechange",
                         move |_| {
                             let state_res = get_peer_connection_state(&peer);
-                            // 'RtcPeerConnection.connectionState' is
-                            // experimental feature and currently supported
-                            // only in Chromium. If browser doesn't
-                            // supports it - we just ignore it.
+                            // Error here should never happen, because if the
+                            // browser does not support the functionality of
+                            // 'RTCPeerConnection.connectionState', then this
+                            // callback can't be set.
                             if let Ok(state) = state_res {
                                 let state_parse_res =
                                     PeerConnectionState::try_from(
@@ -441,6 +441,7 @@ impl RtcPeerConnection {
                 );
             }
         }
+
         Ok(())
     }
 

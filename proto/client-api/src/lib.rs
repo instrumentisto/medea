@@ -1,11 +1,10 @@
 //! Client API protocol implementation for Medea media server.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
-use std::convert::TryFrom;
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -178,22 +177,28 @@ pub enum PeerConnectionState {
     Connected,
 }
 
-#[derive(Debug)]
+/// Error which can occur while [`PeerConnection`] parsing.
+///
+/// Indicates that provided [`str`] is unknown [`PeerConnectionState`].
+#[derive(Debug, Display)]
+#[display(fmt = "Unknown PeerConnectionState.")]
 pub struct UnknownPeerConnectionState;
 
 impl TryFrom<&str> for PeerConnectionState {
     type Error = UnknownPeerConnectionState;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "new" => Ok(Self::New),
-            "connecting" => Ok(Self::Connecting),
-            "connected" => Ok(Self::Connected),
-            "disconnected" => Ok(Self::Disconnected),
-            "failed" => Ok(Self::Failed),
-            "closed" => Ok(Self::Closed),
-            _ => Err(UnknownPeerConnectionState),
-        }
+        use PeerConnectionState::*;
+
+        Ok(match value {
+            "new" => New,
+            "connecting" => Connecting,
+            "connected" => Connected,
+            "disconnected" => Disconnected,
+            "failed" => Failed,
+            "closed" => Closed,
+            _ => return Err(UnknownPeerConnectionState),
+        })
     }
 }
 
