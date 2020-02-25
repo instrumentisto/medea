@@ -5,7 +5,6 @@ use medea_client_api_proto::{
     Direction as DirectionProto, IceServer, PeerConnectionState,
 };
 use tracerr::Traced;
-use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
@@ -18,7 +17,8 @@ use web_sys::{
 use crate::{
     media::TrackConstraints,
     utils::{
-        console_error, EventListener, EventListenerBindError, JsCaused, JsError,
+        console_error, get_property_by_name, EventListener,
+        EventListenerBindError, JsCaused, JsError,
     },
 };
 
@@ -392,9 +392,9 @@ impl RtcPeerConnection {
     ///
     /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails. This error can be ignored, since this
-    /// event is only implemented in Chrome and Safari.
+    /// event is currently implemented only in Chrome and Safari.
     ///
-    /// Tracking issue for FF:
+    /// Tracking issue for Firefox:
     /// <https://bugzilla.mozilla.org/show_bug.cgi?id=1265827>
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
@@ -420,7 +420,7 @@ impl RtcPeerConnection {
                             // browser does not support the functionality of
                             // 'RTCPeerConnection.connectionState', then this
                             // callback can't be set.
-                            if let Ok(state) = state_res {
+                            if let Some(state) = state_res {
                                 let state_parse_res =
                                     PeerConnectionState::try_from(
                                         state.as_str(),
@@ -617,15 +617,10 @@ impl Drop for RtcPeerConnection {
     }
 }
 
-/// Calls [RTCPeerConnection.connectionState][1] getter.
+/// Returns [RTCPeerConnection.connectionState][1] property of provided
+/// [`SysRtcPeerConnection`] using reflection.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-peerconnection-connection-state
-#[wasm_bindgen(inline_js = "export function get_peer_connection_state(peer) \
-                            { return peer.connectionState }")]
-extern "C" {
-    #[allow(clippy::needless_pass_by_value)]
-    #[wasm_bindgen(catch)]
-    fn get_peer_connection_state(
-        peer: &SysRtcPeerConnection,
-    ) -> std::result::Result<String, JsValue>;
+fn get_peer_connection_state(peer: &SysRtcPeerConnection) -> Option<String> {
+    get_property_by_name(peer, "connectionState", |v| v.as_string())
 }

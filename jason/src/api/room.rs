@@ -896,7 +896,7 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Handles [`PeerEvent::ConnectionStateChanged`] event and sends new
-    /// state to RPC server.
+    /// state to the RPC server.
     fn on_connection_state_changed(
         &mut self,
         peer_id: PeerId,
