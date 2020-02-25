@@ -1,5 +1,6 @@
 //! Signalling API E2E tests.
 
+mod command_validation;
 mod pub_sub_signallng;
 mod three_pubs;
 
@@ -135,6 +136,18 @@ impl Handler<CloseSocket> for TestMember {
             self.sink.flush().await.unwrap();
             self.sink.close().await.unwrap();
         });
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+pub struct SendCommand(pub Command);
+
+impl Handler<SendCommand> for TestMember {
+    type Result = ();
+
+    fn handle(&mut self, msg: SendCommand, _: &mut Self::Context) {
+        self.send_command(msg.0);
     }
 }
 
