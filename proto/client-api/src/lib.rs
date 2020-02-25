@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use std::convert::TryFrom;
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -145,6 +146,9 @@ pub enum Command {
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
+
+    /// Peer Connection's connection state.
+    PeerConnectionStateChanged(PeerConnectionState),
 }
 
 /// Peer Connection's ICE connection state.
@@ -164,8 +168,7 @@ pub enum IceConnectionState {
 /// Peer Connection's connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PeerConnectionState {
     Closed,
     Failed,
@@ -173,6 +176,25 @@ pub enum PeerConnectionState {
     New,
     Connecting,
     Connected,
+}
+
+#[derive(Debug)]
+pub struct UnknownPeerConnectionState;
+
+impl TryFrom<&str> for PeerConnectionState {
+    type Error = UnknownPeerConnectionState;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "new" => Ok(Self::New),
+            "connecting" => Ok(Self::Connecting),
+            "connected" => Ok(Self::Connected),
+            "disconnected" => Ok(Self::Disconnected),
+            "failed" => Ok(Self::Failed),
+            "closed" => Ok(Self::Closed),
+            _ => Err(UnknownPeerConnectionState),
+        }
+    }
 }
 
 /// Reason of disconnecting Web Client from Media Server.

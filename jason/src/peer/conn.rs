@@ -1,7 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::Display;
-use medea_client_api_proto::{Direction as DirectionProto, IceServer, PeerConnectionState};
+use medea_client_api_proto::{
+    Direction as DirectionProto, IceServer, PeerConnectionState,
+};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -260,19 +262,6 @@ impl RtcPeerConnection {
             .map_err(RTCPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
-        match get_peer_connection_state(&peer) {
-            Ok(state) => {
-                console_error(format!(
-                    "connectionstatechange: {}",
-                    state,
-                ))
-                //                                    f();
-            }
-            Err(err) => {
-                console_error(format!("AZAAZAZ: {:?}", err))
-            }
-        };
-
         Ok(Self {
             peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
@@ -428,16 +417,26 @@ impl RtcPeerConnection {
                         move |_| {
                             match get_peer_connection_state(&peer) {
                                 Ok(state) => {
-                                    console_error(format!(
-                                        "connectionstatechange: {}",
-                                        state,
-                                    ))
-                                    //                                    f();
+                                    match PeerConnectionState::try_from(
+                                        state.as_str(),
+                                    ) {
+                                        Ok(state) => {
+                                            (f)(state);
+                                        }
+                                        Err(_) => console_error(format!(
+                                            "Unknown RTCPeerConnectionState: \
+                                             {}",
+                                            state
+                                        )),
+                                    }
                                 }
-                                Err(err) => {
-                                    console_error(format!("AZAAZAZ: {:?}", err))
-                                }
-                            }
+                                // 'RtcPeerConnection.connectionState' is
+                                // experimental feature and currently supported
+                                // only
+                                // in Chromium. If browser doesn't supports it -
+                                // we just ignore it.
+                                Err(_) => (),
+                            };
                         },
                     )
                     .map_err(tracerr::map_from_and_wrap!())?,

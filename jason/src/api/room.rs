@@ -14,8 +14,8 @@ use futures::{
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatch,
+    IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
+    Track, TrackId, TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -891,6 +891,21 @@ impl PeerEventHandler for InnerRoom {
             peer_id,
             metrics: PeerMetrics::IceConnectionStateChanged(
                 ice_connection_state,
+            ),
+        });
+    }
+
+    /// Handles [`PeerEvent::ConnectionStateChanged`] event and sends new
+    /// state to RPC server.
+    fn on_connection_state_changed(
+        &mut self,
+        peer_id: PeerId,
+        peer_connection_state: PeerConnectionState,
+    ) {
+        self.rpc.send_command(Command::AddPeerConnectionMetrics {
+            peer_id,
+            metrics: PeerMetrics::PeerConnectionStateChanged(
+                peer_connection_state,
             ),
         });
     }
