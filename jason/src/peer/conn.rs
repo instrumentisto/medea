@@ -395,7 +395,7 @@ impl RtcPeerConnection {
     /// event is only implemented in Chrome and Safari.
     ///
     /// Tracking issue for FF:
-    /// https://bugzilla.mozilla.org/show_bug.cgi?id=1265827
+    /// <https://bugzilla.mozilla.org/show_bug.cgi?id=1265827>
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
     pub fn on_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
@@ -415,28 +415,26 @@ impl RtcPeerConnection {
                         Rc::clone(&self.peer),
                         "connectionstatechange",
                         move |_| {
-                            match get_peer_connection_state(&peer) {
-                                Ok(state) => {
-                                    match PeerConnectionState::try_from(
+                            let state_res = get_peer_connection_state(&peer);
+                            // 'RtcPeerConnection.connectionState' is
+                            // experimental feature and currently supported
+                            // only in Chromium. If browser doesn't
+                            // supports it - we just ignore it.
+                            if let Ok(state) = state_res {
+                                let state_parse_res =
+                                    PeerConnectionState::try_from(
                                         state.as_str(),
-                                    ) {
-                                        Ok(state) => {
-                                            (f)(state);
-                                        }
-                                        Err(_) => console_error(format!(
-                                            "Unknown RTCPeerConnectionState: \
-                                             {}",
-                                            state
-                                        )),
-                                    }
+                                    );
+                                if let Ok(state) = state_parse_res {
+                                    (f)(state);
+                                } else {
+                                    console_error(format!(
+                                        "Unknown RTCPeerConnection connection \
+                                         state: {}.",
+                                        state
+                                    ));
                                 }
-                                // 'RtcPeerConnection.connectionState' is
-                                // experimental feature and currently supported
-                                // only
-                                // in Chromium. If browser doesn't supports it -
-                                // we just ignore it.
-                                Err(_) => (),
-                            };
+                            }
                         },
                     )
                     .map_err(tracerr::map_from_and_wrap!())?,
