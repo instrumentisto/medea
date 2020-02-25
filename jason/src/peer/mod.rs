@@ -6,6 +6,7 @@ mod conn;
 mod ice_server;
 mod media;
 mod repo;
+mod stats;
 mod stream;
 mod stream_request;
 mod track;

@@ -3,8 +3,8 @@ use std::{cell::RefCell, rc::Rc};
 use derive_more::Display;
 use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
-use wasm_bindgen::{JsCast, closure::Closure, JsValue, prelude::*};
-use wasm_bindgen_futures::{JsFuture, spawn_local};
+use wasm_bindgen::{closure::Closure, prelude::*, JsCast, JsValue};
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
     RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
@@ -15,7 +15,11 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, EventListenerBindError, JsCaused, JsError, window, console_error},
+    utils::{
+        console_error, window, EventListener, EventListenerBindError, JsCaused,
+        JsError,
+    },
+    peer::stats::RtcStats
 };
 
 use super::ice_server::RtcIceServers;
@@ -247,19 +251,25 @@ impl RtcPeerConnection {
 
         let peer = Rc::new(peer);
 
-
         let peer_clone = Rc::clone(&peer);
         let a = Closure::wrap(Box::new(move || {
             let another_peer_clone = Rc::clone(&peer_clone);
             spawn_local(async move {
                 let stats = JsFuture::from(another_peer_clone.get_stats())
-                    .await.unwrap();
+                    .await
+                    .unwrap();
+
+                let statssss = RtcStats::from(&stats);
+
                 asd(&stats);
-//                js_sys::JSON::stringify
-//                console_error(&stats);
             });
         }) as Box<dyn Fn()>);
-        window().set_interval_with_callback_and_timeout_and_arguments_0(a.as_ref().unchecked_ref(), 1000).unwrap();
+        window()
+            .set_interval_with_callback_and_timeout_and_arguments_0(
+                a.as_ref().unchecked_ref(),
+                10000,
+            )
+            .unwrap();
         a.forget();
 
         Ok(Self {
@@ -556,10 +566,7 @@ impl Drop for RtcPeerConnection {
     }
 }
 
-
 #[wasm_bindgen(inline_js = "export function asd(arg) { window.asd = arg; }")]
 extern "C" {
-    fn asd(
-        arg: &JsValue,
-    );
+    fn asd(arg: &JsValue);
 }
