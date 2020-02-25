@@ -198,6 +198,10 @@ pub enum ClosedStateReason {
     /// First received [`ServerMsg`] after [`RpcClient::connect`] is not
     /// [`ServerMsg::RpcSettings`].
     FirstServerMsgIsNotRpcSettings,
+
+    /// Connection has been inactive for a while and thus considered idle
+    /// by a client.
+    Idle,
 }
 
 impl State {
@@ -445,7 +449,10 @@ impl WebSocketRpcClient {
 
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
     /// subs about connection loss.
-    fn on_connection_loss(&self) {
+    fn on_connection_loss(&self, closed_state_reason: ClosedStateReason) {
+        self.0
+            .borrow_mut()
+            .update_state(&State::Closed(closed_state_reason));
         self.0.borrow_mut().heartbeat.take();
         self.0
             .borrow_mut()
@@ -474,30 +481,32 @@ impl WebSocketRpcClient {
             CloseMsg::Normal(_, reason) => match reason {
                 CloseByServerReason::Reconnected => (),
                 CloseByServerReason::Idle => {
-                    self.on_connection_loss();
+                    self.on_connection_loss(ClosedStateReason::ConnectionLost(
+                        close_msg.clone(),
+                    ));
                 }
                 _ => {
                     self.0.borrow_mut().sock.take();
-                    if *reason != CloseByServerReason::Reconnected {
-                        self.0
-                            .borrow_mut()
-                            .on_close_subscribers
-                            .drain(..)
-                            .filter_map(|sub| {
-                                sub.send(CloseReason::ByServer(*reason)).err()
-                            })
-                            .for_each(|reason| {
-                                console_error(format!(
-                                    "Failed to send reason of Jason close to \
-                                     subscriber: {:?}",
-                                    reason
-                                ))
-                            });
-                    }
+                    self.0
+                        .borrow_mut()
+                        .on_close_subscribers
+                        .drain(..)
+                        .filter_map(|sub| {
+                            sub.send(CloseReason::ByServer(*reason)).err()
+                        })
+                        .for_each(|reason| {
+                            console_error(format!(
+                                "Failed to send reason of Jason close to \
+                                 subscriber: {:?}",
+                                reason
+                            ))
+                        });
                 }
             },
             CloseMsg::Abnormal(_) => {
-                self.on_connection_loss();
+                self.on_connection_loss(ClosedStateReason::ConnectionLost(
+                    close_msg.clone(),
+                ));
             }
         }
     }
@@ -555,7 +564,7 @@ impl WebSocketRpcClient {
         spawn_local(async move {
             while let Some(_) = on_idle.next().await {
                 if let Some(this) = weak_this.upgrade().map(Self) {
-                    this.on_connection_loss();
+                    this.on_connection_loss(ClosedStateReason::Idle);
                 }
             }
         });
@@ -602,6 +611,9 @@ impl WebSocketRpcClient {
                 )));
             }
         } else {
+            self.0.borrow_mut().update_state(&State::Closed(
+                ClosedStateReason::FirstServerMsgIsNotRpcSettings,
+            ));
             return Err(tracerr::new!(RpcClientError::NoSocket));
         }
 
