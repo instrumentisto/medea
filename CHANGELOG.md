@@ -32,11 +32,11 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
-    - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
-    - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58](/../../pull/58));
+    - Filter `SetIceCandidate` messages without `candidate` ([#50]);
+    - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
-    - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79](/../../pull/79));
-    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81](/../../pull/81)).
+    - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
+    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]).
 - Configuration:
@@ -46,17 +46,22 @@ All user visible changes to this project will be documented in this file. This p
     - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
 - Testing:
     - E2E tests for signalling ([#28]).
-    
+
 ### Fixed
 
 - Signalling:
-    - Room crashing when handling commands with non existent `peer_id` ([#86](/../../pull/86)).
+    - Room crashing when handling commands with non-existent `peer_id` ([#86]).
 
 [#28]: /../../pull/28
 [#33]: /../../pull/33
+[#50]: /../../pull/50
+[#58]: /../../pull/58
 [#63]: /../../pull/63
 [#75]: /../../pull/75
+[#79]: /../../pull/79
+[#81]: /../../pull/81
 [#84]: /../../pull/84
+[#86]: /../../pull/86
 
 
 

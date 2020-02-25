@@ -15,12 +15,18 @@ use crate::api::control::MemberId;
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct CommandMessage {
+    /// ID of [`Member`] that sent this [`Command`] to the server.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
+    /// Actual [`Command`] being issued.
     pub command: Command,
 }
 
 impl CommandMessage {
-    /// Creates [`CommandMessage`].
+    /// Creates new [`CommandMessage`].
+    #[inline]
     pub fn new(member_id: MemberId, command: Command) -> Self {
         Self { member_id, command }
     }

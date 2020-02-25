@@ -112,18 +112,21 @@ pub enum RoomError {
     EndpointAlreadyExists(Fid<ToEndpoint>),
 }
 
-#[derive(Debug, Fail, Display, PartialEq)]
+/// Error of validating received [`Command`].
+#[derive(Debug, Display, Fail, PartialEq)]
 pub enum CommandValidationError {
+    /// Unable to find expected [`Peer`].
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
 
+    /// Specified [`Peer`] doesn't belong to the [`Member`] which sends
+    /// [`Command`].
     #[display(
-        fmt = "Member's Command targets Peer [id = {}] that does not belong \
-               to this Member [id = {}] ",
+        fmt = "Peer [id = {}] that doesn't belong to Member [id = {}]",
         _0,
         _1
     )]
-    PeerDoesNotBelongToThisMember(PeerId, MemberId),
+    PeerBelongsToAnotherMember(PeerId, MemberId),
 }
 
 impl From<PeerError> for RoomError {
@@ -748,14 +751,17 @@ impl Room {
         Ok(())
     }
 
-    /// Validates [`CommandMessage`]. Two assertions are made:
-    /// 1. Specified [`PeerId`] must be known to Room.
+    /// Validates given [`CommandMessage`].
+    ///
+    /// Two assertions are made:
+    /// 1. Specified [`PeerId`] must be known to [`Room`].
     /// 2. Found [`Peer`] must belong to specified [`Member`]
     fn validate_command(
         &self,
         command: &CommandMessage,
     ) -> Result<(), CommandValidationError> {
         use Command::*;
+        use CommandValidationError::*;
 
         let peer_id = match command.command {
             MakeSdpOffer { peer_id, .. }
@@ -768,12 +774,9 @@ impl Room {
         let peer = self
             .peers
             .get_peer_by_id(peer_id)
-            .map_err(|_| CommandValidationError::PeerNotFound(peer_id))?;
+            .map_err(|_| PeerNotFound(peer_id))?;
         if peer.member_id() != command.member_id {
-            return Err(CommandValidationError::PeerDoesNotBelongToThisMember(
-                peer_id,
-                peer.member_id(),
-            ));
+            return Err(PeerBelongsToAnotherMember(peer_id, peer.member_id()));
         }
         Ok(())
     }
