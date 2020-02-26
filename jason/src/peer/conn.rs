@@ -15,11 +15,11 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
+    peer::stats::RtcStats,
     utils::{
         console_error, window, EventListener, EventListenerBindError, JsCaused,
         JsError,
     },
-    peer::stats::RtcStats
 };
 
 use super::ice_server::RtcIceServers;
@@ -259,9 +259,9 @@ impl RtcPeerConnection {
                     .await
                     .unwrap();
 
-                let statssss = RtcStats::from(&stats);
-
                 asd(&stats);
+
+//                let statssss = RtcStats::from(&stats);
             });
         }) as Box<dyn Fn()>);
         window()
