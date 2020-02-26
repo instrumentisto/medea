@@ -18,7 +18,6 @@ use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::RtcStats as SysRtcStats;
 
 use crate::utils::get_property_by_name;
-use crate::utils::console_error;
 
 struct RtcStatsReportEntry(js_sys::JsString, SysRtcStats);
 
@@ -51,6 +50,16 @@ pub struct RtcStat<T> {
     kind: T,
 }
 
+impl<T> RtcStat<T> {
+    fn new(id: String, timestamp: u64, kind: T) -> RtcStat<T> {
+        RtcStat {
+            id,
+            timestamp,
+            kind,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RtcStats {
     ice_pairs: Vec<RtcStat<RtcIceCandidatePairStats>>,
@@ -76,13 +85,11 @@ impl From<&JsValue> for RtcStats {
             let stat = next.value();
             let stat = stat.unchecked_into::<js_sys::Array>();
             let stat = RtcStatsReportEntry::try_from(stat).unwrap();
-            let stat =
-                RtcStatsType::try_from(&stat.1)
-                    .unwrap();
+            let stat = RtcStatsType::try_from(&stat.1).unwrap();
 
             match stat {
                 RtcStatsType::CandidatePair(pair) => {
-                    if pair.nominated {
+                    if pair.kind.nominated {
                         ice_pairs.push(pair);
                     }
                 }
@@ -96,8 +103,6 @@ impl From<&JsValue> for RtcStats {
 
             next = iterator.next().unwrap();
         }
-
-        console_error(format!("{:?}", ice_pairs));
 
         RtcStats { ice_pairs }
     }
@@ -134,20 +139,27 @@ impl TryFrom<&SysRtcStats> for RtcStatsType {
     type Error = ();
 
     fn try_from(val: &SysRtcStats) -> Result<Self, Self::Error> {
-        let type_ = get_property_by_name(&val, "type", |type_| {
-            type_.as_string()
+        use RtcStatsType::*;
+
+        let id = get_property_by_name(&val, "id", |id| id.as_string()).unwrap();
+        let timestamp = get_property_by_name(&val, "timestamp", |timestamp| {
+            timestamp.as_f64().map(|timestamp| timestamp as u64)
         })
         .unwrap();
+        let kind =
+            get_property_by_name(&val, "type", |type_| type_.as_string())
+                .unwrap();
 
-        use RtcStatsType::*;
-        let stat = match type_.as_ref() {
+        let kind = match kind.as_ref() {
             "codec" => Codec,
             "local-candidate" => LocalCandidate,
             "remote-candidate" => RemoteCandidate,
             "track" => Track,
-            "candidate-pair" => {
-                CandidatePair(RtcIceCandidatePairStats::from(val))
-            }
+            "candidate-pair" => CandidatePair(RtcStat::new(
+                id,
+                timestamp,
+                RtcIceCandidatePairStats::from(val),
+            )),
             "inbound-rtp" => InboundRtp,
             "outbound-rtp" => OutboundRtp,
             "remote-inbound-rtp" => RemoteInboundRtp,
@@ -164,10 +176,10 @@ impl TryFrom<&SysRtcStats> for RtcStatsType {
             "sctp-transport" => SctpTransport,
             "certificate" => Certificate,
             "ice-server" => IceServer,
-            _ => Unknown(type_),
+            _ => Unknown(kind),
         };
 
-        Ok(stat)
+        Ok(kind)
     }
 }
 
@@ -188,15 +200,35 @@ impl From<&SysRtcStats> for RtcIceCandidatePairStats {
     fn from(val: &SysRtcStats) -> Self {
         let state =
             get_property_by_name(&val, "state", |val| val.as_string()).unwrap();
-        let nominated = get_property_by_name(&val, "nominated", |val| val.as_bool()).unwrap();
-        let writable = get_property_by_name(&val, "writable", |val| val.as_bool()).unwrap();
-        let bytes_sent = get_property_by_name(&val, "bytesSent", |val| val.as_f64()).unwrap() as u64;
-        let bytes_received = get_property_by_name(&val, "bytesReceived", |val| val.as_f64()).unwrap() as u64;
-        let total_round_trip_time = get_property_by_name(&val, "totalRoundTripTime", |val| val.as_f64()).unwrap();
-        let current_round_trip_time = get_property_by_name(&val, "currentRoundTripTime", |val| val.as_f64());
-        let available_outgoing_bitrate = get_property_by_name(&val, "availableOutgoingBitrate", |val| val.as_f64()).map(|val| val as u64);
+        let nominated =
+            get_property_by_name(&val, "nominated", |val| val.as_bool())
+                .unwrap();
+        let writable =
+            get_property_by_name(&val, "writable", |val| val.as_bool())
+                .unwrap();
+        let bytes_sent = get_property_by_name(&val, "bytesSent", |val| {
+            val.as_f64()
+        })
+        .unwrap() as u64;
+        let bytes_received =
+            get_property_by_name(&val, "bytesReceived", |val| val.as_f64())
+                .unwrap() as u64;
+        let total_round_trip_time =
+            get_property_by_name(&val, "totalRoundTripTime", |val| {
+                val.as_f64()
+            })
+            .unwrap();
+        let current_round_trip_time =
+            get_property_by_name(&val, "currentRoundTripTime", |val| {
+                val.as_f64()
+            });
+        let available_outgoing_bitrate =
+            get_property_by_name(&val, "availableOutgoingBitrate", |val| {
+                val.as_f64()
+            })
+            .map(|val| val as u64);
 
-        let stat = RtcIceCandidatePairStats {
+        RtcIceCandidatePairStats {
             state: IceCandidatePairState::from(state.as_ref()),
             nominated,
             writable,
@@ -205,9 +237,7 @@ impl From<&SysRtcStats> for RtcIceCandidatePairStats {
             total_round_trip_time,
             current_round_trip_time,
             available_outgoing_bitrate,
-        };
-
-        stat
+        }
     }
 }
 
@@ -236,13 +266,12 @@ impl From<&str> for IceCandidatePairState {
     }
 }
 
-//#[derive(Debug)]
-//struct RTCInboundRtpStreamStats {
-//    nominated: bool,
-//    writable: bool,
-//    bytes_sent: u64,
-//    bytes_received: u64,
-//    total_round_trip_time: f64,
-//    current_round_trip_time: Option<f64>,
-//    available_outgoing_bitrate: Option<u64>,
-//}
+// https://www.w3.org/TR/webrtc-stats/#inboundrtpstats-dict*
+#[derive(Debug)]
+ struct RtcInboundRtpStreamStats {
+    media_type: bool,
+    bytes_received: u64,
+    packets_received: u64,
+    packets_lost: u64,
+    jitter: f64
+}

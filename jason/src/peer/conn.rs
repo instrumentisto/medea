@@ -261,7 +261,7 @@ impl RtcPeerConnection {
 
                 asd(&stats);
 
-//                let statssss = RtcStats::from(&stats);
+                console_error(format!("{:?}", RtcStats::from(&stats)));
             });
         }) as Box<dyn Fn()>);
         window()
