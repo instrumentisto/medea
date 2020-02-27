@@ -599,6 +599,8 @@ impl Room {
             spec.p2p,
             member.downgrade(),
             spec.force_relay,
+            spec.on_start.clone(),
+            spec.on_stop.clone(),
         );
 
         debug!(
@@ -720,6 +722,8 @@ impl Room {
                 publish.p2p,
                 signalling_member.downgrade(),
                 publish.force_relay,
+                publish.on_start.clone(),
+                publish.on_stop.clone(),
             );
             signalling_member.insert_src(signalling_publish);
         }
@@ -1378,7 +1382,41 @@ impl Handler<OnStartOnStopCallback> for Room {
                     }
                 }
                 Endpoint::WebRtcPublishEndpoint(publish_endpoint) => {
-                    // TODO
+                    // TODO: I'm redudant in some if cases!!!
+                    let fid = publish_endpoint
+                        .owner()
+                        .get_fid_to_endpoint(publish_endpoint.id().into());
+                    match msg.event {
+                        EventType::OnStart => {
+                            publish_endpoint
+                                .change_peer_status(msg.peer_id, true);
+                            if let Some(on_start) = publish_endpoint.on_start()
+                            {
+                                if publish_endpoint.publishing_peers_count()
+                                    == 1
+                                {
+                                    self.callbacks.send_callback(
+                                        on_start,
+                                        fid.into(),
+                                        OnStartEvent,
+                                    );
+                                }
+                            }
+                        }
+                        EventType::OnStop => {
+                            publish_endpoint
+                                .change_peer_status(msg.peer_id, true);
+                            if let Some(on_stop) = publish_endpoint.on_stop() {
+                                if !publish_endpoint.is_endpoint_publishing() {
+                                    self.callbacks.send_callback(
+                                        on_stop,
+                                        fid.into(),
+                                        OnStopEvent,
+                                    );
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

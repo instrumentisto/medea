@@ -201,6 +201,8 @@ impl Member {
                     publisher_endpoint.p2p,
                     publisher_member.downgrade(),
                     publisher_endpoint.force_relay,
+                    publisher_endpoint.on_start.clone(),
+                    publisher_endpoint.on_stop.clone(),
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -232,6 +234,8 @@ impl Member {
                     e.p2p,
                     this_member.downgrade(),
                     e.force_relay,
+                    e.on_start.clone(),
+                    e.on_stop.clone(),
                 ));
             });
 

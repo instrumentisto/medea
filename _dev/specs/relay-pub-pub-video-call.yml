@@ -14,12 +14,14 @@ spec:
             spec:
               p2p: Always
               force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
           play-responder:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://relay-pub-pub-video-call/responder/publish"
               force_relay: true
-              on_play: "grpc://127.0.0.1:9099"
+              on_start: "grpc://127.0.0.1:9099"
               on_stop: "grpc://127.0.0.1:9099"
     responder:
       kind: Member
@@ -33,10 +35,12 @@ spec:
             spec:
               p2p: Always
               force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://relay-pub-pub-video-call/caller/publish"
               force_relay: true
-              on_play: "grpc://127.0.0.1:9099"
+              on_start: "grpc://127.0.0.1:9099"
               on_stop: "grpc://127.0.0.1:9099"

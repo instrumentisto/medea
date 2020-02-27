@@ -20,6 +20,8 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
+use crate::{api::control::callback::url::CallbackUrl, media::Peer};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -45,6 +47,12 @@ struct WebRtcPublishEndpointInner {
     /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
     /// this [`WebRtcPublishEndpoint`].
     peer_ids: HashSet<PeerId>,
+
+    peers_status: HashMap<PeerId, bool>,
+
+    on_start: Option<CallbackUrl>,
+
+    on_stop: Option<CallbackUrl>,
 }
 
 impl Drop for WebRtcPublishEndpointInner {
@@ -115,6 +123,8 @@ impl WebRtcPublishEndpoint {
         p2p: P2pMode,
         owner: WeakMember,
         is_force_relayed: bool,
+        on_start: Option<CallbackUrl>,
+        on_stop: Option<CallbackUrl>,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
@@ -123,6 +133,9 @@ impl WebRtcPublishEndpoint {
             sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
+            peers_status: HashMap::new(),
+            on_start,
+            on_stop,
         })))
     }
 
@@ -152,6 +165,7 @@ impl WebRtcPublishEndpoint {
 
     /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
     pub fn add_peer_id(&self, peer_id: PeerId) {
+        self.0.borrow_mut().peers_status.insert(peer_id, false);
         self.0.borrow_mut().add_peer_id(peer_id)
     }
 
@@ -201,6 +215,40 @@ impl WebRtcPublishEndpoint {
     /// [`WebRtcPublishEndpoint`].
     pub fn is_force_relayed(&self) -> bool {
         self.0.borrow().is_force_relayed
+    }
+
+    pub fn change_peer_status(&self, peer_id: PeerId, is_publishing: bool) {
+        if let Some(peer_status) =
+            self.0.borrow_mut().peers_status.get_mut(&peer_id)
+        {
+            *peer_status = is_publishing;
+        }
+    }
+
+    pub fn is_endpoint_publishing(&self) -> bool {
+        self.0
+            .borrow()
+            .peers_status
+            .values()
+            .find(|status| **status == true)
+            .is_some()
+    }
+
+    pub fn publishing_peers_count(&self) -> usize {
+        self.0
+            .borrow()
+            .peers_status
+            .values()
+            .filter(|s| **s)
+            .count()
+    }
+
+    pub fn on_start(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_start.clone()
+    }
+
+    pub fn on_stop(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_stop.clone()
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
