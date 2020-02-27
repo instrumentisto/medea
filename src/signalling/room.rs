@@ -26,7 +26,8 @@ use crate::{
         control::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
-                OnJoinEvent, OnLeaveEvent, OnLeaveReason,
+                OnJoinEvent, OnLeaveEvent, OnLeaveReason, OnStartEvent,
+                OnStopEvent,
             },
             endpoints::{
                 webrtc_play_endpoint::Validated,
@@ -1341,6 +1342,47 @@ impl Handler<OnStartOnStopCallback> for Room {
         msg: OnStartOnStopCallback,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        let endpoint = self
+            .peers
+            .get_endpoint_path_by_peer_id(msg.peer_id)
+            .and_then(|endpoint| endpoint.upgrade());
+
+        use super::elements::endpoints::Endpoint;
+        if let Some(endpoint) = endpoint {
+            match endpoint {
+                Endpoint::WebRtcPlayEndpoint(play_endpoint) => {
+                    let fid = play_endpoint
+                        .owner()
+                        .get_fid_to_endpoint(play_endpoint.id().into());
+                    match msg.event {
+                        EventType::OnStart => {
+                            if let Some(callback_url) = play_endpoint.on_start()
+                            {
+                                self.callbacks.send_callback(
+                                    callback_url,
+                                    fid.into(),
+                                    OnStartEvent,
+                                );
+                            }
+                        }
+                        EventType::OnStop => {
+                            if let Some(callback_url) = play_endpoint.on_stop()
+                            {
+                                self.callbacks.send_callback(
+                                    callback_url,
+                                    fid.into(),
+                                    OnStopEvent,
+                                );
+                            }
+                        }
+                    }
+                }
+                Endpoint::WebRtcPublishEndpoint(publish_endpoint) => {
+                    // TODO
+                }
+            }
+        }
+
         debug!("LOOK AT ME: {:?}", msg);
     }
 }

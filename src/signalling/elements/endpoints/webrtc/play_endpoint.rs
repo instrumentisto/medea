@@ -177,6 +177,14 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    pub fn on_start(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_start.clone()
+    }
+
+    pub fn on_stop(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_stop.clone()
+    }
+
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
     /// pointer.
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {

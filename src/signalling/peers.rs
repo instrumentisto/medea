@@ -12,12 +12,13 @@ use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::control::{EndpointId, MemberId, RoomId},
     log::prelude::*,
     media::{IceUser, New, Peer, PeerStateMachine},
     signalling::{
-        elements::endpoints::webrtc::{
-            WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+        elements::endpoints::{
+            webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            WeakEndpoint,
         },
         room::RoomError,
     },
@@ -49,6 +50,8 @@ pub struct PeerRepository {
     /// [`MediaTrack`]: crate::media::track::MediaTrack
     /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
+
+    peers_endpoints: HashMap<PeerId, WeakEndpoint>,
 }
 
 /// Simple ID counter.
@@ -78,6 +81,7 @@ impl PeerRepository {
             peers: HashMap::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
+            peers_endpoints: HashMap::new(),
         }
     }
 
@@ -367,7 +371,11 @@ impl PeerRepository {
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 
             src.add_peer_id(src_peer_id);
+            self.peers_endpoints
+                .insert(src_peer_id, src.downgrade().into());
             sink.set_peer_id(sink_peer_id);
+            self.peers_endpoints
+                .insert(sink_peer_id, sink.downgrade().into());
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -377,7 +385,11 @@ impl PeerRepository {
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 
             src.add_peer_id(src_peer.id());
+            self.peers_endpoints
+                .insert(src_peer.id(), src.downgrade().into());
             sink.set_peer_id(sink_peer.id());
+            self.peers_endpoints
+                .insert(sink_peer.id(), sink.downgrade().into());
 
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();
@@ -389,5 +401,12 @@ impl PeerRepository {
         };
 
         None
+    }
+
+    pub fn get_endpoint_path_by_peer_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<WeakEndpoint> {
+        self.peers_endpoints.get(&peer_id).cloned()
     }
 }
