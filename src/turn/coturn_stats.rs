@@ -337,7 +337,7 @@ pub fn run_coturn_stats_watcher(cf: &conf::Turn) {
     });
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PublisherAllocationState {
     Stopped,
     Playing,
@@ -386,10 +386,20 @@ impl PublisherAllocation {
         self.last_update = Instant::now();
     }
 
-    pub fn on_start(&self) {
+    pub fn on_start(&mut self) {
+        self.state = PublisherAllocationState::Playing;
         self.room_addr.do_send(OnStartOnStopCallback {
             peer_id: self.peer_id,
             event: EventType::OnStart,
+        });
+    }
+
+    pub fn on_stop(&mut self) {
+        self.state = PublisherAllocationState::Stopped;
+
+        self.room_addr.do_send(OnStartOnStopCallback {
+            peer_id: self.peer_id,
+            event: EventType::OnStop,
         });
     }
 }
@@ -527,6 +537,23 @@ impl Actor for CoturnStats {
             }
             .into_actor(self),
         );
+
+        ctx.run_interval(Duration::from_millis(500), |this, ctx| {
+            for (id, (allocation, partner_allocation)) in &this.allocations {
+                let last_update = allocation.borrow().last_update;
+                let allocation_state = allocation.borrow().state;
+                if last_update + Duration::from_secs(3) < Instant::now() {
+                    if allocation_state == PublisherAllocationState::Playing {
+                        allocation.borrow_mut().on_stop();
+                    }
+                } else {
+                    if allocation_state == PublisherAllocationState::Stopped {
+                        allocation.borrow_mut().on_start();
+                    }
+                }
+            }
+        });
+
         ctx.add_stream(msg_stream);
     }
 }

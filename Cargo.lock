@@ -642,6 +642,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "combine"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c875843236b5e2eb535fd0b696387bfb623f896479b10ed626cf442b836e8032"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "memchr",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "config"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2205,7 +2218,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eeb1fe3fc011cde97315f370bc88e4db3c23b08709a04915921e02b1d363b20"
 dependencies = [
  "bytes",
- "combine",
+ "combine 3.8.1",
  "dtoa",
  "futures-executor",
  "futures-util",
@@ -2223,9 +2236,8 @@ name = "redis"
 version = "0.15.2-alpha.0"
 dependencies = [
  "bytes",
- "combine",
+ "combine 4.0.1",
  "dtoa",
- "futures-executor",
  "futures-util",
  "itoa",
  "percent-encoding 2.1.0",
