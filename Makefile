@@ -350,7 +350,7 @@ ifeq ($(browser),firefox)
 else ifeq ($(browser),safari)
 	webdriver-env = SAFARIDRIVER_REMOTE
 else
-	webriver-env = CHROMEDRIVER_REMOTE
+	webdriver-env = CHROMEDRIVER_REMOTE
 endif
 
 test.unit:
@@ -372,7 +372,7 @@ ifeq ($(browser),default)
 	cargo test --target wasm32-unknown-unknown --features mockable
 else
 ifeq ($(browser),safari)
-	safaridriver --enable -p 4444
+	sudo safaridriver --enable -p 4444
 else
 	@make docker.up.webdriver browser=$(browser)
 endif
