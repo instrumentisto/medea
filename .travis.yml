@@ -131,8 +131,7 @@ jobs:
       before_script:
         # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
         - cargo install -f wasm-bindgen-cli
-                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
-                                                    | grep -o '[0-9\.]*'`
+                --version 0.2.58
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason browser=safari
 
