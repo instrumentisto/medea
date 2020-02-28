@@ -345,7 +345,13 @@ endif
 #	                | crate=medea-jason [browser=(chrome|firefox|default)] )]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
-webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
+ifeq ($(browser),firefox)
+	webdriver-env = GECKODRIVER_REMOTE
+else ifeq ($(browser),safari)
+	webdriver-env = SAFARIDRIVER_REMOTE
+else
+	webriver-env = CHROMEDRIVER_REMOTE
+endif
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -365,7 +371,11 @@ ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
 	cargo test --target wasm32-unknown-unknown --features mockable
 else
+ifeq ($(browser),safari)
+	safaridriver --enable -p 4444
+else
 	@make docker.up.webdriver browser=$(browser)
+endif
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
