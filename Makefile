@@ -372,7 +372,7 @@ ifeq ($(browser),default)
 	cargo test --target wasm32-unknown-unknown --features mockable
 else
 ifeq ($(browser),safari)
-	sudo safaridriver --enable -p 4444
+	sudo safaridriver --enable -p 4444 &
 else
 	@make docker.up.webdriver browser=$(browser)
 endif
