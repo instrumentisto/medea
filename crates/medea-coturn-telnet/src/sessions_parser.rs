@@ -40,7 +40,7 @@ impl fmt::Display for Protocol {
     }
 }
 
-const TURN_SESSION_ID_FACTOR: u64 = 1000000000000000;
+const TURN_SESSION_ID_FACTOR: u64 = 1_000_000_000_000_000;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SessionId(pub u64);

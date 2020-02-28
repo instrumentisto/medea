@@ -6,7 +6,7 @@ use std::fmt;
 use medea_control_api_proto::grpc::callback::{
     callback_client::CallbackClient as ProtoCallbackClient
 };
-use futures::future::{FutureExt, LocalBoxFuture};
+use futures::future::LocalBoxFuture;
 use tonic::transport::Channel;
 
 use crate::{

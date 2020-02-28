@@ -10,7 +10,6 @@ use crate::api::control::{
     endpoints::webrtc_play_endpoint::{
         Unvalidated, Validated, ValidationError,
     },
-    member::MemberElement::WebRtcPlayEndpoint,
     TryFromProtobufError,
 };
 use medea_control_api_proto::grpc::api as proto;
@@ -73,7 +72,6 @@ pub struct WebRtcPublishEndpoint<T> {
     pub on_stop: Option<CallbackUrl>,
 
     #[serde(skip)]
-    #[serde(bound = "T: From<Unvalidated> + Default")]
     _validation_state: T,
 }
 

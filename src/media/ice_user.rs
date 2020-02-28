@@ -5,7 +5,7 @@
 use derive_more::{AsRef, Display, From, Into};
 use medea_client_api_proto::{IceServer, PeerId};
 
-use crate::api::control::{EndpointId, RoomId};
+use crate::api::control::RoomId;
 
 /// Username for authorization on Turn server.
 #[derive(AsRef, Clone, Debug, Display, From, Into)]

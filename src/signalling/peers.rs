@@ -4,15 +4,19 @@
 //! [`Peer`]: crate::media::peer::Peer
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
+    future::Future,
+    rc::Rc,
+    sync::Arc,
 };
 
 use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
-    api::control::{EndpointId, MemberId, RoomId},
+    api::control::{MemberId, RoomId},
     log::prelude::*,
     media::{IceUser, New, Peer, PeerStateMachine},
     signalling::{
@@ -24,7 +28,6 @@ use crate::{
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
-use std::{cell::RefCell, future::Future, rc::Rc, sync::Arc};
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -51,7 +54,7 @@ pub struct PeerRepository {
     /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
 
-    peers_endpoints: HashMap<PeerId, WeakEndpoint>,
+    peers_endpoints: HashMap<PeerId, Vec<WeakEndpoint>>,
 }
 
 /// Simple ID counter.
@@ -372,10 +375,14 @@ impl PeerRepository {
 
             src.add_peer_id(src_peer_id);
             self.peers_endpoints
-                .insert(src_peer_id, src.downgrade().into());
+                .entry(src_peer_id)
+                .or_default()
+                .push(src.downgrade().into());
             sink.set_peer_id(sink_peer_id);
             self.peers_endpoints
-                .insert(sink_peer_id, sink.downgrade().into());
+                .entry(sink_peer_id)
+                .or_default()
+                .push(sink.downgrade().into());
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -386,10 +393,14 @@ impl PeerRepository {
 
             src.add_peer_id(src_peer.id());
             self.peers_endpoints
-                .insert(src_peer.id(), src.downgrade().into());
+                .entry(src_peer.id())
+                .or_default()
+                .push(src.downgrade().into());
             sink.set_peer_id(sink_peer.id());
             self.peers_endpoints
-                .insert(sink_peer.id(), sink.downgrade().into());
+                .entry(sink_peer.id())
+                .or_default()
+                .push(sink.downgrade().into());
 
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();
@@ -406,7 +417,7 @@ impl PeerRepository {
     pub fn get_endpoint_path_by_peer_id(
         &self,
         peer_id: PeerId,
-    ) -> Option<WeakEndpoint> {
+    ) -> Option<Vec<WeakEndpoint>> {
         self.peers_endpoints.get(&peer_id).cloned()
     }
 }

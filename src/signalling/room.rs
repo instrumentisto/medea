@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, Message, WrapFuture as _, WrapFuture,
+    Handler, Message, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -60,7 +60,8 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
-use futures::TryFutureExt;
+
+use super::elements::endpoints::Endpoint;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -251,7 +252,7 @@ impl Room {
         let fut = self.peers.get_ice_user(sender_peer_id);
 
         Ok(Box::new(fut.into_actor(self).then(
-            move |ice_user, this, ctx| {
+            move |ice_user, this, _| {
                 let sender = this.peers.get_peer_by_id(sender_peer_id).unwrap();
                 let peer_created = Event::PeerCreated {
                     peer_id: sender.id(),
@@ -851,7 +852,7 @@ impl CommandHandler for Room {
         let fut = self.peers.get_ice_user(to_peer_id);
 
         Ok(Box::new(fut.into_actor(self).then(
-            move |ice_user, this, ctx| {
+            move |ice_user, this, _| {
                 let to_peer = this.peers.get_peer_by_id(to_peer_id).unwrap();
                 let event = Event::PeerCreated {
                     peer_id: to_peer.id(),
@@ -1344,15 +1345,18 @@ impl Handler<OnStartOnStopCallback> for Room {
     fn handle(
         &mut self,
         msg: OnStartOnStopCallback,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        let endpoint = self
+        let endpoints: Vec<_> = self
             .peers
             .get_endpoint_path_by_peer_id(msg.peer_id)
-            .and_then(|endpoint| endpoint.upgrade());
+            .into_iter()
+            .flat_map(|endpoints| {
+                endpoints.into_iter().filter_map(|e| e.upgrade())
+            })
+            .collect();
 
-        use super::elements::endpoints::Endpoint;
-        if let Some(endpoint) = endpoint {
+        for endpoint in endpoints {
             match endpoint {
                 Endpoint::WebRtcPlayEndpoint(play_endpoint) => {
                     let fid = play_endpoint
@@ -1405,7 +1409,7 @@ impl Handler<OnStartOnStopCallback> for Room {
                         }
                         EventType::OnStop => {
                             publish_endpoint
-                                .change_peer_status(msg.peer_id, true);
+                                .change_peer_status(msg.peer_id, false);
                             if let Some(on_stop) = publish_endpoint.on_stop() {
                                 if !publish_endpoint.is_endpoint_publishing() {
                                     self.callbacks.send_callback(

@@ -12,8 +12,7 @@ use medea::{
     shutdown::{self, GracefulShutdown},
     signalling::{room_repo::RoomRepository, room_service::RoomService},
     turn::{
-        cli::CoturnTelnetClient,
-        coturn_stats::{run_coturn_stats_watcher, CoturnStats},
+        cli::CoturnTelnetClient, coturn_stats::CoturnStats,
         new_turn_auth_service,
     },
     AppContext,

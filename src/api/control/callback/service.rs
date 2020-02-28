@@ -120,7 +120,7 @@ mod tests {
     fn callback_request() -> CallbackRequest {
         CallbackRequest::new(
             StatefulFid::try_from("foo".to_string()).unwrap(),
-            CallbackEvent::OnJoin(OnJoinEvent),
+            CallbackEvent::Join(OnJoinEvent),
         )
     }
 

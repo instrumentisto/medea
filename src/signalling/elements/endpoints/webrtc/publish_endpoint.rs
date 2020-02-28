@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
@@ -10,8 +10,9 @@ use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
-    api::control::endpoints::webrtc_publish_endpoint::{
-        P2pMode, WebRtcPublishId as Id,
+    api::control::{
+        callback::url::CallbackUrl,
+        endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
     },
     signalling::elements::{
         endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
@@ -20,8 +21,6 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-use crate::{api::control::callback::url::CallbackUrl, media::Peer};
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -226,12 +225,7 @@ impl WebRtcPublishEndpoint {
     }
 
     pub fn is_endpoint_publishing(&self) -> bool {
-        self.0
-            .borrow()
-            .peers_status
-            .values()
-            .find(|status| **status == true)
-            .is_some()
+        self.0.borrow().peers_status.values().any(|status| *status)
     }
 
     pub fn publishing_peers_count(&self) -> usize {

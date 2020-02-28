@@ -14,8 +14,8 @@ use std::{
 };
 
 use actix::{
-    fut::wrap_future, ActorFuture as _, AsyncContext, Context,
-    ContextFutureSpawner as _, SpawnHandle, WrapFuture,
+    fut::wrap_future, AsyncContext, Context, ContextFutureSpawner as _,
+    SpawnHandle,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -43,7 +43,7 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
+    turn::{TurnAuthService, TurnServiceErr},
     AppContext,
 };
 
@@ -251,9 +251,8 @@ impl ParticipantService {
                     .map(move |_| Ok(member)),
             ))
         } else {
-            let turn_service = self.turn_service.clone();
-            let cloned_member_id = member_id.clone();
-            let room_id = self.room_id.clone();
+            // TODO: here was turn_service user creating. Maybe it needed
+            // here???
             self.insert_connection(member_id, conn);
             Box::new(wrap_future(future::ok(member)))
         }

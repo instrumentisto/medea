@@ -12,7 +12,6 @@ use serde::Deserialize;
 use crate::api::control::{
     callback::url::CallbackUrl, refs::SrcUri, TryFromProtobufError,
 };
-use std::marker::PhantomData;
 
 /// ID of [`WebRtcPlayEndpoint`].
 #[derive(
@@ -46,7 +45,6 @@ pub struct WebRtcPlayEndpoint<T> {
     pub force_relay: bool,
 
     #[serde(skip)]
-    #[serde(bound = "T: From<Unvalidated> + Default")]
     _validation_state: T,
 }
 

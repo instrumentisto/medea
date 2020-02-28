@@ -9,26 +9,26 @@ use serde::Serialize;
 #[derive(Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum CallbackEvent {
-    OnJoin(join::OnJoin),
-    OnLeave(leave::OnLeave),
-    OnStart(on_start::OnStart),
-    OnStop(on_stop::OnStop),
+    Join(join::OnJoin),
+    Leave(leave::OnLeave),
+    Start(on_start::OnStart),
+    Stop(on_stop::OnStop),
 }
 
 impl From<proto::request::Event> for CallbackEvent {
     fn from(proto: proto::request::Event) -> Self {
         match proto {
             proto::request::Event::OnLeave(on_leave) => {
-                Self::OnLeave(on_leave.into())
+                Self::Leave(on_leave.into())
             }
             proto::request::Event::OnJoin(on_join) => {
-                Self::OnJoin(on_join.into())
+                Self::Join(on_join.into())
             }
             proto::request::Event::OnStart(on_start) => {
-                Self::OnStart(on_start.into())
+                Self::Start(on_start.into())
             }
             proto::request::Event::OnStop(on_stop) => {
-                Self::OnStop(on_stop.into())
+                Self::Stop(on_stop.into())
             }
         }
     }

@@ -11,26 +11,27 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{IceServer, PeerId};
+use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+        endpoints::{
+            webrtc_play_endpoint::Validated,
+            WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+        },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
-    media::IceUser,
 };
 
 use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
-use crate::api::control::endpoints::webrtc_play_endpoint::Validated;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]

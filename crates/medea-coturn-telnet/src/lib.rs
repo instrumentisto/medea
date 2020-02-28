@@ -4,7 +4,9 @@
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 //! [deadpool]: https://crates.io/crates/deadpool
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+// TODO: remove me
+#![allow(clippy::missing_errors_doc)]
 
 pub mod codec;
 pub mod connection;

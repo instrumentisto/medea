@@ -89,25 +89,25 @@ impl Into<proto::OnStop> for OnStopEvent {
 /// All callbacks which can happen.
 #[derive(Debug, From)]
 pub enum CallbackEvent {
-    OnJoin(OnJoinEvent),
-    OnLeave(OnLeaveEvent),
-    OnStart(OnStartEvent),
-    OnStop(OnStopEvent),
+    Join(OnJoinEvent),
+    Leave(OnLeaveEvent),
+    Start(OnStartEvent),
+    Stop(OnStopEvent),
 }
 
 impl Into<proto::request::Event> for CallbackEvent {
     fn into(self) -> proto::request::Event {
         match self {
-            Self::OnJoin(on_join) => {
+            Self::Join(on_join) => {
                 proto::request::Event::OnJoin(on_join.into())
             }
-            Self::OnLeave(on_leave) => {
+            Self::Leave(on_leave) => {
                 proto::request::Event::OnLeave(on_leave.into())
             }
-            Self::OnStart(on_start) => {
+            Self::Start(on_start) => {
                 proto::request::Event::OnStart(on_start.into())
             }
-            Self::OnStop(on_stop) => {
+            Self::Stop(on_stop) => {
                 proto::request::Event::OnStop(on_stop.into())
             }
         }

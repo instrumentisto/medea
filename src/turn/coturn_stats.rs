@@ -1,27 +1,27 @@
-use std::{fmt, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
-use actix::Message;
-use async_trait::async_trait;
-use derive_more::{Display, From};
-use failure::Fail;
-use rand::{distributions::Alphanumeric, Rng};
+use actix::{
+    Actor, ActorFuture, Addr, AsyncContext, Handler, Message, StreamHandler,
+    WrapFuture,
+};
+use derive_more::Display;
+use futures::{channel::mpsc, StreamExt};
+use medea_client_api_proto::PeerId;
+use medea_coturn_telnet::sessions_parser::Session;
+use patched_redis::ConnectionInfo;
 
 use crate::{
-    api::control::{EndpointId, MemberId, RoomId},
+    api::control::RoomId,
     conf,
     log::prelude::*,
-    media::IceUser,
-    turn::repo::{TurnDatabase, TurnDatabaseErr},
+    signalling::{room::OnStartOnStopCallback, Room},
+    turn::cli::{CoturnCliError, CoturnTelnetClient},
 };
-use actix::{
-    Actor, ActorFuture, Addr, AsyncContext, Handler, SpawnHandle,
-    StreamHandler, WrapFuture,
-};
-use futures::channel::mpsc;
-use medea_client_api_proto::PeerId;
-use medea_coturn_telnet::sessions_parser::{Session, TrafficUsage};
-use patched_redis::{ConnectionInfo, IntoConnectionInfo};
-use std::{collections::HashMap, time::Duration};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Traffic {
@@ -32,25 +32,27 @@ pub struct Traffic {
 }
 
 impl Traffic {
-    pub fn parse(body: String) -> Result<Self, CoturnEventParseError> {
+    pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
         let mut items: HashMap<&str, u64> = body
             .split(", ")
             .map(|i| {
                 let mut splitted_item = i.split('=');
                 let key = splitted_item.next().ok_or_else(|| {
-                    CoturnEventParseError::FailedToParseTrafficMap(body.clone())
+                    CoturnEventParseError::FailedToParseTrafficMap(
+                        body.to_string(),
+                    )
                 })?;
                 let value: u64 = splitted_item
                     .next()
                     .ok_or_else(|| {
                         CoturnEventParseError::FailedToParseTrafficMap(
-                            body.clone(),
+                            body.to_string(),
                         )
                     })?
                     .parse()
                     .map_err(|_| {
                         CoturnEventParseError::FailedToParseTrafficMap(
-                            body.clone(),
+                            body.to_string(),
                         )
                     })?;
 
@@ -100,7 +102,7 @@ pub enum CoturnAllocationEvent {
 impl CoturnAllocationEvent {
     pub fn parse(
         event_type: &str,
-        body: String,
+        body: &str,
     ) -> Result<Self, CoturnEventParseError> {
         match event_type {
             "total_traffic" => Ok(CoturnAllocationEvent::TotalTraffic {
@@ -164,7 +166,7 @@ pub struct CoturnEvent {
 
 impl CoturnEvent {
     pub fn parse(
-        msg: patched_redis::Msg,
+        msg: &patched_redis::Msg,
     ) -> Result<Self, CoturnEventParseError> {
         let channel: String = msg
             .get_channel()
@@ -206,7 +208,7 @@ impl CoturnEvent {
 
         let event = CoturnAllocationEvent::parse(
             event_type,
-            msg.get_payload().unwrap(),
+            msg.get_payload::<String>().unwrap().as_str(),
         )?;
 
         Ok(CoturnEvent {
@@ -275,26 +277,7 @@ pub enum CoturnEventParseError {
     NoEventType,
 }
 
-pub struct CoturnStatsWatcher {
-    client: redis::Client,
-}
-
-use crate::{
-    media::peer::Context,
-    signalling::{room::OnStartOnStopCallback, Room},
-    turn::{
-        cli::{CoturnCliError, CoturnTelnetClient},
-        coturn_stats::EventType::OnStart,
-    },
-};
-use actix_web::web::patch;
-use futures::{StreamExt, TryFutureExt};
-use patched_redis::Client as RedisClient;
-use redis::Msg;
-use std::{
-    cell::RefCell, collections::HashSet, rc::Rc, thread::JoinHandle,
-    time::Instant,
-};
+pub struct CoturnStatsWatcher;
 
 pub async fn coturn_watcher_loop(
     client: patched_redis::Client,
@@ -305,7 +288,7 @@ pub async fn coturn_watcher_loop(
     let mut pubsub_stream = pusub.on_message();
 
     while let Some(msg) = pubsub_stream.next().await {
-        match CoturnEvent::parse(msg) {
+        match CoturnEvent::parse(&msg) {
             Ok(event) => {
                 debug!("Coturn stats: {:?}", event);
             }
@@ -425,7 +408,6 @@ type Alloc = Rc<RefCell<PublisherAllocation>>;
 pub struct CoturnStats {
     allocations: HashMap<u64, (Alloc, Option<Alloc>)>,
     client: patched_redis::Client,
-    // TODO: PeerId -> CoturnUsername
     awaits_allocation: HashMap<PeerId, Subscribe>,
     coturn_client: CoturnTelnetClient,
     relay_allocations_ids: HashMap<PeerId, u64>,
@@ -538,18 +520,18 @@ impl Actor for CoturnStats {
             .into_actor(self),
         );
 
-        ctx.run_interval(Duration::from_millis(500), |this, ctx| {
-            for (id, (allocation, partner_allocation)) in &this.allocations {
+        ctx.run_interval(Duration::from_millis(500), |this, _| {
+            // TODO: use partner allocation
+            for (allocation, _partner_allocation) in this.allocations.values() {
                 let last_update = allocation.borrow().last_update;
                 let allocation_state = allocation.borrow().state;
                 if last_update + Duration::from_secs(3) < Instant::now() {
                     if allocation_state == PublisherAllocationState::Playing {
                         allocation.borrow_mut().on_stop();
                     }
-                } else {
-                    if allocation_state == PublisherAllocationState::Stopped {
-                        allocation.borrow_mut().on_start();
-                    }
+                } else if allocation_state == PublisherAllocationState::Stopped
+                {
+                    allocation.borrow_mut().on_start();
                 }
             }
         });
@@ -560,7 +542,7 @@ impl Actor for CoturnStats {
 
 fn find_relay_session(sessions: Vec<Session>) -> Option<Session> {
     for session in sessions {
-        if session.peers.len() > 0 {
+        if !session.peers.is_empty() {
             return Some(session);
         }
     }
@@ -575,7 +557,7 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
         ctx: &mut Self::Context,
     ) {
         if let Some(msg) = item {
-            let event = if let Ok(event) = CoturnEvent::parse(msg) {
+            let event = if let Ok(event) = CoturnEvent::parse(&msg) {
                 event
             } else {
                 return;
@@ -583,41 +565,6 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
             let peer_id = event.peer_id;
 
             match event.event {
-                CoturnAllocationEvent::New { lifetime: _ } => {
-                    if let Some(subscription_request) =
-                        self.awaits_allocation.get(&event.peer_id)
-                    {
-                        let coturn_client = self.coturn_client.clone();
-                        let room_id = subscription_request.room_id.clone();
-                        ctx.spawn(
-                            async move {
-                                tokio::time::delay_for(Duration::from_millis(
-                                    500,
-                                ))
-                                .await;
-                                let sess = format!(
-                                    "{}_{}",
-                                    room_id,
-                                    event.peer_id.to_string()
-                                );
-                                coturn_client.get_sessions(sess).await
-                            }
-                            .into_actor(self)
-                            .map(
-                                move |res, this, ctx| match res {
-                                    Ok(sessions) => {
-                                        this.try_init_allocation(
-                                            sessions, peer_id,
-                                        );
-                                    }
-                                    Err(e) => {
-                                        println!("\n\n{:?}\n\n", e);
-                                    }
-                                },
-                            ),
-                        );
-                    }
-                }
                 CoturnAllocationEvent::Traffic { traffic } => {
                     if let Some((allocation, partner_allocation)) =
                         self.allocations.get(&event.allocation_id)
@@ -631,40 +578,45 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
                                 .borrow_mut()
                                 .update_send_bytes(traffic.received_bytes);
                         }
-                    } else {
-                        if let Some(subscription_request) =
-                            self.awaits_allocation.get(&event.peer_id)
-                        {
-                            let coturn_client = self.coturn_client.clone();
-                            let room_id = subscription_request.room_id.clone();
-                            ctx.spawn(
-                                async move {
-                                    let sess = format!(
-                                        "{}_{}",
-                                        room_id,
-                                        event.peer_id.to_string()
-                                    );
-                                    coturn_client.get_sessions(sess).await
-                                }
-                                .into_actor(self)
-                                .map(
-                                    move |res, this, ctx| match res {
-                                        Ok(sessions) => {
-                                            this.try_init_allocation(
+                    } else if let Some(subscription_request) =
+                        self.awaits_allocation.get(&event.peer_id)
+                    {
+                        let coturn_client = self.coturn_client.clone();
+                        let room_id = subscription_request.room_id.clone();
+                        ctx.spawn(
+                            async move {
+                                let sess = format!(
+                                    "{}_{}",
+                                    room_id,
+                                    event.peer_id.to_string()
+                                );
+                                coturn_client.get_sessions(sess).await
+                            }
+                            .into_actor(self)
+                            .map(
+                                move |res, this, _| match res {
+                                    Ok(sessions) => {
+                                        if let Err(e) = this
+                                            .try_init_allocation(
                                                 sessions, peer_id,
+                                            )
+                                        {
+                                            error!(
+                                                "Allocation init error: {:?}",
+                                                e
                                             );
-                                        }
-                                        Err(e) => {
-                                            println!("\n\n{:?}\n\n", e);
-                                        }
-                                    },
-                                ),
-                            );
-                        }
+                                        };
+                                    }
+                                    Err(e) => {
+                                        error!("Coturn CLI error: {:?}", e);
+                                    }
+                                },
+                            ),
+                        );
                     }
                 }
                 CoturnAllocationEvent::Deleted => {
-                    if let Some((allocation, partner_allocation)) =
+                    if let Some((_, partner_allocation)) =
                         self.allocations.remove(&event.allocation_id)
                     {
                         if let Some(partner_allocation) = partner_allocation {
@@ -701,7 +653,7 @@ impl Handler<Subscribe> for CoturnStats {
     fn handle(
         &mut self,
         msg: Subscribe,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let coturn_client = self.coturn_client.clone();
         let peer_id = msg.peer_id;
@@ -710,13 +662,17 @@ impl Handler<Subscribe> for CoturnStats {
         Box::new(
             async move { coturn_client.get_sessions(session_id).await }
                 .into_actor(self)
-                .map(move |res, this, ctx| {
+                .map(move |res, this, _| {
                     match res {
                         Ok(sessions) => {
-                            this.try_init_allocation(sessions, peer_id);
+                            if let Err(e) =
+                                this.try_init_allocation(sessions, peer_id)
+                            {
+                                error!("Allocation init failed: {:?}", e);
+                            };
                         }
                         Err(e) => {
-                            println!("\n\n{:?}\n\n", e);
+                            error!("Get Coturn sessions failed: {:?}", e);
                         }
                     }
 

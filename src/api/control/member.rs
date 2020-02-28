@@ -46,7 +46,7 @@ pub enum MemberElement<T> {
     /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
     /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
-    #[serde(bound = "T: From<Unvalidated> + Default")]
+    #[serde(bound = "T: From<Unvalidated>")]
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint<T> },
 }
 
@@ -94,6 +94,9 @@ impl Into<RoomElement<Validated>> for MemberSpec {
     }
 }
 
+type PublishEndpointsItem<'a> =
+    (WebRtcPublishId, &'a WebRtcPublishEndpoint<Validated>);
+
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(
@@ -124,8 +127,7 @@ impl MemberSpec {
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint<Validated>)>
-    {
+    ) -> impl Iterator<Item = PublishEndpointsItem> {
         self.pipeline.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPublishEndpoint { spec } => {
                 Some((id.clone().into(), spec))

@@ -8,23 +8,19 @@ use std::{fmt, sync::Arc};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
+use medea_client_api_proto::PeerId;
 use rand::{distributions::Alphanumeric, Rng};
-use redis::{ConnectionInfo, IntoConnectionInfo, PubSub};
+use redis::ConnectionInfo;
 
 use crate::{
-    api::control::{EndpointId, MemberId, RoomId},
+    api::control::RoomId,
     conf,
-    log::prelude::*,
     media::IceUser,
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         repo::{TurnDatabase, TurnDatabaseErr},
     },
 };
-use actix::{Actor, AsyncContext, StreamHandler};
-use futures::channel::mpsc;
-use medea_client_api_proto::PeerId;
-use std::collections::HashMap;
 
 static TURN_PASS_LEN: usize = 16;
 
