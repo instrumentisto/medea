@@ -268,10 +268,10 @@ impl From<&str> for IceCandidatePairState {
 
 // https://www.w3.org/TR/webrtc-stats/#inboundrtpstats-dict*
 #[derive(Debug)]
- struct RtcInboundRtpStreamStats {
+struct RtcInboundRtpStreamStats {
     media_type: bool,
     bytes_received: u64,
     packets_received: u64,
     packets_lost: u64,
-    jitter: f64
+    jitter: f64,
 }
