@@ -10,7 +10,7 @@ use actix::{
     AsyncContext, ContextFutureSpawner as _, Handler, Message, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
-use futures::future::{self, FutureExt as _, LocalBoxFuture};
+use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
 };
@@ -179,7 +179,7 @@ impl Actor for WsSession {
                         ));
                     }
                 };
-                future::ready(()).into_actor(this)
+                actix::fut::ready(())
             })
             .wait(ctx);
     }
@@ -313,7 +313,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         }
                         Ok(ClientMsg::Command(command)) => {
                             self.room
-                                .send_command(command)
+                                .send_command(self.member_id.clone(), command)
                                 .into_actor(self)
                                 .spawn(ctx);
                         }
@@ -555,7 +555,7 @@ mod test {
                 .expect_connection_closed()
                 .returning(|_, _| future::ready(()).boxed_local());
 
-            rpc_server.expect_send_command().return_once(|command| {
+            rpc_server.expect_send_command().return_once(|_, command| {
                 let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
                 future::ready(()).boxed_local()
             });
