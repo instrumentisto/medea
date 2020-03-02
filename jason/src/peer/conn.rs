@@ -1,4 +1,4 @@
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
 use medea_client_api_proto::{
@@ -415,25 +415,41 @@ impl RtcPeerConnection {
                         Rc::clone(&self.peer),
                         "connectionstatechange",
                         move |_| {
-                            let state_res = get_peer_connection_state(&peer);
                             // Error here should never happen, because if the
                             // browser does not support the functionality of
                             // 'RTCPeerConnection.connectionState', then this
                             // callback can't be set.
-                            if let Some(state) = state_res {
-                                let state_parse_res =
-                                    PeerConnectionState::try_from(
-                                        state.as_str(),
-                                    );
-                                if let Ok(state) = state_parse_res {
-                                    (f)(state);
-                                } else {
-                                    console_error(format!(
-                                        "Unknown RTCPeerConnection connection \
-                                         state: {}.",
-                                        state
-                                    ));
-                                }
+                            if let Some(state) =
+                                get_peer_connection_state(&peer)
+                            {
+                                let state = match state.as_ref() {
+                                    "new" => PeerConnectionState::New,
+                                    "connecting" => {
+                                        PeerConnectionState::Connecting
+                                    }
+                                    "connected" => {
+                                        PeerConnectionState::Connected
+                                    }
+                                    "disconnected" => {
+                                        PeerConnectionState::Disconnected
+                                    }
+                                    "failed" => PeerConnectionState::Failed,
+                                    "closed" => PeerConnectionState::Closed,
+                                    _ => {
+                                        console_error(format!(
+                                            "Unknown RTCPeerConnection \
+                                             connection state: {}.",
+                                            state
+                                        ));
+                                        return;
+                                    }
+                                };
+                                f(state);
+                            } else {
+                                console_error(
+                                    "Could not receive RTCPeerConnection \
+                                     connection state",
+                                );
                             }
                         },
                     )

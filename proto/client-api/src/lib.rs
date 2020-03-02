@@ -1,6 +1,6 @@
 //! Client API protocol implementation for Medea media server.
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
@@ -175,31 +175,6 @@ pub enum PeerConnectionState {
     New,
     Connecting,
     Connected,
-}
-
-/// Error which can occur while [`PeerConnection`] parsing.
-///
-/// Indicates that provided [`str`] is unknown [`PeerConnectionState`].
-#[derive(Debug, Display)]
-#[display(fmt = "Unknown PeerConnectionState.")]
-pub struct UnknownPeerConnectionState;
-
-impl TryFrom<&str> for PeerConnectionState {
-    type Error = UnknownPeerConnectionState;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        use PeerConnectionState::*;
-
-        Ok(match value {
-            "new" => New,
-            "connecting" => Connecting,
-            "connected" => Connected,
-            "disconnected" => Disconnected,
-            "failed" => Failed,
-            "closed" => Closed,
-            _ => return Err(UnknownPeerConnectionState),
-        })
-    }
 }
 
 /// Reason of disconnecting Web Client from Media Server.
