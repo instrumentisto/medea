@@ -417,7 +417,7 @@ impl RtcPeerConnection {
                             // Error here should never happen, because if the
                             // browser does not support the functionality of
                             // 'RTCPeerConnection.connectionState', then this
-                            // callback can't be set.
+                            // callback won't fire.
                             if let Some(state) =
                                 get_peer_connection_state(&peer)
                             {
