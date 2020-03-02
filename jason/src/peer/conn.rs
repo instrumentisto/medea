@@ -219,6 +219,8 @@ pub struct RtcPeerConnection {
     /// network transports being used by the connection.
     ///
     /// Implemented in Chrome and Safari.
+    /// Tracking issue for Firefox:
+    /// <https://bugzilla.mozilla.org/show_bug.cgi?id=1265827>
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
@@ -393,9 +395,6 @@ impl RtcPeerConnection {
     /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails. This error can be ignored, since this
     /// event is currently implemented only in Chrome and Safari.
-    ///
-    /// Tracking issue for Firefox:
-    /// <https://bugzilla.mozilla.org/show_bug.cgi?id=1265827>
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
     pub fn on_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
