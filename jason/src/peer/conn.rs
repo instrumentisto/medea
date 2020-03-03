@@ -5,11 +5,12 @@ use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
-    RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
-    RtcSessionDescriptionInit, RtcTrackEvent, RtcBundlePolicy
+    Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
+    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
+    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcTrackEvent,
 };
 
 use crate::{
