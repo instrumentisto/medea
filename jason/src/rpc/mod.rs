@@ -754,7 +754,7 @@ impl RpcClient for WebSocketRpcClient {
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
             if let Err(err) = socket.send(&ClientMsg::Command(command)) {
-                console_error(e);
+                JasonError::from(err).print()
             }
         }
     }
