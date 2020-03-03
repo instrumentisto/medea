@@ -251,33 +251,20 @@ impl RtcPeerConnection {
 
         let peer = Rc::new(peer);
 
-        let peer_clone = Rc::clone(&peer);
-        let a = Closure::wrap(Box::new(move || {
-            let another_peer_clone = Rc::clone(&peer_clone);
-            spawn_local(async move {
-                let stats = JsFuture::from(another_peer_clone.get_stats())
-                    .await
-                    .unwrap();
-
-                asd(&stats);
-
-                console_error(format!("{:#?}", RtcStats::from(&stats)));
-            });
-        }) as Box<dyn Fn()>);
-        window()
-            .set_interval_with_callback_and_timeout_and_arguments_0(
-                a.as_ref().unchecked_ref(),
-                10000,
-            )
-            .unwrap();
-        a.forget();
-
         Ok(Self {
             peer,
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_track: RefCell::new(None),
         })
+    }
+
+    pub async fn get_stats(&self) -> RtcStats {
+        let js_stats = JsFuture::from(self.peer.get_stats()).await.unwrap();
+
+        asd(&js_stats);
+
+        RtcStats::from(&js_stats)
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and

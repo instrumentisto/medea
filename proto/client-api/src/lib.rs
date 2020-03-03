@@ -1,7 +1,10 @@
 //! Client API protocol implementation for Medea media server.
 
+pub mod stats;
+
 use std::collections::HashMap;
 
+use crate::stats::RtcStatsType;
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
@@ -135,6 +138,10 @@ pub enum Command {
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
+    },
+    AddPeerConnectionStats {
+        peer_id: PeerId,
+        stats: Vec<RtcStatsType>,
     },
 }
 

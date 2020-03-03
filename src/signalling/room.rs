@@ -58,6 +58,7 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
+use medea_client_api_proto::stats::RtcStatsType;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -768,6 +769,7 @@ impl Room {
             | MakeSdpAnswer { peer_id, .. }
             | SetIceCandidate { peer_id, .. }
             | AddPeerConnectionMetrics { peer_id, .. }
+            | AddPeerConnectionStats { peer_id, .. }
             | UpdateTracks { peer_id, .. } => peer_id,
         };
 
@@ -1003,6 +1005,15 @@ impl CommandHandler for Room {
         } else {
             Ok(Box::new(actix::fut::ok(())))
         }
+    }
+
+    fn on_add_peer_connection_stats(
+        &mut self,
+        peer_id: PeerId,
+        stats: Vec<RtcStatsType>,
+    ) -> Self::Output {
+        println!("{:#?}", stats);
+        Ok(Box::new(actix::fut::ok(())))
     }
 }
 

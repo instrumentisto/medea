@@ -39,6 +39,8 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::peer::RtcStats;
+use medea_client_api_proto::stats::RtcStat;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -892,6 +894,13 @@ impl PeerEventHandler for InnerRoom {
             metrics: PeerMetrics::IceConnectionStateChanged(
                 ice_connection_state,
             ),
+        });
+    }
+
+    fn on_stats_update(&mut self, peer_id: PeerId, stats: RtcStats) {
+        self.rpc.send_command(Command::AddPeerConnectionStats {
+            peer_id,
+            stats: stats.0,
         });
     }
 }

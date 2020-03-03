@@ -48,6 +48,10 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
+pub use crate::peer::stats::RtcStats;
+use crate::utils::delay_for;
+use std::time::Duration;
+use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -144,6 +148,10 @@ pub enum PeerEvent {
         /// New [`IceConnectionState`].
         ice_connection_state: IceConnectionState,
     },
+    StatsUpdate {
+        peer_id: Id,
+        stats: RtcStats,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -211,6 +219,20 @@ impl PeerConnection {
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(vec![]),
         };
+
+        let id = peer.id;
+        let sender = peer.peer_events_sender.clone();
+        let peer_clone = peer.peer.clone();
+        spawn_local(async move {
+            loop {
+                delay_for(Duration::from_secs(5).into()).await;
+                let stats = peer_clone.get_stats().await;
+                let _ = sender.unbounded_send(PeerEvent::StatsUpdate {
+                    peer_id: id,
+                    stats,
+                });
+            }
+        });
 
         // Bind to `icecandidate` event.
         let id = peer.id;
