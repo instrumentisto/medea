@@ -261,7 +261,7 @@ impl RtcPeerConnection {
 
                 asd(&stats);
 
-                console_error(format!("{:?}", RtcStats::from(&stats)));
+                console_error(format!("{:#?}", RtcStats::from(&stats)));
             });
         }) as Box<dyn Fn()>);
         window()

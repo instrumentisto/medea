@@ -20,6 +20,7 @@ use web_sys::RtcStats as SysRtcStats;
 
 use crate::utils::{console_error, get_property_by_name};
 use futures::future::Remote;
+use std::collections::HashMap;
 
 struct RtcStatsReportEntry(js_sys::JsString, SysRtcStats);
 
@@ -63,9 +64,7 @@ impl<T> RtcStat<T> {
 }
 
 #[derive(Debug)]
-pub struct RtcStats {
-    ice_pairs: Vec<RtcStat<RtcIceCandidatePairStats>>,
-}
+pub struct RtcStats(HashMap<String, RtcStatsType>);
 
 impl From<&JsValue> for RtcStats {
     fn from(stats: &JsValue) -> Self {
@@ -80,7 +79,7 @@ impl From<&JsValue> for RtcStats {
             .unwrap()
             .unchecked_into::<js_sys::Iterator>();
 
-        let mut ice_pairs = Vec::new();
+        let mut stats = HashMap::new();
 
         let mut next = iterator.next().unwrap();
         while !next.done() {
@@ -89,28 +88,12 @@ impl From<&JsValue> for RtcStats {
             let stat = RtcStatsReportEntry::try_from(stat).unwrap();
             let stat = RtcStatsType::try_from(&stat.1).unwrap();
 
-            console_error(format!("Stat: {:?}", stat));
-
-            match stat {
-                RtcStatsType::CandidatePair(pair) => {
-                    if pair.kind.nominated.unwrap_or_default() {
-                        ice_pairs.push(pair);
-                    }
-                }
-                RtcStatsType::OutboundRtp(stat) => {
-                }
-                RtcStatsType::Unknown(unknown_stat) => {
-                    // print error
-                }
-                _ => {
-                    // ignore
-                }
-            }
+            stats.insert(stat.stat_name(), stat);
 
             next = iterator.next().unwrap();
         }
 
-        RtcStats { ice_pairs }
+        RtcStats(stats)
     }
 }
 
@@ -141,6 +124,38 @@ enum RtcStatsType {
     Unknown(String),
 }
 
+impl RtcStatsType {
+    pub fn stat_name(&self) -> String {
+        use RtcStatsType::*;
+
+        match self {
+            Codec => "codec",
+            InboundRtp(_) => "inbound-rtp",
+            OutboundRtp(_) => "outbound-rtp",
+            RemoteInboundRtp => "remote-inbound-rtp",
+            RemoteOutboundRtp => "remote-outbound-rtp",
+            MediaSoure => "media-source",
+            Csrc => "csrc",
+            PeerConnection => "peer-connection",
+            DataChannel => "data-channel",
+            Stream => "stream",
+            Track(_) => "track",
+            Transceiver => "transceiver",
+            Sender => "sender",
+            Receiver => "receiver",
+            Transport => "transport",
+            SctpTransport => "sctp-transport",
+            CandidatePair(_) => "candidate-pair",
+            LocalCandidate(_) => "local-candidate",
+            RemoteCandidate(_) => "remote-candidate",
+            Certificate => "certificate",
+            IceServer => "ice-server",
+            Unknown(s) => s.as_str(),
+        }
+        .to_string()
+    }
+}
+
 impl TryFrom<&SysRtcStats> for RtcStatsType {
     type Error = ();
 
@@ -158,8 +173,16 @@ impl TryFrom<&SysRtcStats> for RtcStatsType {
 
         let kind = match kind.as_ref() {
             "codec" => Codec,
-            "local-candidate" => LocalCandidate(RtcStat::new(id, timestamp, LocalCandidateStat::from(val))),
-            "remote-candidate" => RemoteCandidate(RtcStat::new(id, timestamp, RemoteCandidateStat::from(val))),
+            "local-candidate" => LocalCandidate(RtcStat::new(
+                id,
+                timestamp,
+                LocalCandidateStat::from(val),
+            )),
+            "remote-candidate" => RemoteCandidate(RtcStat::new(
+                id,
+                timestamp,
+                RemoteCandidateStat::from(val),
+            )),
             "track" => Track(RtcStat::new(id, timestamp, TrackStat::from(val))),
             "candidate-pair" => CandidatePair(RtcStat::new(
                 id,
