@@ -23,6 +23,7 @@ use crate::{
 };
 
 use super::ice_server::RtcIceServers;
+use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
 /// [RTCIceCandidate][1] representation.
 ///

@@ -15,25 +15,29 @@ use std::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(untagged)]
 pub enum NonExhaustive<T> {
     Known(T),
     Unknown(String),
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 pub struct RtcStat<T> {
     id: String,
-    timestamp: f32,
+    timestamp: Time,
     #[serde(flatten)]
     kind: T,
 }
 
 /// https://www.w3.org/TR/webrtc-stats/#rtctatstype-*
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum KnownRtcStatsType {
@@ -154,7 +158,7 @@ pub enum KnownRtcStatsType {
     IceServer(RtcStat<RtcIceServerStats>),
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaStreamStat {
     /// `stream.id` property.
@@ -165,7 +169,7 @@ pub struct MediaStreamStat {
     track_ids: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct DataChannelStat {
     /// The "label" value of the [`RTCDataChannel`] object.
@@ -185,7 +189,7 @@ pub struct DataChannelStat {
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
     #[serde(rename = "dataChannelIdentifier")]
-    data_channel_id: Option<f32>,
+    data_channel_id: Option<u64>,
 
     /// A [stats object reference] for the transport used to carry this
     /// datachannel.
@@ -201,29 +205,29 @@ pub struct DataChannelStat {
     state: Option<DataChannelState>,
 
     /// Represents the total number of API "message" events sent.
-    messages_sent: Option<f32>,
+    messages_sent: Option<u64>,
 
     /// Represents the total number of payload bytes sent on this
     /// [`RTCDataChannel`], i.e., not including headers or padding.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    bytes_sent: Option<f64>,
+    bytes_sent: Option<u64>,
 
     /// Represents the total number of API "message" events received.
-    messages_received: Option<f32>,
+    messages_received: Option<u64>,
 
     /// Represents the total number of bytes received on this
     /// [`RTCDataChannel`], i.e., not including headers or padding.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    bytes_received: Option<f64>,
+    bytes_received: Option<u64>,
 }
 
 pub type DataChannelState = NonExhaustive<KnownDataChannelState>;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub enum KnownDataChannelState {
     Connecting,
@@ -232,32 +236,32 @@ pub enum KnownDataChannelState {
     Closed,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcPeerConnectionStat {
     /// Represents the number of unique `DataChannel`s that have entered the
     /// "open" state during their lifetime.
-    data_channels_opened: Option<f32>,
+    data_channels_opened: Option<u64>,
 
     /// Represents the number of unique `DataChannel`s that have left the
     /// "open" state during their lifetime (due to being closed by either
     /// end or the underlying transport being closed). `DataChannel`s that
     /// transition from "connecting" to "closing" or "closed" without ever
     /// being "open" are not counted in this number.
-    data_channels_closed: Option<f32>,
+    data_channels_closed: Option<u64>,
 
     /// Represents the number of unique `DataChannel`s returned from a
     /// successful `createDataChannel()` call on the `RTCPeerConnection`.
     /// If the underlying data transport is not established, these may be
     /// in the "connecting" state.
-    data_channels_requested: Option<f32>,
+    data_channels_requested: Option<u64>,
 
     /// Represents the number of unique `DataChannel`s signaled in a
     /// "datachannel" event on the `RTCPeerConnection`.
-    data_channels_accepted: Option<f32>,
+    data_channels_accepted: Option<u64>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtpContributingSourceStat {
     /// The SSRC identifier of the contributing source represented by this
@@ -266,7 +270,7 @@ pub struct RtpContributingSourceStat {
     /// contributed to.
     ///
     /// [RFC3550]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3550
-    contributor_ssrc: Option<f32>,
+    contributor_ssrc: Option<u32>,
 
     /// The ID of the [`RTCInboundRtpStreamStats`] object representing the
     /// inbound RTP stream that this contributing source is contributing to.
@@ -284,7 +288,7 @@ pub struct RtpContributingSourceStat {
     /// [`RTCInboundRtpStreamStats.packetsReceived`]:
     /// https://tinyurl.com/rreuf49
     /// [`contributorSsrc`]: https://tinyurl.com/tf8c7j4
-    packets_contributed_to: Option<f32>,
+    packets_contributed_to: Option<u64>,
 
     /// Present if the last received RTP packet that this source contributed to
     /// contained an [RFC6465] mixer-to-client audio level header extension.
@@ -299,10 +303,10 @@ pub struct RtpContributingSourceStat {
     /// 10^(-rfc6465_level/20)`.
     ///
     /// [RFC6465]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6465
-    audio_level: Option<f32>,
+    audio_level: Option<Float>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteOutboundRtpStreamStat {
     /// The `localId` is used for looking up the local
@@ -326,10 +330,10 @@ pub struct RemoteOutboundRtpStreamStat {
     remote_timestamp: Option<Duration>,
 
     /// Represents the total number of RTCP SR blocks sent for this SSRC.
-    reports_sent: Option<f64>,
+    reports_sent: Option<u64>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteInboundRtpStreamStat {
     /// The `localId` is used for looking up the local
@@ -346,21 +350,21 @@ pub struct RemoteInboundRtpStreamStat {
     /// undefined.
     ///
     /// [RFC3550]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3550
-    round_trip_time: Option<f32>,
+    round_trip_time: Option<Time>,
 
     /// The fraction packet loss reported for this SSRC. Calculated as defined
     /// in [RFC3550] section 6.4.1 and Appendix A.3.
     ///
     /// [RFC3550]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3550
-    fraction_lost: Option<f32>,
+    fraction_lost: Option<Float>,
 
     /// Represents the total number of RTCP RR blocks received for this SSRC.
-    reports_received: Option<f64>,
+    reports_received: Option<u64>,
 
     /// Represents the total number of RTCP RR blocks received for this SSRC
     /// that contain a valid round trip time. This counter will increment if
     /// the roundTripTime is undefined.
-    round_trip_time_measurements: Option<f64>,
+    round_trip_time_measurements: Option<Float>,
 }
 
 ///  An RTCRtpTransceiverStats stats object represents an RTCRtpTransceiver of
@@ -371,7 +375,7 @@ pub struct RemoteInboundRtpStreamStat {
 /// RTCRtpTransceiverStats objects can only be deleted if the corresponding
 /// RTCRtpTransceiver is removed - this can only happen if a remote description
 /// is rolled back.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcRtpTransceiverStats {
     /// The identifier of the stats object representing the RTCRtpSender
@@ -396,7 +400,7 @@ pub struct RtcRtpTransceiverStats {
 
 /// An [`RtcSctpTransportStats`] object represents the stats corresponding to an
 /// `RTCSctpTransport`.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcSctpTransportStats {
     /// The latest smoothed round-trip time value, corresponding to
@@ -405,7 +409,7 @@ pub struct RtcSctpTransportStats {
     /// undefined.
     ///
     /// [RFC6458]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6458
-    smoothed_round_trip_time: Option<f32>,
+    smoothed_round_trip_time: Option<Time>,
 }
 
 /// An [`RtcTransportStats`] object represents the stats corresponding to an
@@ -424,7 +428,7 @@ pub struct RtcSctpTransportStats {
 /// [`MediaStreamTrack`]:
 /// https://www.w3.org/TR/webrtc-stats/#dfn-mediastreamtrack
 /// [WEBRTC]: https://www.w3.org/TR/webrtc-stats/#bib-webrtc
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcTransportStats {
     /// Represents the total number of packets sent over this transport.
@@ -446,7 +450,7 @@ pub struct RtcTransportStats {
     ice_role: Option<IceRole>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum IceRole {
     /// An agent whose role as defined by [ICE], Section 3, has not yet been
@@ -466,7 +470,7 @@ pub enum IceRole {
     Controlled,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
 pub enum SenderStatsKind {
@@ -474,7 +478,7 @@ pub enum SenderStatsKind {
     Video { media_source_id: Option<String> },
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
 pub enum ReceiverStatsKind {
@@ -485,7 +489,7 @@ pub enum ReceiverStatsKind {
 pub type RtcStatsType = KnownRtcStatsType;
 
 // https://www.w3.org/TR/webrtc-stats/#candidatepair-dict*
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceCandidatePairStats {
     state: IceCandidatePairState,
@@ -495,7 +499,7 @@ pub struct RtcIceCandidatePairStats {
     /// [RFC5245]: https://www.w3.org/TR/webrtc-stats/#bib-rfc5245
     nominated: bool,
 
-    // TODO: check that this field exists.
+    // TODO: doc
     writable: bool,
 
     /// Represents the total number of payload bytes sent on this candidate
@@ -515,7 +519,7 @@ pub struct RtcIceCandidatePairStats {
     ///
     /// [STUN-PATH-CHAR]: https://www.w3.org/TR/webrtc-stats/#bib-stun-path-char
     /// [RFC7675]: https://www.w3.org/TR/webrtc-stats/#bib-rfc7675
-    total_round_trip_time: Option<f64>,
+    total_round_trip_time: Option<Time>,
 
     /// Represents the latest round trip time measured in seconds, computed
     /// from both STUN connectivity checks [STUN-PATH-CHAR], including those
@@ -523,7 +527,7 @@ pub struct RtcIceCandidatePairStats {
     ///
     /// [STUN-PATH-CHAR]: https://www.w3.org/TR/webrtc-stats/#bib-stun-path-char
     /// [RFC7675]: https://www.w3.org/TR/webrtc-stats/#bib-rfc7675
-    current_round_trip_time: Option<f64>,
+    current_round_trip_time: Option<Time>,
 
     /// It is calculated by the underlying congestion control by combining the
     /// available bitrate for all the outgoing RTP streams using this candidate
@@ -549,7 +553,7 @@ pub struct RtcIceCandidatePairStats {
 /// remote candidates in the pair.  The state is assigned once the check
 /// list for each media stream has been computed.  There are five
 /// potential values that the state can have:
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub enum KnownIceCandidatePairState {
     /// A check has not been performed for this pair, and can be
@@ -578,7 +582,7 @@ pub enum KnownIceCandidatePairState {
 
 pub type IceCandidatePairState = NonExhaustive<KnownIceCandidatePairState>;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum KnownProtocol {
     Udp,
@@ -591,7 +595,7 @@ pub type Protocol = NonExhaustive<KnownProtocol>;
 /// defined in [ICE] section 15.1.
 ///
 /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum KnownCandidateType {
     /// A host candidate, as defined in Section 4.1.1.1 of [ICE].
@@ -617,7 +621,7 @@ pub enum KnownCandidateType {
 
 pub type CandidateType = NonExhaustive<KnownCandidateType>;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum KnownMediaType {
     Audio,
@@ -626,7 +630,7 @@ pub enum KnownMediaType {
 
 pub type MediaType = NonExhaustive<KnownMediaType>;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "mediaType")]
 pub enum RtcInboundRtpStreamMediaType {
@@ -657,15 +661,15 @@ pub enum RtcInboundRtpStreamMediaType {
         silent_concealed_samples: Option<u64>,
 
         /// Represents the audio level of the receiving track.
-        audio_level: Option<f32>,
+        audio_level: Option<Float>,
 
         /// Represents the audio energy of the receiving track.
-        total_audio_energy: Option<f32>,
+        total_audio_energy: Option<Float>,
 
         /// Represents the audio duration of the receiving track. For audio
         /// durations of tracks attached locally, see RTCAudioSourceStats
         /// instead.
-        total_samples_duration: Option<f32>,
+        total_samples_duration: Option<Time>,
     },
     Video {
         /// It represents the total number of frames correctly decoded for this
@@ -693,7 +697,7 @@ pub enum RtcInboundRtpStreamMediaType {
 
         /// Sum of the interframe delays in seconds between consecutively
         /// decoded frames, recorded just after a frame has been decoded.
-        total_inter_frame_delay: Option<f32>,
+        total_inter_frame_delay: Option<Float>,
 
         /// The number of decoded frames in the last second.
         #[serde(rename = "framesPerSecond")]
@@ -737,7 +741,7 @@ pub enum RtcInboundRtpStreamMediaType {
 /// statistics object is the time at which the data was sampled.
 ///
 /// [W3C doc]: https://www.w3.org/TR/webrtc-stats/#inboundrtpstats-dict*
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 pub struct RtcInboundRtpStreamStats {
     /// The identifier of the stats object representing the receiving track.
     track_id: Option<String>,
@@ -756,7 +760,8 @@ pub struct RtcInboundRtpStreamStats {
     packets_lost: Option<u64>,
 
     // TODO: check that this field exists.
-    jitter: Option<f64>,
+    // TODO: maybe f64 check it
+    jitter: Option<Float>,
 
     /// Total number of seconds that have been spent decoding the
     /// `framesDecoded` frames of this stream. The average decode time can
@@ -764,14 +769,14 @@ pub struct RtcInboundRtpStreamStats {
     /// it takes to decode one frame is the time passed between feeding the
     /// decoder a frame and the decoder returning decoded data for that
     /// frame.
-    total_decode_time: Option<f32>,
+    total_decode_time: Option<Time>,
 
     /// The total number of audio samples or video frames that have come out of
     /// the jitter buffer (increasing jitterBufferDelay).
     jitter_buffer_emitted_count: Option<u64>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackStat {
     /// Represents the `id` property of the track.
@@ -795,7 +800,7 @@ pub struct TrackStat {
     media_source_id: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcOutboundRtpStreamStats {
     /// The identifier of the stats object representing the current track
@@ -807,7 +812,7 @@ pub struct RtcOutboundRtpStreamStats {
     media_source_id: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceCandidateStats {
     /// It is a unique identifier that is associated to the object that was
@@ -853,7 +858,7 @@ pub struct RtcIceCandidateStats {
     deleted: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum MediaSourceKind {
@@ -874,17 +879,17 @@ pub enum MediaSourceKind {
     },
     Audio {
         /// Represents the audio level of the media source.
-        audio_level: Option<f32>,
+        audio_level: Option<Float>,
 
         /// Represents the audio energy of the media source.
-        total_audio_energy: Option<f32>,
+        total_audio_energy: Option<Float>,
 
         /// Represents the audio duration of the media source.
-        total_samples_duration: Option<f32>,
+        total_samples_duration: Option<Float>,
     },
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSourceStat {
     #[serde(rename = "trackIdentifier")]
@@ -893,7 +898,7 @@ pub struct MediaSourceStat {
     kind: MediaSourceKind,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcCodecStats {
     /// Payload type as used in RTP encoding or decoding.
@@ -907,7 +912,7 @@ pub struct RtcCodecStats {
     clock_rate: u32,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 // TODO: Maybe extract this data somehow?
 pub struct RtcCertificateStats {
@@ -927,6 +932,24 @@ pub struct RtcCertificateStats {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Time(pub f32);
+
+impl Hash for Time {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_string().hash(state);
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Float(pub f32);
+
+impl Hash for Float {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_string().hash(state);
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceServerStats {
     /// The URL of the ICE server (e.g. TURN or STUN server).
@@ -946,5 +969,5 @@ pub struct RtcIceServerStats {
 
     /// The sum of RTTs for all requests that have been sent where a response
     /// has been received.
-    total_round_trip_time: Option<f32>,
+    total_round_trip_time: Option<Time>,
 }

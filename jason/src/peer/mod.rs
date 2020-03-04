@@ -50,7 +50,12 @@ pub use self::{
 };
 pub use crate::peer::stats::RtcStats;
 use crate::utils::delay_for;
-use std::time::Duration;
+use medea_client_api_proto::stats::RtcStatsType;
+use std::{
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -181,6 +186,12 @@ pub struct PeerConnection {
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 }
 
+fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
+}
+
 impl PeerConnection {
     /// Creates new [`PeerConnection`].
     ///
@@ -223,10 +234,29 @@ impl PeerConnection {
         let id = peer.id;
         let sender = peer.peer_events_sender.clone();
         let peer_clone = peer.peer.clone();
+        // TODO: stop this loop on PeerConnection drop.
         spawn_local(async move {
+            let mut cache = HashSet::new();
             loop {
                 delay_for(Duration::from_secs(5).into()).await;
                 let stats = peer_clone.get_stats().await;
+
+                let stats = RtcStats(
+                    stats
+                        .0
+                        .into_iter()
+                        .filter(|stat| {
+                            let stat_hash = calculate_hash(stat);
+
+                            let is_already_in_cache =
+                                cache.contains(&stat_hash);
+                            cache.insert(stat_hash);
+
+                            !is_already_in_cache
+                        })
+                        .collect(),
+                );
+
                 let _ = sender.unbounded_send(PeerEvent::StatsUpdate {
                     peer_id: id,
                     stats,
