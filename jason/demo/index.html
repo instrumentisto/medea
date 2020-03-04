@@ -65,7 +65,8 @@
 
       // here we repeat get room request to reduce possibility of concurrency bugs, e.g. another user was added to the
       // room since first request.
-      var otherMembers = Object.keys((await axios.get(controlUrl + roomId)).data.element.pipeline);
+      let controlRoom = await axios.get(controlUrl + roomId);
+      var otherMembers = Object.keys(controlRoom.data.element.pipeline);
       var play_requests = [];
       for (let i = 0; i < otherMembers.length; i++) {
         let id = otherMembers[i];
