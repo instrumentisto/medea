@@ -148,8 +148,8 @@ pub enum PeerEvent {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
     ConnectionStateChanged {
-        /// ID of the [`PeerConnection`] that sends
-        /// [`connectionstatechange`][1] event.
+        /// ID of the [`PeerConnection`] that sends [`connectionstatechange`][1]
+        /// event.
         ///
         /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
         peer_id: Id,

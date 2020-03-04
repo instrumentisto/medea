@@ -25,7 +25,7 @@ All user visible changes to this project will be documented in this file. This p
 
 - Media management:
     - Library API:
-        - Mute/unmute local video/audio ([#40](/../../pull/40), [#81]):
+        - Mute/unmute local video/audio ([#40], [#81]):
             - `Room.mute_audio()`;
             - `Room.unmute_audio()`;
             - `Room.mute_video()`;
@@ -36,14 +36,14 @@ All user visible changes to this project will be documented in this file. This p
             - `MediaManager.init_local_stream()`.
         - Local media stream constraints:
             - `MediaStreamConstraints`, `AudioTrackConstraints` classes ([#46]);
-            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78](/../../pull/78)).
+            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]).
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`;
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RtcIceTransportPolicy` configuration ([#79](/../../pull/79)).
+        - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
@@ -53,9 +53,8 @@ All user visible changes to this project will be documented in this file. This p
     - `RpcClient` and `RpcTransport` reconnection ([#75]).
 - Signalling:
     - Emitting of RPC commands:
-        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71));
-        - `ApplyTracks` for muting/unmuting ([#81]);
-        - `AddPeerConnectionMetrics` with `PeerConnectionState` ([#87](/../../pull/87)).
+        - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
+        - `ApplyTracks` for muting/unmuting ([#81]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -63,13 +62,19 @@ All user visible changes to this project will be documented in this file. This p
 ### Fixed
 
 - Signalling:
-    - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
+    - Skipped `IceCandidate`s received before receiving remote SDP ([#50]).
 
+[#40]: /../../pull/40
 [#46]: /../../pull/46
+[#50]: /../../pull/59
 [#54]: /../../pull/54
 [#55]: /../../pull/55
+[#71]: /../../pull/71
 [#75]: /../../pull/75
+[#78]: /../../pull/78
+[#79]: /../../pull/79
 [#81]: /../../pull/81
+[#87]: /../../pull/87
 
 
 

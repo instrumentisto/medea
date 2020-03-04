@@ -212,10 +212,9 @@ pub struct RtcPeerConnection {
     on_ice_connection_state_changed:
         RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
 
-    /// [`connectionstatechange`][2] callback of [RTCPeerConnection][1].
-    ///
-    /// This fires whenever the aggregate state of the connection changes. The
-    /// aggregate state is a combination of the states of all of the individual
+    /// [`connectionstatechange`][2] callback of [RTCPeerConnection][1],
+    /// fires whenever the aggregate state of the connection changes.
+    /// The aggregate state is a combination of the states of all individual
     /// network transports being used by the connection.
     ///
     /// Implemented in Chrome and Safari.
@@ -393,8 +392,9 @@ impl RtcPeerConnection {
     /// # Errors
     ///
     /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
-    /// [`EventListener`] binding fails. This error can be ignored, since this
-    /// event is currently implemented only in Chrome and Safari.
+    /// [`EventListener`] binding fails.
+    /// This error can be ignored, since this event is currently implemented
+    /// only in Chrome and Safari.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
     pub fn on_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
@@ -416,7 +416,7 @@ impl RtcPeerConnection {
                         move |_| {
                             // Error here should never happen, because if the
                             // browser does not support the functionality of
-                            // 'RTCPeerConnection.connectionState', then this
+                            // `RTCPeerConnection.connectionState`, then this
                             // callback won't fire.
                             if let Some(state) =
                                 get_peer_connection_state(&peer)
@@ -438,7 +438,7 @@ impl RtcPeerConnection {
                                         console_error(format!(
                                             "Unknown RTCPeerConnection \
                                              connection state: {}.",
-                                            state
+                                            state,
                                         ));
                                         return;
                                     }
@@ -456,7 +456,6 @@ impl RtcPeerConnection {
                 );
             }
         }
-
         Ok(())
     }
 
