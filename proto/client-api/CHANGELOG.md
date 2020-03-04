@@ -11,7 +11,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### BC Breaks
 
-- RPC messages ([#75](/../../pull/75)):
+- RPC messages ([#75]):
     - Server messages:
         - `Pong` is now `Ping`.
     - Client messages:
@@ -21,14 +21,19 @@ All user visible changes to this project will be documented in this file. This p
 
 - `TrackId` and `PeerId` types ([#28]);
 - `Incrementable` trait ([#28]);
-- `CloseReason` and `CloseDescription` types ([#58](/../../pull/58));
-- `AddPeerConnectionMetrics` client command with `IceConnectionState` metric ([#71](/../../pull/71));
-- `RpcSettings` server message ([#75](/../../pull/75));
-- `force_relay` field to `PeerCreated` event ([#79](/../../pull/79));
-- `UpdateTracks` command and `TracksUpdated` event ([#81](/../../pull/81));
-- `PeerConnectionState` metric to the `AddPeerConnectionMetrics` client command ([#87](/../../pull/87)).
+- `CloseReason` and `CloseDescription` types ([#58]);
+- `AddPeerConnectionMetrics` client command with `IceConnectionState` and `PeerConnectionState` metrics ([#71], [#87]);
+- `RpcSettings` server message ([#75]);
+- `force_relay` field to `PeerCreated` event ([#79]);
+- `UpdateTracks` command and `TracksUpdated` event ([#81]).
 
 [#28]: /../../pull/28
+[#58]: /../../pull/58
+[#71]: /../../pull/71
+[#75]: /../../pull/75
+[#79]: /../../pull/79
+[#81]: /../../pull/81
+[#87]: /../../pull/87
 
 
 

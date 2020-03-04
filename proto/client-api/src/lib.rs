@@ -146,7 +146,7 @@ pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
 
-    /// Peer Connection's connection state.
+    /// Peer Connection's state.
     PeerConnectionStateChanged(PeerConnectionState),
 }
 
@@ -164,10 +164,10 @@ pub enum IceConnectionState {
     Closed,
 }
 
-/// Peer Connection's connection state.
+/// Peer Connection's state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PeerConnectionState {
     Closed,
     Failed,
