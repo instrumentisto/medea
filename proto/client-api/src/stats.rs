@@ -18,6 +18,13 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(untagged)]
+pub enum NonExhaustive<T> {
+    Known(T),
+    Unknown(String),
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct RtcStat<T> {
     id: String,
     timestamp: f32,
@@ -30,27 +37,121 @@ pub struct RtcStat<T> {
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum KnownRtcStatsType {
-    Codec(RtcStat<CodecStat>),
+    /// Statistics for a codec that is currently being used by RTP streams
+    /// being sent or received by this `RTCPeerConnection` object. It is
+    /// accessed by the [`RtcCodecStats`].
+    Codec(RtcStat<RtcCodecStats>),
+
+    /// Statistics for an inbound RTP stream that is currently received with
+    /// this RTCPeerConnection object. It is accessed by the
+    /// [`RtcInboundRtpStreamStats`].
     InboundRtp(RtcStat<RtcInboundRtpStreamStats>),
-    OutboundRtp(RtcStat<OutboundRtpStats>),
+
+    /// Statistics for an outbound RTP stream that is currently sent with this
+    /// `RTCPeerConnection` object. It is accessed by the
+    /// [`RtcOutboundRtpStreamStats`].
+    ///
+    /// When there are multiple RTP streams connected to the same sender, such
+    /// as when using simulcast or RTX, there will be one
+    /// [`RtcOutboundRtpStreamStats`] per RTP stream, with distinct values of
+    /// the "ssrc" attribute, and all these senders will have a reference to
+    /// the same "sender" object (of type `RTCAudioSenderStats` or
+    /// `RTCVideoSenderStats`) and "track" object (of type
+    /// `RTCSenderAudioTrackAttachmentStats` or
+    /// `RTCSenderVideoTrackAttachmentStats`).
+    OutboundRtp(RtcStat<RtcOutboundRtpStreamStats>),
+
+    /// Statistics for the remote endpoint's inbound RTP stream corresponding
+    /// to an outbound stream that is currently sent with this
+    /// `RTCPeerConnection` object. It is measured at the remote endpoint and
+    /// reported in an RTCP Receiver Report (RR) or RTCP Extended Report (XR).
     RemoteInboundRtp(RtcStat<RemoteInboundRtpStreamStat>),
+
+    /// Statistics for the remote endpoint's outbound RTP stream corresponding
+    /// to an inbound stream that is currently received with this
+    /// `RTCPeerConnection` object. It is measured at the remote endpoint and
+    /// reported in an RTCP Sender Report (SR).
     RemoteOutboundRtp(RtcStat<RemoteOutboundRtpStreamStat>),
-    Csrc(RtcStat<RtpContributingSourceStat>),
-    PeerConnection(RtcStat<RtcPeerConnectionStat>),
-    DataChannel(RtcStat<DataChannelStat>),
-    Stream(RtcStat<MediaStreamStat>),
-    Track(RtcStat<TrackStat>),
-    Transceiver(RtcStat<RtpTransceiverStat>),
-    Sender(RtcStat<SenderStatsKind>),
-    Receiver(RtcStat<ReceiverStatsKind>),
-    Transport(RtcStat<TransportStat>),
-    SctpTransport(RtcStat<SctpTransport>),
-    CandidatePair(RtcStat<RtcIceCandidatePairStats>),
-    LocalCandidate(RtcStat<LocalCandidateStat>),
-    RemoteCandidate(RtcStat<RemoteCandidateStat>),
-    Certificate(RtcStat<CertificateStat>),
-    IceServer(RtcStat<IceServerStat>),
+
+    /// Statistics for the media produced by a `MediaStreamTrack`that is
+    /// currently attached to an `RTCRtpSender`. This reflects the media that
+    /// is fed to the encoder; after `getUserMedia()` constraints have been
+    /// applied (i.e. not the raw media produced by the camera).
     MediaSource(RtcStat<MediaSourceStat>),
+
+    /// Statistics for a contributing source (CSRC) that contributed to an
+    /// inbound RTP stream.
+    Csrc(RtcStat<RtpContributingSourceStat>),
+
+    /// Statistics related to the `RTCPeerConnection` object.
+    PeerConnection(RtcStat<RtcPeerConnectionStat>),
+
+    /// Statistics related to each RTCDataChannel id.
+    DataChannel(RtcStat<DataChannelStat>),
+
+    /// This is now obsolete. Contains statistics related to a specific
+    /// MediaStream.
+    Stream(RtcStat<MediaStreamStat>),
+
+    /// Statistics related to a specific MediaStreamTrack's attachment to an
+    /// RTCRtpSender and the corresponding media-level metrics.
+    Track(RtcStat<TrackStat>),
+
+    /// Statistics related to a specific `RTCRtpTransceiver`.
+    Transceiver(RtcStat<RtcRtpTransceiverStats>),
+
+    /// Statistics related to a specific `RTCRtpSender` and the corresponding
+    /// media-level metrics.
+    Sender(RtcStat<SenderStatsKind>),
+
+    /// Statistics related to a specific receiver and the corresponding
+    /// media-level metrics.
+    Receiver(RtcStat<ReceiverStatsKind>),
+
+    /// Transport statistics related to the `RTCPeerConnection` object.
+    Transport(RtcStat<RtcTransportStats>),
+
+    /// SCTP transport statistics related to an `RTCSctpTransport` object.
+    SctpTransport(RtcStat<RtcSctpTransportStats>),
+
+    /// ICE candidate pair statistics related to the `RTCIceTransport` objects.
+    ///
+    /// A candidate pair that is not the current pair for a transport is
+    /// [deleted] when the `RTCIceTransport` does an ICE restart, at the time
+    /// the state changes to "new". The candidate pair that is the current
+    /// pair for a transport is deleted after an ICE restart when the
+    /// `RTCIceTransport` switches to using a candidate pair generated from
+    /// the new candidates; this time doesn't correspond to any other
+    /// externally observable event.
+    ///
+    /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
+    CandidatePair(RtcStat<RtcIceCandidatePairStats>),
+
+    /// ICE local candidate statistics related to the `RTCIceTransport`
+    /// objects.
+    ///
+    /// A local candidate is [deleted] when the `RTCIceTransport` does an ICE
+    /// restart, and the candidate is no longer a member of any non-deleted
+    /// candidate pair.
+    ///
+    /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
+    LocalCandidate(RtcStat<RtcIceCandidateStats>),
+
+    /// ICE remote candidate statistics related to the `RTCIceTransport`
+    /// objects.
+    ///
+    /// A remote candidate is [deleted] when the `RTCIceTransport` does an ICE
+    /// restart, and the candidate is no longer a member of any non-deleted
+    /// candidate pair.
+    ///
+    /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
+    RemoteCandidate(RtcStat<RtcIceCandidateStats>),
+
+    /// Information about a certificate used by an `RTCIceTransport`.
+    Certificate(RtcStat<RtcCertificateStats>),
+
+    /// Information about the connection to an ICE server (e.g. STUN or TURN).
+    IceServer(RtcStat<RtcIceServerStats>),
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -262,23 +363,70 @@ pub struct RemoteInboundRtpStreamStat {
     round_trip_time_measurements: Option<f64>,
 }
 
+///  An RTCRtpTransceiverStats stats object represents an RTCRtpTransceiver of
+/// an RTCPeerConnection.
+///
+/// It appears as soon as the monitored RTCRtpTransceiver object is created,
+/// such as by invoking addTransceiver, addTrack or setRemoteDescription.
+/// RTCRtpTransceiverStats objects can only be deleted if the corresponding
+/// RTCRtpTransceiver is removed - this can only happen if a remote description
+/// is rolled back.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct RtpTransceiverStat {
+pub struct RtcRtpTransceiverStats {
+    /// The identifier of the stats object representing the RTCRtpSender
+    /// [associated with the `RTCRtpTransceiver`][1] represented by this stats
+    /// object.
+    ///
+    /// [1]: https://w3c.github.io/webrtc-pc/#dom-rtcrtptransceiver-sender
     sender_id: Option<String>,
+
+    /// The identifier of the stats object representing the RTCRtpReceiver
+    /// [associated with the `RTCRtpTransceiver`][1] represented by this stats
+    /// object.
+    ///
+    /// [1]: https://w3c.github.io/webrtc-pc/#dom-rtcrtptransceiver-receiver
     receiver_id: Option<String>,
+
+    /// If the RTCRtpTransceiver that this stats object represents has a `mid`
+    /// value that is not null, this is that value, otherwise this value is
+    /// undefined.
     mid: Option<String>,
 }
 
+/// An [`RtcSctpTransportStats`] object represents the stats corresponding to an
+/// `RTCSctpTransport`.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SctpTransport {
+pub struct RtcSctpTransportStats {
+    /// The latest smoothed round-trip time value, corresponding to
+    /// `spinfo_srtt` defined in [RFC6458] but converted to seconds. If
+    /// there has been no round-trip time measurements yet, this value is
+    /// undefined.
+    ///
+    /// [RFC6458]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6458
     smoothed_round_trip_time: Option<f32>,
 }
 
+/// An [`RtcTransportStats`] object represents the stats corresponding to an
+/// [`RTCDtlsTransport`] and its underlying [`RTCIceTransport`]. When RTCP
+/// multiplexing is used, one transport is used for both RTP and RTCP.
+/// Otherwise, RTP and RTCP will be sent on separate transports, and
+/// `rtcpTransportStatsId` can be used to pair the resulting
+/// [`RtcTransportStats`] objects. Additionally, when bundling is used, a single
+/// transport will be used for all [`MediaStreamTrack`]s in the bundle group. If
+/// bundling is not used, different [`MediaStreamTrack`] will use different
+/// transports. RTCP multiplexing and bundling are described in [WEBRTC].
+///
+/// [`RTCDtlsTransport`]:
+/// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdtlstransport
+/// [`RTCIceTransport`]: https://www.w3.org/TR/webrtc-stats/#dfn-rtcicetransport
+/// [`MediaStreamTrack`]:
+/// https://www.w3.org/TR/webrtc-stats/#dfn-mediastreamtrack
+/// [WEBRTC]: https://www.w3.org/TR/webrtc-stats/#bib-webrtc
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct TransportStat {
+pub struct RtcTransportStats {
     /// Represents the total number of packets sent over this transport.
     packets_sent: Option<u64>,
 
@@ -301,8 +449,20 @@ pub struct TransportStat {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum IceRole {
+    /// An agent whose role as defined by [ICE], Section 3, has not yet been
+    /// determined.
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
     Unknown,
+
+    /// A controlling agent as defined by [ICE], Section 3.
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
     Controlling,
+
+    /// A controlled agent as defined by [ICE], Section 3.
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
     Controlled,
 }
 
@@ -322,37 +482,98 @@ pub enum ReceiverStatsKind {
     Video {},
 }
 
-pub type RtcStatsType = NonExhaustive<KnownRtcStatsType>;
+pub type RtcStatsType = KnownRtcStatsType;
 
 // https://www.w3.org/TR/webrtc-stats/#candidatepair-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceCandidatePairStats {
     state: IceCandidatePairState,
+    /// Related to updating the nominated flag described in Section 7.1.3.2.4
+    /// of [RFC5245].
+    ///
+    /// [RFC5245]: https://www.w3.org/TR/webrtc-stats/#bib-rfc5245
     nominated: bool,
+
+    // TODO: check that this field exists.
     writable: bool,
+
+    /// Represents the total number of payload bytes sent on this candidate
+    /// pair, i.e., not including headers or padding.
     bytes_sent: u64,
+
+    /// Represents the total number of payload bytes received on this candidate
+    /// pair, i.e., not including headers or padding.
     bytes_received: u64,
+
+    /// Represents the sum of all round trip time measurements in seconds since
+    /// the beginning of the session, based on STUN connectivity check
+    /// [STUN-PATH-CHAR] responses (responsesReceived), including those that
+    /// reply to requests that are sent in order to verify consent [RFC7675].
+    /// The average round trip time can be computed from `totalRoundTripTime`
+    /// by dividing it by `responsesReceived`.
+    ///
+    /// [STUN-PATH-CHAR]: https://www.w3.org/TR/webrtc-stats/#bib-stun-path-char
+    /// [RFC7675]: https://www.w3.org/TR/webrtc-stats/#bib-rfc7675
     total_round_trip_time: Option<f64>,
+
+    /// Represents the latest round trip time measured in seconds, computed
+    /// from both STUN connectivity checks [STUN-PATH-CHAR], including those
+    /// that are sent for consent verification [RFC7675].
+    ///
+    /// [STUN-PATH-CHAR]: https://www.w3.org/TR/webrtc-stats/#bib-stun-path-char
+    /// [RFC7675]: https://www.w3.org/TR/webrtc-stats/#bib-rfc7675
     current_round_trip_time: Option<f64>,
+
+    /// It is calculated by the underlying congestion control by combining the
+    /// available bitrate for all the outgoing RTP streams using this candidate
+    /// pair. The bitrate measurement does not count the size of the IP or
+    /// other transport layers like TCP or UDP. It is similar to the TIAS
+    /// defined in [RFC3890], i.e., it is measured in bits per second and the
+    /// bitrate is calculated over a 1 second window.
+    ///
+    /// Implementations that do not calculate a sender-side estimate MUST leave
+    /// this undefined. Additionally, the value MUST be undefined for candidate
+    /// pairs that were never used. For pairs in use, the estimate is normally
+    /// no lower than the bitrate for the packets sent at
+    /// `lastPacketSentTimestamp`, but might be higher. For candidate pairs
+    /// that are not currently in use but were used before, implementations
+    /// MUST return undefined.
+    ///
+    /// [RFC3890]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3890
     available_outgoing_bitrate: Option<u64>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(untagged)]
-pub enum NonExhaustive<T> {
-    Known(T),
-    Unknown(String),
-}
-
+/// Each candidate pair in the check list has a foundation and a state.
+/// The foundation is the combination of the foundations of the local and
+/// remote candidates in the pair.  The state is assigned once the check
+/// list for each media stream has been computed.  There are five
+/// potential values that the state can have:
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum KnownIceCandidatePairState {
-    Frozen,
+    /// A check has not been performed for this pair, and can be
+    /// performed as soon as it is the highest-priority Waiting pair on
+    /// the check list.
     Waiting,
+
+    /// A check has been sent for this pair, but the transaction
+    /// is in progress.
     InProgress,
-    Failed,
+
+    /// A check for this pair was already done and produced a
+    /// successful result.
     Succeeded,
+
+    /// A check for this pair was already done and failed, either never
+    /// producing any response or producing an unrecoverable failure
+    /// response.
+    Failed,
+
+    /// A check for this pair hasn't been performed, and it can't
+    /// yet be performed until some other check succeeds, allowing this
+    /// pair to unfreeze and move into the Waiting state.
+    Frozen,
 }
 
 pub type IceCandidatePairState = NonExhaustive<KnownIceCandidatePairState>;
@@ -366,11 +587,32 @@ pub enum KnownProtocol {
 
 pub type Protocol = NonExhaustive<KnownProtocol>;
 
+/// The `RTCIceCandidateType` represents the type of the ICE candidate, as
+/// defined in [ICE] section 15.1.
+///
+/// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum KnownCandidateType {
-    Prflx,
+    /// A host candidate, as defined in Section 4.1.1.1 of [ICE].
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
     Host,
+
+    /// A server reflexive candidate, as defined in Section 4.1.1.2 of [ICE].
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
+    Srlfx,
+
+    /// A peer reflexive candidate, as defined in Section 4.1.1.2 of [ICE].
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
+    Prflx,
+
+    /// A relay candidate, as defined in Section 7.1.3.2.1 of [ICE].
+    ///
+    /// [ICE]: https://www.w3.org/TR/webrtc/#bib-ice
+    Relay,
 }
 
 pub type CandidateType = NonExhaustive<KnownCandidateType>;
@@ -389,127 +631,226 @@ pub type MediaType = NonExhaustive<KnownMediaType>;
 #[serde(tag = "mediaType")]
 pub enum RtcInboundRtpStreamMediaType {
     Audio {
+        /// Whether the last RTP packet whose frame was delivered to the
+        /// `RTCRtpReceiver`'s `MediaStreamTrack` for playout contained voice
+        /// activity or not based on the presence of the V bit in the extension
+        /// header, as defined in [RFC6464].
+        ///
+        /// [RFC6464]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6464
         voice_activity_flag: Option<bool>,
+
+        /// The total number of samples that have been received on this RTP
+        /// stream. This includes `concealedSamples`.
         total_samples_received: Option<u64>,
+
+        /// The total number of samples that are concealed samples. A concealed
+        /// sample is a sample that was replaced with synthesized samples
+        /// generated locally before being played out. Examples of samples that
+        /// have to be concealed are samples from lost packets (reported in
+        /// `packetsLost`) or samples from packets that arrive too late to be
+        /// played out (reported in `packetsDiscarded`).
         concealed_samples: Option<u64>,
+
+        /// The total number of concealed samples inserted that are "silent".
+        /// Playing out silent samples results in silence or comfort noise.
+        /// This is a subset of `concealedSamples`.
         silent_concealed_samples: Option<u64>,
+
+        /// Represents the audio level of the receiving track.
         audio_level: Option<f32>,
+
+        /// Represents the audio energy of the receiving track.
         total_audio_energy: Option<f32>,
+
+        /// Represents the audio duration of the receiving track. For audio
+        /// durations of tracks attached locally, see RTCAudioSourceStats
+        /// instead.
         total_samples_duration: Option<f32>,
     },
     Video {
+        /// It represents the total number of frames correctly decoded for this
+        /// RTP stream, i.e., frames that would be displayed if no frames are
+        /// dropped.
         frames_decoded: Option<u64>,
+
+        /// It represents the total number of key frames, such as key frames in
+        /// VP8 [RFC6386] or IDR-frames in H.264 [RFC6184], successfully
+        /// decoded for this RTP media stream. This is a subset of
+        /// framesDecoded. `framesDecoded - keyFramesDecoded` gives you the
+        /// number of delta frames decoded.
+        ///
+        /// [RFC6385]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6386
+        /// [RFC6184]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6184
         key_frames_decoded: Option<u64>,
+
+        /// Represents the width of the last decoded frame. Before the first
+        /// frame is decoded this attribute is missing.
         frame_width: Option<u64>,
+
+        /// Represents the height of the last decoded frame. Before the first
+        /// frame is decoded this attribute is missing.
         frame_height: Option<u64>,
+
+        /// Sum of the interframe delays in seconds between consecutively
+        /// decoded frames, recorded just after a frame has been decoded.
         total_inter_frame_delay: Option<f32>,
+
+        /// The number of decoded frames in the last second.
         #[serde(rename = "framesPerSecond")]
         fps: Option<u64>,
+
+        /// Represents the bit depth per pixel of the last decoded frame.
+        /// Typical values are 24, 30, or 36 bits. Before the first frame is
+        /// decoded this attribute is missing.
         frame_bit_depth: Option<u64>,
+
+        /// Count the total number of Full Intra Request (FIR) packets sent by
+        /// this receiver.
         fir_count: Option<u64>,
+
+        /// Count the total number of Picture Loss Indication (PLI) packets
+        /// sent by this receiver.
         pli_count: Option<u64>,
+
+        /// Count the total number of Slice Loss Indication (SLI) packets sent
+        /// by this receiver.
         sli_count: Option<u64>,
+
+        /// The number of concealment events. This counter increases every
+        /// time a concealed sample is synthesized after a non-concealed
+        /// sample. That is, multiple consecutive concealed samples will
+        /// increase the `concealedSamples` count multiple times but is a
+        /// single concealment event.
         concealment_events: Option<u64>,
+
+        /// Represents the total number of complete frames received on this RTP
+        /// stream. This metric is incremented when the complete frame is
+        /// received. Represents the total number of complete frames received
+        /// on this RTP stream. This metric is incremented when the complete
+        /// frame is received.
         frames_received: Option<u64>,
     },
 }
 
-// https://www.w3.org/TR/webrtc-stats/#inboundrtpstats-dict*
+/// The [`RtcInboundRtpStreamStats`] dictionary represents the measurement
+/// metrics for the incoming RTP media stream. The timestamp reported in the
+/// statistics object is the time at which the data was sampled.
+///
+/// [W3C doc]: https://www.w3.org/TR/webrtc-stats/#inboundrtpstats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct RtcInboundRtpStreamStats {
+    /// The identifier of the stats object representing the receiving track.
     track_id: Option<String>,
+
+    // TODO: docs
     #[serde(flatten)]
     media_type: RtcInboundRtpStreamMediaType,
+
+    /// Total number of bytes received for this SSRC.
     bytes_received: Option<u64>,
+
+    // TODO: check that this field exists.
     packets_received: Option<u64>,
+
+    // TODO: check that this field exists.
     packets_lost: Option<u64>,
+
+    // TODO: check that this field exists.
     jitter: Option<f64>,
+
+    /// Total number of seconds that have been spent decoding the
+    /// `framesDecoded` frames of this stream. The average decode time can
+    /// be calculated by dividing this value with `framesDecoded`. The time
+    /// it takes to decode one frame is the time passed between feeding the
+    /// decoder a frame and the decoder returning decoded data for that
+    /// frame.
     total_decode_time: Option<f32>,
+
+    /// The total number of audio samples or video frames that have come out of
+    /// the jitter buffer (increasing jitterBufferDelay).
     jitter_buffer_emitted_count: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackStat {
+    /// Represents the `id` property of the track.
     #[serde(rename = "trackIdentifier")]
-    track_id: Option<String>,
+    track_id: String,
+
+    /// True if the source is remote, for instance if it is sourced from
+    /// another host via an RTCPeerConnection. False otherwise.
     remote_source: Option<bool>,
+
+    /// Reflects the "ended" state of the track.
     ended: Option<bool>,
+
+    // TODO: doc
     detached: Option<bool>,
+
+    // TODO: enum, doc
     kind: Option<String>,
+
+    // TODO: doc
     media_source_id: Option<String>,
-    jitter_buffer_delay: Option<f64>,
-    jitter_buffer_emitted_count: Option<f64>,
-    frame_width: Option<u64>,
-    frames_received: Option<f64>,
-    frames_decoded: Option<f64>,
-    frames_dropped: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct InboundRtpStats {
-    kind: Option<String>,
-    media_type: MediaType,
-    jitter: Option<f64>,
-    nack_count: Option<u64>,
-    packets_loss: Option<u32>,
-    packets_received: Option<u64>,
-    remote_id: Option<String>,
-    ssrc: Option<u64>,
-    transport_id: Option<String>,
+pub struct RtcOutboundRtpStreamStats {
+    /// The identifier of the stats object representing the current track
+    /// attachment to the sender of this stream.
+    track_id: Option<String>,
+
+    /// The identifier of the stats object representing the track currently
+    /// attached to the sender of this stream.
+    media_source_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct OutboundRtpStats {
-    bitrate_mean: Option<f32>,
-    bitrate_std_dev: Option<f32>,
-    bytes_sent: Option<u64>,
-    dropped_frames: Option<u32>,
-    fir_count: Option<u32>,
-    framerate_mean: Option<f32>,
-    framedrate_std_dev: Option<f32>,
-    framed_encoded: Option<u32>,
-    kind: Option<String>,
-    framed_decoded: Option<u64>,
-    media_type: Option<MediaType>,
-    nack_count: Option<u32>,
-    packets_sent: Option<u32>,
-    pli_count: Option<u32>,
-    qp_sum: Option<u32>,
-    remote_id: Option<String>,
-    ssrc: Option<u64>,
-}
+pub struct RtcIceCandidateStats {
+    /// It is a unique identifier that is associated to the object that was
+    /// inspected to produce the `RTCTransportStats` associated with this
+    /// candidate.
+    transport_id: String,
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct LocalCandidateStat {
+    // TODO: doc, enum
     network_type: Option<String>,
-    address: Option<String>,
-    transport_id: Option<String>,
-    port: Option<u16>,
-    protocol: Option<Protocol>,
-    candidate_type: Option<CandidateType>,
-    priority: Option<u32>,
-    url: Option<String>,
-    relay_protocol: Option<Protocol>,
-    deleted: Option<bool>,
-}
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteCandidateStat {
-    transport_id: Option<String>,
-    network_type: Option<String>,
+    /// It is the address of the candidate, allowing for IPv4 addresses, IPv6
+    /// addresses, and fully qualified domain names (FQDNs).
     address: Option<String>,
-    port: Option<u16>,
-    protocol: Option<Protocol>,
-    candidate_type: Option<CandidateType>,
-    priority: Option<u32>,
+
+    /// It is the port number of the candidate.
+    port: u16,
+
+    /// Valid values for transport is one of `udp` and `tcp`.
+    protocol: Protocol,
+
+    // TODO: doc
+    candidate_type: CandidateType,
+
+    /// Calculated as defined in [RFC5245] section 15.1.
+    ///
+    /// [RFC5245]: https://www.w3.org/TR/webrtc-stats/#bib-rfc5245
+    priority: u32,
+
+    /// For local candidates this is the URL of the ICE server from which the
+    /// candidate was obtained. It is the same as the [url surfaced in the
+    /// `RTCPeerConnectionIceEvent`][1].
+    ///
+    /// `None` for remote candidates.
+    ///
+    /// [1]: https://w3c.github.io/webrtc-pc/#rtcpeerconnectioniceevent
     url: Option<String>,
+
+    /// It is the protocol used by the endpoint to communicate with the TURN
+    /// server. This is only present for local candidates.
     relay_protocol: Option<Protocol>,
-    deleted: Option<bool>,
+
+    // TODO: doc
+    deleted: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -517,14 +858,28 @@ pub struct RemoteCandidateStat {
 #[serde(tag = "kind")]
 pub enum MediaSourceKind {
     Video {
+        /// The width, in pixels, of the last frame originating from this
+        /// source. Before a frame has been produced this attribute is missing.
         width: Option<u32>,
+
+        /// The height, in pixels, of the last frame originating from this
+        /// source. Before a frame has been produced this attribute is missing.
         height: Option<u32>,
+
+        /// The number of frames originating from this source, measured during
+        /// the last second. For the first second of this object's lifetime
+        /// this attribute is missing.
         #[serde(rename = "framesPerSecond")]
         fps: Option<u32>,
     },
     Audio {
+        /// Represents the audio level of the media source.
         audio_level: Option<f32>,
+
+        /// Represents the audio energy of the media source.
         total_audio_energy: Option<f32>,
+
+        /// Represents the audio duration of the media source.
         total_samples_duration: Option<f32>,
     },
 }
@@ -540,30 +895,56 @@ pub struct MediaSourceStat {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct CodecStat {
-    payload_type: Option<u32>,
+pub struct RtcCodecStats {
+    /// Payload type as used in RTP encoding or decoding.
+    payload_type: u32,
+
+    /// The codec MIME media type/subtype. e.g., video/vp8 or equivalent.
     // TODO: Parse it as MIME.
-    mime_type: Option<String>,
-    clock_rate: Option<u32>,
+    mime_type: String,
+
+    /// Represents the media sampling rate.
+    clock_rate: u32,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 // TODO: Maybe extract this data somehow?
-pub struct CertificateStat {
-    fingerprint: Option<String>,
+pub struct RtcCertificateStats {
+    /// The fingerprint of the certificate. Only use the fingerprint value as
+    /// defined in Section 5 of [RFC4572].
+    ///
+    /// [RFC4572]: https://www.w3.org/TR/webrtc-stats/#bib-rfc4572
+    fingerprint: String,
+
+    /// The hash function used to compute the certificate fingerprint. For
+    /// instance, "sha-256".
     // TODO: enum
-    fingerprint_algorithm: Option<String>,
-    base64_certificate: Option<String>,
+    fingerprint_algorithm: String,
+
+    /// The DER-encoded base-64 representation of the certificate.
+    base64_certificate: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct IceServerStat {
+pub struct RtcIceServerStats {
+    /// The URL of the ICE server (e.g. TURN or STUN server).
     url: String,
+
+    /// It is the port number used by the client.
     port: u16,
+
+    /// Valid values for transport is one of udp and tcp.
     protocol: Protocol,
+
+    /// The total amount of requests that have been sent to this server.
     total_requests_sent: Option<u64>,
+
+    /// The total amount of responses received from this server.
     total_responses_received: Option<u64>,
+
+    /// The sum of RTTs for all requests that have been sent where a response
+    /// has been received.
     total_round_trip_time: Option<f32>,
 }
