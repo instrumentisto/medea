@@ -35,8 +35,6 @@
     }
 
     async function addNewMember(roomId, memberId) {
-      let controlRoom = await axios.get(controlUrl + roomId);
-      let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
       let pipeline = {
         publish: {
           kind: 'WebRtcPublishEndpoint',
@@ -45,11 +43,9 @@
         },
       };
 
-      let memberIds = [];
-
-      for (let i = 0; i < anotherMembers.length; i++) {
-        let memberId = anotherMembers[i];
-        memberIds.push(memberId);
+      var otherMembers = Object.keys((await axios.get(controlUrl + roomId)).data.element.pipeline);
+      for (let i = 0; i < otherMembers.length; i++) {
+        let memberId = otherMembers[i];
         pipeline["play-" + memberId] = {
           kind: 'WebRtcPlayEndpoint',
           src: 'local://' + roomId + '/' + memberId + "/publish",
@@ -67,9 +63,16 @@
         },
       });
 
+      // here we repeat get room request to reduce possibility of concurrency bugs, e.g. another user was added to the
+      // room since first request.
+      var otherMembers = Object.keys((await axios.get(controlUrl + roomId)).data.element.pipeline);
       var play_requests = [];
-      for (let i = 0; i < memberIds.length; i++) {
-        let id = memberIds[i];
+      for (let i = 0; i < otherMembers.length; i++) {
+        let id = otherMembers[i];
+
+        if (id === memberId) {
+          continue;
+        }
 
         let playRequest = axios({
           method: 'post',
