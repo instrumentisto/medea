@@ -9,8 +9,8 @@ use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
-    VideoSettings,
+    AudioSettings, Direction, MediaType, PeerConnectionState, PeerId as Id,
+    Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -71,6 +71,13 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
+#[enum_delegate(pub fn connection_state(&self) -> &PeerConnectionState)]
+#[enum_delegate(
+    pub fn update_connection_state<S: Into<PeerConnectionState>>(
+        &self,
+        state: S
+    )
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -153,6 +160,7 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
+    connection_state: PeerConnectionState,
 }
 
 /// [RTCPeerConnection] representation.
@@ -232,6 +240,17 @@ impl<T> Peer<T> {
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
     }
+
+    pub fn update_connection_state<S: Into<PeerConnectionState>>(
+        &self,
+        state: S,
+    ) {
+        //        self.context.connection_state = state;
+    }
+
+    pub fn connection_state(&self) -> &PeerConnectionState {
+        &self.context.connection_state
+    }
 }
 
 impl Peer<New> {
@@ -255,6 +274,7 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
+            connection_state: PeerConnectionState::New,
         };
         Self {
             context,

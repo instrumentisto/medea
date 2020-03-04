@@ -169,12 +169,28 @@ pub enum IceConnectionState {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PeerConnectionState {
-    Closed,
-    Failed,
-    Disconnected,
     New,
     Connecting,
     Connected,
+    Disconnected,
+    Failed,
+    Closed,
+}
+
+impl From<IceConnectionState> for PeerConnectionState {
+    fn from(ice_con_state: IceConnectionState) -> Self {
+        use PeerConnectionState::*;
+        match ice_con_state {
+            IceConnectionState::New => New,
+            IceConnectionState::Checking => Connecting,
+            IceConnectionState::Connected | IceConnectionState::Completed => {
+                Connected
+            }
+            IceConnectionState::Failed => Failed,
+            IceConnectionState::Disconnected => Disconnected,
+            IceConnectionState::Closed => Closed,
+        }
+    }
 }
 
 /// Reason of disconnecting Web Client from Media Server.

@@ -974,9 +974,20 @@ impl CommandHandler for Room {
     /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        _peer_id: PeerId,
-        _candidate: PeerMetrics,
+        peer_id: PeerId,
+        metrics: PeerMetrics,
     ) -> Self::Output {
+        match metrics {
+            PeerMetrics::IceConnectionStateChanged(state) => {
+                let peer = self.peers.get_peer_by_id(peer_id)?;
+                peer.update_connection_state(state);
+            }
+            PeerMetrics::PeerConnectionStateChanged(state) => {
+                let peer = self.peers.get_peer_by_id(peer_id)?;
+                peer.update_connection_state(state);
+            }
+        }
+
         Ok(Box::new(actix::fut::ok(())))
     }
 
