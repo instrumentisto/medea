@@ -8,10 +8,11 @@ use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
-    RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
-    RtcSessionDescriptionInit, RtcTrackEvent,
+    RtcIceTransportPolicy, RtcOfferOptions,
+    RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
+    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcTrackEvent,
 };
 
 use crate::{
@@ -519,14 +520,22 @@ impl RtcPeerConnection {
     ///
     /// Should be called after local tracks changes, which require
     /// renegotiation.
-    pub async fn create_and_set_offer(&self) -> Result<String> {
+    pub async fn create_and_set_offer(
+        &self,
+        ice_restart: bool,
+    ) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(peer.create_offer())
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateOfferFailed)
-            .map_err(tracerr::wrap!())?;
+        let mut offer_options = RtcOfferOptions::new();
+        offer_options.ice_restart(ice_restart);
+
+        let create_offer = JsFuture::from(
+            peer.create_offer_with_rtc_offer_options(&offer_options),
+        )
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::CreateOfferFailed)
+        .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);

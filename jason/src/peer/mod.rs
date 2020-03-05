@@ -447,7 +447,18 @@ impl PeerConnection {
 
         let offer = self
             .peer
-            .create_and_set_offer()
+            .create_and_set_offer(false)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(offer)
+    }
+
+    /// blabla
+    pub async fn start_ice_restart(&self) -> Result<String> {
+        let offer = self
+            .peer
+            .create_and_set_offer(true)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
 

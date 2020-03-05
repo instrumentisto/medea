@@ -835,8 +835,30 @@ impl EventHandler for InnerRoom {
     }
 
     fn on_connection_restarted(&mut self, peer_id: PeerId) {
+        let rpc = Rc::clone(&self.rpc);
         if let Some(peer) = self.peers.get(peer_id) {
-            console_error("got ice restart");
+            spawn_local(
+                async move {
+                    let sdp_offer = peer
+                        .start_ice_restart()
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    let mids = peer
+                        .get_mids()
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    rpc.send_command(Command::MakeSdpOffer {
+                        peer_id,
+                        sdp_offer,
+                        mids,
+                    });
+                    Result::<_, Traced<RoomError>>::Ok(())
+                }
+                .then(|result| async move {
+                    if let Err(err) = result {
+                        JasonError::from(err.into_parts()).print();
+                    };
+                }),
+            );
         } else {
             // TODO: No peer, whats next?
             JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
