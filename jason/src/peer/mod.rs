@@ -294,7 +294,7 @@ impl PeerConnection {
         let (fut, abort) = future::abortable(async move {
             let mut cache = HashSet::new();
             loop {
-                delay_for(Duration::from_secs(5).into()).await;
+                delay_for(Duration::from_secs(1).into()).await;
                 let stats = match peer_clone.get_stats().await {
                     Ok(stats) => stats,
                     Err(e) => {
