@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell, collections::hash_map::DefaultHasher, convert::TryFrom,
+    hash::Hash, rc::Rc,
+};
 
 use derive_more::Display;
 use medea_client_api_proto::{Direction as DirectionProto, IceServer};
@@ -15,7 +18,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    peer::stats::RtcStats,
+    peer::stats::{RtcStats, RtcStatsError},
     utils::{
         console_error, window, EventListener, EventListenerBindError, JsCaused,
         JsError,
@@ -23,7 +26,6 @@ use crate::{
 };
 
 use super::ice_server::RtcIceServers;
-use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
 /// [RTCIceCandidate][1] representation.
 ///
@@ -164,6 +166,9 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
+    #[display(fmt = "Failed to get RTCStats: {:?}", _0)]
+    RtcStats(RtcStatsError),
+
     /// Occurs if the local description associated with the
     /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set local SDP description: {}", _0)]
@@ -180,6 +185,12 @@ type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
 impl From<EventListenerBindError> for RTCPeerConnectionError {
     fn from(err: EventListenerBindError) -> Self {
         Self::PeerConnectionEventBindFailed(err)
+    }
+}
+
+impl From<RtcStatsError> for RTCPeerConnectionError {
+    fn from(e: RtcStatsError) -> Self {
+        Self::RtcStats(e)
     }
 }
 
@@ -260,12 +271,12 @@ impl RtcPeerConnection {
         })
     }
 
-    pub async fn get_stats(&self) -> RtcStats {
+    pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats = JsFuture::from(self.peer.get_stats()).await.unwrap();
 
         asd(&js_stats);
 
-        RtcStats::from(&js_stats)
+        RtcStats::try_from(&js_stats).map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and

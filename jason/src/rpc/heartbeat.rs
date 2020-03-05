@@ -16,22 +16,13 @@ use crate::{
     rpc::{RpcTransport, TransportError},
     utils::{
         console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
+        TaskHandle,
     },
 };
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
-
-/// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
-#[derive(Debug, From)]
-struct TaskHandle(AbortHandle);
-
-impl Drop for TaskHandle {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
 
 /// Idle timeout of [`RpcClient`].
 ///

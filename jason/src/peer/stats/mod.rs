@@ -11,80 +11,87 @@
 //! [5]: https://www.w3.org/TR/webrtc/#dom-rtcstats-id
 //! [6]: https://www.w3.org/TR/webrtc/#dom-rtcstats
 
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
+use derive_more::From;
+use futures::future::Remote;
 use medea_client_api_proto::stats::RtcStatsType;
 use serde::Deserialize;
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::RtcStats as SysRtcStats;
 
 use crate::utils::{console_error, get_property_by_name};
-use futures::future::Remote;
-use std::{collections::HashMap, time::Duration};
 
 struct RtcStatsReportEntry(js_sys::JsString, SysRtcStats);
 
+#[derive(Debug, From)]
+pub enum RtcStatsError {
+    UndefinedId,
+    UndefinedStats,
+    Js(JsValue),
+    EntriesNotFound,
+    ParseError(serde_json::Error),
+}
+
 impl TryFrom<js_sys::Array> for RtcStatsReportEntry {
-    type Error = ();
+    type Error = Traced<RtcStatsError>;
 
     fn try_from(value: js_sys::Array) -> Result<Self, Self::Error> {
         let id = value.get(0);
         let stats = value.get(1);
 
         if id.is_undefined() {
-            panic!("asdasd");
+            return Err(tracerr::new!(RtcStatsError::UndefinedId));
         }
 
         if stats.is_undefined() {
-            panic!("asdasd2222");
+            return Err(tracerr::new!(RtcStatsError::UndefinedStats));
         }
 
-        let id = id.dyn_into::<js_sys::JsString>().unwrap();
-        let stats = stats.dyn_into::<SysRtcStats>().unwrap();
+        let id = id
+            .dyn_into::<js_sys::JsString>()
+            .map_err(tracerr::from_and_wrap!())?;
+        let stats = stats
+            .dyn_into::<SysRtcStats>()
+            .map_err(tracerr::from_and_wrap!())?;
 
         Ok(RtcStatsReportEntry(id, stats))
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct RtcStat<T> {
-    id: String,
-    timestamp: f32,
-    #[serde(flatten)]
-    kind: T,
-}
-
 #[derive(Debug)]
 pub struct RtcStats(pub Vec<RtcStatsType>);
 
-impl From<&JsValue> for RtcStats {
-    fn from(stats: &JsValue) -> Self {
+impl TryFrom<&JsValue> for RtcStats {
+    type Error = Traced<RtcStatsError>;
+
+    fn try_from(stats: &JsValue) -> Result<Self, Self::Error> {
         let entries_fn =
             get_property_by_name(&stats, "entries", |func: JsValue| {
                 Some(func.unchecked_into::<js_sys::Function>())
             })
-            .unwrap();
+            .ok_or_else(|| tracerr::new!(RtcStatsError::EntriesNotFound))?;
 
         let iterator = entries_fn
             .call0(stats.as_ref())
-            .unwrap()
+            .map_err(tracerr::from_and_wrap!())?
             .unchecked_into::<js_sys::Iterator>();
 
         let mut stats = Vec::new();
 
-        let mut next = iterator.next().unwrap();
-        while !next.done() {
-            let stat = next.value();
+        for stat in iterator {
+            let stat = stat.map_err(tracerr::from_and_wrap!())?;
             let stat = stat.unchecked_into::<js_sys::Array>();
-            let stat = RtcStatsReportEntry::try_from(stat).unwrap();
-            let stat: RtcStatsType =
-                JsValue::from(&stat.1).into_serde().unwrap();
+            let stat = RtcStatsReportEntry::try_from(stat)
+                .map_err(tracerr::map_from_and_wrap!())?;
+            let stat: RtcStatsType = JsValue::from(&stat.1)
+                .into_serde()
+                .map_err(tracerr::from_and_wrap!())?;
 
             stats.push(stat);
-
-            next = iterator.next().unwrap();
         }
 
-        RtcStats(stats)
+        Ok(RtcStats(stats))
     }
 }

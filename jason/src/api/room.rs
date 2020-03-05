@@ -13,9 +13,9 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatch,
+    stats::RtcStat, Command, Direction, Event as RpcEvent, EventHandler,
+    IceCandidate, IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
+    TrackId, TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -25,7 +25,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     peer::{
         MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
         StableMuteState, TransceiverKind,
     },
     rpc::{
@@ -39,8 +39,6 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::peer::RtcStats;
-use medea_client_api_proto::stats::RtcStat;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -897,10 +895,16 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
-    fn on_stats_update(&mut self, peer_id: PeerId, stats: RtcStats) {
+    fn on_stats_update(
+        &mut self,
+        peer_id: PeerId,
+        stats: RtcStats,
+        tracks_ids: HashMap<String, TrackId>,
+    ) {
         self.rpc.send_command(Command::AddPeerConnectionStats {
             peer_id,
             stats: stats.0,
+            tracks_ids,
         });
     }
 }

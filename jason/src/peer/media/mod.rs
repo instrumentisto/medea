@@ -20,7 +20,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{delay_for, JsCaused, JsError},
+    utils::{console_error, delay_for, JsCaused, JsError},
 };
 
 use super::{
@@ -31,7 +31,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use crate::utils::console_error;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -132,6 +131,14 @@ impl JsTrackIdToMedeaTrackId {
     pub fn get_receiver(&self, sys_id: &str) -> Option<TrackId> {
         self.receivers.get(sys_id).copied()
     }
+
+    pub fn into_iter(&self) -> impl Iterator<Item = (String, TrackId)> {
+        // TODO: temporary
+        self.senders
+            .clone()
+            .into_iter()
+            .chain(self.receivers.clone().into_iter())
+    }
 }
 
 impl InnerMediaConnections {
@@ -168,6 +175,10 @@ impl MediaConnections {
             .iter_senders_with_kind(kind)
             .cloned()
             .collect()
+    }
+
+    pub fn iter_tracks_ids(&self) -> impl Iterator<Item = (String, TrackId)> {
+        self.0.borrow().js_track_id_to_medea_track_id.into_iter()
     }
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is

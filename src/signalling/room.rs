@@ -1011,8 +1011,10 @@ impl CommandHandler for Room {
         &mut self,
         peer_id: PeerId,
         stats: Vec<RtcStatsType>,
+        tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {
         println!("{:#?}", stats);
+        println!("{:?}", tracks_ids);
         Ok(Box::new(actix::fut::ok(())))
     }
 }
