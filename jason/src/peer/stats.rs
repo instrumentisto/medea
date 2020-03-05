@@ -1,16 +1,3 @@
-//! [Spec][] is quite new atm, and is poorly adopted by UA's.
-//!
-//! [RTCStatsReport][2] allows [maplike][3] operations. [entries()][4] operation
-//! returns array of arrays, where first value is [RTCStats.id][5] and second is
-//! actual [RTCStats][6].
-//!
-//! [1]: https://www.w3.org/TR/webrtc-stats/
-//! [2]: https://www.w3.org/TR/webrtc/#rtcstatsreport-object
-//! [3]: https://heycam.github.io/webidl/#idl-maplike
-//! [4]: https://heycam.github.io/webidl/#es-map-entries
-//! [5]: https://www.w3.org/TR/webrtc/#dom-rtcstats-id
-//! [6]: https://www.w3.org/TR/webrtc/#dom-rtcstats
-
 use std::convert::TryFrom;
 
 use derive_more::From;

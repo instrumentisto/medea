@@ -1,8 +1,8 @@
 //! [Spec][] is quite new atm, and is poorly adopted by UA's.
 //!
-//! [RTCStatsReport][2] allows [maplike][3] operations. [entries()][4] operation
-//! returns array of arrays, where first value is [RTCStats.id][5] and second is
-//! actual [RTCStats][6].
+//! [`RTCStatsReport`][2] allows [maplike][3] operations. [entries()][4]
+//! operation returns array of arrays, where first value is [`RTCStats.id`][5]
+//! and second is actual [`RTCStats`][6].
 //!
 //! [1]: https://www.w3.org/TR/webrtc-stats/
 //! [2]: https://www.w3.org/TR/webrtc/#rtcstatsreport-object
@@ -10,6 +10,8 @@
 //! [4]: https://heycam.github.io/webidl/#es-map-entries
 //! [5]: https://www.w3.org/TR/webrtc/#dom-rtcstats-id
 //! [6]: https://www.w3.org/TR/webrtc/#dom-rtcstats
+
+#![allow(clippy::module_name_repetitions)]
 
 use std::{
     hash::{Hash, Hasher},
@@ -30,10 +32,10 @@ pub struct RtcStat<T> {
     id: String,
     timestamp: Time,
     #[serde(flatten)]
-    kind: T,
+    kind: Box<T>,
 }
 
-/// https://www.w3.org/TR/webrtc-stats/#rtctatstype-*
+/// <https://www.w3.org/TR/webrtc-stats/#rtctatstype-*>
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
@@ -951,7 +953,7 @@ pub struct RtcCertificateStats {
     base64_certificate: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Time(pub f32);
 
 impl Hash for Time {
@@ -960,12 +962,24 @@ impl Hash for Time {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+impl PartialEq for Time {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_string().eq(&other.0.to_string())
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Float(pub f32);
 
 impl Hash for Float {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_string().hash(state);
+    }
+}
+
+impl PartialEq for Float {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_string().eq(&other.0.to_string())
     }
 }
 

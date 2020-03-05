@@ -3,7 +3,6 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 use derive_more::Display;
 use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
-use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
@@ -574,9 +573,4 @@ impl Drop for RtcPeerConnection {
         self.on_ice_connection_state_changed.borrow_mut().take();
         self.peer.close();
     }
-}
-
-#[wasm_bindgen(inline_js = "export function asd(arg) { window.asd = arg; }")]
-extern "C" {
-    fn asd(arg: &JsValue);
 }
