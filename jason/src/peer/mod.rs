@@ -24,7 +24,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::RtcStatsType, Direction, IceConnectionState,
-    IceServer, PeerId as Id, PeerId, Track, TrackId,
+    IceServer, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -156,6 +156,20 @@ pub enum PeerEvent {
         ice_connection_state: IceConnectionState,
     },
 
+    /// [`RtcPeerConnection`]'s [connection][1] state changed.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
+    ConnectionStateChanged {
+        /// ID of the [`PeerConnection`] that sends
+        /// [`connectionstatechange`][1] event.
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
+        peer_id: Id,
+
+        /// New [`PeerConnectionState`].
+        peer_connection_state: PeerConnectionState,
+    },
+
     /// [`RtcPeerConnection`]'s [`RtcStats`] update.
     StatsUpdate {
         /// ID of the [`PeerConnection`] for which [`RtcStats`] was sent.
@@ -266,6 +280,19 @@ impl PeerConnection {
                     &sender,
                     ice_connection_state,
                 );
+            }))
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        // Bind to `connectionstatechange` event.
+        let id = peer.id;
+        let sender = peer.peer_events_sender.clone();
+        peer.peer
+            .on_connection_state_change(Some(move |peer_connection_state| {
+                let _ =
+                    sender.unbounded_send(PeerEvent::ConnectionStateChanged {
+                        peer_id: id,
+                        peer_connection_state,
+                    });
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 

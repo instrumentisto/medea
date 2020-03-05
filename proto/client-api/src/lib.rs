@@ -154,6 +154,9 @@ pub enum Command {
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
+
+    /// Peer Connection's connection state.
+    PeerConnectionStateChanged(PeerConnectionState),
 }
 
 /// Peer Connection's ICE connection state.
@@ -168,6 +171,19 @@ pub enum IceConnectionState {
     Failed,
     Disconnected,
     Closed,
+}
+
+/// Peer Connection's connection state.
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PeerConnectionState {
+    Closed,
+    Failed,
+    Disconnected,
+    New,
+    Connecting,
+    Connected,
 }
 
 /// Reason of disconnecting Web Client from Media Server.
