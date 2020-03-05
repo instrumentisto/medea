@@ -840,7 +840,7 @@ impl EventHandler for InnerRoom {
             spawn_local(
                 async move {
                     let sdp_offer = peer
-                        .start_ice_restart()
+                        .start_renegotiation(true)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     let mids = peer
@@ -864,6 +864,17 @@ impl EventHandler for InnerRoom {
             JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
                 .print();
         }
+    }
+
+    fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {
+        let sdp_answer = peer
+            .process_offer(sdp_offer, tracks, local_stream.as_ref())
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+        rpc.send_command(Command::MakeSdpAnswer {
+            peer_id,
+            sdp_answer,
+        });
     }
 }
 

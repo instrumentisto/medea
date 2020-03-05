@@ -250,6 +250,11 @@ pub enum Event {
         peer_id: PeerId,
     },
 
+    SdpOfferMade {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
+
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade {

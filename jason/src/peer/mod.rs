@@ -455,10 +455,10 @@ impl PeerConnection {
     }
 
     /// blabla
-    pub async fn start_ice_restart(&self) -> Result<String> {
+    pub async fn start_renegotiation(&self, ice_restart: bool) -> Result<String> {
         let offer = self
             .peer
-            .create_and_set_offer(true)
+            .create_and_set_offer(ice_restart)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
 
