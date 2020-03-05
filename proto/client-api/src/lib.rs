@@ -246,10 +246,6 @@ pub enum Event {
         force_relay: bool,
     },
 
-    ConnectionRestarted {
-        peer_id: PeerId,
-    },
-
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade {
