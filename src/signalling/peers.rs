@@ -14,7 +14,7 @@ use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 use crate::{
     api::control::MemberId,
     log::prelude::*,
-    media::{New, Peer, PeerStateMachine},
+    media::{peer::Stable, Peer, PeerStateMachine},
     signalling::{
         elements::endpoints::webrtc::{
             WebRtcPlayEndpoint, WebRtcPublishEndpoint,
@@ -87,7 +87,7 @@ impl PeerRepository {
         &mut self,
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
-    ) -> (Peer<New>, Peer<New>) {
+    ) -> (Peer<Stable>, Peer<Stable>) {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
@@ -313,9 +313,9 @@ impl PeerRepository {
             // TODO: when dynamic patching of [`Room`] will be done then we need
             //       rewrite this code to updating [`Peer`]s in not
             //       [`Peer<New>`] state.
-            let mut src_peer: Peer<New> =
+            let mut src_peer: Peer<Stable> =
                 self.take_inner_peer(src_peer_id).unwrap();
-            let mut sink_peer: Peer<New> =
+            let mut sink_peer: Peer<Stable> =
                 self.take_inner_peer(sink_peer_id).unwrap();
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());

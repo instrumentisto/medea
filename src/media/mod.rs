@@ -8,8 +8,8 @@ pub mod track;
 pub use self::{
     ice_user::{IceUser, IceUsername},
     peer::{
-        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
-        WaitLocalSdp, WaitRemoteSdp,
+        Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp,
+        WaitRemoteSdp,
     },
     track::MediaTrack,
 };

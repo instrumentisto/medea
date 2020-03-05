@@ -42,8 +42,8 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
-        WaitLocalSdp, WaitRemoteSdp,
+        peer::Stable, Peer, PeerError, WaitLocalHaveRemote, WaitLocalSdp,
+        WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
     signalling::{
@@ -226,15 +226,15 @@ impl Room {
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
     /// which of them has any outbound tracks. That [`Peer`] state will be
     /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
-    /// [`New`] state. At least one of provided peers must have outbound
+    /// [`Stable`] state. At least one of provided peers must have outbound
     /// tracks.
     fn send_peer_created(
         &mut self,
         peer1_id: PeerId,
         peer2_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
+        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
+        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
 
         // decide which peer is sender
         let (sender, receiver) = if peer1.is_sender() {
@@ -808,8 +808,13 @@ impl Room {
 
                     match connected_peer_state {
                         Connecting | Disconnected => {
+                            let member_id = peer.member_id();
+                            let peer: Peer<Stable> =
+                                self.peers.take_inner_peer(peer_id).unwrap();
+                            self.peers.add_peer(peer.start_renegotiation());
+
                             self.members.send_event_to_member(
-                                peer.member_id(),
+                                member_id,
                                 Event::ConnectionRestarted { peer_id },
                             )
                         }
@@ -898,7 +903,7 @@ impl CommandHandler for Room {
         from_peer.set_mids(mids)?;
 
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
+        let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
@@ -978,28 +983,9 @@ impl CommandHandler for Room {
             return Ok(Box::new(actix::fut::ok(())));
         }
 
-        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
-        if let PeerStateMachine::New(_) = from_peer {
-            return Err(PeerError::WrongState(
-                from_peer_id,
-                "Not New",
-                format!("{}", from_peer),
-            )
-            .into());
-        }
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
-        if let PeerStateMachine::New(_) = to_peer {
-            return Err(PeerError::WrongState(
-                to_peer_id,
-                "Not New",
-                format!("{}", to_peer),
-            )
-            .into());
-        }
-
-        let to_member_id = to_peer.member_id();
+        let to_peer_id =
+            self.peers.get_peer_by_id(from_peer_id)?.partner_peer_id();
+        let to_member_id = self.peers.get_peer_by_id(to_peer_id)?.member_id();
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,
