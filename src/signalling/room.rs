@@ -11,10 +11,10 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    Command, CommandHandler, Event, IceCandidate, PeerConnectionState, PeerId,
+    PeerMetrics, TrackId, TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -780,6 +780,47 @@ impl Room {
         }
         Ok(())
     }
+
+    fn update_peer_connection_state<S: Into<PeerConnectionState>>(
+        &mut self,
+        peer_id: PeerId,
+        new_state: S,
+    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+        use PeerConnectionState::*;
+        let peer = match self.peers.get_peer_by_id(peer_id) {
+            Ok(peer) => peer,
+            Err(err) => return future::err(err).boxed_local(),
+        };
+
+        let old_state: PeerConnectionState =
+            peer.update_connection_state(new_state);
+        let new_state: PeerConnectionState = peer.connection_state();
+
+        match new_state {
+            Failed => match old_state {
+                Connected | Disconnected => {
+                    let connected_peer_state: PeerConnectionState =
+                        match self.peers.get_peer_by_id(peer.partner_peer_id())
+                        {
+                            Ok(peer) => peer.connection_state(),
+                            Err(err) => return future::err(err).boxed_local(),
+                        };
+
+                    match connected_peer_state {
+                        Connecting | Disconnected => {
+                            self.members.send_event_to_member(
+                                peer.member_id(),
+                                Event::ConnectionRestarted { peer_id },
+                            )
+                        }
+                        _ => future::ok(()).boxed_local(),
+                    }
+                }
+                _ => future::ok(()).boxed_local(),
+            },
+            _ => future::ok(()).boxed_local(),
+        }
+    }
 }
 
 impl RpcServer for Addr<Room> {
@@ -978,17 +1019,15 @@ impl CommandHandler for Room {
         metrics: PeerMetrics,
     ) -> Self::Output {
         match metrics {
-            PeerMetrics::IceConnectionStateChanged(state) => {
-                let peer = self.peers.get_peer_by_id(peer_id)?;
-                peer.update_connection_state(state);
-            }
-            PeerMetrics::PeerConnectionStateChanged(state) => {
-                let peer = self.peers.get_peer_by_id(peer_id)?;
-                peer.update_connection_state(state);
-            }
+            PeerMetrics::IceConnectionStateChanged(state) => Ok(Box::new(
+                self.update_peer_connection_state(peer_id, state)
+                    .into_actor(self),
+            )),
+            PeerMetrics::PeerConnectionStateChanged(state) => Ok(Box::new(
+                self.update_peer_connection_state(peer_id, state)
+                    .into_actor(self),
+            )),
         }
-
-        Ok(Box::new(actix::fut::ok(())))
     }
 
     /// Sends [`Event::TracksUpdated`] with data from the received

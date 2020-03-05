@@ -833,6 +833,16 @@ impl EventHandler for InnerRoom {
                 .print();
         }
     }
+
+    fn on_connection_restarted(&mut self, peer_id: PeerId) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            console_error("got ice restart");
+        } else {
+            // TODO: No peer, whats next?
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
+    }
 }
 
 /// [`PeerEvent`]s handling.

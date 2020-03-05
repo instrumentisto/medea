@@ -4,7 +4,7 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
@@ -71,12 +71,12 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn connection_state(&self) -> &PeerConnectionState)]
+#[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
 #[enum_delegate(
     pub fn update_connection_state<S: Into<PeerConnectionState>>(
         &self,
         state: S
-    )
+    ) -> PeerConnectionState
 )]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -160,7 +160,7 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
-    connection_state: PeerConnectionState,
+    connection_state: RefCell<PeerConnectionState>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -244,12 +244,12 @@ impl<T> Peer<T> {
     pub fn update_connection_state<S: Into<PeerConnectionState>>(
         &self,
         state: S,
-    ) {
-        //        self.context.connection_state = state;
+    ) -> PeerConnectionState {
+        self.context.connection_state.replace(state.into())
     }
 
-    pub fn connection_state(&self) -> &PeerConnectionState {
-        &self.context.connection_state
+    pub fn connection_state(&self) -> PeerConnectionState {
+        self.context.connection_state.borrow().clone()
     }
 }
 
@@ -274,7 +274,7 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
-            connection_state: PeerConnectionState::New,
+            connection_state: RefCell::new(PeerConnectionState::New),
         };
         Self {
             context,
