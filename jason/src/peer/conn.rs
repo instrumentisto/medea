@@ -1,13 +1,10 @@
-use std::{
-    cell::RefCell, collections::hash_map::DefaultHasher, convert::TryFrom,
-    hash::Hash, rc::Rc,
-};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::Display;
 use medea_client_api_proto::{Direction as DirectionProto, IceServer};
 use tracerr::Traced;
-use wasm_bindgen::{closure::Closure, prelude::*, JsCast, JsValue};
-use wasm_bindgen_futures::{spawn_local, JsFuture};
+use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
     RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
@@ -19,10 +16,7 @@ use web_sys::{
 use crate::{
     media::TrackConstraints,
     peer::stats::{RtcStats, RtcStatsError},
-    utils::{
-        console_error, window, EventListener, EventListenerBindError, JsCaused,
-        JsError,
-    },
+    utils::{EventListener, EventListenerBindError, JsCaused, JsError},
 };
 
 use super::ice_server::RtcIceServers;
@@ -166,8 +160,13 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
+    /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
     #[display(fmt = "Failed to get RTCStats: {:?}", _0)]
     RtcStats(RtcStatsError),
+
+    /// `PeerConnection.getStats()` promise thrown exception.
+    #[display(fmt = "PeerConnection.getStats() failed with error: {:?}", _0)]
+    GetStatsException(JsError),
 
     /// Occurs if the local description associated with the
     /// [`RtcPeerConnection`] cannot be changed.
@@ -271,10 +270,22 @@ impl RtcPeerConnection {
         })
     }
 
+    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors wiht [`RTCPeerConnectionError::RtcStats`] if getting or parsing
+    /// of [`RtcStats`] fails.
+    ///
+    /// Errors with [`RTCPeerConncetionError::GetStatsException`] when
+    /// `RTCPeerConnection.getStats` promise throws exception.
     pub async fn get_stats(&self) -> Result<RtcStats> {
-        let js_stats = JsFuture::from(self.peer.get_stats()).await.unwrap();
-
-        asd(&js_stats);
+        let js_stats =
+            JsFuture::from(self.peer.get_stats()).await.map_err(|e| {
+                tracerr::new!(RTCPeerConnectionError::GetStatsException(
+                    JsError::from(e)
+                ))
+            })?;
 
         RtcStats::try_from(&js_stats).map_err(tracerr::map_from_and_wrap!())
     }

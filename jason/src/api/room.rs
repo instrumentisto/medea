@@ -13,9 +13,9 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    stats::RtcStat, Command, Direction, Event as RpcEvent, EventHandler,
-    IceCandidate, IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
-    TrackId, TrackPatch,
+    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
+    IceConnectionState, IceServer, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};

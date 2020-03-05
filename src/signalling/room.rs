@@ -1009,7 +1009,7 @@ impl CommandHandler for Room {
 
     fn on_add_peer_connection_stats(
         &mut self,
-        peer_id: PeerId,
+        _: PeerId,
         stats: Vec<RtcStatsType>,
         tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {

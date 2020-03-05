@@ -155,9 +155,17 @@ pub enum PeerEvent {
         /// New [`IceConnectionState`].
         ice_connection_state: IceConnectionState,
     },
+
+    /// [`RtcPeerConnection`]'s [`RtcStats`] update.
     StatsUpdate {
+        /// ID of the [`PeerConnection`] for which [`RtcStats`] was sent.
         peer_id: Id,
+
+        /// [`RtcStats`] of this [`PeerConnection`].
         stats: RtcStats,
+
+        /// Connection between real `MediaTrack` ID and Medea's `MediaTrack`
+        /// ID.
         tracks_ids: HashMap<String, TrackId>,
     },
 }
@@ -274,6 +282,9 @@ impl PeerConnection {
         Ok(peer)
     }
 
+    /// Spawn [`Future`] which will get [`RtcStats`] of this [`PeerConnection`]
+    /// and send update of [`RtcStats`] to the
+    /// [`PeerConnection::peer_events_sender`].
     pub fn start_stats_task(&mut self) {
         let id = self.id;
         let sender = self.peer_events_sender.clone();

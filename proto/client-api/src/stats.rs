@@ -12,8 +12,6 @@
 //! [6]: https://www.w3.org/TR/webrtc/#dom-rtcstats
 
 use std::{
-    collections::HashMap,
-    convert::TryFrom,
     hash::{Hash, Hasher},
     time::Duration,
 };

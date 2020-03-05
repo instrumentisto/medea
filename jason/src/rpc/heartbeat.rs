@@ -3,12 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::{Display, From, Mul};
-use futures::{
-    channel::mpsc,
-    future::{self, AbortHandle},
-    stream::LocalBoxStream,
-    StreamExt as _,
-};
+use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use wasm_bindgen_futures::spawn_local;
 

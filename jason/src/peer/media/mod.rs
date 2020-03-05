@@ -99,46 +99,7 @@ struct InnerMediaConnections {
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 
-    js_track_id_to_medea_track_id: JsTrackIdToMedeaTrackId,
-}
-
-#[derive(Debug)]
-struct JsTrackIdToMedeaTrackId {
-    senders: HashMap<String, TrackId>,
-    receivers: HashMap<String, TrackId>,
-}
-
-impl JsTrackIdToMedeaTrackId {
-    pub fn new() -> Self {
-        Self {
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-        }
-    }
-
-    pub fn insert_sender(&mut self, sys_id: String, id: TrackId) {
-        self.senders.insert(sys_id, id);
-    }
-
-    pub fn insert_receiver(&mut self, sys_id: String, id: TrackId) {
-        self.receivers.insert(sys_id, id);
-    }
-
-    pub fn get_sender(&self, sys_id: &str) -> Option<TrackId> {
-        self.senders.get(sys_id).copied()
-    }
-
-    pub fn get_receiver(&self, sys_id: &str) -> Option<TrackId> {
-        self.receivers.get(sys_id).copied()
-    }
-
-    pub fn into_iter(&self) -> impl Iterator<Item = (String, TrackId)> {
-        // TODO: temporary
-        self.senders
-            .clone()
-            .into_iter()
-            .chain(self.receivers.clone().into_iter())
-    }
+    tracks_ids: HashMap<String, TrackId>,
 }
 
 impl InnerMediaConnections {
@@ -163,7 +124,7 @@ impl MediaConnections {
             peer,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            js_track_id_to_medea_track_id: JsTrackIdToMedeaTrackId::new(),
+            tracks_ids: HashMap::new(),
         }))
     }
 
@@ -177,8 +138,9 @@ impl MediaConnections {
             .collect()
     }
 
+    /// Returns [`Iterator`] over JS-side `MediaTrack` IDs and Medea-side IDs.
     pub fn iter_tracks_ids(&self) -> impl Iterator<Item = (String, TrackId)> {
-        self.0.borrow().js_track_id_to_medea_track_id.into_iter()
+        self.0.borrow().tracks_ids.clone().into_iter()
     }
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
@@ -370,8 +332,7 @@ impl MediaConnections {
 
         let mut s = self.0.borrow_mut();
         for (sys_id, track_id) in tracks_ids {
-            s.js_track_id_to_medea_track_id
-                .insert_sender(sys_id, track_id);
+            s.tracks_ids.insert(sys_id, track_id);
         }
 
         future::try_join_all(
@@ -424,14 +385,11 @@ impl MediaConnections {
                 }
             }
             if let Some((sys_track_id, track_id)) = insert {
-                s.js_track_id_to_medea_track_id
-                    .insert_receiver(sys_track_id, track_id);
+                s.tracks_ids.insert(sys_track_id, track_id);
             }
 
-            console_error(format!(
-                "track_ids: {:?}",
-                s.js_track_id_to_medea_track_id
-            ));
+            // TODO: remove me
+            console_error(format!("track_ids: {:?}", s.tracks_ids));
 
             sender_id
         } else {

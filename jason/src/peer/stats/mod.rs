@@ -11,17 +11,15 @@
 //! [5]: https://www.w3.org/TR/webrtc/#dom-rtcstats-id
 //! [6]: https://www.w3.org/TR/webrtc/#dom-rtcstats
 
-use std::{collections::HashMap, convert::TryFrom, time::Duration};
+use std::convert::TryFrom;
 
 use derive_more::From;
-use futures::future::Remote;
 use medea_client_api_proto::stats::RtcStatsType;
-use serde::Deserialize;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::RtcStats as SysRtcStats;
 
-use crate::utils::{console_error, get_property_by_name};
+use crate::utils::get_property_by_name;
 
 struct RtcStatsReportEntry(js_sys::JsString, SysRtcStats);
 
@@ -60,6 +58,7 @@ impl TryFrom<js_sys::Array> for RtcStatsReportEntry {
     }
 }
 
+/// All available [`RtcStatsType`] of `PeerConnection`.
 #[derive(Debug)]
 pub struct RtcStats(pub Vec<RtcStatsType>);
 
