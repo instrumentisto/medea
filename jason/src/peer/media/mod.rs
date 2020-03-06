@@ -388,9 +388,6 @@ impl MediaConnections {
                 s.tracks_ids.insert(sys_track_id, track_id);
             }
 
-            // TODO: remove me
-            console_error(format!("track_ids: {:?}", s.tracks_ids));
-
             sender_id
         } else {
             None
