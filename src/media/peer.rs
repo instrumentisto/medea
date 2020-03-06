@@ -17,6 +17,7 @@ use medea_macro::enum_delegate;
 use crate::{
     api::control::MemberId, media::MediaTrack, signalling::peers::Counter,
 };
+use crate::media::track::MediaTrackStats;
 
 /// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
@@ -72,6 +73,7 @@ impl PeerError {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
+#[enum_delegate(pub fn update_stats(&self, track_stats: HashMap<TrackId, MediaTrackStats>))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -232,6 +234,15 @@ impl<T> Peer<T> {
     /// Indicates whether all media is forcibly relayed through a TURN server.
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
+    }
+
+    pub fn update_stats(&self, track_stats: HashMap<TrackId, MediaTrackStats>) {
+        for (track_id, stats) in track_stats {
+            if let Some(track) = self.context.senders.get(&track_id)
+                .or_else(|| self.context.receivers.get(&track_id)) {
+                track.update_stats(stats);
+            }
+        }
     }
 }
 

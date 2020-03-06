@@ -14,6 +14,19 @@ pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,
     pub media_type: MediaType,
+    stats: RefCell<MediaTrackStats>,
+}
+
+#[derive(Debug, Default)]
+pub struct MediaTrackStats {
+    bytes_sent: u64,
+    bytes_received: u64,
+}
+
+impl MediaTrackStats {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 impl MediaTrack {
@@ -23,6 +36,7 @@ impl MediaTrack {
             id,
             mid: RefCell::new(None),
             media_type,
+            stats: RefCell::new(MediaTrackStats::new()),
         }
     }
 
@@ -32,5 +46,9 @@ impl MediaTrack {
 
     pub fn mid(&self) -> Option<String> {
         self.mid.borrow_mut().as_ref().cloned()
+    }
+
+    pub fn update_stats(&self, new_stats: MediaTrackStats) {
+        self.stats.replace(new_stats);
     }
 }

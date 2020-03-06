@@ -1467,20 +1467,28 @@ impl Handler<OnStartOnStopCallback> for Room {
                         EventType::OnStart => {
                             if let Some(callback_url) = play_endpoint.on_start()
                             {
+                                // TODO: OnStopEvent audio and video separation
                                 self.callbacks.send_callback(
                                     callback_url,
                                     fid.into(),
-                                    OnStartEvent,
+                                    OnStartEvent {
+                                        audio: true,
+                                        video: true,
+                                    },
                                 );
                             }
                         }
                         EventType::OnStop => {
                             if let Some(callback_url) = play_endpoint.on_stop()
                             {
+                                // TODO: OnStopEvent audio and video separation
                                 self.callbacks.send_callback(
                                     callback_url,
                                     fid.into(),
-                                    OnStopEvent,
+                                    OnStopEvent {
+                                        audio: true,
+                                        video: true,
+                                    },
                                 );
                             }
                         }
@@ -1500,10 +1508,15 @@ impl Handler<OnStartOnStopCallback> for Room {
                                 if publish_endpoint.publishing_peers_count()
                                     == 1
                                 {
+                                    // TODO: OnStopEvent audio and video
+                                    // separation
                                     self.callbacks.send_callback(
                                         on_start,
                                         fid.into(),
-                                        OnStartEvent,
+                                        OnStartEvent {
+                                            audio: true,
+                                            video: true,
+                                        },
                                     );
                                 }
                             }
@@ -1513,10 +1526,15 @@ impl Handler<OnStartOnStopCallback> for Room {
                                 .change_peer_status(msg.peer_id, false);
                             if let Some(on_stop) = publish_endpoint.on_stop() {
                                 if !publish_endpoint.is_endpoint_publishing() {
+                                    // TODO: OnStopEvent audio and video
+                                    // separation
                                     self.callbacks.send_callback(
                                         on_stop,
                                         fid.into(),
-                                        OnStopEvent,
+                                        OnStopEvent {
+                                            audio: true,
+                                            video: true,
+                                        },
                                     );
                                 }
                             }
