@@ -802,6 +802,8 @@ impl TryFrom<&StatId> for InboundRtpId {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcInboundRtpStreamStats {
+    pub track_id: Option<String>,
+
     // TODO: docs
     #[serde(flatten)]
     pub media_type: RtcInboundRtpStreamMediaType,

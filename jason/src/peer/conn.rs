@@ -305,6 +305,7 @@ impl RtcPeerConnection {
                     JsError::from(e)
                 ))
             })?;
+        asd(&js_stats);
 
         RtcStats::try_from(&js_stats).map_err(tracerr::map_from_and_wrap!())
     }
@@ -674,4 +675,10 @@ impl Drop for RtcPeerConnection {
 /// [1]: https://www.w3.org/TR/webrtc/#dom-peerconnection-connection-state
 fn get_peer_connection_state(peer: &SysRtcPeerConnection) -> Option<String> {
     get_property_by_name(peer, "connectionState", |v| v.as_string())
+}
+
+use wasm_bindgen::{JsValue, prelude::*};
+#[wasm_bindgen(inline_js = "export function asd(arg) { window.asd = arg; }")]
+extern "C" {
+    fn asd(arg: &JsValue);
 }

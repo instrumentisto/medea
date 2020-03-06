@@ -63,6 +63,8 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use medea_client_api_proto::stats::KnownRtcStatsType;
+use crate::media::track::MediaTrackStats;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1040,12 +1042,28 @@ impl CommandHandler for Room {
 
     fn on_add_peer_connection_stats(
         &mut self,
-        _: PeerId,
+        peer_id: PeerId,
         stats: Vec<RtcStatsType>,
         tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {
         println!("{:#?}", stats);
-        println!("{:?}", tracks_ids);
+        let tracks_stats = stats.into_iter()
+            .filter_map(|stat| {
+                match stat {
+                    KnownRtcStatsType::InboundRtp(stat) => {
+                        let track_id = stat.id.try_get_track_id().unwrap();
+                        Some((track_id, MediaTrackStats {
+                            bytes_received: stat.kind.bytes_received.unwrap(),
+                        }))
+                    }
+                    _ => None
+                }
+            })
+            .collect();
+        let peer = self.peers.get_peer_by_id(peer_id).unwrap();
+        peer.update_stats(tracks_stats);
+
+//        println!("{:?}", tracks_ids);
         Ok(Box::new(actix::fut::ok(())))
     }
 }

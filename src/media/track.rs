@@ -19,8 +19,8 @@ pub struct MediaTrack {
 
 #[derive(Debug, Default)]
 pub struct MediaTrackStats {
-    bytes_sent: u64,
-    bytes_received: u64,
+//    bytes_sent: u64,
+    pub bytes_received: u64,
 }
 
 impl MediaTrackStats {
