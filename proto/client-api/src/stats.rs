@@ -18,7 +18,9 @@ use std::{
     time::Duration,
 };
 
+use crate::{stats::KnownRtcStatsType::Track, TrackId};
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(untagged)]
@@ -28,8 +30,17 @@ pub enum NonExhaustive<T> {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
+pub struct StatId(String);
+
+impl StatId {
+    pub fn try_get_track_id(&self) -> Option<TrackId> {
+        self.0.split('_').last()?.parse().map(TrackId).ok()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 pub struct RtcStat<T> {
-    pub id: String,
+    pub id: StatId,
     pub timestamp: Time,
     #[serde(flatten)]
     pub kind: Box<T>,
@@ -756,16 +767,41 @@ pub enum RtcInboundRtpStreamMediaType {
     },
 }
 
+#[derive(Debug)]
+pub struct NotInboundRtpIdError;
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
+pub struct InboundRtpId {
+    track_id: TrackId,
+}
+
+impl TryFrom<&StatId> for InboundRtpId {
+    type Error = NotInboundRtpIdError;
+
+    fn try_from(value: &StatId) -> Result<Self, Self::Error> {
+        let track_id = value
+            .0
+            .split('_')
+            .rev()
+            .last()
+            .ok_or(NotInboundRtpIdError)?
+            .parse()
+            .map_err(|_| NotInboundRtpIdError)?;
+
+        Ok(InboundRtpId {
+            track_id: TrackId(track_id),
+        })
+    }
+}
+
 /// The [`RtcInboundRtpStreamStats`] dictionary represents the measurement
 /// metrics for the incoming RTP media stream. The timestamp reported in the
 /// statistics object is the time at which the data was sampled.
 ///
 /// [W3C doc]: https://www.w3.org/TR/webrtc-stats/#inboundrtpstats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
+#[serde(rename_all = "camelCase")]
 pub struct RtcInboundRtpStreamStats {
-    /// The identifier of the stats object representing the receiving track.
-    pub track_id: Option<String>,
-
     // TODO: docs
     #[serde(flatten)]
     pub media_type: RtcInboundRtpStreamMediaType,
@@ -777,7 +813,7 @@ pub struct RtcInboundRtpStreamStats {
     pub packets_received: Option<u64>,
 
     // TODO: check that this field exists.
-    packets_lost: Option<u64>,
+    pub packets_lost: Option<u64>,
 
     // TODO: check that this field exists.
     // TODO: maybe f64 check it
