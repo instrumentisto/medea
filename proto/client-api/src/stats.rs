@@ -29,10 +29,10 @@ pub enum NonExhaustive<T> {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 pub struct RtcStat<T> {
-    id: String,
-    timestamp: Time,
+    pub id: String,
+    pub timestamp: Time,
     #[serde(flatten)]
-    kind: Box<T>,
+    pub kind: Box<T>,
 }
 
 /// <https://www.w3.org/TR/webrtc-stats/#rtctatstype-*>
@@ -178,10 +178,10 @@ pub enum KnownRtcStatsType {
 pub struct MediaStreamStat {
     /// `stream.id` property.
     #[serde(rename = "streamIdentifier")]
-    stream_id: String,
+    pub stream_id: String,
 
     /// This is the id of the stats object, not the `track.id`.
-    track_ids: Vec<String>,
+    pub track_ids: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -192,52 +192,52 @@ pub struct DataChannelStat {
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    label: Option<String>,
+    pub label: Option<String>,
 
     /// The "protocol" value of the [`RTCDataChannel`] object.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    protocol: Option<Protocol>,
+    pub protocol: Option<Protocol>,
 
     /// The "id" attribute of the [`RTCDataChannel`] object.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
     #[serde(rename = "dataChannelIdentifier")]
-    data_channel_id: Option<u64>,
+    pub data_channel_id: Option<u64>,
 
     /// A [stats object reference][1] for the transport used to carry this
     /// datachannel.
     ///
     /// [1]: https://www.w3.org/TR/webrtc-stats/#dfn-stats-object-reference
-    transport_id: Option<String>,
+    pub transport_id: Option<String>,
 
     /// The "readyState" value of the [`RTCDataChannel`] object.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    state: Option<DataChannelState>,
+    pub state: Option<DataChannelState>,
 
     /// Represents the total number of API "message" events sent.
-    messages_sent: Option<u64>,
+    pub messages_sent: Option<u64>,
 
     /// Represents the total number of payload bytes sent on this
     /// [`RTCDataChannel`], i.e., not including headers or padding.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    bytes_sent: Option<u64>,
+    pub bytes_sent: Option<u64>,
 
     /// Represents the total number of API "message" events received.
-    messages_received: Option<u64>,
+    pub messages_received: Option<u64>,
 
     /// Represents the total number of bytes received on this
     /// [`RTCDataChannel`], i.e., not including headers or padding.
     ///
     /// [`RTCDataChannel`]:
     /// https://www.w3.org/TR/webrtc-stats/#dfn-rtcdatachannel
-    bytes_received: Option<u64>,
+    pub bytes_received: Option<u64>,
 }
 
 pub type DataChannelState = NonExhaustive<KnownDataChannelState>;
@@ -257,24 +257,24 @@ pub enum KnownDataChannelState {
 pub struct RtcPeerConnectionStat {
     /// Represents the number of unique `DataChannel`s that have entered the
     /// "open" state during their lifetime.
-    data_channels_opened: Option<u64>,
+    pub data_channels_opened: Option<u64>,
 
     /// Represents the number of unique `DataChannel`s that have left the
     /// "open" state during their lifetime (due to being closed by either
     /// end or the underlying transport being closed). `DataChannel`s that
     /// transition from "connecting" to "closing" or "closed" without ever
     /// being "open" are not counted in this number.
-    data_channels_closed: Option<u64>,
+    pub data_channels_closed: Option<u64>,
 
     /// Represents the number of unique `DataChannel`s returned from a
     /// successful `createDataChannel()` call on the `RTCPeerConnection`.
     /// If the underlying data transport is not established, these may be
     /// in the "connecting" state.
-    data_channels_requested: Option<u64>,
+    pub data_channels_requested: Option<u64>,
 
     /// Represents the number of unique `DataChannel`s signaled in a
     /// "datachannel" event on the `RTCPeerConnection`.
-    data_channels_accepted: Option<u64>,
+    pub data_channels_accepted: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -287,14 +287,14 @@ pub struct RtpContributingSourceStat {
     /// contributed to.
     ///
     /// [RFC3550]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3550
-    contributor_ssrc: Option<u32>,
+    pub contributor_ssrc: Option<u32>,
 
     /// The ID of the [`RTCInboundRtpStreamStats`] object representing the
     /// inbound RTP stream that this contributing source is contributing to.
     ///
     /// [`RTCInboundRtpStreamStats`]:
     /// https://www.w3.org/TR/webrtc-stats/#dom-rtcinboundrtpstreamstats
-    inbound_rtp_stream_id: Option<String>,
+    pub inbound_rtp_stream_id: Option<String>,
 
     /// The total number of RTP packets that this contributing source
     /// contributed to. This value is incremented each time a packet is counted
@@ -305,7 +305,7 @@ pub struct RtpContributingSourceStat {
     /// [`RTCInboundRtpStreamStats.packetsReceived`]:
     /// https://tinyurl.com/rreuf49
     /// [`contributorSsrc`]: https://tinyurl.com/tf8c7j4
-    packets_contributed_to: Option<u64>,
+    pub packets_contributed_to: Option<u64>,
 
     /// Present if the last received RTP packet that this source contributed to
     /// contained an [RFC6465] mixer-to-client audio level header extension.
@@ -320,7 +320,7 @@ pub struct RtpContributingSourceStat {
     /// 10^(-rfc6465_level/20)`.
     ///
     /// [RFC6465]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6465
-    audio_level: Option<Float>,
+    pub audio_level: Option<Float>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -331,7 +331,7 @@ pub struct RemoteOutboundRtpStreamStat {
     ///
     /// [`RTCInboundRtpStreamStats`]:
     /// https://www.w3.org/TR/webrtc-stats/#dom-rtcinboundrtpstreamstats
-    local_id: Option<String>,
+    pub local_id: Option<String>,
 
     /// `remoteTimestamp`, of type `DOMHighResTimeStamp` [HIGHRES-TIME],
     /// represents the remote timestamp at which these statistics were sent by
@@ -344,10 +344,10 @@ pub struct RemoteOutboundRtpStreamStat {
     ///
     /// [HIGRES-TIME]: https://www.w3.org/TR/webrtc-stats/#bib-highres-time
     // TODO: test that this is correct.
-    remote_timestamp: Option<Duration>,
+    pub remote_timestamp: Option<Duration>,
 
     /// Represents the total number of RTCP SR blocks sent for this SSRC.
-    reports_sent: Option<u64>,
+    pub reports_sent: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -358,7 +358,7 @@ pub struct RemoteInboundRtpStreamStat {
     ///
     /// [`RTCOutBoundRtpStreamStats`]:
     /// https://www.w3.org/TR/webrtc-stats/#dom-rtcoutboundrtpstreamstats
-    local_id: Option<String>,
+    pub local_id: Option<String>,
 
     /// Estimated round trip time for this SSRC based on the RTCP timestamps in
     /// the RTCP Receiver Report (RR) and measured in seconds. Calculated as
@@ -367,21 +367,21 @@ pub struct RemoteInboundRtpStreamStat {
     /// undefined.
     ///
     /// [RFC3550]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3550
-    round_trip_time: Option<Time>,
+    pub round_trip_time: Option<Time>,
 
     /// The fraction packet loss reported for this SSRC. Calculated as defined
     /// in [RFC3550] section 6.4.1 and Appendix A.3.
     ///
     /// [RFC3550]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3550
-    fraction_lost: Option<Float>,
+    pub fraction_lost: Option<Float>,
 
     /// Represents the total number of RTCP RR blocks received for this SSRC.
-    reports_received: Option<u64>,
+    pub reports_received: Option<u64>,
 
     /// Represents the total number of RTCP RR blocks received for this SSRC
     /// that contain a valid round trip time. This counter will increment if
     /// the roundTripTime is undefined.
-    round_trip_time_measurements: Option<Float>,
+    pub round_trip_time_measurements: Option<Float>,
 }
 
 /// An RTCRtpTransceiverStats stats object represents an RTCRtpTransceiver of
@@ -401,19 +401,19 @@ pub struct RtcRtpTransceiverStats {
     /// object.
     ///
     /// [1]: https://w3c.github.io/webrtc-pc/#dom-rtcrtptransceiver-sender
-    sender_id: Option<String>,
+    pub sender_id: Option<String>,
 
     /// The identifier of the stats object representing the RTCRtpReceiver
     /// [associated with the `RTCRtpTransceiver`][1] represented by this stats
     /// object.
     ///
     /// [1]: https://w3c.github.io/webrtc-pc/#dom-rtcrtptransceiver-receiver
-    receiver_id: Option<String>,
+    pub receiver_id: Option<String>,
 
     /// If the RTCRtpTransceiver that this stats object represents has a `mid`
     /// value that is not null, this is that value, otherwise this value is
     /// undefined.
-    mid: Option<String>,
+    pub mid: Option<String>,
 }
 
 /// An [`RtcSctpTransportStats`] object represents the stats corresponding to an
@@ -427,7 +427,7 @@ pub struct RtcSctpTransportStats {
     /// undefined.
     ///
     /// [RFC6458]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6458
-    smoothed_round_trip_time: Option<Time>,
+    pub smoothed_round_trip_time: Option<Time>,
 }
 
 /// An [`RtcTransportStats`] object represents the stats corresponding to an
@@ -450,22 +450,22 @@ pub struct RtcSctpTransportStats {
 #[serde(rename_all = "camelCase")]
 pub struct RtcTransportStats {
     /// Represents the total number of packets sent over this transport.
-    packets_sent: Option<u64>,
+    pub packets_sent: Option<u64>,
 
     /// Represents the total number of packets received on this transport.
-    packets_received: Option<u64>,
+    pub packets_received: Option<u64>,
 
     /// Represents the total number of payload bytes sent on this
     /// `PeerConnection`, i.e., not including headers or padding.
-    bytes_sent: Option<u64>,
+    pub bytes_sent: Option<u64>,
 
     /// Represents the total number of bytes received on this PeerConnection,
     /// i.e., not including headers or padding.
-    bytes_received: Option<u64>,
+    pub bytes_received: Option<u64>,
 
     /// Set to the current value of the "role" attribute of the underlying
     /// RTCDtlsTransport's "transport".
-    ice_role: Option<IceRole>,
+    pub ice_role: Option<IceRole>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -512,23 +512,23 @@ pub type RtcStatsType = KnownRtcStatsType;
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceCandidatePairStats {
-    state: IceCandidatePairState,
+    pub state: IceCandidatePairState,
     /// Related to updating the nominated flag described in Section 7.1.3.2.4
     /// of [RFC5245].
     ///
     /// [RFC5245]: https://www.w3.org/TR/webrtc-stats/#bib-rfc5245
-    nominated: bool,
+    pub nominated: bool,
 
     // TODO: doc
-    writable: bool,
+    pub writable: bool,
 
     /// Represents the total number of payload bytes sent on this candidate
     /// pair, i.e., not including headers or padding.
-    bytes_sent: u64,
+    pub bytes_sent: u64,
 
     /// Represents the total number of payload bytes received on this candidate
     /// pair, i.e., not including headers or padding.
-    bytes_received: u64,
+    pub bytes_received: u64,
 
     /// Represents the sum of all round trip time measurements in seconds since
     /// the beginning of the session, based on STUN connectivity check
@@ -539,7 +539,7 @@ pub struct RtcIceCandidatePairStats {
     ///
     /// [STUN-PATH-CHAR]: https://www.w3.org/TR/webrtc-stats/#bib-stun-path-char
     /// [RFC7675]: https://www.w3.org/TR/webrtc-stats/#bib-rfc7675
-    total_round_trip_time: Option<Time>,
+    pub total_round_trip_time: Option<Time>,
 
     /// Represents the latest round trip time measured in seconds, computed
     /// from both STUN connectivity checks [STUN-PATH-CHAR], including those
@@ -547,7 +547,7 @@ pub struct RtcIceCandidatePairStats {
     ///
     /// [STUN-PATH-CHAR]: https://www.w3.org/TR/webrtc-stats/#bib-stun-path-char
     /// [RFC7675]: https://www.w3.org/TR/webrtc-stats/#bib-rfc7675
-    current_round_trip_time: Option<Time>,
+    pub current_round_trip_time: Option<Time>,
 
     /// It is calculated by the underlying congestion control by combining the
     /// available bitrate for all the outgoing RTP streams using this candidate
@@ -565,7 +565,7 @@ pub struct RtcIceCandidatePairStats {
     /// MUST return undefined.
     ///
     /// [RFC3890]: https://www.w3.org/TR/webrtc-stats/#bib-rfc3890
-    available_outgoing_bitrate: Option<u64>,
+    pub available_outgoing_bitrate: Option<u64>,
 }
 
 /// Each candidate pair in the check list has a foundation and a state.
@@ -764,24 +764,24 @@ pub enum RtcInboundRtpStreamMediaType {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 pub struct RtcInboundRtpStreamStats {
     /// The identifier of the stats object representing the receiving track.
-    track_id: Option<String>,
+    pub track_id: Option<String>,
 
     // TODO: docs
     #[serde(flatten)]
-    media_type: RtcInboundRtpStreamMediaType,
+    pub media_type: RtcInboundRtpStreamMediaType,
 
     /// Total number of bytes received for this SSRC.
-    bytes_received: Option<u64>,
+    pub bytes_received: Option<u64>,
 
     // TODO: check that this field exists.
-    packets_received: Option<u64>,
+    pub packets_received: Option<u64>,
 
     // TODO: check that this field exists.
     packets_lost: Option<u64>,
 
     // TODO: check that this field exists.
     // TODO: maybe f64 check it
-    jitter: Option<Float>,
+    pub jitter: Option<Float>,
 
     /// Total number of seconds that have been spent decoding the
     /// `framesDecoded` frames of this stream. The average decode time can
@@ -789,11 +789,11 @@ pub struct RtcInboundRtpStreamStats {
     /// it takes to decode one frame is the time passed between feeding the
     /// decoder a frame and the decoder returning decoded data for that
     /// frame.
-    total_decode_time: Option<Time>,
+    pub total_decode_time: Option<Time>,
 
     /// The total number of audio samples or video frames that have come out of
     /// the jitter buffer (increasing jitterBufferDelay).
-    jitter_buffer_emitted_count: Option<u64>,
+    pub jitter_buffer_emitted_count: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -801,23 +801,23 @@ pub struct RtcInboundRtpStreamStats {
 pub struct TrackStat {
     /// Represents the `id` property of the track.
     #[serde(rename = "trackIdentifier")]
-    track_id: String,
+    pub track_id: String,
 
     /// True if the source is remote, for instance if it is sourced from
     /// another host via an RTCPeerConnection. False otherwise.
-    remote_source: Option<bool>,
+    pub remote_source: Option<bool>,
 
     /// Reflects the "ended" state of the track.
-    ended: Option<bool>,
+    pub ended: Option<bool>,
 
     // TODO: doc
-    detached: Option<bool>,
+    pub detached: Option<bool>,
 
     // TODO: enum, doc
-    kind: Option<String>,
+    pub kind: Option<String>,
 
     // TODO: doc
-    media_source_id: Option<String>,
+    pub media_source_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -825,11 +825,11 @@ pub struct TrackStat {
 pub struct RtcOutboundRtpStreamStats {
     /// The identifier of the stats object representing the current track
     /// attachment to the sender of this stream.
-    track_id: Option<String>,
+    pub track_id: Option<String>,
 
     /// The identifier of the stats object representing the track currently
     /// attached to the sender of this stream.
-    media_source_id: Option<String>,
+    pub media_source_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -838,28 +838,28 @@ pub struct RtcIceCandidateStats {
     /// It is a unique identifier that is associated to the object that was
     /// inspected to produce the `RTCTransportStats` associated with this
     /// candidate.
-    transport_id: Option<String>,
+    pub transport_id: Option<String>,
 
     // TODO: doc, enum
-    network_type: Option<String>,
+    pub network_type: Option<String>,
 
     /// It is the address of the candidate, allowing for IPv4 addresses, IPv6
     /// addresses, and fully qualified domain names (FQDNs).
-    address: Option<String>,
+    pub address: Option<String>,
 
     /// It is the port number of the candidate.
-    port: u16,
+    pub port: u16,
 
     /// Valid values for transport is one of `udp` and `tcp`.
-    protocol: Protocol,
+    pub protocol: Protocol,
 
     // TODO: doc
-    candidate_type: CandidateType,
+    pub candidate_type: CandidateType,
 
     /// Calculated as defined in [RFC5245] section 15.1.
     ///
     /// [RFC5245]: https://www.w3.org/TR/webrtc-stats/#bib-rfc5245
-    priority: u32,
+    pub priority: u32,
 
     /// For local candidates this is the URL of the ICE server from which the
     /// candidate was obtained. It is the same as the [url surfaced in the
@@ -868,14 +868,14 @@ pub struct RtcIceCandidateStats {
     /// `None` for remote candidates.
     ///
     /// [1]: https://w3c.github.io/webrtc-pc/#rtcpeerconnectioniceevent
-    url: Option<String>,
+    pub url: Option<String>,
 
     /// It is the protocol used by the endpoint to communicate with the TURN
     /// server. This is only present for local candidates.
-    relay_protocol: Option<Protocol>,
+    pub relay_protocol: Option<Protocol>,
 
     // TODO: doc
-    deleted: Option<bool>,
+    pub deleted: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -913,9 +913,9 @@ pub enum MediaSourceKind {
 #[serde(rename_all = "camelCase")]
 pub struct MediaSourceStat {
     #[serde(rename = "trackIdentifier")]
-    track_id: Option<String>,
+    pub track_id: Option<String>,
     #[serde(flatten)]
-    kind: MediaSourceKind,
+    pub kind: MediaSourceKind,
 }
 
 #[cfg(feature = "unused")]
@@ -924,14 +924,14 @@ pub struct MediaSourceStat {
 #[cfg(feature = "unused")]
 pub struct RtcCodecStats {
     /// Payload type as used in RTP encoding or decoding.
-    payload_type: u32,
+    pub payload_type: u32,
 
     /// The codec MIME media type/subtype. e.g., video/vp8 or equivalent.
     // TODO: Parse it as MIME.
-    mime_type: String,
+    pub mime_type: String,
 
     /// Represents the media sampling rate.
-    clock_rate: u32,
+    pub clock_rate: u32,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
@@ -942,15 +942,15 @@ pub struct RtcCertificateStats {
     /// defined in Section 5 of [RFC4572].
     ///
     /// [RFC4572]: https://www.w3.org/TR/webrtc-stats/#bib-rfc4572
-    fingerprint: String,
+    pub fingerprint: String,
 
     /// The hash function used to compute the certificate fingerprint. For
     /// instance, "sha-256".
     // TODO: enum
-    fingerprint_algorithm: String,
+    pub fingerprint_algorithm: String,
 
     /// The DER-encoded base-64 representation of the certificate.
-    base64_certificate: String,
+    pub base64_certificate: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -988,21 +988,21 @@ impl PartialEq for Float {
 #[cfg(feature = "unused")]
 pub struct RtcIceServerStats {
     /// The URL of the ICE server (e.g. TURN or STUN server).
-    url: String,
+    pub url: String,
 
     /// It is the port number used by the client.
-    port: u16,
+    pub port: u16,
 
     /// Valid values for transport is one of udp and tcp.
-    protocol: Protocol,
+    pub protocol: Protocol,
 
     /// The total amount of requests that have been sent to this server.
-    total_requests_sent: Option<u64>,
+    pub total_requests_sent: Option<u64>,
 
     /// The total amount of responses received from this server.
-    total_responses_received: Option<u64>,
+    pub total_responses_received: Option<u64>,
 
     /// The sum of RTTs for all requests that have been sent where a response
     /// has been received.
-    total_round_trip_time: Option<Time>,
+    pub total_round_trip_time: Option<Time>,
 }
