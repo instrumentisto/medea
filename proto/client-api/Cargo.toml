@@ -16,6 +16,7 @@ categories = ["api-bindings", "web-programming"]
 default = ["jason", "medea"]
 jason = []
 medea = []
+unused = []
 
 [dependencies]
 derive_more = "0.15"

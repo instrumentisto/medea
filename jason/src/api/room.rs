@@ -25,7 +25,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     peer::{
         MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
         StableMuteState, TransceiverKind,
     },
     rpc::{
@@ -907,6 +907,19 @@ impl PeerEventHandler for InnerRoom {
             metrics: PeerMetrics::PeerConnectionStateChanged(
                 peer_connection_state,
             ),
+        });
+    }
+
+    fn on_stats_update(
+        &mut self,
+        peer_id: PeerId,
+        stats: RtcStats,
+        tracks_ids: HashMap<String, TrackId>,
+    ) {
+        self.rpc.send_command(Command::AddPeerConnectionStats {
+            peer_id,
+            stats: stats.0,
+            tracks_ids,
         });
     }
 }

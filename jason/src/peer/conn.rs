@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::Display;
 use medea_client_api_proto::{
@@ -16,6 +16,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
+    peer::stats::{RtcStats, RtcStatsError},
     utils::{
         console_error, get_property_by_name, EventListener,
         EventListenerBindError, JsCaused, JsError,
@@ -163,6 +164,14 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
+    /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
+    #[display(fmt = "Failed to get RTCStats: {:?}", _0)]
+    RtcStats(RtcStatsError),
+
+    /// `PeerConnection.getStats()` promise thrown exception.
+    #[display(fmt = "PeerConnection.getStats() failed with error: {:?}", _0)]
+    GetStatsException(JsError),
+
     /// Occurs if the local description associated with the
     /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set local SDP description: {}", _0)]
@@ -179,6 +188,12 @@ type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
 impl From<EventListenerBindError> for RTCPeerConnectionError {
     fn from(err: EventListenerBindError) -> Self {
         Self::PeerConnectionEventBindFailed(err)
+    }
+}
+
+impl From<RtcStatsError> for RTCPeerConnectionError {
+    fn from(e: RtcStatsError) -> Self {
+        Self::RtcStats(e)
     }
 }
 
@@ -263,13 +278,35 @@ impl RtcPeerConnection {
             .map_err(RTCPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
+        let peer = Rc::new(peer);
+
         Ok(Self {
-            peer: Rc::new(peer),
+            peer,
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_connection_state_changed: RefCell::new(None),
             on_track: RefCell::new(None),
         })
+    }
+
+    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors wiht [`RTCPeerConnectionError::RtcStats`] if getting or parsing
+    /// of [`RtcStats`] fails.
+    ///
+    /// Errors with [`RTCPeerConncetionError::GetStatsException`] when
+    /// `RTCPeerConnection.getStats` promise throws exception.
+    pub async fn get_stats(&self) -> Result<RtcStats> {
+        let js_stats =
+            JsFuture::from(self.peer.get_stats()).await.map_err(|e| {
+                tracerr::new!(RTCPeerConnectionError::GetStatsException(
+                    JsError::from(e)
+                ))
+            })?;
+
+        RtcStats::try_from(&js_stats).map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
