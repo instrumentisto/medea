@@ -40,7 +40,11 @@ pub trait RpcServer: Debug + Send {
     /// Sends [`Command`].
     ///
     /// [`Command`]:
-    fn send_command(&self, msg: Command) -> LocalBoxFuture<'static, ()>;
+    fn send_command(
+        &self,
+        member_id: MemberId,
+        msg: Command,
+    ) -> LocalBoxFuture<'static, ()>;
 }
 
 #[cfg(test)]

@@ -39,8 +39,8 @@ fn main() -> Result<(), Error> {
             let graceful_shutdown =
                 GracefulShutdown::new(config.shutdown.timeout).start();
             let coturn_client = CoturnTelnetClient::new(
-                (config.turn.cli.ip.to_string(), config.turn.cli.port),
-                config.turn.cli.pass.clone(),
+                (config.turn.cli.host.to_string(), config.turn.cli.port),
+                config.turn.cli.pass.to_string(),
                 config.turn.cli.pool.into(),
             );
             let coturn_stats = CoturnStats::new(&config.turn, coturn_client)

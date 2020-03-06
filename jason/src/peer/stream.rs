@@ -11,11 +11,7 @@ use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::{
-    media::TrackConstraints,
-    peer::media::{EnabledAudio, EnabledVideo},
-    utils::HandlerDetachedError,
-};
+use crate::{media::TrackConstraints, utils::HandlerDetachedError};
 
 use super::MediaTrack;
 
@@ -103,20 +99,6 @@ impl MediaStream {
     /// Instantiates new [`MediaStreamHandle`] for use on JS side.
     pub fn new_handle(&self) -> MediaStreamHandle {
         MediaStreamHandle(Rc::downgrade(&self.0))
-    }
-
-    /// Enables or disables all audio [`MediaTrack`]s in this stream.
-    pub fn toggle_audio_tracks(&self, enabled: EnabledAudio) {
-        for track in self.0.audio_tracks.values() {
-            track.set_enabled(enabled.0);
-        }
-    }
-
-    /// Enables or disables all video [`MediaTrack`]s in this stream.
-    pub fn toggle_video_tracks(&self, enabled: EnabledVideo) {
-        for track in self.0.video_tracks.values() {
-            track.set_enabled(enabled.0);
-        }
     }
 
     /// Returns actual underlying [MediaStream][1] object.

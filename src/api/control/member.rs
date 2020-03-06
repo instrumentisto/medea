@@ -98,6 +98,22 @@ type PublishEndpointsItem<'a> =
     (WebRtcPublishId, &'a WebRtcPublishEndpoint<Validated>);
 
 impl MemberSpec {
+    /// Creates new [`MemberSpec`] with the given parameters.
+    #[inline]
+    pub fn new(
+        pipeline: Pipeline<EndpointId, MemberElement<Validated>>,
+        credentials: String,
+        on_join: Option<CallbackUrl>,
+        on_leave: Option<CallbackUrl>,
+    ) -> Self {
+        Self {
+            pipeline,
+            credentials,
+            on_join,
+            on_leave,
+        }
+    }
+
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(
         &self,

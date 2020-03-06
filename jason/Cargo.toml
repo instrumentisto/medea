@@ -19,11 +19,6 @@ crate-type = ["cdylib", "rlib"]
 [profile.release]
 opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
-# TODO: Remove this when https://github.com/rustwasm/wasm-pack/issues/782
-#       issue will be resolved.
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = false
-
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
@@ -37,6 +32,7 @@ futures = "0.3"
 js-sys = "0.3"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = { path = "../crates/medea-macro" }
+medea-reactive = { path = "../crates/medea-reactive" }
 mockall = { version = "0.5", optional = true }
 predicates-tree = { version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }

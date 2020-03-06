@@ -13,7 +13,7 @@ use nom::{
 #[derive(Debug)]
 pub struct UnknownProtocol;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Protocol {
     Udp,
     Tcp,
@@ -42,7 +42,7 @@ impl fmt::Display for Protocol {
 
 const TURN_SESSION_ID_FACTOR: u64 = 1_000_000_000_000_000;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SessionId(pub u64);
 
 impl SessionId {
@@ -61,7 +61,7 @@ impl fmt::Display for SessionId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Session {
     pub num: u32,
     pub id: SessionId,
@@ -83,7 +83,7 @@ pub struct Session {
     pub peers: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrafficUsage {
     pub received_packets: u64,
     pub received_bytes: u64,

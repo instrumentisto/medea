@@ -100,7 +100,7 @@ pub struct ParticipantService {
     connections: HashMap<MemberId, Box<dyn RpcConnection>>,
 
     /// Stores [`RpcConnection`] drop tasks.
-    /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
+    /// If [`RpcConnection`] is lost, [`Room`] waits for `connect_timeout`
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 

@@ -21,7 +21,7 @@
 
     async function createRoom(roomId) {
       try {
-        let resp = await axios({
+        await axios({
           method: 'post',
           url: controlUrl + roomId,
           data: {
@@ -67,9 +67,11 @@
         },
       });
 
+      var play_requests = [];
       for (let i = 0; i < memberIds.length; i++) {
         let id = memberIds[i];
-        await axios({
+
+        let playRequest = axios({
           method: 'post',
           url: controlUrl + roomId + "/" + id + '/play-' + memberId,
           data: {
@@ -77,8 +79,10 @@
             src: 'local://' + roomId + '/' + memberId + '/publish',
             force_relay: controlRoom.data.element.pipeline[id].pipeline.publish.force_relay,
           }
-        })
+        });
+        play_requests.push(playRequest);
       }
+      await Promise.all(play_requests);
 
       return resp.data.sids[memberId]
     }
@@ -241,24 +245,24 @@
       let isAudioMuted = false;
       let isVideoMuted = false;
 
-      muteAudio.addEventListener('click', () => {
+      muteAudio.addEventListener('click', async () => {
         if(isAudioMuted) {
-          room.unmute_audio();
+          await room.unmute_audio();
           isAudioMuted = false;
           muteAudio.textContent = "Mute audio";
         } else {
-          room.mute_audio();
+          await room.mute_audio();
           isAudioMuted = true;
           muteAudio.textContent = "Unmute audio";
         }
       });
-      muteVideo.addEventListener('click', () => {
+      muteVideo.addEventListener('click', async () => {
         if(isVideoMuted) {
-          room.unmute_video();
+          await room.unmute_video();
           isVideoMuted = false;
           muteVideo.textContent = "Mute video";
         } else {
-          room.mute_video();
+          await room.mute_video();
           isVideoMuted = true;
           muteVideo.textContent = "Unmute video";
         }

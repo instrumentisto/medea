@@ -262,6 +262,10 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 
 /// Starts all [`Room`]s from static [Control API] specs.
 ///
+/// # Errors
+///
+/// Errors if unable to send message to [`RoomService`] actor.
+///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Room`]: crate::signalling::room::Room
 pub async fn start_static_rooms(

@@ -12,7 +12,7 @@ use actix::{
 use derive_more::Display;
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::PeerId;
-use medea_coturn_telnet::sessions_parser::Session;
+use medea_coturn_telnet_client::sessions_parser::Session;
 use patched_redis::ConnectionInfo;
 
 use crate::{
@@ -304,14 +304,14 @@ pub async fn coturn_watcher_loop(
 pub fn run_coturn_stats_watcher(cf: &conf::Turn) {
     let connection_info = ConnectionInfo {
         addr: Box::new(patched_redis::ConnectionAddr::Tcp(
-            cf.db.redis.ip.to_string(),
+            cf.db.redis.host.to_string(),
             cf.db.redis.port,
         )),
         db: cf.db.redis.db_number,
         passwd: if cf.db.redis.pass.is_empty() {
             None
         } else {
-            Some(cf.db.redis.pass.clone())
+            Some(cf.db.redis.pass.to_string())
         },
     };
     let client = patched_redis::Client::open(connection_info).unwrap();
@@ -420,14 +420,14 @@ impl CoturnStats {
     ) -> Result<Self, patched_redis::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(patched_redis::ConnectionAddr::Tcp(
-                cf.db.redis.ip.to_string(),
+                cf.db.redis.host.to_string(),
                 cf.db.redis.port,
             )),
             db: cf.db.redis.db_number,
             passwd: if cf.db.redis.pass.is_empty() {
                 None
             } else {
-                Some(cf.db.redis.pass.clone())
+                Some(cf.db.redis.pass.to_string())
             },
         };
         let client = patched_redis::Client::open(connection_info)?;

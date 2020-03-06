@@ -1,19 +1,26 @@
-//! Media tracks.
+//! [`crate::peer::PeerConnection`] media management.
 
-use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
+mod mute_state;
 
-use derive_more::{Display, From};
-use futures::future;
-use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
+use std::{
+    borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
+    future::Future, rc::Rc, time::Duration,
+};
+
+use derive_more::Display;
+use futures::{future, future::Either, StreamExt};
+use medea_client_api_proto as proto;
+use medea_reactive::{DroppedError, ObservableCell};
+use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
 use crate::{
     media::TrackConstraints,
-    utils::{JsCaused, JsError},
+    utils::{delay_for, JsCaused, JsError},
 };
 
 use super::{
@@ -22,6 +29,8 @@ use super::{
     stream_request::StreamRequest,
     track::MediaTrack,
 };
+
+pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -53,17 +62,30 @@ pub enum MediaConnectionsError {
     /// [`Sender`] constraints.
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
+
+    /// Occurs when [`MuteState`] of [`Sender`] was dropped.
+    #[display(fmt = "MuteState of Sender was dropped.")]
+    MuteStateDropped,
+
+    /// Occurs when [`MuteState`] of [`Sender`] transits into opposite to
+    /// expected [`MuteState`].
+    #[display(fmt = "MuteState of Sender transits into opposite to expected \
+                     MuteState")]
+    MuteStateTransitsIntoOppositeState,
+
+    /// Invalid [`medea_client_api_proto::TrackPatch`] for [`MediaTrack`].
+    #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
+    InvalidTrackPatch(TrackId),
+}
+
+impl From<DroppedError> for MediaConnectionsError {
+    #[inline]
+    fn from(_: DroppedError) -> Self {
+        Self::MuteStateDropped
+    }
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
-
-/// Indicator of audio being switched on or off.
-#[derive(Clone, Copy, Debug, Display, Eq, From, PartialEq)]
-pub struct EnabledAudio(pub bool);
-
-/// Indicator of video being switched on or off.
-#[derive(Clone, Copy, Debug, Display, Eq, From, PartialEq)]
-pub struct EnabledVideo(pub bool);
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -76,12 +98,6 @@ struct InnerMediaConnections {
 
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
-
-    /// Are senders audio tracks muted or not.
-    enabled_audio: EnabledAudio,
-
-    /// Are senders video tracks muted or not.
-    enabled_video: EnabledVideo,
 }
 
 impl InnerMediaConnections {
@@ -101,55 +117,56 @@ impl MediaConnections {
     /// Instantiates new [`MediaConnections`] storage for a given
     /// [`RtcPeerConnection`].
     #[inline]
-    pub fn new(
-        peer: Rc<RtcPeerConnection>,
-        enabled_audio: EnabledAudio,
-        enabled_video: EnabledVideo,
-    ) -> Self {
+    pub fn new(peer: Rc<RtcPeerConnection>) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            enabled_audio,
-            enabled_video,
         }))
     }
 
-    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Audio`].
-    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
-        self.0.borrow_mut().enabled_audio = enabled;
+    /// Returns all [`Sender`]s from this [`MediaConnections`] with provided
+    /// [`TransceiverKind`].
+    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
-            .iter_senders_with_kind(TransceiverKind::Audio)
-            .for_each(|s| s.set_track_enabled(enabled.0));
+            .iter_senders_with_kind(kind)
+            .cloned()
+            .collect()
     }
 
-    /// Enables or disables all [`Sender`]s with [`TransceiverKind::Video`].
-    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
-        self.0.borrow_mut().enabled_video = enabled;
-        self.0
-            .borrow()
-            .iter_senders_with_kind(TransceiverKind::Video)
-            .for_each(|s| s.set_track_enabled(enabled.0));
+    /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
+    /// in provided [`MuteState`].
+    pub fn is_all_senders_in_mute_state(
+        &self,
+        kind: TransceiverKind,
+        mute_state: StableMuteState,
+    ) -> bool {
+        for sender in self.0.borrow().iter_senders_with_kind(kind) {
+            if sender.mute_state() != mute_state.into() {
+                return false;
+            }
+        }
+        true
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// Returns `true` if all [`MediaTrack`]s of all [`Sender`]s with
     /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .find(|s| !s.is_track_enabled())
+            .find(|s| s.is_track_muted())
             .is_none()
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with
+    /// Returns `true` if all [`MediaTrack`]s of all [`Sender`]s with
     /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .find(|s| !s.is_track_enabled())
+            .find(|s| s.is_track_muted())
             .is_none()
     }
 
@@ -158,10 +175,10 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaConnectionsError::SendersWithoutMids`] if some
+    /// Errors with [`MediaConnectionsError::SendersWithoutMid`] if some
     /// [`Sender`] doesn't have [mid].
     ///
-    /// Errors with [`MediaConnectionsError::ReceiversWithoutMids`] if some
+    /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
     /// [mid]:
@@ -215,6 +232,7 @@ impl MediaConnections {
                         track.media_type.into(),
                         &s.peer,
                         mid,
+                        track.is_muted.into(),
                     )
                     .map_err(tracerr::wrap!())?;
                     s.senders.insert(track.id, sndr);
@@ -230,6 +248,26 @@ impl MediaConnections {
                     s.receivers.insert(track.id, recv);
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Updates [`Sender`]s of this [`super::PeerConnection`] with
+    /// [`proto::TrackPatch`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
+    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
+    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+        for track_proto in tracks {
+            let track =
+                self.get_sender_by_id(track_proto.id).ok_or_else(|| {
+                    tracerr::new!(MediaConnectionsError::InvalidTrackPatch(
+                        track_proto.id
+                    ))
+                })?;
+            track.update(&track_proto);
         }
         Ok(())
     }
@@ -280,9 +318,6 @@ impl MediaConnections {
                 ));
             }
         }
-
-        stream.toggle_audio_tracks(s.enabled_audio);
-        stream.toggle_video_tracks(s.enabled_video);
 
         future::try_join_all(
             sender_and_track
@@ -344,7 +379,7 @@ impl MediaConnections {
     }
 
     /// Returns [`MediaTrack`] by its [`TrackId`] and [`TransceiverDirection`].
-    pub fn get_track_by_id(
+    pub fn get_track_by_id_and_direction(
         &self,
         direction: TransceiverDirection,
         id: TrackId,
@@ -360,6 +395,25 @@ impl MediaConnections {
             }
         }
     }
+
+    /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
+    #[inline]
+    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
+        self.0.borrow().senders.get(&id).cloned()
+    }
+
+    /// Returns [`MediaTrack`] from this [`MediaConnections`] by its
+    /// [`TrackId`].
+    pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<MediaTrack>> {
+        let inner = self.0.borrow();
+        inner
+            .senders
+            .get(&id)
+            .and_then(|s| s.track.borrow().clone())
+            .or_else(|| {
+                inner.receivers.get(&id).and_then(|recv| recv.track.clone())
+            })
+    }
 }
 
 /// Representation of a local [`MediaTrack`] that is being sent to some remote
@@ -369,6 +423,7 @@ pub struct Sender {
     caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
+    mute_state: ObservableCell<MuteState>,
 }
 
 impl Sender {
@@ -381,6 +436,7 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
+        mute_state: StableMuteState,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -390,17 +446,79 @@ impl Sender {
                 .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
                 .map_err(tracerr::wrap!())?,
         };
-        Ok(Rc::new(Self {
+
+        let mute_state = ObservableCell::new(mute_state.into());
+        let mut subscription = mute_state.subscribe();
+        let this = Rc::new(Self {
             track_id,
             caps,
             track: RefCell::new(None),
             transceiver,
-        }))
+            mute_state,
+        });
+
+        // TODO: remove when refactor muting to dropping tracks.
+        let weak_this = Rc::downgrade(&this);
+        spawn_local(async move {
+            while let Some(mute_state_update) = subscription.next().await {
+                if let Some(this) = weak_this.upgrade() {
+                    match mute_state_update {
+                        MuteState::Stable(stable) => {
+                            if let Some(track) = this.track.borrow().as_ref() {
+                                track.set_enabled_by_mute_state(stable);
+                            }
+                        }
+                        MuteState::Transition(_) => {
+                            let weak_this = Rc::downgrade(&this);
+                            spawn_local(async move {
+                                let mut transitions =
+                                    this.mute_state.subscribe().skip(1);
+                                let timeout = Box::pin(delay_for(
+                                    Duration::from_secs(10).into(),
+                                ));
+                                match future::select(
+                                    transitions.next(),
+                                    timeout,
+                                )
+                                .await
+                                {
+                                    Either::Left(_) => (),
+                                    Either::Right(_) => {
+                                        if let Some(this) = weak_this.upgrade()
+                                        {
+                                            let stable = this
+                                                .mute_state
+                                                .get()
+                                                .cancel_transition();
+                                            this.mute_state.set(stable);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        });
+
+        Ok(this)
+    }
+
+    /// Returns [`TrackId`] of this [`Sender`].
+    pub fn track_id(&self) -> TrackId {
+        self.track_id
     }
 
     /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
-    fn kind(&self) -> TransceiverKind {
+    pub fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
+    }
+
+    /// Returns [`MuteState`] of this [`Sender`].
+    pub fn mute_state(&self) -> MuteState {
+        self.mute_state.get()
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
@@ -425,23 +543,90 @@ impl Sender {
         sender
             .transceiver
             .set_direction(RtcRtpTransceiverDirection::Sendonly);
+        // TODO: this is temporary disabled, until we resolve case of muting
+        //       senders, that were added after muting room.
+        //       (instrumentisto/medea#85)
+
+        //        let stable_mute_state = match sender.mute_state() {
+        //            MuteState::Stable(stable) => stable,
+        //            MuteState::Transition(transition) =>
+        // transition.into_inner(),        };
+        //        track.set_enabled_by_mute_state(stable_mute_state);
         sender.track.borrow_mut().replace(track);
 
         Ok(())
     }
 
-    /// Enables or disables this [`Sender`]s track.
-    fn set_track_enabled(&self, enabled: bool) {
-        if let Some(track) = self.track.borrow().as_ref() {
-            track.set_enabled(enabled);
+    /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
+    pub fn is_track_muted(&self) -> bool {
+        self.mute_state.get() == StableMuteState::Muted.into()
+    }
+
+    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    pub fn mute_state_transition_to(&self, desired_state: StableMuteState) {
+        let current_mute_state = self.mute_state.get();
+        self.mute_state
+            .set(current_mute_state.transition_to(desired_state));
+    }
+
+    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
+    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    ///
+    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
+    /// or the [`Sender`] is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// the `desired_state`.
+    pub fn when_mute_state_stable(
+        &self,
+        desired_state: StableMuteState,
+    ) -> impl Future<Output = Result<()>> {
+        let mut mute_states = self.mute_state.subscribe();
+        async move {
+            while let Some(state) = mute_states.next().await {
+                match state {
+                    MuteState::Transition(_) => continue,
+                    MuteState::Stable(s) => {
+                        if s == desired_state {
+                            return Ok(());
+                        } else {
+                            return Err(tracerr::new!(
+                                MediaConnectionsError::
+                                MuteStateTransitsIntoOppositeState
+                            ));
+                        }
+                    }
+                }
+            }
+            Ok(())
         }
     }
 
-    /// Checks is sender has track and it is enabled.
-    fn is_track_enabled(&self) -> bool {
-        match self.track.borrow().as_ref() {
-            None => false,
-            Some(track) => track.is_enabled(),
+    /// Updates this [`Track`] basing on the provided [`proto::TrackPatch`].
+    pub fn update(&self, track: &proto::TrackPatch) {
+        if track.id != self.track_id {
+            return;
+        }
+
+        if let Some(is_muted) = track.is_muted {
+            let new_mute_state = StableMuteState::from(is_muted);
+            let current_mute_state = self.mute_state.get();
+
+            let mute_state_update: MuteState = match current_mute_state {
+                MuteState::Stable(_) => new_mute_state.into(),
+                MuteState::Transition(t) => {
+                    if t.intended() == new_mute_state {
+                        new_mute_state.into()
+                    } else {
+                        t.set_inner(new_mute_state).into()
+                    }
+                }
+            };
+
+            self.mute_state.set(mute_state_update);
         }
     }
 }

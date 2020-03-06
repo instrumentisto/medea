@@ -15,7 +15,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
+    self as proto, Direction, IceConnectionState, IceServer,
+    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -39,7 +40,8 @@ pub use self::{
         TransceiverDirection, TransceiverKind,
     },
     media::{
-        EnabledAudio, EnabledVideo, MediaConnections, MediaConnectionsError,
+        MediaConnections, MediaConnectionsError, MuteState,
+        MuteStateTransition, Sender, StableMuteState,
     },
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
@@ -141,6 +143,20 @@ pub enum PeerEvent {
         /// New [`IceConnectionState`].
         ice_connection_state: IceConnectionState,
     },
+
+    /// [`RtcPeerConnection`]'s [connection][1] state changed.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
+    ConnectionStateChanged {
+        /// ID of the [`PeerConnection`] that sends
+        /// [`connectionstatechange`][1] event.
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
+        peer_id: Id,
+
+        /// New [`PeerConnectionState`].
+        peer_connection_state: PeerConnectionState,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -151,7 +167,9 @@ pub struct PeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
-    /// [`Sender`]s and [`Receivers`] of this [`RtcPeerConnection`].
+    /// [`Sender`]s and [`Receiver`]s of this [`RtcPeerConnection`].
+    ///
+    /// [`Receiver`]: self::media::Receiver
     media_connections: Rc<MediaConnections>,
 
     /// [`MediaManager`] that will be used to acquire local [`MediaStream`]s.
@@ -188,19 +206,14 @@ impl PeerConnection {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
-        enabled_audio: EnabledAudio,
-        enabled_video: EnabledVideo,
         is_force_relayed: bool,
     ) -> Result<Self> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
-        let media_connections = Rc::new(MediaConnections::new(
-            Rc::clone(&peer),
-            enabled_audio,
-            enabled_video,
-        ));
+        let media_connections =
+            Rc::new(MediaConnections::new(Rc::clone(&peer)));
 
         let peer = Self {
             id,
@@ -234,6 +247,19 @@ impl PeerConnection {
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
+        // Bind to `connectionstatechange` event.
+        let id = peer.id;
+        let sender = peer.peer_events_sender.clone();
+        peer.peer
+            .on_connection_state_change(Some(move |peer_connection_state| {
+                let _ =
+                    sender.unbounded_send(PeerEvent::ConnectionStateChanged {
+                        peer_id: id,
+                        peer_connection_state,
+                    });
+            }))
+            .map_err(tracerr::map_from_and_wrap!())?;
+
         // Bind to `track` event.
         let id = peer.id;
         let media_connections = Rc::clone(&peer.media_connections);
@@ -245,6 +271,38 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(peer)
+    }
+
+    /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
+    /// the provided `mute_state`.
+    #[inline]
+    pub fn is_all_senders_in_mute_state(
+        &self,
+        kind: TransceiverKind,
+        mute_state: StableMuteState,
+    ) -> bool {
+        self.media_connections
+            .is_all_senders_in_mute_state(kind, mute_state)
+    }
+
+    /// Returns [`PeerId`] of this [`PeerConnection`].
+    #[inline]
+    pub fn id(&self) -> PeerId {
+        self.id
+    }
+
+    /// Updates [`Sender`]s of this [`PeerConnection`] with
+    /// [`proto::TrackPatch`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
+    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
+    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+        Ok(self
+            .media_connections
+            .update_senders(tracks)
+            .map_err(tracerr::map_from_and_wrap!())?)
     }
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
@@ -332,16 +390,6 @@ impl PeerConnection {
         }
     }
 
-    /// Disables or enables all audio tracks for all [`Sender`]s.
-    pub fn toggle_send_audio(&self, enabled: EnabledAudio) {
-        self.media_connections.toggle_send_audio(enabled)
-    }
-
-    /// Disables or enables all video tracks for all [`Sender`]s.
-    pub fn toggle_send_video(&self, enabled: EnabledVideo) {
-        self.media_connections.toggle_send_video(enabled)
-    }
-
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()
@@ -350,6 +398,13 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
+    }
+
+    /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
+    /// [`TransceiverKind`].
+    #[inline]
+    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
+        self.media_connections.get_senders(kind)
     }
 
     /// Track id to mid relations of all send tracks of this

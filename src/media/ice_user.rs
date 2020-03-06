@@ -1,13 +1,15 @@
-//! Representation of [coturn]'s user.
+//! Representation of [Coturn]'s user.
 //!
-//! [coturn]: https://github.com/coturn/coturn
+//! [Coturn]: https://github.com/coturn/coturn
 
 use derive_more::{AsRef, Display, From, Into};
 use medea_client_api_proto::{IceServer, PeerId};
 
 use crate::api::control::RoomId;
 
-/// Username for authorization on Turn server.
+/// Username for authorization on [Coturn] server.
+///
+/// [Coturn]: https://github.com/coturn/coturn
 #[derive(AsRef, Clone, Debug, Display, From, Into)]
 #[as_ref(forward)]
 pub struct IceUsername(String);
@@ -17,10 +19,13 @@ pub struct IceUsername(String);
 pub struct IceUser {
     /// Address of Turn server.
     address: String,
+
     /// Username for authorization.
     username: IceUsername,
+
     /// Password for authorization.
     pass: String,
+
     /// Non static users are meant to be saved and delete from some remote
     /// storage, while static users are hardcoded on Turn server and do not
     /// require any additional management.
