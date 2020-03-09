@@ -432,33 +432,31 @@ impl PeerConnection {
     /// Sync provided tracks creating all required `Sender`s and
     /// `Receiver`s, request local stream if required, get, set and return
     /// sdp offer.
+    ///
+    /// Can be used to initiate [ICE restart][1]. This makes sense only when
+    /// renegotiating [stable][2] [RTCPeerConnection][3].
+    ///
+    /// This method can be called during renegotiation. If no tracks were
+    /// changed (e.g. [ICE restart][1] renegotiation), then no tracks or a
+    /// stream should be provided.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcofferoptions-icerestart
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcsignalingstate-stable
+    /// [3]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn get_offer(
         &self,
-        tracks: Vec<Track>,
+        track_updates: Vec<Track>,
         local_stream: Option<&SysMediaStream>,
+        ice_restart: bool,
     ) -> Result<String> {
         self.media_connections
-            .update_tracks(tracks)
+            .update_tracks(track_updates)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.insert_local_stream(local_stream)
             .await
             .map_err(tracerr::wrap!())?;
 
-        let offer = self
-            .peer
-            .create_and_set_offer(false)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(offer)
-    }
-
-    /// blabla
-    pub async fn start_renegotiation(
-        &self,
-        ice_restart: bool,
-    ) -> Result<String> {
         let offer = self
             .peer
             .create_and_set_offer(ice_restart)
@@ -589,14 +587,15 @@ impl PeerConnection {
     /// provided, then stream will be requested from UA.
     ///
     /// This method can be called during renegotiation. If no tracks were
-    /// changed (e.g. ice-restart renegotiation), then no tracks or a stream
-    /// should be provided.
+    /// changed (e.g. [ICE restart][2] renegotiation), then no tracks or a
+    /// stream should be provided.
     ///
     /// `set_remote_description` will create all transceivers and fire all
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcofferoptions-icerestart
     pub async fn process_offer(
         &self,
         offer: String,

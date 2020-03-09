@@ -726,7 +726,7 @@ impl EventHandler for InnerRoom {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
-                            .get_offer(tracks, local_stream.as_ref())
+                            .get_offer(tracks, local_stream.as_ref(), false)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         let mids = peer
@@ -840,7 +840,7 @@ impl EventHandler for InnerRoom {
             spawn_local(
                 async move {
                     let sdp_offer = peer
-                        .start_renegotiation(true)
+                        .get_offer(Vec::new(), None, true)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     let mids = peer
@@ -872,7 +872,7 @@ impl EventHandler for InnerRoom {
             spawn_local(
                 async move {
                     let sdp_answer = peer
-                        .process_offer(sdp_offer, vec![], None)
+                        .process_offer(sdp_offer, Vec::new(), None)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     rpc.send_command(Command::MakeSdpAnswer {
