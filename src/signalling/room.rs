@@ -807,7 +807,7 @@ impl Room {
                         };
 
                     match connected_peer_state {
-                        Connecting | Disconnected => {
+                        Connected | Disconnected => {
                             let member_id = peer.member_id();
                             let peer: Peer<Stable> =
                                 self.peers.take_inner_peer(peer_id).unwrap();
