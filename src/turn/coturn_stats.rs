@@ -566,6 +566,11 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnStats {
 
             match event.event {
                 CoturnAllocationEvent::Traffic { traffic } => {
+                    println!(
+                        "\n\t\tPeerId: {}; packets_sent: {}; \
+                         packets_received: {}\n",
+                        peer_id, traffic.received_packets, traffic.sent_packets
+                    );
                     if let Some((allocation, partner_allocation)) =
                         self.allocations.get(&event.allocation_id)
                     {

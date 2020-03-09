@@ -13,8 +13,12 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    stats::RtcStatsType, Command, CommandHandler, Event, IceCandidate, PeerId,
-    PeerMetrics, TrackId, TrackPatch,
+    stats::{
+        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType,
+        RtcStatsType,
+    },
+    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
+    TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -63,8 +67,8 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use crate::media::peer::PeerStats;
 use medea_client_api_proto::stats::KnownRtcStatsType;
-use crate::media::track::MediaTrackStats;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1046,24 +1050,48 @@ impl CommandHandler for Room {
         stats: Vec<RtcStatsType>,
         tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {
-        println!("{:#?}", stats);
-        let tracks_stats = stats.into_iter()
-            .filter_map(|stat| {
-                match stat {
-                    KnownRtcStatsType::InboundRtp(stat) => {
-                        let track_id = stat.id.try_get_track_id().unwrap();
-                        Some((track_id, MediaTrackStats {
-                            bytes_received: stat.kind.bytes_received.unwrap(),
-                        }))
-                    }
-                    _ => None
-                }
-            })
-            .collect();
-        let peer = self.peers.get_peer_by_id(peer_id).unwrap();
-        peer.update_stats(tracks_stats);
+        //        println!("{:#?}", stats);
+        let mut audio_received_packets = 0;
+        let mut video_received_packets = 0;
+        let mut audio_sent_packets = 0;
+        let mut video_sent_packets = 0;
 
-//        println!("{:?}", tracks_ids);
+        for stat in stats {
+            match stat {
+                KnownRtcStatsType::InboundRtp(stat) => {
+                    match stat.kind.media_type {
+                        RtcInboundRtpStreamMediaType::Audio { .. } => {
+                            audio_received_packets +=
+                                stat.kind.packets_received;
+                        }
+                        RtcInboundRtpStreamMediaType::Video { .. } => {
+                            video_received_packets +=
+                                stat.kind.packets_received;
+                        }
+                    }
+                }
+                KnownRtcStatsType::OutboundRtp(stat) => {
+                    match stat.kind.media_type {
+                        RtcOutboundRtpStreamMediaType::Audio { .. } => {
+                            audio_sent_packets += stat.kind.packets_sent;
+                        }
+                        RtcOutboundRtpStreamMediaType::Video { .. } => {
+                            video_sent_packets += stat.kind.packets_sent;
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        let peer = self.peers.get_peer_by_id_mut(peer_id).unwrap();
+        peer.update_stats(PeerStats {
+            audio_received_packets,
+            video_received_packets,
+            audio_sent_packets,
+            video_sent_packets,
+        });
+
         Ok(Box::new(actix::fut::ok(())))
     }
 }

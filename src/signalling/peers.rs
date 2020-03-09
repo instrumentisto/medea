@@ -111,6 +111,21 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
+    /// Returns mutably borrowed [`PeerStateMachine`] by its ID.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn get_peer_by_id_mut(
+        &mut self,
+        peer_id: PeerId,
+    ) -> Result<&mut PeerStateMachine, RoomError> {
+        self.peers
+            .get_mut(&peer_id)
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+    }
+
     pub fn get_ice_user(
         &mut self,
         peer_id: PeerId,

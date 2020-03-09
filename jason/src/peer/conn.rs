@@ -677,7 +677,7 @@ fn get_peer_connection_state(peer: &SysRtcPeerConnection) -> Option<String> {
     get_property_by_name(peer, "connectionState", |v| v.as_string())
 }
 
-use wasm_bindgen::{JsValue, prelude::*};
+use wasm_bindgen::{prelude::*, JsValue};
 #[wasm_bindgen(inline_js = "export function asd(arg) { window.asd = arg; }")]
 extern "C" {
     fn asd(arg: &JsValue);

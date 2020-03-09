@@ -17,7 +17,6 @@ use medea_macro::enum_delegate;
 use crate::{
     api::control::MemberId, media::MediaTrack, signalling::peers::Counter,
 };
-use crate::media::track::MediaTrackStats;
 
 /// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
@@ -66,6 +65,14 @@ impl PeerError {
     }
 }
 
+#[derive(Debug)]
+pub struct PeerStats {
+    pub audio_received_packets: u64,
+    pub video_received_packets: u64,
+    pub audio_sent_packets: u64,
+    pub video_sent_packets: u64,
+}
+
 /// Implementation of ['Peer'] state machine.
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
@@ -73,7 +80,7 @@ impl PeerError {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn update_stats(&self, track_stats: HashMap<TrackId, MediaTrackStats>))]
+#[enum_delegate(pub fn update_stats(&mut self, new_stats: PeerStats))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -156,6 +163,7 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
+    stats: PeerStats,
 }
 
 /// [RTCPeerConnection] representation.
@@ -236,13 +244,12 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    pub fn update_stats(&self, track_stats: HashMap<TrackId, MediaTrackStats>) {
-        for (track_id, stats) in track_stats {
-            if let Some(track) = self.context.senders.get(&track_id)
-                .or_else(|| self.context.receivers.get(&track_id)) {
-                track.update_stats(stats);
-            }
-        }
+    pub fn update_stats(&mut self, new_stats: PeerStats) {
+        println!(
+            "\n\n\t\tPeerId: {}; Peer stat update {:?}\n\n",
+            self.context.id, new_stats
+        );
+        self.context.stats = new_stats;
     }
 }
 
@@ -267,6 +274,12 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
+            stats: PeerStats {
+                audio_received_packets: 0,
+                video_received_packets: 0,
+                audio_sent_packets: 0,
+                video_sent_packets: 0,
+            },
         };
         Self {
             context,

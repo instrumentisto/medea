@@ -44,6 +44,7 @@ pub struct RtcStat<T> {
     pub timestamp: Time,
     #[serde(flatten)]
     pub kind: Box<T>,
+    transport_id: Option<String>,
 }
 
 /// <https://www.w3.org/TR/webrtc-stats/#rtctatstype-*>
@@ -804,15 +805,21 @@ impl TryFrom<&StatId> for InboundRtpId {
 pub struct RtcInboundRtpStreamStats {
     pub track_id: Option<String>,
 
+    pub receiver_id: Option<String>,
+
+    pub transport_id: Option<String>,
+
+    pub remote_id: Option<String>,
+
     // TODO: docs
     #[serde(flatten)]
     pub media_type: RtcInboundRtpStreamMediaType,
 
     /// Total number of bytes received for this SSRC.
-    pub bytes_received: Option<u64>,
+    pub bytes_received: u64,
 
     // TODO: check that this field exists.
-    pub packets_received: Option<u64>,
+    pub packets_received: u64,
 
     // TODO: check that this field exists.
     pub packets_lost: Option<u64>,
@@ -860,7 +867,32 @@ pub struct TrackStat {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
+#[serde(tag = "mediaType")]
+pub enum RtcOutboundRtpStreamMediaType {
+    Audio {
+        total_samples_sent: Option<u64>,
+        voice_activity_flag: Option<bool>,
+    },
+    Video {
+        frame_width: Option<u64>,
+        frame_height: Option<u64>,
+        frames_per_second: Option<u64>,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
+#[serde(rename_all = "camelCase")]
 pub struct RtcOutboundRtpStreamStats {
+    pub sender_id: Option<String>,
+    pub remote_id: Option<String>,
+    pub transport_id: Option<String>,
+
+    #[serde(flatten)]
+    pub media_type: RtcOutboundRtpStreamMediaType,
+
+    pub bytes_sent: u64,
+
+    pub packets_sent: u64,
     /// The identifier of the stats object representing the current track
     /// attachment to the sender of this stream.
     pub track_id: Option<String>,
