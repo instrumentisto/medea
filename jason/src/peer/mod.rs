@@ -455,7 +455,10 @@ impl PeerConnection {
     }
 
     /// blabla
-    pub async fn start_renegotiation(&self, ice_restart: bool) -> Result<String> {
+    pub async fn start_renegotiation(
+        &self,
+        ice_restart: bool,
+    ) -> Result<String> {
         let offer = self
             .peer
             .create_and_set_offer(ice_restart)
@@ -580,6 +583,15 @@ impl PeerConnection {
     /// Sync provided tracks creating all required `Sender`s and
     /// `Receiver`s, request local stream if required, get, set and return
     /// SDP answer.
+    ///
+    /// If provided track updates contains send-tracks and stream was provided,
+    /// then stream will be inserted into created `Sender`s, if no stream was
+    /// provided, then stream will be requested from UA.
+    ///
+    /// This method can be called during renegotiation. If no tracks were
+    /// changed (e.g. ice-restart renegotiation), then no tracks or a stream
+    /// should be provided.
+    ///
     /// `set_remote_description` will create all transceivers and fire all
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
@@ -588,12 +600,13 @@ impl PeerConnection {
     pub async fn process_offer(
         &self,
         offer: String,
-        tracks: Vec<Track>,
+        track_updates: Vec<Track>,
         local_stream: Option<&SysMediaStream>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
-        let (recv, send): (Vec<_>, Vec<_>) =
-            tracks.into_iter().partition(|track| match track.direction {
+        let (recv, send): (Vec<_>, Vec<_>) = track_updates
+            .into_iter()
+            .partition(|track| match track.direction {
                 Direction::Send { .. } => false,
                 Direction::Recv { .. } => true,
             });
@@ -603,10 +616,13 @@ impl PeerConnection {
             .update_tracks(recv)
             .map_err(tracerr::map_from_and_wrap!())?;
 
+        // set offer, which will create transceivers and discover remote tracks
+        // in receivers
         self.set_remote_offer(offer)
             .await
             .map_err(tracerr::wrap!())?;
 
+        // update senders
         self.media_connections
             .update_tracks(send)
             .map_err(tracerr::map_from_and_wrap!())?;

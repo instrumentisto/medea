@@ -867,14 +867,31 @@ impl EventHandler for InnerRoom {
     }
 
     fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {
-        let sdp_answer = peer
-            .process_offer(sdp_offer, tracks, local_stream.as_ref())
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        rpc.send_command(Command::MakeSdpAnswer {
-            peer_id,
-            sdp_answer,
-        });
+        if let Some(peer) = self.peers.get(peer_id) {
+            let rpc = Rc::clone(&self.rpc);
+            spawn_local(
+                async move {
+                    let sdp_answer = peer
+                        .process_offer(sdp_offer, vec![], None)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    rpc.send_command(Command::MakeSdpAnswer {
+                        peer_id,
+                        sdp_answer,
+                    });
+                    Result::<_, Traced<RoomError>>::Ok(())
+                }
+                .then(|result| async move {
+                    if let Err(err) = result {
+                        JasonError::from(err.into_parts()).print();
+                    };
+                }),
+            );
+        } else {
+            // TODO: No peer, whats next?
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
     }
 }
 
