@@ -23,8 +23,8 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    self as proto, stats::RtcStatsType, Direction, IceConnectionState,
-    IceServer, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    self as proto, Direction, IceConnectionState, IceServer,
+    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -335,10 +335,6 @@ impl PeerConnection {
                         .0
                         .into_iter()
                         .filter(|stat| {
-                            if stat == &RtcStatsType::Other {
-                                return false;
-                            }
-
                             let stat_hash = calculate_hash(stat);
 
                             let is_already_in_cache =

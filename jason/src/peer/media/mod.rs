@@ -20,7 +20,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{console_error, delay_for, JsCaused, JsError},
+    utils::{delay_for, JsCaused, JsError},
 };
 
 use super::{
