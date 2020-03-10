@@ -818,7 +818,6 @@ pub struct RtcInboundRtpStreamStats {
     /// Total number of bytes received for this SSRC.
     pub bytes_received: u64,
 
-    // TODO: check that this field exists.
     pub packets_received: u64,
 
     // TODO: check that this field exists.
