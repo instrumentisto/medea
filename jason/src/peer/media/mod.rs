@@ -99,6 +99,7 @@ struct InnerMediaConnections {
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 
+    /// Relation between JS-side `MediaTrack` ID and Medea-side [`TrackId`].
     tracks_ids: HashMap<String, TrackId>,
 }
 
@@ -138,7 +139,8 @@ impl MediaConnections {
             .collect()
     }
 
-    /// Returns [`Iterator`] over JS-side `MediaTrack` IDs and Medea-side IDs.
+    /// Returns [`Iterator`] over JS-side `MediaTrack` IDs and Medea-side
+    /// [`TrackId`]s.
     pub fn iter_tracks_ids(&self) -> impl Iterator<Item = (String, TrackId)> {
         self.0.borrow().tracks_ids.clone().into_iter()
     }

@@ -213,6 +213,9 @@ pub struct PeerConnection {
     stats_getter_task_handle: Option<TaskHandle>,
 }
 
+/// Returns hash of provided object.
+///
+/// Hash will be calculated with [`DefaultHasher`].
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
@@ -309,7 +312,7 @@ impl PeerConnection {
         Ok(peer)
     }
 
-    /// Spawn [`Future`] which will get [`RtcStats`] of this [`PeerConnection`]
+    /// Spawns [`Future`] which will get [`RtcStats`] of this [`PeerConnection`]
     /// and send update of [`RtcStats`] to the
     /// [`PeerConnection::peer_events_sender`].
     pub fn start_stats_task(&mut self) {

@@ -1,3 +1,6 @@
+//! Deserialization of the [`RtcStatsType`] from the [`SysRtcStats`]
+//! implementation.
+
 use std::convert::TryFrom;
 
 use derive_more::From;
@@ -8,14 +11,25 @@ use web_sys::RtcStats as SysRtcStats;
 
 use crate::utils::get_property_by_name;
 
+/// Entry of the [`SysRtcStats`] dictionary.
 struct RtcStatsReportEntry(js_sys::JsString, SysRtcStats);
 
+/// Errors which can occur while deserialization of the [`RtcStatsType`].
 #[derive(Debug, From)]
 pub enum RtcStatsError {
+    /// `RTCStats.id` is undefined.
     UndefinedId,
+
+    /// `RTCStats.stats` is undefined.
     UndefinedStats,
+
+    /// Some JS error occured.
     Js(JsValue),
+
+    /// `RTCStats.entries` is undefined.
     EntriesNotFound,
+
+    /// Error while [`RtcStatsType`] deserialization.
     ParseError(serde_json::Error),
 }
 

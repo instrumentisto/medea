@@ -140,9 +140,16 @@ pub enum Command {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     },
+    /// Web Client sends Peer Connection stats.
     AddPeerConnectionStats {
+        /// [`PeerId`] of `PeerConnection` for which this stats.
         peer_id: PeerId,
+
+        /// Actual stats.
         stats: Vec<RtcStatsType>,
+
+        /// Relation between JS-side `MediaTrack` ID and Medea-side
+        /// [`TrackId`].
         tracks_ids: HashMap<String, TrackId>,
     },
 }

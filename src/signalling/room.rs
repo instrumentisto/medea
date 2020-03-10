@@ -1006,14 +1006,19 @@ impl CommandHandler for Room {
         }
     }
 
+    /// Prints received `RtcStats` report into logs, atm.
     fn on_add_peer_connection_stats(
         &mut self,
-        _: PeerId,
+        peer_id: PeerId,
         stats: Vec<RtcStatsType>,
         tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {
-        println!("{:#?}", stats);
-        println!("{:?}", tracks_ids);
+        debug!(
+            "Received RtcStats for a Peer with {} ID and {:#?} tracks IDs: \
+             {:#?}",
+            peer_id, tracks_ids, stats
+        );
+
         Ok(Box::new(actix::fut::ok(())))
     }
 }
