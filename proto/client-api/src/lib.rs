@@ -246,21 +246,17 @@ pub enum Event {
         force_relay: bool,
     },
 
-    ConnectionRestarted {
-        peer_id: PeerId,
-    },
+    /// Media Server notifies Web Client about necessity to start renegotation,
+    /// creating new SDP Offer.
+    RenegotiationStarted { peer_id: PeerId, ice_restart: bool },
 
-    SdpOfferMade {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
+    /// Media Server notifies Web Client about necessity to apply specified SDP
+    /// Offer to Web Client's RTCPeerConnection.
+    SdpOfferMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -271,9 +267,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved {
-        peer_ids: Vec<PeerId>,
-    },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// [`Peer`].

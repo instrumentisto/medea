@@ -235,6 +235,7 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
+    /// Changes [`Peer`]'s connection state returning current value.
     pub fn update_connection_state<S: Into<PeerConnectionState>>(
         &self,
         state: S,
@@ -242,6 +243,7 @@ impl<T> Peer<T> {
         self.context.connection_state.replace(state.into())
     }
 
+    /// Returns [`Peer`] current connection state.
     pub fn connection_state(&self) -> PeerConnectionState {
         self.context.connection_state.borrow().clone()
     }
@@ -418,6 +420,8 @@ impl Peer<Stable> {
         Ok(mids)
     }
 
+    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
+    /// SDP Offer and Answer.
     pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
         context.sdp_answer = None;

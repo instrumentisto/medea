@@ -815,7 +815,10 @@ impl Room {
 
                             self.members.send_event_to_member(
                                 member_id,
-                                Event::ConnectionRestarted { peer_id },
+                                Event::RenegotiationStarted {
+                                    peer_id,
+                                    ice_restart: true,
+                                },
                             )
                         }
                         _ => future::ok(()).boxed_local(),
