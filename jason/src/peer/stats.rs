@@ -1,5 +1,4 @@
-//! Deserialization of the [`RtcStatsType`] from the [`SysRtcStats`]
-//! implementation.
+//! Deserialization of the [`RtcStatsType`] from the [`SysRtcStats`].
 
 use std::convert::TryFrom;
 

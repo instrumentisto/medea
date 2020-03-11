@@ -29,7 +29,7 @@ fn toggle_mute_tracks_updates(
         .collect()
 }
 
-/// Tests that [`RtcStats`] getting normally deserializes.
+/// Tests that [`RtcStats`] normally deserializes.
 #[wasm_bindgen_test]
 async fn get_stats() {
     let (tx, _rx) = mpsc::unbounded();

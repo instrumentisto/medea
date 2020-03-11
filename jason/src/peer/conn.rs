@@ -278,10 +278,8 @@ impl RtcPeerConnection {
             .map_err(RTCPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
-        let peer = Rc::new(peer);
-
         Ok(Self {
-            peer,
+            peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_connection_state_changed: RefCell::new(None),

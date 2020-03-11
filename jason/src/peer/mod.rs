@@ -40,6 +40,8 @@ use crate::{
     },
 };
 
+pub use crate::peer::stats::RtcStats;
+
 #[cfg(feature = "mockable")]
 #[doc(inline)]
 pub use self::repo::MockPeerRepository;
@@ -58,7 +60,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
-pub use crate::peer::stats::RtcStats;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -210,6 +211,9 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
+    /// [`TaskHandle`] for a task which will call
+    /// [`RtcPeerConnection::get_stats`] every second and send updated
+    /// [`RtcStatType`] to the server.
     stats_getter_task_handle: Option<TaskHandle>,
 }
 
@@ -349,12 +353,12 @@ impl PeerConnection {
                         .collect(),
                 );
 
-                let tracks_ids = media_connections.iter_tracks_ids().collect();
-
                 let _ = sender.unbounded_send(PeerEvent::StatsUpdate {
                     peer_id: id,
                     stats,
-                    tracks_ids,
+                    tracks_ids: media_connections
+                        .iter_js_to_medea_tracks_ids()
+                        .collect(),
                 });
             }
         });
