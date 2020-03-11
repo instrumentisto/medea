@@ -1099,6 +1099,18 @@ struct TrackPatch {
 }
 ```
 
+#### 11. AddPeerConnectionStats
+
+`Web Client` sends `PeerConnection` stats.
+
+```rust
+struct AddPeerConnectionStats {
+    peer_id: PeerId,
+    stats: Vec<RtcStatsType>,
+    tracks_ids: HashMap<String, TrackId>,
+}
+```
+
 
 ### Extended examples
 

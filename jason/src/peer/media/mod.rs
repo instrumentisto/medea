@@ -20,7 +20,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{console_error, delay_for, JsCaused, JsError},
+    utils::{delay_for, JsCaused, JsError},
 };
 
 use super::{
@@ -99,7 +99,8 @@ struct InnerMediaConnections {
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 
-    tracks_ids: HashMap<String, TrackId>,
+    /// Relation between JS-side `MediaTrack` ID and Medea-side [`TrackId`].
+    js_to_medea_tracks_ids: HashMap<String, TrackId>,
 }
 
 impl InnerMediaConnections {
@@ -124,7 +125,7 @@ impl MediaConnections {
             peer,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            tracks_ids: HashMap::new(),
+            js_to_medea_tracks_ids: HashMap::new(),
         }))
     }
 
@@ -138,9 +139,12 @@ impl MediaConnections {
             .collect()
     }
 
-    /// Returns [`Iterator`] over JS-side `MediaTrack` IDs and Medea-side IDs.
-    pub fn iter_tracks_ids(&self) -> impl Iterator<Item = (String, TrackId)> {
-        self.0.borrow().tracks_ids.clone().into_iter()
+    /// Returns [`Iterator`] over JS-side `MediaTrack` IDs and Medea-side
+    /// [`TrackId`]s.
+    pub fn iter_js_to_medea_tracks_ids(
+        &self,
+    ) -> impl Iterator<Item = (String, TrackId)> {
+        self.0.borrow().js_to_medea_tracks_ids.clone().into_iter()
     }
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
@@ -332,7 +336,7 @@ impl MediaConnections {
 
         let mut s = self.0.borrow_mut();
         for (sys_id, track_id) in tracks_ids {
-            s.tracks_ids.insert(sys_id, track_id);
+            s.js_to_medea_tracks_ids.insert(sys_id, track_id);
         }
 
         future::try_join_all(
@@ -357,7 +361,9 @@ impl MediaConnections {
     ) -> Option<PeerId> {
         let mut s = self.0.borrow_mut();
         if let Some(mid) = transceiver.mid() {
-            let insert;
+            // 'js_to_medea_tracks_ids' entry which should be inserted if it
+            // Some.
+            let js_to_medea_tracks_ids_insert;
             let sender_id;
 
             {
@@ -368,7 +374,8 @@ impl MediaConnections {
                         .is_some()
                 });
                 if let Some(receiver) = receiver {
-                    insert = Some((track.id(), receiver.track_id));
+                    js_to_medea_tracks_ids_insert =
+                        Some((track.id(), receiver.track_id));
 
                     let track = MediaTrack::new(
                         receiver.track_id,
@@ -381,11 +388,14 @@ impl MediaConnections {
                     sender_id = Some(receiver.sender_id)
                 } else {
                     sender_id = None;
-                    insert = None;
+                    js_to_medea_tracks_ids_insert = None;
                 }
             }
-            if let Some((sys_track_id, track_id)) = insert {
-                s.tracks_ids.insert(sys_track_id, track_id);
+
+            if let Some((sys_track_id, track_id)) =
+                js_to_medea_tracks_ids_insert
+            {
+                s.js_to_medea_tracks_ids.insert(sys_track_id, track_id);
             }
 
             sender_id

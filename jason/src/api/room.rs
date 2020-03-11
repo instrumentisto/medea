@@ -910,6 +910,8 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
+    /// Handles [`PeerEvent::StatsUpdate`] event and sends new stats to the RPC
+    /// server.
     fn on_stats_update(
         &mut self,
         peer_id: PeerId,

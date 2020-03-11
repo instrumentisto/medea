@@ -29,6 +29,22 @@ fn toggle_mute_tracks_updates(
         .collect()
 }
 
+/// Tests that [`RtcStats`] normally deserializes.
+#[wasm_bindgen_test]
+async fn get_stats() {
+    let (tx, _rx) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let peer =
+        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    assert!(!peer.get_stats().await.unwrap().0.is_empty());
+}
+
 const AUDIO_TRACK_ID: u64 = 1;
 const VIDEO_TRACK_ID: u64 = 2;
 

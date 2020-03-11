@@ -67,7 +67,6 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use medea_client_api_proto::stats::KnownRtcStatsType;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1045,12 +1044,19 @@ impl CommandHandler for Room {
         }
     }
 
+    /// Prints received `RtcStats` report into logs, atm.
     fn on_add_peer_connection_stats(
         &mut self,
         peer_id: PeerId,
         stats: Vec<RtcStatsType>,
         tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {
+        debug!(
+            "Received RtcStats for a Peer with {} ID and {:#?} tracks IDs: \
+             {:?}",
+            peer_id, tracks_ids, stats
+        );
+
         Ok(Box::new(actix::fut::ok(())))
     }
 }
