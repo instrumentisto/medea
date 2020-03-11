@@ -68,7 +68,7 @@ pub struct RtcStat<T> {
 
     /// Actual stats of this [`RtcStat`].
     ///
-    /// All possible stats are described in the [`KnownRtcStatsType`] enum.
+    /// All possible stats are described in the [`RtcStatsType`] enum.
     #[serde(flatten)]
     pub stats: Box<T>,
 }
@@ -81,7 +81,7 @@ pub struct RtcStat<T> {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
-pub enum KnownRtcStatsType {
+pub enum RtcStatsType {
     /// Statistics for a codec that is currently being used by RTP streams
     /// being sent or received by this `RTCPeerConnection` object. It is
     /// accessed by the [`RtcCodecStats`].
@@ -209,16 +209,17 @@ pub enum KnownRtcStatsType {
     /// Information about the connection to an ICE server (e.g. STUN or TURN).
     #[cfg(feature = "unused")]
     IceServer(RtcStat<RtcIceServerStats>),
-}
 
-/// Stores known [`KnownRtcStatsType`] (as [`NonExhaustive::Known`] enum
-/// variant) or unknown state (as [`NonExhaustive::Unknown`] enum variant).
-pub type RtcStatsType = NonExhaustive<KnownRtcStatsType>;
+    /// Disabled or unknown variants of stats will be deserialized as
+    /// [`RtcStatsType::Other`].
+    #[serde(other)]
+    Other,
+}
 
 /// This is now obsolete. Contains statistics related to a specific
 /// `MediaStream`.
 ///
-/// [`KnownRtcStatsType::Stream`] variant.
+/// [`RtcStatsType::Stream`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -237,7 +238,7 @@ pub struct MediaStreamStat {
 
 /// Statistics related to each RTCDataChannel id.
 ///
-/// [`KnownRtcStatsType::DataChannel`] variant.
+/// [`RtcStatsType::DataChannel`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -342,7 +343,7 @@ pub enum KnownDataChannelState {
 
 /// Stats for the [`RTCPeerConnection`] object.
 ///
-/// [`KnownRtcStatsType::PeerConnection`] variant.
+/// [`RtcStatsType::PeerConnection`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -378,7 +379,7 @@ pub struct RtcPeerConnectionStat {
 /// Statistics for a contributing source (CSRC) that contributed to an
 /// inbound RTP stream.
 ///
-/// [`KnownRtcStatsType::Csrc`] variant.
+/// [`RtcStatsType::Csrc`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -434,7 +435,7 @@ pub struct RtpContributingSourceStat {
 /// `RTCPeerConnection` object. It is measured at the remote endpoint and
 /// reported in an RTCP Sender Report (SR).
 ///
-/// [`KnownRtcStatsType::RemoteOutbountRtp`] variant.
+/// [`RtcStatsType::RemoteOutbountRtp`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -471,7 +472,7 @@ pub struct RemoteOutboundRtpStreamStat {
 /// `RTCPeerConnection` object. It is measured at the remote endpoint and
 /// reported in an RTCP Receiver Report (RR) or RTCP Extended Report (XR).
 ///
-/// [`KnownRtcStatsType::RemoteInboundRtp`] variant.
+/// [`RtcStatsType::RemoteInboundRtp`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -519,7 +520,7 @@ pub struct RemoteInboundRtpStreamStat {
 /// RTCRtpTransceiver is removed - this can only happen if a remote description
 /// is rolled back.
 ///
-/// [`KnownRtcStatsType::Transceiver`] variant.
+/// [`RtcStatsType::Transceiver`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -551,7 +552,7 @@ pub struct RtcRtpTransceiverStats {
 /// An [`RtcSctpTransportStats`] object represents the stats corresponding to an
 /// `RTCSctpTransport`.
 ///
-/// [`KnownRtcStatsType::SctpTransport`] variant.
+/// [`RtcStatsType::SctpTransport`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -578,7 +579,7 @@ pub struct RtcSctpTransportStats {
 /// bundling is not used, different [`MediaStreamTrack`] will use different
 /// transports. RTCP multiplexing and bundling are described in [WEBRTC].
 ///
-/// [`KnownRtcStatsType::Transport`] variant.
+/// [`RtcStatsType::Transport`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -639,7 +640,7 @@ pub enum IceRole {
 /// Statistics related to a specific `RTCRtpSender` and the corresponding
 /// media-level metrics.
 ///
-/// [`KnownRtcStatsType::Sender`] variant.
+/// [`RtcStatsType::Sender`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -665,7 +666,7 @@ pub enum SenderStatsKind {
 /// Statistics related to a specific receiver and the corresponding
 /// media-level metrics.
 ///
-/// [`KnownRtcStatsType::Receiver`] variant.
+/// [`RtcStatsType::Receiver`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -698,7 +699,7 @@ pub enum ReceiverStatsKind {
 /// the new candidates; this time doesn't correspond to any other
 /// externally observable event.
 ///
-/// [`KnownRtcStatsType::CandidatePair`] variant.
+/// [`RtcStatsType::CandidatePair`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -855,7 +856,7 @@ pub enum KnownCandidateType {
 pub type CandidateType = NonExhaustive<KnownCandidateType>;
 
 /// Fields which should be in the [`RtcStat`] of
-/// [`KnownRtcStatsType::InboundRtp`] type based on `mediaType`.
+/// [`RtcStatsType::InboundRtp`] type based on `mediaType`.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "mediaType")]
@@ -969,7 +970,7 @@ pub enum RtcInboundRtpStreamMediaType {
 /// metrics for the incoming RTP media stream. The timestamp reported in the
 /// statistics object is the time at which the data was sampled.
 ///
-/// [`KnownRtcStatsType::InboundRtp`] variant.
+/// [`RtcStatsType::InboundRtp`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1012,7 +1013,7 @@ pub struct RtcInboundRtpStreamStats {
 /// Statistics related to a specific `MediaStreamTrack`'s attachment to an
 /// `RTCRtpSender` and the corresponding media-level metrics.
 ///
-/// [`KnownRtcStatsType::Track`] variant.
+/// [`RtcStatsType::Track`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1049,7 +1050,7 @@ pub enum TrackStatKind {
 }
 
 /// Fields which should be in the [`RtcStat`] of
-/// [`KnownRtcStatsType::OutboundRtp`] type based on `mediaType`.
+/// [`RtcStatsType::OutboundRtp`] type based on `mediaType`.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "mediaType")]
@@ -1099,7 +1100,7 @@ pub enum RtcOutboundRtpStreamMediaType {
 /// `RTCSenderAudioTrackAttachmentStats` or
 /// `RTCSenderVideoTrackAttachmentStats`).
 ///
-/// [`KnownRtcStatsType::OutboundRtp`] variant.
+/// [`RtcStatsType::OutboundRtp`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1129,8 +1130,8 @@ pub struct RtcOutboundRtpStreamStats {
 /// `RTCIceCandidateStats` reflects the properties of a `candidate` in Section
 /// 15.1 of [RFC5245]. It corresponds to a `RTCIceCandidate` object.
 ///
-/// [`KnownRtcStatsType::LocalCandidate`] or
-/// [`KnownRtcStatsType::RemoteCandidate`] variants.
+/// [`RtcStatsType::LocalCandidate`] or
+/// [`RtcStatsType::RemoteCandidate`] variants.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1177,7 +1178,7 @@ pub struct RtcIceCandidateStats {
 }
 
 /// Fields which should be in the [`RtcStat`] of
-/// [`KnownRtcStatsType::MediaSource`] type based on `kind`.
+/// [`RtcStatsType::MediaSource`] type based on `kind`.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
@@ -1215,7 +1216,7 @@ pub enum MediaSourceKind {
 /// Statistics for the media produced by a MediaStreamTrack that is currently
 /// attached to an `RTCRtpSender`.
 ///
-/// [`KnownRtcStatsType::MediaSource`] variant.
+/// [`RtcStatsType::MediaSource`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1236,7 +1237,7 @@ pub struct MediaSourceStat {
 /// being sent or received by this `RTCPeerConnection` object. It is
 /// accessed by the [`RtcCodecStats`].
 ///
-/// [`KnownRtcStatsType::Codec`] variant.
+/// [`RtcStatsType::Codec`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1258,7 +1259,7 @@ pub struct RtcCodecStats {
 
 /// Information about a certificate used by an `RTCIceTransport`.
 ///
-/// [`KnownRtcStatsType::Certificate`] variant.
+/// [`RtcStatsType::Certificate`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -1345,7 +1346,7 @@ impl PartialEq for Float {
 
 /// Information about the connection to an ICE server (e.g. STUN or TURN).
 ///
-/// [`KnownRtcStatsType::IceServer`] variant.
+/// [`RtcStatsType::IceServer`] variant.
 ///
 /// [Full doc on W3C][1]
 ///

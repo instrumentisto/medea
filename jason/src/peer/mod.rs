@@ -365,6 +365,19 @@ impl PeerConnection {
         self.stats_getter_task_handle = Some(abort.into());
     }
 
+    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
+    /// [`RtcStats`].
+    pub async fn get_stats(&self) -> Result<RtcStats> {
+        self.peer
+            .get_stats()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
     /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
     /// the provided `mute_state`.
     #[inline]

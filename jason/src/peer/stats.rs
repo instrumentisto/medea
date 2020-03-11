@@ -89,6 +89,10 @@ impl TryFrom<&JsValue> for RtcStats {
                 .into_serde()
                 .map_err(tracerr::from_and_wrap!())?;
 
+            if let RtcStatsType::Other = &stat {
+                continue;
+            }
+
             stats.push(stat);
         }
 
