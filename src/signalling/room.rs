@@ -67,7 +67,6 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use crate::media::peer::PeerStats;
 use medea_client_api_proto::stats::KnownRtcStatsType;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -821,99 +820,7 @@ impl Room {
         Ok(())
     }
 
-    pub fn update_traffic_stats(
-        &mut self,
-        peer_id: PeerId,
-        new_stats: PeerStats,
-    ) {
-        let is_audio_publishing_started;
-        let is_video_publishing_started;
-        let is_audio_playing_started;
-        let is_video_playing_started;
-
-        {
-            let peer = self.peers.get_peer_by_id_mut(peer_id).unwrap();
-
-            is_audio_publishing_started = !peer.is_publishing(true, false)
-                && new_stats.audio_sent_packets > 0;
-            is_video_publishing_started = !peer.is_publishing(false, true)
-                && new_stats.video_sent_packets > 0;
-            is_audio_playing_started = !peer.is_playing(true, false)
-                && new_stats.audio_received_packets > 0;
-            is_video_playing_started = !peer.is_playing(false, true)
-                && new_stats.video_received_packets > 0;
-
-            peer.update_stats(new_stats);
-        }
-
-        let is_playing_started =
-            is_audio_playing_started || is_video_playing_started;
-        let is_publishing_started =
-            is_audio_publishing_started || is_video_publishing_started;
-
-        if !(is_playing_started || is_publishing_started) {
-            return;
-        }
-
-        let endpoints: Vec<_> = if let Some(endpoints) =
-            self.peers.get_endpoint_path_by_peer_id(peer_id)
-        {
-            endpoints
-                .into_iter()
-                .flat_map(|weak| weak.upgrade())
-                .collect()
-        } else {
-            return;
-        };
-
-        if is_playing_started {
-            for endpoint in &endpoints {
-                if let Endpoint::WebRtcPlayEndpoint(play_endpoint) = endpoint {
-                    if let Some(callback_url) = play_endpoint.on_start() {
-                        let fid = play_endpoint
-                            .owner()
-                            .get_fid_to_endpoint(play_endpoint.id().into());
-
-                        self.callbacks.send_callback(
-                            callback_url,
-                            fid.into(),
-                            OnStartEvent {
-                                audio: is_audio_playing_started,
-                                video: is_video_playing_started,
-                            },
-                        );
-                    }
-                }
-            }
-        }
-
-        if is_publishing_started {
-            for endpoint in &endpoints {
-                if let Endpoint::WebRtcPublishEndpoint(publish_endpoint) =
-                    endpoint
-                {
-                    publish_endpoint.change_peer_status(peer_id, true);
-                    if let Some(on_start) = publish_endpoint.on_start() {
-                        if publish_endpoint.publishing_peers_count() == 1 {
-                            let fid =
-                                publish_endpoint.owner().get_fid_to_endpoint(
-                                    publish_endpoint.id().into(),
-                                );
-
-                            self.callbacks.send_callback(
-                                on_start,
-                                fid.into(),
-                                OnStartEvent {
-                                    audio: is_audio_publishing_started,
-                                    video: is_video_publishing_started,
-                                },
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
+    pub fn update_traffic_stats(&mut self, peer_id: PeerId) {}
 }
 
 impl RpcServer for Addr<Room> {
@@ -1144,50 +1051,6 @@ impl CommandHandler for Room {
         stats: Vec<RtcStatsType>,
         tracks_ids: HashMap<String, TrackId>,
     ) -> Self::Output {
-        //        println!("{:#?}", stats);
-
-        // FIXME: if this stats patch doesn't have traffic updates, then
-        //       traffic update will be zero, but this is error and should be
-        // fixed.
-        let mut new_stats = PeerStats {
-            audio_received_packets: 0,
-            video_received_packets: 0,
-            audio_sent_packets: 0,
-            video_sent_packets: 0,
-        };
-
-        for stat in stats {
-            match stat {
-                KnownRtcStatsType::InboundRtp(stat) => {
-                    match stat.kind.media_type {
-                        RtcInboundRtpStreamMediaType::Audio { .. } => {
-                            new_stats.audio_received_packets +=
-                                stat.kind.packets_received;
-                        }
-                        RtcInboundRtpStreamMediaType::Video { .. } => {
-                            new_stats.video_received_packets +=
-                                stat.kind.packets_received;
-                        }
-                    }
-                }
-                KnownRtcStatsType::OutboundRtp(stat) => {
-                    match stat.kind.media_type {
-                        RtcOutboundRtpStreamMediaType::Audio { .. } => {
-                            new_stats.audio_sent_packets +=
-                                stat.kind.packets_sent;
-                        }
-                        RtcOutboundRtpStreamMediaType::Video { .. } => {
-                            new_stats.video_sent_packets +=
-                                stat.kind.packets_sent;
-                        }
-                    }
-                }
-                _ => (),
-            }
-        }
-
-        self.update_traffic_stats(peer_id, new_stats);
-
         Ok(Box::new(actix::fut::ok(())))
     }
 }
@@ -1615,10 +1478,7 @@ impl Handler<OnStartOnStopCallback> for Room {
                                 self.callbacks.send_callback(
                                     callback_url,
                                     fid.into(),
-                                    OnStartEvent {
-                                        audio: true,
-                                        video: true,
-                                    },
+                                    OnStartEvent {},
                                 );
                             }
                         }
@@ -1629,10 +1489,7 @@ impl Handler<OnStartOnStopCallback> for Room {
                                 self.callbacks.send_callback(
                                     callback_url,
                                     fid.into(),
-                                    OnStopEvent {
-                                        audio: true,
-                                        video: true,
-                                    },
+                                    OnStopEvent {},
                                 );
                             }
                         }
@@ -1657,10 +1514,7 @@ impl Handler<OnStartOnStopCallback> for Room {
                                     self.callbacks.send_callback(
                                         on_start,
                                         fid.into(),
-                                        OnStartEvent {
-                                            audio: true,
-                                            video: true,
-                                        },
+                                        OnStartEvent {},
                                     );
                                 }
                             }
@@ -1675,10 +1529,7 @@ impl Handler<OnStartOnStopCallback> for Room {
                                     self.callbacks.send_callback(
                                         on_stop,
                                         fid.into(),
-                                        OnStopEvent {
-                                            audio: true,
-                                            video: true,
-                                        },
+                                        OnStopEvent {},
                                     );
                                 }
                             }

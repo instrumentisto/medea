@@ -17,6 +17,7 @@ use medea_macro::enum_delegate;
 use crate::{
     api::control::MemberId, media::MediaTrack, signalling::peers::Counter,
 };
+use medea_client_api_proto::stats::StatId;
 
 /// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
@@ -65,40 +66,6 @@ impl PeerError {
     }
 }
 
-#[derive(Debug)]
-pub struct PeerStats {
-    pub audio_received_packets: u64,
-    pub video_received_packets: u64,
-    pub audio_sent_packets: u64,
-    pub video_sent_packets: u64,
-}
-
-impl PeerStats {
-    pub fn is_publishing(&self, audio: bool, video: bool) -> bool {
-        let is_audio_publishing = self.audio_sent_packets > 0;
-        let is_video_publishing = self.video_sent_packets > 0;
-
-        let is_only_audio_should_be = audio && !video && is_audio_publishing;
-        let is_only_video_should_be = video && !audio && is_video_publishing;
-        let is_both_should_be =
-            audio && video && is_audio_publishing && is_video_publishing;
-
-        is_only_audio_should_be || is_only_video_should_be || is_both_should_be
-    }
-
-    pub fn is_playing(&self, audio: bool, video: bool) -> bool {
-        let is_audio_playing = self.audio_received_packets > 0;
-        let is_video_playing = self.video_received_packets > 0;
-
-        let is_only_audio_should_be = audio && !video && is_audio_playing;
-        let is_only_video_should_be = video && !audio && is_video_playing;
-        let is_both_should_be =
-            audio && video && is_audio_playing && is_video_playing;
-
-        is_only_audio_should_be || is_only_video_should_be || is_both_should_be
-    }
-}
-
 /// Implementation of ['Peer'] state machine.
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
@@ -106,9 +73,7 @@ impl PeerStats {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn update_stats(&mut self, new_stats: PeerStats))]
-#[enum_delegate(pub fn is_playing(&self, audio: bool, video: bool) -> bool)]
-#[enum_delegate(pub fn is_publishing(&self, audio: bool, video: bool) -> bool)]
+#[enum_delegate(pub fn update_stats(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -191,7 +156,6 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
-    stats: PeerStats,
 }
 
 /// [RTCPeerConnection] representation.
@@ -272,34 +236,7 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    pub fn update_stats(&mut self, new_stats: PeerStats) {
-        println!(
-            "\n\n\t\tPeerId: {}; Peer stat update {:?}\n\n",
-            self.context.id, new_stats
-        );
-
-        // TODO: maybe macro here is bad?
-        macro_rules! update_if_greater {
-            ($field:ident) => {
-                if self.context.stats.$field < new_stats.$field {
-                    self.context.stats.$field = new_stats.$field;
-                }
-            };
-        }
-
-        update_if_greater!(video_sent_packets);
-        update_if_greater!(audio_sent_packets);
-        update_if_greater!(video_received_packets);
-        update_if_greater!(audio_received_packets);
-    }
-
-    pub fn is_publishing(&self, audio: bool, video: bool) -> bool {
-        self.context.stats.is_publishing(audio, video)
-    }
-
-    pub fn is_playing(&self, audio: bool, video: bool) -> bool {
-        self.context.stats.is_playing(audio, video)
-    }
+    pub fn update_stats(&mut self) {}
 }
 
 impl Peer<New> {
@@ -323,12 +260,6 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
-            stats: PeerStats {
-                audio_received_packets: 0,
-                video_received_packets: 0,
-                audio_sent_packets: 0,
-                video_sent_packets: 0,
-            },
         };
         Self {
             context,
@@ -478,60 +409,5 @@ impl Peer<Stable> {
             );
         }
         Ok(mids)
-    }
-}
-
-#[cfg(test)]
-mod peer_stats_specs {
-    use super::PeerStats;
-
-    #[test]
-    fn fully_not_started() {
-        let peer = PeerStats {
-            audio_received_packets: 0,
-            video_received_packets: 0,
-            audio_sent_packets: 0,
-            video_sent_packets: 0,
-        };
-
-        assert!(!peer.is_publishing(true, true));
-        assert!(!peer.is_publishing(true, false));
-        assert!(!peer.is_publishing(false, true));
-        assert!(peer.is_publishing(false, false));
-
-        assert!(!peer.is_playing(true, true));
-        assert!(!peer.is_playing(true, false));
-        assert!(!peer.is_playing(false, true));
-        assert!(peer.is_playing(false, false));
-    }
-
-    #[test]
-    fn audio_playing() {
-        let peer = PeerStats {
-            audio_received_packets: 100,
-            video_received_packets: 0,
-            audio_sent_packets: 0,
-            video_sent_packets: 0,
-        };
-
-        assert!(!peer.is_playing(true, true));
-        assert!(peer.is_playing(true, false));
-        assert!(!peer.is_playing(false, true));
-        assert!(!peer.is_playing(false, false));
-    }
-
-    #[test]
-    fn all_playing() {
-        let peer = PeerStats {
-            audio_received_packets: 100,
-            video_received_packets: 100,
-            audio_sent_packets: 0,
-            video_sent_packets: 0,
-        };
-
-        assert!(peer.is_playing(true, true));
-        assert!(peer.is_playing(true, false));
-        assert!(peer.is_playing(false, true));
-        assert!(!peer.is_playing(false, false));
     }
 }

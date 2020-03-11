@@ -69,32 +69,20 @@ impl Into<proto::OnJoin> for OnJoinEvent {
 }
 
 #[derive(Debug)]
-pub struct OnStartEvent {
-    pub audio: bool,
-    pub video: bool,
-}
+pub struct OnStartEvent {}
 
 impl Into<proto::OnStart> for OnStartEvent {
     fn into(self) -> proto::OnStart {
-        proto::OnStart {
-            audio: self.audio,
-            video: self.video,
-        }
+        proto::OnStart {}
     }
 }
 
 #[derive(Debug)]
-pub struct OnStopEvent {
-    pub audio: bool,
-    pub video: bool,
-}
+pub struct OnStopEvent {}
 
 impl Into<proto::OnStop> for OnStopEvent {
     fn into(self) -> proto::OnStop {
-        proto::OnStop {
-            audio: self.audio,
-            video: self.video,
-        }
+        proto::OnStop {}
     }
 }
 

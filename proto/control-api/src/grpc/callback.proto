@@ -26,15 +26,9 @@ message Request {
   }
 }
 
-message OnStart {
-  bool audio = 1;
-  bool video = 2;
-}
+message OnStart {}
 
-message OnStop {
-  bool audio = 1;
-  bool video = 2;
-}
+message OnStop {}
 
 // Empty response of the Callback service.
 //

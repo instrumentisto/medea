@@ -27,17 +27,9 @@ pub mod request {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStart {
-    #[prost(bool, tag="1")]
-    pub audio: bool,
-    #[prost(bool, tag="2")]
-    pub video: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStop {
-    #[prost(bool, tag="1")]
-    pub audio: bool,
-    #[prost(bool, tag="2")]
-    pub video: bool,
 }
 /// Empty response of the Callback service.
 ///
