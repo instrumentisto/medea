@@ -1015,7 +1015,7 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         debug!(
             "Received RtcStats for a Peer with {} ID and {:#?} tracks IDs: \
-             {:#?}",
+             {:?}",
             peer_id, tracks_ids, stats
         );
 
