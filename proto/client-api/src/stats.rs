@@ -460,8 +460,7 @@ pub struct RemoteOutboundRtpStreamStat {
     /// local clock.
     ///
     /// [HIGRES-TIME]: https://www.w3.org/TR/webrtc-stats/#bib-highres-time
-    // TODO: test that this is correct.
-    pub remote_timestamp: Option<Duration>,
+    pub remote_timestamp: Option<HighResTimeStamp>,
 
     /// Represents the total number of RTCP SR blocks sent for this SSRC.
     pub reports_sent: Option<u64>,
