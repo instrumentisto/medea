@@ -67,6 +67,7 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use medea_control_api_proto::grpc::callback::OnStart;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1056,6 +1057,45 @@ impl CommandHandler for Room {
              {:?}",
             peer_id, tracks_ids, stats
         );
+
+        let mut is_started = false;
+        if let Ok(peer) = self.peers.get_peer_by_id_mut(peer_id) {
+            let is_started_before_update = peer.is_started();
+            peer.update_stats(&stats);
+            if peer.is_started() && !is_started_before_update {
+                is_started = true;
+                println!("\n\n\tPeer {} started!!!\n\n", peer_id);
+            }
+        }
+        if is_started {
+            if let Some(endpoints) = self.peers.get_endpoint_path_by_peer_id(peer_id) {
+                let send_callbacks: HashMap<_, _> = endpoints.into_iter().filter_map(|e| e.upgrade())
+                    .filter_map(|endpoint| {
+                        match endpoint {
+                            Endpoint::WebRtcPublishEndpoint(publish) => {
+                                publish.change_peer_status(peer_id, true);
+                                if publish.publishing_peers_count() == 1 {
+                                    if let Some(on_start) = publish.on_start() {
+                                        let fid = publish.owner().get_fid_to_endpoint(publish.id().into());
+                                        return Some((fid, on_start))
+                                    }
+                                }
+                            }
+                            Endpoint::WebRtcPlayEndpoint(play) => {
+                                if let Some(on_start) = play.on_start() {
+                                    let fid = play.owner().get_fid_to_endpoint(play.id().into());
+                                    return Some((fid, on_start))
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                for (fid, on_start) in send_callbacks {
+                    self.callbacks.send_callback(on_start, fid.into(), OnStartEvent {});
+                }
+            }
+        }
 
         Ok(Box::new(actix::fut::ok(())))
     }

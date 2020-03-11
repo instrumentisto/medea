@@ -41,7 +41,7 @@ pub enum NonExhaustive<T> {
 /// underlying object.
 ///
 /// [`RTCStatsReport`]: https://www.w3.org/TR/webrtc/#dom-rtcstatsreport
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash, Eq)]
 pub struct StatId(pub String);
 
 /// Represents the [stats object] constructed by inspecting a specific
