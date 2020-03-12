@@ -112,9 +112,14 @@ impl WsSession {
                     ClosedReason::Lost,
                 ));
 
-                ctx.notify(Close::with_normal_code(&CloseDescription::new(
-                    CloseReason::Idle,
-                )))
+                // TODO: Lets comment this out until we implement handshake on
+                //       reconnect. Since all messages buffered on client will
+                //       be lost then, we can only afford when we will have
+                //       handshakes on reconnect.
+                //       PR: https://github.com/instrumentisto/medea/pull/51
+                // ctx.notify(Close::with_normal_code(&CloseDescription::new(
+                //     CloseReason::Idle,
+                // )))
             }
         });
     }
