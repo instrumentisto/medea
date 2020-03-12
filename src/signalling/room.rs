@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, Message, WrapFuture as _,
+    Handler, Message, WrapFuture as _, WrapFuture,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -67,6 +67,7 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use crate::turn::stats_validator::{StatsValidator, Validate};
 use medea_control_api_proto::grpc::callback::OnStart;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -203,6 +204,8 @@ pub struct Room {
     state: State,
 
     coturn_stats: Addr<CoturnStats>,
+
+    stats_validator: Addr<StatsValidator>,
 }
 
 impl Room {
@@ -226,6 +229,8 @@ impl Room {
             state: State::Started,
             callbacks: context.callbacks.clone(),
             coturn_stats: context.coturn_stats.clone(),
+            stats_validator: StatsValidator::new(context.turn_service.clone())
+                .start(),
         })
     }
 
@@ -1068,23 +1073,33 @@ impl CommandHandler for Room {
             }
         }
         if is_started {
-            if let Some(endpoints) = self.peers.get_endpoint_path_by_peer_id(peer_id) {
-                let send_callbacks: HashMap<_, _> = endpoints.into_iter().filter_map(|e| e.upgrade())
+            if let Some(endpoints) =
+                self.peers.get_endpoint_path_by_peer_id(peer_id)
+            {
+                let send_callbacks: HashMap<_, _> = endpoints
+                    .into_iter()
+                    .filter_map(|e| e.upgrade())
                     .filter_map(|endpoint| {
                         match endpoint {
                             Endpoint::WebRtcPublishEndpoint(publish) => {
                                 publish.change_peer_status(peer_id, true);
                                 if publish.publishing_peers_count() == 1 {
                                     if let Some(on_start) = publish.on_start() {
-                                        let fid = publish.owner().get_fid_to_endpoint(publish.id().into());
-                                        return Some((fid, on_start))
+                                        let fid = publish
+                                            .owner()
+                                            .get_fid_to_endpoint(
+                                                publish.id().into(),
+                                            );
+                                        return Some((fid, on_start));
                                     }
                                 }
                             }
                             Endpoint::WebRtcPlayEndpoint(play) => {
                                 if let Some(on_start) = play.on_start() {
-                                    let fid = play.owner().get_fid_to_endpoint(play.id().into());
-                                    return Some((fid, on_start))
+                                    let fid = play
+                                        .owner()
+                                        .get_fid_to_endpoint(play.id().into());
+                                    return Some((fid, on_start));
                                 }
                             }
                         }
@@ -1092,9 +1107,46 @@ impl CommandHandler for Room {
                     })
                     .collect();
                 for (fid, on_start) in send_callbacks {
-                    self.callbacks.send_callback(on_start, fid.into(), OnStartEvent {});
+                    self.callbacks.send_callback(
+                        on_start,
+                        fid.into(),
+                        OnStartEvent {},
+                    );
                 }
             }
+
+            return Ok(Box::new(
+                self.stats_validator
+                    .send(Validate {
+                        peer_id,
+                        room_id: self.id().clone(),
+                    })
+                    .into_actor(self)
+                    .map(move |res, this, ctx| {
+                        match res {
+                            Ok(res) => match res {
+                                Ok(_) => {
+                                    println!(
+                                        "\n\n\n{} Peer validated!\n\n\n",
+                                        peer_id
+                                    );
+                                }
+                                Err(_) => {
+                                    println!(
+                                        "\n\n\n{} Peer invalidated!\n\n\n",
+                                        peer_id
+                                    );
+                                }
+                            },
+                            Err(_) => {
+                                println!(
+                                    "\n\n\nSomething with actor!!!!!\n\n\n"
+                                );
+                            }
+                        }
+                        Ok(())
+                    }),
+            ));
         }
 
         Ok(Box::new(actix::fut::ok(())))
@@ -1586,6 +1638,22 @@ impl Handler<OnStartOnStopCallback> for Room {
         }
 
         debug!("LOOK AT ME: {:?}", msg);
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct InvalidPeerStats(pub PeerId);
+
+impl Handler<InvalidPeerStats> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: InvalidPeerStats,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        println!("Stats of Peer {} is invalid.", msg.0);
     }
 }
 

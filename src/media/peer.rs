@@ -220,7 +220,8 @@ impl TrackStat {
     }
 
     pub fn is_running(&self) -> bool {
-        let is_updated_within_timeout = self.last_update > (Instant::now() - Duration::from_secs(10));
+        let is_updated_within_timeout =
+            self.last_update > (Instant::now() - Duration::from_secs(10));
 
         match self.direction {
             TrackStatDirection::Recv { packets_received } => {

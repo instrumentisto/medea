@@ -21,6 +21,7 @@ use crate::{
     },
 };
 use medea_client_api_proto::PeerId;
+use medea_coturn_telnet_client::sessions_parser::Session;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -63,6 +64,12 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 
     /// Deletes batch of [`IceUser`]s.
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr>;
+
+    async fn get_sessions(
+        &self,
+        room_id: RoomId,
+        peer_id: PeerId,
+    ) -> Result<Vec<Session>, TurnServiceErr>;
 }
 
 /// [`TurnAuthService`] implementation backed by Redis database.
@@ -148,6 +155,17 @@ impl TurnAuthService for Service {
         self.turn_db.remove(users.as_slice()).await?;
         self.coturn_cli.delete_sessions(users.as_slice()).await?;
         Ok(())
+    }
+
+    async fn get_sessions(
+        &self,
+        room_id: RoomId,
+        peer_id: PeerId,
+    ) -> Result<Vec<Session>, TurnServiceErr> {
+        Ok(self
+            .coturn_cli
+            .get_sessions(format!("{}_{}", room_id, peer_id))
+            .await?)
     }
 }
 
