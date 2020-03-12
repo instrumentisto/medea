@@ -781,10 +781,18 @@ impl Room {
         Ok(())
     }
 
-    fn update_peer_connection_state<S: Into<PeerConnectionState>>(
+    /// Updates specified [`Peer`] connection state.
+    ///
+    /// Initiates ICE restart if new connection state is
+    /// [`PeerConnectionState::Failed`], previous connection state is
+    /// [`PeerConnectionState::Connected`] or
+    /// [`PeerConnectionState::Disconnected`] and connected [`Peer`] connection
+    /// state is [`PeerConnectionState::Connected`] or
+    /// [`PeerConnectionState::Disconnected`].
+    fn update_peer_connection_state(
         &mut self,
         peer_id: PeerId,
-        new_state: S,
+        new_state: PeerConnectionState,
     ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
         use PeerConnectionState::*;
         let peer = match self.peers.get_peer_by_id(peer_id) {
@@ -792,10 +800,17 @@ impl Room {
             Err(err) => return future::err(err).boxed_local(),
         };
 
-        let old_state: PeerConnectionState =
-            peer.update_connection_state(new_state);
-        let new_state: PeerConnectionState = peer.connection_state();
+        let old_state: PeerConnectionState = peer.connection_state();
 
+        // check whether state really changed
+        if let (Failed, Disconnected) = (old_state, new_state) {
+            // Failed => Disconnected is still Failed
+            return future::ok(()).boxed_local();
+        } else {
+            peer.set_connection_state(new_state);
+        }
+
+        // maybe init ICE restart
         match new_state {
             Failed => match old_state {
                 Connected | Disconnected => {
@@ -806,22 +821,24 @@ impl Room {
                             Err(err) => return future::err(err).boxed_local(),
                         };
 
-                    match connected_peer_state {
-                        Connected | Disconnected => {
-                            let member_id = peer.member_id();
-                            let peer: Peer<Stable> =
-                                self.peers.take_inner_peer(peer_id).unwrap();
-                            self.peers.add_peer(peer.start_renegotiation());
+                    if let Failed = connected_peer_state {
+                        match self.peers.take_inner_peer::<Stable>(peer_id) {
+                            Ok(peer) => {
+                                let member_id = peer.member_id();
+                                self.peers.add_peer(peer.start_renegotiation());
 
-                            self.members.send_event_to_member(
-                                member_id,
-                                Event::RenegotiationStarted {
-                                    peer_id,
-                                    ice_restart: true,
-                                },
-                            )
+                                self.members.send_event_to_member(
+                                    member_id,
+                                    Event::RenegotiationStarted {
+                                        peer_id,
+                                        ice_restart: true,
+                                    },
+                                )
+                            }
+                            Err(err) => future::err(err).boxed_local(),
                         }
-                        _ => future::ok(()).boxed_local(),
+                    } else {
+                        future::ok(()).boxed_local()
                     }
                 }
                 _ => future::ok(()).boxed_local(),
@@ -923,7 +940,7 @@ impl CommandHandler for Room {
         let event = match from_peer.connection_state() {
             PeerConnectionState::Failed => Event::SdpOfferMade {
                 peer_id: to_peer.id(),
-                sdp_answer: sdp_offer,
+                sdp_offer,
             },
             _ => Event::PeerCreated {
                 peer_id: to_peer.id(),
@@ -1013,16 +1030,19 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         metrics: PeerMetrics,
     ) -> Self::Output {
-        match metrics {
-            PeerMetrics::IceConnectionStateChanged(state) => Ok(Box::new(
-                self.update_peer_connection_state(peer_id, state)
-                    .into_actor(self),
-            )),
-            PeerMetrics::PeerConnectionStateChanged(state) => Ok(Box::new(
-                self.update_peer_connection_state(peer_id, state)
-                    .into_actor(self),
-            )),
-        }
+        use PeerMetrics::*;
+
+        Ok(Box::new(
+            match metrics {
+                IceConnectionStateChanged(state) => {
+                    self.update_peer_connection_state(peer_id, state.into())
+                }
+                PeerConnectionStateChanged(state) => {
+                    self.update_peer_connection_state(peer_id, state)
+                }
+            }
+            .into_actor(self),
+        ))
     }
 
     /// Sends [`Event::TracksUpdated`] with data from the received
@@ -1491,15 +1511,21 @@ mod test {
     fn command_validation_peer_does_not_belong_to_member() {
         let mut room = empty_room();
 
-        let member1 = MemberSpec::new(
-            Pipeline::new(HashMap::new()),
-            String::from("w/e"),
-            None,
-            None,
-        );
+        room.peers.add_peer(Peer::new(
+            PeerId(0),
+            MemberId::from(String::from("member_1")),
+            PeerId(1),
+            MemberId::from(String::from("member_2")),
+            false,
+        ));
 
-        room.create_member(MemberId(String::from("member1")), &member1)
-            .unwrap();
+        room.peers.add_peer(Peer::new(
+            PeerId(1),
+            MemberId::from(String::from("member_2")),
+            PeerId(0),
+            MemberId::from(String::from("member_1")),
+            false,
+        ));
 
         let no_such_peer = CommandMessage::new(
             MemberId(String::from("member1")),
@@ -1517,7 +1543,52 @@ mod test {
 
         assert_eq!(
             validation,
-            Err(CommandValidationError::PeerNotFound(PeerId(1)))
+            Err(CommandValidationError::PeerBelongsToAnotherMember(
+                PeerId(1),
+                MemberId(String::from("member_2"))
+            ))
+        );
+    }
+
+    #[actix_rt::test]
+    async fn simple_update_peer_connection_state() {
+        let mut room: Room = empty_room();
+        let peer_id = PeerId(0);
+
+        room.peers.add_peer(Peer::new(
+            peer_id,
+            MemberId::from(String::from("member_1")),
+            PeerId(1),
+            MemberId::from(String::from("member_2")),
+            false,
+        ));
+
+        room.update_peer_connection_state(
+            peer_id,
+            PeerConnectionState::Connecting,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            room.peers
+                .get_peer_by_id(peer_id)
+                .unwrap()
+                .connection_state(),
+            PeerConnectionState::Connecting
+        );
+
+        room.update_peer_connection_state(
+            peer_id,
+            PeerConnectionState::Connected,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            room.peers
+                .get_peer_by_id(peer_id)
+                .unwrap()
+                .connection_state(),
+            PeerConnectionState::Connected
         );
     }
 }

@@ -19,13 +19,20 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- `TrackId` and `PeerId` types ([#28]);
-- `Incrementable` trait ([#28]);
-- `CloseReason` and `CloseDescription` types ([#58]);
-- `AddPeerConnectionMetrics` client command with `IceConnectionState` and `PeerConnectionState` metrics ([#71], [#87]);
-- `RpcSettings` server message ([#75]);
-- `force_relay` field to `PeerCreated` event ([#79]);
-- `UpdateTracks` command and `TracksUpdated` event ([#81]).
+- Commands:
+    - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` metrics ([#71], [#87]);
+    - `UpdateTracks` ([#58]);
+- Events: 
+    - `RpcSettings` ([#75]);
+    - `force_relay` field to `PeerCreated` event ([#79]);
+    - `TracksUpdated` ([#81]);
+    - `SdpOfferMade` ([#89]);
+    - `RenegotiationStarted` ([#89]);
+- Misc:
+    - `TrackId` and `PeerId` types ([#28]);
+    - `Incrementable` trait ([#28]);
+    - `CloseReason` and `CloseDescription` types ([#58]).
+    
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -34,6 +41,7 @@ All user visible changes to this project will be documented in this file. This p
 [#79]: /../../pull/79
 [#81]: /../../pull/81
 [#87]: /../../pull/87
+[#89]: /../../pull/89
 
 
 

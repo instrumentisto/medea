@@ -74,7 +74,7 @@ async fn mute_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
     let handle = room.new_handle();
@@ -89,7 +89,7 @@ async fn mute_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -116,7 +116,7 @@ async fn join_two_audio_mutes() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -151,7 +151,7 @@ async fn join_two_video_mutes() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -188,7 +188,7 @@ async fn join_mute_and_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(5);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -230,7 +230,7 @@ async fn join_mute_and_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer(5);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -272,7 +272,7 @@ async fn join_unmute_and_mute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(7);
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -462,7 +462,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
     let (audio_track, video_track) = get_test_tracks(false, false);
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -866,7 +866,7 @@ mod patches_generation {
                 .unwrap(),
             );
 
-            peer.get_offer(tracks, None).await.unwrap();
+            peer.get_offer(tracks, None, false).await.unwrap();
 
             peers.insert(peer_id, peer);
         }
@@ -1039,5 +1039,10 @@ mod patches_generation {
                 }]
             }
         );
+    }
+
+    #[wasm_bindgen_test]
+    async fn ice_restart_renegotiation() {
+        unimplemented!()
     }
 }

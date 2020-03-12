@@ -1,6 +1,7 @@
 //! Signalling API E2E tests.
 
 mod command_validation;
+mod ice_restart;
 mod pub_sub_signallng;
 mod three_pubs;
 

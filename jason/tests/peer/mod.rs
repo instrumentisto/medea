@@ -40,7 +40,7 @@ async fn mute_unmute_audio() {
     let peer =
         PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -65,7 +65,7 @@ async fn mute_unmute_video() {
     let (audio_track, video_track) = get_test_tracks(false, false);
     let peer =
         PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -91,7 +91,7 @@ async fn new_with_mute_audio() {
     let peer =
         PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
 
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
@@ -106,7 +106,7 @@ async fn new_with_mute_video() {
     let (audio_track, video_track) = get_test_tracks(false, true);
     let peer =
         PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -128,7 +128,7 @@ async fn add_candidates_to_answerer_before_offer() {
         PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let offer = pc1
-        .get_offer(vec![audio_track, video_track], None)
+        .get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -158,7 +158,7 @@ async fn add_candidates_to_offerer_before_answer() {
 
     let (audio_track, video_track) = get_test_tracks(false, false);
     let offer = pc1
-        .get_offer(vec![audio_track, video_track], None)
+        .get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
     let answer = pc2.process_offer(offer, vec![], None).await.unwrap();
@@ -186,7 +186,7 @@ async fn normal_exchange_of_candidates() {
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+        .get_offer(vec![audio_track.clone(), video_track.clone()], None, false)
         .await
         .unwrap();
     let answer = peer2
@@ -238,7 +238,7 @@ async fn send_event_on_new_local_stream() {
     let (audio_track, video_track) = get_test_tracks(false, true);
     let id = PeerId(1);
     let peer = PeerConnection::new(id, tx, vec![], manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 
@@ -270,7 +270,7 @@ async fn ice_connection_state_changed_is_emitted() {
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+        .get_offer(vec![audio_track.clone(), video_track.clone()], None, false)
         .await
         .unwrap();
     let answer = peer2

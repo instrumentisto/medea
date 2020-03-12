@@ -716,6 +716,19 @@ struct TracksUpdated {
 }
 ```
 
+#### 11. RenegotiationStarted
+
+`Media Server` notifies Web Client about necessity to start renegotiation. Target `Peer` must answer with `MakeSdpOffer` command.
+
+Can be used to restart ICE connection.
+
+```rust
+struct RenegotiationStarted {
+    peer_id: PeerId,
+    ice_restart: bool,
+}
+```
+
 
 ### Commands
 

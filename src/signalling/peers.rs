@@ -174,6 +174,36 @@ impl PeerRepository {
             .filter(move |peer| &peer.member_id() == member_id)
     }
 
+    // /// Returns owned [`Peer`] by its ID. [`Peer`] is returned to repository
+    // in case of error. ///
+    // /// # Errors
+    // ///
+    // /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`]
+    // doesn't /// exist in [`PeerRepository`].
+    // ///
+    // /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
+    // requested state. pub fn take_inner_peer<S>(
+    //     &mut self,
+    //     peer_id: PeerId,
+    // ) -> Result<Peer<S>, RoomError>
+    // where
+    //     &Peer<S>: TryFrom<&PeerStateMachine>,
+    //     Peer<S>: TryFrom<PeerStateMachine>,
+    //     <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
+    // {
+    //     match self.peers.remove(&peer_id) {
+    //         Some(peer) => {
+    //             match <&Peer::<S>>::try_from(&peer) {
+    //                 Ok(_) => peer.try_into().map_err(Into::into),
+    //                 Err(_) => {
+    //                     unreachable!()
+    //                 },
+    //             }
+    //         },
+    //         None => Err(RoomError::PeerNotFound(peer_id)),
+    //     }
+    // }
+
     /// Returns owned [`Peer`] by its ID.
     ///
     /// # Errors

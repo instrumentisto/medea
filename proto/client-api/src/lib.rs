@@ -153,7 +153,7 @@ pub enum PeerMetrics {
 /// Peer Connection's ICE connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum IceConnectionState {
     New,
     Checking,
@@ -167,7 +167,7 @@ pub enum IceConnectionState {
 /// Peer Connection's connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PeerConnectionState {
     New,
     Connecting,
@@ -246,13 +246,9 @@ pub enum Event {
         force_relay: bool,
     },
 
-    /// Media Server notifies Web Client about necessity to start renegotation,
-    /// creating new SDP Offer.
-    RenegotiationStarted { peer_id: PeerId, ice_restart: bool },
-
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Offer to Web Client's RTCPeerConnection.
-    SdpOfferMade { peer_id: PeerId, sdp_answer: String },
+    SdpOfferMade { peer_id: PeerId, sdp_offer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
@@ -278,6 +274,10 @@ pub enum Event {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     },
+
+    /// Media Server notifies Web Client about necessity to start
+    /// renegotiation, creating new SDP Offer.
+    RenegotiationStarted { peer_id: PeerId, ice_restart: bool },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

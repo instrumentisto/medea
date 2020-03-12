@@ -70,10 +70,10 @@ impl PeerError {
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
 #[enum_delegate(
-    pub fn update_connection_state<S: Into<PeerConnectionState>>(
+    pub fn set_connection_state(
         &self,
-        state: S
-    ) -> PeerConnectionState
+        state: PeerConnectionState
+    )
 )]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -235,17 +235,14 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    /// Changes [`Peer`]'s connection state returning current value.
-    pub fn update_connection_state<S: Into<PeerConnectionState>>(
-        &self,
-        state: S,
-    ) -> PeerConnectionState {
-        self.context.connection_state.replace(state.into())
+    /// Changes [`Peer`]'s connection state.
+    pub fn set_connection_state(&self, state: PeerConnectionState) {
+        self.context.connection_state.replace(state);
     }
 
     /// Returns [`Peer`] current connection state.
     pub fn connection_state(&self) -> PeerConnectionState {
-        self.context.connection_state.borrow().clone()
+        *self.context.connection_state.borrow()
     }
 }
 
@@ -292,7 +289,7 @@ impl Peer<WaitLocalSdp> {
 }
 
 impl Peer<WaitRemoteSdp> {
-    /// Sets remote description and transition [`Peer`] to [`Stable`] state.
+    /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer.to_string());
@@ -304,7 +301,7 @@ impl Peer<WaitRemoteSdp> {
 }
 
 impl Peer<WaitLocalHaveRemote> {
-    /// Sets local description and transition [`Peer`] to [`Stable`] state.
+    /// Sets local description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer);

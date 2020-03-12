@@ -43,7 +43,8 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RtcIceTransportPolicy` configuration ([#79]).
+        - `RtcIceTransportPolicy` configuration ([#79]);
+    - ICE restart support ([#89]).
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
@@ -55,6 +56,8 @@ All user visible changes to this project will be documented in this file. This p
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
         - `ApplyTracks` for muting/unmuting ([#81]).
+    - Handle `Event::RenegotiationStarted`([#89]);
+    - Handle `Even::SdpOfferMade` ([#89]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -75,6 +78,7 @@ All user visible changes to this project will be documented in this file. This p
 [#79]: /../../pull/79
 [#81]: /../../pull/81
 [#87]: /../../pull/87
+[#89]: /../../pull/89
 
 
 

@@ -36,7 +36,9 @@ All user visible changes to this project will be documented in this file. This p
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
-    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]).
+    - Send `Event::TracksUpdated` on `Command::UpdateTracks` ([#81]).
+    - Send `Event::RenegotiationStarted` based on reported connection state ([#89]);
+    - Send `Event::SdpOfferMade` on `Command::MakeSdpOffer` during renegotiation ([#89]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]).
 - Configuration:
@@ -62,6 +64,7 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#84]: /../../pull/84
 [#86]: /../../pull/86
+[#89]: /../../pull/89
 
 
 
