@@ -12,7 +12,7 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStatsType,
         StatId,
     },
-    MediaType, PeerId,
+    PeerId,
 };
 
 use crate::{

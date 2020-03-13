@@ -3,10 +3,7 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::{
-    collections::{HashMap, HashSet},
-    time::Instant,
-};
+use std::collections::{HashMap, HashSet};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
@@ -67,7 +64,6 @@ use crate::{
         peers::PeerRepository,
         room::CommandValidationError::PeerBelongsToAnotherMember,
     },
-    turn::coturn_stats::{CoturnStats, EventType, Subscribe},
     utils::ResponseActAnyFuture,
     AppContext,
 };
@@ -207,8 +203,6 @@ pub struct Room {
     /// Current state of this [`Room`].
     state: State,
 
-    coturn_stats: Addr<CoturnStats>,
-
     metrics_service: Addr<MetricsService>,
 
     peer_metrics_service: Addr<PeerMetricsService>,
@@ -235,7 +229,6 @@ impl Room {
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
-            coturn_stats: context.coturn_stats.clone(),
             peer_metrics_service: PeerMetricsService::new(
                 room_spec.id().clone(),
                 metrics_service.clone(),
@@ -412,20 +405,6 @@ impl Room {
             },
         });
 
-        self.coturn_stats.do_send(Subscribe {
-            peer_id: first_peer,
-            partner_peer_id: second_peer,
-            room_id: self.id.clone(),
-            addr: ctx.address(),
-            events_type: HashSet::new(),
-        });
-        self.coturn_stats.do_send(Subscribe {
-            peer_id: second_peer,
-            partner_peer_id: first_peer,
-            room_id: self.id.clone(),
-            addr: ctx.address(),
-            events_type: HashSet::new(),
-        });
         match self.send_peer_created(first_peer, second_peer) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
                 if res.is_ok() {
@@ -1559,111 +1538,6 @@ impl Handler<CreateEndpoint> for Room {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Message, Debug)]
-#[rtype(result = "()")]
-pub struct OnStartOnStopCallback {
-    pub event: EventType,
-    pub peer_id: PeerId,
-}
-
-impl Handler<OnStartOnStopCallback> for Room {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: OnStartOnStopCallback,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        return;
-
-        let endpoints: Vec<_> = self
-            .peers
-            .get_endpoint_path_by_peer_id(msg.peer_id)
-            .into_iter()
-            .flat_map(|endpoints| {
-                endpoints.into_iter().filter_map(|e| e.upgrade())
-            })
-            .collect();
-
-        for endpoint in endpoints {
-            match endpoint {
-                Endpoint::WebRtcPlayEndpoint(play_endpoint) => {
-                    let fid = play_endpoint
-                        .owner()
-                        .get_fid_to_endpoint(play_endpoint.id().into());
-                    match msg.event {
-                        EventType::OnStart => {
-                            if let Some(callback_url) = play_endpoint.on_start()
-                            {
-                                // TODO: OnStopEvent audio and video separation
-                                self.callbacks.send_callback(
-                                    callback_url,
-                                    fid.into(),
-                                    OnStartEvent {},
-                                );
-                            }
-                        }
-                        EventType::OnStop => {
-                            if let Some(callback_url) = play_endpoint.on_stop()
-                            {
-                                // TODO: OnStopEvent audio and video separation
-                                self.callbacks.send_callback(
-                                    callback_url,
-                                    fid.into(),
-                                    OnStopEvent {},
-                                );
-                            }
-                        }
-                    }
-                }
-                Endpoint::WebRtcPublishEndpoint(publish_endpoint) => {
-                    // TODO: I'm redudant in some if cases!!!
-                    let fid = publish_endpoint
-                        .owner()
-                        .get_fid_to_endpoint(publish_endpoint.id().into());
-                    match msg.event {
-                        EventType::OnStart => {
-                            publish_endpoint
-                                .change_peer_status(msg.peer_id, true);
-                            if let Some(on_start) = publish_endpoint.on_start()
-                            {
-                                if publish_endpoint.publishing_peers_count()
-                                    == 1
-                                {
-                                    // TODO: OnStopEvent audio and video
-                                    // separation
-                                    self.callbacks.send_callback(
-                                        on_start,
-                                        fid.into(),
-                                        OnStartEvent {},
-                                    );
-                                }
-                            }
-                        }
-                        EventType::OnStop => {
-                            publish_endpoint
-                                .change_peer_status(msg.peer_id, false);
-                            if let Some(on_stop) = publish_endpoint.on_stop() {
-                                if !publish_endpoint.is_endpoint_publishing() {
-                                    // TODO: OnStopEvent audio and video
-                                    // separation
-                                    self.callbacks.send_callback(
-                                        on_stop,
-                                        fid.into(),
-                                        OnStopEvent {},
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        debug!("LOOK AT ME: {:?}", msg);
     }
 }
 

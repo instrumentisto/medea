@@ -11,10 +11,7 @@ use medea::{
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
     signalling::{room_repo::RoomRepository, room_service::RoomService},
-    turn::{
-        cli::CoturnTelnetClient, coturn_stats::CoturnStats,
-        new_turn_auth_service,
-    },
+    turn::{cli::CoturnTelnetClient, new_turn_auth_service},
     AppContext,
 };
 
@@ -43,11 +40,7 @@ fn main() -> Result<(), Error> {
                 config.turn.cli.pass.to_string(),
                 config.turn.cli.pool.into(),
             );
-            let coturn_stats = CoturnStats::new(&config.turn, coturn_client)
-                .unwrap()
-                .start();
-            let app_context =
-                AppContext::new(config.clone(), turn_service, coturn_stats);
+            let app_context = AppContext::new(config.clone(), turn_service);
 
             let room_repo = RoomRepository::new(HashMap::new());
             let room_service = RoomService::new(

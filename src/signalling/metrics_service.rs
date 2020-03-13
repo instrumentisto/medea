@@ -3,24 +3,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix::{
-    Actor, Addr, AsyncContext, Handler, Message, StreamHandler, WrapFuture,
-};
-use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{
-    stats::StatId, PeerId, PeerMetrics::PeerConnectionStateChanged,
-};
-use patched_redis::{ConnectionInfo, Msg};
+use actix::{Actor, Addr, AsyncContext, Handler, Message};
+use medea_client_api_proto::PeerId;
 
 use crate::{
     api::control::RoomId,
     signalling::{
         room::{PeerStarted, PeerStopped},
         Room,
-    },
-    turn::{
-        coturn_metrics,
-        coturn_stats::{CoturnAllocationEvent, CoturnEvent},
     },
 };
 

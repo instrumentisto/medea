@@ -23,7 +23,6 @@ use medea_client_api_proto::{
     VideoSettings,
 };
 use medea_macro::enum_delegate;
-use slog_envlogger::new;
 
 use crate::{
     api::control::MemberId,
