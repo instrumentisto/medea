@@ -6,7 +6,7 @@ use std::{
 use actix::{
     Actor, Addr, AsyncContext, Handler, Message, StreamHandler, WrapFuture,
 };
-use futures::channel::mpsc;
+use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{
     stats::StatId, PeerId, PeerMetrics::PeerConnectionStateChanged,
 };
@@ -14,8 +14,14 @@ use patched_redis::{ConnectionInfo, Msg};
 
 use crate::{
     api::control::RoomId,
-    signalling::{room::PeerStarted, Room},
-    turn::coturn_stats::{CoturnAllocationEvent, CoturnEvent},
+    signalling::{
+        room::{PeerStarted, PeerStopped},
+        Room,
+    },
+    turn::{
+        coturn_metrics,
+        coturn_stats::{CoturnAllocationEvent, CoturnEvent},
+    },
 };
 
 #[derive(Debug)]
@@ -24,7 +30,6 @@ pub struct MetricsService {
 }
 
 impl MetricsService {
-    // TODO: Cotext here
     pub fn new(cf: &crate::conf::turn::Turn) -> Self {
         Self {
             stats: HashMap::new(),
@@ -37,8 +42,6 @@ impl MetricsService {
         }
     }
 }
-
-use futures::StreamExt;
 
 impl Actor for MetricsService {
     type Context = actix::Context<Self>;
@@ -107,19 +110,13 @@ impl Handler<TrafficFlows> for MetricsService {
                                             &peer.state
                                         {
                                             // TODO: change it to enum variants
-                                            // count
+                                            //       count
                                             if srcs.len() < 2 {
-                                                panic!(
-                                                    "\n\n\n\n\n\n\n\n\n\n\n\\
-                                                     nVALIDATION \
-                                                     FAILED\n\n\n\n\n\\n\n\n\\
-                                                     n\n\n\n\n\n\n\n\n\n\n"
-                                                )
-                                            // TODO: FATAL ERROR
+                                                // TODO: FATAL ERROR
+                                                println!("VALIDATION FAILED")
                                             } else {
                                                 println!(
-                                                    "\n\n\nYAAAAAY VALIDATION \
-                                                     PASSED\n\n\n"
+                                                    "YAAAAAY VALIDATION PASSED"
                                                 );
                                             }
                                         }
@@ -214,8 +211,6 @@ pub struct AddPeer {
     pub room_id: RoomId,
     pub peer_id: PeerId,
 }
-
-use crate::{signalling::room::PeerStopped, turn::coturn_metrics};
 
 impl Handler<AddPeer> for MetricsService {
     type Result = ();

@@ -4,25 +4,35 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    fmt,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
+    stats::{
+        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType,
+        RtcStatsType, StatId,
+    },
     AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
     VideoSettings,
 };
 use medea_macro::enum_delegate;
+use slog_envlogger::new;
 
 use crate::{
-    api::control::MemberId, media::MediaTrack, signalling::peers::Counter,
+    api::control::MemberId,
+    media::MediaTrack,
+    signalling::{
+        peer_metrics_service, peer_metrics_service::TrackMediaType,
+        peers::Counter,
+    },
 };
-use medea_client_api_proto::stats::{
-    RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStatsType,
-    StatId,
-};
-use slog_envlogger::new;
-use std::time::{Duration, Instant};
 
 /// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
@@ -80,6 +90,7 @@ impl PeerError {
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
 #[enum_delegate(pub fn update_stats(&mut self, stats: &Vec<RtcStatsType>))]
 #[enum_delegate(pub fn is_started(&self) -> bool)]
+#[enum_delegate(pub fn get_spec(&self) -> peer_metrics_service::PeerSpec)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -424,6 +435,23 @@ impl<T> Peer<T> {
             && (stats_video_senders_count == video_senders_count)
             && (stats_audio_receivers_count == audio_receivers_count)
             && (stats_video_receives_count == video_received_count)
+    }
+
+    pub fn get_spec(&self) -> peer_metrics_service::PeerSpec {
+        let senders = self
+            .context
+            .senders
+            .values()
+            .map(|sender| TrackMediaType::from(&sender.media_type))
+            .collect();
+        let received = self
+            .context
+            .receivers
+            .values()
+            .map(|recv| TrackMediaType::from(&recv.media_type))
+            .collect();
+
+        peer_metrics_service::PeerSpec { senders, received }
     }
 }
 

@@ -3,7 +3,10 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Instant,
+};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
@@ -20,7 +23,7 @@ use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
     TrackPatch,
 };
-use medea_control_api_proto::grpc::api as proto;
+use medea_control_api_proto::grpc::{api as proto, callback::OnStart};
 
 use crate::{
     api::{
@@ -58,8 +61,11 @@ use crate::{
             member::MemberError,
             Member, MembersLoadError,
         },
+        metrics_service::{AddPeer, FlowMetricSource, MetricsService},
         participants::{ParticipantService, ParticipantServiceErr},
+        peer_metrics_service::{AddPeers, AddStat, PeerMetricsService},
         peers::PeerRepository,
+        room::CommandValidationError::PeerBelongsToAnotherMember,
     },
     turn::coturn_stats::{CoturnStats, EventType, Subscribe},
     utils::ResponseActAnyFuture,
@@ -67,12 +73,6 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use crate::{
-    signalling::metrics_service::{AddPeer, FlowMetricSource, MetricsService},
-    turn::stats_validator::{StatsValidator, Validate},
-};
-use medea_control_api_proto::grpc::callback::OnStart;
-use std::time::Instant;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -209,9 +209,9 @@ pub struct Room {
 
     coturn_stats: Addr<CoturnStats>,
 
-    stats_validator: Addr<StatsValidator>,
-
     metrics_service: Addr<MetricsService>,
+
+    peer_metrics_service: Addr<PeerMetricsService>,
 }
 
 impl Room {
@@ -236,8 +236,11 @@ impl Room {
             state: State::Started,
             callbacks: context.callbacks.clone(),
             coturn_stats: context.coturn_stats.clone(),
-            stats_validator: StatsValidator::new(context.turn_service.clone())
-                .start(),
+            peer_metrics_service: PeerMetricsService::new(
+                room_spec.id().clone(),
+                metrics_service.clone(),
+            )
+            .start(),
             metrics_service,
         })
     }
@@ -393,6 +396,20 @@ impl Room {
         self.metrics_service.do_send(AddPeer {
             peer_id: second_peer,
             room_id: self.id.clone(),
+        });
+
+        // TODO: UNWRAP
+        let first_pee = self.peers.get_peer_by_id(first_peer).unwrap();
+        let second_pee = self.peers.get_peer_by_id(second_peer).unwrap();
+        self.peer_metrics_service.do_send(AddPeers {
+            first_peer: crate::signalling::peer_metrics_service::Peer {
+                peer_id: first_peer,
+                spec: first_pee.get_spec(),
+            },
+            second_peer: crate::signalling::peer_metrics_service::Peer {
+                peer_id: second_peer,
+                spec: second_pee.get_spec(),
+            },
         });
 
         self.coturn_stats.do_send(Subscribe {
@@ -1080,20 +1097,10 @@ impl CommandHandler for Room {
             peer_id, tracks_ids, stats
         );
 
-        if let Ok(peer) = self.peers.get_peer_by_id_mut(peer_id) {
-            peer.update_stats(&stats);
-            if peer.is_started() {
-                self.metrics_service.do_send(
-                    crate::signalling::metrics_service::TrafficFlows {
-                        room_id: self.id.clone(),
-                        peer_id,
-                        timestamp: Instant::now(),
-                        source: FlowMetricSource::Peer,
-                    },
-                );
-                println!("\n\n\tPeer {} is flowing!!!\n\n", peer_id);
-            }
-        }
+        self.peer_metrics_service.do_send(AddStat {
+            peer_id,
+            stat: stats,
+        });
 
         Ok(Box::new(actix::fut::ok(())))
     }

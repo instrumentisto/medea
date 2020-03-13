@@ -7,7 +7,6 @@ pub mod coturn_metrics;
 pub mod coturn_stats;
 pub mod repo;
 pub mod service;
-pub mod stats_validator;
 
 #[doc(inline)]
 pub use self::service::{

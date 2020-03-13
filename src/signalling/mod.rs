@@ -6,6 +6,7 @@
 pub mod elements;
 pub mod metrics_service;
 pub mod participants;
+pub mod peer_metrics_service;
 pub mod peers;
 pub mod room;
 pub mod room_repo;
