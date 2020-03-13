@@ -22,53 +22,14 @@ pub struct CoturnUsername {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CoturnPeerStat {
-    pub last_update: Instant,
     pub allocations_count: u64,
 }
 
 #[derive(Debug)]
 pub struct CoturnMetrics {
     metrics_service: Addr<MetricsService>,
-    subscribed_peers: HashMap<CoturnUsername, CoturnPeerStat>,
     client: patched_redis::Client,
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct Subscribe(pub CoturnUsername);
-
-impl Handler<Subscribe> for CoturnMetrics {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: Subscribe,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        self.subscribed_peers.insert(
-            msg.0,
-            CoturnPeerStat {
-                allocations_count: 0,
-                last_update: Instant::now(),
-            },
-        );
-    }
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct Unsubscribe(pub CoturnUsername);
-
-impl Handler<Unsubscribe> for CoturnMetrics {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: Unsubscribe,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        todo!()
-    }
+    allocations: HashMap<CoturnUsername, CoturnPeerStat>,
 }
 
 impl CoturnMetrics {
@@ -93,8 +54,8 @@ impl CoturnMetrics {
 
         Self {
             metrics_service,
-            subscribed_peers: HashMap::new(),
             client,
+            allocations: HashMap::new(),
         }
     }
 }
@@ -140,48 +101,41 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
                 return;
             };
 
-            let coturn_username = CoturnUsername {
+            let username = CoturnUsername {
                 room_id: event.room_id.clone(),
                 peer_id: event.peer_id,
             };
 
-            if let Some(peer_stat) =
-                self.subscribed_peers.get_mut(&coturn_username)
-            {
-                peer_stat.last_update = Instant::now();
-
-                match event.event {
-                    CoturnAllocationEvent::Traffic { traffic } => {
-                        peer_stat.allocations_count += 1;
-                        let is_traffic_really_going = traffic.sent_packets
-                            + traffic.received_packets
-                            > 10;
-                        if is_traffic_really_going {
-                            println!(
-                                "\n\nPeer {} is started in Coturn\n\n",
-                                event.peer_id
-                            );
-                            self.metrics_service.do_send(TrafficFlows {
-                                peer_id: event.peer_id,
-                                room_id: event.room_id.clone(),
-                                timestamp: Instant::now(),
-                                source: FlowMetricSource::Coturn,
-                            })
-                        }
+            let mut peer_stat =
+                self.allocations.entry(username).or_insert(CoturnPeerStat {
+                    allocations_count: 0,
+                });
+            match event.event {
+                CoturnAllocationEvent::Traffic { traffic } => {
+                    peer_stat.allocations_count += 1;
+                    let is_traffic_really_going =
+                        traffic.sent_packets + traffic.received_packets > 10;
+                    if is_traffic_really_going {
+                        self.metrics_service.do_send(TrafficFlows {
+                            peer_id: event.peer_id,
+                            room_id: event.room_id.clone(),
+                            timestamp: Instant::now(),
+                            source: FlowMetricSource::Coturn,
+                        })
                     }
-                    CoturnAllocationEvent::Deleted => {
-                        peer_stat.allocations_count -= 1;
-                        if peer_stat.allocations_count == 0 {
-                            self.metrics_service.do_send(TrafficStopped {
-                                peer_id: event.peer_id,
-                                room_id: event.room_id.clone(),
-                                timestamp: Instant::now(),
-                                source: StoppedMetricSource::Coturn,
-                            });
-                        }
-                    }
-                    _ => (),
                 }
+                CoturnAllocationEvent::Deleted => {
+                    peer_stat.allocations_count -= 1;
+                    if peer_stat.allocations_count == 0 {
+                        self.metrics_service.do_send(TrafficStopped {
+                            peer_id: event.peer_id,
+                            room_id: event.room_id.clone(),
+                            timestamp: Instant::now(),
+                            source: StoppedMetricSource::Coturn,
+                        });
+                    }
+                }
+                _ => (),
             }
         }
     }

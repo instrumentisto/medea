@@ -23,9 +23,13 @@ use crate::{
         clients::CallbackClientFactoryImpl, service::CallbackService,
     },
     conf::Conf,
-    turn::{coturn_stats::CoturnStats, TurnAuthService},
+    signalling::metrics_service::MetricsService,
+    turn::{
+        coturn_metrics::CoturnMetrics, coturn_stats::CoturnStats,
+        TurnAuthService,
+    },
 };
-use actix::Addr;
+use actix::{Actor, Addr};
 
 /// Global application context.
 #[derive(Clone, Debug)]
@@ -44,6 +48,10 @@ pub struct AppContext {
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
 
     pub coturn_stats: Addr<CoturnStats>,
+
+    pub metrics_service: Addr<MetricsService>,
+
+    pub coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl AppContext {
@@ -54,11 +62,17 @@ impl AppContext {
         turn: Arc<dyn TurnAuthService>,
         coturn_stats: Addr<CoturnStats>,
     ) -> Self {
+        let metrics_service = MetricsService::new(&config.turn).start();
+        let coturn_metrics =
+            CoturnMetrics::new(&config.turn, metrics_service.clone()).start();
+
         Self {
             config: Arc::new(config),
             turn_service: turn,
             callbacks: CallbackService::default(),
             coturn_stats,
+            metrics_service,
+            coturn_metrics,
         }
     }
 }

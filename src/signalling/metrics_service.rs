@@ -21,32 +21,23 @@ use crate::{
 #[derive(Debug)]
 pub struct MetricsService {
     stats: HashMap<RoomId, RoomStats>,
-    coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl MetricsService {
     // TODO: Cotext here
-    pub fn new(cf: &crate::conf::turn::Turn) -> Addr<Self> {
-        MetricsService::create(move |ctx| {
-            let coturn_metrics = CoturnMetrics::new(cf, ctx.address()).start();
-
-            Self {
-                stats: HashMap::new(),
-                coturn_metrics,
-            }
-        })
+    pub fn new(cf: &crate::conf::turn::Turn) -> Self {
+        Self {
+            stats: HashMap::new(),
+        }
     }
 
     pub fn remove_peer(&mut self, room_id: RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.tracks.remove(&peer_id);
         }
-        self.coturn_metrics
-            .do_send(Unsubscribe(CoturnUsername { room_id, peer_id }));
     }
 }
 
-use crate::turn::coturn_metrics::{CoturnMetrics, CoturnUsername, Unsubscribe};
 use futures::StreamExt;
 
 impl Actor for MetricsService {
@@ -234,13 +225,6 @@ impl Handler<AddPeer> for MetricsService {
         msg: AddPeer,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.coturn_metrics.do_send(coturn_metrics::Subscribe(
-            CoturnUsername {
-                room_id: msg.room_id.clone(),
-                peer_id: msg.peer_id,
-            },
-        ));
-
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             room.tracks.insert(
                 msg.peer_id,
