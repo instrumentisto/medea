@@ -57,8 +57,7 @@ server:
 
 web-client:
   image:
-    repository: alexlapa/medea-demo
-    tag: tune-ws
+    tag: edge
     pullPolicy: Always
 
   deployment:
