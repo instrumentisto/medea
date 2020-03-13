@@ -1156,6 +1156,22 @@ impl Handler<PeerStarted> for Room {
     }
 }
 
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerStopped(pub PeerId);
+
+impl Handler<PeerStopped> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: PeerStopped,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        println!("Peer {} OnSTOP", msg.0);
+    }
+}
+
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
 impl Actor for Room {

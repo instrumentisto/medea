@@ -1,72 +1,58 @@
 use std::{
     collections::{HashMap, HashSet},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use actix::{
     Actor, Addr, AsyncContext, Handler, Message, StreamHandler, WrapFuture,
 };
-use medea_client_api_proto::{stats::StatId, PeerId};
-
-use crate::{
-    api::control::RoomId, signalling::Room, turn::coturn_stats::CoturnEvent,
+use futures::channel::mpsc;
+use medea_client_api_proto::{
+    stats::StatId, PeerId, PeerMetrics::PeerConnectionStateChanged,
 };
 use patched_redis::{ConnectionInfo, Msg};
+
+use crate::{
+    api::control::RoomId,
+    signalling::{room::PeerStarted, Room},
+    turn::coturn_stats::{CoturnAllocationEvent, CoturnEvent},
+};
 
 #[derive(Debug)]
 pub struct MetricsService {
     stats: HashMap<RoomId, RoomStats>,
-    client: patched_redis::Client,
+    coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl MetricsService {
-    pub fn new(cf: &crate::conf::turn::Turn) -> Self {
-        let connection_info = ConnectionInfo {
-            addr: Box::new(patched_redis::ConnectionAddr::Tcp(
-                cf.db.redis.host.to_string(),
-                cf.db.redis.port,
-            )),
-            db: cf.db.redis.db_number,
-            passwd: if cf.db.redis.pass.is_empty() {
-                None
-            } else {
-                Some(cf.db.redis.pass.to_string())
-            },
-        };
-        // TODO: UNWRAP
-        let client = patched_redis::Client::open(connection_info).unwrap();
+    // TODO: Cotext here
+    pub fn new(cf: &crate::conf::turn::Turn) -> Addr<Self> {
+        MetricsService::create(move |ctx| {
+            let coturn_metrics = CoturnMetrics::new(cf, ctx.address()).start();
 
-        Self {
-            stats: HashMap::new(),
-            client,
+            Self {
+                stats: HashMap::new(),
+                coturn_metrics,
+            }
+        })
+    }
+
+    pub fn remove_peer(&mut self, room_id: RoomId, peer_id: PeerId) {
+        if let Some(room) = self.stats.get_mut(&room_id) {
+            room.tracks.remove(&peer_id);
         }
+        self.coturn_metrics
+            .do_send(Unsubscribe(CoturnUsername { room_id, peer_id }));
     }
 }
 
+use crate::turn::coturn_metrics::{CoturnMetrics, CoturnUsername, Unsubscribe};
 use futures::StreamExt;
 
 impl Actor for MetricsService {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let (msg_tx, msg_stream) = mpsc::unbounded();
-        let client = self.client.clone();
-
-        ctx.spawn(
-            async move {
-                let conn = client.get_async_connection().await.unwrap();
-                let mut pubsub = conn.into_pubsub();
-                pubsub
-                    .psubscribe("turn/realm/*/user/*/allocation/*")
-                    .await
-                    .unwrap();
-
-                let mut msg_stream = pubsub.on_message();
-                while msg_tx.unbounded_send(msg_stream.next().await).is_ok() {}
-            }
-            .into_actor(self),
-        );
-
         ctx.run_interval(Duration::from_secs(10), |this, ctx| {
             for stat in this.stats.values() {
                 for track in stat.tracks.values() {
@@ -85,8 +71,6 @@ impl Actor for MetricsService {
                 }
             }
         });
-
-        ctx.add_stream(msg_stream);
     }
 }
 
@@ -114,7 +98,7 @@ impl Handler<TrafficFlows> for MetricsService {
                     PeerState::Started(sources) => {
                         sources.insert(msg.source);
                     }
-                    PeerState::Stopped(_) => {
+                    PeerState::Stopped => {
                         let mut srcs = HashSet::new();
                         srcs.insert(msg.source);
                         peer.state = PeerState::Started(srcs);
@@ -131,7 +115,8 @@ impl Handler<TrafficFlows> for MetricsService {
                                         if let PeerState::Started(srcs) =
                                             &peer.state
                                         {
-                                            // TODO: change it to enum variants count
+                                            // TODO: change it to enum variants
+                                            // count
                                             if srcs.len() < 2 {
                                                 panic!(
                                                     "\n\n\n\n\n\n\n\n\n\n\n\\
@@ -178,44 +163,11 @@ impl Handler<TrafficStopped> for MetricsService {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            if let Some(peer) = room.tracks.get_mut(&msg.peer_id) {
-                peer.last_update = msg.timestamp;
-                match &mut peer.state {
-                    PeerState::Stopped(sources) => {
-                        sources.insert(msg.source);
-                    }
-                    PeerState::Started(_) => {
-                        let mut srcs = HashSet::new();
-                        srcs.insert(msg.source);
-                        peer.state = PeerState::Stopped(srcs);
-
-                        ctx.run_later(
-                            Duration::from_secs(15),
-                            move |this, ctx| {
-                                if let Some(room) =
-                                    this.stats.get_mut(&msg.room_id)
-                                {
-                                    if let Some(peer) =
-                                        room.tracks.get_mut(&msg.peer_id)
-                                    {
-                                        if let PeerState::Stopped(srcs) =
-                                            &peer.state
-                                        {
-                                            // TODO: change it to enum variants count
-                                            if srcs.len() < 3 {
-                                                // TODO: FATAL ERROR
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                        );
-
-                        // TODO: send OnStop.
-                    }
-                }
+            if let Some(peer) = room.tracks.remove(&msg.peer_id) {
+                room.room.do_send(PeerStopped(peer.peer_id));
             }
         }
+        self.remove_peer(msg.room_id, msg.peer_id);
     }
 }
 
@@ -237,14 +189,13 @@ pub enum StoppedMetricSource {
 #[derive(Debug)]
 pub enum PeerState {
     Started(HashSet<FlowMetricSource>),
-    Stopped(HashSet<StoppedMetricSource>),
+    Stopped,
 }
 
 #[derive(Debug)]
 pub struct PeerStat {
     pub peer_id: PeerId,
     pub state: PeerState,
-    pub allocations: HashSet<u64>,
     pub last_update: Instant,
 }
 
@@ -273,6 +224,8 @@ pub struct AddPeer {
     pub peer_id: PeerId,
 }
 
+use crate::{signalling::room::PeerStopped, turn::coturn_metrics};
+
 impl Handler<AddPeer> for MetricsService {
     type Result = ();
 
@@ -281,12 +234,19 @@ impl Handler<AddPeer> for MetricsService {
         msg: AddPeer,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        self.coturn_metrics.do_send(coturn_metrics::Subscribe(
+            CoturnUsername {
+                room_id: msg.room_id.clone(),
+                peer_id: msg.peer_id,
+            },
+        ));
+
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             room.tracks.insert(
                 msg.peer_id,
                 PeerStat {
                     peer_id: msg.peer_id,
-                    state: PeerState::Stopped(HashSet::new()),
+                    state: PeerState::Stopped,
                     last_update: Instant::now(),
                 },
             );
@@ -299,6 +259,18 @@ impl Handler<AddPeer> for MetricsService {
 pub struct RemovePeer {
     pub room_id: RoomId,
     pub peer_id: PeerId,
+}
+
+impl Handler<RemovePeer> for MetricsService {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: RemovePeer,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.remove_peer(msg.room_id, msg.peer_id);
+    }
 }
 
 impl Handler<RegisterRoom> for MetricsService {
@@ -317,61 +289,5 @@ impl Handler<RegisterRoom> for MetricsService {
                 tracks: HashMap::new(),
             },
         );
-    }
-}
-
-use crate::{
-    signalling::room::PeerStarted, turn::coturn_stats::CoturnAllocationEvent,
-};
-use futures::channel::mpsc;
-use medea_client_api_proto::PeerMetrics::PeerConnectionStateChanged;
-use std::time::Duration;
-
-impl StreamHandler<Option<patched_redis::Msg>> for MetricsService {
-    fn handle(
-        &mut self,
-        item: Option<patched_redis::Msg>,
-        ctx: &mut Self::Context,
-    ) {
-        if let Some(msg) = item {
-            let event = if let Ok(event) = CoturnEvent::parse(&msg) {
-                event
-            } else {
-                return;
-            };
-
-            if let Some(room) = self.stats.get(&event.room_id) {
-                if room.tracks.contains_key(&event.peer_id) {
-                    match event.event {
-                        CoturnAllocationEvent::Traffic { traffic } => {
-                            if traffic.sent_packets + traffic.received_packets
-                                > 10
-                            {
-                                ctx.notify(TrafficFlows {
-                                    peer_id: event.peer_id,
-                                    room_id: event.room_id.clone(),
-                                    timestamp: Instant::now(),
-                                    source: FlowMetricSource::Coturn,
-                                });
-                            }
-                        }
-                        CoturnAllocationEvent::Deleted => {
-                            //                            
-                            // ctx.notify(TrafficStopped {
-                            //                                source:
-                            // StoppedMetricSource::Coturn,
-                            //                                timestamp:
-                            // Instant::now(),
-                            //                                peer_id:
-                            // event.peer_id,
-                            //                                room_id:
-                            // event.room_id.clone(),
-                            //                            })
-                        }
-                        _ => (),
-                    }
-                }
-            }
-        }
     }
 }

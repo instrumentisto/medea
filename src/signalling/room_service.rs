@@ -134,7 +134,7 @@ impl RoomService {
         Self {
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
-            metrics_service: MetricsService::new(&app.config.turn).start(),
+            metrics_service: MetricsService::new(&app.config.turn),
             room_repo,
             app,
             graceful_shutdown,

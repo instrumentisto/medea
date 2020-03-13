@@ -2,4 +2,4 @@
 static_specs_dir = "_dev/specs/"
 
 [log]
-level = "DEBUG"
+level = "WARN"
