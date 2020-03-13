@@ -67,8 +67,12 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use crate::turn::stats_validator::{StatsValidator, Validate};
+use crate::{
+    signalling::metrics_service::{AddPeer, FlowMetricSource, MetricsService},
+    turn::stats_validator::{StatsValidator, Validate},
+};
 use medea_control_api_proto::grpc::callback::OnStart;
+use std::time::Instant;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -206,6 +210,8 @@ pub struct Room {
     coturn_stats: Addr<CoturnStats>,
 
     stats_validator: Addr<StatsValidator>,
+
+    metrics_service: Addr<MetricsService>,
 }
 
 impl Room {
@@ -218,6 +224,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
+        metrics_service: Addr<MetricsService>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -231,6 +238,7 @@ impl Room {
             coturn_stats: context.coturn_stats.clone(),
             stats_validator: StatsValidator::new(context.turn_service.clone())
                 .start(),
+            metrics_service,
         })
     }
 
@@ -378,6 +386,15 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
+        self.metrics_service.do_send(AddPeer {
+            peer_id: first_peer,
+            room_id: self.id.clone(),
+        });
+        self.metrics_service.do_send(AddPeer {
+            peer_id: second_peer,
+            room_id: self.id.clone(),
+        });
+
         self.coturn_stats.do_send(Subscribe {
             peer_id: first_peer,
             partner_peer_id: second_peer,
@@ -1063,93 +1080,79 @@ impl CommandHandler for Room {
             peer_id, tracks_ids, stats
         );
 
-        let mut is_started = false;
         if let Ok(peer) = self.peers.get_peer_by_id_mut(peer_id) {
-            let is_started_before_update = peer.is_started();
             peer.update_stats(&stats);
-            if peer.is_started() && !is_started_before_update {
-                is_started = true;
-                println!("\n\n\tPeer {} started!!!\n\n", peer_id);
+            if peer.is_started() {
+                self.metrics_service.do_send(
+                    crate::signalling::metrics_service::TrafficFlows {
+                        room_id: self.id.clone(),
+                        peer_id,
+                        timestamp: Instant::now(),
+                        source: FlowMetricSource::Peer,
+                    },
+                );
+                println!("\n\n\tPeer {} is flowing!!!\n\n", peer_id);
             }
         }
-        if is_started {
-            if let Some(endpoints) =
-                self.peers.get_endpoint_path_by_peer_id(peer_id)
-            {
-                let send_callbacks: HashMap<_, _> = endpoints
-                    .into_iter()
-                    .filter_map(|e| e.upgrade())
-                    .filter_map(|endpoint| {
-                        match endpoint {
-                            Endpoint::WebRtcPublishEndpoint(publish) => {
-                                publish.change_peer_status(peer_id, true);
-                                if publish.publishing_peers_count() == 1 {
-                                    if let Some(on_start) = publish.on_start() {
-                                        let fid = publish
-                                            .owner()
-                                            .get_fid_to_endpoint(
-                                                publish.id().into(),
-                                            );
-                                        return Some((fid, on_start));
-                                    }
-                                }
-                            }
-                            Endpoint::WebRtcPlayEndpoint(play) => {
-                                if let Some(on_start) = play.on_start() {
-                                    let fid = play
-                                        .owner()
-                                        .get_fid_to_endpoint(play.id().into());
+
+        Ok(Box::new(actix::fut::ok(())))
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerStarted(pub PeerId);
+
+impl Handler<PeerStarted> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: PeerStarted,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        println!("\n\n\n\n\n\n\n\nPeer {} started!!!\n\n\n\n", msg.0);
+        let peer_id = msg.0;
+        if let Some(endpoints) =
+            self.peers.get_endpoint_path_by_peer_id(peer_id)
+        {
+            let send_callbacks: HashMap<_, _> = endpoints
+                .into_iter()
+                .filter_map(|e| {
+                    let endpoint = e.upgrade()?;
+                    match endpoint {
+                        Endpoint::WebRtcPublishEndpoint(publish) => {
+                            publish.change_peer_status(peer_id, true);
+                            if publish.publishing_peers_count() == 1 {
+                                if let Some(on_start) = publish.on_start() {
+                                    let fid =
+                                        publish.owner().get_fid_to_endpoint(
+                                            publish.id().into(),
+                                        );
                                     return Some((fid, on_start));
                                 }
                             }
                         }
-                        None
-                    })
-                    .collect();
-                for (fid, on_start) in send_callbacks {
-                    self.callbacks.send_callback(
-                        on_start,
-                        fid.into(),
-                        OnStartEvent {},
-                    );
-                }
-            }
-
-            return Ok(Box::new(
-                self.stats_validator
-                    .send(Validate {
-                        peer_id,
-                        room_id: self.id().clone(),
-                    })
-                    .into_actor(self)
-                    .map(move |res, this, ctx| {
-                        match res {
-                            Ok(res) => match res {
-                                Ok(_) => {
-                                    println!(
-                                        "\n\n\n{} Peer validated!\n\n\n",
-                                        peer_id
-                                    );
-                                }
-                                Err(_) => {
-                                    println!(
-                                        "\n\n\n{} Peer invalidated!\n\n\n",
-                                        peer_id
-                                    );
-                                }
-                            },
-                            Err(_) => {
-                                println!(
-                                    "\n\n\nSomething with actor!!!!!\n\n\n"
-                                );
+                        Endpoint::WebRtcPlayEndpoint(play) => {
+                            if let Some(on_start) = play.on_start() {
+                                let fid = play
+                                    .owner()
+                                    .get_fid_to_endpoint(play.id().into());
+                                return Some((fid, on_start));
                             }
                         }
-                        Ok(())
-                    }),
-            ));
+                    }
+                    None
+                })
+                .collect();
+            for (fid, on_start) in send_callbacks {
+                self.callbacks.send_callback(
+                    on_start,
+                    fid.into(),
+                    OnStartEvent {},
+                );
+            }
         }
-
-        Ok(Box::new(actix::fut::ok(())))
     }
 }
 
@@ -1638,22 +1641,6 @@ impl Handler<OnStartOnStopCallback> for Room {
         }
 
         debug!("LOOK AT ME: {:?}", msg);
-    }
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct InvalidPeerStats(pub PeerId);
-
-impl Handler<InvalidPeerStats> for Room {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: InvalidPeerStats,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        println!("Stats of Peer {} is invalid.", msg.0);
     }
 }
 

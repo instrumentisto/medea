@@ -1,14 +1,16 @@
-use crate::{
-    api::control::RoomId,
-    signalling::Room,
-    turn::{cli::CoturnTelnetClient, TurnAuthService},
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
+
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Handler, Message, WrapFuture,
 };
 use medea_client_api_proto::PeerId;
 use medea_coturn_telnet_client::sessions_parser::Session;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+
+use crate::{
+    api::control::RoomId,
+    signalling::Room,
+    turn::{cli::CoturnTelnetClient, TurnAuthService},
+};
 
 #[derive(Debug)]
 pub struct StatsValidator {

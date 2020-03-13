@@ -158,10 +158,10 @@ impl CoturnAllocationEvent {
 
 #[derive(Debug)]
 pub struct CoturnEvent {
-    event: CoturnAllocationEvent,
-    room_id: RoomId,
-    peer_id: PeerId,
-    allocation_id: u64,
+    pub event: CoturnAllocationEvent,
+    pub room_id: RoomId,
+    pub peer_id: PeerId,
+    pub allocation_id: u64,
 }
 
 impl CoturnEvent {

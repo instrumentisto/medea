@@ -23,6 +23,7 @@ use crate::{
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
+        metrics_service::MetricsService,
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
@@ -119,6 +120,8 @@ pub struct RoomService {
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
+
+    metrics_service: Addr<MetricsService>,
 }
 
 impl RoomService {
@@ -131,6 +134,7 @@ impl RoomService {
         Self {
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
+            metrics_service: MetricsService::new(&app.config.turn).start(),
             room_repo,
             app,
             graceful_shutdown,
@@ -209,11 +213,19 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room = Room::new(&spec, &self.app)?.start();
+            let room =
+                Room::new(&spec, &self.app, self.metrics_service.clone())?
+                    .start();
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
                 shutdown::Priority(2),
+            );
+            self.metrics_service.do_send(
+                crate::signalling::metrics_service::RegisterRoom {
+                    room: room.clone(),
+                    room_id: spec.id,
+                },
             );
 
             self.room_repo.add(room_id, room);
@@ -265,8 +277,15 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(&room_spec, &self.app)?;
+        let room =
+            Room::new(&room_spec, &self.app, self.metrics_service.clone())?;
         let room_addr = room.start();
+        self.metrics_service.do_send(
+            crate::signalling::metrics_service::RegisterRoom {
+                room: room_addr.clone(),
+                room_id: room_spec.id.clone(),
+            },
+        );
 
         shutdown::subscribe(
             &self.graceful_shutdown,

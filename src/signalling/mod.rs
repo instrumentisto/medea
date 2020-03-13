@@ -4,6 +4,7 @@
 //! [signalling]: https://webrtcglossary.com/signaling/
 
 pub mod elements;
+pub mod metrics_service;
 pub mod participants;
 pub mod peers;
 pub mod room;
