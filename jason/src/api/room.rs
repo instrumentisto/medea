@@ -908,20 +908,18 @@ impl PeerEventHandler for InnerRoom {
                 peer_connection_state,
             ),
         });
+
+        if let PeerConnectionState::Connected = peer_connection_state {
+            self.peers.send_peer_stats_scrape(peer_id);
+        }
     }
 
     /// Handles [`PeerEvent::StatsUpdate`] event and sends new stats to the RPC
     /// server.
-    fn on_stats_update(
-        &mut self,
-        peer_id: PeerId,
-        stats: RtcStats,
-        tracks_ids: HashMap<String, TrackId>,
-    ) {
-        self.rpc.send_command(Command::AddPeerConnectionStats {
+    fn on_stats_update(&mut self, peer_id: PeerId, stats: RtcStats) {
+        self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
-            stats: stats.0,
-            tracks_ids,
+            metrics: PeerMetrics::StatsUpdate(stats.0),
         });
     }
 }

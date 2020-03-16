@@ -3,15 +3,14 @@
 use std::convert::TryFrom;
 
 use derive_more::From;
-use medea_client_api_proto::stats::RtcStatsType;
+use medea_client_api_proto::stats::{RtcStat, RtcStatsType};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::RtcStats as SysRtcStats;
 
 use crate::utils::get_property_by_name;
 
 /// Entry of the [`SysRtcStats`] dictionary.
-struct RtcStatsReportEntry(js_sys::JsString, SysRtcStats);
+struct RtcStatsReportEntry(js_sys::JsString, JsValue);
 
 /// Errors which can occur while deserialization of the [`RtcStatsType`].
 #[derive(Debug, From)]
@@ -50,12 +49,8 @@ impl TryFrom<js_sys::Array> for RtcStatsReportEntry {
         let id = id
             .dyn_into::<js_sys::JsString>()
             .map_err(tracerr::from_and_wrap!())?;
-        // TODO: "wasm-bindgen: imported JS function that was not marked as
-        //        `catch` threw an error: RTCStats is not defined" at
-        //        "var ret = getObject(arg0) instanceof RTCStats;"
-        //        Chromium 79/Chrome 82 / FF 72
         let stats = stats
-            .dyn_into::<SysRtcStats>()
+            .dyn_into::<JsValue>()
             .map_err(tracerr::from_and_wrap!())?;
 
         Ok(RtcStatsReportEntry(id, stats))
@@ -64,7 +59,7 @@ impl TryFrom<js_sys::Array> for RtcStatsReportEntry {
 
 /// All available [`RtcStatsType`] of `PeerConnection`.
 #[derive(Debug)]
-pub struct RtcStats(pub Vec<RtcStatsType>);
+pub struct RtcStats(pub Vec<RtcStat>);
 
 impl TryFrom<&JsValue> for RtcStats {
     type Error = Traced<RtcStatsError>;
@@ -88,11 +83,11 @@ impl TryFrom<&JsValue> for RtcStats {
             let stat = stat.unchecked_into::<js_sys::Array>();
             let stat = RtcStatsReportEntry::try_from(stat)
                 .map_err(tracerr::map_from_and_wrap!())?;
-            let stat: RtcStatsType = JsValue::from(&stat.1)
+            let stat: RtcStat = JsValue::from(&stat.1)
                 .into_serde()
                 .map_err(tracerr::from_and_wrap!())?;
 
-            if let RtcStatsType::Other = &stat {
+            if let RtcStatsType::Other = &stat.stats {
                 continue;
             }
 

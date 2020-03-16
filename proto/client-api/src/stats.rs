@@ -46,7 +46,7 @@ pub struct StatId(pub String);
 /// [monitored object]: https://www.w3.org/TR/webrtc-stats/#dfn-monitored-object
 /// [1]: https://www.w3.org/TR/webrtc/#rtcstats-dictionary
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
-pub struct RtcStat<T> {
+pub struct RtcStat {
     /// A unique id that is associated with the object that was inspected to
     /// produce this RTCStats object.
     pub id: StatId,
@@ -63,7 +63,7 @@ pub struct RtcStat<T> {
     ///
     /// All possible stats are described in the [`RtcStatsType`] enum.
     #[serde(flatten)]
-    pub stats: Box<T>,
+    pub stats: RtcStatsType,
 }
 
 /// Represents all known types of [`RtcStat`]s.
@@ -79,12 +79,12 @@ pub enum RtcStatsType {
     /// being sent or received by this `RTCPeerConnection` object. It is
     /// accessed by the [`RtcCodecStats`].
     #[cfg(feature = "unused")]
-    Codec(RtcStat<RtcCodecStats>),
+    Codec(RtcCodecStats),
 
     /// Statistics for an inbound RTP stream that is currently received with
     /// this RTCPeerConnection object. It is accessed by the
     /// [`RtcInboundRtpStreamStats`].
-    InboundRtp(RtcStat<RtcInboundRtpStreamStats>),
+    InboundRtp(RtcInboundRtpStreamStats),
 
     /// Statistics for an outbound RTP stream that is currently sent with this
     /// `RTCPeerConnection` object. It is accessed by the
@@ -98,69 +98,68 @@ pub enum RtcStatsType {
     /// `RTCVideoSenderStats`) and "track" object (of type
     /// `RTCSenderAudioTrackAttachmentStats` or
     /// `RTCSenderVideoTrackAttachmentStats`).
-    OutboundRtp(RtcStat<RtcOutboundRtpStreamStats>),
+    OutboundRtp(RtcOutboundRtpStreamStats),
 
     /// Statistics for the remote endpoint's inbound RTP stream corresponding
     /// to an outbound stream that is currently sent with this
     /// `RTCPeerConnection` object. It is measured at the remote endpoint and
     /// reported in an RTCP Receiver Report (RR) or RTCP Extended Report (XR).
-    RemoteInboundRtp(RtcStat<RemoteInboundRtpStreamStat>),
+    RemoteInboundRtp(RemoteInboundRtpStreamStat),
 
     /// Statistics for the remote endpoint's outbound RTP stream corresponding
     /// to an inbound stream that is currently received with this
     /// `RTCPeerConnection` object. It is measured at the remote endpoint and
     /// reported in an RTCP Sender Report (SR).
-    RemoteOutboundRtp(RtcStat<RemoteOutboundRtpStreamStat>),
+    RemoteOutboundRtp(RemoteOutboundRtpStreamStat),
 
     /// Statistics for the media produced by a `MediaStreamTrack`that is
     /// currently attached to an `RTCRtpSender`. This reflects the media that
     /// is fed to the encoder; after `getUserMedia()` constraints have been
     /// applied (i.e. not the raw media produced by the camera).
-    MediaSource(RtcStat<MediaSourceStat>),
+    MediaSource(MediaSourceStat),
 
     /// Statistics for a contributing source (CSRC) that contributed to an
     /// inbound RTP stream.
     #[cfg(feature = "unused")]
-    Csrc(RtcStat<RtpContributingSourceStat>),
+    Csrc(RtpContributingSourceStat),
 
     /// Statistics related to the `RTCPeerConnection` object.
     #[cfg(feature = "unused")]
-    PeerConnection(RtcStat<RtcPeerConnectionStat>),
+    PeerConnection(RtcPeerConnectionStat),
 
     /// Statistics related to each RTCDataChannel id.
     #[cfg(feature = "unused")]
-    DataChannel(RtcStat<DataChannelStat>),
+    DataChannel(DataChannelStat),
 
     /// This is now obsolete. Contains statistics related to a specific
     /// MediaStream.
     #[cfg(feature = "unused")]
-    Stream(RtcStat<MediaStreamStat>),
+    Stream(MediaStreamStat),
 
     /// Statistics related to a specific MediaStreamTrack's attachment to an
     /// RTCRtpSender and the corresponding media-level metrics.
-    // maybe
-    Track(RtcStat<TrackStat>),
+    Track(TrackStat),
 
     /// Statistics related to a specific `RTCRtpTransceiver`.
     #[cfg(feature = "unused")]
-    Transceiver(RtcStat<RtcRtpTransceiverStats>),
+    Transceiver(RtcRtpTransceiverStats),
 
     /// Statistics related to a specific `RTCRtpSender` and the corresponding
     /// media-level metrics.
     #[cfg(feature = "unused")]
-    Sender(RtcStat<SenderStatsKind>),
+    Sender(SenderStatsKind),
 
     /// Statistics related to a specific receiver and the corresponding
     /// media-level metrics.
     #[cfg(feature = "unused")]
-    Receiver(RtcStat<ReceiverStatsKind>),
+    Receiver(ReceiverStatsKind),
 
     /// Transport statistics related to the `RTCPeerConnection` object.
-    Transport(RtcStat<RtcTransportStats>),
+    Transport(RtcTransportStats),
 
     /// SCTP transport statistics related to an `RTCSctpTransport` object.
     // maybe
-    SctpTransport(RtcStat<RtcSctpTransportStats>),
+    SctpTransport(RtcSctpTransportStats),
 
     /// ICE candidate pair statistics related to the `RTCIceTransport` objects.
     ///
@@ -173,7 +172,7 @@ pub enum RtcStatsType {
     /// externally observable event.
     ///
     /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
-    CandidatePair(RtcStat<RtcIceCandidatePairStats>),
+    CandidatePair(RtcIceCandidatePairStats),
 
     /// ICE local candidate statistics related to the `RTCIceTransport`
     /// objects.
@@ -183,7 +182,7 @@ pub enum RtcStatsType {
     /// candidate pair.
     ///
     /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
-    LocalCandidate(RtcStat<RtcIceCandidateStats>),
+    LocalCandidate(RtcIceCandidateStats),
 
     /// ICE remote candidate statistics related to the `RTCIceTransport`
     /// objects.
@@ -193,15 +192,15 @@ pub enum RtcStatsType {
     /// candidate pair.
     ///
     /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
-    RemoteCandidate(RtcStat<RtcIceCandidateStats>),
+    RemoteCandidate(RtcIceCandidateStats),
 
     /// Information about a certificate used by an `RTCIceTransport`.
     #[cfg(feature = "unused")]
-    Certificate(RtcStat<RtcCertificateStats>),
+    Certificate(RtcCertificateStats),
 
     /// Information about the connection to an ICE server (e.g. STUN or TURN).
     #[cfg(feature = "unused")]
-    IceServer(RtcStat<RtcIceServerStats>),
+    IceServer(RtcIceServerStats),
 
     /// Disabled or unknown variants of stats will be deserialized as
     /// [`RtcStatsType::Other`].
@@ -226,7 +225,7 @@ pub struct MediaStreamStat {
     pub stream_id: String,
 
     /// This is the id of the stats object, not the `track.id`.
-    pub track_ids: Vec<String>,
+    pub track_ids: Vec<StatId>,
 }
 
 /// Statistics related to each RTCDataChannel id.
