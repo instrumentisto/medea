@@ -335,4 +335,97 @@ async fn ice_connection_state_changed_is_emitted() {
             break;
         }
     }
+
+    #[wasm_bindgen_test]
+    async fn ice_restart_renegotiation() {
+        let (tx1, mut rx1) = mpsc::unbounded();
+        let (tx2, mut rx2) = mpsc::unbounded();
+
+        let manager = Rc::new(MediaManager::default());
+        let peer1 = PeerConnection::new(
+            PeerId(1),
+            tx1,
+            vec![],
+            Rc::clone(&manager),
+            false,
+        )
+        .unwrap();
+        let peer2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, false)
+            .unwrap();
+        let (audio_track, video_track) = get_test_tracks(false, false);
+
+        let offer = peer1
+            .get_offer(
+                vec![audio_track.clone(), video_track.clone()],
+                None,
+                false,
+            )
+            .await
+            .unwrap();
+        let answer = peer2
+            .process_offer(
+                offer,
+                vec![audio_track.clone(), video_track.clone()],
+                None,
+            )
+            .await
+            .unwrap();
+        peer1.set_remote_answer(answer).await.unwrap();
+
+        async fn break_on_connected(
+            rx: &mut mpsc::UnboundedReceiver<PeerEvent>,
+            other_peer: &PeerConnection,
+        ) {
+            while let Some(event) = rx.next().await {
+                match event {
+                    PeerEvent::IceCandidateDiscovered {
+                        peer_id: _,
+                        candidate,
+                        sdp_m_line_index,
+                        sdp_mid,
+                    } => {
+                        other_peer
+                            .add_ice_candidate(
+                                candidate,
+                                sdp_m_line_index,
+                                sdp_mid,
+                            )
+                            .await
+                            .unwrap();
+                    }
+                    PeerEvent::IceConnectionStateChanged {
+                        peer_id: _,
+                        ice_connection_state,
+                    } => {
+                        if let IceConnectionState::Connected =
+                            ice_connection_state
+                        {
+                            break;
+                        };
+                    }
+                    _ => {}
+                }
+            }
+        };
+
+        break_on_connected(&mut rx1, &peer2).await;
+        break_on_connected(&mut rx2, &peer1).await;
+
+        let offer = peer1
+            .get_offer(
+                vec![audio_track.clone(), video_track.clone()],
+                None,
+                true,
+            )
+            .await
+            .unwrap();
+        let answer = peer2
+            .process_offer(offer, vec![audio_track, video_track], None)
+            .await
+            .unwrap();
+        peer1.set_remote_answer(answer).await.unwrap();
+
+        // break_on_connected(&mut rx1, &peer2).await;
+        // break_on_connected(&mut rx2, &peer1).await;
+    }
 }

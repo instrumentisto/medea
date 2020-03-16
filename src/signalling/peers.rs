@@ -14,7 +14,7 @@ use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 use crate::{
     api::control::MemberId,
     log::prelude::*,
-    media::{peer::Stable, Peer, PeerStateMachine},
+    media::{peer::Stable, Peer, PeerError, PeerStateMachine},
     signalling::{
         elements::endpoints::webrtc::{
             WebRtcPlayEndpoint, WebRtcPublishEndpoint,
@@ -174,52 +174,34 @@ impl PeerRepository {
             .filter(move |peer| &peer.member_id() == member_id)
     }
 
-    // /// Returns owned [`Peer`] by its ID. [`Peer`] is returned to repository
-    // in case of error. ///
-    // /// # Errors
-    // ///
-    // /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`]
-    // doesn't /// exist in [`PeerRepository`].
-    // ///
-    // /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
-    // requested state. pub fn take_inner_peer<S>(
-    //     &mut self,
-    //     peer_id: PeerId,
-    // ) -> Result<Peer<S>, RoomError>
-    // where
-    //     &Peer<S>: TryFrom<&PeerStateMachine>,
-    //     Peer<S>: TryFrom<PeerStateMachine>,
-    //     <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
-    // {
-    //     match self.peers.remove(&peer_id) {
-    //         Some(peer) => {
-    //             match <&Peer::<S>>::try_from(&peer) {
-    //                 Ok(_) => peer.try_into().map_err(Into::into),
-    //                 Err(_) => {
-    //                     unreachable!()
-    //                 },
-    //             }
-    //         },
-    //         None => Err(RoomError::PeerNotFound(peer_id)),
-    //     }
-    // }
-
-    /// Returns owned [`Peer`] by its ID.
+    /// Returns owned [`Peer`] by its ID. If [`Peer`] is found, but it is in
+    /// unexcpected state, then it is returned to repository.
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
+    ///
+    /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
+    /// requested state.
     pub fn take_inner_peer<S>(
         &mut self,
         peer_id: PeerId,
     ) -> Result<Peer<S>, RoomError>
     where
         Peer<S>: TryFrom<PeerStateMachine>,
-        <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
+        <Peer<S> as TryFrom<PeerStateMachine>>::Error:
+            Into<(PeerError, PeerStateMachine)>,
     {
         match self.peers.remove(&peer_id) {
-            Some(peer) => peer.try_into().map_err(Into::into),
+            Some(peer) => match peer.try_into() {
+                Ok(peer) => Ok(peer),
+                Err(err) => {
+                    let (err, peer) = err.into();
+                    self.peers.insert(peer_id, peer);
+                    Err(RoomError::from(err))
+                }
+            },
             None => Err(RoomError::PeerNotFound(peer_id)),
         }
     }
@@ -342,7 +324,7 @@ impl PeerRepository {
         {
             // TODO: when dynamic patching of [`Room`] will be done then we need
             //       rewrite this code to updating [`Peer`]s in not
-            //       [`Peer<New>`] state.
+            //       [`Peer<Stable>`] state.
             let mut src_peer: Peer<Stable> =
                 self.take_inner_peer(src_peer_id).unwrap();
             let mut sink_peer: Peer<Stable> =
@@ -383,5 +365,63 @@ impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::media::WaitRemoteSdp;
+
+    #[test]
+    fn take_inner_peer() {
+        let peer = Peer::<Stable>::new(
+            PeerId(1),
+            MemberId(String::from("member")),
+            PeerId(2),
+            MemberId(String::from("partner_member")),
+            false,
+        );
+
+        let mut peers = HashMap::new();
+        peers.insert(peer.id(), peer.into());
+
+        let mut repo = PeerRepository {
+            peers,
+            peers_count: Counter::default(),
+            tracks_count: Counter::default(),
+        };
+
+        // bad id
+        match repo.take_inner_peer::<Stable>(PeerId(2)) {
+            Ok(_) => unreachable!(),
+            Err(err) => match err {
+                RoomError::PeerNotFound(peer_id) => {
+                    assert_eq!(peer_id, PeerId(2));
+                }
+                _ => unreachable!(),
+            },
+        }
+        // peer still there
+        assert!(repo.get_peer_by_id(PeerId(1)).is_ok());
+
+        // bad state
+        if let Err(RoomError::PeerError(PeerError::WrongState(..))) =
+            repo.take_inner_peer::<WaitRemoteSdp>(PeerId(1))
+        {
+            // ok
+        } else {
+            unreachable!()
+        }
+        // peer still there
+        assert!(repo.get_peer_by_id(PeerId(1)).is_ok());
+
+        // ok
+        let peer = repo.take_inner_peer::<Stable>(PeerId(1)).unwrap();
+        assert_eq!(peer.id(), PeerId(1));
+        // peer is taken
+        assert!(repo.get_peer_by_id(PeerId(1)).is_err())
     }
 }

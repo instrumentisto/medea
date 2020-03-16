@@ -2,15 +2,12 @@
 
 use std::{
     convert::TryInto as _,
-    fmt::{Display, Error, Formatter},
-    sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
 
 use actix::{
     fut::WrapFuture as _, Actor, ActorContext, ActorFuture, Addr, Arbiter,
-    AsyncContext, ContextFutureSpawner as _, Handler, MailboxError, Message,
-    StreamHandler,
+    AsyncContext, ContextFutureSpawner as _, Handler, Message, StreamHandler,
 };
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::{FutureExt as _, LocalBoxFuture};
@@ -21,14 +18,11 @@ use medea_client_api_proto::{
 use crate::{
     api::{
         client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
-        control::{MemberId, RoomId},
+        control::MemberId,
         RpcServer,
     },
     log::prelude::*,
 };
-
-/// Used to generate [`WsSession`] IDs.
-static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// [`WsSession`] closed reason.
 #[derive(Debug)]
@@ -43,14 +37,8 @@ enum InnerCloseReason {
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
 pub struct WsSession {
-    /// [`WsSession`] ID;
-    id: u64,
-
     /// ID of [`Member`] that WebSocket connection is associated with.
     member_id: MemberId,
-
-    /// ID of [`RpcServer`] that WebSocket connection is associated with.
-    room_id: RoomId,
 
     /// [`Room`] that [`Member`] is associated with.
     room: Box<dyn RpcServer>,
@@ -80,15 +68,12 @@ impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
     pub fn new(
         member_id: MemberId,
-        room_id: RoomId,
         room: Box<dyn RpcServer>,
         idle_timeout: Duration,
         ping_interval: Duration,
     ) -> Self {
         Self {
-            id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
             member_id,
-            room_id,
             room,
             idle_timeout,
             last_activity: Instant::now(),
@@ -101,25 +86,20 @@ impl WsSession {
     /// Starts watchdog which will drop connection if `now`-`last_activity` >
     /// `idle_timeout`.
     fn start_idle_watchdog(ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(Duration::new(1, 0), |this, ctx| {
-            if Instant::now().duration_since(this.last_activity)
-                > this.idle_timeout
+        ctx.run_interval(Duration::new(1, 0), |session, ctx| {
+            if Instant::now().duration_since(session.last_activity)
+                > session.idle_timeout
             {
-                info!("{}: WsSession is idle", this);
+                info!("WsSession of member {} is idle", session.member_id);
 
-                Arbiter::spawn(this.room.connection_closed(
-                    this.member_id.clone(),
+                Arbiter::spawn(session.room.connection_closed(
+                    session.member_id.clone(),
                     ClosedReason::Lost,
                 ));
 
-                // TODO: Lets comment this out until we implement handshake on
-                //       reconnect. Since all messages buffered on client will
-                //       be lost then, we can only afford when we will have
-                //       handshakes on reconnect.
-                //       PR: https://github.com/instrumentisto/medea/pull/51
-                // ctx.notify(Close::with_normal_code(&CloseDescription::new(
-                //     CloseReason::Idle,
-                // )))
+                ctx.notify(Close::with_normal_code(&CloseDescription::new(
+                    CloseReason::Idle,
+                )))
             }
         });
     }
@@ -168,7 +148,7 @@ impl Actor for WsSession {
     /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
     /// signal to the [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
-        debug!("{}: WsSession started", self);
+        debug!("Started WsSession for Member [id = {}]", self.member_id);
 
         self.room
             .connection_established(
@@ -190,9 +170,9 @@ impl Actor for WsSession {
                     }
                     Err(err) => {
                         error!(
-                            "{}: WsSession of Member failed to join Room \
+                            "WsSession of member {} failed to join Room, \
                              because: {:?}",
-                            this, err,
+                            this.member_id, err,
                         );
                         ctx.notify(Close::with_normal_code(
                             &CloseDescription::new(CloseReason::InternalError),
@@ -210,10 +190,13 @@ impl Actor for WsSession {
     /// does nothing if `WsSession.close_reason` is
     /// `Some(InnerCloseReason::ByServer)`.
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        debug!("{}: WsSession Stopped", self);
+        debug!("Stopped WsSession for member {}", self.member_id);
         match self.close_reason.take() {
             None => {
-                error!("{}: WsSession was unexpectedly dropped", self);
+                error!(
+                    "WsSession of Member [{}] was unexpectedly dropped",
+                    self.member_id
+                );
                 Arbiter::spawn(self.room.connection_closed(
                     self.member_id.clone(),
                     ClosedReason::Lost,
@@ -242,14 +225,7 @@ impl RpcConnection for Addr<WsSession> {
             self.send(Close::with_normal_code(&close_description));
         async {
             if let Err(err) = close_result.await {
-                match err {
-                    MailboxError::Closed => {
-                        // RpcConnection is already closed, so it ok
-                    }
-                    MailboxError::Timeout => {
-                        error!("Failed Close RpcConnection")
-                    }
-                }
+                error!("Failed Close RpcConnection: {:?} ", err)
             }
         }
         .boxed_local()
@@ -297,7 +273,7 @@ impl Handler<Close> for WsSession {
 
     /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
-        debug!("{}: Closing WsSession", self);
+        debug!("Closing WsSession for member {}", self.member_id);
         self.close_reason = Some(InnerCloseReason::ByServer);
         ctx.close(Some(close.0));
         ctx.stop();
@@ -309,9 +285,9 @@ impl Handler<EventMessage> for WsSession {
 
     /// Sends [`Event`] to Web Client.
     fn handle(&mut self, msg: EventMessage, ctx: &mut Self::Context) {
-        debug!("{}: Sending Event: {:?}]", self, msg);
         let event =
             serde_json::to_string(&ServerMsg::Event(msg.into())).unwrap();
+        debug!("Event {} for member {}", event, self.member_id);
         ctx.text(event);
     }
 }
@@ -323,29 +299,31 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
         msg: Result<ws::Message, ws::ProtocolError>,
         ctx: &mut Self::Context,
     ) {
+        debug!(
+            "Received WS message: {:?} from member {}",
+            msg, self.member_id
+        );
         match msg {
             Ok(msg) => match msg {
                 ws::Message::Text(text) => {
                     self.last_activity = Instant::now();
                     match serde_json::from_str::<ClientMsg>(&text) {
-                        Ok(ClientMsg::Pong(n)) => {
-                            debug!("{}: Received Pong: {}", self, n);
+                        Ok(ClientMsg::Pong(_)) => {
+                            // do nothing
                         }
                         Ok(ClientMsg::Command(command)) => {
-                            debug!("{}: Received Command: {:?}", self, command);
                             self.room
                                 .send_command(self.member_id.clone(), command)
                                 .into_actor(self)
                                 .spawn(ctx);
                         }
                         Err(err) => error!(
-                            "{}: Error [{:?}] parsing client message: [{}]",
-                            self, err, &text,
+                            "Error [{:?}] parsing client message [{}]",
+                            err, &text,
                         ),
                     }
                 }
                 ws::Message::Close(reason) => {
-                    debug!("{}: Received Close message: {:?}", self, reason);
                     if self.close_reason.is_none() {
                         let closed_reason = if let Some(reason) = &reason {
                             if reason.code == CloseCode::Normal
@@ -365,10 +343,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         ctx.stop();
                     }
                 }
-                _ => error!("{}: Unsupported client message", self),
+                _ => error!(
+                    "Unsupported client message from member {}",
+                    self.member_id,
+                ),
             },
             Err(err) => {
-                error!("{}: StreamHandler Error: {:?}", self, err);
+                error!(
+                    "Error in WsSession StreamHandler for Member [{}]: {:?}",
+                    self.member_id, err,
+                );
             }
         };
     }
@@ -376,18 +360,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     /// Method is called when stream finishes. Stops [`WsSession`] actor
     /// execution.
     fn finished(&mut self, ctx: &mut Self::Context) {
-        debug!("{}: message stream is finished", self);
+        debug!(
+            "WsSession message stream for Member [{}] is finished",
+            self.member_id
+        );
         ctx.stop()
-    }
-}
-
-impl Display for WsSession {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(
-            f,
-            "WsSession [{}] of Member [{}/{}]",
-            self.id, self.room_id, self.member_id
-        )
     }
 }
 

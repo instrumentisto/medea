@@ -116,15 +116,18 @@ macro_rules! impl_peer_converts {
         }
 
         impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
-            type Error = PeerError;
+            type Error = (PeerError, PeerStateMachine);
 
             fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerError::WrongState(
-                        peer.id(),
-                        stringify!($peer_type),
-                        format!("{}", peer),
+                    _ => Err((
+                        PeerError::WrongState(
+                            peer.id(),
+                            stringify!($peer_type),
+                            format!("{}", peer),
+                        ),
+                        peer,
                     )),
                 }
             }

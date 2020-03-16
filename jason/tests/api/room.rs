@@ -1040,9 +1040,4 @@ mod patches_generation {
             }
         );
     }
-
-    #[wasm_bindgen_test]
-    async fn ice_restart_renegotiation() {
-        unimplemented!()
-    }
 }

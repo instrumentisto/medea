@@ -68,7 +68,6 @@ async fn ws_index(
                 Ok(_) => ws::start(
                     WsSession::new(
                         member_id,
-                        room_id,
                         Box::new(room),
                         state.config.idle_timeout,
                         state.config.ping_interval,

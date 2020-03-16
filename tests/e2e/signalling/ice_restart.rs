@@ -1,6 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use actix::Context;
+use actix::{clock::delay_for, Context};
 use futures::{channel::mpsc::*, StreamExt as _};
 use medea::hashmap;
 use medea_client_api_proto::{
@@ -136,17 +136,8 @@ async fn ice_restart() {
         .await
         .unwrap();
 
-    // first peer receives Event::RenegotiationStarted
-    match rx1.next().await.unwrap() {
-        Event::RenegotiationStarted {
-            peer_id,
-            ice_restart,
-        } => {
-            assert_eq!(peer_id, peer1_id);
-            assert!(ice_restart);
-        }
-        _ => unreachable!(),
-    }
+    // make sure that there are not contention between Failed messages
+    delay_for(Duration::from_millis(500)).await;
 
     // second peer failed
     member2
@@ -159,10 +150,22 @@ async fn ice_restart() {
         .await
         .unwrap();
 
-    // first peer sends renegotiation offer
-    member1
+    // second peer receives Event::RenegotiationStarted
+    match rx2.next().await.unwrap() {
+        Event::RenegotiationStarted {
+            peer_id,
+            ice_restart,
+        } => {
+            assert_eq!(peer_id, peer2_id);
+            assert!(ice_restart);
+        }
+        _ => unreachable!(),
+    }
+
+    // second peer sends renegotiation offer
+    member2
         .send(SendCommand(Command::MakeSdpOffer {
-            peer_id: peer1_id,
+            peer_id: peer2_id,
             sdp_offer: String::from("offer"),
             mids: hashmap! {
                 TrackId(0) => String::from("0"),
@@ -172,31 +175,31 @@ async fn ice_restart() {
         .await
         .unwrap();
 
-    // second peer receives offer (and not RenegotiationStarted)
-    match rx2.next().await.unwrap() {
+    // first peer receives offer (and not RenegotiationStarted)
+    match rx1.next().await.unwrap() {
         Event::SdpOfferMade { peer_id, sdp_offer } => {
-            assert_eq!(peer_id, peer2_id);
+            assert_eq!(peer_id, peer1_id);
             assert_eq!(sdp_offer, String::from("offer"));
         }
         _ => unreachable!(),
     }
 
-    // second peer answers with SDP answer
-    member2
+    // first peer answers with SDP answer
+    member1
         .send(SendCommand(Command::MakeSdpAnswer {
-            peer_id: peer2_id,
+            peer_id: peer1_id,
             sdp_answer: String::from("answer"),
         }))
         .await
         .unwrap();
 
-    // first peer receives answer
-    match rx1.next().await.unwrap() {
+    // second peer receives answer
+    match rx2.next().await.unwrap() {
         Event::SdpAnswerMade {
             peer_id,
             sdp_answer,
         } => {
-            assert_eq!(peer_id, peer1_id);
+            assert_eq!(peer_id, peer2_id);
             assert_eq!(sdp_answer, String::from("answer"));
         }
         _ => unreachable!(),
