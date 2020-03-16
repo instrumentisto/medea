@@ -2,8 +2,6 @@
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
-// TODO: changelog, rename `unused` feature to something more meaningful.
-
 #![allow(clippy::module_name_repetitions)]
 
 use std::{

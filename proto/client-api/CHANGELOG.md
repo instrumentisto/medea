@@ -26,7 +26,28 @@ All user visible changes to this project will be documented in this file. This p
 - `RpcSettings` server message ([#75]);
 - `force_relay` field to `PeerCreated` event ([#79]);
 - `UpdateTracks` command and `TracksUpdated` event ([#81]);
-- `AddPeerConnectionStats` command and structs for the `RTCStats` ([#90]).
+- `StatsUpdate` metric into `AddPeerConnectionMetrics` command ([#90]).
+- `RTCPeerConnection` stats ([#90]):
+    - `RtcCodecStats`;
+    - `RtcInboundRtpStreamStats`;
+    - `RtcOutboundRtpStreamStats`;
+    - `RemoteInboundRtpStreamStat`;
+    - `RemoteOutboundRtpStreamStat`;
+    - `MediaSourceStat`;
+    - `RtpContributingSourceStat`;
+    - `RtcPeerConnectionStat`;
+    - `DataChannelStat`;
+    - `MediaStreamStat`;
+    - `TrackStat`;
+    - `RtcRtpTransceiverStats`;
+    - `SenderStatsKind`;
+    - `ReceiverStatsKind`;
+    - `RtcTransportStats`;
+    - `RtcSctpTransportStats`;
+    - `RtcIceCandidatePairStats`;
+    - `RtcIceCandidateStats`;
+    - `RtcCertificateStats`;
+    - `RtcIceServerStats`.
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
