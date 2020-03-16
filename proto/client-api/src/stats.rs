@@ -77,12 +77,12 @@ pub enum RtcStatsType {
     /// being sent or received by this `RTCPeerConnection` object. It is
     /// accessed by the [`RtcCodecStats`].
     #[cfg(feature = "unused-stats")]
-    Codec(RtcCodecStats),
+    Codec(Box<RtcCodecStats>),
 
     /// Statistics for an inbound RTP stream that is currently received with
     /// this RTCPeerConnection object. It is accessed by the
     /// [`RtcInboundRtpStreamStats`].
-    InboundRtp(RtcInboundRtpStreamStats),
+    InboundRtp(Box<RtcInboundRtpStreamStats>),
 
     /// Statistics for an outbound RTP stream that is currently sent with this
     /// `RTCPeerConnection` object. It is accessed by the
@@ -96,68 +96,68 @@ pub enum RtcStatsType {
     /// `RTCVideoSenderStats`) and "track" object (of type
     /// `RTCSenderAudioTrackAttachmentStats` or
     /// `RTCSenderVideoTrackAttachmentStats`).
-    OutboundRtp(RtcOutboundRtpStreamStats),
+    OutboundRtp(Box<RtcOutboundRtpStreamStats>),
 
     /// Statistics for the remote endpoint's inbound RTP stream corresponding
     /// to an outbound stream that is currently sent with this
     /// `RTCPeerConnection` object. It is measured at the remote endpoint and
     /// reported in an RTCP Receiver Report (RR) or RTCP Extended Report (XR).
-    RemoteInboundRtp(RemoteInboundRtpStreamStat),
+    RemoteInboundRtp(Box<RemoteInboundRtpStreamStat>),
 
     /// Statistics for the remote endpoint's outbound RTP stream corresponding
     /// to an inbound stream that is currently received with this
     /// `RTCPeerConnection` object. It is measured at the remote endpoint and
     /// reported in an RTCP Sender Report (SR).
-    RemoteOutboundRtp(RemoteOutboundRtpStreamStat),
+    RemoteOutboundRtp(Box<RemoteOutboundRtpStreamStat>),
 
     /// Statistics for the media produced by a `MediaStreamTrack`that is
     /// currently attached to an `RTCRtpSender`. This reflects the media that
     /// is fed to the encoder; after `getUserMedia()` constraints have been
     /// applied (i.e. not the raw media produced by the camera).
-    MediaSource(MediaSourceStat),
+    MediaSource(Box<MediaSourceStat>),
 
     /// Statistics for a contributing source (CSRC) that contributed to an
     /// inbound RTP stream.
     #[cfg(feature = "unused-stats")]
-    Csrc(RtpContributingSourceStat),
+    Csrc(Box<RtpContributingSourceStat>),
 
     /// Statistics related to the `RTCPeerConnection` object.
     #[cfg(feature = "unused-stats")]
-    PeerConnection(RtcPeerConnectionStat),
+    PeerConnection(Box<RtcPeerConnectionStat>),
 
     /// Statistics related to each RTCDataChannel id.
     #[cfg(feature = "unused-stats")]
-    DataChannel(DataChannelStat),
+    DataChannel(Box<DataChannelStat>),
 
     /// This is now obsolete. Contains statistics related to a specific
     /// MediaStream.
     #[cfg(feature = "unused-stats")]
-    Stream(MediaStreamStat),
+    Stream(Box<MediaStreamStat>),
 
     /// Statistics related to a specific MediaStreamTrack's attachment to an
     /// RTCRtpSender and the corresponding media-level metrics.
-    Track(TrackStat),
+    Track(Box<TrackStat>),
 
     /// Statistics related to a specific `RTCRtpTransceiver`.
     #[cfg(feature = "unused-stats")]
-    Transceiver(RtcRtpTransceiverStats),
+    Transceiver(Box<RtcRtpTransceiverStats>),
 
     /// Statistics related to a specific `RTCRtpSender` and the corresponding
     /// media-level metrics.
     #[cfg(feature = "unused-stats")]
-    Sender(SenderStatsKind),
+    Sender(Box<SenderStatsKind>),
 
     /// Statistics related to a specific receiver and the corresponding
     /// media-level metrics.
     #[cfg(feature = "unused-stats")]
-    Receiver(ReceiverStatsKind),
+    Receiver(Box<ReceiverStatsKind>),
 
     /// Transport statistics related to the `RTCPeerConnection` object.
-    Transport(RtcTransportStats),
+    Transport(Box<RtcTransportStats>),
 
     /// SCTP transport statistics related to an `RTCSctpTransport` object.
     // maybe
-    SctpTransport(RtcSctpTransportStats),
+    SctpTransport(Box<RtcSctpTransportStats>),
 
     /// ICE candidate pair statistics related to the `RTCIceTransport` objects.
     ///
@@ -170,7 +170,7 @@ pub enum RtcStatsType {
     /// externally observable event.
     ///
     /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
-    CandidatePair(RtcIceCandidatePairStats),
+    CandidatePair(Box<RtcIceCandidatePairStats>),
 
     /// ICE local candidate statistics related to the `RTCIceTransport`
     /// objects.
@@ -180,7 +180,7 @@ pub enum RtcStatsType {
     /// candidate pair.
     ///
     /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
-    LocalCandidate(RtcIceCandidateStats),
+    LocalCandidate(Box<RtcIceCandidateStats>),
 
     /// ICE remote candidate statistics related to the `RTCIceTransport`
     /// objects.
@@ -190,15 +190,15 @@ pub enum RtcStatsType {
     /// candidate pair.
     ///
     /// [deleted]: https://www.w3.org/TR/webrtc-stats/#dfn-deleted
-    RemoteCandidate(RtcIceCandidateStats),
+    RemoteCandidate(Box<RtcIceCandidateStats>),
 
     /// Information about a certificate used by an `RTCIceTransport`.
     #[cfg(feature = "unused-stats")]
-    Certificate(RtcCertificateStats),
+    Certificate(Box<RtcCertificateStats>),
 
     /// Information about the connection to an ICE server (e.g. STUN or TURN).
     #[cfg(feature = "unused-stats")]
-    IceServer(RtcIceServerStats),
+    IceServer(Box<RtcIceServerStats>),
 
     /// Disabled or unknown variants of stats will be deserialized as
     /// [`RtcStatsType::Other`].
