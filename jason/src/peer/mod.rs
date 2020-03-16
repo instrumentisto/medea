@@ -40,8 +40,6 @@ use crate::{
     },
 };
 
-pub use crate::peer::stats::RtcStats;
-
 #[cfg(feature = "mockable")]
 #[doc(inline)]
 pub use self::repo::MockPeerRepository;
@@ -56,6 +54,7 @@ pub use self::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, Sender, StableMuteState,
     },
+    stats::RtcStats,
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
@@ -217,15 +216,6 @@ pub struct PeerConnection {
     stats_getter_task_handle: Option<TaskHandle>,
 }
 
-/// Returns hash of provided object.
-///
-/// Hash will be calculated with [`DefaultHasher`].
-fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
-}
-
 impl PeerConnection {
     /// Creates new [`PeerConnection`].
     ///
@@ -266,7 +256,7 @@ impl PeerConnection {
             stats_getter_task_handle: None,
         };
 
-        peer.start_stats_task();
+        peer.schedule_peer_stats_scrape();
 
         // Bind to `icecandidate` event.
         let id = peer.id;
@@ -316,10 +306,12 @@ impl PeerConnection {
         Ok(peer)
     }
 
+    // TODO: move scrape and send logic to separate function, call it on
+    //       PeerConnectionState::Connected, move timer to PeerRepository?
     /// Spawns [`Future`] which will get [`RtcStats`] of this [`PeerConnection`]
     /// and send update of [`RtcStats`] to the
     /// [`PeerConnection::peer_events_sender`].
-    pub fn start_stats_task(&mut self) {
+    pub fn schedule_peer_stats_scrape(&mut self) {
         let id = self.id;
         let sender = self.peer_events_sender.clone();
         let peer_clone = self.peer.clone();
@@ -342,13 +334,16 @@ impl PeerConnection {
                         .0
                         .into_iter()
                         .filter(|stat| {
-                            let stat_hash = calculate_hash(stat);
+                            let mut hasher = DefaultHasher::new();
+                            stat.hash(&mut hasher);
+                            let stat_hash = hasher.finish();
 
-                            let is_already_in_cache =
-                                cache.contains(&stat_hash);
-                            cache.insert(stat_hash);
-
-                            !is_already_in_cache
+                            // TODO: not sure about this. how does
+                            //       RtcStat.timestamp work? does it change on
+                            //       stale values? does it change on every
+                            //       scrape? can we just use id+timestamp for
+                            //       identity check?
+                            !cache.insert(stat_hash)
                         })
                         .collect(),
                 );

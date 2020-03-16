@@ -141,6 +141,7 @@ pub enum Command {
         tracks_patches: Vec<TrackPatch>,
     },
     /// Web Client sends Peer Connection stats.
+    // TODO: join with AddPeerConnectionMetrics
     AddPeerConnectionStats {
         /// [`PeerId`] of `PeerConnection` for which this stats.
         peer_id: PeerId,
@@ -148,6 +149,8 @@ pub enum Command {
         /// Actual stats.
         stats: Vec<RtcStatsType>,
 
+        // TODO: do we need this for on_start/on_stop?
+        //       it seems a little redundant to repeat this with every message
         /// Relation between JS-side `MediaTrack` ID and Medea-side
         /// [`TrackId`].
         tracks_ids: HashMap<String, TrackId>,

@@ -166,7 +166,7 @@ pub enum RTCPeerConnectionError {
 
     /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
     #[display(fmt = "Failed to get RTCStats: {:?}", _0)]
-    RtcStats(RtcStatsError),
+    RtcStatsError(RtcStatsError),
 
     /// `PeerConnection.getStats()` promise thrown exception.
     #[display(fmt = "PeerConnection.getStats() failed with error: {:?}", _0)]
@@ -193,7 +193,7 @@ impl From<EventListenerBindError> for RTCPeerConnectionError {
 
 impl From<RtcStatsError> for RTCPeerConnectionError {
     fn from(e: RtcStatsError) -> Self {
-        Self::RtcStats(e)
+        Self::RtcStatsError(e)
     }
 }
 

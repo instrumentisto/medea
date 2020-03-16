@@ -50,6 +50,10 @@ impl TryFrom<js_sys::Array> for RtcStatsReportEntry {
         let id = id
             .dyn_into::<js_sys::JsString>()
             .map_err(tracerr::from_and_wrap!())?;
+        // TODO: "wasm-bindgen: imported JS function that was not marked as
+        //        `catch` threw an error: RTCStats is not defined" at
+        //        "var ret = getObject(arg0) instanceof RTCStats;"
+        //        Chromium 79/Chrome 82 / FF 72
         let stats = stats
             .dyn_into::<SysRtcStats>()
             .map_err(tracerr::from_and_wrap!())?;
