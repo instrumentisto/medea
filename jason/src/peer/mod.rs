@@ -202,6 +202,7 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
+    /// Hashes of [`RtcStat`]s which was already sent to the server.
     stats_cache: RefCell<HashSet<u64>>,
 }
 

@@ -974,14 +974,9 @@ impl CommandHandler for Room {
     /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        peer_id: PeerId,
-        metrics: PeerMetrics,
+        _peer_id: PeerId,
+        _metrics: PeerMetrics,
     ) -> Self::Output {
-        println!(
-            "Received metrics for a Peer with {} ID: {:#?}",
-            peer_id, metrics
-        );
-
         Ok(Box::new(actix::fut::ok(())))
     }
 

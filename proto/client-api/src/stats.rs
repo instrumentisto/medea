@@ -1321,13 +1321,19 @@ impl PartialEq for HighResTimeStamp {
 pub struct Float(pub f64);
 
 impl Hash for Float {
+    /// Some people believed that such an behavior is incorrect (but in some
+    /// programming languages this is default behavior) due to `NaN`, `Inf` or
+    /// `-Inf` (they all will have the same hashes). But in the case of
+    /// `RTCStat` received from the client, there should not be such situations,
+    /// and the hash will always be correct.
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // TODO: add some docs
         self.0.to_string().hash(state);
     }
 }
 
 impl PartialEq for Float {
+    /// This implementation is needed so that the results of comparing objects
+    /// and comparing hashes match.
     fn eq(&self, other: &Self) -> bool {
         self.0.to_string().eq(&other.0.to_string())
     }
