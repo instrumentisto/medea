@@ -101,7 +101,7 @@ impl WsSession {
     /// Starts watchdog which will drop connection if `now`-`last_activity` >
     /// `idle_timeout`.
     fn start_idle_watchdog(ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(Duration::new(1, 0), |this, _ctx| {
+        ctx.run_interval(Duration::new(1, 0), |this, ctx| {
             if Instant::now().duration_since(this.last_activity)
                 > this.idle_timeout
             {
@@ -112,14 +112,9 @@ impl WsSession {
                     ClosedReason::Lost,
                 ));
 
-                // TODO: Lets comment this out until we implement handshake on
-                //       reconnect. Since all messages buffered on client will
-                //       be lost then, we can only afford when we will have
-                //       handshakes on reconnect.
-                //       PR: https://github.com/instrumentisto/medea/pull/51
-                // ctx.notify(Close::with_normal_code(&CloseDescription::new(
-                //     CloseReason::Idle,
-                // )))
+                ctx.notify(Close::with_normal_code(&CloseDescription::new(
+                    CloseReason::Idle,
+                )))
             }
         });
     }
@@ -652,6 +647,7 @@ mod test {
 
             WsSession::new(
                 member_id,
+                RoomId::from(String::from("room")),
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
