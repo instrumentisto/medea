@@ -8,11 +8,13 @@ use std::{fmt, sync::Arc};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
+use medea_client_api_proto::PeerId;
+use medea_coturn_telnet_client::sessions_parser::Session;
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::control::RoomId,
     conf,
     media::IceUser,
     turn::{
@@ -20,8 +22,6 @@ use crate::{
         repo::{TurnDatabase, TurnDatabaseErr},
     },
 };
-use medea_client_api_proto::PeerId;
-use medea_coturn_telnet_client::sessions_parser::Session;
 
 static TURN_PASS_LEN: usize = 16;
 

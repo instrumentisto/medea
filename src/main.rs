@@ -11,7 +11,7 @@ use medea::{
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
     signalling::{room_repo::RoomRepository, room_service::RoomService},
-    turn::{cli::CoturnTelnetClient, new_turn_auth_service},
+    turn::new_turn_auth_service,
     AppContext,
 };
 
@@ -35,11 +35,6 @@ fn main() -> Result<(), Error> {
             let turn_service = new_turn_auth_service(&config.turn)?;
             let graceful_shutdown =
                 GracefulShutdown::new(config.shutdown.timeout).start();
-            let coturn_client = CoturnTelnetClient::new(
-                (config.turn.cli.host.to_string(), config.turn.cli.port),
-                config.turn.cli.pass.to_string(),
-                config.turn.cli.pool.into(),
-            );
             let app_context = AppContext::new(config.clone(), turn_service);
 
             let room_repo = RoomRepository::new(HashMap::new());

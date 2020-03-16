@@ -1,26 +1,9 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Duration};
 
-use actix::{
-    Actor, ActorFuture, Addr, AsyncContext, Handler, Message, StreamHandler,
-    WrapFuture,
-};
 use derive_more::Display;
-use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::PeerId;
-use medea_coturn_telnet_client::sessions_parser::Session;
-use patched_redis::ConnectionInfo;
 
-use crate::{
-    api::control::RoomId,
-    conf,
-    log::prelude::*,
-    turn::cli::{CoturnCliError, CoturnTelnetClient},
-};
+use crate::api::control::RoomId;
 
 #[derive(Clone, Debug, Copy)]
 pub struct Traffic {

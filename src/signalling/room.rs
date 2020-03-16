@@ -6,21 +6,17 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, Message, WrapFuture as _, WrapFuture,
+    Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
+    Message, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    stats::{
-        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType,
-        RtcStatsType,
-    },
-    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    stats::RtcStatsType, Command, CommandHandler, Event, IceCandidate, PeerId,
+    PeerMetrics, TrackId, TrackPatch,
 };
-use medea_control_api_proto::grpc::{api as proto, callback::OnStart};
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::{
@@ -32,7 +28,6 @@ use crate::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
                 OnJoinEvent, OnLeaveEvent, OnLeaveReason, OnStartEvent,
-                OnStopEvent,
             },
             endpoints::{
                 webrtc_play_endpoint::Validated,
@@ -58,11 +53,10 @@ use crate::{
             member::MemberError,
             Member, MembersLoadError,
         },
-        metrics_service::{AddPeer, FlowMetricSource, MetricsService},
+        metrics_service::{AddPeer, MetricsService},
         participants::{ParticipantService, ParticipantServiceErr},
         peer_metrics_service::{AddPeers, AddStat, PeerMetricsService},
         peers::PeerRepository,
-        room::CommandValidationError::PeerBelongsToAnotherMember,
     },
     utils::ResponseActAnyFuture,
     AppContext,
@@ -837,8 +831,6 @@ impl Room {
         }
         Ok(())
     }
-
-    pub fn update_traffic_stats(&mut self, peer_id: PeerId) {}
 }
 
 impl RpcServer for Addr<Room> {
@@ -1095,7 +1087,7 @@ impl Handler<PeerStarted> for Room {
     fn handle(
         &mut self,
         msg: PeerStarted,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         println!("\n\n\n\n\n\n\n\nPeer {} started!!!\n\n\n\n", msg.0);
         let peer_id = msg.0;
@@ -1152,7 +1144,7 @@ impl Handler<PeerStopped> for Room {
     fn handle(
         &mut self,
         msg: PeerStopped,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         println!("Peer {} OnSTOP", msg.0);
     }

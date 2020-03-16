@@ -9,12 +9,13 @@ use std::{
     str::{from_utf8, Utf8Error},
 };
 
-use crate::sessions_parser::{parse_sessions, Session, SessionId};
 use bytes::{BufMut as _, Bytes, BytesMut};
 use derive_more::{Display, From};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use tokio_util::codec::{Decoder, Encoder};
+
+use crate::sessions_parser::{parse_sessions, Session, SessionId};
 
 /// [`CURSOR`] is received whenever [Telnet] server has finished writing
 /// response and is ready to receive new requests.
@@ -36,11 +37,6 @@ static UNKNOWN_COMMAND: &str = "Unknown command\r\n\r\n";
 /// [`CoturnCliResponse::Sessions`].
 static IS_SESSIONS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"Total sessions: \d"#).unwrap());
-
-/// Regular expression to extract session IDs from
-/// [`CoturnCliResponse::Sessions`].
-static EXTRACT_SESSIONS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\d\) id=(.*),").unwrap());
 
 /// Message that is received from [Coturn] server via [Telnet].
 ///

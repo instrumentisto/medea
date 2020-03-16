@@ -1,3 +1,10 @@
+use std::{collections::HashMap, time::Instant};
+
+use actix::{Actor, Addr, AsyncContext, StreamHandler, WrapFuture};
+use futures::{channel::mpsc, StreamExt as _};
+use medea_client_api_proto::PeerId;
+use patched_redis::ConnectionInfo;
+
 use crate::{
     api::control::RoomId,
     signalling::metrics_service::{
@@ -6,13 +13,6 @@ use crate::{
     },
     turn::coturn_stats::{CoturnAllocationEvent, CoturnEvent},
 };
-use actix::{
-    Actor, Addr, AsyncContext, Handler, Message, StreamHandler, WrapFuture,
-};
-use futures::{channel::mpsc, StreamExt as _};
-use medea_client_api_proto::PeerId;
-use patched_redis::ConnectionInfo;
-use std::{collections::HashMap, time::Instant};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CoturnUsername {
@@ -92,7 +92,7 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
     fn handle(
         &mut self,
         item: Option<patched_redis::Msg>,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) {
         if let Some(msg) = item {
             let event = if let Ok(event) = CoturnEvent::parse(&msg) {

@@ -20,7 +20,7 @@ pub struct MetricsService {
 }
 
 impl MetricsService {
-    pub fn new(cf: &crate::conf::turn::Turn) -> Self {
+    pub fn new() -> Self {
         Self {
             stats: HashMap::new(),
         }
@@ -89,7 +89,7 @@ impl Handler<TrafficFlows> for MetricsService {
 
                         ctx.run_later(
                             Duration::from_secs(15),
-                            move |this, ctx| {
+                            move |this, _| {
                                 if let Some(room) =
                                     this.stats.get_mut(&msg.room_id)
                                 {
@@ -138,7 +138,7 @@ impl Handler<TrafficStopped> for MetricsService {
     fn handle(
         &mut self,
         msg: TrafficStopped,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             if let Some(peer) = room.tracks.remove(&msg.peer_id) {
@@ -205,11 +205,7 @@ pub struct AddPeer {
 impl Handler<AddPeer> for MetricsService {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: AddPeer,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: AddPeer, _: &mut Self::Context) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             room.tracks.insert(
                 msg.peer_id,
@@ -236,7 +232,7 @@ impl Handler<RemovePeer> for MetricsService {
     fn handle(
         &mut self,
         msg: RemovePeer,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         self.remove_peer(msg.room_id, msg.peer_id);
     }
@@ -248,7 +244,7 @@ impl Handler<RegisterRoom> for MetricsService {
     fn handle(
         &mut self,
         msg: RegisterRoom,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         self.stats.insert(
             msg.room_id.clone(),

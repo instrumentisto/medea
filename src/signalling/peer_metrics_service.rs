@@ -189,11 +189,7 @@ pub struct AddPeers {
 impl Handler<AddPeers> for PeerMetricsService {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: AddPeers,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: AddPeers, _: &mut Self::Context) -> Self::Result {
         let first_peer = Rc::new(RefCell::new(PeerStat {
             partner_peer: Weak::new(),
             last_update: Instant::now(),
@@ -225,11 +221,7 @@ pub struct AddStat {
 impl Handler<AddStat> for PeerMetricsService {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: AddStat,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: AddStat, _: &mut Self::Context) -> Self::Result {
         if let Some(peer) = self.peers.get(&msg.peer_id) {
             let mut peer_ref = peer.borrow_mut();
 

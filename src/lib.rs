@@ -18,6 +18,8 @@ pub mod turn;
 
 use std::sync::Arc;
 
+use actix::{Actor, Addr};
+
 use crate::{
     api::control::callback::{
         clients::CallbackClientFactoryImpl, service::CallbackService,
@@ -26,7 +28,6 @@ use crate::{
     signalling::metrics_service::MetricsService,
     turn::{coturn_metrics::CoturnMetrics, TurnAuthService},
 };
-use actix::{Actor, Addr};
 
 /// Global application context.
 #[derive(Clone, Debug)]
@@ -53,7 +54,7 @@ impl AppContext {
     /// Creates new [`AppContext`].
     #[inline]
     pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
-        let metrics_service = MetricsService::new(&config.turn).start();
+        let metrics_service = MetricsService::new().start();
         let coturn_metrics =
             CoturnMetrics::new(&config.turn, metrics_service.clone()).start();
 
