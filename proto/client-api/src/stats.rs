@@ -78,7 +78,7 @@ pub enum RtcStatsType {
     /// Statistics for a codec that is currently being used by RTP streams
     /// being sent or received by this `RTCPeerConnection` object. It is
     /// accessed by the [`RtcCodecStats`].
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Codec(RtcCodecStats),
 
     /// Statistics for an inbound RTP stream that is currently received with
@@ -120,20 +120,20 @@ pub enum RtcStatsType {
 
     /// Statistics for a contributing source (CSRC) that contributed to an
     /// inbound RTP stream.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Csrc(RtpContributingSourceStat),
 
     /// Statistics related to the `RTCPeerConnection` object.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     PeerConnection(RtcPeerConnectionStat),
 
     /// Statistics related to each RTCDataChannel id.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     DataChannel(DataChannelStat),
 
     /// This is now obsolete. Contains statistics related to a specific
     /// MediaStream.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Stream(MediaStreamStat),
 
     /// Statistics related to a specific MediaStreamTrack's attachment to an
@@ -141,17 +141,17 @@ pub enum RtcStatsType {
     Track(TrackStat),
 
     /// Statistics related to a specific `RTCRtpTransceiver`.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Transceiver(RtcRtpTransceiverStats),
 
     /// Statistics related to a specific `RTCRtpSender` and the corresponding
     /// media-level metrics.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Sender(SenderStatsKind),
 
     /// Statistics related to a specific receiver and the corresponding
     /// media-level metrics.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Receiver(ReceiverStatsKind),
 
     /// Transport statistics related to the `RTCPeerConnection` object.
@@ -195,11 +195,11 @@ pub enum RtcStatsType {
     RemoteCandidate(RtcIceCandidateStats),
 
     /// Information about a certificate used by an `RTCIceTransport`.
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     Certificate(RtcCertificateStats),
 
     /// Information about the connection to an ICE server (e.g. STUN or TURN).
-    #[cfg(feature = "unused")]
+    #[cfg(feature = "unused-stats")]
     IceServer(RtcIceServerStats),
 
     /// Disabled or unknown variants of stats will be deserialized as
@@ -218,7 +218,7 @@ pub enum RtcStatsType {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#idl-def-rtcmediastreamstats
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct MediaStreamStat {
     /// `stream.id` property.
     #[serde(rename = "streamIdentifier")]
@@ -237,7 +237,7 @@ pub struct MediaStreamStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#dcstats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct DataChannelStat {
     /// The "label" value of the [`RTCDataChannel`] object.
     ///
@@ -344,7 +344,7 @@ pub enum KnownDataChannelState {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#pcstats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct RtcPeerConnectionStat {
     /// Represents the number of unique `DataChannel`s that have entered the
     /// "open" state during their lifetime.
@@ -378,7 +378,7 @@ pub struct RtcPeerConnectionStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#contributingsourcestats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct RtpContributingSourceStat {
     /// The SSRC identifier of the contributing source represented by this
     /// stats object, as defined by [RFC3550]. It is a 32-bit unsigned integer
@@ -518,7 +518,7 @@ pub struct RemoteInboundRtpStreamStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#transceiver-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct RtcRtpTransceiverStats {
     /// The identifier of the stats object representing the RTCRtpSender
     /// [associated with the `RTCRtpTransceiver`][1] represented by this stats
@@ -639,7 +639,7 @@ pub enum IceRole {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub enum SenderStatsKind {
     /// Represents [`RTCAudioSenderStats`] object.
     ///
@@ -665,7 +665,7 @@ pub enum SenderStatsKind {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub enum ReceiverStatsKind {
     /// Represents [`RTCAudioReceiverStats`] object.
     ///
@@ -1233,10 +1233,9 @@ pub struct MediaSourceStat {
 /// [Full doc on W3C][1]
 ///
 /// [1]: https://www.w3.org/TR/webrtc-stats/#dom-rtccodecstats
-#[cfg(feature = "unused")]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct RtcCodecStats {
     /// Payload type as used in RTP encoding or decoding.
     pub payload_type: u32,
@@ -1257,7 +1256,7 @@ pub struct RtcCodecStats {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#certificatestats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct RtcCertificateStats {
     /// The fingerprint of the certificate. Only use the fingerprint value as
     /// defined in Section 5 of [RFC4572].
@@ -1345,7 +1344,7 @@ impl PartialEq for Float {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#ice-server-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused")]
+#[cfg(feature = "unused-stats")]
 pub struct RtcIceServerStats {
     /// The URL of the ICE server (e.g. TURN or STUN server).
     pub url: String,
