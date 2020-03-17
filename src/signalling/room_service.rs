@@ -23,7 +23,7 @@ use crate::{
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
-        metrics_service::MetricsService,
+        metrics_service::{MetricsService, UnregisterRoom},
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
@@ -149,6 +149,7 @@ impl RoomService {
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
+            self.metrics_service.do_send(UnregisterRoom(id.clone()));
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),

@@ -219,17 +219,33 @@ impl Handler<RegisterRoom> for MetricsService {
 #[rtype(result = "()")]
 pub struct UnregisterRoom(pub RoomId);
 
+impl Handler<UnregisterRoom> for MetricsService {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: UnregisterRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.stats.remove(&msg.0);
+    }
+}
+
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct AddPeer {
+pub struct Subscribe {
     pub room_id: RoomId,
     pub peer_id: PeerId,
 }
 
-impl Handler<AddPeer> for MetricsService {
+impl Handler<Subscribe> for MetricsService {
     type Result = ();
 
-    fn handle(&mut self, msg: AddPeer, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: Subscribe,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             room.tracks.insert(
                 msg.peer_id,

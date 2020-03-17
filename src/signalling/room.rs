@@ -53,7 +53,7 @@ use crate::{
             member::MemberError,
             Member, MembersLoadError,
         },
-        metrics_service::{AddPeer, MetricsService},
+        metrics_service::{MetricsService, Subscribe},
         participants::{ParticipantService, ParticipantServiceErr},
         peer_metrics_service::{AddPeers, AddStat, PeerMetricsService},
         peers::PeerRepository,
@@ -370,7 +370,7 @@ impl Room {
                             if publisher.on_start().is_some()
                                 || publisher.on_stop().is_some()
                             {
-                                metrics_service.do_send(AddPeer {
+                                metrics_service.do_send(Subscribe {
                                     peer_id: publisher_peer_id,
                                     room_id: room_id.clone(),
                                 });
@@ -378,7 +378,7 @@ impl Room {
                             if receiver.on_start().is_some()
                                 || receiver.on_stop().is_some()
                             {
-                                metrics_service.do_send(AddPeer {
+                                metrics_service.do_send(Subscribe {
                                     peer_id: receiver_peer_id,
                                     room_id: room_id.clone(),
                                 });
@@ -404,11 +404,11 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        self.metrics_service.do_send(AddPeer {
+        self.metrics_service.do_send(Subscribe {
             peer_id: first_peer,
             room_id: self.id.clone(),
         });
-        self.metrics_service.do_send(AddPeer {
+        self.metrics_service.do_send(Subscribe {
             peer_id: second_peer,
             room_id: self.id.clone(),
         });
