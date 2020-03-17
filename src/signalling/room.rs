@@ -13,8 +13,8 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    stats::RtcStatsType, Command, CommandHandler, Event, IceCandidate, PeerId,
-    PeerMetrics, TrackId, TrackPatch,
+    stats::RtcStatsType, Command, CommandHandler, Event, IceCandidate,
+    PeerConnectionState, PeerId, PeerMetrics, TrackId, TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -63,6 +63,7 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use crate::api::control::callback::OnStopEvent;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1146,7 +1147,48 @@ impl Handler<PeerStopped> for Room {
         msg: PeerStopped,
         _: &mut Self::Context,
     ) -> Self::Result {
-        println!("Peer {} OnSTOP", msg.0);
+        println!("Peer {} stopped!!!", msg.0);
+        let peer_id = msg.0;
+        if let Some(endpoints) =
+        self.peers.get_endpoint_path_by_peer_id(peer_id)
+        {
+            let send_callbacks: HashMap<_, _> = endpoints
+                .into_iter()
+                .filter_map(|e| {
+                    let endpoint = e.upgrade()?;
+                    match endpoint {
+                        Endpoint::WebRtcPublishEndpoint(publish) => {
+                            publish.change_peer_status(peer_id, false);
+                            if publish.publishing_peers_count() == 0 {
+                                if let Some(on_stop) = publish.on_stop() {
+                                    let fid =
+                                        publish.owner().get_fid_to_endpoint(
+                                            publish.id().into(),
+                                        );
+                                    return Some((fid, on_stop));
+                                }
+                            }
+                        }
+                        Endpoint::WebRtcPlayEndpoint(play) => {
+                            if let Some(on_stop) = play.on_stop() {
+                                let fid = play
+                                    .owner()
+                                    .get_fid_to_endpoint(play.id().into());
+                                return Some((fid, on_stop));
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect();
+            for (fid, on_stop) in send_callbacks {
+                self.callbacks.send_callback(
+                    on_stop,
+                    fid.into(),
+                    OnStopEvent {},
+                );
+            }
+        }
     }
 }
 
@@ -1408,6 +1450,13 @@ impl Handler<RpcConnectionClosed> for Room {
                 self.peers.remove_peers_related_to_member(&msg.member_id);
 
             for (peer_member_id, peers_ids) in removed_peers {
+                for peer_id in &peers_ids {
+                    self.peer_metrics_service.do_send(
+                        crate::signalling::peer_metrics_service::PeerRemoved {
+                            peer_id: *peer_id,
+                        },
+                    );
+                }
                 // Here we may have some problems. If two participants
                 // disconnect at one moment then sending event
                 // to another participant fail,

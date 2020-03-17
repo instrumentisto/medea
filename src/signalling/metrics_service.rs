@@ -101,9 +101,9 @@ impl Handler<TrafficFlows> for MetricsService {
                                         {
                                             // TODO: change it to enum variants
                                             //       count
-                                            if srcs.len() < 2 {
+                                            if srcs.len() < 3 {
                                                 // TODO: FATAL ERROR
-                                                println!("VALIDATION FAILED")
+                                                println!("VALIDATION FAILED {:?}", srcs);
                                             } else {
                                                 println!(
                                                     "YAAAAAY VALIDATION PASSED"
@@ -151,7 +151,7 @@ impl Handler<TrafficStopped> for MetricsService {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
-    // TODO: PartnerPeer,
+    PartnerPeer,
     Peer,
     Coturn,
 }
@@ -162,6 +162,7 @@ pub enum StoppedMetricSource {
     Peer,
     Coturn,
     Timeout,
+    PeerRemoved,
 }
 
 #[derive(Debug)]
@@ -189,6 +190,25 @@ pub struct RoomStats {
 pub struct RegisterRoom {
     pub room_id: RoomId,
     pub room: Addr<Room>,
+
+impl Handler<RegisterRoom> for MetricsService {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: RegisterRoom,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        self.stats.insert(
+            msg.room_id.clone(),
+            RoomStats {
+                room_id: msg.room_id,
+                room: msg.room,
+                tracks: HashMap::new(),
+            },
+        );
+    }
+}
 }
 
 #[derive(Debug, Message)]
@@ -235,24 +255,5 @@ impl Handler<RemovePeer> for MetricsService {
         _: &mut Self::Context,
     ) -> Self::Result {
         self.remove_peer(msg.room_id, msg.peer_id);
-    }
-}
-
-impl Handler<RegisterRoom> for MetricsService {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: RegisterRoom,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        self.stats.insert(
-            msg.room_id.clone(),
-            RoomStats {
-                room_id: msg.room_id,
-                room: msg.room,
-                tracks: HashMap::new(),
-            },
-        );
     }
 }

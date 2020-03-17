@@ -1,24 +1,26 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    time::Duration,
     rc::{Rc, Weak},
     time::Instant,
 };
 
-use actix::{Actor, Addr, Handler, Message};
+use actix::{Actor, Addr, Handler, Message, AsyncContext};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStatsType,
         StatId,
     },
-    PeerId,
+    PeerConnectionState, PeerId,
 };
 
 use crate::{
     api::control::RoomId,
     signalling::metrics_service::{
-        FlowMetricSource, MetricsService, TrafficFlows,
+        FlowMetricSource, MetricsService, StoppedMetricSource, TrafficFlows,
+        TrafficStopped,
     },
 };
 
@@ -89,12 +91,20 @@ impl ReceiveStat {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PeerStatState {
+    Connected,
+    Waiting,
+}
+
 #[derive(Debug)]
 struct PeerStat {
+    peer_id: PeerId,
     partner_peer: Weak<RefCell<PeerStat>>,
     spec: PeerSpec,
     senders: HashMap<StatId, SenderStat>,
     receivers: HashMap<StatId, ReceiveStat>,
+    state: PeerStatState,
     last_update: Instant,
 }
 
@@ -129,7 +139,7 @@ impl PeerStat {
             .update(upd);
     }
 
-    pub fn is_started(&self) -> bool {
+    pub fn is_conforms_spec(&self) -> bool {
         let mut spec_senders: Vec<_> = self.spec.senders.clone();
         let mut spec_receivers: Vec<_> = self.spec.received.clone();
         spec_senders.sort();
@@ -138,17 +148,32 @@ impl PeerStat {
         let mut current_senders: Vec<_> = self
             .senders
             .values()
+            .filter(|sender| sender.last_update > Instant::now() - Duration::from_secs(10))
             .map(|sender| sender.media_type)
             .collect();
         let mut current_receivers: Vec<_> = self
             .receivers
             .values()
-            .map(|receivers| receivers.media_type)
+            .filter(|receiver| receiver.last_update > Instant::now() - Duration::from_secs(10))
+            .map(|receiver| receiver.media_type)
             .collect();
         current_receivers.sort();
         current_senders.sort();
 
         spec_receivers == current_receivers && spec_senders == current_senders
+    }
+
+    pub fn get_partner_peer_id(&self) -> Option<PeerId> {
+        self.partner_peer.upgrade()
+            .map(|partner_peer| partner_peer.borrow().get_peer_id())
+    }
+
+    pub fn get_peer_id(&self) -> PeerId {
+        self.peer_id
+    }
+
+    pub fn set_state(&mut self, state: PeerStatState) {
+        self.state = state;
     }
 }
 
@@ -171,6 +196,17 @@ impl PeerMetricsService {
 
 impl Actor for PeerMetricsService {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.run_interval(Duration::from_secs(10), |this, ctx| {
+            for peer in this.peers.values().filter(|peer| peer.borrow().state == PeerStatState::Connected) {
+                let peer_ref = peer.borrow();
+                if !peer_ref.is_conforms_spec() {
+                    println!("Peer {} doesn't conforms Peer spec!!!", peer_ref.peer_id);
+                }
+            }
+        });
+    }
 }
 
 #[derive(Debug)]
@@ -191,17 +227,21 @@ impl Handler<AddPeers> for PeerMetricsService {
 
     fn handle(&mut self, msg: AddPeers, _: &mut Self::Context) -> Self::Result {
         let first_peer = Rc::new(RefCell::new(PeerStat {
+            peer_id: msg.first_peer.peer_id,
             partner_peer: Weak::new(),
             last_update: Instant::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
+            state: PeerStatState::Waiting,
             spec: msg.first_peer.spec,
         }));
         let second_peer = Rc::new(RefCell::new(PeerStat {
+            peer_id: msg.second_peer.peer_id,
             partner_peer: Rc::downgrade(&first_peer),
             last_update: Instant::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
+            state: PeerStatState::Waiting,
             spec: msg.second_peer.spec,
         }));
         first_peer.borrow_mut().partner_peer = Rc::downgrade(&second_peer);
@@ -237,14 +277,48 @@ impl Handler<AddStat> for PeerMetricsService {
                 }
             }
 
-            if peer_ref.is_started() {
+            if peer_ref.is_conforms_spec() {
                 self.metrics_service.do_send(TrafficFlows {
                     room_id: self.room_id.clone(),
                     peer_id: msg.peer_id,
                     source: FlowMetricSource::Peer,
                     timestamp: Instant::now(),
                 });
+                peer_ref.set_state(PeerStatState::Connected);
+                if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
+                    self.metrics_service.do_send(TrafficFlows {
+                        room_id: self.room_id.clone(),
+                        peer_id: partner_peer_id,
+                        source: FlowMetricSource::PartnerPeer,
+                        timestamp: Instant::now(),
+                    });
+                }
             }
+        }
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerRemoved {
+    pub peer_id: PeerId,
+}
+
+impl Handler<PeerRemoved> for PeerMetricsService {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: PeerRemoved,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(peer) = self.peers.remove(&msg.peer_id) {
+            self.metrics_service.do_send(TrafficStopped {
+                peer_id: msg.peer_id,
+                room_id: self.room_id.clone(),
+                timestamp: Instant::now(),
+                source: StoppedMetricSource::PeerRemoved,
+            });
         }
     }
 }
