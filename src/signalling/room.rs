@@ -64,6 +64,7 @@ use crate::{
 
 use super::elements::endpoints::Endpoint;
 use crate::api::control::callback::OnStopEvent;
+use medea_client_api_proto::Command::AddPeerConnectionMetrics;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -358,8 +359,31 @@ impl Room {
             )
             .filter_map({
                 let peers = &mut self.peers;
+                let metrics_service = self.metrics_service.clone();
+                let room_id = self.id.clone();
                 move |(publisher, receiver)| {
-                    peers.connect_endpoints(&publisher, &receiver)
+                    peers.connect_endpoints(&publisher, &receiver).map(
+                        |(publisher_peer_id, receiver_peer_id)| {
+                            if publisher.on_start().is_some()
+                                || publisher.on_stop().is_some()
+                            {
+                                metrics_service.do_send(AddPeer {
+                                    peer_id: publisher_peer_id,
+                                    room_id: room_id.clone(),
+                                });
+                            }
+                            if receiver.on_start().is_some()
+                                || receiver.on_stop().is_some()
+                            {
+                                metrics_service.do_send(AddPeer {
+                                    peer_id: receiver_peer_id,
+                                    room_id: room_id.clone(),
+                                });
+                            }
+
+                            (publisher_peer_id, receiver_peer_id)
+                        },
+                    )
                 }
             })
             .collect::<Vec<_>>()
@@ -1036,6 +1060,7 @@ impl CommandHandler for Room {
             }
             _ => (),
         }
+
         Ok(Box::new(actix::fut::ok(())))
     }
 
