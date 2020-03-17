@@ -43,7 +43,7 @@ enum InnerCloseReason {
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
 pub struct WsSession {
-    /// [`WsSession`] ID;
+    /// ID of [`WsSession`].
     id: u64,
 
     /// ID of [`Member`] that WebSocket connection is associated with.
@@ -445,7 +445,7 @@ mod test {
 
             WsSession::new(
                 member_id,
-                RoomId::from(String::from("room")),
+                RoomId::from("room"),
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
@@ -481,7 +481,7 @@ mod test {
 
             WsSession::new(
                 member_id,
-                RoomId::from(String::from("room")),
+                RoomId::from("room"),
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_millis(50),
@@ -530,7 +530,7 @@ mod test {
 
             WsSession::new(
                 member_id,
-                RoomId::from(String::from("room")),
+                RoomId::from("room"),
                 Box::new(rpc_server),
                 Duration::from_millis(100),
                 Duration::from_secs(10),
@@ -583,7 +583,7 @@ mod test {
 
             WsSession::new(
                 member_id,
-                RoomId::from(String::from("room")),
+                RoomId::from("room"),
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
@@ -647,7 +647,7 @@ mod test {
 
             WsSession::new(
                 member_id,
-                RoomId::from(String::from("room")),
+                RoomId::from("room"),
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
@@ -703,7 +703,7 @@ mod test {
 
             WsSession::new(
                 member_id,
-                RoomId::from(String::from("room")),
+                RoomId::from("room"),
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
