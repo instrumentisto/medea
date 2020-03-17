@@ -154,15 +154,15 @@ impl Handler<TrafficStopped> for MetricsService {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
-    PartnerPeer,
-    Peer,
+    PartnerPeerTraffic,
+    PeerTraffic,
     Coturn,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum StoppedMetricSource {
     // TODO: PartnerPeer,
-    Peer,
+    PeerTraffic,
     Coturn,
     Timeout,
     PeerRemoved,

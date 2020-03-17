@@ -18,8 +18,8 @@ use medea_client_api_proto::{
 use crate::{
     api::control::RoomId,
     signalling::metrics_service::{
-        FlowMetricSource, MetricsService, StoppedMetricSource, TrafficFlows,
-        TrafficStopped,
+        FlowMetricSource, MetricsService, PeerState::Stopped,
+        StoppedMetricSource, TrafficFlows, TrafficStopped,
     },
 };
 use medea_client_api_proto::stats::RtcStat;
@@ -75,6 +75,10 @@ impl SenderStat {
         self.last_update = Instant::now();
         self.packets_sent = upd.packets_sent;
     }
+
+    pub fn is_active(&self) -> bool {
+        self.last_update > Instant::now() - Duration::from_secs(10)
+    }
 }
 
 #[derive(Debug)]
@@ -88,6 +92,10 @@ impl ReceiveStat {
     pub fn update(&mut self, upd: Box<RtcInboundRtpStreamStats>) {
         self.last_update = Instant::now();
         self.packets_received = upd.packets_received;
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.last_update > Instant::now() - Duration::from_secs(10)
     }
 }
 
@@ -148,23 +156,43 @@ impl PeerStat {
         let mut current_senders: Vec<_> = self
             .senders
             .values()
-            .filter(|sender| {
-                sender.last_update > Instant::now() - Duration::from_secs(10)
-            })
+            .filter(|sender| sender.is_active())
             .map(|sender| sender.media_type)
             .collect();
         let mut current_receivers: Vec<_> = self
             .receivers
             .values()
-            .filter(|receiver| {
-                receiver.last_update > Instant::now() - Duration::from_secs(10)
-            })
+            .filter(|receiver| receiver.is_active())
             .map(|receiver| receiver.media_type)
             .collect();
         current_receivers.sort();
         current_senders.sort();
 
         spec_receivers == current_receivers && spec_senders == current_senders
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        let active_senders_count = self
+            .senders
+            .values()
+            .filter(|sender| sender.is_active())
+            .count();
+        let active_receivers_count = self
+            .receivers
+            .values()
+            .filter(|recv| recv.is_active())
+            .count();
+
+        active_receivers_count + active_receivers_count == 0
+    }
+
+    pub fn get_stop_time(&self) -> Instant {
+        self.senders
+            .values()
+            .map(|send| send.last_update)
+            .chain(self.receivers.values().map(|recv| recv.last_update))
+            .max()
+            .unwrap_or_else(|| Instant::now())
     }
 
     pub fn get_partner_peer_id(&self) -> Option<PeerId> {
@@ -210,7 +238,18 @@ impl Actor for PeerMetricsService {
                 .filter(|peer| peer.borrow().state == PeerStatState::Connected)
             {
                 let peer_ref = peer.borrow();
+
+                if peer_ref.is_stopped() {
+                    this.metrics_service.do_send(TrafficStopped {
+                        room_id: this.room_id.clone(),
+                        peer_id: peer_ref.peer_id,
+                        timestamp: peer_ref.get_stop_time(),
+                        source: StoppedMetricSource::PeerTraffic,
+                    });
+                }
+
                 if !peer_ref.is_conforms_spec() {
+                    // TODO: this is fatal error
                     println!(
                         "Peer {} doesn't conforms Peer spec!!!",
                         peer_ref.peer_id
@@ -289,21 +328,34 @@ impl Handler<AddStat> for PeerMetricsService {
                 }
             }
 
-            if peer_ref.is_conforms_spec() {
-                self.metrics_service.do_send(TrafficFlows {
+            if peer_ref.is_stopped() {
+                self.metrics_service.do_send(TrafficStopped {
+                    source: StoppedMetricSource::PeerTraffic,
+                    timestamp: peer_ref.get_stop_time(),
+                    peer_id: peer_ref.peer_id,
                     room_id: self.room_id.clone(),
-                    peer_id: msg.peer_id,
-                    source: FlowMetricSource::Peer,
-                    timestamp: Instant::now(),
                 });
-                peer_ref.set_state(PeerStatState::Connected);
-                if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
+            } else {
+                if peer_ref.is_conforms_spec() {
                     self.metrics_service.do_send(TrafficFlows {
                         room_id: self.room_id.clone(),
-                        peer_id: partner_peer_id,
-                        source: FlowMetricSource::PartnerPeer,
+                        peer_id: msg.peer_id,
+                        source: FlowMetricSource::PeerTraffic,
                         timestamp: Instant::now(),
                     });
+                    peer_ref.set_state(PeerStatState::Connected);
+                    if let Some(partner_peer_id) =
+                        peer_ref.get_partner_peer_id()
+                    {
+                        self.metrics_service.do_send(TrafficFlows {
+                            room_id: self.room_id.clone(),
+                            peer_id: partner_peer_id,
+                            source: FlowMetricSource::PartnerPeerTraffic,
+                            timestamp: Instant::now(),
+                        });
+                    }
+                } else {
+                    // TODO: fatal error
                 }
             }
         }
