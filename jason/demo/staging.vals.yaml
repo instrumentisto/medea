@@ -14,7 +14,7 @@ server:
           public_url: wss://demo.medea.stg.t11913.org/ws
           bind_port: 9980
     rpc:
-      idle_timeout: 20s
+      idle_timeout: 60s
       reconnect_timeout: 5m
       ping_interval: 5s
     turn:
@@ -59,8 +59,7 @@ server:
 
 web-client:
   image:
-    repository: alexlapa/medea-demo
-    tag: tune-ws
+    tag: edge
     pullPolicy: Always
 
   deployment:

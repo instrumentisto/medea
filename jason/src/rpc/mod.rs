@@ -757,6 +757,7 @@ impl RpcClient for WebSocketRpcClient {
                 // TODO: we will just wait for reconnect at this moment
                 //       should be handled properly as a part of future
                 //       state synchronization mechanism
+                //       PR: https://github.com/instrumentisto/medea/pull/51
                 JasonError::from(err).print()
             }
         }
