@@ -1397,7 +1397,7 @@ mod test {
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
-            id: RoomId(String::from("test")),
+            id: RoomId::from("test"),
             pipeline: Pipeline::new(HashMap::new()),
         };
         let ctx = AppContext::new(

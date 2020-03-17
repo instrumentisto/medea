@@ -13,6 +13,10 @@ server:
         http:
           public_url: wss://demo.medea.stg.t11913.org/ws
           bind_port: 9980
+    rpc:
+      idle_timeout: 60s
+      reconnect_timeout: 5m
+      ping_interval: 5s
     turn:
       host: demo.medea.stg.t11913.org
       pass: changeme
@@ -31,6 +35,8 @@ server:
     conf:
       listening-port: 9934
       cli-password: changeme
+    extraArgs:
+      - --verbose
 
   coturn-db:
     image:

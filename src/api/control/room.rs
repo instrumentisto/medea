@@ -21,8 +21,9 @@ use super::{
 /// ID of [`Room`].
 ///
 /// [`Room`]: crate::signalling::room::Room
-#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
-pub struct Id(pub String);
+#[derive(Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq)]
+#[from(forward)]
+pub struct Id(String);
 
 /// Element of [`Room`]'s [`Pipeline`].
 ///

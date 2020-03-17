@@ -213,7 +213,7 @@ async fn normal_exchange_of_candidates() {
 
     resolve_after(500).await.unwrap();
 
-    handle_ice_candidates(rx1, &peer2, 2).await;
+    handle_ice_candidates(rx1, &peer2, 1).await;
     handle_ice_candidates(rx2, &peer1, 1).await;
 }
 

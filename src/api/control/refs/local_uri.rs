@@ -260,7 +260,7 @@ mod specs {
             StatefulLocalUri::try_from(String::from("local://room_id"))
                 .unwrap();
         if let StatefulLocalUri::Room(room) = local_uri {
-            assert_eq!(room.take_room_id(), RoomId("room_id".to_string()));
+            assert_eq!(room.take_room_id(), RoomId::from("room_id"));
         } else {
             unreachable!(
                 "Local uri '{}' parsed to {:?} state but should be in \
@@ -280,7 +280,7 @@ mod specs {
             let (element_id, room_uri) = member.take_member_id();
             assert_eq!(element_id, MemberId("room_element_id".to_string()));
             let room_id = room_uri.take_room_id();
-            assert_eq!(room_id, RoomId("room_id".to_string()));
+            assert_eq!(room_id, RoomId::from("room_id"));
         } else {
             unreachable!(
                 "Local URI '{}' parsed to {:?} state but should be in \
@@ -302,7 +302,7 @@ mod specs {
             let (member_id, room_uri) = member_uri.take_member_id();
             assert_eq!(member_id, MemberId("room_element_id".to_string()));
             let room_id = room_uri.take_room_id();
-            assert_eq!(room_id, RoomId("room_id".to_string()));
+            assert_eq!(room_id, RoomId::from("room_id"));
         } else {
             unreachable!(
                 "Local URI '{}' parsed to {:?} state but should be in \
