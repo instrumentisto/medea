@@ -67,7 +67,6 @@ use crate::{
     api::control::callback::OnStopEvent,
     signalling::metrics_service::UnsubscribePeer,
 };
-use medea_client_api_proto::Command::AddPeerConnectionMetrics;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;

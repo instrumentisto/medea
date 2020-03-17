@@ -225,7 +225,7 @@ impl Handler<UnregisterRoom> for MetricsService {
     fn handle(
         &mut self,
         msg: UnregisterRoom,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         self.stats.remove(&msg.0);
     }
@@ -272,7 +272,7 @@ impl Handler<UnsubscribePeer> for MetricsService {
     fn handle(
         &mut self,
         msg: UnsubscribePeer,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room_stats) = self.stats.get_mut(&msg.room_id) {
             for peer_id in msg.peers_ids {
@@ -314,7 +314,7 @@ impl Handler<FatalPeerError> for MetricsService {
     fn handle(
         &mut self,
         msg: FatalPeerError,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         self.fatal_peer_error(&msg.room_id, msg.peer_id);
     }

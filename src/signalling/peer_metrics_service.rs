@@ -12,14 +12,14 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStatsType,
         StatId,
     },
-    PeerConnectionState, PeerId,
+    PeerId,
 };
 
 use crate::{
     api::control::RoomId,
     signalling::metrics_service::{
-        FatalPeerError, FlowMetricSource, MetricsService, PeerState::Stopped,
-        StoppedMetricSource, TrafficFlows, TrafficStopped,
+        FatalPeerError, FlowMetricSource, MetricsService, StoppedMetricSource,
+        TrafficFlows, TrafficStopped,
     },
 };
 use medea_client_api_proto::stats::RtcStat;
@@ -183,7 +183,7 @@ impl PeerStat {
             .filter(|recv| recv.is_active())
             .count();
 
-        active_receivers_count + active_receivers_count == 0
+        active_receivers_count + active_senders_count == 0
     }
 
     pub fn get_stop_time(&self) -> Instant {
@@ -231,7 +231,7 @@ impl Actor for PeerMetricsService {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.run_interval(Duration::from_secs(10), |this, ctx| {
+        ctx.run_interval(Duration::from_secs(10), |this, _| {
             for peer in this
                 .peers
                 .values()
@@ -376,9 +376,9 @@ impl Handler<PeerRemoved> for PeerMetricsService {
     fn handle(
         &mut self,
         msg: PeerRemoved,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(peer) = self.peers.remove(&msg.peer_id) {
+        if let Some(_) = self.peers.remove(&msg.peer_id) {
             self.metrics_service.do_send(TrafficStopped {
                 peer_id: msg.peer_id,
                 room_id: self.room_id.clone(),

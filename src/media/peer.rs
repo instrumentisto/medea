@@ -16,8 +16,7 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     stats::{
-        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType,
-        RtcStatsType, StatId,
+        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, StatId,
     },
     AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
     VideoSettings,
