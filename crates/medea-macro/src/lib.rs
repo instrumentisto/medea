@@ -4,8 +4,6 @@
 //!
 //! [Medea]: https://github.com/instrumentisto/medea
 
-extern crate proc_macro;
-
 mod dispatchable;
 mod enum_delegate;
 mod js_caused;
