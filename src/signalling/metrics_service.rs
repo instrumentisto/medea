@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MetricsService {
     stats: HashMap<RoomId, RoomStats>,
 }
@@ -27,8 +27,8 @@ impl MetricsService {
         }
     }
 
-    pub fn remove_peer(&mut self, room_id: RoomId, peer_id: PeerId) {
-        if let Some(room) = self.stats.get_mut(&room_id) {
+    pub fn remove_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
+        if let Some(room) = self.stats.get_mut(room_id) {
             room.tracks.remove(&peer_id);
         }
     }
@@ -40,10 +40,10 @@ impl MetricsService {
         }
     }
 
-    fn check_on_start(&mut self, room_id: RoomId, peer_id: PeerId) {
+    fn check_on_start(&mut self, room_id: &RoomId, peer_id: PeerId) {
         let peer = self
             .stats
-            .get_mut(&room_id)
+            .get_mut(room_id)
             .and_then(|room| room.tracks.get_mut(&peer_id));
 
         if let Some(peer) = peer {
@@ -51,7 +51,7 @@ impl MetricsService {
                 let is_not_all_sources_sent_start =
                     srcs.len() < FlowMetricSource::VARIANT_COUNT;
                 if is_not_all_sources_sent_start {
-                    self.fatal_peer_error(&room_id, peer_id);
+                    self.fatal_peer_error(room_id, peer_id);
                 }
             }
         }
@@ -115,7 +115,7 @@ impl Handler<TrafficFlows> for MetricsService {
                         ctx.run_later(
                             Duration::from_secs(15),
                             move |this, _| {
-                                this.check_on_start(msg.room_id, msg.peer_id);
+                                this.check_on_start(&msg.room_id, msg.peer_id);
                             },
                         );
 
@@ -149,7 +149,7 @@ impl Handler<TrafficStopped> for MetricsService {
                 room.room.do_send(PeerStopped(peer.peer_id));
             }
         }
-        self.remove_peer(msg.room_id, msg.peer_id);
+        self.remove_peer(&msg.room_id, msg.peer_id);
     }
 }
 
@@ -297,7 +297,7 @@ impl Handler<RemovePeer> for MetricsService {
         msg: RemovePeer,
         _: &mut Self::Context,
     ) -> Self::Result {
-        self.remove_peer(msg.room_id, msg.peer_id);
+        self.remove_peer(&msg.room_id, msg.peer_id);
     }
 }
 

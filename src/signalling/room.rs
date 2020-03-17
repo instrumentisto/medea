@@ -1052,7 +1052,7 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// Does nothing atm.
+    #[allow(clippy::single_match)]
     fn on_add_peer_connection_metrics(
         &mut self,
         peer_id: PeerId,

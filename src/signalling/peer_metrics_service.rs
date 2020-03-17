@@ -71,7 +71,7 @@ struct SenderStat {
 }
 
 impl SenderStat {
-    pub fn update(&mut self, upd: Box<RtcOutboundRtpStreamStats>) {
+    pub fn update(&mut self, upd: &RtcOutboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.packets_sent = upd.packets_sent;
     }
@@ -89,7 +89,7 @@ struct ReceiveStat {
 }
 
 impl ReceiveStat {
-    pub fn update(&mut self, upd: Box<RtcInboundRtpStreamStats>) {
+    pub fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.packets_received = upd.packets_received;
     }
@@ -120,7 +120,7 @@ impl PeerStat {
     pub fn update_sender(
         &mut self,
         stat_id: StatId,
-        upd: Box<RtcOutboundRtpStreamStats>,
+        upd: &RtcOutboundRtpStreamStats,
     ) {
         self.senders
             .entry(stat_id)
@@ -135,7 +135,7 @@ impl PeerStat {
     pub fn update_received(
         &mut self,
         stat_id: StatId,
-        upd: Box<RtcInboundRtpStreamStats>,
+        upd: &RtcInboundRtpStreamStats,
     ) {
         self.receivers
             .entry(stat_id)
@@ -147,6 +147,7 @@ impl PeerStat {
             .update(upd);
     }
 
+    #[allow(clippy::filter_map)]
     pub fn is_conforms_spec(&self) -> bool {
         let mut spec_senders: Vec<_> = self.spec.senders.clone();
         let mut spec_receivers: Vec<_> = self.spec.received.clone();
@@ -192,7 +193,7 @@ impl PeerStat {
             .map(|send| send.last_update)
             .chain(self.receivers.values().map(|recv| recv.last_update))
             .max()
-            .unwrap_or_else(|| Instant::now())
+            .unwrap_or_else(Instant::now)
     }
 
     pub fn get_partner_peer_id(&self) -> Option<PeerId> {
@@ -246,13 +247,11 @@ impl Actor for PeerMetricsService {
                         timestamp: peer_ref.get_stop_time(),
                         source: StoppedMetricSource::PeerTraffic,
                     });
-                } else {
-                    if !peer_ref.is_conforms_spec() {
-                        this.metrics_service.do_send(FatalPeerError {
-                            room_id: this.room_id.clone(),
-                            peer_id: peer_ref.peer_id,
-                        });
-                    }
+                } else if !peer_ref.is_conforms_spec() {
+                    this.metrics_service.do_send(FatalPeerError {
+                        room_id: this.room_id.clone(),
+                        peer_id: peer_ref.peer_id,
+                    });
                 }
             }
         });
@@ -316,7 +315,7 @@ impl Handler<AddStat> for PeerMetricsService {
             let mut peer_ref = peer.borrow_mut();
 
             for stat in msg.stat {
-                match stat.stats {
+                match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
                         peer_ref.update_received(stat.id, inbound);
                     }
@@ -334,31 +333,27 @@ impl Handler<AddStat> for PeerMetricsService {
                     peer_id: peer_ref.peer_id,
                     room_id: self.room_id.clone(),
                 });
-            } else {
-                if peer_ref.is_conforms_spec() {
+            } else if peer_ref.is_conforms_spec() {
+                self.metrics_service.do_send(TrafficFlows {
+                    room_id: self.room_id.clone(),
+                    peer_id: msg.peer_id,
+                    source: FlowMetricSource::PeerTraffic,
+                    timestamp: Instant::now(),
+                });
+                peer_ref.set_state(PeerStatState::Connected);
+                if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
                     self.metrics_service.do_send(TrafficFlows {
                         room_id: self.room_id.clone(),
-                        peer_id: msg.peer_id,
-                        source: FlowMetricSource::PeerTraffic,
+                        peer_id: partner_peer_id,
+                        source: FlowMetricSource::PartnerPeerTraffic,
                         timestamp: Instant::now(),
                     });
-                    peer_ref.set_state(PeerStatState::Connected);
-                    if let Some(partner_peer_id) =
-                        peer_ref.get_partner_peer_id()
-                    {
-                        self.metrics_service.do_send(TrafficFlows {
-                            room_id: self.room_id.clone(),
-                            peer_id: partner_peer_id,
-                            source: FlowMetricSource::PartnerPeerTraffic,
-                            timestamp: Instant::now(),
-                        });
-                    }
-                } else {
-                    self.metrics_service.do_send(FatalPeerError {
-                        room_id: self.room_id.clone(),
-                        peer_id: peer_ref.peer_id,
-                    });
                 }
+            } else {
+                self.metrics_service.do_send(FatalPeerError {
+                    room_id: self.room_id.clone(),
+                    peer_id: peer_ref.peer_id,
+                });
             }
         }
     }
@@ -378,7 +373,7 @@ impl Handler<PeerRemoved> for PeerMetricsService {
         msg: PeerRemoved,
         _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(_) = self.peers.remove(&msg.peer_id) {
+        if self.peers.remove(&msg.peer_id).is_some() {
             self.metrics_service.do_send(TrafficStopped {
                 peer_id: msg.peer_id,
                 room_id: self.room_id.clone(),

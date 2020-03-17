@@ -69,11 +69,13 @@ pub struct SessionId(pub u64);
 
 impl SessionId {
     /// Extracts Coturn server ID from this [`SessionId`].
+    #[must_use]
     pub fn server_id(self) -> u64 {
         self.0 / TURN_SESSION_ID_FACTOR
     }
 
     /// Extracts Coturn session ID from this [`SessionId`].
+    #[must_use]
     pub fn session_id(self) -> u64 {
         self.0 - (self.server_id() * TURN_SESSION_ID_FACTOR)
     }
@@ -165,6 +167,10 @@ pub struct TrafficUsage {
 
 impl TrafficUsage {
     /// Tries to parse [`Session`]'s [`TrafficUsage`] from a provided [`str`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if fails to parse some of the [`TrafficUsage`] stats.
     pub fn parse(input: &str) -> IResult<&str, Self> {
         let (input, rp) = coturn_stat(input, "rp=")?;
         let received_packets = rp.parse().unwrap();
@@ -305,6 +311,10 @@ fn address<'a>(input: &'a str) -> IResult<&'a str, &'a str> {
 }
 
 /// Tries to parse all [`Session`]s from a provided [`str`].
+///
+/// # Errors
+///
+/// Errors if some fatal error occurs while [`Session`]s parsing.
 pub fn parse_sessions(input: &str) -> IResult<&str, Vec<Session>> {
     many0(parse_session)(input)
 }

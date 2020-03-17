@@ -118,7 +118,7 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
                     if is_traffic_really_going {
                         self.metrics_service.do_send(TrafficFlows {
                             peer_id: event.peer_id,
-                            room_id: event.room_id.clone(),
+                            room_id: event.room_id,
                             timestamp: Instant::now(),
                             source: FlowMetricSource::Coturn,
                         })
@@ -129,7 +129,7 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
                     if peer_stat.allocations_count == 0 {
                         self.metrics_service.do_send(TrafficStopped {
                             peer_id: event.peer_id,
-                            room_id: event.room_id.clone(),
+                            room_id: event.room_id,
                             timestamp: Instant::now(),
                             source: StoppedMetricSource::Coturn,
                         });

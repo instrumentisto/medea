@@ -2,6 +2,8 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+#![allow(clippy::type_repetition_in_bounds)]
+
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
