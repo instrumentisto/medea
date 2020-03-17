@@ -35,6 +35,8 @@ server:
     conf:
       listening-port: 9934
       cli-password: changeme
+    extraArgs:
+      - --verbose
 
   coturn-db:
     image:
