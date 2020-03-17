@@ -7,11 +7,12 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
-    RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
-    RtcSessionDescriptionInit, RtcTrackEvent,
+    Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
+    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
+    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcTrackEvent,
 };
 
 use crate::{
@@ -249,13 +250,13 @@ impl RtcPeerConnection {
     where
         I: IntoIterator<Item = IceServer>,
     {
-        // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
         let policy = if is_force_relayed {
             RtcIceTransportPolicy::Relay
         } else {
             RtcIceTransportPolicy::All
         };
+        peer_conf.bundle_policy(RtcBundlePolicy::MaxBundle);
         peer_conf.ice_transport_policy(policy);
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
