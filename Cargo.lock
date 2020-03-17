@@ -1587,6 +1587,7 @@ dependencies = [
  "toml",
  "tonic",
  "url",
+ "variant_count",
 ]
 
 [[package]]
@@ -3269,6 +3270,16 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding 2.1.0",
+]
+
+[[package]]
+name = "variant_count"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a354a533b2174d183981d781a3b7eaf5f747a818332ba65cbf96c70285866b0"
+dependencies = [
+ "quote 0.6.13",
+ "syn 0.15.44",
 ]
 
 [[package]]

@@ -18,7 +18,7 @@ use medea_client_api_proto::{
 use crate::{
     api::control::RoomId,
     signalling::metrics_service::{
-        FlowMetricSource, MetricsService, PeerState::Stopped,
+        FatalPeerError, FlowMetricSource, MetricsService, PeerState::Stopped,
         StoppedMetricSource, TrafficFlows, TrafficStopped,
     },
 };
@@ -246,14 +246,13 @@ impl Actor for PeerMetricsService {
                         timestamp: peer_ref.get_stop_time(),
                         source: StoppedMetricSource::PeerTraffic,
                     });
-                }
-
-                if !peer_ref.is_conforms_spec() {
-                    // TODO: this is fatal error
-                    println!(
-                        "Peer {} doesn't conforms Peer spec!!!",
-                        peer_ref.peer_id
-                    );
+                } else {
+                    if !peer_ref.is_conforms_spec() {
+                        this.metrics_service.do_send(FatalPeerError {
+                            room_id: this.room_id.clone(),
+                            peer_id: peer_ref.peer_id,
+                        });
+                    }
                 }
             }
         });
@@ -355,7 +354,10 @@ impl Handler<AddStat> for PeerMetricsService {
                         });
                     }
                 } else {
-                    // TODO: fatal error
+                    self.metrics_service.do_send(FatalPeerError {
+                        room_id: self.room_id.clone(),
+                        peer_id: peer_ref.peer_id,
+                    });
                 }
             }
         }

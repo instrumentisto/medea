@@ -63,7 +63,10 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use crate::api::control::callback::OnStopEvent;
+use crate::{
+    api::control::callback::OnStopEvent,
+    signalling::metrics_service::UnsubscribePeer,
+};
 use medea_client_api_proto::Command::AddPeerConnectionMetrics;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -540,13 +543,18 @@ impl Room {
     ) {
         debug!("Remove peers.");
         self.peers
-            .remove_peers(&member_id, peer_ids_to_remove)
+            .remove_peers(&member_id, &peer_ids_to_remove)
             .into_iter()
             .for_each(|(member_id, peers_id)| {
                 self.member_peers_removed(peers_id, member_id, ctx)
                     .map(|_, _, _| ())
                     .spawn(ctx);
             });
+
+        self.metrics_service.do_send(UnsubscribePeer {
+            peers_ids: peer_ids_to_remove,
+            room_id: self.id.clone(),
+        });
     }
 
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -1591,6 +1599,39 @@ impl Handler<CreateEndpoint> for Room {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerSpecContradiction {
+    pub peer_id: PeerId,
+}
+
+impl Handler<PeerSpecContradiction> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: PeerSpecContradiction,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        println!(
+            "Real state of Peer [id = {}] from Room [id = {}] has fatal \
+             contradiction with spec!",
+            msg.peer_id, self.id
+        );
+
+        let member_id;
+        if let Ok(peer) = self.peers.get_peer_by_id(msg.peer_id) {
+            member_id = peer.member_id();
+        } else {
+            return;
+        }
+
+        let mut peers_ids = HashSet::new();
+        peers_ids.insert(msg.peer_id);
+        self.remove_peers(&member_id, peers_ids, ctx);
     }
 }
 

@@ -5,11 +5,12 @@ use std::{
 
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use medea_client_api_proto::PeerId;
+use variant_count::VariantCount;
 
 use crate::{
     api::control::RoomId,
     signalling::{
-        room::{PeerStarted, PeerStopped},
+        room::{PeerSpecContradiction, PeerStarted, PeerStopped},
         Room,
     },
 };
@@ -29,6 +30,30 @@ impl MetricsService {
     pub fn remove_peer(&mut self, room_id: RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.tracks.remove(&peer_id);
+        }
+    }
+
+    fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
+        if let Some(room) = self.stats.get_mut(&room_id) {
+            room.tracks.remove(&peer_id);
+            room.room.do_send(PeerSpecContradiction { peer_id });
+        }
+    }
+
+    fn check_on_start(&mut self, room_id: RoomId, peer_id: PeerId) {
+        let peer = self
+            .stats
+            .get_mut(&room_id)
+            .and_then(|room| room.tracks.get_mut(&peer_id));
+
+        if let Some(peer) = peer {
+            if let PeerState::Started(srcs) = &peer.state {
+                let is_not_all_sources_sent_start =
+                    srcs.len() < FlowMetricSource::VARIANT_COUNT;
+                if is_not_all_sources_sent_start {
+                    self.fatal_peer_error(&room_id, peer_id);
+                }
+            }
         }
     }
 }
@@ -90,31 +115,7 @@ impl Handler<TrafficFlows> for MetricsService {
                         ctx.run_later(
                             Duration::from_secs(15),
                             move |this, _| {
-                                if let Some(room) =
-                                    this.stats.get_mut(&msg.room_id)
-                                {
-                                    if let Some(peer) =
-                                        room.tracks.get_mut(&msg.peer_id)
-                                    {
-                                        if let PeerState::Started(srcs) =
-                                            &peer.state
-                                        {
-                                            // TODO: change it to enum variants
-                                            //       count
-                                            if srcs.len() < 3 {
-                                                // TODO: FATAL ERROR
-                                                println!(
-                                                    "VALIDATION FAILED {:?}",
-                                                    srcs
-                                                );
-                                            } else {
-                                                println!(
-                                                    "YAAAAAY VALIDATION PASSED"
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
+                                this.check_on_start(msg.room_id, msg.peer_id);
                             },
                         );
 
@@ -152,7 +153,7 @@ impl Handler<TrafficStopped> for MetricsService {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, VariantCount)]
 pub enum FlowMetricSource {
     PartnerPeerTraffic,
     PeerTraffic,
@@ -244,6 +245,29 @@ impl Handler<AddPeer> for MetricsService {
 
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
+pub struct UnsubscribePeer {
+    pub room_id: RoomId,
+    pub peers_ids: HashSet<PeerId>,
+}
+
+impl Handler<UnsubscribePeer> for MetricsService {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: UnsubscribePeer,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room_stats) = self.stats.get_mut(&msg.room_id) {
+            for peer_id in msg.peers_ids {
+                room_stats.tracks.remove(&peer_id);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
 pub struct RemovePeer {
     pub room_id: RoomId,
     pub peer_id: PeerId,
@@ -258,5 +282,24 @@ impl Handler<RemovePeer> for MetricsService {
         _: &mut Self::Context,
     ) -> Self::Result {
         self.remove_peer(msg.room_id, msg.peer_id);
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct FatalPeerError {
+    pub room_id: RoomId,
+    pub peer_id: PeerId,
+}
+
+impl Handler<FatalPeerError> for MetricsService {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: FatalPeerError,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.fatal_peer_error(&msg.room_id, msg.peer_id);
     }
 }

@@ -271,7 +271,7 @@ impl PeerRepository {
     pub fn remove_peers(
         &mut self,
         member_id: &MemberId,
-        peer_ids: HashSet<PeerId>,
+        peer_ids: &HashSet<PeerId>,
     ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
@@ -287,7 +287,7 @@ impl PeerRepository {
                 removed_peers
                     .entry(member_id.clone())
                     .or_insert_with(Vec::new)
-                    .push(peer_id);
+                    .push(*peer_id);
             }
         }
 
@@ -348,7 +348,7 @@ impl PeerRepository {
     ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut peers_id_to_delete = HashSet::new();
         peers_id_to_delete.insert(peer_id);
-        self.remove_peers(&member_id, peers_id_to_delete)
+        self.remove_peers(&member_id, &peers_id_to_delete)
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
