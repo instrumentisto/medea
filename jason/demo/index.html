@@ -63,7 +63,7 @@
         },
       });
 
-      // here we repeat get room request to reduce possibility of concurrency
+      // Here we repeat get room request to reduce possibility of concurrency
       // bugs, e.g. another user was added to the room since first request.
       let controlRoom = await axios.get(controlUrl + roomId);
       var otherMembers = Object.keys(controlRoom.data.element.pipeline);
@@ -170,7 +170,6 @@
       let joinCallerButton = document.getElementById('join__join');
       let usernameInput = document.getElementById('join__username');
 
-      // try to load username from cookies
       let userNameFromCookies = getCookie(userNameCookieName);
       if (userNameFromCookies) {
         usernameInput.value = userNameFromCookies;
@@ -283,7 +282,6 @@
           connectBtnsDiv.style.display = 'none';
           controlBtns.style.display = 'block';
 
-          // save username to cookies
           setCookie(userNameCookieName, usernameInput.value, 365);
 
           isForceRelay = isForceRelayCheckbox.checked;
