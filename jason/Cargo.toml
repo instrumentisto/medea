@@ -27,13 +27,13 @@ mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 console_error_panic_hook = { version = "0.1", optional = true }
 derive_more = "0.99"
 downcast = { version = "0.10", optional = true }
-fragile = { version = "0.3", optional = true }
+fragile = { version = "1.0", optional = true }
 futures = "0.3"
 js-sys = "0.3"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = { path = "../crates/medea-macro" }
 medea-reactive = { path = "../crates/medea-reactive" }
-mockall = { version = "0.5", optional = true }
+mockall = { version = "0.6", optional = true }
 predicates-tree = { version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
