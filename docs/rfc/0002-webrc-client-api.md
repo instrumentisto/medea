@@ -1068,6 +1068,8 @@ Related objects:
 ```rust
 pub enum PeerMetrics {
     IceConnectionStateChanged(IceConnectionState),
+    PeerConnectionStateChanged(PeerConnectionState),
+    StatsUpdate(Vec<RtcStat>),
 }
 
 pub enum IceConnectionState {
@@ -1078,6 +1080,15 @@ pub enum IceConnectionState {
     Failed,
     Disconnected,
     Closed,
+}
+
+pub enum PeerConnectionState {
+    Closed,
+    Failed,
+    Disconnected,
+    New,
+    Connecting,
+    Connected,
 }
 ```
 
@@ -1096,18 +1107,6 @@ struct UpdateTracks {
 struct TrackPatch {
     pub id: TrackId,
     pub is_muted: Option<bool>,
-}
-```
-
-#### 11. AddPeerConnectionStats
-
-`Web Client` sends `PeerConnection` stats.
-
-```rust
-struct AddPeerConnectionStats {
-    peer_id: PeerId,
-    stats: Vec<RtcStatsType>,
-    tracks_ids: HashMap<String, TrackId>,
 }
 ```
 

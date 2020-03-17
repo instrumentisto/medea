@@ -103,7 +103,10 @@ impl Handler<TrafficFlows> for MetricsService {
                                             //       count
                                             if srcs.len() < 3 {
                                                 // TODO: FATAL ERROR
-                                                println!("VALIDATION FAILED {:?}", srcs);
+                                                println!(
+                                                    "VALIDATION FAILED {:?}",
+                                                    srcs
+                                                );
                                             } else {
                                                 println!(
                                                     "YAAAAAY VALIDATION PASSED"
@@ -190,6 +193,7 @@ pub struct RoomStats {
 pub struct RegisterRoom {
     pub room_id: RoomId,
     pub room: Addr<Room>,
+}
 
 impl Handler<RegisterRoom> for MetricsService {
     type Result = ();
@@ -208,7 +212,6 @@ impl Handler<RegisterRoom> for MetricsService {
             },
         );
     }
-}
 }
 
 #[derive(Debug, Message)]

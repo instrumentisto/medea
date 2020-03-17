@@ -8,7 +8,7 @@ use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-use crate::stats::RtcStatsType;
+use crate::stats::RtcStat;
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -140,18 +140,6 @@ pub enum Command {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     },
-    /// Web Client sends Peer Connection stats.
-    AddPeerConnectionStats {
-        /// [`PeerId`] of `PeerConnection` for which this stats.
-        peer_id: PeerId,
-
-        /// Actual stats.
-        stats: Vec<RtcStatsType>,
-
-        /// Relation between JS-side `MediaTrack` ID and Medea-side
-        /// [`TrackId`].
-        tracks_ids: HashMap<String, TrackId>,
-    },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -164,6 +152,9 @@ pub enum PeerMetrics {
 
     /// Peer Connection's connection state.
     PeerConnectionStateChanged(PeerConnectionState),
+
+    /// Peer Connection's RTC stats.
+    StatsUpdate(Vec<RtcStat>),
 }
 
 /// Peer Connection's ICE connection state.
@@ -183,7 +174,7 @@ pub enum IceConnectionState {
 /// Peer Connection's connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PeerConnectionState {
     Closed,
     Failed,

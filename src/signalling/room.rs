@@ -13,8 +13,8 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    stats::RtcStatsType, Command, CommandHandler, Event, IceCandidate,
-    PeerConnectionState, PeerId, PeerMetrics, TrackId, TrackPatch,
+    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
+    TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -819,7 +819,6 @@ impl Room {
             | MakeSdpAnswer { peer_id, .. }
             | SetIceCandidate { peer_id, .. }
             | AddPeerConnectionMetrics { peer_id, .. }
-            | AddPeerConnectionStats { peer_id, .. }
             | UpdateTracks { peer_id, .. } => peer_id,
         };
 
@@ -1025,9 +1024,18 @@ impl CommandHandler for Room {
     /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        _peer_id: PeerId,
-        _candidate: PeerMetrics,
+        peer_id: PeerId,
+        metrics: PeerMetrics,
     ) -> Self::Output {
+        match metrics {
+            PeerMetrics::StatsUpdate(stats) => {
+                self.peer_metrics_service.do_send(AddStat {
+                    peer_id,
+                    stat: stats,
+                });
+            }
+            _ => (),
+        }
         Ok(Box::new(actix::fut::ok(())))
     }
 
@@ -1054,27 +1062,6 @@ impl CommandHandler for Room {
         } else {
             Ok(Box::new(actix::fut::ok(())))
         }
-    }
-
-    /// Prints received `RtcStats` report into logs, atm.
-    fn on_add_peer_connection_stats(
-        &mut self,
-        peer_id: PeerId,
-        stats: Vec<RtcStatsType>,
-        tracks_ids: HashMap<String, TrackId>,
-    ) -> Self::Output {
-        debug!(
-            "Received RtcStats for a Peer with {} ID and {:#?} tracks IDs: \
-             {:?}",
-            peer_id, tracks_ids, stats
-        );
-
-        self.peer_metrics_service.do_send(AddStat {
-            peer_id,
-            stat: stats,
-        });
-
-        Ok(Box::new(actix::fut::ok(())))
     }
 }
 
@@ -1150,7 +1137,7 @@ impl Handler<PeerStopped> for Room {
         println!("Peer {} stopped!!!", msg.0);
         let peer_id = msg.0;
         if let Some(endpoints) =
-        self.peers.get_endpoint_path_by_peer_id(peer_id)
+            self.peers.get_endpoint_path_by_peer_id(peer_id)
         {
             let send_callbacks: HashMap<_, _> = endpoints
                 .into_iter()

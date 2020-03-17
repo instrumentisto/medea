@@ -1,12 +1,11 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    time::Duration,
     rc::{Rc, Weak},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
-use actix::{Actor, Addr, Handler, Message, AsyncContext};
+use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
@@ -23,6 +22,7 @@ use crate::{
         TrafficStopped,
     },
 };
+use medea_client_api_proto::stats::RtcStat;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub enum TrackMediaType {
@@ -148,13 +148,17 @@ impl PeerStat {
         let mut current_senders: Vec<_> = self
             .senders
             .values()
-            .filter(|sender| sender.last_update > Instant::now() - Duration::from_secs(10))
+            .filter(|sender| {
+                sender.last_update > Instant::now() - Duration::from_secs(10)
+            })
             .map(|sender| sender.media_type)
             .collect();
         let mut current_receivers: Vec<_> = self
             .receivers
             .values()
-            .filter(|receiver| receiver.last_update > Instant::now() - Duration::from_secs(10))
+            .filter(|receiver| {
+                receiver.last_update > Instant::now() - Duration::from_secs(10)
+            })
             .map(|receiver| receiver.media_type)
             .collect();
         current_receivers.sort();
@@ -164,7 +168,8 @@ impl PeerStat {
     }
 
     pub fn get_partner_peer_id(&self) -> Option<PeerId> {
-        self.partner_peer.upgrade()
+        self.partner_peer
+            .upgrade()
             .map(|partner_peer| partner_peer.borrow().get_peer_id())
     }
 
@@ -199,10 +204,17 @@ impl Actor for PeerMetricsService {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.run_interval(Duration::from_secs(10), |this, ctx| {
-            for peer in this.peers.values().filter(|peer| peer.borrow().state == PeerStatState::Connected) {
+            for peer in this
+                .peers
+                .values()
+                .filter(|peer| peer.borrow().state == PeerStatState::Connected)
+            {
                 let peer_ref = peer.borrow();
                 if !peer_ref.is_conforms_spec() {
-                    println!("Peer {} doesn't conforms Peer spec!!!", peer_ref.peer_id);
+                    println!(
+                        "Peer {} doesn't conforms Peer spec!!!",
+                        peer_ref.peer_id
+                    );
                 }
             }
         });
@@ -255,7 +267,7 @@ impl Handler<AddPeers> for PeerMetricsService {
 #[rtype(result = "()")]
 pub struct AddStat {
     pub peer_id: PeerId,
-    pub stat: Vec<RtcStatsType>,
+    pub stat: Vec<RtcStat>,
 }
 
 impl Handler<AddStat> for PeerMetricsService {
@@ -266,12 +278,12 @@ impl Handler<AddStat> for PeerMetricsService {
             let mut peer_ref = peer.borrow_mut();
 
             for stat in msg.stat {
-                match stat {
-                    RtcStatsType::InboundRtp(stat) => {
-                        peer_ref.update_received(stat.id, stat.stats);
+                match stat.stats {
+                    RtcStatsType::InboundRtp(inbound) => {
+                        peer_ref.update_received(stat.id, inbound);
                     }
-                    RtcStatsType::OutboundRtp(stat) => {
-                        peer_ref.update_sender(stat.id, stat.stats);
+                    RtcStatsType::OutboundRtp(outbound) => {
+                        peer_ref.update_sender(stat.id, outbound);
                     }
                     _ => (),
                 }

@@ -17,7 +17,6 @@ use std::{
     convert::{From, TryFrom},
     hash::{Hash, Hasher},
     rc::Rc,
-    time::Duration,
 };
 
 use derive_more::{Display, From};
@@ -28,19 +27,14 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
 use web_sys::{
     MediaStream as SysMediaStream, RtcIceConnectionState, RtcTrackEvent,
 };
 
 use crate::{
     media::{MediaManager, MediaManagerError},
-    utils::{
-        console_error, delay_for, JasonError, JsCaused, JsError, TaskHandle,
-    },
+    utils::{console_error, JasonError, JsCaused, JsError},
 };
-
-pub use crate::peer::stats::RtcStats;
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -56,6 +50,7 @@ pub use self::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, Sender, StableMuteState,
     },
+    stats::RtcStats,
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
@@ -178,10 +173,6 @@ pub enum PeerEvent {
 
         /// [`RtcStats`] of this [`PeerConnection`].
         stats: RtcStats,
-
-        /// Connection between real `MediaTrack` ID and Medea's `MediaTrack`
-        /// ID.
-        tracks_ids: HashMap<String, TrackId>,
     },
 }
 
@@ -211,19 +202,8 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
-    /// [`TaskHandle`] for a task which will call
-    /// [`RtcPeerConnection::get_stats`] every second and send updated
-    /// [`RtcStatType`] to the server.
-    stats_getter_task_handle: Option<TaskHandle>,
-}
-
-/// Returns hash of provided object.
-///
-/// Hash will be calculated with [`DefaultHasher`].
-fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
+    /// Hashes of [`RtcStat`]s which was already sent to the server.
+    stats_cache: RefCell<HashSet<u64>>,
 }
 
 impl PeerConnection {
@@ -255,18 +235,16 @@ impl PeerConnection {
         let media_connections =
             Rc::new(MediaConnections::new(Rc::clone(&peer)));
 
-        let mut peer = Self {
+        let peer = Self {
             id,
             peer,
             media_connections,
             media_manager,
             peer_events_sender,
+            stats_cache: RefCell::new(HashSet::new()),
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(vec![]),
-            stats_getter_task_handle: None,
         };
-
-        peer.start_stats_task();
 
         // Bind to `icecandidate` event.
         let id = peer.id;
@@ -316,57 +294,37 @@ impl PeerConnection {
         Ok(peer)
     }
 
-    /// Spawns [`Future`] which will get [`RtcStats`] of this [`PeerConnection`]
-    /// and send update of [`RtcStats`] to the
-    /// [`PeerConnection::peer_events_sender`].
-    pub fn start_stats_task(&mut self) {
-        let id = self.id;
-        let sender = self.peer_events_sender.clone();
-        let peer_clone = self.peer.clone();
-        let media_connections = self.media_connections.clone();
-
-        let (fut, abort) = future::abortable(async move {
-            let mut cache = HashSet::new();
-            loop {
-                delay_for(Duration::from_secs(1).into()).await;
-                let stats = match peer_clone.get_stats().await {
-                    Ok(stats) => stats,
-                    Err(e) => {
-                        JasonError::from(e).print();
-                        continue;
-                    }
-                };
-
-                let stats = RtcStats(
-                    stats
-                        .0
-                        .into_iter()
-                        .filter(|stat| {
-                            let stat_hash = calculate_hash(stat);
-
-                            let is_already_in_cache =
-                                cache.contains(&stat_hash);
-                            cache.insert(stat_hash);
-
-                            !is_already_in_cache
-                        })
-                        .collect(),
-                );
-
-                let _ = sender.unbounded_send(PeerEvent::StatsUpdate {
-                    peer_id: id,
-                    stats,
-                    tracks_ids: media_connections
-                        .iter_js_to_medea_tracks_ids()
-                        .collect(),
-                });
+    /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
+    pub async fn send_peer_stats_scrape(&self) {
+        let stats = match self.peer.get_stats().await {
+            Ok(stats) => stats,
+            Err(e) => {
+                JasonError::from(e).print();
+                return;
             }
-        });
+        };
 
-        spawn_local(async move {
-            fut.await.ok();
-        });
-        self.stats_getter_task_handle = Some(abort.into());
+        let mut cache_mut = self.stats_cache.borrow_mut();
+        let stats = RtcStats(
+            stats
+                .0
+                .into_iter()
+                .filter(|stat| {
+                    let mut hasher = DefaultHasher::new();
+                    stat.stats.hash(&mut hasher);
+                    let stat_hash = hasher.finish();
+
+                    cache_mut.insert(stat_hash)
+                })
+                .collect(),
+        );
+
+        let _ =
+            self.peer_events_sender
+                .unbounded_send(PeerEvent::StatsUpdate {
+                    peer_id: self.id,
+                    stats,
+                });
     }
 
     /// Returns [`RtcStats`] of this [`PeerConnection`].

@@ -87,8 +87,6 @@ impl PeerError {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn update_stats(&mut self, stats: &Vec<RtcStatsType>))]
-#[enum_delegate(pub fn is_started(&self) -> bool)]
 #[enum_delegate(pub fn get_spec(&self) -> peer_metrics_service::PeerSpec)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -320,120 +318,6 @@ impl<T> Peer<T> {
     /// Indicates whether all media is forcibly relayed through a TURN server.
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
-    }
-
-    pub fn update_stats(&mut self, stats: &Vec<RtcStatsType>) {
-        for stat in stats {
-            match stat {
-                RtcStatsType::OutboundRtp(outbound) => {
-                    let stat_id = outbound.id.clone();
-                    let packets_sent = outbound.stats.packets_sent;
-                    self.context
-                        .tracks_stats
-                        .entry(stat_id)
-                        .or_insert_with(move || TrackStat {
-                            direction: TrackStatDirection::Send {
-                                packets_sent,
-                            },
-                            track_type: TrackType::from(
-                                &outbound.stats.media_type,
-                            ),
-                            last_update: Instant::now(),
-                        })
-                        .update_packets_sent(packets_sent);
-                }
-                RtcStatsType::InboundRtp(inbound) => {
-                    let stat_id = inbound.id.clone();
-                    let packets_received = inbound.stats.packets_received;
-                    self.context
-                        .tracks_stats
-                        .entry(stat_id)
-                        .or_insert_with(move || TrackStat {
-                            direction: TrackStatDirection::Recv {
-                                packets_received,
-                            },
-                            track_type: TrackType::from(
-                                &inbound.stats.media_specific_stats,
-                            ),
-                            last_update: Instant::now(),
-                        })
-                        .update_packets_received(packets_received);
-                }
-                _ => (),
-            }
-        }
-
-        println!(
-            "\n\nTrackStats: {:?}\nSenders count: {}; Receivers count: {}",
-            self.context.tracks_stats,
-            self.context.senders.len(),
-            self.context.receivers.len()
-        );
-    }
-
-    pub fn is_started(&self) -> bool {
-        let mut audio_senders_count = 0;
-        let mut video_senders_count = 0;
-        let mut audio_receivers_count = 0;
-        let mut video_received_count = 0;
-
-        for sender in self.context.senders.values() {
-            match &sender.media_type {
-                MediaType::Audio(_) => {
-                    audio_senders_count += 1;
-                }
-                MediaType::Video(_) => {
-                    video_senders_count += 1;
-                }
-            }
-        }
-
-        for receiver in self.context.receivers.values() {
-            match &receiver.media_type {
-                MediaType::Audio(_) => {
-                    audio_receivers_count += 1;
-                }
-                MediaType::Video(_) => {
-                    video_received_count += 1;
-                }
-            }
-        }
-
-        let mut stats_audio_senders_count = 0;
-        let mut stats_video_senders_count = 0;
-        let mut stats_audio_receivers_count = 0;
-        let mut stats_video_receives_count = 0;
-
-        for stat in self
-            .context
-            .tracks_stats
-            .values()
-            .filter(|s| s.is_running())
-        {
-            match &stat.direction {
-                TrackStatDirection::Send { .. } => match &stat.track_type {
-                    TrackType::Audio => {
-                        stats_audio_senders_count += 1;
-                    }
-                    TrackType::Video => {
-                        stats_video_senders_count += 1;
-                    }
-                },
-                TrackStatDirection::Recv { .. } => match &stat.track_type {
-                    TrackType::Audio => {
-                        stats_audio_receivers_count += 1;
-                    }
-                    TrackType::Video => {
-                        stats_video_receives_count += 1;
-                    }
-                },
-            }
-        }
-
-        (stats_audio_senders_count == audio_senders_count)
-            && (stats_video_senders_count == video_senders_count)
-            && (stats_audio_receivers_count == audio_receivers_count)
-            && (stats_video_receives_count == video_received_count)
     }
 
     pub fn get_spec(&self) -> peer_metrics_service::PeerSpec {
