@@ -300,22 +300,3 @@ impl Handler<RemovePeer> for MetricsCallbacksService {
         self.remove_peer(&msg.room_id, msg.peer_id);
     }
 }
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct FatalPeerError {
-    pub room_id: RoomId,
-    pub peer_id: PeerId,
-}
-
-impl Handler<FatalPeerError> for MetricsCallbacksService {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: FatalPeerError,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        self.fatal_peer_error(&msg.room_id, msg.peer_id);
-    }
-}

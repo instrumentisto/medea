@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, Message, WrapFuture as _,
+    Handler, Message, StreamHandler, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -59,7 +59,7 @@ use crate::{
             Member, MembersLoadError,
         },
         participants::{ParticipantService, ParticipantServiceErr},
-        peer_metrics_service::PeerMetricsService,
+        peer_metrics_service::{PeerMetricsEventHandler, PeerMetricsService},
         peers::PeerRepository,
     },
     utils::ResponseActAnyFuture,
@@ -67,6 +67,7 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use crate::signalling::peer_metrics_service::PeerMetricsEvent;
 use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -1108,7 +1109,6 @@ impl Handler<PeerStarted> for Room {
         msg: PeerStarted,
         _: &mut Self::Context,
     ) -> Self::Result {
-        println!("\n\n\n\n\n\n\n\nPeer {} started!!!\n\n\n\n", msg.0);
         let peer_id = msg.0;
         if let Some(endpoints) =
             self.peers.get_endpoint_path_by_peer_id(peer_id)
@@ -1221,6 +1221,26 @@ impl Actor for Room {
         ctx.run_interval(Duration::from_secs(10), |this, _| {
             this.peer_metrics_service.check_peers_validity();
         });
+
+        ctx.add_stream(self.peer_metrics_service.subscribe());
+    }
+}
+
+impl StreamHandler<PeerMetricsEvent> for Room {
+    fn handle(&mut self, event: PeerMetricsEvent, ctx: &mut Self::Context) {
+        ctx.spawn(event.dispatch_with(self));
+    }
+}
+
+impl PeerMetricsEventHandler for Room {
+    type Output = ActFuture<()>;
+
+    fn on_fatal_peer_failure(&mut self, peer_id: PeerId) -> Self::Output {
+        Box::new(async move { peer_id }.into_actor(self).map(
+            |peer_id, _, ctx| {
+                ctx.notify(PeerSpecContradiction { peer_id });
+            },
+        ))
     }
 }
 

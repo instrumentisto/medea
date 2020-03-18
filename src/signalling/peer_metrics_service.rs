@@ -6,6 +6,7 @@ use std::{
 };
 
 use actix::Addr;
+use futures::channel::mpsc;
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
@@ -14,14 +15,16 @@ use medea_client_api_proto::{
     },
     PeerId,
 };
+use medea_macro::dispatchable;
 
 use crate::api::control::{
     callback::metrics_callback_service::{
-        FatalPeerError, FlowMetricSource, MetricsCallbacksService,
-        StoppedMetricSource, TrafficFlows, TrafficStopped,
+        FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
+        TrafficFlows, TrafficStopped,
     },
     RoomId,
 };
+use futures::Stream;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub enum TrackMediaType {
@@ -54,6 +57,12 @@ impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
             medea_client_api_proto::MediaType::Video(_) => Self::Video,
         }
     }
+}
+
+#[dispatchable]
+#[derive(Debug, Clone)]
+pub enum PeerMetricsEvent {
+    FatalPeerFailure(PeerId),
 }
 
 #[derive(Debug)]
@@ -221,6 +230,7 @@ pub struct PeerMetricsService {
     room_id: RoomId,
     metrics_service: Addr<MetricsCallbacksService>,
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
+    peer_metric_events_sender: Option<mpsc::UnboundedSender<PeerMetricsEvent>>,
 }
 
 impl PeerMetricsService {
@@ -232,7 +242,23 @@ impl PeerMetricsService {
             room_id,
             metrics_service,
             peers: HashMap::new(),
+            peer_metric_events_sender: None,
         }
+    }
+
+    fn fatal_peer_error(&self, peer_id: PeerId) {
+        if let Some(sender) = &self.peer_metric_events_sender {
+            // TODO: maybe print this to log??
+            let _ = sender
+                .unbounded_send(PeerMetricsEvent::FatalPeerFailure(peer_id));
+        }
+    }
+
+    pub fn subscribe(&mut self) -> impl Stream<Item = PeerMetricsEvent> {
+        let (tx, rx) = mpsc::unbounded();
+        self.peer_metric_events_sender = Some(tx);
+
+        rx
     }
 
     pub fn check_peers_validity(&self) {
@@ -251,14 +277,9 @@ impl PeerMetricsService {
                     source: StoppedMetricSource::PeerTraffic,
                 });
             } else if !peer_ref.is_conforms_spec() {
-                self.metrics_service.do_send(FatalPeerError {
-                    room_id: self.room_id.clone(),
-                    peer_id: peer_ref.peer_id,
-                });
+                self.fatal_peer_error(peer_ref.peer_id);
             }
         }
-
-        println!("Peers was validated!");
     }
 
     pub fn add_peers(&mut self, first_peer: Peer, second_peer: Peer) {
@@ -327,10 +348,7 @@ impl PeerMetricsService {
                     });
                 }
             } else {
-                self.metrics_service.do_send(FatalPeerError {
-                    room_id: self.room_id.clone(),
-                    peer_id: peer_ref.peer_id,
-                });
+                self.fatal_peer_error(peer_ref.peer_id);
             }
         }
     }
