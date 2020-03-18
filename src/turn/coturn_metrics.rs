@@ -71,12 +71,8 @@ impl CoturnMetrics {
             allocations_count: HashMap::new(),
         }
     }
-}
 
-impl Actor for CoturnMetrics {
-    type Context = actix::Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn add_redis_stream(&mut self, ctx: &mut <Self as Actor>::Context) {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();
 
@@ -90,64 +86,72 @@ impl Actor for CoturnMetrics {
                     .unwrap();
 
                 let mut msg_stream = pubsub.on_message();
-                while msg_tx.unbounded_send(msg_stream.next().await).is_ok() {}
+                while let Some(msg) = msg_stream.next().await {
+                    if msg_tx.unbounded_send(msg).is_err() {
+                        break;
+                    }
+                }
             }
             .into_actor(self),
         );
-
-        // TODO: add watchdog
 
         ctx.add_stream(msg_stream);
     }
 }
 
-impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
-    fn handle(
-        &mut self,
-        item: Option<patched_redis::Msg>,
-        _: &mut Self::Context,
-    ) {
-        if let Some(msg) = item {
-            let event = if let Ok(event) = CoturnEvent::parse(&msg) {
-                event
-            } else {
-                return;
-            };
+impl Actor for CoturnMetrics {
+    type Context = actix::Context<Self>;
 
-            let username = CoturnUsername {
-                room_id: event.room_id.clone(),
-                peer_id: event.peer_id,
-            };
+    fn started(&mut self, ctx: &mut Self::Context) {
+        self.add_redis_stream(ctx);
+    }
+}
 
-            let allocations_count =
-                self.allocations_count.entry(username).or_insert(0);
-            match event.event {
-                CoturnAllocationEvent::Traffic { traffic } => {
-                    *allocations_count += 1;
-                    let is_traffic_really_going =
-                        traffic.sent_packets + traffic.received_packets > 10;
-                    if is_traffic_really_going {
-                        self.metrics_service.do_send(TrafficFlows {
-                            peer_id: event.peer_id,
-                            room_id: event.room_id,
-                            timestamp: Instant::now(),
-                            source: FlowMetricSource::Coturn,
-                        })
-                    }
+impl StreamHandler<patched_redis::Msg> for CoturnMetrics {
+    fn handle(&mut self, msg: patched_redis::Msg, _: &mut Self::Context) {
+        let event = if let Ok(event) = CoturnEvent::parse(&msg) {
+            event
+        } else {
+            return;
+        };
+
+        let username = CoturnUsername {
+            room_id: event.room_id.clone(),
+            peer_id: event.peer_id,
+        };
+
+        let allocations_count =
+            self.allocations_count.entry(username).or_insert(0);
+        match event.event {
+            CoturnAllocationEvent::Traffic { traffic } => {
+                *allocations_count += 1;
+                let is_traffic_really_going =
+                    traffic.sent_packets + traffic.received_packets > 10;
+                if is_traffic_really_going {
+                    self.metrics_service.do_send(TrafficFlows {
+                        peer_id: event.peer_id,
+                        room_id: event.room_id,
+                        timestamp: Instant::now(),
+                        source: FlowMetricSource::Coturn,
+                    })
                 }
-                CoturnAllocationEvent::Deleted => {
-                    *allocations_count -= 1;
-                    if *allocations_count == 0 {
-                        self.metrics_service.do_send(TrafficStopped {
-                            peer_id: event.peer_id,
-                            room_id: event.room_id,
-                            timestamp: Instant::now(),
-                            source: StoppedMetricSource::Coturn,
-                        });
-                    }
-                }
-                _ => (),
             }
+            CoturnAllocationEvent::Deleted => {
+                *allocations_count -= 1;
+                if *allocations_count == 0 {
+                    self.metrics_service.do_send(TrafficStopped {
+                        peer_id: event.peer_id,
+                        room_id: event.room_id,
+                        timestamp: Instant::now(),
+                        source: StoppedMetricSource::Coturn,
+                    });
+                }
+            }
+            _ => (),
         }
+    }
+
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        self.add_redis_stream(ctx);
     }
 }

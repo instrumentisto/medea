@@ -228,12 +228,14 @@ impl Encoder for CoturnCliCodec {
 
 #[cfg(test)]
 mod spec {
-    use super::*;
+    use std::time::Duration;
+
     use crate::{
         proto::CoturnCliResponse::Sessions,
         sessions_parser::{Protocol, TrafficUsage},
     };
-    use std::time::Duration;
+
+    use super::*;
 
     #[tokio::test]
     async fn parses_greeting() {
