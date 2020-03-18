@@ -9,20 +9,19 @@ use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStatsType,
-        StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
+        RtcStatsType, StatId,
     },
     PeerId,
 };
 
-use crate::{
-    api::control::RoomId,
-    signalling::metrics_service::{
-        FatalPeerError, FlowMetricSource, MetricsService, StoppedMetricSource,
-        TrafficFlows, TrafficStopped,
+use crate::api::control::{
+    callback::metrics_callback_service::{
+        FatalPeerError, FlowMetricSource, MetricsCallbacksService,
+        StoppedMetricSource, TrafficFlows, TrafficStopped,
     },
+    RoomId,
 };
-use medea_client_api_proto::stats::RtcStat;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub enum TrackMediaType {
@@ -214,12 +213,15 @@ impl PeerStat {
 #[derive(Debug)]
 pub struct PeerMetricsService {
     room_id: RoomId,
-    metrics_service: Addr<MetricsService>,
+    metrics_service: Addr<MetricsCallbacksService>,
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
 }
 
 impl PeerMetricsService {
-    pub fn new(room_id: RoomId, metrics_service: Addr<MetricsService>) -> Self {
+    pub fn new(
+        room_id: RoomId,
+        metrics_service: Addr<MetricsCallbacksService>,
+    ) -> Self {
         Self {
             room_id,
             metrics_service,

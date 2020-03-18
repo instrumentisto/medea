@@ -14,6 +14,9 @@ use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
+        callback::metrics_callback_service::{
+            self as mcs, MetricsCallbacksService,
+        },
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
@@ -23,7 +26,6 @@ use crate::{
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
-        metrics_service::{MetricsService, UnregisterRoom},
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
@@ -121,7 +123,7 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
-    metrics_service: Addr<MetricsService>,
+    metrics_service: Addr<MetricsCallbacksService>,
 }
 
 impl RoomService {
@@ -149,7 +151,8 @@ impl RoomService {
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
-            self.metrics_service.do_send(UnregisterRoom(id.clone()));
+            self.metrics_service
+                .do_send(mcs::UnregisterRoom(id.clone()));
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -222,12 +225,10 @@ impl Handler<StartStaticRooms> for RoomService {
                 room.clone().recipient(),
                 shutdown::Priority(2),
             );
-            self.metrics_service.do_send(
-                crate::signalling::metrics_service::RegisterRoom {
-                    room: room.clone(),
-                    room_id: spec.id,
-                },
-            );
+            self.metrics_service.do_send(mcs::RegisterRoom {
+                room: room.clone(),
+                room_id: spec.id,
+            });
 
             self.room_repo.add(room_id, room);
         }
@@ -281,12 +282,10 @@ impl Handler<CreateRoom> for RoomService {
         let room =
             Room::new(&room_spec, &self.app, self.metrics_service.clone())?;
         let room_addr = room.start();
-        self.metrics_service.do_send(
-            crate::signalling::metrics_service::RegisterRoom {
-                room: room_addr.clone(),
-                room_id: room_spec.id.clone(),
-            },
-        );
+        self.metrics_service.do_send(mcs::RegisterRoom {
+            room: room_addr.clone(),
+            room_id: room_spec.id.clone(),
+        });
 
         shutdown::subscribe(
             &self.graceful_shutdown,

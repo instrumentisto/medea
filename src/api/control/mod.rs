@@ -11,7 +11,10 @@ pub mod pipeline;
 pub mod refs;
 pub mod room;
 
-use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
+use std::{
+    collections::HashMap, convert::TryFrom as _, fs::File, io::Read as _,
+    path::Path,
+};
 
 use actix::Addr;
 use derive_more::Display;
@@ -41,7 +44,6 @@ pub use self::{
 use crate::api::control::endpoints::webrtc_play_endpoint::{
     Unvalidated, Validated, ValidationError,
 };
-use std::collections::HashMap;
 
 /// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]

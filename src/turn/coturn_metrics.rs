@@ -6,10 +6,12 @@ use medea_client_api_proto::PeerId;
 use patched_redis::ConnectionInfo;
 
 use crate::{
-    api::control::RoomId,
-    signalling::metrics_service::{
-        FlowMetricSource, MetricsService, StoppedMetricSource, TrafficFlows,
-        TrafficStopped,
+    api::control::{
+        callback::metrics_callback_service::{
+            FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
+            TrafficFlows, TrafficStopped,
+        },
+        RoomId,
     },
     turn::coturn_stats::{CoturnAllocationEvent, CoturnEvent},
 };
@@ -27,7 +29,7 @@ pub struct CoturnPeerStat {
 
 #[derive(Debug)]
 pub struct CoturnMetrics {
-    metrics_service: Addr<MetricsService>,
+    metrics_service: Addr<MetricsCallbacksService>,
     client: patched_redis::Client,
     allocations: HashMap<CoturnUsername, CoturnPeerStat>,
 }
@@ -35,7 +37,7 @@ pub struct CoturnMetrics {
 impl CoturnMetrics {
     pub fn new(
         cf: &crate::conf::turn::Turn,
-        metrics_service: Addr<MetricsService>,
+        metrics_service: Addr<MetricsCallbacksService>,
     ) -> Self {
         let connection_info = ConnectionInfo {
             addr: Box::new(patched_redis::ConnectionAddr::Tcp(

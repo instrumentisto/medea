@@ -16,11 +16,11 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct MetricsService {
+pub struct MetricsCallbacksService {
     stats: HashMap<RoomId, RoomStats>,
 }
 
-impl MetricsService {
+impl MetricsCallbacksService {
     pub fn new() -> Self {
         Self {
             stats: HashMap::new(),
@@ -29,13 +29,13 @@ impl MetricsService {
 
     pub fn remove_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(room_id) {
-            room.tracks.remove(&peer_id);
+            room.peers.remove(&peer_id);
         }
     }
 
     fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
-            room.tracks.remove(&peer_id);
+            room.peers.remove(&peer_id);
             room.room.do_send(PeerSpecContradiction { peer_id });
         }
     }
@@ -44,7 +44,7 @@ impl MetricsService {
         let peer = self
             .stats
             .get_mut(room_id)
-            .and_then(|room| room.tracks.get_mut(&peer_id));
+            .and_then(|room| room.peers.get_mut(&peer_id));
 
         if let Some(peer) = peer {
             if let PeerState::Started(srcs) = &peer.state {
@@ -58,13 +58,13 @@ impl MetricsService {
     }
 }
 
-impl Actor for MetricsService {
+impl Actor for MetricsCallbacksService {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.run_interval(Duration::from_secs(10), |this, ctx| {
             for stat in this.stats.values() {
-                for track in stat.tracks.values() {
+                for track in stat.peers.values() {
                     if let PeerState::Started(_) = &track.state {
                         if track.last_update
                             < Instant::now() - Duration::from_secs(10)
@@ -92,7 +92,7 @@ pub struct TrafficFlows {
     pub source: FlowMetricSource,
 }
 
-impl Handler<TrafficFlows> for MetricsService {
+impl Handler<TrafficFlows> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -101,7 +101,7 @@ impl Handler<TrafficFlows> for MetricsService {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            if let Some(peer) = room.tracks.get_mut(&msg.peer_id) {
+            if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
                 peer.last_update = msg.timestamp;
                 match &mut peer.state {
                     PeerState::Started(sources) => {
@@ -136,7 +136,7 @@ pub struct TrafficStopped {
     pub source: StoppedMetricSource,
 }
 
-impl Handler<TrafficStopped> for MetricsService {
+impl Handler<TrafficStopped> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -145,7 +145,7 @@ impl Handler<TrafficStopped> for MetricsService {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            if let Some(peer) = room.tracks.remove(&msg.peer_id) {
+            if let Some(peer) = room.peers.remove(&msg.peer_id) {
                 room.room.do_send(PeerStopped(peer.peer_id));
             }
         }
@@ -186,7 +186,7 @@ pub struct PeerStat {
 pub struct RoomStats {
     room_id: RoomId,
     room: Addr<Room>,
-    tracks: HashMap<PeerId, PeerStat>,
+    peers: HashMap<PeerId, PeerStat>,
 }
 
 #[derive(Debug, Message)]
@@ -196,7 +196,7 @@ pub struct RegisterRoom {
     pub room: Addr<Room>,
 }
 
-impl Handler<RegisterRoom> for MetricsService {
+impl Handler<RegisterRoom> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -209,7 +209,7 @@ impl Handler<RegisterRoom> for MetricsService {
             RoomStats {
                 room_id: msg.room_id,
                 room: msg.room,
-                tracks: HashMap::new(),
+                peers: HashMap::new(),
             },
         );
     }
@@ -219,7 +219,7 @@ impl Handler<RegisterRoom> for MetricsService {
 #[rtype(result = "()")]
 pub struct UnregisterRoom(pub RoomId);
 
-impl Handler<UnregisterRoom> for MetricsService {
+impl Handler<UnregisterRoom> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -238,7 +238,7 @@ pub struct Subscribe {
     pub peer_id: PeerId,
 }
 
-impl Handler<Subscribe> for MetricsService {
+impl Handler<Subscribe> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -247,7 +247,7 @@ impl Handler<Subscribe> for MetricsService {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            room.tracks.insert(
+            room.peers.insert(
                 msg.peer_id,
                 PeerStat {
                     peer_id: msg.peer_id,
@@ -266,7 +266,7 @@ pub struct UnsubscribePeer {
     pub peers_ids: HashSet<PeerId>,
 }
 
-impl Handler<UnsubscribePeer> for MetricsService {
+impl Handler<UnsubscribePeer> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -276,7 +276,7 @@ impl Handler<UnsubscribePeer> for MetricsService {
     ) -> Self::Result {
         if let Some(room_stats) = self.stats.get_mut(&msg.room_id) {
             for peer_id in msg.peers_ids {
-                room_stats.tracks.remove(&peer_id);
+                room_stats.peers.remove(&peer_id);
             }
         }
     }
@@ -289,7 +289,7 @@ pub struct RemovePeer {
     pub peer_id: PeerId,
 }
 
-impl Handler<RemovePeer> for MetricsService {
+impl Handler<RemovePeer> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
@@ -308,7 +308,7 @@ pub struct FatalPeerError {
     pub peer_id: PeerId,
 }
 
-impl Handler<FatalPeerError> for MetricsService {
+impl Handler<FatalPeerError> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(

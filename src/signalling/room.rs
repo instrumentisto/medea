@@ -26,8 +26,13 @@ use crate::{
         },
         control::{
             callback::{
-                clients::CallbackClientFactoryImpl, service::CallbackService,
+                clients::CallbackClientFactoryImpl,
+                metrics_callback_service::{
+                    self as mcs, MetricsCallbacksService,
+                },
+                service::CallbackService,
                 OnJoinEvent, OnLeaveEvent, OnLeaveReason, OnStartEvent,
+                OnStopEvent,
             },
             endpoints::{
                 webrtc_play_endpoint::Validated,
@@ -53,7 +58,6 @@ use crate::{
             member::MemberError,
             Member, MembersLoadError,
         },
-        metrics_service::{MetricsService, Subscribe},
         participants::{ParticipantService, ParticipantServiceErr},
         peer_metrics_service::{AddPeers, AddStat, PeerMetricsService},
         peers::PeerRepository,
@@ -63,10 +67,6 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use crate::{
-    api::control::callback::OnStopEvent,
-    signalling::metrics_service::UnsubscribePeer,
-};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -201,7 +201,7 @@ pub struct Room {
     /// Current state of this [`Room`].
     state: State,
 
-    metrics_service: Addr<MetricsService>,
+    metrics_callbacks_service: Addr<MetricsCallbacksService>,
 
     peer_metrics_service: Addr<PeerMetricsService>,
 }
@@ -216,7 +216,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
-        metrics_service: Addr<MetricsService>,
+        metrics_service: Addr<MetricsCallbacksService>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -232,7 +232,7 @@ impl Room {
                 metrics_service.clone(),
             )
             .start(),
-            metrics_service,
+            metrics_callbacks_service: metrics_service,
         })
     }
 
@@ -361,7 +361,7 @@ impl Room {
             )
             .filter_map({
                 let peers = &mut self.peers;
-                let metrics_service = self.metrics_service.clone();
+                let metrics_service = self.metrics_callbacks_service.clone();
                 let room_id = self.id.clone();
                 move |(publisher, receiver)| {
                     peers.connect_endpoints(&publisher, &receiver).map(
@@ -369,7 +369,7 @@ impl Room {
                             if publisher.on_start().is_some()
                                 || publisher.on_stop().is_some()
                             {
-                                metrics_service.do_send(Subscribe {
+                                metrics_service.do_send(mcs::Subscribe {
                                     peer_id: publisher_peer_id,
                                     room_id: room_id.clone(),
                                 });
@@ -377,7 +377,7 @@ impl Room {
                             if receiver.on_start().is_some()
                                 || receiver.on_stop().is_some()
                             {
-                                metrics_service.do_send(Subscribe {
+                                metrics_service.do_send(mcs::Subscribe {
                                     peer_id: receiver_peer_id,
                                     room_id: room_id.clone(),
                                 });
@@ -403,11 +403,11 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        self.metrics_service.do_send(Subscribe {
+        self.metrics_callbacks_service.do_send(mcs::Subscribe {
             peer_id: first_peer,
             room_id: self.id.clone(),
         });
-        self.metrics_service.do_send(Subscribe {
+        self.metrics_callbacks_service.do_send(mcs::Subscribe {
             peer_id: second_peer,
             room_id: self.id.clone(),
         });
@@ -550,10 +550,11 @@ impl Room {
                     .spawn(ctx);
             });
 
-        self.metrics_service.do_send(UnsubscribePeer {
-            peers_ids: peer_ids_to_remove,
-            room_id: self.id.clone(),
-        });
+        self.metrics_callbacks_service
+            .do_send(mcs::UnsubscribePeer {
+                peers_ids: peer_ids_to_remove,
+                room_id: self.id.clone(),
+            });
     }
 
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
