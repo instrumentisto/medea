@@ -168,77 +168,7 @@ pub struct Context {
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
-    tracks_stats: HashMap<StatId, TrackStat>,
     is_force_relayed: bool,
-}
-
-#[derive(Debug, PartialEq, Hash, Eq)]
-pub enum TrackType {
-    Audio,
-    Video,
-}
-
-impl From<&RtcOutboundRtpStreamMediaType> for TrackType {
-    fn from(media_type: &RtcOutboundRtpStreamMediaType) -> Self {
-        match media_type {
-            RtcOutboundRtpStreamMediaType::Audio { .. } => Self::Audio,
-            RtcOutboundRtpStreamMediaType::Video { .. } => Self::Video,
-        }
-    }
-}
-
-impl From<&RtcInboundRtpStreamMediaType> for TrackType {
-    fn from(media_type: &RtcInboundRtpStreamMediaType) -> Self {
-        match media_type {
-            RtcInboundRtpStreamMediaType::Audio { .. } => Self::Audio,
-            RtcInboundRtpStreamMediaType::Video { .. } => Self::Video,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Hash, Eq)]
-pub enum TrackStatDirection {
-    Send { packets_sent: u64 },
-    Recv { packets_received: u64 },
-}
-
-#[derive(Debug, PartialEq, Hash, Eq)]
-pub struct TrackStat {
-    direction: TrackStatDirection,
-    track_type: TrackType,
-    last_update: Instant,
-}
-
-impl TrackStat {
-    pub fn update_packets_sent(&mut self, new_sent: u64) {
-        if let TrackStatDirection::Send { packets_sent } = &mut self.direction {
-            self.last_update = Instant::now();
-            *packets_sent = new_sent;
-        }
-    }
-
-    pub fn update_packets_received(&mut self, new_received: u64) {
-        if let TrackStatDirection::Recv { packets_received } =
-            &mut self.direction
-        {
-            self.last_update = Instant::now();
-            *packets_received = new_received;
-        }
-    }
-
-    pub fn is_running(&self) -> bool {
-        let is_updated_within_timeout =
-            self.last_update > (Instant::now() - Duration::from_secs(10));
-
-        match self.direction {
-            TrackStatDirection::Recv { packets_received } => {
-                packets_received > 0 && is_updated_within_timeout
-            }
-            TrackStatDirection::Send { packets_sent } => {
-                packets_sent > 0 && is_updated_within_timeout
-            }
-        }
-    }
 }
 
 /// [RTCPeerConnection] representation.
@@ -358,7 +288,6 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
-            tracks_stats: HashMap::new(),
         };
         Self {
             context,

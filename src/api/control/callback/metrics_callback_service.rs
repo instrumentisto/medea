@@ -1,3 +1,16 @@
+//! Service which is responsible to `Peer` metrics based Control API callbacks.
+//!
+//! `Peer` metrics will be collected from the many sources of metrics. All this
+//! metrics will be collected and based on them, [`MetricsCallbackService`] will
+//! consider which callback should be sent (or not sent).
+//!
+//! # List of `Peer` metrics based Control API callbacks:
+//!
+//! 1. `WebRtcPublishEndpoint::on_start`;
+//! 2. `WebRtcPublishEndpoint::on_stop`;
+//! 3. `WebRtcPlayEndpoint::on_start`;
+//! 4. `WebRtcPlayEndpoint::on_stop`.
+
 use std::{
     collections::{HashMap, HashSet},
     time::{Duration, Instant},
@@ -15,24 +28,34 @@ use crate::{
     },
 };
 
+/// Service which responsible for the `Peer` metrics based Control API
+/// callbacks.
 #[derive(Debug, Default)]
 pub struct MetricsCallbacksService {
+    /// All `Room` which exists on the Medea server.
     stats: HashMap<RoomId, RoomStats>,
 }
 
 impl MetricsCallbacksService {
+    /// Returns new [`MetricsCallbacksService`].
     pub fn new() -> Self {
         Self {
             stats: HashMap::new(),
         }
     }
 
-    pub fn remove_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
+    /// Unsubscribes [`MetricsCallbackService`] from watching a `Peer` with
+    /// provided [`PeerId`].
+    ///
+    /// Removes provided [`PeerId`] from [`RoomStat`] with provided [`RoomId`].
+    pub fn unsubscribe_from_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(room_id) {
             room.peers.remove(&peer_id);
         }
     }
 
+    /// Unsubscribes [`MetricsCallbackService`] from a `Peer` with fatal error
+    /// and notifies [`Room`] about fatal error in [`PeerStat`].
     fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.peers.remove(&peer_id);
@@ -40,6 +63,14 @@ impl MetricsCallbacksService {
         }
     }
 
+    /// Checks that all metrics sources considered that `Peer` with provided
+    /// [`PeerId`] is started.
+    ///
+    /// This function will be called on every [`PeerStat`] after `10sec` from
+    /// first [`PeerStat`]'s [`TrafficFlows`] message.
+    ///
+    /// If this check fails then [`MetricsCallbackService::fatal_peer_error`]
+    /// will be called for this [`PeerStat`].
     fn check_on_start(&mut self, room_id: &RoomId, peer_id: PeerId) {
         let peer = self
             .stats
@@ -83,12 +114,21 @@ impl Actor for MetricsCallbacksService {
     }
 }
 
+/// Some [`FlowMetricSource`] notifies [`MetricsCallbacksService`] that `Peer`
+/// with provided [`PeerId`] is normally flows.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct TrafficFlows {
+    /// [`RoomId`] of [`Room`] where this `Peer` is stored.
     pub room_id: RoomId,
+
+    /// [`PeerId`] of `Peer` which flows.
     pub peer_id: PeerId,
+
+    /// Time when proof of `Peer`'s traffic flowing was gotten.
     pub timestamp: Instant,
+
+    /// Source of this metric.
     pub source: FlowMetricSource,
 }
 
@@ -127,12 +167,21 @@ impl Handler<TrafficFlows> for MetricsCallbacksService {
     }
 }
 
+/// Some [`StoppedMetricSource`] notifies [`MetricsCallbacksService`] that
+/// traffic flowing of `Peer` with provided [`PeerId`] was stopped.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct TrafficStopped {
+    /// [`RoomId`] of [`Room`] where this `Peer` is stored.
     pub room_id: RoomId,
+
+    /// [`PeerId`] of `Peer` which traffic was stopped.
     pub peer_id: PeerId,
+
+    /// Time when proof of `Peer`'s traffic stopping was gotten.
     pub timestamp: Instant,
+
+    /// Source of this metric.
     pub source: StoppedMetricSource,
 }
 
@@ -149,17 +198,34 @@ impl Handler<TrafficStopped> for MetricsCallbacksService {
                 room.room.do_send(PeerStopped(peer.peer_id));
             }
         }
-        self.remove_peer(&msg.room_id, msg.peer_id);
+        self.unsubscribe_from_peer(&msg.room_id, msg.peer_id);
     }
 }
 
+/// All sources of [`TrafficFlows`] message.
+///
+/// This is needed for checking that all metrics sources have the same opinion
+/// about current `PeerConnection`'s traffic state.
+///
+/// [`MetricsCallbackService`] checks that all sources have the same opinion
+/// after `10secs` from first [`TrafficFlows`] message received for some
+/// [`PeerStat`]. If at least one [`FlowMetricSource`] doesn't sent
+/// [`TrafficFlows`] message, then `PeerConnection` will be considered as wrong
+/// and it will be stopped.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, VariantCount)]
 pub enum FlowMetricSource {
+    /// Metrics from the partner `PeerConnection`.
     PartnerPeerTraffic,
+
+    /// Metrics from the `PeerConnection`.
     PeerTraffic,
+
+    /// Metrics for this `PeerConnection` from the Coturn TURN server.
     Coturn,
 }
 
+/// All sources of [`TrafficStopped`] message.
+// TODO: maybe this is not needed???
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum StoppedMetricSource {
     // TODO: PartnerPeer,
@@ -169,30 +235,68 @@ pub enum StoppedMetricSource {
     PeerRemoved,
 }
 
+/// Current state of [`PeerStat`].
+///
+/// If [`PeerStat`] goes into [`PeerState::Started`] then all
+/// [`FlowMetricSource`]s should notify [`MetricsCallbackService`] about it.
 #[derive(Debug)]
 pub enum PeerState {
+    /// [`PeerStat`] is started.
     Started(HashSet<FlowMetricSource>),
+
+    /// [`PeerStat`] is stopped.
     Stopped,
 }
 
+/// Current state of `PeerConnection`.
+///
+/// Also this structure may be considered as subscription to Control API
+/// callbacks.
 #[derive(Debug)]
 pub struct PeerStat {
+    /// [`PeerId`] of `PeerConnection` which this [`PeerStat`] represents.
     pub peer_id: PeerId,
+
+    /// Current state of this [`PeerStat`].
     pub state: PeerState,
+
+    /// Time of last received [`PeerState`] proof.
+    ///
+    /// If [`PeerStat`] doesn't updates withing `10secs` then this [`PeerStat`]
+    /// will be considered as [`PeerState::Stopped`].
     pub last_update: Instant,
 }
 
+/// Stores [`PeerStat`]s of `PeerConnection`s for which [`PeerState`] [`Room`]
+/// is watching.
 #[derive(Debug)]
 pub struct RoomStats {
+    /// [`RoomId`] of all [`PeerStat`] which stored here.
     room_id: RoomId,
+
+    /// [`Addr`] of [`Room`] which is watching for this [`PeerStat`]s.
     room: Addr<Room>,
+
+    /// [`PeerStat`] for which some [`Room`] is watching.
     peers: HashMap<PeerId, PeerStat>,
 }
 
+/// Registers new [`Room`] as [`PeerStat`]s watcher.
+///
+/// This message will only add provided [`Room`] to the list. For real
+/// subscription to a [`PeerStat`] [`Subscribe`] message should be used.
+///
+/// [`RegisterRoom`] will be called in [`RoomService`] for every [`Room`] when
+/// it created.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct RegisterRoom {
+    /// [`RoomId`] of [`Room`] which requested to register in the
+    /// [`MetricsCallbacksService`].
     pub room_id: RoomId,
+
+    /// [`Addr`] of room which requrested to register in the
+    /// [`MetricsCallbackService`].
     pub room: Addr<Room>,
 }
 
@@ -215,6 +319,11 @@ impl Handler<RegisterRoom> for MetricsCallbacksService {
     }
 }
 
+/// Unregister [`Room`] with provided [`RoomId`] from the
+/// [`MetricsCallbacksService`].
+///
+/// This message will just remove subscription. This isn't considered as
+/// [`TrafficStopped`] or something like this.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct UnregisterRoom(pub RoomId);
@@ -231,19 +340,25 @@ impl Handler<UnregisterRoom> for MetricsCallbacksService {
     }
 }
 
+/// Subscribes [`Room`] with provided [`RoomId`] to [`PeerStat`] with provided
+/// [`PeerId`].
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct Subscribe {
+pub struct SubscribePeer {
+    /// [`RoomId`] of [`Room`] which subscribes on [`PeerStat`]'s [`PeerState`]
+    /// changes.
     pub room_id: RoomId,
+
+    /// [`PeerId`] of [`PeerStat`] for which subscription is requested.
     pub peer_id: PeerId,
 }
 
-impl Handler<Subscribe> for MetricsCallbacksService {
+impl Handler<SubscribePeer> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
         &mut self,
-        msg: Subscribe,
+        msg: SubscribePeer,
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
@@ -259,19 +374,25 @@ impl Handler<Subscribe> for MetricsCallbacksService {
     }
 }
 
+/// Unsubscribes [`Room`] with provided [`RoomId`] from [`PeerStat`] with
+/// provided [`PeerId`].
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct UnsubscribePeer {
+pub struct UnsubscribePeers {
+    /// [`RoomId`] of [`Room`] which unsubscribes from [`PeerStat`]'s
+    /// [`PeerState`] changes.
     pub room_id: RoomId,
+
+    /// [`PeerId`] of [`PeerStat`] from which unsubscription is requested.
     pub peers_ids: HashSet<PeerId>,
 }
 
-impl Handler<UnsubscribePeer> for MetricsCallbacksService {
+impl Handler<UnsubscribePeers> for MetricsCallbacksService {
     type Result = ();
 
     fn handle(
         &mut self,
-        msg: UnsubscribePeer,
+        msg: UnsubscribePeers,
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room_stats) = self.stats.get_mut(&msg.room_id) {
@@ -279,24 +400,5 @@ impl Handler<UnsubscribePeer> for MetricsCallbacksService {
                 room_stats.peers.remove(&peer_id);
             }
         }
-    }
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct RemovePeer {
-    pub room_id: RoomId,
-    pub peer_id: PeerId,
-}
-
-impl Handler<RemovePeer> for MetricsCallbacksService {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: RemovePeer,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        self.remove_peer(&msg.room_id, msg.peer_id);
     }
 }

@@ -1,3 +1,6 @@
+//! Service which is responsible for processing [`PeerConnection`]'s metrics
+//! received from the Coturn.
+
 use std::{collections::HashMap, time::Instant};
 
 use actix::{Actor, Addr, AsyncContext, StreamHandler, WrapFuture};
@@ -13,28 +16,36 @@ use crate::{
         },
         RoomId,
     },
-    turn::coturn_stats::{CoturnAllocationEvent, CoturnEvent},
+    turn::allocation_event::{CoturnAllocationEvent, CoturnEvent},
 };
 
+/// Username of the Coturn user.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CoturnUsername {
+    /// [`RoomId`] of [`Room`] for which this Coturn user is created.
     pub room_id: RoomId,
+
+    /// [`PeerId`] of [`PeerConnection`] for which this Coturn user is created.
     pub peer_id: PeerId,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct CoturnPeerStat {
-    pub allocations_count: u64,
-}
-
+/// Service which is responsible for processing [`PeerConnection`]'s metrics
+/// received from the Coturn.
 #[derive(Debug)]
 pub struct CoturnMetrics {
+    /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
+    /// sent.
     metrics_service: Addr<MetricsCallbacksService>,
+
+    /// Redis client with which Coturn stat updates will be received.
     client: patched_redis::Client,
-    allocations: HashMap<CoturnUsername, CoturnPeerStat>,
+
+    /// Count of allocations for the [`CoturnUsername`] (which acts as a key).
+    allocations_count: HashMap<CoturnUsername, u64>,
 }
 
 impl CoturnMetrics {
+    /// Returns new [`CoturnMetrics`] service.
     pub fn new(
         cf: &crate::conf::turn::Turn,
         metrics_service: Addr<MetricsCallbacksService>,
@@ -57,7 +68,7 @@ impl CoturnMetrics {
         Self {
             metrics_service,
             client,
-            allocations: HashMap::new(),
+            allocations_count: HashMap::new(),
         }
     }
 }
@@ -108,13 +119,11 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
                 peer_id: event.peer_id,
             };
 
-            let mut peer_stat =
-                self.allocations.entry(username).or_insert(CoturnPeerStat {
-                    allocations_count: 0,
-                });
+            let allocations_count =
+                self.allocations_count.entry(username).or_insert(0);
             match event.event {
                 CoturnAllocationEvent::Traffic { traffic } => {
-                    peer_stat.allocations_count += 1;
+                    *allocations_count += 1;
                     let is_traffic_really_going =
                         traffic.sent_packets + traffic.received_packets > 10;
                     if is_traffic_really_going {
@@ -127,8 +136,8 @@ impl StreamHandler<Option<patched_redis::Msg>> for CoturnMetrics {
                     }
                 }
                 CoturnAllocationEvent::Deleted => {
-                    peer_stat.allocations_count -= 1;
-                    if peer_stat.allocations_count == 0 {
+                    *allocations_count -= 1;
+                    if *allocations_count == 0 {
                         self.metrics_service.do_send(TrafficStopped {
                             peer_id: event.peer_id,
                             room_id: event.room_id,

@@ -203,8 +203,11 @@ pub struct Room {
     /// Current state of this [`Room`].
     state: State,
 
+    /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
+    /// callbacks will be performed.
     metrics_callbacks_service: Addr<MetricsCallbacksService>,
 
+    /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeerMetricsService,
 }
 
@@ -370,7 +373,7 @@ impl Room {
                             if publisher.on_start().is_some()
                                 || publisher.on_stop().is_some()
                             {
-                                metrics_service.do_send(mcs::Subscribe {
+                                metrics_service.do_send(mcs::SubscribePeer {
                                     peer_id: publisher_peer_id,
                                     room_id: room_id.clone(),
                                 });
@@ -378,7 +381,7 @@ impl Room {
                             if receiver.on_start().is_some()
                                 || receiver.on_stop().is_some()
                             {
-                                metrics_service.do_send(mcs::Subscribe {
+                                metrics_service.do_send(mcs::SubscribePeer {
                                     peer_id: receiver_peer_id,
                                     room_id: room_id.clone(),
                                 });
@@ -404,14 +407,6 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        self.metrics_callbacks_service.do_send(mcs::Subscribe {
-            peer_id: first_peer,
-            room_id: self.id.clone(),
-        });
-        self.metrics_callbacks_service.do_send(mcs::Subscribe {
-            peer_id: second_peer,
-            room_id: self.id.clone(),
-        });
         use super::peer_metrics_service as pms;
 
         // TODO: UNWRAP
@@ -553,7 +548,7 @@ impl Room {
             });
 
         self.metrics_callbacks_service
-            .do_send(mcs::UnsubscribePeer {
+            .do_send(mcs::UnsubscribePeers {
                 peers_ids: peer_ids_to_remove,
                 room_id: self.id.clone(),
             });
@@ -1110,9 +1105,7 @@ impl Handler<PeerStarted> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let peer_id = msg.0;
-        if let Some(endpoints) =
-            self.peers.get_endpoint_path_by_peer_id(peer_id)
-        {
+        if let Some(endpoints) = self.peers.get_endpoints_by_peer_id(peer_id) {
             let send_callbacks: HashMap<_, _> = endpoints
                 .into_iter()
                 .filter_map(|e| {
@@ -1167,9 +1160,7 @@ impl Handler<PeerStopped> for Room {
     ) -> Self::Result {
         println!("Peer {} stopped!!!", msg.0);
         let peer_id = msg.0;
-        if let Some(endpoints) =
-            self.peers.get_endpoint_path_by_peer_id(peer_id)
-        {
+        if let Some(endpoints) = self.peers.get_endpoints_by_peer_id(peer_id) {
             let send_callbacks: HashMap<_, _> = endpoints
                 .into_iter()
                 .filter_map(|e| {

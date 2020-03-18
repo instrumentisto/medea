@@ -2,9 +2,9 @@
 //!
 //! [TURN]: https://webrtcglossary.com/turn
 
+pub mod allocation_event;
 pub mod cli;
 pub mod coturn_metrics;
-pub mod coturn_stats;
 pub mod repo;
 pub mod service;
 

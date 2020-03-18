@@ -72,16 +72,43 @@ impl Traffic {
     }
 }
 
+/// All type of the allocation events which can be thrown by Coturn.
 #[derive(Debug)]
 pub enum CoturnAllocationEvent {
-    New { lifetime: Duration },
-    Refreshed { lifetime: Duration },
+    /// New allocation is created.
+    New {
+        /// Time for which this allocation will be available.
+        ///
+        /// This time may be changed by Coturn then
+        /// [`CoturnAllocationEvent::Refreshed`] will be sent.
+        lifetime: Duration,
+    },
+
+    /// Allocation's lifetime is updated.
+    Refreshed {
+        /// New time for this this allocation will be available.
+        ///
+        /// If this time is `0` then allocation can be considered as deleted.
+        lifetime: Duration,
+    },
+
+    /// Update of [`Traffic`] statistic.
     Traffic { traffic: Traffic },
+
+    /// Total [`Traffic`] statistic of this allocation.
+    ///
+    /// Allocation can be considered as deleted.
     TotalTraffic { traffic: Traffic },
+
+    /// Allocation is deleted.
     Deleted,
 }
 
 impl CoturnAllocationEvent {
+    /// Tries to parse [`CoturnAllocationEvent`] from the provided `event_type`
+    /// and `body`.
+    ///
+    /// `body` will be interpreted different based on provided `event_type`.
     pub fn parse(
         event_type: &str,
         body: &str,
@@ -138,15 +165,24 @@ impl CoturnAllocationEvent {
     }
 }
 
+/// Allocation event received from the Coturn.
 #[derive(Debug)]
 pub struct CoturnEvent {
+    /// Actual allocation event received from the Coturn.
     pub event: CoturnAllocationEvent,
+
+    /// [`RoomId`] for which this [`CoturnEvent`] was received.
     pub room_id: RoomId,
+
+    /// [`PeerId`] for which this [`CoturnEvent`] was received.
     pub peer_id: PeerId,
+
+    /// Allocation ID for which this [`CoturnEvent`] was received.
     pub allocation_id: u64,
 }
 
 impl CoturnEvent {
+    /// Tries to parse [`CoturnEvnet]` from a provided Redis message.
     pub fn parse(
         msg: &patched_redis::Msg,
     ) -> Result<Self, CoturnEventParseError> {
@@ -202,6 +238,7 @@ impl CoturnEvent {
     }
 }
 
+/// Errors which can occur while [`CoturnEvent`] parsing.
 #[derive(Debug, Display)]
 pub enum CoturnEventParseError {
     /// Unsupported allocation status.
@@ -255,6 +292,7 @@ pub enum CoturnEventParseError {
     #[display(fmt = "No allocation ID metadata.")]
     NoAllocationId,
 
+    /// Event type is not provided.
     #[display(fmt = "No event type.")]
     NoEventType,
 }

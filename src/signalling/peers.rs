@@ -429,7 +429,9 @@ impl PeerRepository {
         None
     }
 
-    pub fn get_endpoint_path_by_peer_id(
+    /// Returns [`Weak`] references to the [`Endpoint`]s for which provided
+    /// [`PeerId`] was created.
+    pub fn get_endpoints_by_peer_id(
         &self,
         peer_id: PeerId,
     ) -> Option<Vec<WeakEndpoint>> {
