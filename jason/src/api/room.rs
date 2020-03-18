@@ -906,7 +906,7 @@ impl PeerEventHandler for InnerRoom {
         });
 
         if let PeerConnectionState::Connected = peer_connection_state {
-            self.peers.send_peer_stats_scrape(peer_id);
+            self.peers.send_peer_stats(peer_id);
         }
     }
 

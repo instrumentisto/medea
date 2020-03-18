@@ -41,7 +41,7 @@ async fn get_stats() {
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
-
+    // TODO: add asserts for all 'important' stats
     assert!(!peer.get_stats().await.unwrap().0.is_empty());
 }
 

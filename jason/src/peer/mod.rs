@@ -202,8 +202,11 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
-    /// Hashes of [`RtcStat`]s which was already sent to the server.
-    stats_cache: RefCell<HashSet<u64>>,
+    // TODO: test for stats cache logic
+    /// Hashes of [`RtcStat`]s which was already sent to the server, so we wont
+    /// duplicate stats that were already sent. Stores precomputed hashes,
+    /// since we dont need access to actual stats values.
+    sent_stats_cache: RefCell<HashSet<u64>>,
 }
 
 impl PeerConnection {
@@ -241,7 +244,7 @@ impl PeerConnection {
             media_connections,
             media_manager,
             peer_events_sender,
-            stats_cache: RefCell::new(HashSet::new()),
+            sent_stats_cache: RefCell::new(HashSet::new()),
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(vec![]),
         };
@@ -295,7 +298,7 @@ impl PeerConnection {
     }
 
     /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
-    pub async fn send_peer_stats_scrape(&self) {
+    pub async fn send_peer_stats(&self) {
         let stats = match self.peer.get_stats().await {
             Ok(stats) => stats,
             Err(e) => {
@@ -304,7 +307,7 @@ impl PeerConnection {
             }
         };
 
-        let mut cache_mut = self.stats_cache.borrow_mut();
+        let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
             stats
                 .0
@@ -314,7 +317,7 @@ impl PeerConnection {
                     stat.stats.hash(&mut hasher);
                     let stat_hash = hasher.finish();
 
-                    cache_mut.insert(stat_hash)
+                    stats_cache.insert(stat_hash)
                 })
                 .collect(),
         );

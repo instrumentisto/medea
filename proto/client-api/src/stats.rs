@@ -1272,7 +1272,7 @@ pub struct RtcCertificateStats {
 
 /// Represents [`DOMHighResTimeStamp`].
 ///
-/// Can be converted to the [`SystemTime`] with accurate to the milliseconds.
+/// Can be converted to the [`SystemTime`] with millisecond-wise accuracy.
 ///
 /// The [`HighResTimeStamp`] type is a [`f32`] and is used to store a time value
 /// in milliseconds. This type can be used to describe a discrete point in time
@@ -1316,7 +1316,7 @@ impl PartialEq for HighResTimeStamp {
     }
 }
 
-/// Wrapped around [`f64`] for which implemented [`Hash`].
+/// [`f64`] wrapper with [`Hash`] implementation.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Float(pub f64);
 
