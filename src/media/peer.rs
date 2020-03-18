@@ -4,20 +4,11 @@
 
 #![allow(clippy::use_self)]
 
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    fmt,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    stats::{
-        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, StatId,
-    },
     AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
     VideoSettings,
 };

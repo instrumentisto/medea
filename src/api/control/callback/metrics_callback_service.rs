@@ -229,14 +229,22 @@ pub enum FlowMetricSource {
 }
 
 /// All sources of [`TrafficStopped`] message.
-// TODO: maybe this is not needed???
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum StoppedMetricSource {
-    PartnerPeerRemoved,
-    PeerTraffic,
-    Coturn,
-    Timeout,
+    /// `PeerConnection` was removed.
     PeerRemoved,
+
+    /// Partner `PeerConnection` was removed.
+    PartnerPeerRemoved,
+
+    /// `PeerConnection` traffic stopped growing.
+    PeerTraffic,
+
+    /// All Coturn allocations related to this `PeerConnection` was removed.
+    Coturn,
+
+    /// [`MetricsCallbackService`] doesn't receive [`TrafficFlows`] too long.
+    Timeout,
 }
 
 /// Current state of [`PeerStat`].

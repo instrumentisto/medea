@@ -404,26 +404,41 @@ impl Room {
     fn connect_peers(
         &mut self,
         ctx: &mut Context<Self>,
-        first_peer: PeerId,
-        second_peer: PeerId,
+        first_peer_id: PeerId,
+        second_peer_id: PeerId,
     ) {
         use super::peer_metrics_service as pms;
 
-        // TODO: UNWRAP
-        let first_pee = self.peers.get_peer_by_id(first_peer).unwrap();
-        let second_pee = self.peers.get_peer_by_id(second_peer).unwrap();
-        self.peer_metrics_service.add_peers(
-            pms::Peer {
-                peer_id: first_peer,
-                spec: first_pee.get_spec(),
-            },
-            pms::Peer {
-                peer_id: second_peer,
-                spec: second_pee.get_spec(),
-            },
-        );
+        let peers =
+            self.peers.get_peer_by_id(first_peer_id).map(|first_peer| {
+                self.peers
+                    .get_peer_by_id(second_peer_id)
+                    .map(|second_peer| {
+                        (first_peer.get_spec(), second_peer.get_spec())
+                    })
+            });
+        if let Ok(Ok((first_peer_spec, second_peer_spec))) = peers {
+            self.peer_metrics_service.add_peers(
+                pms::Peer {
+                    peer_id: first_peer_id,
+                    spec: first_peer_spec,
+                },
+                pms::Peer {
+                    peer_id: second_peer_id,
+                    spec: second_peer_spec,
+                },
+            );
+        } else {
+            error!(
+                "Failed to create subscription to Peer [id = {}] and Peer [id \
+                 = {}] metrics. Because some of this error: {:?}",
+                first_peer_id, second_peer_id, peers
+            );
+            self.close_gracefully(ctx).spawn(ctx);
+            return;
+        }
 
-        match self.send_peer_created(first_peer, second_peer) {
+        match self.send_peer_created(first_peer_id, second_peer_id) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
                 if res.is_ok() {
                     return Box::new(actix::fut::ready(()));
@@ -538,7 +553,7 @@ impl Room {
     fn remove_peers(
         &mut self,
         member_id: &MemberId,
-        peer_ids_to_remove: HashSet<PeerId>,
+        peer_ids_to_remove: &HashSet<PeerId>,
         ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
@@ -579,7 +594,7 @@ impl Room {
 
             // Send PeersRemoved to `Member`s which have related to this
             // `Member` `Peer`s.
-            self.remove_peers(&member.id(), peers, ctx);
+            self.remove_peers(&member.id(), &peers, ctx);
 
             self.members.delete_member(member_id, ctx);
 
@@ -630,7 +645,7 @@ impl Room {
                         room_id: self.id.clone(),
                         peers_ids: peer_ids.clone(),
                     });
-                self.remove_peers(member_id, peer_ids, ctx);
+                self.remove_peers(member_id, &peer_ids, ctx);
             }
 
             publish_id.into()
@@ -1212,12 +1227,12 @@ impl Handler<PeerStopped> for Room {
             let member_id = self
                 .peers
                 .get_peer_by_id(peer_id)
-                .map(|peer| peer.member_id())
+                .map(PeerStateMachine::member_id)
                 .ok();
             if let Some(member_id) = member_id {
                 let mut peers_ids = HashSet::new();
                 peers_ids.insert(peer_id);
-                self.remove_peers(&member_id, peers_ids, ctx);
+                self.remove_peers(&member_id, &peers_ids, ctx);
             }
 
             for (fid, on_stop) in send_callbacks {
@@ -1670,7 +1685,7 @@ impl Handler<PeerSpecContradiction> for Room {
 
         let mut peers_ids = HashSet::new();
         peers_ids.insert(msg.peer_id);
-        self.remove_peers(&member_id, peers_ids, ctx);
+        self.remove_peers(&member_id, &peers_ids, ctx);
     }
 }
 
