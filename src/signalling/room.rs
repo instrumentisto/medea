@@ -502,6 +502,10 @@ impl Room {
             return self.close_gracefully(ctx);
         }
 
+        peers_id.iter().for_each(|peer_id| {
+            self.peer_metrics_service.peer_removed(*peer_id)
+        });
+
         Box::new(self.send_peers_removed(member_id, peers_id).then(
             |err, this, ctx: &mut Context<Self>| {
                 if let Err(e) = err {
@@ -546,12 +550,6 @@ impl Room {
                     .map(|_, _, _| ())
                     .spawn(ctx);
             });
-
-        self.metrics_callbacks_service
-            .do_send(mcs::UnsubscribePeers {
-                peers_ids: peer_ids_to_remove,
-                room_id: self.id.clone(),
-            });
     }
 
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -572,6 +570,12 @@ impl Room {
                         .flat_map(WebRtcPublishEndpoint::peer_ids),
                 )
                 .collect();
+
+            self.metrics_callbacks_service
+                .do_send(mcs::UnsubscribePeers {
+                    room_id: self.id.clone(),
+                    peers_ids: peers.clone(),
+                });
 
             // Send PeersRemoved to `Member`s which have related to this
             // `Member` `Peer`s.
@@ -599,6 +603,15 @@ impl Room {
             let play_id = endpoint_id.into();
             if let Some(endpoint) = member.take_sink(&play_id) {
                 if let Some(peer_id) = endpoint.peer_id() {
+                    let mut peers_ids = HashSet::new();
+                    peers_ids.insert(peer_id);
+                    self.metrics_callbacks_service.do_send(
+                        mcs::UnsubscribePeers {
+                            room_id: self.id.clone(),
+                            peers_ids,
+                        },
+                    );
+
                     let removed_peers =
                         self.peers.remove_peer(member_id, peer_id);
                     for (member_id, peers_ids) in removed_peers {
@@ -612,6 +625,11 @@ impl Room {
             let publish_id = String::from(play_id).into();
             if let Some(endpoint) = member.take_src(&publish_id) {
                 let peer_ids = endpoint.peer_ids();
+                self.metrics_callbacks_service
+                    .do_send(mcs::UnsubscribePeers {
+                        room_id: self.id.clone(),
+                        peers_ids: peer_ids.clone(),
+                    });
                 self.remove_peers(member_id, peer_ids, ctx);
             }
 
@@ -1156,7 +1174,7 @@ impl Handler<PeerStopped> for Room {
     fn handle(
         &mut self,
         msg: PeerStopped,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         println!("Peer {} stopped!!!", msg.0);
         let peer_id = msg.0;
@@ -1190,6 +1208,18 @@ impl Handler<PeerStopped> for Room {
                     None
                 })
                 .collect();
+
+            let member_id = self
+                .peers
+                .get_peer_by_id(peer_id)
+                .map(|peer| peer.member_id())
+                .ok();
+            if let Some(member_id) = member_id {
+                let mut peers_ids = HashSet::new();
+                peers_ids.insert(peer_id);
+                self.remove_peers(&member_id, peers_ids, ctx);
+            }
+
             for (fid, on_stop) in send_callbacks {
                 self.callbacks.send_callback(
                     on_stop,

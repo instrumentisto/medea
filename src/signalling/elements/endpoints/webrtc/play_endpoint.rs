@@ -10,6 +10,7 @@ use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
+        callback::url::CallbackUrl,
         endpoints::webrtc_play_endpoint::WebRtcPlayId as Id, refs::SrcUri,
     },
     signalling::elements::{
@@ -19,7 +20,6 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-use crate::api::control::callback::url::CallbackUrl;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {

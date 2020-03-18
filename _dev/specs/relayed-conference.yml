@@ -1,0 +1,88 @@
+kind: Room
+id: relayed-conference
+spec:
+  pipeline:
+    member-1:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+          play-member-2:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-conference/member-2/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+          play-member-3:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-conference/member-3/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+    member-2:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+          play-member-1:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-conference/member-1/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+          play-member-3:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-conference/member-3/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+    member-3:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+          play-member-1:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-conference/member-1/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+          play-member-2:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://relayed-conference/member-2/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"

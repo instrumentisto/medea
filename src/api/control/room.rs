@@ -9,16 +9,17 @@ use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::url::CallbackUrl, EndpointId, TryFromProtobufError,
+    callback::url::CallbackUrl,
+    endpoints::webrtc_play_endpoint::{
+        Unvalidated, Validated, ValidationError,
+    },
+    EndpointId, TryFromProtobufError,
 };
 
 use super::{
     member::{MemberElement, MemberSpec},
     pipeline::Pipeline,
     MemberId, RootElement, TryFromElementError,
-};
-use crate::api::control::endpoints::webrtc_play_endpoint::{
-    Unvalidated, Validated, ValidationError,
 };
 
 /// ID of [`Room`].

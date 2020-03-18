@@ -195,6 +195,10 @@ impl Handler<TrafficStopped> for MetricsCallbacksService {
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             if let Some(peer) = room.peers.remove(&msg.peer_id) {
+                println!(
+                    "Peer #{} stopped basic on {:?}.",
+                    msg.peer_id, msg.source
+                );
                 room.room.do_send(PeerStopped(peer.peer_id));
             }
         }
@@ -228,7 +232,7 @@ pub enum FlowMetricSource {
 // TODO: maybe this is not needed???
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum StoppedMetricSource {
-    // TODO: PartnerPeer,
+    PartnerPeerRemoved,
     PeerTraffic,
     Coturn,
     Timeout,
