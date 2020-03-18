@@ -3,13 +3,15 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{
-    collections::{hash_map::Iter, HashMap},
+    collections::{
+        hash_map::{IntoIter, Iter},
+        HashMap,
+    },
     hash::Hash,
     iter::IntoIterator,
 };
 
 use serde::Deserialize;
-use std::collections::hash_map::IntoIter;
 
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]

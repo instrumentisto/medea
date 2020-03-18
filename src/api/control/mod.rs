@@ -22,7 +22,12 @@ use failure::{Error, Fail};
 use serde::Deserialize;
 
 use crate::{
-    api::control::callback::url::CallbackUrlParseError,
+    api::control::{
+        callback::url::CallbackUrlParseError,
+        endpoints::webrtc_play_endpoint::{
+            Unvalidated, Validated, ValidationError,
+        },
+    },
     log::prelude::*,
     signalling::room_service::{
         RoomService, RoomServiceError, StartStaticRooms,
@@ -40,9 +45,6 @@ pub use self::{
     },
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
-};
-use crate::api::control::endpoints::webrtc_play_endpoint::{
-    Unvalidated, Validated, ValidationError,
 };
 
 /// Errors which may occur while deserializing protobuf spec.

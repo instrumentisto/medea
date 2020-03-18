@@ -5,6 +5,7 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
@@ -14,7 +15,6 @@ use crate::api::control::{
     },
     TryFromProtobufError,
 };
-use medea_control_api_proto::grpc::api as proto;
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(

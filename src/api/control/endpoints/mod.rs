@@ -11,9 +11,10 @@ use derive_more::{Display, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
+use crate::api::control::endpoints::webrtc_play_endpoint::Validated;
+
 use super::{member::MemberElement, TryFromProtobufError};
 
-use crate::api::control::endpoints::webrtc_play_endpoint::Validated;
 #[doc(inline)]
 pub use webrtc_play_endpoint::{WebRtcPlayEndpoint, WebRtcPlayId};
 #[doc(inline)]
