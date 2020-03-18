@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
+    Handler, Message, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -59,7 +59,7 @@ use crate::{
             Member, MembersLoadError,
         },
         participants::{ParticipantService, ParticipantServiceErr},
-        peer_metrics_service::{AddPeers, AddStat, PeerMetricsService},
+        peer_metrics_service::PeerMetricsService,
         peers::PeerRepository,
     },
     utils::ResponseActAnyFuture,
@@ -67,6 +67,7 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
+use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -203,7 +204,7 @@ pub struct Room {
 
     metrics_callbacks_service: Addr<MetricsCallbacksService>,
 
-    peer_metrics_service: Addr<PeerMetricsService>,
+    peer_metrics_service: PeerMetricsService,
 }
 
 impl Room {
@@ -230,8 +231,7 @@ impl Room {
             peer_metrics_service: PeerMetricsService::new(
                 room_spec.id().clone(),
                 metrics_service.clone(),
-            )
-            .start(),
+            ),
             metrics_callbacks_service: metrics_service,
         })
     }
@@ -411,20 +411,21 @@ impl Room {
             peer_id: second_peer,
             room_id: self.id.clone(),
         });
+        use super::peer_metrics_service as pms;
 
         // TODO: UNWRAP
         let first_pee = self.peers.get_peer_by_id(first_peer).unwrap();
         let second_pee = self.peers.get_peer_by_id(second_peer).unwrap();
-        self.peer_metrics_service.do_send(AddPeers {
-            first_peer: crate::signalling::peer_metrics_service::Peer {
+        self.peer_metrics_service.add_peers(
+            pms::Peer {
                 peer_id: first_peer,
                 spec: first_pee.get_spec(),
             },
-            second_peer: crate::signalling::peer_metrics_service::Peer {
+            pms::Peer {
                 peer_id: second_peer,
                 spec: second_pee.get_spec(),
             },
-        });
+        );
 
         match self.send_peer_created(first_peer, second_peer) {
             Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
@@ -1061,10 +1062,7 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         match metrics {
             PeerMetrics::StatsUpdate(stats) => {
-                self.peer_metrics_service.do_send(AddStat {
-                    peer_id,
-                    stat: stats,
-                });
+                self.peer_metrics_service.add_stat(peer_id, stats);
             }
             _ => (),
         }
@@ -1217,8 +1215,12 @@ impl Handler<PeerStopped> for Room {
 impl Actor for Room {
     type Context = Context<Self>;
 
-    fn started(&mut self, _: &mut Self::Context) {
+    fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
+
+        ctx.run_interval(Duration::from_secs(10), |this, _| {
+            this.peer_metrics_service.check_peers_validity();
+        });
     }
 }
 
@@ -1471,11 +1473,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
             for (peer_member_id, peers_ids) in removed_peers {
                 for peer_id in &peers_ids {
-                    self.peer_metrics_service.do_send(
-                        crate::signalling::peer_metrics_service::PeerRemoved {
-                            peer_id: *peer_id,
-                        },
-                    );
+                    self.peer_metrics_service.peer_removed(*peer_id);
                 }
                 // Here we may have some problems. If two participants
                 // disconnect at one moment then sending event

@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix::{Actor, Addr, AsyncContext, Handler, Message};
+use actix::Addr;
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
@@ -70,12 +70,12 @@ struct SenderStat {
 }
 
 impl SenderStat {
-    pub fn update(&mut self, upd: &RtcOutboundRtpStreamStats) {
+    fn update(&mut self, upd: &RtcOutboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.packets_sent = upd.packets_sent;
     }
 
-    pub fn is_active(&self) -> bool {
+    fn is_active(&self) -> bool {
         self.last_update > Instant::now() - Duration::from_secs(10)
     }
 }
@@ -88,12 +88,12 @@ struct ReceiveStat {
 }
 
 impl ReceiveStat {
-    pub fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
+    fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.packets_received = upd.packets_received;
     }
 
-    pub fn is_active(&self) -> bool {
+    fn is_active(&self) -> bool {
         self.last_update > Instant::now() - Duration::from_secs(10)
     }
 }
@@ -116,7 +116,7 @@ struct PeerStat {
 }
 
 impl PeerStat {
-    pub fn update_sender(
+    fn update_sender(
         &mut self,
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
@@ -131,7 +131,7 @@ impl PeerStat {
             .update(upd);
     }
 
-    pub fn update_received(
+    fn update_received(
         &mut self,
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
@@ -147,7 +147,7 @@ impl PeerStat {
     }
 
     #[allow(clippy::filter_map)]
-    pub fn is_conforms_spec(&self) -> bool {
+    fn is_conforms_spec(&self) -> bool {
         let mut spec_senders: Vec<_> = self.spec.senders.clone();
         let mut spec_receivers: Vec<_> = self.spec.received.clone();
         spec_senders.sort();
@@ -171,7 +171,7 @@ impl PeerStat {
         spec_receivers == current_receivers && spec_senders == current_senders
     }
 
-    pub fn is_stopped(&self) -> bool {
+    fn is_stopped(&self) -> bool {
         let active_senders_count = self
             .senders
             .values()
@@ -186,7 +186,7 @@ impl PeerStat {
         active_receivers_count + active_senders_count == 0
     }
 
-    pub fn get_stop_time(&self) -> Instant {
+    fn get_stop_time(&self) -> Instant {
         self.senders
             .values()
             .map(|send| send.last_update)
@@ -195,19 +195,25 @@ impl PeerStat {
             .unwrap_or_else(Instant::now)
     }
 
-    pub fn get_partner_peer_id(&self) -> Option<PeerId> {
+    fn get_partner_peer_id(&self) -> Option<PeerId> {
         self.partner_peer
             .upgrade()
             .map(|partner_peer| partner_peer.borrow().get_peer_id())
     }
 
-    pub fn get_peer_id(&self) -> PeerId {
+    fn get_peer_id(&self) -> PeerId {
         self.peer_id
     }
 
-    pub fn set_state(&mut self, state: PeerStatState) {
+    fn set_state(&mut self, state: PeerStatState) {
         self.state = state;
     }
+}
+
+#[derive(Debug)]
+pub struct Peer {
+    pub peer_id: PeerId,
+    pub spec: PeerSpec,
 }
 
 #[derive(Debug)]
@@ -228,95 +234,64 @@ impl PeerMetricsService {
             peers: HashMap::new(),
         }
     }
-}
 
-impl Actor for PeerMetricsService {
-    type Context = actix::Context<Self>;
+    pub fn check_peers_validity(&self) {
+        for peer in self
+            .peers
+            .values()
+            .filter(|peer| peer.borrow().state == PeerStatState::Connected)
+        {
+            let peer_ref = peer.borrow();
 
-    fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.run_interval(Duration::from_secs(10), |this, _| {
-            for peer in this
-                .peers
-                .values()
-                .filter(|peer| peer.borrow().state == PeerStatState::Connected)
-            {
-                let peer_ref = peer.borrow();
-
-                if peer_ref.is_stopped() {
-                    this.metrics_service.do_send(TrafficStopped {
-                        room_id: this.room_id.clone(),
-                        peer_id: peer_ref.peer_id,
-                        timestamp: peer_ref.get_stop_time(),
-                        source: StoppedMetricSource::PeerTraffic,
-                    });
-                } else if !peer_ref.is_conforms_spec() {
-                    this.metrics_service.do_send(FatalPeerError {
-                        room_id: this.room_id.clone(),
-                        peer_id: peer_ref.peer_id,
-                    });
-                }
+            if peer_ref.is_stopped() {
+                self.metrics_service.do_send(TrafficStopped {
+                    room_id: self.room_id.clone(),
+                    peer_id: peer_ref.peer_id,
+                    timestamp: peer_ref.get_stop_time(),
+                    source: StoppedMetricSource::PeerTraffic,
+                });
+            } else if !peer_ref.is_conforms_spec() {
+                self.metrics_service.do_send(FatalPeerError {
+                    room_id: self.room_id.clone(),
+                    peer_id: peer_ref.peer_id,
+                });
             }
-        });
+        }
+
+        println!("Peers was validated!");
     }
-}
 
-#[derive(Debug)]
-pub struct Peer {
-    pub peer_id: PeerId,
-    pub spec: PeerSpec,
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct AddPeers {
-    pub first_peer: Peer,
-    pub second_peer: Peer,
-}
-
-impl Handler<AddPeers> for PeerMetricsService {
-    type Result = ();
-
-    fn handle(&mut self, msg: AddPeers, _: &mut Self::Context) -> Self::Result {
-        let first_peer = Rc::new(RefCell::new(PeerStat {
-            peer_id: msg.first_peer.peer_id,
+    pub fn add_peers(&mut self, first_peer: Peer, second_peer: Peer) {
+        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
+            peer_id: first_peer.peer_id,
             partner_peer: Weak::new(),
             last_update: Instant::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
-            spec: msg.first_peer.spec,
+            spec: first_peer.spec,
         }));
-        let second_peer = Rc::new(RefCell::new(PeerStat {
-            peer_id: msg.second_peer.peer_id,
-            partner_peer: Rc::downgrade(&first_peer),
+        let second_peer_stat = Rc::new(RefCell::new(PeerStat {
+            peer_id: second_peer.peer_id,
+            partner_peer: Rc::downgrade(&first_peer_stat),
             last_update: Instant::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
-            spec: msg.second_peer.spec,
+            spec: second_peer.spec,
         }));
-        first_peer.borrow_mut().partner_peer = Rc::downgrade(&second_peer);
+        first_peer_stat.borrow_mut().partner_peer =
+            Rc::downgrade(&second_peer_stat);
 
-        self.peers.insert(msg.first_peer.peer_id, first_peer);
-        self.peers.insert(msg.second_peer.peer_id, second_peer);
+        self.peers.insert(first_peer.peer_id, first_peer_stat);
+        self.peers.insert(second_peer.peer_id, second_peer_stat);
     }
-}
 
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct AddStat {
-    pub peer_id: PeerId,
-    pub stat: Vec<RtcStat>,
-}
-
-impl Handler<AddStat> for PeerMetricsService {
-    type Result = ();
-
-    fn handle(&mut self, msg: AddStat, _: &mut Self::Context) -> Self::Result {
-        if let Some(peer) = self.peers.get(&msg.peer_id) {
+    pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+        if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
-            for stat in msg.stat {
+            for stat in stats {
                 match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
                         peer_ref.update_received(stat.id, inbound);
@@ -338,7 +313,7 @@ impl Handler<AddStat> for PeerMetricsService {
             } else if peer_ref.is_conforms_spec() {
                 self.metrics_service.do_send(TrafficFlows {
                     room_id: self.room_id.clone(),
-                    peer_id: msg.peer_id,
+                    peer_id,
                     source: FlowMetricSource::PeerTraffic,
                     timestamp: Instant::now(),
                 });
@@ -359,25 +334,11 @@ impl Handler<AddStat> for PeerMetricsService {
             }
         }
     }
-}
 
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct PeerRemoved {
-    pub peer_id: PeerId,
-}
-
-impl Handler<PeerRemoved> for PeerMetricsService {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: PeerRemoved,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        if self.peers.remove(&msg.peer_id).is_some() {
+    pub fn peer_removed(&mut self, peer_id: PeerId) {
+        if self.peers.remove(&peer_id).is_some() {
             self.metrics_service.do_send(TrafficStopped {
-                peer_id: msg.peer_id,
+                peer_id,
                 room_id: self.room_id.clone(),
                 timestamp: Instant::now(),
                 source: StoppedMetricSource::PeerRemoved,
