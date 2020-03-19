@@ -1067,9 +1067,9 @@ struct AddPeerConnectionMetrics {
 Related objects:
 ```rust
 pub enum PeerMetrics {
-    IceConnectionStateChanged(IceConnectionState),
-    PeerConnectionStateChanged(PeerConnectionState),
-    StatsUpdate(Vec<RtcStat>),
+    IceConnectionState(IceConnectionState),
+    PeerConnectionState(PeerConnectionState),
+    RtcStats(Vec<RtcStat>),
 }
 
 pub enum IceConnectionState {
@@ -1096,7 +1096,7 @@ pub enum PeerConnectionState {
 
 All types of the `RtcStat` object you can find [here](https://www.w3.org/TR/webrtc-stats/#rtcstatstype-str*).
 
-`Web Client` should send only updated `RtcStat`s in the `PeerMetrics::StatsUpdate` metric.
+`Web Client` should send only updated `RtcStat`s in the `PeerMetrics::RtcStats` metric.
 
 Metrics list will be extended as needed.
 
