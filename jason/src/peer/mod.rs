@@ -13,7 +13,7 @@ mod track;
 
 use std::{
     cell::RefCell,
-    collections::{hash_map::DefaultHasher, HashMap, HashSet},
+    collections::{hash_map::DefaultHasher, HashMap},
     convert::{From, TryFrom},
     hash::{Hash, Hasher},
     rc::Rc,
@@ -22,7 +22,7 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    self as proto, Direction, IceConnectionState, IceServer,
+    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
@@ -202,8 +202,12 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
-    /// Hashes of [`RtcStat`]s which was already sent to the server.
-    stats_cache: RefCell<HashSet<u64>>,
+    /// Last hashes of the all [`RtcStat`]s which was already sent to the
+    /// server, so we won't duplicate stats that were already sent.
+    ///
+    /// Stores precomputed hashes, since we don't need access to actual stats
+    /// values.
+    sent_stats_cache: RefCell<HashMap<StatId, u64>>,
 }
 
 impl PeerConnection {
@@ -241,7 +245,7 @@ impl PeerConnection {
             media_connections,
             media_manager,
             peer_events_sender,
-            stats_cache: RefCell::new(HashSet::new()),
+            sent_stats_cache: RefCell::new(HashMap::new()),
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(vec![]),
         };
@@ -294,17 +298,10 @@ impl PeerConnection {
         Ok(peer)
     }
 
-    /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
-    pub async fn send_peer_stats_scrape(&self) {
-        let stats = match self.peer.get_stats().await {
-            Ok(stats) => stats,
-            Err(e) => {
-                JasonError::from(e).print();
-                return;
-            }
-        };
-
-        let mut cache_mut = self.stats_cache.borrow_mut();
+    /// Filters already sent [`RtcStat`]s and send only new [`RtcStat`]s from
+    /// the provided [`RtcStats`].
+    pub async fn send_peer_stats(&self, stats: RtcStats) {
+        let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
             stats
                 .0
@@ -314,17 +311,39 @@ impl PeerConnection {
                     stat.stats.hash(&mut hasher);
                     let stat_hash = hasher.finish();
 
-                    cache_mut.insert(stat_hash)
+                    if let Some(last_hash) = stats_cache.get_mut(&stat.id) {
+                        if *last_hash == stat_hash {
+                            false
+                        } else {
+                            *last_hash = stat_hash;
+                            true
+                        }
+                    } else {
+                        stats_cache.insert(stat.id.clone(), stat_hash);
+                        true
+                    }
                 })
                 .collect(),
         );
 
-        let _ =
-            self.peer_events_sender
-                .unbounded_send(PeerEvent::StatsUpdate {
+        if !stats.0.is_empty() {
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::StatsUpdate {
                     peer_id: self.id,
                     stats,
-                });
+                },
+            );
+        }
+    }
+
+    /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
+    pub async fn send_peer_stats_update(&self) {
+        match self.peer.get_stats().await {
+            Ok(stats) => self.send_peer_stats(stats).await,
+            Err(e) => {
+                JasonError::from(e).print();
+            }
+        };
     }
 
     /// Returns [`RtcStats`] of this [`PeerConnection`].

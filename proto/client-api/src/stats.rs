@@ -76,7 +76,7 @@ pub enum RtcStatsType {
     /// Statistics for a codec that is currently being used by RTP streams
     /// being sent or received by this `RTCPeerConnection` object. It is
     /// accessed by the [`RtcCodecStats`].
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Codec(Box<RtcCodecStats>),
 
     /// Statistics for an inbound RTP stream that is currently received with
@@ -118,20 +118,20 @@ pub enum RtcStatsType {
 
     /// Statistics for a contributing source (CSRC) that contributed to an
     /// inbound RTP stream.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Csrc(Box<RtpContributingSourceStat>),
 
     /// Statistics related to the `RTCPeerConnection` object.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     PeerConnection(Box<RtcPeerConnectionStat>),
 
     /// Statistics related to each RTCDataChannel id.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     DataChannel(Box<DataChannelStat>),
 
     /// This is now obsolete. Contains statistics related to a specific
     /// MediaStream.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Stream(Box<MediaStreamStat>),
 
     /// Statistics related to a specific MediaStreamTrack's attachment to an
@@ -139,24 +139,23 @@ pub enum RtcStatsType {
     Track(Box<TrackStat>),
 
     /// Statistics related to a specific `RTCRtpTransceiver`.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Transceiver(Box<RtcRtpTransceiverStats>),
 
     /// Statistics related to a specific `RTCRtpSender` and the corresponding
     /// media-level metrics.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Sender(Box<SenderStatsKind>),
 
     /// Statistics related to a specific receiver and the corresponding
     /// media-level metrics.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Receiver(Box<ReceiverStatsKind>),
 
     /// Transport statistics related to the `RTCPeerConnection` object.
     Transport(Box<RtcTransportStats>),
 
     /// SCTP transport statistics related to an `RTCSctpTransport` object.
-    // maybe
     SctpTransport(Box<RtcSctpTransportStats>),
 
     /// ICE candidate pair statistics related to the `RTCIceTransport` objects.
@@ -193,11 +192,11 @@ pub enum RtcStatsType {
     RemoteCandidate(Box<RtcIceCandidateStats>),
 
     /// Information about a certificate used by an `RTCIceTransport`.
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     Certificate(Box<RtcCertificateStats>),
 
     /// Information about the connection to an ICE server (e.g. STUN or TURN).
-    #[cfg(feature = "unused-stats")]
+    #[cfg(feature = "extended-stats")]
     IceServer(Box<RtcIceServerStats>),
 
     /// Disabled or unknown variants of stats will be deserialized as
@@ -216,7 +215,7 @@ pub enum RtcStatsType {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#idl-def-rtcmediastreamstats
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct MediaStreamStat {
     /// `stream.id` property.
     #[serde(rename = "streamIdentifier")]
@@ -235,7 +234,7 @@ pub struct MediaStreamStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#dcstats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct DataChannelStat {
     /// The "label" value of the [`RTCDataChannel`] object.
     ///
@@ -342,7 +341,7 @@ pub enum KnownDataChannelState {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#pcstats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct RtcPeerConnectionStat {
     /// Represents the number of unique `DataChannel`s that have entered the
     /// "open" state during their lifetime.
@@ -376,7 +375,7 @@ pub struct RtcPeerConnectionStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#contributingsourcestats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct RtpContributingSourceStat {
     /// The SSRC identifier of the contributing source represented by this
     /// stats object, as defined by [RFC3550]. It is a 32-bit unsigned integer
@@ -425,7 +424,7 @@ pub struct RtpContributingSourceStat {
 /// `RTCPeerConnection` object. It is measured at the remote endpoint and
 /// reported in an RTCP Sender Report (SR).
 ///
-/// [`RtcStatsType::RemoteOutbountRtp`] variant.
+/// [`RtcStatsType::RemoteOutboundRtp`] variant.
 ///
 /// [Full doc on W3C][1]
 ///
@@ -516,7 +515,7 @@ pub struct RemoteInboundRtpStreamStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#transceiver-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct RtcRtpTransceiverStats {
     /// The identifier of the stats object representing the RTCRtpSender
     /// [associated with the `RTCRtpTransceiver`][1] represented by this stats
@@ -637,7 +636,7 @@ pub enum IceRole {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub enum SenderStatsKind {
     /// Represents [`RTCAudioSenderStats`] object.
     ///
@@ -663,7 +662,7 @@ pub enum SenderStatsKind {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub enum ReceiverStatsKind {
     /// Represents [`RTCAudioReceiverStats`] object.
     ///
@@ -902,7 +901,7 @@ pub enum RtcInboundRtpStreamMediaType {
         /// framesDecoded. `framesDecoded - keyFramesDecoded` gives you the
         /// number of delta frames decoded.
         ///
-        /// [RFC6385]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6386
+        /// [RFC6386]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6386
         /// [RFC6184]: https://www.w3.org/TR/webrtc-stats/#bib-rfc6184
         key_frames_decoded: Option<u64>,
 
@@ -1024,7 +1023,7 @@ pub struct TrackStat {
     /// Either `audio` or `video`.
     ///
     /// This reflects the `kind` attribute of the `MediaStreamTrack`.
-    pub kind: Option<String>,
+    pub kind: Option<TrackStatKind>,
 }
 
 /// Reflects the `kind` attribute of the `MediaStreamTrack`.
@@ -1233,7 +1232,7 @@ pub struct MediaSourceStat {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#dom-rtccodecstats
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct RtcCodecStats {
     /// Payload type as used in RTP encoding or decoding.
     pub payload_type: u32,
@@ -1254,7 +1253,7 @@ pub struct RtcCodecStats {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#certificatestats-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct RtcCertificateStats {
     /// The fingerprint of the certificate. Only use the fingerprint value as
     /// defined in Section 5 of [RFC4572].
@@ -1272,7 +1271,7 @@ pub struct RtcCertificateStats {
 
 /// Represents [`DOMHighResTimeStamp`].
 ///
-/// Can be converted to the [`SystemTime`] with accurate to the milliseconds.
+/// Can be converted to the [`SystemTime`] with millisecond-wise accuracy.
 ///
 /// The [`HighResTimeStamp`] type is a [`f32`] and is used to store a time value
 /// in milliseconds. This type can be used to describe a discrete point in time
@@ -1316,7 +1315,7 @@ impl PartialEq for HighResTimeStamp {
     }
 }
 
-/// Wrapped around [`f64`] for which implemented [`Hash`].
+/// [`f64`] wrapper with [`Hash`] implementation.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Float(pub f64);
 
@@ -1348,7 +1347,7 @@ impl PartialEq for Float {
 /// [1]: https://www.w3.org/TR/webrtc-stats/#ice-server-dict*
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "unused-stats")]
+#[cfg(feature = "extended-stats")]
 pub struct RtcIceServerStats {
     /// The URL of the ICE server (e.g. TURN or STUN server).
     pub url: String,

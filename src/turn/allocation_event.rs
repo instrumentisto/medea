@@ -196,7 +196,7 @@ impl CoturnEvent {
                 .next()
                 .ok_or(CoturnEventParseError::NoUserInfo)?;
             let mut user_splitted = user.split('_');
-            let room_id = RoomId(
+            let room_id = RoomId::from(
                 user_splitted
                     .next()
                     .ok_or(CoturnEventParseError::NoMemberId)?

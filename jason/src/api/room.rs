@@ -889,9 +889,7 @@ impl PeerEventHandler for InnerRoom {
     ) {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
-            metrics: PeerMetrics::IceConnectionStateChanged(
-                ice_connection_state,
-            ),
+            metrics: PeerMetrics::IceConnectionState(ice_connection_state),
         });
     }
 
@@ -904,13 +902,11 @@ impl PeerEventHandler for InnerRoom {
     ) {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
-            metrics: PeerMetrics::PeerConnectionStateChanged(
-                peer_connection_state,
-            ),
+            metrics: PeerMetrics::PeerConnectionState(peer_connection_state),
         });
 
         if let PeerConnectionState::Connected = peer_connection_state {
-            self.peers.send_peer_stats_scrape(peer_id);
+            self.peers.send_peer_stats(peer_id);
         }
     }
 
@@ -919,7 +915,7 @@ impl PeerEventHandler for InnerRoom {
     fn on_stats_update(&mut self, peer_id: PeerId, stats: RtcStats) {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
-            metrics: PeerMetrics::StatsUpdate(stats.0),
+            metrics: PeerMetrics::RtcStats(stats.0),
         });
     }
 }

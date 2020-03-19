@@ -42,7 +42,7 @@ dotenv = "0.15"
 failure = "0.1"
 variant_count = "1.0"
 futures = { version = "0.3", features = ["compat"] }
-humantime-serde = "0.1"
+humantime-serde = "1.0"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
@@ -78,6 +78,6 @@ awc = "1.0"
 derive_builder = "0.9"
 lazy_static = "1.4"
 mockall = "0.6"
-serial_test = "0.3"
-serial_test_derive = "0.3"
+serial_test = "0.4"
+serial_test_derive = "0.4"
 tempfile = "3.1"

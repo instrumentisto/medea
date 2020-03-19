@@ -281,7 +281,7 @@ impl ControlApi for ControlApiService {
         &self,
         request: tonic::Request<proto::CreateRequest>,
     ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
-        debug!("Create Request: {:?}", request);
+        debug!("Create gRPC Request: [{:?}]", request);
         let create_response =
             match self.create_element(request.into_inner()).await {
                 Ok(sid) => proto::CreateResponse { sid, error: None },
@@ -298,6 +298,7 @@ impl ControlApi for ControlApiService {
         &self,
         request: tonic::Request<proto::IdRequest>,
     ) -> Result<tonic::Response<proto::Response>, Status> {
+        debug!("Delete gRPC Request: [{:?}]", request);
         let response = match self.delete_element(request.into_inner()).await {
             Ok(_) => proto::Response { error: None },
             Err(e) => proto::Response {
@@ -312,6 +313,7 @@ impl ControlApi for ControlApiService {
         &self,
         request: tonic::Request<proto::IdRequest>,
     ) -> Result<tonic::Response<proto::GetResponse>, Status> {
+        debug!("Get gRPC Request: [{:?}]", request);
         let response = match self.get_element(request.into_inner()).await {
             Ok(elements) => proto::GetResponse {
                 elements,

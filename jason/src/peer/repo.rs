@@ -40,7 +40,7 @@ pub trait PeerRepository {
 
     /// Sends [`RtcStats`] update of [`PeerConnection`] with provided [`PeerId`]
     /// to the server.
-    fn send_peer_stats_scrape(&self, peer_id: PeerId);
+    fn send_peer_stats(&self, peer_id: PeerId);
 }
 
 /// [`PeerConnection`] factory and repository.
@@ -52,9 +52,9 @@ pub struct Repository {
     peers: Rc<RefCell<HashMap<PeerId, Rc<PeerConnection>>>>,
 
     /// [`TaskHandle`] for a task which will call
-    /// [`PeerConnection::send_peer_stats_scrape`] of all [`PeerConnection`]s
-    /// every second and send updated [`RtcStatType`] to the server.
-    stats_getter_task_handle: Option<TaskHandle>,
+    /// [`PeerConnection::send_peer_stats`] of all [`PeerConnection`]s
+    /// every second and send updated [`RtcStat`]s to the server.
+    stats_scrape_task: Option<TaskHandle>,
 }
 
 impl Repository {
@@ -64,29 +64,39 @@ impl Repository {
         let mut this = Self {
             media_manager,
             peers: Rc::new(RefCell::new(HashMap::new())),
-            stats_getter_task_handle: None,
+            stats_scrape_task: None,
         };
         this.schedule_peers_stats_scrape();
 
         this
     }
 
+    /// Schedules task which will call [`PeerConnection::send_peer_stats`] of
+    /// all [`PeerConnection`]s every second and send updated [`RtcStat`]s
+    /// to the server.
     fn schedule_peers_stats_scrape(&mut self) {
         let peers = self.peers.clone();
         let (fut, abort) = future::abortable(async move {
             loop {
                 delay_for(Duration::from_secs(1).into()).await;
 
-                for peer in peers.borrow().values() {
-                    peer.send_peer_stats_scrape().await;
-                }
+                future::join_all(
+                    peers
+                        .borrow()
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .iter()
+                        .map(|peer| peer.send_peer_stats_update()),
+                )
+                .await;
             }
         });
 
         spawn_local(async move {
             fut.await.ok();
         });
-        self.stats_getter_task_handle = Some(abort.into());
+        self.stats_scrape_task = Some(abort.into());
     }
 }
 
@@ -133,10 +143,12 @@ impl PeerRepository for Repository {
         self.peers.borrow().values().cloned().collect()
     }
 
-    fn send_peer_stats_scrape(&self, peer_id: PeerId) {
+    /// Sends [`RtcStats`] update of [`PeerConnection`] with provided [`PeerId`]
+    /// to the server.
+    fn send_peer_stats(&self, peer_id: PeerId) {
         if let Some(peer) = self.peers.borrow().get(&peer_id).cloned() {
             spawn_local(async move {
-                peer.send_peer_stats_scrape().await;
+                peer.send_peer_stats_update().await;
             });
         }
     }

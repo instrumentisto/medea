@@ -753,7 +753,13 @@ impl RpcClient for WebSocketRpcClient {
 
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
-            socket.send(&ClientMsg::Command(command)).unwrap();
+            if let Err(err) = socket.send(&ClientMsg::Command(command)) {
+                // TODO: we will just wait for reconnect at this moment
+                //       should be handled properly as a part of future
+                //       state synchronization mechanism
+                //       PR: https://github.com/instrumentisto/medea/pull/51
+                JasonError::from(err).print()
+            }
         }
     }
 

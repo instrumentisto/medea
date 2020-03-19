@@ -7,11 +7,12 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
-    RtcIceTransportPolicy, RtcPeerConnection as SysRtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
-    RtcSessionDescriptionInit, RtcTrackEvent,
+    Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
+    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
+    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcTrackEvent,
 };
 
 use crate::{
@@ -165,11 +166,11 @@ pub enum RTCPeerConnectionError {
     PeerConnectionEventBindFailed(EventListenerBindError),
 
     /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
-    #[display(fmt = "Failed to get RTCStats: {:?}", _0)]
-    RtcStatsError(RtcStatsError),
+    #[display(fmt = "Failed to get RTCStats: {}", _0)]
+    RtcStatsError(#[js(cause)] RtcStatsError),
 
     /// `PeerConnection.getStats()` promise thrown exception.
-    #[display(fmt = "PeerConnection.getStats() failed with error: {:?}", _0)]
+    #[display(fmt = "PeerConnection.getStats() failed with error: {}", _0)]
     GetStatsException(JsError),
 
     /// Occurs if the local description associated with the
@@ -264,13 +265,13 @@ impl RtcPeerConnection {
     where
         I: IntoIterator<Item = IceServer>,
     {
-        // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
         let policy = if is_force_relayed {
             RtcIceTransportPolicy::Relay
         } else {
             RtcIceTransportPolicy::All
         };
+        peer_conf.bundle_policy(RtcBundlePolicy::MaxBundle);
         peer_conf.ice_transport_policy(policy);
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
@@ -291,7 +292,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors wiht [`RTCPeerConnectionError::RtcStats`] if getting or parsing
+    /// Errors with [`RTCPeerConnectionError::RtcStats`] if getting or parsing
     /// of [`RtcStats`] fails.
     ///
     /// Errors with [`RTCPeerConncetionError::GetStatsException`] when

@@ -1090,7 +1090,7 @@ impl CommandHandler for Room {
         metrics: PeerMetrics,
     ) -> Self::Output {
         match metrics {
-            PeerMetrics::StatsUpdate(stats) => {
+            PeerMetrics::RtcStats(stats) => {
                 self.peer_metrics_service.add_stat(peer_id, stats);
             }
             _ => (),
@@ -1697,7 +1697,7 @@ mod test {
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
-            id: RoomId(String::from("test")),
+            id: RoomId::from("test"),
             pipeline: Pipeline::new(HashMap::new()),
         };
         let ctx = AppContext::new(

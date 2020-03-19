@@ -4,7 +4,6 @@
   <title>Chat</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fakerator@0.3.0/dist/fakerator.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
@@ -17,6 +16,7 @@
     let inited = false;
     const controlUrl = document.location.protocol + "//" +
                        document.location.host + "/control-api/";
+    const userNameCookieName = "MEDEA_DEMO_USER_NAME";
     var isForceRelay = false;
 
     async function createRoom(roomId) {
@@ -35,8 +35,6 @@
     }
 
     async function addNewMember(roomId, memberId) {
-      let controlRoom = await axios.get(controlUrl + roomId);
-      let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
       let pipeline = {
         publish: {
           kind: 'WebRtcPublishEndpoint',
@@ -45,11 +43,9 @@
         },
       };
 
-      let memberIds = [];
-
-      for (let i = 0; i < anotherMembers.length; i++) {
-        let memberId = anotherMembers[i];
-        memberIds.push(memberId);
+      var otherMembers = Object.keys((await axios.get(controlUrl + roomId)).data.element.pipeline);
+      for (let i = 0; i < otherMembers.length; i++) {
+        let memberId = otherMembers[i];
         pipeline["play-" + memberId] = {
           kind: 'WebRtcPlayEndpoint',
           src: 'local://' + roomId + '/' + memberId + "/publish",
@@ -67,9 +63,17 @@
         },
       });
 
+      // Here we repeat get room request to reduce possibility of concurrency
+      // bugs, e.g. another user was added to the room since first request.
+      let controlRoom = await axios.get(controlUrl + roomId);
+      var otherMembers = Object.keys(controlRoom.data.element.pipeline);
       var play_requests = [];
-      for (let i = 0; i < memberIds.length; i++) {
-        let id = memberIds[i];
+      for (let i = 0; i < otherMembers.length; i++) {
+        let id = otherMembers[i];
+
+        if (id === memberId) {
+          continue;
+        }
 
         let playRequest = axios({
           method: 'post',
@@ -165,7 +169,11 @@
 
       let joinCallerButton = document.getElementById('join__join');
       let usernameInput = document.getElementById('join__username');
-      usernameInput.value = Fakerator().names.firstNameM();
+
+      let userNameFromCookies = getCookie(userNameCookieName);
+      if (userNameFromCookies) {
+        usernameInput.value = userNameFromCookies;
+      }
 
       let room = await jason.init_room();
 
@@ -221,7 +229,7 @@
         connectionState.textContent = 'Reconnecting';
 
         try {
-          await reconnectHandle.reconnect_with_backoff(500, 2.0, 10000);
+          await reconnectHandle.reconnect_with_backoff(500, 1.1, 10000);
           connectionState.className = 'badge badge-success';
           connectionState.textContent = 'Connected';
         } catch (e) {
@@ -273,6 +281,8 @@
           let connectBtnsDiv = document.getElementById("join__join");
           connectBtnsDiv.style.display = 'none';
           controlBtns.style.display = 'block';
+
+          setCookie(userNameCookieName, usernameInput.value, 365);
 
           isForceRelay = isForceRelayCheckbox.checked;
           isForceRelayCheckbox.disabled = true;
@@ -348,6 +358,27 @@
         "[msg:", e.message(), "], [source", e.source(), "]]",
       );
       console.error(e.trace());
+    }
+
+    function setCookie(name, value, days) {
+      var expires = "";
+      if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+      }
+      document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    }
+
+    function getCookie(name) {
+      var nameEQ = name + "=";
+      var ca = document.cookie.split(';');
+      for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+      }
+      return null;
     }
   </script>
 

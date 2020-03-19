@@ -1,4 +1,12 @@
 //! Client API protocol implementation for Medea media server.
+//!
+//! ## Feature flags
+//!
+//! - `jason`: Enables [`Deserialize`] implementation for [`Event`]s, and
+//! [`Serialize`] implementation for [`Command`]s.
+//! - `medea`: Enables [`Deserialize`] implementation for [`Command`]s, and
+//! [`Serialize`] implementation for [`Event`]s.
+//! - `extended-stats`: Enables unused RTC Stats DTOs.
 
 pub mod stats;
 
@@ -134,7 +142,7 @@ pub enum Command {
         peer_id: PeerId,
         metrics: PeerMetrics,
     },
-    /// Web Client asks permission to update [`Track`]s in specified [`Peer`].
+    /// Web Client asks permission to update [`Track`]s in specified Peer.
     /// Media Server gives permission by sending [`Event::TracksUpdated`].
     UpdateTracks {
         peer_id: PeerId,
@@ -148,13 +156,13 @@ pub enum Command {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
-    IceConnectionStateChanged(IceConnectionState),
+    IceConnectionState(IceConnectionState),
 
     /// Peer Connection's connection state.
-    PeerConnectionStateChanged(PeerConnectionState),
+    PeerConnectionState(PeerConnectionState),
 
     /// Peer Connection's RTC stats.
-    StatsUpdate(Vec<RtcStat>),
+    RtcStats(Vec<RtcStat>),
 }
 
 /// Peer Connection's ICE connection state.
@@ -253,7 +261,7 @@ pub enum Event {
     PeersRemoved { peer_ids: Vec<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
-    /// [`Peer`].
+    /// Peer.
     ///
     /// Can be used to update existing [`Track`] settings (e.g. change to lower
     /// video resolution, mute audio).
