@@ -1063,7 +1063,7 @@ struct AddPeerConnectionMetrics {
     metrics: PeerMetrics,
 }
 ```
-// TODO: add some docs about RtcStat, no need to list every option
+
 Related objects:
 ```rust
 pub enum PeerMetrics {
@@ -1091,6 +1091,12 @@ pub enum PeerConnectionState {
     Connected,
 }
 ```
+
+`RtcStat` object represents [`RTCStats`](https://www.w3.org/TR/webrtc/#dom-rtcstats) dictionary from the WebRTC specification.
+
+All types of the `RtcStat` object you can find [here](https://www.w3.org/TR/webrtc-stats/#rtcstatstype-str*).
+
+`Web Client` should send only updated `RtcStat`s in the `PeerMetrics::StatsUpdate` metric.
 
 Metrics list will be extended as needed.
 

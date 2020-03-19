@@ -4,15 +4,22 @@ mod media;
 
 use std::rc::Rc;
 
-use futures::{channel::mpsc, StreamExt as _};
-use medea_client_api_proto::{IceConnectionState, PeerId, TrackId, TrackPatch};
+use futures::{channel::mpsc, Stream, StreamExt as _};
+use medea_client_api_proto::{
+    stats::{
+        HighResTimeStamp, KnownIceCandidatePairState, NonExhaustive,
+        RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
+        RtcStatsType, StatId, TrackStat, TrackStatKind,
+    },
+    IceConnectionState, PeerId, TrackId, TrackPatch,
+};
 use medea_jason::{
     media::MediaManager,
-    peer::{PeerConnection, PeerEvent},
+    peer::{PeerConnection, PeerEvent, RtcStats},
 };
 use wasm_bindgen_test::*;
 
-use crate::{get_test_tracks, resolve_after};
+use crate::{await_with_timeout, get_test_tracks, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -27,22 +34,6 @@ fn toggle_mute_tracks_updates(
             is_muted: Some(is_muted),
         })
         .collect()
-}
-
-/// Tests that [`RtcStats`] normally deserializes.
-#[wasm_bindgen_test]
-async fn get_stats() {
-    let (tx, _rx) = mpsc::unbounded();
-    let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, false);
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
-
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
-    // TODO: add asserts for all 'important' stats
-    assert!(!peer.get_stats().await.unwrap().0.is_empty());
 }
 
 const AUDIO_TRACK_ID: u64 = 1;
@@ -350,5 +341,293 @@ async fn ice_connection_state_changed_is_emitted() {
         if checking1 && checking2 && connected1 && connected2 {
             break;
         }
+    }
+}
+
+struct InterconnectedPeers {
+    pub first_peer: PeerConnection,
+    pub second_peer: PeerConnection,
+    pub peer_events_recv: Box<dyn Stream<Item = PeerEvent>>,
+}
+
+impl InterconnectedPeers {
+    pub async fn new() -> Self {
+        let (tx1, peer_events_stream1) = mpsc::unbounded();
+        let (tx2, peer_events_stream2) = mpsc::unbounded();
+
+        let manager = Rc::new(MediaManager::default());
+        let peer1 = PeerConnection::new(
+            PeerId(1),
+            tx1,
+            vec![],
+            Rc::clone(&manager),
+            false,
+        )
+        .unwrap();
+        let peer2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, false)
+            .unwrap();
+        let (audio_track, video_track) = get_test_tracks(false, false);
+
+        let offer = peer1
+            .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+            .await
+            .unwrap();
+        let answer = peer2
+            .process_offer(offer, vec![audio_track, video_track], None)
+            .await
+            .unwrap();
+        peer1.set_remote_answer(answer).await.unwrap();
+
+        resolve_after(1000).await.unwrap();
+
+        let mut events =
+            futures::stream::select(peer_events_stream1, peer_events_stream2);
+
+        let mut checking1 = false;
+        let mut checking2 = false;
+        let mut connected1 = false;
+        let mut connected2 = false;
+        while let Some(event) = events.next().await {
+            let event: PeerEvent = event;
+            match event {
+                PeerEvent::IceCandidateDiscovered {
+                    peer_id,
+                    candidate,
+                    sdp_m_line_index,
+                    sdp_mid,
+                } => {
+                    if peer_id.0 == 1 {
+                        peer2
+                            .add_ice_candidate(
+                                candidate,
+                                sdp_m_line_index,
+                                sdp_mid,
+                            )
+                            .await
+                            .unwrap();
+                    } else {
+                        peer1
+                            .add_ice_candidate(
+                                candidate,
+                                sdp_m_line_index,
+                                sdp_mid,
+                            )
+                            .await
+                            .unwrap();
+                    }
+                }
+                PeerEvent::IceConnectionStateChanged {
+                    peer_id,
+                    ice_connection_state,
+                } => match ice_connection_state {
+                    IceConnectionState::Checking => {
+                        if peer_id.0 == 1 {
+                            checking1 = true;
+                        } else {
+                            checking2 = true;
+                        }
+                    }
+                    IceConnectionState::Connected => {
+                        if peer_id.0 == 1 {
+                            connected1 = true;
+                        } else {
+                            connected2 = true;
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            };
+
+            if checking1 && checking2 && connected1 && connected2 {
+                break;
+            }
+        }
+
+        Self {
+            first_peer: peer1,
+            second_peer: peer2,
+            peer_events_recv: Box::new(events),
+        }
+    }
+}
+
+#[wasm_bindgen_test]
+async fn get_traffic_stats() {
+    let peers = InterconnectedPeers::new().await;
+
+    let first_peer_stats = peers.first_peer.get_stats().await.unwrap();
+    let mut first_peer_video_outbound_stats_count = 0;
+    let mut first_peer_audio_outbound_stats_count = 0;
+    for stat in first_peer_stats.0 {
+        match stat.stats {
+            RtcStatsType::OutboundRtp(outbound) => match outbound.media_type {
+                RtcOutboundRtpStreamMediaType::Audio { .. } => {
+                    first_peer_audio_outbound_stats_count += 1
+                }
+                RtcOutboundRtpStreamMediaType::Video { .. } => {
+                    first_peer_video_outbound_stats_count += 1
+                }
+            },
+            RtcStatsType::InboundRtp(_) => {
+                unreachable!("First Peer shouldn't have any InboundRtp stats.")
+            }
+            RtcStatsType::CandidatePair(candidate_pair) => {
+                assert_eq!(
+                    candidate_pair.state,
+                    NonExhaustive::Known(KnownIceCandidatePairState::Succeeded)
+                );
+            }
+            _ => (),
+        }
+    }
+    assert_eq!(first_peer_video_outbound_stats_count, 1);
+    assert_eq!(first_peer_audio_outbound_stats_count, 1);
+
+    let second_peer_stats = peers.second_peer.get_stats().await.unwrap();
+    let mut second_peer_video_inbound_stats_count = 0;
+    let mut second_peer_audio_inbound_stats_count = 0;
+    for stat in second_peer_stats.0 {
+        match stat.stats {
+            RtcStatsType::InboundRtp(inbound) => {
+                match inbound.media_specific_stats {
+                    RtcInboundRtpStreamMediaType::Audio { .. } => {
+                        second_peer_audio_inbound_stats_count += 1
+                    }
+                    RtcInboundRtpStreamMediaType::Video { .. } => {
+                        second_peer_video_inbound_stats_count += 1
+                    }
+                }
+            }
+            RtcStatsType::OutboundRtp(_) => unreachable!(
+                "Second Peer shouldn't have any OutboundRtp stats."
+            ),
+            RtcStatsType::CandidatePair(candidate_pair) => {
+                assert_eq!(
+                    candidate_pair.state,
+                    NonExhaustive::Known(KnownIceCandidatePairState::Succeeded)
+                );
+            }
+            _ => (),
+        }
+    }
+    assert_eq!(second_peer_video_inbound_stats_count, 1);
+    assert_eq!(second_peer_audio_inbound_stats_count, 1);
+}
+
+mod peer_stats_caching {
+    use super::*;
+
+    #[wasm_bindgen_test]
+    async fn works() {
+        let (tx, peer_events_stream) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+        let peer =
+            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+
+        let stat = RtcStat {
+            id: StatId("2ef2e34c".to_string()),
+            timestamp: HighResTimeStamp(1584373509700.0),
+            stats: RtcStatsType::Track(Box::new(TrackStat {
+                track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
+                kind: Some(TrackStatKind::Audio),
+                remote_source: None,
+                ended: Some(false),
+            })),
+        };
+        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+
+        let mut peer_events_stream = peer_events_stream.filter_map(|event| {
+            Box::pin(async move {
+                if let PeerEvent::StatsUpdate { peer_id: _, stats } = event {
+                    Some(stats)
+                } else {
+                    None
+                }
+            })
+        });
+        let first_rtc_stats = peer_events_stream.next().await.unwrap();
+        assert_eq!(first_rtc_stats.0[0], stat);
+
+        peer.send_peer_stats(RtcStats(vec![stat])).await;
+        await_with_timeout(Box::pin(peer_events_stream.next()), 100)
+            .await
+            .unwrap_err();
+    }
+
+    #[wasm_bindgen_test]
+    async fn takes_into_account_stat_id() {
+        let (tx, peer_events_stream) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+        let peer =
+            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+
+        let mut stat = RtcStat {
+            id: StatId("2ef2e34c".to_string()),
+            timestamp: HighResTimeStamp(1584373509700.0),
+            stats: RtcStatsType::Track(Box::new(TrackStat {
+                track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
+                kind: Some(TrackStatKind::Audio),
+                remote_source: None,
+                ended: Some(false),
+            })),
+        };
+        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+
+        let mut peer_events_stream = peer_events_stream.filter_map(|event| {
+            Box::pin(async move {
+                if let PeerEvent::StatsUpdate { peer_id: _, stats } = event {
+                    Some(stats)
+                } else {
+                    None
+                }
+            })
+        });
+        let first_rtc_stats = peer_events_stream.next().await.unwrap();
+        assert_eq!(first_rtc_stats.0[0], stat);
+
+        stat.id = StatId("3df3d34c".to_string());
+        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        let first_rtc_stats = peer_events_stream.next().await.unwrap();
+        assert_eq!(first_rtc_stats.0[0], stat);
+    }
+
+    #[wasm_bindgen_test]
+    async fn sends_updated_stats() {
+        let (tx, peer_events_stream) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+        let peer =
+            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+
+        let mut track_stat = Box::new(TrackStat {
+            track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
+            kind: Some(TrackStatKind::Audio),
+            remote_source: None,
+            ended: Some(false),
+        });
+        let mut stat = RtcStat {
+            id: StatId("2ef2e34c".to_string()),
+            timestamp: HighResTimeStamp(1584373509700.0),
+            stats: RtcStatsType::Track(track_stat.clone()),
+        };
+        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+
+        let mut peer_events_stream = peer_events_stream.filter_map(|event| {
+            Box::pin(async move {
+                if let PeerEvent::StatsUpdate { peer_id: _, stats } = event {
+                    Some(stats)
+                } else {
+                    None
+                }
+            })
+        });
+        let first_rtc_stats = peer_events_stream.next().await.unwrap();
+        assert_eq!(first_rtc_stats.0[0], stat);
+
+        track_stat.ended = Some(true);
+        stat.stats = RtcStatsType::Track(track_stat);
+        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        let first_rtc_stats = peer_events_stream.next().await.unwrap();
+        assert_eq!(first_rtc_stats.0[0], stat);
     }
 }

@@ -77,11 +77,16 @@ impl Repository {
             loop {
                 delay_for(Duration::from_secs(1).into()).await;
 
-                for peer in peers.borrow().values() {
-                    // TODO: dont await while holding ref, dont do sequential
-                    //       awaits if you can join them and run in parallel
-                    peer.send_peer_stats().await;
-                }
+                future::join_all(
+                    peers
+                        .borrow()
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .iter()
+                        .map(|peer| peer.send_peer_stats_update()),
+                )
+                .await;
             }
         });
 
@@ -135,11 +140,12 @@ impl PeerRepository for Repository {
         self.peers.borrow().values().cloned().collect()
     }
 
-    // TODO: docs?
+    /// Sends [`RtcStats`] update of [`PeerConnection`] with provided [`PeerId`]
+    /// to the server.
     fn send_peer_stats(&self, peer_id: PeerId) {
         if let Some(peer) = self.peers.borrow().get(&peer_id).cloned() {
             spawn_local(async move {
-                peer.send_peer_stats().await;
+                peer.send_peer_stats_update().await;
             });
         }
     }
