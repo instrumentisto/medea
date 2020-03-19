@@ -11,7 +11,8 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStat, TrackStatKind,
     },
-    IceConnectionState, PeerId, TrackId, TrackPatch,
+    AudioSettings, Direction, IceConnectionState, MediaType, PeerId, Track,
+    TrackId, TrackPatch, VideoSettings,
 };
 use medea_jason::{
     media::MediaManager,
@@ -20,6 +21,7 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{await_with_timeout, get_test_tracks, resolve_after};
+use std::pin::Pin;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -347,7 +349,7 @@ async fn ice_connection_state_changed_is_emitted() {
 struct InterconnectedPeers {
     pub first_peer: PeerConnection,
     pub second_peer: PeerConnection,
-    pub peer_events_recv: Box<dyn Stream<Item = PeerEvent>>,
+    pub peer_events_recv: Pin<Box<dyn Stream<Item = PeerEvent>>>,
 }
 
 impl InterconnectedPeers {
@@ -366,28 +368,39 @@ impl InterconnectedPeers {
         .unwrap();
         let peer2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, false)
             .unwrap();
-        let (audio_track, video_track) = get_test_tracks(false, false);
 
         let offer = peer1
-            .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+            .get_offer(Self::get_peer1_tracks(), None)
             .await
             .unwrap();
         let answer = peer2
-            .process_offer(offer, vec![audio_track, video_track], None)
+            .process_offer(offer, Self::get_peer2_tracks(), None)
             .await
             .unwrap();
         peer1.set_remote_answer(answer).await.unwrap();
 
         resolve_after(1000).await.unwrap();
 
-        let mut events =
+        let events =
             futures::stream::select(peer_events_stream1, peer_events_stream2);
 
+        let mut interconnected_peers = Self {
+            first_peer: peer1,
+            second_peer: peer2,
+            peer_events_recv: Box::pin(events),
+        };
+
+        interconnected_peers.handle_ice_candidates().await;
+
+        interconnected_peers
+    }
+
+    async fn handle_ice_candidates(&mut self) {
         let mut checking1 = false;
         let mut checking2 = false;
         let mut connected1 = false;
         let mut connected2 = false;
-        while let Some(event) = events.next().await {
+        while let Some(event) = self.peer_events_recv.next().await {
             let event: PeerEvent = event;
             match event {
                 PeerEvent::IceCandidateDiscovered {
@@ -397,7 +410,7 @@ impl InterconnectedPeers {
                     sdp_mid,
                 } => {
                     if peer_id.0 == 1 {
-                        peer2
+                        self.second_peer
                             .add_ice_candidate(
                                 candidate,
                                 sdp_m_line_index,
@@ -406,7 +419,7 @@ impl InterconnectedPeers {
                             .await
                             .unwrap();
                     } else {
-                        peer1
+                        self.first_peer
                             .add_ice_candidate(
                                 candidate,
                                 sdp_m_line_index,
@@ -443,15 +456,57 @@ impl InterconnectedPeers {
                 break;
             }
         }
+    }
 
-        Self {
-            first_peer: peer1,
-            second_peer: peer2,
-            peer_events_recv: Box::new(events),
-        }
+    fn get_peer1_tracks() -> Vec<Track> {
+        vec![
+            Track {
+                id: TrackId(1),
+                direction: Direction::Send {
+                    receivers: vec![PeerId(2)],
+                    mid: None,
+                },
+                media_type: MediaType::Audio(AudioSettings {}),
+                is_muted: false,
+            },
+            Track {
+                id: TrackId(2),
+                direction: Direction::Send {
+                    receivers: vec![PeerId(2)],
+                    mid: None,
+                },
+                media_type: MediaType::Video(VideoSettings {}),
+                is_muted: false,
+            },
+        ]
+    }
+
+    fn get_peer2_tracks() -> Vec<Track> {
+        vec![
+            Track {
+                id: TrackId(1),
+                direction: Direction::Recv {
+                    sender: PeerId(1),
+                    mid: None,
+                },
+                media_type: MediaType::Audio(AudioSettings {}),
+                is_muted: false,
+            },
+            Track {
+                id: TrackId(2),
+                direction: Direction::Recv {
+                    sender: PeerId(2),
+                    mid: None,
+                },
+                media_type: MediaType::Video(VideoSettings {}),
+                is_muted: false,
+            },
+        ]
     }
 }
 
+/// Tests that [`PeerConnection::get_stats`] works correctly and provides stats
+/// which we need at the moment.
 #[wasm_bindgen_test]
 async fn get_traffic_stats() {
     let peers = InterconnectedPeers::new().await;
@@ -515,9 +570,12 @@ async fn get_traffic_stats() {
     assert_eq!(second_peer_audio_inbound_stats_count, 1);
 }
 
+/// Tests for a [`RtcStat`]s caching mechanism of the [`PeerConnection`].
 mod peer_stats_caching {
     use super::*;
 
+    /// Tests that [`PeerConnection::send_peer_stats`] will send only one
+    /// [`RtcStat`] update when we try to send two identical [`RtcStat`]s.
     #[wasm_bindgen_test]
     async fn works() {
         let (tx, peer_events_stream) = mpsc::unbounded();
@@ -555,6 +613,9 @@ mod peer_stats_caching {
             .unwrap_err();
     }
 
+    /// Tests that [`PeerConnection::send_peer_stats`] will send two
+    /// [`RtcStat`]s updates with identical content but with different
+    /// [`StatId`]s.
     #[wasm_bindgen_test]
     async fn takes_into_account_stat_id() {
         let (tx, peer_events_stream) = mpsc::unbounded();
@@ -592,6 +653,9 @@ mod peer_stats_caching {
         assert_eq!(first_rtc_stats.0[0], stat);
     }
 
+    /// Tests that [`PeerConnection::send_peer_stats`] will send two
+    /// [`RtcStat`]s updates with different content, but with identical
+    /// [`StatId`].
     #[wasm_bindgen_test]
     async fn sends_updated_stats() {
         let (tx, peer_events_stream) = mpsc::unbounded();
