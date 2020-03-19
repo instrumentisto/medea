@@ -12,7 +12,7 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrlParseError,
-        endpoints::webrtc_play_endpoint::ValidationError,
+        endpoints::ValidationError,
         grpc::server::GrpcControlApiError,
         refs::{
             fid::ParseFidError, local_uri::LocalUriParseError,

@@ -24,9 +24,7 @@ use serde::Deserialize;
 use crate::{
     api::control::{
         callback::url::CallbackUrlParseError,
-        endpoints::webrtc_play_endpoint::{
-            Unvalidated, Validated, ValidationError,
-        },
+        endpoints::{Unvalidated, Validated, ValidationError},
     },
     log::prelude::*,
     signalling::room_service::{
@@ -82,8 +80,15 @@ pub enum TryFromProtobufError {
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
 
+    /// Occurs when callback is not supported while 'force_relay' is set to
+    /// false.
+    #[display(
+        fmt = "Callback is not supported while 'force_relay' is set to false."
+    )]
     CallbackNotSupportedInNotRelayMode,
 
+    /// Occurs when validation of a some element is failed.
+    #[display(fmt = "Validation of a some element is failed.")]
     SpecValidationError(ValidationError),
 }
 
@@ -121,6 +126,11 @@ pub enum RootElement<T> {
 }
 
 impl RootElement<Unvalidated> {
+    /// Tries to validate [`RootElement`].
+    ///
+    /// # Errors
+    ///
+    /// 1. [`ValidationError`] if underlying element fails validation.
     pub fn validate(self) -> Result<RootElement<Validated>, ValidationError> {
         match self {
             RootElement::Room { id, spec } => {
@@ -194,6 +204,11 @@ pub enum LoadStaticControlSpecsError {
     #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
     YamlDeserializationError(serde_yaml::Error),
 
+    /// Occurs when validation of a some element of a spec is failed.
+    #[display(
+        fmt = "Validation of a some element of a spec is failed. {}",
+        _0
+    )]
     SpecValidationError(ValidationError),
 }
 

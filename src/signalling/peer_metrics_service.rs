@@ -282,7 +282,7 @@ impl PeerStat {
             .values()
             .map(|send| send.last_update)
             .chain(self.receivers.values().map(|recv| recv.last_update))
-            .max()
+            .min()
             .unwrap_or_else(Instant::now)
     }
 
@@ -361,7 +361,6 @@ impl PeerMetricsService {
     /// [`PeerMetricsEvent::FatalPeerFailure`] will be sent to the subscriber.
     fn fatal_peer_error(&self, peer_id: PeerId) {
         if let Some(sender) = &self.peer_metric_events_sender {
-            // TODO: maybe print this to log??
             let _ = sender
                 .unbounded_send(PeerMetricsEvent::FatalPeerFailure(peer_id));
         }

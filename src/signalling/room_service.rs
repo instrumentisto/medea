@@ -123,6 +123,8 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
+    /// [`MetricsCallbacksService`] for all [`Room`]s from this
+    /// [`RoomService`].
     metrics_service: Addr<MetricsCallbacksService>,
 }
 

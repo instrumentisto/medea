@@ -50,8 +50,10 @@ struct WebRtcPlayEndpointInner {
     /// [`WebRtcPlayEndpoint`].
     is_force_relayed: bool,
 
+    /// URL to which `OnStart` Control API callback will be sent.
     on_start: Option<CallbackUrl>,
 
+    /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
 }
 
@@ -177,11 +179,13 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().is_force_relayed
     }
 
-    pub fn on_start(&self) -> Option<CallbackUrl> {
+    /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
+    pub fn get_on_start(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_start.clone()
     }
 
-    pub fn on_stop(&self) -> Option<CallbackUrl> {
+    /// Returns [`CallbackUrl`] to which Medea should send `OnStop` callback.
+    pub fn get_on_stop(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_stop.clone()
     }
 

@@ -5,15 +5,24 @@ use medea_client_api_proto::PeerId;
 
 use crate::api::control::RoomId;
 
+/// Traffic stats of some allocation.
 #[derive(Clone, Debug, Copy)]
 pub struct Traffic {
+    /// Count of packets received by allocation.
     pub received_packets: u64,
+
+    /// Count of bytes received by allocation.
     pub received_bytes: u64,
+
+    /// Count of packets received by allocation.
     pub sent_packets: u64,
+
+    /// Count of bytes sent by allocation.
     pub sent_bytes: u64,
 }
 
 impl Traffic {
+    /// Tries to parse [`Traffic`] stats from the provided [`str`].
     pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
         let mut items: HashMap<&str, u64> = body
             .split(", ")
@@ -284,7 +293,7 @@ pub enum CoturnEventParseError {
     #[display(fmt = "No MemberId metadata.")]
     NoMemberId,
 
-    /// No PeerId metadata.
+    /// No [`PeerId`] metadata.
     #[display(fmt = "No PeerId metadata.")]
     NoPeerId,
 

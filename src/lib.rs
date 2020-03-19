@@ -3,8 +3,6 @@
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
-// TODO: remove me
-#![allow(clippy::missing_errors_doc)]
 
 #[macro_use]
 pub mod utils;
@@ -46,8 +44,14 @@ pub struct AppContext {
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
 
+    /// Service which responsible for the `Peer` metrics based Control API
+    /// callbacks.
+    ///
+    /// Will be used for the all [`Room`]s.
     pub metrics_service: Addr<MetricsCallbacksService>,
 
+    /// Service which is responsible for processing [`PeerConnection`]'s
+    /// metrics received from the Coturn.
     pub coturn_metrics: Addr<CoturnMetrics>,
 }
 
@@ -57,7 +61,9 @@ impl AppContext {
     pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
         let metrics_service = MetricsCallbacksService::new().start();
         let coturn_metrics =
-            CoturnMetrics::new(&config.turn, metrics_service.clone()).start();
+            CoturnMetrics::new(&config.turn, metrics_service.clone())
+                .unwrap()
+                .start();
 
         Self {
             config: Arc::new(config),

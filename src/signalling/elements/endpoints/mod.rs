@@ -7,13 +7,19 @@ pub mod webrtc;
 use derive_more::From;
 use medea_control_api_proto::grpc::api as proto;
 
+use self::webrtc::{
+    play_endpoint::WeakWebRtcPlayEndpoint,
+    publish_endpoint::WeakWebRtcPublishEndpoint, WebRtcPlayEndpoint,
+    WebRtcPublishEndpoint,
+};
+
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
-    WebRtcPublishEndpoint(webrtc::WebRtcPublishEndpoint),
-    WebRtcPlayEndpoint(webrtc::WebRtcPlayEndpoint),
+    WebRtcPublishEndpoint(WebRtcPublishEndpoint),
+    WebRtcPlayEndpoint(WebRtcPlayEndpoint),
 }
 
 impl Into<proto::Element> for Endpoint {
@@ -25,13 +31,20 @@ impl Into<proto::Element> for Endpoint {
     }
 }
 
+/// Weak pointer to a some endpoint.
+///
+/// Can be upgraded to the [`Endpoint`] by calling [`WeakEndpoint::upgrade`].
 #[derive(Clone, Debug, From)]
 pub enum WeakEndpoint {
-    WebRtcPublishEndpoint(webrtc::publish_endpoint::WeakWebRtcPublishEndpoint),
-    WebRtcPlayEndpoint(webrtc::play_endpoint::WeakWebRtcPlayEndpoint),
+    /// Weak pointer to the [`WebRtcPublishEndpoint`].
+    WebRtcPublishEndpoint(WeakWebRtcPublishEndpoint),
+
+    /// Weak pointer to the [`WebRtcPlayEndpoint`].
+    WebRtcPlayEndpoint(WeakWebRtcPlayEndpoint),
 }
 
 impl WeakEndpoint {
+    /// Upgrades this weak pointer to a strong [`Endpoint`] pointer.
     pub fn upgrade(&self) -> Option<Endpoint> {
         match self {
             WeakEndpoint::WebRtcPublishEndpoint(publish_endpoint) => {

@@ -3,7 +3,10 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
@@ -35,8 +38,7 @@ use crate::{
                 OnStopEvent,
             },
             endpoints::{
-                webrtc_play_endpoint::Validated,
-                WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+                Validated, WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
             refs::{Fid, StatefulFid, ToEndpoint, ToMember},
@@ -59,7 +61,9 @@ use crate::{
             Member, MembersLoadError,
         },
         participants::{ParticipantService, ParticipantServiceErr},
-        peer_metrics_service::{PeerMetricsEventHandler, PeerMetricsService},
+        peer_metrics_service::{
+            PeerMetricsEvent, PeerMetricsEventHandler, PeerMetricsService,
+        },
         peers::PeerRepository,
     },
     utils::ResponseActAnyFuture,
@@ -67,8 +71,6 @@ use crate::{
 };
 
 use super::elements::endpoints::Endpoint;
-use crate::signalling::peer_metrics_service::PeerMetricsEvent;
-use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -370,16 +372,16 @@ impl Room {
                 move |(publisher, receiver)| {
                     peers.connect_endpoints(&publisher, &receiver).map(
                         |(publisher_peer_id, receiver_peer_id)| {
-                            if publisher.on_start().is_some()
-                                || publisher.on_stop().is_some()
+                            if publisher.get_on_start().is_some()
+                                || publisher.get_on_stop().is_some()
                             {
                                 metrics_service.do_send(mcs::SubscribePeer {
                                     peer_id: publisher_peer_id,
                                     room_id: room_id.clone(),
                                 });
                             }
-                            if receiver.on_start().is_some()
-                                || receiver.on_stop().is_some()
+                            if receiver.get_on_start().is_some()
+                                || receiver.get_on_stop().is_some()
                             {
                                 metrics_service.do_send(mcs::SubscribePeer {
                                     peer_id: receiver_peer_id,
@@ -1147,7 +1149,7 @@ impl Handler<PeerStarted> for Room {
                         Endpoint::WebRtcPublishEndpoint(publish) => {
                             publish.change_peer_status(peer_id, true);
                             if publish.publishing_peers_count() == 1 {
-                                if let Some(on_start) = publish.on_start() {
+                                if let Some(on_start) = publish.get_on_start() {
                                     let fid =
                                         publish.owner().get_fid_to_endpoint(
                                             publish.id().into(),
@@ -1157,7 +1159,7 @@ impl Handler<PeerStarted> for Room {
                             }
                         }
                         Endpoint::WebRtcPlayEndpoint(play) => {
-                            if let Some(on_start) = play.on_start() {
+                            if let Some(on_start) = play.get_on_start() {
                                 let fid = play
                                     .owner()
                                     .get_fid_to_endpoint(play.id().into());
@@ -1202,7 +1204,7 @@ impl Handler<PeerStopped> for Room {
                         Endpoint::WebRtcPublishEndpoint(publish) => {
                             publish.change_peer_status(peer_id, false);
                             if publish.publishing_peers_count() == 0 {
-                                if let Some(on_stop) = publish.on_stop() {
+                                if let Some(on_stop) = publish.get_on_stop() {
                                     let fid =
                                         publish.owner().get_fid_to_endpoint(
                                             publish.id().into(),
@@ -1212,7 +1214,7 @@ impl Handler<PeerStopped> for Room {
                             }
                         }
                         Endpoint::WebRtcPlayEndpoint(play) => {
-                            if let Some(on_stop) = play.on_stop() {
+                            if let Some(on_stop) = play.get_on_stop() {
                                 let fid = play
                                     .owner()
                                     .get_fid_to_endpoint(play.id().into());
@@ -1670,7 +1672,7 @@ impl Handler<PeerSpecContradiction> for Room {
         msg: PeerSpecContradiction,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        println!(
+        error!(
             "Real state of Peer [id = {}] from Room [id = {}] has fatal \
              contradiction with spec!",
             msg.peer_id, self.id

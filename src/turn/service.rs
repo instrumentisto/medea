@@ -20,6 +20,7 @@ use crate::{
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         repo::{TurnDatabase, TurnDatabaseErr},
+        CoturnUsername,
     },
 };
 
@@ -65,6 +66,8 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Deletes batch of [`IceUser`]s.
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr>;
 
+    /// Returns [`Session`]s of the Coturn user created for a provided
+    /// [`RoomId`] and [`PeerId`].
     async fn get_sessions(
         &self,
         room_id: RoomId,
@@ -157,6 +160,8 @@ impl TurnAuthService for Service {
         Ok(())
     }
 
+    /// Returns [`Session`]s of the Coturn user created for a provided
+    /// [`RoomId`] and [`PeerId`].
     async fn get_sessions(
         &self,
         room_id: RoomId,
@@ -164,7 +169,7 @@ impl TurnAuthService for Service {
     ) -> Result<Vec<Session>, TurnServiceErr> {
         Ok(self
             .coturn_cli
-            .get_sessions(format!("{}_{}", room_id, peer_id))
+            .get_sessions(CoturnUsername { room_id, peer_id })
             .await?)
     }
 }

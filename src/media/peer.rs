@@ -240,6 +240,7 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
+    /// Returns [`PeerSpec`] of this [`PeerConnection`].
     pub fn get_spec(&self) -> peer_metrics_service::PeerSpec {
         let senders = self
             .context

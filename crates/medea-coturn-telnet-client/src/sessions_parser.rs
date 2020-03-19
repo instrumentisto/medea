@@ -306,7 +306,7 @@ fn coturn_stat<'a>(
 }
 
 /// Tries to parse address.
-fn address<'a>(input: &'a str) -> IResult<&'a str, &'a str> {
+fn address(input: &str) -> IResult<&str, &str> {
     is_a("1234567890.:[]")(input)
 }
 

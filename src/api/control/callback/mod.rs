@@ -69,6 +69,7 @@ impl Into<proto::OnJoin> for OnJoinEvent {
     }
 }
 
+/// `on_start` callback for the Control API.
 #[derive(Debug)]
 pub struct OnStartEvent {}
 
@@ -78,6 +79,7 @@ impl Into<proto::OnStart> for OnStartEvent {
     }
 }
 
+/// `on_stop` callback for the Control API.
 #[derive(Debug)]
 pub struct OnStopEvent {}
 

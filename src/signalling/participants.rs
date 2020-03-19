@@ -251,8 +251,6 @@ impl ParticipantService {
                     .map(move |_| Ok(member)),
             ))
         } else {
-            // TODO: here was turn_service user creating. Maybe it needed
-            // here???
             self.insert_connection(member_id, conn);
             Box::new(wrap_future(future::ok(member)))
         }

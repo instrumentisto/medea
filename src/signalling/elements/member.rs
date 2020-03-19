@@ -17,10 +17,7 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        endpoints::{
-            webrtc_play_endpoint::Validated,
-            WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        },
+        endpoints::{Validated, WebRtcPlayEndpoint as WebRtcPlayEndpointSpec},
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, WebRtcPlayId, WebRtcPublishId,

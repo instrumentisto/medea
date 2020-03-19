@@ -14,10 +14,9 @@ use serde::Deserialize;
 use crate::api::control::{
     callback::url::CallbackUrl,
     endpoints::{
-        webrtc_play_endpoint::{
-            Unvalidated, Validated, ValidationError, WebRtcPlayEndpoint,
-        },
+        webrtc_play_endpoint::WebRtcPlayEndpoint,
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+        Unvalidated, Validated, ValidationError,
     },
     pipeline::Pipeline,
     room::RoomElement,
@@ -53,6 +52,11 @@ pub enum MemberElement<T> {
 }
 
 impl MemberElement<Unvalidated> {
+    /// Validates [`MemberElement`].
+    ///
+    /// # Errors
+    ///
+    /// 1. Returns [`ValidationError`] if underlying endpoint fails validation.
     pub fn validate(self) -> Result<MemberElement<Validated>, ValidationError> {
         match self {
             MemberElement::WebRtcPublishEndpoint { spec } => {

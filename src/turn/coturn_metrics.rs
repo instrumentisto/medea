@@ -5,29 +5,18 @@ use std::{collections::HashMap, time::Instant};
 
 use actix::{Actor, Addr, AsyncContext, StreamHandler, WrapFuture};
 use futures::{channel::mpsc, StreamExt as _};
-use medea_client_api_proto::PeerId;
 use patched_redis::ConnectionInfo;
 
 use crate::{
-    api::control::{
-        callback::metrics_callback_service::{
-            FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
-            TrafficFlows, TrafficStopped,
-        },
-        RoomId,
+    api::control::callback::metrics_callback_service::{
+        FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
+        TrafficFlows, TrafficStopped,
     },
-    turn::allocation_event::{CoturnAllocationEvent, CoturnEvent},
+    turn::{
+        allocation_event::{CoturnAllocationEvent, CoturnEvent},
+        CoturnUsername,
+    },
 };
-
-/// Username of the Coturn user.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct CoturnUsername {
-    /// [`RoomId`] of [`Room`] for which this Coturn user is created.
-    pub room_id: RoomId,
-
-    /// [`PeerId`] of [`PeerConnection`] for which this Coturn user is created.
-    pub peer_id: PeerId,
-}
 
 /// Service which is responsible for processing [`PeerConnection`]'s metrics
 /// received from the Coturn.
@@ -49,7 +38,7 @@ impl CoturnMetrics {
     pub fn new(
         cf: &crate::conf::turn::Turn,
         metrics_service: Addr<MetricsCallbacksService>,
-    ) -> Self {
+    ) -> Result<Self, patched_redis::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(patched_redis::ConnectionAddr::Tcp(
                 cf.db.redis.host.to_string(),
@@ -62,16 +51,20 @@ impl CoturnMetrics {
                 Some(cf.db.redis.pass.to_string())
             },
         };
-        // TODO: UNWRAP
-        let client = patched_redis::Client::open(connection_info).unwrap();
+        let client = patched_redis::Client::open(connection_info)?;
 
-        Self {
+        Ok(Self {
             metrics_service,
             client,
             allocations_count: HashMap::new(),
-        }
+        })
     }
 
+    /// Opens new Redis connection, subscribes to the Coturn events and adds
+    /// [`Stream`] with this events to the provided [`Context`].
+    ///
+    /// This function can be used to connect [`CoturnMetrics`] to the Redis or
+    /// to restart this connection if it old connection is lost.
     fn add_redis_stream(&mut self, ctx: &mut <Self as Actor>::Context) {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();

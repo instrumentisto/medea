@@ -10,9 +10,7 @@ use serde::Deserialize;
 
 use crate::api::control::{
     callback::url::CallbackUrl,
-    endpoints::webrtc_play_endpoint::{
-        Unvalidated, Validated, ValidationError,
-    },
+    endpoints::{Unvalidated, Validated, ValidationError},
     EndpointId, TryFromProtobufError,
 };
 
@@ -47,6 +45,11 @@ pub enum RoomElement<T> {
 }
 
 impl RoomElement<Unvalidated> {
+    /// Tries to validate [`RoomElement`].
+    ///
+    /// # Errors
+    ///
+    /// 1. [`ValidationError`] if underlying element fails validation.
     pub fn validate(self) -> Result<RoomElement<Validated>, ValidationError> {
         match self {
             RoomElement::Member {

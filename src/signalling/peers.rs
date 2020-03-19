@@ -31,10 +31,14 @@ use crate::{
 
 #[derive(Debug)]
 pub struct PeerRepository {
+    /// [`RoomId`] of [`Room`] which owns this [`PeerRepository`].
     room_id: RoomId,
 
+    /// [`IceUser`]s for all [`PeerConnection`] of this [`PeerRepository`].
     ice_users: Rc<RefCell<HashMap<PeerId, IceUser>>>,
 
+    /// [`TurnAuthService`] with which [`IceUser`]s for the [`PeerConnection`]s
+    /// from this [`PeerRepository`] will be created.
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -54,6 +58,8 @@ pub struct PeerRepository {
     /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
 
+    /// Weak references to the [`Endpoint`]s for which [`PeerConnection`] is
+    /// created.
     peers_endpoints: HashMap<PeerId, Vec<WeakEndpoint>>,
 }
 

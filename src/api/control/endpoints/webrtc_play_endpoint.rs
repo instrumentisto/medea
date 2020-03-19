@@ -5,7 +5,6 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
-use failure::Fail;
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -13,22 +12,13 @@ use crate::api::control::{
     callback::url::CallbackUrl, refs::SrcUri, TryFromProtobufError,
 };
 
+use super::{Unvalidated, Validated, ValidationError};
+
 /// ID of [`WebRtcPlayEndpoint`].
 #[derive(
     Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From, Into,
 )]
 pub struct WebRtcPlayId(String);
-
-#[derive(Debug, Default, Clone)]
-pub struct Unvalidated;
-
-#[derive(Debug, Clone)]
-pub struct Validated;
-
-#[derive(Debug, Fail, Display)]
-pub enum ValidationError {
-    ForceRelayShouldBeEnabled,
-}
 
 /// Media element which is able to play media data for client via WebRTC.
 #[derive(Clone, Deserialize, Debug)]
@@ -36,19 +26,38 @@ pub struct WebRtcPlayEndpoint<T> {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SrcUri,
 
+    /// URL to which `OnStart` Control API callback will be sent.
     pub on_start: Option<CallbackUrl>,
 
+    /// URL to which `OnStop` Control API callback will be sent.
     pub on_stop: Option<CallbackUrl>,
 
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
     pub force_relay: bool,
 
+    /// Validation state of the [`WebRtcPlayEndpoint`].
+    ///
+    /// Can be [`Validated`] or [`Unvalidated`].
+    ///
+    /// [`serde`] will deserialize [`WebRtcPlayEndpoint`] into [`Unvalidated`]
+    /// state. Converting from the gRPC's DTOs will cause the same behavior.
+    ///
+    /// To use [`WebRtcPlayEndpoint`] you should call
+    /// [`WebRtcPlayEndpoint::validate`].
     #[serde(skip)]
     _validation_state: T,
 }
 
 impl WebRtcPlayEndpoint<Unvalidated> {
+    /// Validates this [`WebRtcPlayEndpoint`].
+    ///
+    /// # Errors
+    ///
+    /// 1. Returns [`ValidationError::ForceRelayShouldBeEnabled`] if
+    ///    [`WebRtcPlayEndpoint::on_start`] or [`WebRtcPlayEndpoint::
+    ///    on_stop`] is set, but [`WebRtcPlayEndpoint::force_relay`] is set to
+    ///    `false`.
     pub fn validate(
         self,
     ) -> Result<WebRtcPlayEndpoint<Validated>, ValidationError> {

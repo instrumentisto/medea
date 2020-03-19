@@ -15,7 +15,7 @@ use medea_coturn_telnet_client::{
     CoturnTelnetError,
 };
 
-use crate::media::IceUser;
+use crate::{media::IceUser, turn::CoturnUsername};
 
 /// Possible errors returned by [`CoturnTelnetClient`].
 #[derive(Display, Debug, Fail, From)]
@@ -71,13 +71,15 @@ impl CoturnTelnetClient {
         Ok(())
     }
 
+    /// Returns [`Session`]s of the Coturn user with provided
+    /// [`CoturnUsername`].
     pub async fn get_sessions(
         &self,
-        username: String,
+        username: CoturnUsername,
     ) -> Result<Vec<Session>, CoturnCliError> {
         let mut connection = self.0.get().await?;
 
-        Ok(connection.print_sessions(username).await?)
+        Ok(connection.print_sessions(username.to_string()).await?)
     }
 }
 

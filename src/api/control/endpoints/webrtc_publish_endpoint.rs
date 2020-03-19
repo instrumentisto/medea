@@ -8,13 +8,9 @@ use derive_more::{Display, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use crate::api::control::{
-    callback::url::CallbackUrl,
-    endpoints::webrtc_play_endpoint::{
-        Unvalidated, Validated, ValidationError,
-    },
-    TryFromProtobufError,
-};
+use crate::api::control::{callback::url::CallbackUrl, TryFromProtobufError};
+
+use super::{Unvalidated, Validated, ValidationError};
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(
@@ -68,15 +64,35 @@ pub struct WebRtcPublishEndpoint<T> {
     #[serde(default)]
     pub force_relay: bool,
 
+    /// URL to which `OnStart` Control API callback will be sent.
     pub on_start: Option<CallbackUrl>,
 
+    /// URL to which `OnStop` Control API callback will be sent.
     pub on_stop: Option<CallbackUrl>,
 
+    /// Validation state of the [`WebRtcPublishEndpoint`].
+    ///
+    /// Can be [`Validated`] or [`Unvalidated`].
+    ///
+    /// [`serde`] will deserialize [`WebRtcPublishEndpoint`] into
+    /// [`Unvalidated`] state. Converting from the gRPC's DTOs will cause
+    /// the same behavior.
+    ///
+    /// To use [`WebRtcPunblishEndpoint`] you should call
+    /// [`WebRtcPunblishEndpoint::validate`].
     #[serde(skip)]
     _validation_state: T,
 }
 
 impl WebRtcPublishEndpoint<Unvalidated> {
+    /// Validates this [`WebRtcPublishEndpoint`].
+    ///
+    /// # Errors
+    ///
+    /// 1. Returns [`ValidationError::ForceRelayShouldBeEnabled`] if
+    ///    [`WebRtcPublishEndpoint::on_start`] or [`WebRtcPublishEndpoint::
+    ///    on_stop`] is set, but [`WebRtcPlayEndpoint::force_relay`] is set to
+    ///    `false`.
     pub fn validate(
         self,
     ) -> Result<WebRtcPublishEndpoint<Validated>, ValidationError> {

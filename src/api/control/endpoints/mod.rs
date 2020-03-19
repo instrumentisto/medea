@@ -8,10 +8,9 @@ pub mod webrtc_publish_endpoint;
 use std::convert::TryFrom;
 
 use derive_more::{Display, From, Into};
+use failure::Fail;
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
-
-use crate::api::control::endpoints::webrtc_play_endpoint::Validated;
 
 use super::{member::MemberElement, TryFromProtobufError};
 
@@ -44,6 +43,26 @@ macro_rules! impl_from_into {
 
 impl_from_into!(WebRtcPublishId);
 impl_from_into!(WebRtcPlayId);
+
+/// Validation state of the [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`].
+///
+/// Indicates that endpoint needs validation and can't be used.
+#[derive(Debug, Default, Clone)]
+pub struct Unvalidated;
+
+/// Validation state of the [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`].
+///
+/// Indicates that is validated and can be used.
+#[derive(Debug, Clone)]
+pub struct Validated;
+
+/// Errors which can occur while endpoint validation.
+#[derive(Debug, Fail, Display)]
+pub enum ValidationError {
+    /// `OnStart` or `OnStop` callback is set, but `force_relay` field is set
+    /// to false.
+    ForceRelayShouldBeEnabled,
+}
 
 /// Media element that one or more media data streams flow through.
 #[derive(Debug, From)]
