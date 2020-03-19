@@ -156,7 +156,6 @@ pub enum RtcStatsType {
     Transport(Box<RtcTransportStats>),
 
     /// SCTP transport statistics related to an `RTCSctpTransport` object.
-    // maybe
     SctpTransport(Box<RtcSctpTransportStats>),
 
     /// ICE candidate pair statistics related to the `RTCIceTransport` objects.

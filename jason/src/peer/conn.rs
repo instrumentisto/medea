@@ -166,11 +166,11 @@ pub enum RTCPeerConnectionError {
     PeerConnectionEventBindFailed(EventListenerBindError),
 
     /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
-    #[display(fmt = "Failed to get RTCStats: {:?}", _0)]
-    RtcStatsError(RtcStatsError),
+    #[display(fmt = "Failed to get RTCStats: {}", _0)]
+    RtcStatsError(#[js(cause)] RtcStatsError),
 
     /// `PeerConnection.getStats()` promise thrown exception.
-    #[display(fmt = "PeerConnection.getStats() failed with error: {:?}", _0)]
+    #[display(fmt = "PeerConnection.getStats() failed with error: {}", _0)]
     GetStatsException(JsError),
 
     /// Occurs if the local description associated with the
@@ -292,7 +292,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors wiht [`RTCPeerConnectionError::RtcStats`] if getting or parsing
+    /// Errors with [`RTCPeerConnectionError::RtcStats`] if getting or parsing
     /// of [`RtcStats`] fails.
     ///
     /// Errors with [`RTCPeerConncetionError::GetStatsException`] when

@@ -22,7 +22,7 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    self as proto, Direction, IceConnectionState, IceServer,
+    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
@@ -55,7 +55,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
-use medea_client_api_proto::stats::StatId;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -203,9 +202,11 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
-    /// Hashes of [`RtcStat`]s which was already sent to the server, so we wont
-    /// duplicate stats that were already sent. Stores precomputed hashes,
-    /// since we don't need access to actual stats values.
+    /// Last hashes of the all [`RtcStat`]s which was already sent to the
+    /// server, so we won't duplicate stats that were already sent.
+    ///
+    /// Stores precomputed hashes, since we don't need access to actual stats
+    /// values.
     sent_stats_cache: RefCell<HashMap<StatId, u64>>,
 }
 
@@ -297,8 +298,8 @@ impl PeerConnection {
         Ok(peer)
     }
 
-    /// Filters already sent [`RtcStat`]s and send only new stats from the
-    /// provided [`RtcStats`].
+    /// Filters already sent [`RtcStat`]s and send only new [`RtcStat`]s from
+    /// the provided [`RtcStats`].
     pub async fn send_peer_stats(&self, stats: RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(

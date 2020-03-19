@@ -2,7 +2,7 @@
 
 mod media;
 
-use std::rc::Rc;
+use std::{pin::Pin, rc::Rc};
 
 use futures::{channel::mpsc, Stream, StreamExt as _};
 use medea_client_api_proto::{
@@ -21,7 +21,6 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{await_with_timeout, get_test_tracks, resolve_after};
-use std::pin::Pin;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -346,13 +345,24 @@ async fn ice_connection_state_changed_is_emitted() {
     }
 }
 
+/// Two interconnected [`PeerConnection`]s for the test purposes.
+///
+/// `first_peer`
 struct InterconnectedPeers {
+    /// This [`PeerConnection`] will have one `video` track with `send`
+    /// direction and one `audio` track with `send` direction.
     pub first_peer: PeerConnection,
+
+    /// This [`PeerConnection`] will have one `video` track with `recv`
+    /// direction and one `audio` track with `recv` direction.
     pub second_peer: PeerConnection,
+
+    /// All [`PeerEvent`]s of this two interconnected [`PeerConnection`]s.
     pub peer_events_recv: Pin<Box<dyn Stream<Item = PeerEvent>>>,
 }
 
 impl InterconnectedPeers {
+    /// Creates new interconnected [`PeerConnection`]s.
     pub async fn new() -> Self {
         let (tx1, peer_events_stream1) = mpsc::unbounded();
         let (tx2, peer_events_stream2) = mpsc::unbounded();
@@ -395,6 +405,12 @@ impl InterconnectedPeers {
         interconnected_peers
     }
 
+    /// Handles [`PeerEvent::IceCandidateDiscovered`] and
+    /// [`PeerEvent::IceConnectionStateChange`] events.
+    ///
+    /// This [`Future`] will be resolved when all needed ICE candidates will be
+    /// received and [`PeerConnection`]'s ICE connection state will transit into
+    /// [`IceConnectionState::Connected`].
     async fn handle_ice_candidates(&mut self) {
         let mut checking1 = false;
         let mut checking2 = false;
@@ -458,6 +474,7 @@ impl InterconnectedPeers {
         }
     }
 
+    /// Returns [`Track`]s for the `first_peer`.
     fn get_peer1_tracks() -> Vec<Track> {
         vec![
             Track {
@@ -481,6 +498,7 @@ impl InterconnectedPeers {
         ]
     }
 
+    /// Returns [`Track`]s for the `second_peer`.
     fn get_peer2_tracks() -> Vec<Track> {
         vec![
             Track {

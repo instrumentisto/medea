@@ -53,7 +53,7 @@ pub struct Repository {
 
     /// [`TaskHandle`] for a task which will call
     /// [`PeerConnection::send_peer_stats`] of all [`PeerConnection`]s
-    /// every second and send updated [`RtcStatType`] to the server.
+    /// every second and send updated [`RtcStat`]s to the server.
     stats_scrape_task: Option<TaskHandle>,
 }
 
@@ -71,6 +71,9 @@ impl Repository {
         this
     }
 
+    /// Schedules task which will call [`PeerConnection::send_peer_stats`] of
+    /// all [`PeerConnection`]s every second and send updated [`RtcStat`]s
+    /// to the server.
     fn schedule_peers_stats_scrape(&mut self) {
         let peers = self.peers.clone();
         let (fut, abort) = future::abortable(async move {
