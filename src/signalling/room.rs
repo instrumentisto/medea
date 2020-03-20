@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _,
+    fut::Either, Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _,
+    Handler, Message, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -58,7 +58,6 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
-use actix::fut::Either;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
