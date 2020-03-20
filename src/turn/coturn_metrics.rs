@@ -32,6 +32,10 @@ pub struct CoturnMetrics {
 
 impl CoturnMetrics {
     /// Returns new [`CoturnMetrics`] service.
+    ///
+    /// # Errors
+    ///
+    /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
     ) -> Result<Self, patched_redis::RedisError> {

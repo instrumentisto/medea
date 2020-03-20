@@ -58,6 +58,7 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
+use actix::fut::Either;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -263,18 +264,24 @@ impl Room {
 
         Ok(Box::new(fut.into_actor(self).then(
             move |ice_user, this, _| {
-                let sender = this.peers.get_peer_by_id(sender_peer_id).unwrap();
-                let peer_created = Event::PeerCreated {
-                    peer_id: sender.id(),
-                    sdp_offer: None,
-                    tracks: sender.tracks(),
-                    ice_servers: ice_user.servers_list(),
-                    force_relay: sender.is_force_relayed(),
-                };
+                match this.peers.get_peer_by_id(sender_peer_id) {
+                    Ok(sender) => {
+                        let peer_created = Event::PeerCreated {
+                            peer_id: sender.id(),
+                            sdp_offer: None,
+                            tracks: sender.tracks(),
+                            ice_servers: ice_user.servers_list(),
+                            force_relay: sender.is_force_relayed(),
+                        };
 
-                this.members
-                    .send_event_to_member(member_id, peer_created)
-                    .into_actor(this)
+                        Either::Left(
+                            this.members
+                                .send_event_to_member(member_id, peer_created)
+                                .into_actor(this),
+                        )
+                    }
+                    Err(e) => Either::Right(actix::fut::err(e)),
+                }
             },
         )))
     }
