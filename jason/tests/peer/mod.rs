@@ -611,7 +611,7 @@ mod peer_stats_caching {
                 ended: Some(false),
             })),
         };
-        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        peer.send_peer_stats(RtcStats(vec![stat.clone()]));
 
         let mut peer_events_stream = peer_events_stream.filter_map(|event| {
             Box::pin(async move {
@@ -625,7 +625,7 @@ mod peer_stats_caching {
         let first_rtc_stats = peer_events_stream.next().await.unwrap();
         assert_eq!(first_rtc_stats.0[0], stat);
 
-        peer.send_peer_stats(RtcStats(vec![stat])).await;
+        peer.send_peer_stats(RtcStats(vec![stat]));
         await_with_timeout(Box::pin(peer_events_stream.next()), 100)
             .await
             .unwrap_err();
@@ -651,7 +651,7 @@ mod peer_stats_caching {
                 ended: Some(false),
             })),
         };
-        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        peer.send_peer_stats(RtcStats(vec![stat.clone()]));
 
         let mut peer_events_stream = peer_events_stream.filter_map(|event| {
             Box::pin(async move {
@@ -666,7 +666,7 @@ mod peer_stats_caching {
         assert_eq!(first_rtc_stats.0[0], stat);
 
         stat.id = StatId("3df3d34c".to_string());
-        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        peer.send_peer_stats(RtcStats(vec![stat.clone()]));
         let first_rtc_stats = peer_events_stream.next().await.unwrap();
         assert_eq!(first_rtc_stats.0[0], stat);
     }
@@ -692,7 +692,7 @@ mod peer_stats_caching {
             timestamp: HighResTimeStamp(1584373509700.0),
             stats: RtcStatsType::Track(track_stat.clone()),
         };
-        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        peer.send_peer_stats(RtcStats(vec![stat.clone()]));
 
         let mut peer_events_stream = peer_events_stream.filter_map(|event| {
             Box::pin(async move {
@@ -708,7 +708,7 @@ mod peer_stats_caching {
 
         track_stat.ended = Some(true);
         stat.stats = RtcStatsType::Track(track_stat);
-        peer.send_peer_stats(RtcStats(vec![stat.clone()])).await;
+        peer.send_peer_stats(RtcStats(vec![stat.clone()]));
         let first_rtc_stats = peer_events_stream.next().await.unwrap();
         assert_eq!(first_rtc_stats.0[0], stat);
     }

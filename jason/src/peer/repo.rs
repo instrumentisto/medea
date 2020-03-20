@@ -22,7 +22,7 @@ pub trait PeerRepository {
     ///
     /// Errors if creating [`PeerConnection`] fails.
     fn create_peer(
-        &mut self,
+        &self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -33,14 +33,10 @@ pub trait PeerRepository {
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
-    fn remove(&mut self, id: PeerId);
+    fn remove(&self, id: PeerId);
 
     /// Returns all [`PeerConnection`]s stored in repository.
     fn get_all(&self) -> Vec<Rc<PeerConnection>>;
-
-    /// Sends [`RtcStats`] update of [`PeerConnection`] with provided [`PeerId`]
-    /// to the server.
-    fn send_peer_stats(&self, peer_id: PeerId);
 }
 
 /// [`PeerConnection`] factory and repository.
@@ -87,7 +83,7 @@ impl Repository {
                         .cloned()
                         .collect::<Vec<_>>()
                         .iter()
-                        .map(|peer| peer.send_peer_stats_update()),
+                        .map(|peer| peer.scrape_and_send_peer_stats()),
                 )
                 .await;
             }
@@ -104,7 +100,7 @@ impl PeerRepository for Repository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided
     /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
     fn create_peer(
-        &mut self,
+        &self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -120,9 +116,8 @@ impl PeerRepository for Repository {
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );
-        let mut peers_mut = self.peers.borrow_mut();
-        peers_mut.insert(id, peer);
-        Ok(peers_mut.get(&id).cloned().unwrap())
+        self.peers.borrow_mut().insert(id, Rc::clone(&peer));
+        Ok(peer)
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -133,7 +128,7 @@ impl PeerRepository for Repository {
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
     #[inline]
-    fn remove(&mut self, id: PeerId) {
+    fn remove(&self, id: PeerId) {
         self.peers.borrow_mut().remove(&id);
     }
 
@@ -141,15 +136,5 @@ impl PeerRepository for Repository {
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
         self.peers.borrow().values().cloned().collect()
-    }
-
-    /// Sends [`RtcStats`] update of [`PeerConnection`] with provided [`PeerId`]
-    /// to the server.
-    fn send_peer_stats(&self, peer_id: PeerId) {
-        if let Some(peer) = self.peers.borrow().get(&peer_id).cloned() {
-            spawn_local(async move {
-                peer.send_peer_stats_update().await;
-            });
-        }
     }
 }

@@ -300,7 +300,7 @@ impl PeerConnection {
 
     /// Filters already sent [`RtcStat`]s and send only new [`RtcStat`]s from
     /// the provided [`RtcStats`].
-    pub async fn send_peer_stats(&self, stats: RtcStats) {
+    pub fn send_peer_stats(&self, stats: RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
             stats
@@ -337,9 +337,9 @@ impl PeerConnection {
     }
 
     /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
-    pub async fn send_peer_stats_update(&self) {
+    pub async fn scrape_and_send_peer_stats(&self) {
         match self.peer.get_stats().await {
-            Ok(stats) => self.send_peer_stats(stats).await,
+            Ok(stats) => self.send_peer_stats(stats),
             Err(e) => {
                 JasonError::from(e).print();
             }
