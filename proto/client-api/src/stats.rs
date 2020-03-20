@@ -43,6 +43,7 @@ pub struct StatId(pub String);
 /// [stats object]: https://www.w3.org/TR/webrtc-stats/#dfn-stats-object
 /// [monitored object]: https://www.w3.org/TR/webrtc-stats/#dfn-monitored-object
 /// [1]: https://www.w3.org/TR/webrtc/#rtcstats-dictionary
+// TODO: Dont send null fields
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Hash)]
 pub struct RtcStat {
     /// A unique id that is associated with the object that was inspected to
