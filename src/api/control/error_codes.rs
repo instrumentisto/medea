@@ -412,7 +412,8 @@ impl From<RoomError> for ErrorResponse {
             | TryFromElementError(_)
             | BadRoomSpec(_)
             | TurnServiceError(_)
-            | ClientError(_) => Self::unexpected(&err),
+            | ClientError(_)
+            | TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
 }
