@@ -30,6 +30,7 @@ use crate::{
         room_repo::RoomRepository,
         Room,
     },
+    turn::coturn_metrics::CoturnMetrics,
     AppContext,
 };
 
@@ -119,6 +120,10 @@ pub struct RoomService {
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
+
+    /// Service which is responsible for processing [`PeerConnection`]'s
+    /// metrics received from the Coturn.
+    _coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl RoomService {
@@ -129,6 +134,9 @@ impl RoomService {
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Self {
         Self {
+            _coturn_metrics: CoturnMetrics::new(&app.config.turn)
+                .unwrap()
+                .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             room_repo,

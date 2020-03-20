@@ -209,8 +209,8 @@ pub mod test {
     impl TurnAuthService for TurnAuthServiceMock {
         async fn create(
             &self,
-            _: MemberId,
             _: RoomId,
+            _: PeerId,
             _: UnreachablePolicy,
         ) -> Result<IceUser, TurnServiceErr> {
             Ok(IceUser::new(

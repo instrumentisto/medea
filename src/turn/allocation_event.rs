@@ -213,7 +213,7 @@ impl CoturnEvent {
     /// All errors from this function should never happen, so no sense to catch
     /// them individually.
     pub fn parse(
-        msg: &patched_redis::Msg,
+        msg: &redis_pub_sub::Msg,
     ) -> Result<Self, CoturnEventParseError> {
         let channel: String = msg
             .get_channel()

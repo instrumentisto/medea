@@ -7,7 +7,7 @@ use actix::{
     fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, StreamExt as _};
-use patched_redis::ConnectionInfo;
+use redis_pub_sub::ConnectionInfo;
 
 use crate::log::prelude::*;
 
@@ -24,7 +24,7 @@ pub type ActFuture<O> = Box<dyn ActorFuture<Actor = CoturnMetrics, Output = O>>;
 #[derive(Debug)]
 pub struct CoturnMetrics {
     /// Redis client with which Coturn stat updates will be received.
-    client: patched_redis::Client,
+    client: redis_pub_sub::Client,
 
     /// Count of allocations for the [`CoturnUsername`] (which acts as a key).
     allocations_count: HashMap<CoturnUsername, u64>,
@@ -38,9 +38,9 @@ impl CoturnMetrics {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
-    ) -> Result<Self, patched_redis::RedisError> {
+    ) -> Result<Self, redis_pub_sub::RedisError> {
         let connection_info = ConnectionInfo {
-            addr: Box::new(patched_redis::ConnectionAddr::Tcp(
+            addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(
                 cf.db.redis.host.to_string(),
                 cf.db.redis.port,
             )),
@@ -51,7 +51,7 @@ impl CoturnMetrics {
                 Some(cf.db.redis.pass.to_string())
             },
         };
-        let client = patched_redis::Client::open(connection_info)?;
+        let client = redis_pub_sub::Client::open(connection_info)?;
 
         Ok(Self {
             client,
@@ -63,7 +63,7 @@ impl CoturnMetrics {
     /// [`Stream`] with this events to this the [`CoturnMetrics`]'s context.
     fn add_redis_stream(
         &mut self,
-    ) -> ActFuture<Result<(), patched_redis::RedisError>> {
+    ) -> ActFuture<Result<(), redis_pub_sub::RedisError>> {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();
 
@@ -79,7 +79,7 @@ impl CoturnMetrics {
             }
             .into_actor(self)
             .map(
-                |res: Result<_, patched_redis::RedisError>, this, ctx| {
+                |res: Result<_, redis_pub_sub::RedisError>, this, ctx| {
                     let mut pubsub = res?;
                     ctx.spawn(
                         async move {
@@ -133,8 +133,8 @@ impl Actor for CoturnMetrics {
     }
 }
 
-impl StreamHandler<patched_redis::Msg> for CoturnMetrics {
-    fn handle(&mut self, msg: patched_redis::Msg, _: &mut Self::Context) {
+impl StreamHandler<redis_pub_sub::Msg> for CoturnMetrics {
+    fn handle(&mut self, msg: redis_pub_sub::Msg, _: &mut Self::Context) {
         let event = if let Ok(event) = CoturnEvent::parse(&msg) {
             event
         } else {
