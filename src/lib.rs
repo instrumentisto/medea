@@ -16,12 +16,14 @@ pub mod turn;
 
 use std::sync::Arc;
 
+use actix::{Actor, Addr};
+
 use crate::{
     api::control::callback::{
         clients::CallbackClientFactoryImpl, service::CallbackService,
     },
     conf::Conf,
-    turn::TurnAuthService,
+    turn::{coturn_metrics::CoturnMetrics, TurnAuthService},
 };
 
 /// Global application context.
@@ -39,16 +41,22 @@ pub struct AppContext {
     ///
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
+
+    /// Service which is responsible for processing [`PeerConnection`]'s
+    /// metrics received from the Coturn.
+    pub coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl AppContext {
     /// Creates new [`AppContext`].
     #[inline]
     pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
+        let coturn_metrics = CoturnMetrics::new(&config.turn).unwrap().start();
         Self {
             config: Arc::new(config),
             turn_service: turn,
             callbacks: CallbackService::default(),
+            coturn_metrics,
         }
     }
 }

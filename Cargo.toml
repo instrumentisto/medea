@@ -47,6 +47,7 @@ medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
 rand = "0.7"
 redis = "0.15"
+patched_redis = { path = "../redis-rs", package = "redis" }
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
