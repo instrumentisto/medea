@@ -1,9 +1,11 @@
 //! Service which is responsible for processing [`PeerConnection`]'s metrics
 //! received from the Coturn.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
-use actix::{Actor, AsyncContext, StreamHandler, WrapFuture};
+use actix::{
+    fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
+};
 use futures::{channel::mpsc, StreamExt as _};
 use patched_redis::ConnectionInfo;
 
@@ -13,6 +15,9 @@ use super::{
     allocation_event::{CoturnAllocationEvent, CoturnEvent},
     CoturnUsername,
 };
+
+/// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
+pub type ActFuture<O> = Box<dyn ActorFuture<Actor = CoturnMetrics, Output = O>>;
 
 /// Service which is responsible for processing [`PeerConnection`]'s metrics
 /// received from the Coturn.
@@ -51,34 +56,68 @@ impl CoturnMetrics {
     }
 
     /// Opens new Redis connection, subscribes to the Coturn events and adds
-    /// [`Stream`] with this events to the provided [`Context`].
-    ///
-    /// This function can be used to connect [`CoturnMetrics`] to the Redis or
-    /// to restart this connection if it old connection is lost.
-    fn add_redis_stream(&mut self, ctx: &mut <Self as Actor>::Context) {
+    /// [`Stream`] with this events to this the [`CoturnMetrics`]'s context.
+    fn add_redis_stream(
+        &mut self,
+    ) -> ActFuture<Result<(), patched_redis::RedisError>> {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();
 
-        ctx.spawn(
+        Box::new(
             async move {
-                let conn = client.get_async_connection().await.unwrap();
+                let conn = client.get_async_connection().await?;
                 let mut pubsub = conn.into_pubsub();
                 pubsub
                     .psubscribe("turn/realm/*/user/*/allocation/*")
-                    .await
-                    .unwrap();
+                    .await?;
 
-                let mut msg_stream = pubsub.on_message();
-                while let Some(msg) = msg_stream.next().await {
-                    if msg_tx.unbounded_send(msg).is_err() {
-                        break;
-                    }
-                }
+                Ok(pubsub)
             }
-            .into_actor(self),
-        );
+            .into_actor(self)
+            .map(
+                |res: Result<_, patched_redis::RedisError>, this, ctx| {
+                    let mut pubsub = res?;
+                    ctx.spawn(
+                        async move {
+                            let mut msg_stream = pubsub.on_message();
+                            while let Some(msg) = msg_stream.next().await {
+                                if msg_tx.unbounded_send(msg).is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                        .into_actor(this),
+                    );
+                    ctx.add_stream(msg_stream);
 
-        ctx.add_stream(msg_stream);
+                    Ok(())
+                },
+            ),
+        )
+    }
+
+    /// Tries to connect to the Redis until a connection will be successfully
+    /// opened.
+    ///
+    /// Will be resolved when Redis connection is successfully opened.
+    fn connect_redis(&mut self) -> ActFuture<()> {
+        Box::new(self.add_redis_stream().then(|res, this, _| {
+            if let Err(err) = res {
+                warn!(
+                    "Error while creating Redis PubSub connection for the \
+                     CoturnMetrics: {:?}",
+                    err
+                );
+
+                Either::Left(
+                    tokio::time::delay_for(Duration::from_secs(1))
+                        .into_actor(this)
+                        .then(|_, this, _| this.connect_redis()),
+                )
+            } else {
+                Either::Right(async {}.into_actor(this))
+            }
+        }))
     }
 }
 
@@ -86,7 +125,7 @@ impl Actor for CoturnMetrics {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.add_redis_stream(ctx);
+        ctx.wait(self.connect_redis());
     }
 }
 
@@ -135,6 +174,6 @@ impl StreamHandler<patched_redis::Msg> for CoturnMetrics {
     }
 
     fn finished(&mut self, ctx: &mut Self::Context) {
-        self.add_redis_stream(ctx);
+        ctx.wait(self.connect_redis());
     }
 }

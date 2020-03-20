@@ -14,7 +14,7 @@ use medea_coturn_telnet_client::{
     CoturnTelnetError,
 };
 
-use crate::{media::IceUser, turn::CoturnUsername};
+use crate::media::IceUser;
 
 /// Possible errors returned by [`CoturnTelnetClient`].
 #[derive(Display, Debug, Fail, From)]

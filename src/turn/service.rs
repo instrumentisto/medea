@@ -19,7 +19,6 @@ use crate::{
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         repo::{TurnDatabase, TurnDatabaseErr},
-        CoturnUsername,
     },
 };
 

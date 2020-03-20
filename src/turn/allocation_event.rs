@@ -1,3 +1,5 @@
+//! Implementation of the Coturn events deserialization.
+
 use std::{collections::HashMap, time::Duration};
 
 use derive_more::Display;
@@ -235,7 +237,9 @@ impl CoturnEvent {
 
         let event = CoturnAllocationEvent::parse(
             event_type,
-            msg.get_payload::<String>().unwrap().as_str(),
+            msg.get_payload::<String>()
+                .map_err(|_| CoturnEventParseError::WrongPayloadType)?
+                .as_str(),
         )?;
 
         Ok(CoturnEvent {
@@ -304,4 +308,8 @@ pub enum CoturnEventParseError {
     /// Event type is not provided.
     #[display(fmt = "No event type.")]
     NoEventType,
+
+    /// Wrong Redis payload type.
+    #[display(fmt = "Wrong Redis paylod type.")]
+    WrongPayloadType,
 }

@@ -74,6 +74,7 @@ impl<T: Incrementable + Copy> Counter<T> {
 }
 
 impl PeerRepository {
+    /// Returns new [`PeerRepository`] for a [`Room`] with provided [`RoomId`].
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
