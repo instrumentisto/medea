@@ -4,27 +4,42 @@
 //! [`Peer`]: crate::media::peer::Peer
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
+    future::Future,
+    rc::Rc,
+    sync::Arc,
 };
 
 use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
-    api::control::MemberId,
+    api::control::{MemberId, RoomId},
     log::prelude::*,
-    media::{New, Peer, PeerStateMachine},
+    media::{IceUser, New, Peer, PeerStateMachine},
     signalling::{
         elements::endpoints::webrtc::{
             WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         },
         room::RoomError,
     },
+    turn::{TurnAuthService, UnreachablePolicy},
 };
 
 #[derive(Debug)]
 pub struct PeerRepository {
+    /// [`RoomId`] of [`Room`] which owns this [`PeerRepository`].
+    room_id: RoomId,
+
+    /// [`IceUser`]s for all [`PeerConnection`] of this [`PeerRepository`].
+    ice_users: Rc<RefCell<HashMap<PeerId, IceUser>>>,
+
+    /// [`TurnAuthService`] with which [`IceUser`]s for the [`PeerConnection`]s
+    /// from this [`PeerRepository`] will be created.
+    turn_service: Arc<dyn TurnAuthService>,
+
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
@@ -59,6 +74,20 @@ impl<T: Incrementable + Copy> Counter<T> {
 }
 
 impl PeerRepository {
+    pub fn new(
+        room_id: RoomId,
+        turn_service: Arc<dyn TurnAuthService>,
+    ) -> Self {
+        Self {
+            room_id,
+            turn_service,
+            ice_users: Rc::new(RefCell::new(HashMap::new())),
+            peers: HashMap::new(),
+            peers_count: Counter::default(),
+            tracks_count: Counter::default(),
+        }
+    }
+
     /// Store [`Peer`] in [`Room`].
     ///
     /// [`Room`]: crate::signalling::Room
@@ -80,6 +109,34 @@ impl PeerRepository {
         self.peers
             .get(&peer_id)
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+    }
+
+    /// Returns [`IceUser`] for a provided [`PeerId`].
+    ///
+    /// If [`IceUser`] isn't already created then new [`IceUser`] will be
+    /// created.
+    pub fn get_ice_user(
+        &mut self,
+        peer_id: PeerId,
+    ) -> impl Future<Output = IceUser> {
+        let ice_users = Rc::clone(&self.ice_users);
+        let turn_service = Arc::clone(&self.turn_service);
+        let room_id = self.room_id.clone();
+
+        async move {
+            let ice_user = ice_users.borrow().get(&peer_id).cloned();
+            if let Some(ice_user) = ice_user {
+                ice_user
+            } else {
+                let ice_user = turn_service
+                    .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
+                    .await
+                    .unwrap();
+                ice_users.borrow_mut().insert(peer_id, ice_user.clone());
+
+                ice_user
+            }
+        }
     }
 
     /// Creates interconnected [`Peer`]s for provided [`Member`]s.
@@ -203,7 +260,7 @@ impl PeerRepository {
     pub fn remove_peers(
         &mut self,
         member_id: &MemberId,
-        peer_ids: HashSet<PeerId>,
+        peer_ids: &HashSet<PeerId>,
     ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
@@ -219,7 +276,7 @@ impl PeerRepository {
                 removed_peers
                     .entry(member_id.clone())
                     .or_insert_with(Vec::new)
-                    .push(peer_id);
+                    .push(*peer_id);
             }
         }
 
@@ -280,7 +337,7 @@ impl PeerRepository {
     ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut peers_id_to_delete = HashSet::new();
         peers_id_to_delete.insert(peer_id);
-        self.remove_peers(&member_id, peers_id_to_delete)
+        self.remove_peers(&member_id, &peers_id_to_delete)
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
@@ -343,15 +400,5 @@ impl PeerRepository {
         };
 
         None
-    }
-}
-
-impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
-    fn from(peers: HashMap<PeerId, PeerStateMachine>) -> Self {
-        Self {
-            peers,
-            peers_count: Counter::default(),
-            tracks_count: Counter::default(),
-        }
     }
 }
