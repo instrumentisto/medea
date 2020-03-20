@@ -73,9 +73,11 @@ mod join {
     }
 }
 
+/// `on_start` callback's related entities and implementations.
 mod on_start {
     use super::*;
 
+    /// `OnStart` callback of Control API.
     #[derive(Clone, Serialize)]
     pub struct OnStart;
 
@@ -86,9 +88,11 @@ mod on_start {
     }
 }
 
+/// `on_stop` callback's related entities and implementations.
 mod on_stop {
     use super::*;
 
+    /// `OnStop` callback of Control API.
     #[derive(Clone, Serialize)]
     pub struct OnStop;
 

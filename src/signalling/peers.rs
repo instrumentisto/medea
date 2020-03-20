@@ -132,6 +132,10 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
+    /// Returns [`IceUser`] for a provided [`PeerId`].
+    ///
+    /// If [`IceUser`] isn't already created then new [`IceUser`] will be
+    /// created.
     pub fn get_ice_user(
         &mut self,
         peer_id: PeerId,
