@@ -1349,9 +1349,13 @@ mod test {
             String::from("w/e"),
             None,
             None,
+            None,
+            None,
+            None,
         );
 
-        room.create_member(MemberId(String::from("member1")), &member1)
+        room.members
+            .create_member(MemberId(String::from("member1")), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
@@ -1383,9 +1387,13 @@ mod test {
             String::from("w/e"),
             None,
             None,
+            None,
+            None,
+            None,
         );
 
-        room.create_member(MemberId(String::from("member1")), &member1)
+        room.members
+            .create_member(MemberId(String::from("member1")), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(

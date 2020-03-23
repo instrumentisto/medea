@@ -667,7 +667,7 @@ mod tests {
         let room_element: RootElement =
             serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        parse_members(&room_spec).unwrap()
+        parse_members(&room_spec, RpcConf::default()).unwrap()
     }
 
     #[test]

@@ -209,6 +209,12 @@ pub struct Member {
     #[builder(default = "None")]
     #[builder(setter(strip_option))]
     on_leave: Option<String>,
+    #[builder(default = "0")]
+    ping_interval: u64,
+    #[builder(default = "0")]
+    idle_timeout: u64,
+    #[builder(default = "0")]
+    reconnect_timeout: u64,
 }
 
 impl Into<proto::Member> for Member {
@@ -225,6 +231,9 @@ impl Into<proto::Member> for Member {
             on_leave: self.on_leave.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
             credentials: self.credentials.unwrap_or_default(),
+            ping_interval: self.ping_interval,
+            idle_timeout: self.idle_timeout,
+            reconnect_timeout: self.reconnect_timeout,
         }
     }
 }

@@ -414,6 +414,7 @@ mod test {
     };
 
     use super::WsSession;
+    use crate::api::client::rpc_connection::WsSessionSettings;
 
     type SharedChan<T> = (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
 
@@ -448,8 +449,10 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                Duration::from_secs(5),
-                Duration::from_secs(5),
+                WsSessionSettings {
+                    idle_timeout: Duration::from_secs(5),
+                    ping_interval: Duration::from_secs(5),
+                },
             )
         }
 
@@ -484,8 +487,10 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                Duration::from_secs(5),
-                Duration::from_millis(50),
+                WsSessionSettings {
+                    idle_timeout: Duration::from_secs(5),
+                    ping_interval: Duration::from_millis(50),
+                },
             )
         });
 
@@ -533,8 +538,10 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                Duration::from_millis(100),
-                Duration::from_secs(10),
+                WsSessionSettings {
+                    idle_timeout: Duration::from_millis(100),
+                    ping_interval: Duration::from_secs(10),
+                },
             )
         });
 
@@ -586,8 +593,10 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                Duration::from_secs(5),
-                Duration::from_secs(5),
+                WsSessionSettings {
+                    idle_timeout: Duration::from_secs(5),
+                    ping_interval: Duration::from_secs(5),
+                },
             )
         });
 
@@ -650,8 +659,10 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                Duration::from_secs(5),
-                Duration::from_secs(5),
+                WsSessionSettings {
+                    idle_timeout: Duration::from_secs(5),
+                    ping_interval: Duration::from_secs(5),
+                },
             )
         });
 
@@ -706,8 +717,10 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                Duration::from_secs(5),
-                Duration::from_secs(5),
+                WsSessionSettings {
+                    idle_timeout: Duration::from_secs(5),
+                    ping_interval: Duration::from_secs(5),
+                },
             )
         });
 
