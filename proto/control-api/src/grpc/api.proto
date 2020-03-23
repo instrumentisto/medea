@@ -142,6 +142,8 @@ message Member {
   string credentials = 4;
   // Pipeline of this Member.
   map<string, Member.Element> pipeline = 5;
+  uint64 idle_timeout = 6;
+  uint64 reconnection_timeout = 7;
 
   // Elements which Member's pipeline can contain.
   message Element {

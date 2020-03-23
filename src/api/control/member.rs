@@ -20,6 +20,7 @@ use crate::api::control::{
     EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
     WebRtcPlayId,
 };
+use std::time::Duration;
 
 const CREDENTIALS_LEN: usize = 32;
 
@@ -60,6 +61,10 @@ pub struct MemberSpec {
 
     /// URL to which `OnLeave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
+
+    idle_timeout: Option<Duration>,
+
+    reconnection_timeout: Option<Duration>,
 }
 
 impl Into<RoomElement> for MemberSpec {
@@ -69,6 +74,8 @@ impl Into<RoomElement> for MemberSpec {
             credentials: self.credentials,
             on_join: self.on_join,
             on_leave: self.on_leave,
+            idle_timeout: self.idle_timeout,
+            reconnection_timeout: self.reconnection_timeout,
         }
     }
 }
@@ -81,12 +88,16 @@ impl MemberSpec {
         credentials: String,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
+        idle_timeout: Option<Duration>,
+        reconnection_timeout: Option<Duration>,
     ) -> Self {
         Self {
             pipeline,
             credentials,
             on_join,
             on_leave,
+            idle_timeout,
+            reconnection_timeout,
         }
     }
 
@@ -140,6 +151,14 @@ impl MemberSpec {
     /// Returns reference to `on_leave` [`CallbackUrl`].
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
+    }
+
+    pub fn idle_timeout(&self) -> Option<Duration> {
+        self.idle_timeout
+    }
+
+    pub fn reconnection_timeout(&self) -> Option<Duration> {
+        self.reconnection_timeout
     }
 }
 
@@ -195,11 +214,20 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         };
 
+        let idle_timeout = Some(member.idle_timeout)
+            .filter(|t| t != &0)
+            .map(Duration::from_secs);
+        let reconnection_timeout = Some(member.reconnection_timeout)
+            .filter(|t| t != &0)
+            .map(Duration::from_secs);
+
         Ok(Self {
             pipeline: Pipeline::new(pipeline),
             credentials,
             on_join,
             on_leave,
+            idle_timeout,
+            reconnection_timeout,
         })
     }
 }
@@ -240,11 +268,15 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 credentials,
                 on_leave,
                 on_join,
+                idle_timeout,
+                reconnection_timeout,
             } => Ok(Self {
                 pipeline: spec.clone(),
                 credentials: credentials.clone(),
                 on_leave: on_leave.clone(),
                 on_join: on_join.clone(),
+                idle_timeout: idle_timeout.clone(),
+                reconnection_timeout: reconnection_timeout.clone(),
             }),
             _ => Err(TryFromElementError::NotMember),
         }

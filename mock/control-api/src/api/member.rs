@@ -33,6 +33,16 @@ pub struct Member {
     /// URL to which `OnLeave` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     on_leave: Option<String>,
+
+    #[serde(default = "default_grpc_uint64")]
+    idle_timeout: u64,
+
+    #[serde(default = "default_grpc_uint64")]
+    reconnection_timeout: u64,
+}
+
+fn default_grpc_uint64() -> u64 {
+    0
 }
 
 impl Member {
@@ -51,6 +61,8 @@ impl Member {
             credentials: self.credentials.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
             on_leave: self.on_leave.unwrap_or_default(),
+            idle_timeout: self.idle_timeout,
+            reconnection_timeout: self.reconnection_timeout,
         }
     }
 
@@ -77,6 +89,8 @@ impl From<proto::Member> for Member {
             credentials: Some(proto.credentials),
             on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
+            idle_timeout: proto.idle_timeout,
+            reconnection_timeout: proto.reconnection_timeout,
         }
     }
 }

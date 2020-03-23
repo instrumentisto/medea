@@ -17,6 +17,7 @@ use super::{
     pipeline::Pipeline,
     MemberId, RootElement, TryFromElementError,
 };
+use std::time::Duration;
 
 /// ID of [`Room`].
 ///
@@ -33,11 +34,18 @@ pub struct Id(String);
 pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
+    // FIXME: maybe just use MemberSpec??????
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
+        #[serde(default)]
+        #[serde(with = "humantime_serde")]
+        idle_timeout: Option<Duration>,
+        #[serde(default)]
+        #[serde(with = "humantime_serde")]
+        reconnection_timeout: Option<Duration>,
     },
 }
 

@@ -165,6 +165,10 @@ pub struct Member {
     /// Pipeline of this Member.
     #[prost(map="string, message", tag="5")]
     pub pipeline: ::std::collections::HashMap<std::string::String, member::Element>,
+    #[prost(uint64, tag="6")]
+    pub idle_timeout: u64,
+    #[prost(uint64, tag="7")]
+    pub reconnection_timeout: u64,
 }
 pub mod member {
     /// Elements which Member's pipeline can contain.

@@ -30,6 +30,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use std::time::Duration;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -90,6 +91,10 @@ struct MemberInner {
 
     /// URL to which `on_leave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
+
+    idle_timeout: Duration,
+
+    reconnection_timeout: Duration,
 }
 
 impl Member {
@@ -97,7 +102,13 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
-    pub fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
+    pub fn new(
+        id: MemberId,
+        credentials: String,
+        room_id: RoomId,
+        idle_timeout: Duration,
+        reconnection_timeout: Duration,
+    ) -> Self {
         Self(Rc::new(RefCell::new(MemberInner {
             id,
             srcs: HashMap::new(),
@@ -107,6 +118,8 @@ impl Member {
             room_id,
             on_leave: None,
             on_join: None,
+            idle_timeout,
+            reconnection_timeout,
         })))
     }
 
@@ -432,6 +445,14 @@ impl Member {
         self.0.borrow().on_leave.clone()
     }
 
+    pub fn get_idle_timeout(&self) -> Duration {
+        self.0.borrow().idle_timeout
+    }
+
+    pub fn get_reconnection_timeout(&self) -> Duration {
+        self.0.borrow().reconnection_timeout
+    }
+
     /// Sets all [`CallbackUrl`]'s from [`MemberSpec`].
     pub fn set_callback_urls(&self, spec: &MemberSpec) {
         self.0.borrow_mut().on_leave = spec.on_leave().clone();
@@ -470,6 +491,8 @@ impl WeakMember {
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
+    default_idle_timeout: Duration,
+    default_reconnection_timeout: Duration,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -485,6 +508,10 @@ pub fn parse_members(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
+                member.idle_timeout().unwrap_or(default_idle_timeout),
+                member
+                    .reconnection_timeout()
+                    .unwrap_or(default_reconnection_timeout),
             );
             (id.clone(), new_member)
         })
@@ -542,6 +569,8 @@ impl Into<proto::Member> for Member {
                 .get_on_join()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
+            reconnection_timeout: self.get_reconnection_timeout().as_secs(),
+            idle_timeout: self.get_idle_timeout().as_secs(),
             pipeline: member_pipeline,
         }
     }

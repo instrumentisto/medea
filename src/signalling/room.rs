@@ -58,6 +58,7 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
+use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -191,6 +192,10 @@ pub struct Room {
 
     /// Current state of this [`Room`].
     state: State,
+
+    default_idle_timeout: Duration,
+
+    default_reconnection_timeout: Duration,
 }
 
 impl Room {
@@ -210,6 +215,8 @@ impl Room {
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
+            default_idle_timeout: context.config.rpc.idle_timeout,
+            default_reconnection_timeout: context.config.rpc.reconnect_timeout,
         })
     }
 
@@ -702,6 +709,9 @@ impl Room {
             id.clone(),
             spec.credentials().to_string(),
             self.id.clone(),
+            spec.idle_timeout().unwrap_or(self.default_idle_timeout),
+            spec.reconnection_timeout()
+                .unwrap_or(self.default_reconnection_timeout),
         );
 
         signalling_member.set_callback_urls(spec);

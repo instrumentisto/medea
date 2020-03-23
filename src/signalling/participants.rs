@@ -124,7 +124,11 @@ impl ParticipantService {
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
-            members: parse_members(room_spec)?,
+            members: parse_members(
+                room_spec,
+                context.config.rpc.idle_timeout,
+                context.config.rpc.reconnect_timeout,
+            )?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
             turn_service: context.turn_service.clone(),
