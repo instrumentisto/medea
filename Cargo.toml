@@ -73,6 +73,8 @@ url = "2.1"
     git = "https://github.com/mitsuhiko/redis-rs"
     package = "redis"
     rev = "1ea0bd0c2e7b450eb5279995142fd64e5db0fa69"
+    default-features = false
+    features = ["tokio-comp"]
 
 [dev-dependencies]
 actix-codec = "0.2"
