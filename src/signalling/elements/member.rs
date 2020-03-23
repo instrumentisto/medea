@@ -22,6 +22,7 @@ use crate::{
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },
+    conf::Rpc as RpcConf,
     log::prelude::*,
     media::IceUser,
 };
@@ -94,7 +95,7 @@ struct MemberInner {
 
     idle_timeout: Duration,
 
-    reconnection_timeout: Duration,
+    reconnect_timeout: Duration,
 
     ping_interval: Duration,
 }
@@ -109,7 +110,7 @@ impl Member {
         credentials: String,
         room_id: RoomId,
         idle_timeout: Duration,
-        reconnection_timeout: Duration,
+        reconnect_timeout: Duration,
         ping_interval: Duration,
     ) -> Self {
         Self(Rc::new(RefCell::new(MemberInner {
@@ -122,7 +123,7 @@ impl Member {
             on_leave: None,
             on_join: None,
             idle_timeout,
-            reconnection_timeout,
+            reconnect_timeout,
             ping_interval,
         })))
     }
@@ -453,8 +454,8 @@ impl Member {
         self.0.borrow().idle_timeout
     }
 
-    pub fn get_reconnection_timeout(&self) -> Duration {
-        self.0.borrow().reconnection_timeout
+    pub fn get_reconnect_timeout(&self) -> Duration {
+        self.0.borrow().reconnect_timeout
     }
 
     pub fn get_ping_interval(&self) -> Duration {
@@ -500,9 +501,7 @@ impl WeakMember {
 // TODO: maybe provide Rpc config here??
 pub fn parse_members(
     room_spec: &RoomSpec,
-    default_idle_timeout: Duration,
-    default_reconnection_timeout: Duration,
-    default_ping_interval: Duration,
+    rpc_conf: RpcConf,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -518,11 +517,11 @@ pub fn parse_members(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
-                member.idle_timeout().unwrap_or(default_idle_timeout),
+                member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
                 member
-                    .reconnection_timeout()
-                    .unwrap_or(default_reconnection_timeout),
-                member.ping_interval().unwrap_or(default_ping_interval),
+                    .reconnect_timeout()
+                    .unwrap_or(rpc_conf.reconnect_timeout),
+                member.ping_interval().unwrap_or(rpc_conf.ping_interval),
             );
             (id.clone(), new_member)
         })
@@ -580,7 +579,7 @@ impl Into<proto::Member> for Member {
                 .get_on_join()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            reconnection_timeout: self.get_reconnection_timeout().as_secs(),
+            reconnect_timeout: self.get_reconnect_timeout().as_secs(),
             idle_timeout: self.get_idle_timeout().as_secs(),
             ping_interval: self.get_ping_interval().as_secs(),
             pipeline: member_pipeline,

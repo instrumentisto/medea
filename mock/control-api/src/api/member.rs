@@ -41,7 +41,7 @@ pub struct Member {
 
     #[serde(default)]
     #[serde(with = "humantime_serde")]
-    reconnection_timeout: Duration,
+    reconnect_timeout: Duration,
 
     #[serde(default)]
     #[serde(with = "humantime_serde")]
@@ -65,7 +65,7 @@ impl Member {
             on_join: self.on_join.unwrap_or_default(),
             on_leave: self.on_leave.unwrap_or_default(),
             idle_timeout: self.idle_timeout.as_secs(),
-            reconnection_timeout: self.reconnection_timeout.as_secs(),
+            reconnect_timeout: self.reconnect_timeout.as_secs(),
             ping_interval: self.ping_interval.as_secs(),
         }
     }
@@ -94,9 +94,7 @@ impl From<proto::Member> for Member {
             on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
             idle_timeout: Duration::from_secs(proto.idle_timeout),
-            reconnection_timeout: Duration::from_secs(
-                proto.reconnection_timeout,
-            ),
+            reconnect_timeout: Duration::from_secs(proto.reconnect_timeout),
             ping_interval: Duration::from_secs(proto.ping_interval),
         }
     }

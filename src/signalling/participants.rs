@@ -7,11 +7,7 @@
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use actix::{
     fut::wrap_future, ActorFuture as _, AsyncContext, Context,
@@ -35,6 +31,7 @@ use crate::{
             MemberId, MemberSpec, RoomId, RoomSpec,
         },
     },
+    conf::Rpc as RpcConf,
     log::prelude::*,
     signalling::{
         elements::{
@@ -109,13 +106,7 @@ pub struct ParticipantService {
     /// Reference to [`TurnAuthService`].
     turn_service: Arc<dyn TurnAuthService>,
 
-    default_idle_timeout: Duration,
-
-    /// Default [`Duration`], after which the server deletes the client session
-    /// if the remote RPC client does not reconnect after it is idle.
-    default_reconnection_timeout: Duration,
-
-    default_ping_interval: Duration,
+    rpc_conf: RpcConf,
 }
 
 impl ParticipantService {
@@ -130,18 +121,11 @@ impl ParticipantService {
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
-            members: parse_members(
-                room_spec,
-                context.config.rpc.idle_timeout,
-                context.config.rpc.reconnect_timeout,
-                context.config.rpc.ping_interval,
-            )?,
+            members: parse_members(room_spec, context.config.rpc)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
             turn_service: context.turn_service.clone(),
-            default_reconnection_timeout: context.config.rpc.reconnect_timeout,
-            default_idle_timeout: context.config.rpc.idle_timeout,
-            default_ping_interval: context.config.rpc.ping_interval,
+            rpc_conf: context.config.rpc,
         })
     }
 
@@ -335,7 +319,7 @@ impl ParticipantService {
                     self.drop_connection_tasks.insert(
                         member_id.clone(),
                         ctx.run_later(
-                            member.get_reconnection_timeout(),
+                            member.get_reconnect_timeout(),
                             move |_, ctx| {
                                 info!(
                                     "Member [id = {}] connection lost at {:?}.",
@@ -486,10 +470,10 @@ impl ParticipantService {
             id.clone(),
             spec.credentials().to_string(),
             self.room_id.clone(),
-            spec.idle_timeout().unwrap_or(self.default_idle_timeout),
-            spec.reconnection_timeout()
-                .unwrap_or(self.default_reconnection_timeout),
-            spec.ping_interval().unwrap_or(self.default_ping_interval),
+            spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
+            spec.reconnect_timeout()
+                .unwrap_or(self.rpc_conf.reconnect_timeout),
+            spec.ping_interval().unwrap_or(self.rpc_conf.ping_interval),
         );
 
         signalling_member.set_callback_urls(spec);

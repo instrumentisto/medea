@@ -168,7 +168,7 @@ pub struct Member {
     #[prost(uint64, tag="6")]
     pub idle_timeout: u64,
     #[prost(uint64, tag="7")]
-    pub reconnection_timeout: u64,
+    pub reconnect_timeout: u64,
     #[prost(uint64, tag="8")]
     pub ping_interval: u64,
 }

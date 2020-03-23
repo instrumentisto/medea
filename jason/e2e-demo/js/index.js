@@ -195,7 +195,7 @@ const controlDebugWindows = {
       let credentials = container.getElementsByClassName('member-spec__credentials')[0].value;
 
       let idleTimeout = container.getElementsByClassName('member-spec__idle-timeout')[0].value;
-      let reconnectionTimeout = container.getElementsByClassName('member-spec__reconnect-timeout')[0].value;
+      let reconnectTimeout = container.getElementsByClassName('member-spec__reconnect-timeout')[0].value;
       let pingInterval = container.getElementsByClassName('member-spec__ping-interval')[0].value;
 
       let spec = {};
@@ -205,8 +205,8 @@ const controlDebugWindows = {
       if (idleTimeout.length > 0) {
         spec.idle_timeout = idleTimeout;
       }
-      if (reconnectionTimeout.length > 0) {
-        spec.reconnection_timeout = reconnectionTimeout;
+      if (reconnectTimeout.length > 0) {
+        spec.reconnect_timeout = reconnectTimeout;
       }
       if (pingInterval.length > 0) {
         spec.ping_interval = pingInterval;

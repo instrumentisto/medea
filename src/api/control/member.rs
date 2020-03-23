@@ -64,7 +64,7 @@ pub struct MemberSpec {
 
     idle_timeout: Option<Duration>,
 
-    reconnection_timeout: Option<Duration>,
+    reconnect_timeout: Option<Duration>,
 
     ping_interval: Option<Duration>,
 }
@@ -77,7 +77,7 @@ impl Into<RoomElement> for MemberSpec {
             on_join: self.on_join,
             on_leave: self.on_leave,
             idle_timeout: self.idle_timeout,
-            reconnection_timeout: self.reconnection_timeout,
+            reconnect_timeout: self.reconnect_timeout,
             ping_interval: self.ping_interval,
         }
     }
@@ -92,7 +92,7 @@ impl MemberSpec {
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
-        reconnection_timeout: Option<Duration>,
+        reconnect_timeout: Option<Duration>,
         ping_interval: Option<Duration>,
     ) -> Self {
         Self {
@@ -101,7 +101,7 @@ impl MemberSpec {
             on_join,
             on_leave,
             idle_timeout,
-            reconnection_timeout,
+            reconnect_timeout,
             ping_interval,
         }
     }
@@ -162,8 +162,8 @@ impl MemberSpec {
         self.idle_timeout
     }
 
-    pub fn reconnection_timeout(&self) -> Option<Duration> {
-        self.reconnection_timeout
+    pub fn reconnect_timeout(&self) -> Option<Duration> {
+        self.reconnect_timeout
     }
 
     pub fn ping_interval(&self) -> Option<Duration> {
@@ -226,7 +226,7 @@ impl TryFrom<proto::Member> for MemberSpec {
         let idle_timeout = Some(member.idle_timeout)
             .filter(|t| t != &0)
             .map(Duration::from_secs);
-        let reconnection_timeout = Some(member.reconnection_timeout)
+        let reconnect_timeout = Some(member.reconnect_timeout)
             .filter(|t| t != &0)
             .map(Duration::from_secs);
         let ping_interval = Some(member.ping_interval)
@@ -239,7 +239,7 @@ impl TryFrom<proto::Member> for MemberSpec {
             on_join,
             on_leave,
             idle_timeout,
-            reconnection_timeout,
+            reconnect_timeout,
             ping_interval,
         })
     }
@@ -282,7 +282,7 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 on_leave,
                 on_join,
                 idle_timeout,
-                reconnection_timeout,
+                reconnect_timeout,
                 ping_interval,
             } => Ok(Self {
                 pipeline: spec.clone(),
@@ -290,7 +290,7 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 on_leave: on_leave.clone(),
                 on_join: on_join.clone(),
                 idle_timeout: idle_timeout.clone(),
-                reconnection_timeout: reconnection_timeout.clone(),
+                reconnect_timeout: reconnect_timeout.clone(),
                 ping_interval: ping_interval.clone(),
             }),
             _ => Err(TryFromElementError::NotMember),

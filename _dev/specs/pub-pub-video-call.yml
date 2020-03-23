@@ -9,7 +9,7 @@ spec:
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       idle_timeout: 5s
-      reconnection_timeout: 5s
+      reconnect_timeout: 5s
       ping_interval:  7s
       spec:
         pipeline:
@@ -32,7 +32,7 @@ spec:
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       idle_timeout: 1m
-      reconnection_timeout: 1m
+      reconnect_timeout: 1m
       spec:
         pipeline:
           publish:

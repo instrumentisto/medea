@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
 /// RPC connection settings.
-#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Rpc {
     /// Duration, after which remote RPC client will be considered idle if no
