@@ -665,7 +665,9 @@ mod room_service_specs {
         let app = app_ctx();
         let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
 
-        RoomService::new(room_repo, app, graceful_shutdown).start()
+        RoomService::new(room_repo, app, graceful_shutdown)
+            .unwrap()
+            .start()
     }
 
     /// Returns [`Future`] used for testing of all create methods of
