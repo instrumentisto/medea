@@ -1,12 +1,11 @@
 //! `Member` element related methods and entities.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
-use std::time::Duration;
 
 /// Entity that represents [Control API] `Member`.
 ///
@@ -35,14 +34,19 @@ pub struct Member {
     #[serde(skip_serializing_if = "Option::is_none")]
     on_leave: Option<String>,
 
+    /// Duration, after which remote RPC client will be considered IDLE if no
+    /// heartbeat messages received.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
     idle_timeout: Duration,
 
+    /// Duration, after which the server deletes the client session if
+    /// the remote RPC client does not reconnect after it is IDLE.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
     reconnect_timeout: Duration,
 
+    /// Interval of sending `Ping`s from the server to the client.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
     ping_interval: Duration,

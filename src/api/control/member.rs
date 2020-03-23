@@ -2,7 +2,7 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
@@ -20,7 +20,6 @@ use crate::api::control::{
     EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
     WebRtcPlayId,
 };
-use std::time::Duration;
 
 const CREDENTIALS_LEN: usize = 32;
 
@@ -158,14 +157,21 @@ impl MemberSpec {
         &self.on_leave
     }
 
+    /// Returns [`Duration`] for this [`Member`], after which remote RPC client
+    /// will be considered IDLE if no heartbeat messages received.
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
 
+    /// Returns [`Duration`] for this [`Member`], after which the server deletes
+    /// the client session if the remote RPC client does not reconnect after
+    /// it is IDLE.
     pub fn reconnect_timeout(&self) -> Option<Duration> {
         self.reconnect_timeout
     }
 
+    /// Returns interval of sending `Ping`s from the server to the client for
+    /// this [`Member`].
     pub fn ping_interval(&self) -> Option<Duration> {
         self.ping_interval
     }
@@ -289,9 +295,9 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 credentials: credentials.clone(),
                 on_leave: on_leave.clone(),
                 on_join: on_join.clone(),
-                idle_timeout: idle_timeout.clone(),
-                reconnect_timeout: reconnect_timeout.clone(),
-                ping_interval: ping_interval.clone(),
+                idle_timeout: *idle_timeout,
+                reconnect_timeout: *reconnect_timeout,
+                ping_interval: *ping_interval,
             }),
             _ => Err(TryFromElementError::NotMember),
         }

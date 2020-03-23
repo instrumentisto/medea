@@ -112,7 +112,7 @@ impl Server {
 
         let server = HttpServer::new(move || {
             App::new()
-                .app_data(Self::app_data(rooms.clone(), config.rpc.clone()))
+                .app_data(Self::app_data(rooms.clone(), config.rpc))
                 .configure(Self::configure)
                 .wrap(middleware::Logger::default())
         })

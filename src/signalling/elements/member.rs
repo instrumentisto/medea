@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom as _,
     rc::{Rc, Weak},
+    time::Duration,
 };
 
 use derive_more::Display;
@@ -31,7 +32,6 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
-use std::time::Duration;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -93,10 +93,15 @@ struct MemberInner {
     /// URL to which `on_leave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
 
+    /// [`Duration`], after which remote RPC client will be considered IDLE if
+    /// no heartbeat messages received.
     idle_timeout: Duration,
 
+    /// [`Duration`], after which the server deletes the client session if
+    /// the remote RPC client does not reconnect after it is IDLE.
     reconnect_timeout: Duration,
 
+    /// Interval of sending `Ping`s from the server to the client.
     ping_interval: Duration,
 }
 
@@ -450,14 +455,21 @@ impl Member {
         self.0.borrow().on_leave.clone()
     }
 
+    /// Returns [`Duration`] for this [`Member`], after which remote RPC client
+    /// will be considered IDLE if no heartbeat messages received.
     pub fn get_idle_timeout(&self) -> Duration {
         self.0.borrow().idle_timeout
     }
 
+    /// Returns [`Duration`] for this [`Member`], after which the server deletes
+    /// the client session if the remote RPC client does not reconnect after
+    /// it is IDLE.
     pub fn get_reconnect_timeout(&self) -> Duration {
         self.0.borrow().reconnect_timeout
     }
 
+    /// Returns interval of sending `Ping`s from the server to the client for
+    /// this [`Member`].
     pub fn get_ping_interval(&self) -> Duration {
         self.0.borrow().ping_interval
     }
@@ -498,7 +510,6 @@ impl WeakMember {
 /// from [`RoomSpec`].
 ///
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
-// TODO: maybe provide Rpc config here??
 pub fn parse_members(
     room_spec: &RoomSpec,
     rpc_conf: RpcConf,

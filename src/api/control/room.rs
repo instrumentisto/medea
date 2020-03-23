@@ -2,7 +2,7 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
@@ -17,7 +17,6 @@ use super::{
     pipeline::Pipeline,
     MemberId, RootElement, TryFromElementError,
 };
-use std::time::Duration;
 
 /// ID of [`Room`].
 ///

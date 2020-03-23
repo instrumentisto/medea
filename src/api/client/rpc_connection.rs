@@ -2,7 +2,7 @@
 //!
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
 use actix::Message;
 use derive_more::{From, Into};
@@ -10,7 +10,6 @@ use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{CloseDescription, Command, Event};
 
 use crate::api::control::MemberId;
-use std::time::Duration;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(Message)]
@@ -61,9 +60,14 @@ pub trait RpcConnection: fmt::Debug + Send {
         -> LocalBoxFuture<'static, Result<(), ()>>;
 }
 
-#[derive(Debug)]
+/// Settings for the [`WsSession`].
+#[derive(Clone, Copy, Debug)]
 pub struct WsSessionSettings {
+    /// Duration, after which [`WsSession`] will be considered IDLE if no
+    /// heartbeat messages received.
     pub idle_timeout: Duration,
+
+    /// Interval of sending `Ping`s from the server to the client.
     pub ping_interval: Duration,
 }
 
