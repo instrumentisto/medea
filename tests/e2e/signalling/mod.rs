@@ -7,7 +7,8 @@ mod three_pubs;
 use std::time::Duration;
 
 use actix::{
-    Actor, Addr, Arbiter, AsyncContext, Context, Handler, StreamHandler,
+    Actor, ActorContext, Addr, Arbiter, AsyncContext, Context, Handler,
+    StreamHandler,
 };
 use actix_codec::Framed;
 use actix_http::ws;
@@ -23,6 +24,18 @@ use medea_client_api_proto::{
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
+
+pub type ConnectionEventHandler = Box<dyn FnMut(ConnectionEvent)>;
+
+/// Event which will be provided into [`ConnectionEventHandler`] when connection
+/// will be established or disconnected.
+pub enum ConnectionEvent {
+    /// Connection established.
+    Started,
+
+    /// Connection disconnected.
+    Stopped,
+}
 
 /// Medea client for testing purposes.
 pub struct TestMember {
@@ -41,6 +54,10 @@ pub struct TestMember {
     /// Function which will be called at every received [`Event`]
     /// by this [`TestMember`].
     on_message: MessageHandler,
+
+    /// Function which will be called when connection will be established and
+    /// disconnected.
+    on_connection_event: ConnectionEventHandler,
 }
 
 impl TestMember {
@@ -67,6 +84,7 @@ impl TestMember {
     pub async fn connect(
         uri: &str,
         on_message: MessageHandler,
+        on_connection_event: ConnectionEventHandler,
         deadline: Option<Duration>,
     ) -> Addr<Self> {
         let (_, framed) = awc::Client::new().ws(uri).connect().await.unwrap();
@@ -80,20 +98,27 @@ impl TestMember {
                 events: Vec::new(),
                 deadline,
                 on_message,
+                on_connection_event,
             }
         })
     }
 
     /// Starts test member on current thread by given URI.
+    ///
     /// `on_message` - is function which will be called at every [`Event`]
     /// received from server.
+    ///
+    /// `on_connection_event` - is function which will be called when connection
+    /// will be established and disconnected.
     pub fn start(
         uri: String,
         on_message: MessageHandler,
+        on_connection_event: ConnectionEventHandler,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(async move {
-            Self::connect(&uri, on_message, deadline).await;
+            Self::connect(&uri, on_message, on_connection_event, deadline)
+                .await;
         })
     }
 }
@@ -210,5 +235,15 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                 ServerMsg::RpcSettings(_) => {}
             }
         }
+    }
+
+    fn started(&mut self, _: &mut Self::Context) {
+        (self.on_connection_event)(ConnectionEvent::Started);
+    }
+
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        (self.on_connection_event)(ConnectionEvent::Stopped);
+
+        ctx.stop()
     }
 }

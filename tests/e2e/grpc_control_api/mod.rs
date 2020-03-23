@@ -5,6 +5,7 @@
 
 mod create;
 mod delete;
+mod rpc_settings;
 mod signaling;
 
 use std::collections::HashMap;

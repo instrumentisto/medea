@@ -68,6 +68,7 @@ async fn command_validation() {
                 tx1.unbounded_send(event.clone()).unwrap();
             },
         ),
+        Box::new(|_| {}),
         deadline,
     )
     .await;
@@ -82,6 +83,7 @@ async fn command_validation() {
                 tx2.unbounded_send(event.clone()).unwrap();
             },
         ),
+        Box::new(|_| {}),
         deadline,
     );
 

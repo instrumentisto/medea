@@ -525,3 +525,92 @@ impl ParticipantService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+    use std::time::Duration;
+
+    pub fn empty_participants_service() -> ParticipantService {
+        let room_spec = RoomSpec {
+            id: RoomId::from("test"),
+            pipeline: Pipeline::new(HashMap::new()),
+        };
+        let ctx = AppContext::new(
+            Conf::default(),
+            crate::turn::new_turn_auth_service_mock(),
+        );
+
+        ParticipantService::new(&room_spec, &ctx).unwrap()
+    }
+
+    /// Tests that when no RPC settings is provided in the `Member` element
+    /// spec, default RPC settings from config will be used.
+    #[test]
+    fn use_conf_when_no_rpc_settings_in_member_spec() {
+        let mut members = empty_participants_service();
+
+        let test_member_spec = MemberSpec::new(
+            Pipeline::new(HashMap::new()),
+            String::from("w/e"),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let test_member_id = MemberId(String::from("test-member"));
+        members
+            .create_member(test_member_id.clone(), &test_member_spec)
+            .unwrap();
+
+        let test_member = members.get_member_by_id(&test_member_id).unwrap();
+        let default_rpc_conf = Conf::default().rpc;
+
+        assert_eq!(
+            test_member.get_ping_interval(),
+            default_rpc_conf.ping_interval
+        );
+        assert_eq!(
+            test_member.get_idle_timeout(),
+            default_rpc_conf.idle_timeout
+        );
+        assert_eq!(
+            test_member.get_reconnect_timeout(),
+            default_rpc_conf.reconnect_timeout
+        );
+    }
+
+    /// Tests that when RPC settings is provided in the `Member` element spec,
+    /// this RPC settings will be used.
+    #[test]
+    fn use_rpc_settings_from_member_spec() {
+        let mut members = empty_participants_service();
+
+        let idle_timeout = Duration::from_secs(60);
+        let ping_interval = Duration::from_secs(61);
+        let reconnect_timeout = Duration::from_secs(62);
+
+        let test_member_spec = MemberSpec::new(
+            Pipeline::new(HashMap::new()),
+            String::from("w/e"),
+            None,
+            None,
+            Some(idle_timeout),
+            Some(reconnect_timeout),
+            Some(ping_interval),
+        );
+
+        let test_member_id = MemberId(String::from("test-member"));
+        members
+            .create_member(test_member_id.clone(), &test_member_spec)
+            .unwrap();
+
+        let test_member = members.get_member_by_id(&test_member_id).unwrap();
+        assert_eq!(test_member.get_ping_interval(), ping_interval);
+        assert_eq!(test_member.get_idle_timeout(), idle_timeout);
+        assert_eq!(test_member.get_reconnect_timeout(), reconnect_timeout);
+    }
+}
