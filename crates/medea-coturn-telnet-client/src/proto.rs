@@ -219,18 +219,17 @@ impl Decoder for CoturnCliCodec {
     }
 }
 
-impl Encoder for CoturnCliCodec {
+impl Encoder<CoturnCliRequest> for CoturnCliCodec {
     type Error = io::Error;
-    type Item = CoturnCliRequest;
 
     fn encode(
         &mut self,
-        item: Self::Item,
+        req: CoturnCliRequest,
         dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
-        let item: Bytes = item.into();
-        dst.reserve(item.len());
-        dst.put(item);
+        let req: Bytes = req.into();
+        dst.reserve(req.len());
+        dst.put(req);
         Ok(())
     }
 }
