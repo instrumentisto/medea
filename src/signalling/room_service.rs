@@ -128,21 +128,24 @@ pub struct RoomService {
 
 impl RoomService {
     /// Creates new [`RoomService`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetrics`] fails to
+    /// connect to a Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
-    ) -> Self {
-        Self {
-            _coturn_metrics: CoturnMetrics::new(&app.config.turn)
-                .unwrap()
-                .start(),
+    ) -> Result<Self, redis_pub_sub::RedisError> {
+        Ok(Self {
+            _coturn_metrics: CoturnMetrics::new(&app.config.turn)?.start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             room_repo,
             app,
             graceful_shutdown,
-        }
+        })
     }
 
     /// Closes [`Room`] with provided [`RoomId`].

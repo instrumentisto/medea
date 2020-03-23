@@ -13,10 +13,6 @@ fn pub_sub_video_call() {
         let test_fn = move |event: &Event,
                             _: &mut Context<TestMember>,
                             events: Vec<&Event>| {
-            println!(
-                "\n\n\n\n\n\n\n\n\n\nEvent: {:?}\n\n\n\n\n\n\n\n\n\n\n\n\n",
-                event
-            );
             let peers_count = events
                 .iter()
                 .filter(|e| match e {

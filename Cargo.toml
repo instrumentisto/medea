@@ -67,7 +67,8 @@ url = "2.1"
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]
-# TODO: use 'redis' from the crate.io when mitsuhiko/redis-rs#287 will be released and used in 'deadpool-redis'.
+# TODO: use 'redis' from the crates.io when mitsuhiko/redis-rs#287 will
+#       be released and used in 'deadpool-redis'.
 [dependencies.redis-pub-sub]
     git = "https://github.com/mitsuhiko/redis-rs"
     package = "redis"
