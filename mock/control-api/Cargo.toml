@@ -17,6 +17,7 @@ actix-web = "2.0"
 clap = "2.33"
 dotenv = "0.13"
 futures = "0.1"
+humantime-serde = "1.0"
 tonic = "0.1"
 medea-control-api-proto = { path = "../../proto/control-api" }
 protobuf = "2.7"

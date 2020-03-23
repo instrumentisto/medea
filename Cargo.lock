@@ -1395,6 +1395,7 @@ dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "humantime-serde 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-control-api-proto 0.1.0-dev",
  "protobuf 2.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
