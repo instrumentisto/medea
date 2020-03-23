@@ -23,6 +23,7 @@ use crate::{
         client::rpc_connection::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
+            WsSessionSettings,
         },
         control::{
             callback::{
@@ -1104,7 +1105,7 @@ impl Handler<SerializeProto> for Room {
 }
 
 impl Handler<Authorize> for Room {
-    type Result = Result<(), AuthorizationError>;
+    type Result = Result<WsSessionSettings, AuthorizationError>;
 
     /// Responses with `Ok` if `RpcConnection` is authorized, otherwise `Err`s.
     fn handle(
@@ -1114,7 +1115,10 @@ impl Handler<Authorize> for Room {
     ) -> Self::Result {
         self.members
             .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
-            .map(|_| ())
+            .map(move |member| WsSessionSettings {
+                idle_timeout: member.get_idle_timeout(),
+                reconnection_timeout: member.get_reconnection_timeout(),
+            })
     }
 }
 

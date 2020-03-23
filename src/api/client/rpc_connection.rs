@@ -10,6 +10,7 @@ use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{CloseDescription, Command, Event};
 
 use crate::api::control::MemberId;
+use std::time::Duration;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(Message)]
@@ -60,9 +61,15 @@ pub trait RpcConnection: fmt::Debug + Send {
         -> LocalBoxFuture<'static, Result<(), ()>>;
 }
 
+#[derive(Debug)]
+pub struct WsSessionSettings {
+    pub idle_timeout: Duration,
+    pub reconnection_timeout: Duration,
+}
+
 /// Signal for authorizing new [`RpcConnection`] before establishing.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), AuthorizationError>")]
+#[rtype(result = "Result<WsSessionSettings, AuthorizationError>")]
 pub struct Authorize {
     /// ID of [`Member`] to authorize [`RpcConnection`] for.
     ///

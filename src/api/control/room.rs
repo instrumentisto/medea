@@ -34,7 +34,6 @@ pub struct Id(String);
 pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
-    // FIXME: maybe just use MemberSpec??????
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,

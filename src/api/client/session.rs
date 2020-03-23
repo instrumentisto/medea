@@ -20,7 +20,9 @@ use medea_client_api_proto::{
 
 use crate::{
     api::{
-        client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
+        client::rpc_connection::{
+            ClosedReason, EventMessage, RpcConnection, WsSessionSettings,
+        },
         control::{MemberId, RoomId},
         RpcServer,
     },
@@ -82,18 +84,17 @@ impl WsSession {
         member_id: MemberId,
         room_id: RoomId,
         room: Box<dyn RpcServer>,
-        idle_timeout: Duration,
-        ping_interval: Duration,
+        settings: WsSessionSettings,
     ) -> Self {
         Self {
             id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
             member_id,
             room_id,
             room,
-            idle_timeout,
+            idle_timeout: settings.idle_timeout,
             last_activity: Instant::now(),
             last_ping_num: 0,
-            ping_interval,
+            ping_interval: settings.reconnection_timeout,
             close_reason: None,
         }
     }
