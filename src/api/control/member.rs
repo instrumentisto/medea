@@ -65,6 +65,8 @@ pub struct MemberSpec {
     idle_timeout: Option<Duration>,
 
     reconnection_timeout: Option<Duration>,
+
+    ping_interval: Option<Duration>,
 }
 
 impl Into<RoomElement> for MemberSpec {
@@ -76,6 +78,7 @@ impl Into<RoomElement> for MemberSpec {
             on_leave: self.on_leave,
             idle_timeout: self.idle_timeout,
             reconnection_timeout: self.reconnection_timeout,
+            ping_interval: self.ping_interval,
         }
     }
 }
@@ -90,6 +93,7 @@ impl MemberSpec {
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
         reconnection_timeout: Option<Duration>,
+        ping_interval: Option<Duration>,
     ) -> Self {
         Self {
             pipeline,
@@ -98,6 +102,7 @@ impl MemberSpec {
             on_leave,
             idle_timeout,
             reconnection_timeout,
+            ping_interval,
         }
     }
 
@@ -160,6 +165,10 @@ impl MemberSpec {
     pub fn reconnection_timeout(&self) -> Option<Duration> {
         self.reconnection_timeout
     }
+
+    pub fn ping_interval(&self) -> Option<Duration> {
+        self.ping_interval
+    }
 }
 
 /// Generates alphanumeric credentials for [`Member`] with
@@ -220,6 +229,9 @@ impl TryFrom<proto::Member> for MemberSpec {
         let reconnection_timeout = Some(member.reconnection_timeout)
             .filter(|t| t != &0)
             .map(Duration::from_secs);
+        let ping_interval = Some(member.ping_interval)
+            .filter(|t| t != &0)
+            .map(Duration::from_secs);
 
         Ok(Self {
             pipeline: Pipeline::new(pipeline),
@@ -228,6 +240,7 @@ impl TryFrom<proto::Member> for MemberSpec {
             on_leave,
             idle_timeout,
             reconnection_timeout,
+            ping_interval,
         })
     }
 }
@@ -270,6 +283,7 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 on_join,
                 idle_timeout,
                 reconnection_timeout,
+                ping_interval,
             } => Ok(Self {
                 pipeline: spec.clone(),
                 credentials: credentials.clone(),
@@ -277,6 +291,7 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 on_join: on_join.clone(),
                 idle_timeout: idle_timeout.clone(),
                 reconnection_timeout: reconnection_timeout.clone(),
+                ping_interval: ping_interval.clone(),
             }),
             _ => Err(TryFromElementError::NotMember),
         }

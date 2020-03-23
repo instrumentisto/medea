@@ -59,7 +59,6 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
-use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -193,10 +192,6 @@ pub struct Room {
 
     /// Current state of this [`Room`].
     state: State,
-
-    default_idle_timeout: Duration,
-
-    default_reconnection_timeout: Duration,
 }
 
 impl Room {
@@ -216,8 +211,6 @@ impl Room {
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
-            default_idle_timeout: context.config.rpc.idle_timeout,
-            default_reconnection_timeout: context.config.rpc.reconnect_timeout,
         })
     }
 
@@ -687,81 +680,6 @@ impl Room {
         Ok(())
     }
 
-    /// Creates new [`Member`] in this [`ParticipantService`].
-    ///
-    /// This function will check that new [`Member`]'s ID is not present in
-    /// [`ParticipantService`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
-    /// provided [`MemberId`] already exists in [`ParticipantService`].
-    pub fn create_member(
-        &mut self,
-        id: MemberId,
-        spec: &MemberSpec,
-    ) -> Result<(), RoomError> {
-        if self.members.get_member_by_id(&id).is_some() {
-            return Err(RoomError::MemberAlreadyExists(
-                self.members.get_fid_to_member(id),
-            ));
-        }
-        let signalling_member = Member::new(
-            id.clone(),
-            spec.credentials().to_string(),
-            self.id.clone(),
-            spec.idle_timeout().unwrap_or(self.default_idle_timeout),
-            spec.reconnection_timeout()
-                .unwrap_or(self.default_reconnection_timeout),
-        );
-
-        signalling_member.set_callback_urls(spec);
-
-        for (id, publish) in spec.publish_endpoints() {
-            let signalling_publish = WebRtcPublishEndpoint::new(
-                id.clone(),
-                publish.p2p,
-                signalling_member.downgrade(),
-                publish.force_relay,
-            );
-            signalling_member.insert_src(signalling_publish);
-        }
-
-        for (id, play) in spec.play_endpoints() {
-            let partner_member =
-                self.members.get_member(&play.src.member_id)?;
-            let src = partner_member
-                .get_src_by_id(&play.src.endpoint_id)
-                .ok_or_else(|| {
-                    MemberError::EndpointNotFound(
-                        partner_member.get_fid_to_endpoint(
-                            play.src.endpoint_id.clone().into(),
-                        ),
-                    )
-                })?;
-
-            let sink = WebRtcPlayEndpoint::new(
-                id.clone(),
-                play.src.clone(),
-                src.downgrade(),
-                signalling_member.downgrade(),
-                play.force_relay,
-            );
-
-            signalling_member.insert_sink(sink);
-        }
-
-        // This is needed for atomicity.
-        for (_, sink) in signalling_member.sinks() {
-            let src = sink.src();
-            src.add_sink(sink.downgrade());
-        }
-
-        self.members.insert_member(id, signalling_member);
-
-        Ok(())
-    }
-
     /// Validates given [`CommandMessage`].
     ///
     /// Two assertions are made:
@@ -1117,7 +1035,7 @@ impl Handler<Authorize> for Room {
             .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .map(move |member| WsSessionSettings {
                 idle_timeout: member.get_idle_timeout(),
-                reconnection_timeout: member.get_reconnection_timeout(),
+                ping_interval: member.get_ping_interval(),
             })
     }
 }
@@ -1355,7 +1273,7 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        self.create_member(msg.0.clone(), &msg.1)?;
+        self.members.create_member(msg.0.clone(), &msg.1)?;
         debug!(
             "Member [id = {}] created in Room [id = {}].",
             msg.0, self.id

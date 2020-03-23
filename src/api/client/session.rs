@@ -94,7 +94,7 @@ impl WsSession {
             idle_timeout: settings.idle_timeout,
             last_activity: Instant::now(),
             last_ping_num: 0,
-            ping_interval: settings.reconnection_timeout,
+            ping_interval: settings.ping_interval,
             close_reason: None,
         }
     }

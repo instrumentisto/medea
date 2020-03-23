@@ -64,7 +64,7 @@ pub trait RpcConnection: fmt::Debug + Send {
 #[derive(Debug)]
 pub struct WsSessionSettings {
     pub idle_timeout: Duration,
-    pub reconnection_timeout: Duration,
+    pub ping_interval: Duration,
 }
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.

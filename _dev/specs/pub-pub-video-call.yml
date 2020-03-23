@@ -8,8 +8,9 @@ spec:
       credentials: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
-      idle_timeout: 1m
-      reconnection_timeout: 1m
+      idle_timeout: 5s
+      reconnection_timeout: 5s
+      ping_interval:  7s
       spec:
         pipeline:
           # Media element which is able to receive media data from client

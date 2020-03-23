@@ -32,13 +32,15 @@ use crate::{
         },
         control::{
             refs::{Fid, ToEndpoint, ToMember},
-            MemberId, RoomId, RoomSpec,
+            MemberId, MemberSpec, RoomId, RoomSpec,
         },
     },
     log::prelude::*,
     signalling::{
         elements::{
-            member::MemberError, parse_members, Member, MembersLoadError,
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
+            parse_members, Member, MembersLoadError,
         },
         room::{ActFuture, RoomError},
         Room,
@@ -107,9 +109,13 @@ pub struct ParticipantService {
     /// Reference to [`TurnAuthService`].
     turn_service: Arc<dyn TurnAuthService>,
 
-    /// Duration, after which the server deletes the client session if
-    /// the remote RPC client does not reconnect after it is idle.
-    rpc_reconnect_timeout: Duration,
+    default_idle_timeout: Duration,
+
+    /// Default [`Duration`], after which the server deletes the client session
+    /// if the remote RPC client does not reconnect after it is idle.
+    default_reconnection_timeout: Duration,
+
+    default_ping_interval: Duration,
 }
 
 impl ParticipantService {
@@ -128,11 +134,14 @@ impl ParticipantService {
                 room_spec,
                 context.config.rpc.idle_timeout,
                 context.config.rpc.reconnect_timeout,
+                context.config.rpc.ping_interval,
             )?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
             turn_service: context.turn_service.clone(),
-            rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
+            default_reconnection_timeout: context.config.rpc.reconnect_timeout,
+            default_idle_timeout: context.config.rpc.idle_timeout,
+            default_ping_interval: context.config.rpc.ping_interval,
         })
     }
 
@@ -322,19 +331,26 @@ impl ParticipantService {
                 //       now.
             }
             ClosedReason::Lost => {
-                self.drop_connection_tasks.insert(
-                    member_id.clone(),
-                    ctx.run_later(self.rpc_reconnect_timeout, move |_, ctx| {
-                        info!(
-                            "Member [id = {}] connection lost at {:?}.",
-                            member_id, closed_at,
-                        );
-                        ctx.notify(RpcConnectionClosed {
-                            member_id,
-                            reason: ClosedReason::Closed { normal: false },
-                        })
-                    }),
-                );
+                if let Some(member) = self.get_member_by_id(&member_id) {
+                    self.drop_connection_tasks.insert(
+                        member_id.clone(),
+                        ctx.run_later(
+                            member.get_reconnection_timeout(),
+                            move |_, ctx| {
+                                info!(
+                                    "Member [id = {}] connection lost at {:?}.",
+                                    member_id, closed_at,
+                                );
+                                ctx.notify(RpcConnectionClosed {
+                                    member_id,
+                                    reason: ClosedReason::Closed {
+                                        normal: false,
+                                    },
+                                })
+                            },
+                        ),
+                    );
+                }
             }
         }
     }
@@ -445,5 +461,80 @@ impl ParticipantService {
     /// [`ParticipantRepository`] stores.
     pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
         self.members.iter()
+    }
+
+    /// Creates new [`Member`] in this [`ParticipantService`].
+    ///
+    /// This function will check that new [`Member`]'s ID is not present in
+    /// [`ParticipantService`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
+    /// provided [`MemberId`] already exists in [`ParticipantService`].
+    pub fn create_member(
+        &mut self,
+        id: MemberId,
+        spec: &MemberSpec,
+    ) -> Result<(), RoomError> {
+        if self.get_member_by_id(&id).is_some() {
+            return Err(RoomError::MemberAlreadyExists(
+                self.get_fid_to_member(id),
+            ));
+        }
+        let signalling_member = Member::new(
+            id.clone(),
+            spec.credentials().to_string(),
+            self.room_id.clone(),
+            spec.idle_timeout().unwrap_or(self.default_idle_timeout),
+            spec.reconnection_timeout()
+                .unwrap_or(self.default_reconnection_timeout),
+            spec.ping_interval().unwrap_or(self.default_ping_interval),
+        );
+
+        signalling_member.set_callback_urls(spec);
+
+        for (id, publish) in spec.publish_endpoints() {
+            let signalling_publish = WebRtcPublishEndpoint::new(
+                id.clone(),
+                publish.p2p,
+                signalling_member.downgrade(),
+                publish.force_relay,
+            );
+            signalling_member.insert_src(signalling_publish);
+        }
+
+        for (id, play) in spec.play_endpoints() {
+            let partner_member = self.get_member(&play.src.member_id)?;
+            let src = partner_member
+                .get_src_by_id(&play.src.endpoint_id)
+                .ok_or_else(|| {
+                    MemberError::EndpointNotFound(
+                        partner_member.get_fid_to_endpoint(
+                            play.src.endpoint_id.clone().into(),
+                        ),
+                    )
+                })?;
+
+            let sink = WebRtcPlayEndpoint::new(
+                id.clone(),
+                play.src.clone(),
+                src.downgrade(),
+                signalling_member.downgrade(),
+                play.force_relay,
+            );
+
+            signalling_member.insert_sink(sink);
+        }
+
+        // This is needed for atomicity.
+        for (_, sink) in signalling_member.sinks() {
+            let src = sink.src();
+            src.add_sink(sink.downgrade());
+        }
+
+        self.insert_member(id, signalling_member);
+
+        Ok(())
     }
 }

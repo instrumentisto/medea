@@ -144,6 +144,7 @@ message Member {
   map<string, Member.Element> pipeline = 5;
   uint64 idle_timeout = 6;
   uint64 reconnection_timeout = 7;
+  uint64 ping_interval = 8;
 
   // Elements which Member's pipeline can contain.
   message Element {

@@ -39,6 +39,9 @@ pub struct Member {
 
     #[serde(default = "default_grpc_uint64")]
     reconnection_timeout: u64,
+
+    #[serde(default = "default_grpc_uint64")]
+    ping_interval: u64,
 }
 
 fn default_grpc_uint64() -> u64 {
@@ -63,6 +66,7 @@ impl Member {
             on_leave: self.on_leave.unwrap_or_default(),
             idle_timeout: self.idle_timeout,
             reconnection_timeout: self.reconnection_timeout,
+            ping_interval: self.ping_interval,
         }
     }
 
@@ -91,6 +95,7 @@ impl From<proto::Member> for Member {
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
             idle_timeout: proto.idle_timeout,
             reconnection_timeout: proto.reconnection_timeout,
+            ping_interval: proto.ping_interval,
         }
     }
 }

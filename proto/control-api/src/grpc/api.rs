@@ -169,6 +169,8 @@ pub struct Member {
     pub idle_timeout: u64,
     #[prost(uint64, tag="7")]
     pub reconnection_timeout: u64,
+    #[prost(uint64, tag="8")]
+    pub ping_interval: u64,
 }
 pub mod member {
     /// Elements which Member's pipeline can contain.

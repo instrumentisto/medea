@@ -45,6 +45,9 @@ pub enum RoomElement {
         #[serde(default)]
         #[serde(with = "humantime_serde")]
         reconnection_timeout: Option<Duration>,
+        #[serde(default)]
+        #[serde(with = "humantime_serde")]
+        ping_interval: Option<Duration>,
     },
 }
 

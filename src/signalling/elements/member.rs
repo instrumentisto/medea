@@ -95,6 +95,8 @@ struct MemberInner {
     idle_timeout: Duration,
 
     reconnection_timeout: Duration,
+
+    ping_interval: Duration,
 }
 
 impl Member {
@@ -108,6 +110,7 @@ impl Member {
         room_id: RoomId,
         idle_timeout: Duration,
         reconnection_timeout: Duration,
+        ping_interval: Duration,
     ) -> Self {
         Self(Rc::new(RefCell::new(MemberInner {
             id,
@@ -120,6 +123,7 @@ impl Member {
             on_join: None,
             idle_timeout,
             reconnection_timeout,
+            ping_interval,
         })))
     }
 
@@ -453,6 +457,10 @@ impl Member {
         self.0.borrow().reconnection_timeout
     }
 
+    pub fn get_ping_interval(&self) -> Duration {
+        self.0.borrow().ping_interval
+    }
+
     /// Sets all [`CallbackUrl`]'s from [`MemberSpec`].
     pub fn set_callback_urls(&self, spec: &MemberSpec) {
         self.0.borrow_mut().on_leave = spec.on_leave().clone();
@@ -489,10 +497,12 @@ impl WeakMember {
 /// from [`RoomSpec`].
 ///
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
+// TODO: maybe provide Rpc config here??
 pub fn parse_members(
     room_spec: &RoomSpec,
     default_idle_timeout: Duration,
     default_reconnection_timeout: Duration,
+    default_ping_interval: Duration,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -512,6 +522,7 @@ pub fn parse_members(
                 member
                     .reconnection_timeout()
                     .unwrap_or(default_reconnection_timeout),
+                member.ping_interval().unwrap_or(default_ping_interval),
             );
             (id.clone(), new_member)
         })
@@ -571,6 +582,7 @@ impl Into<proto::Member> for Member {
                 .unwrap_or_default(),
             reconnection_timeout: self.get_reconnection_timeout().as_secs(),
             idle_timeout: self.get_idle_timeout().as_secs(),
+            ping_interval: self.get_ping_interval().as_secs(),
             pipeline: member_pipeline,
         }
     }
