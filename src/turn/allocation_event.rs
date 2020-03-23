@@ -7,83 +7,148 @@ use medea_client_api_proto::PeerId;
 
 use crate::api::control::RoomId;
 
-/// Traffic stats of some allocation.
-#[derive(Clone, Debug, Copy)]
-pub struct Traffic {
-    /// Count of packets received by allocation.
-    pub received_packets: u64,
+/// Errors which can occur while [`CoturnEvent`] parsing.
+#[derive(Debug, Display)]
+pub enum CoturnEventParseError {
+    /// Unsupported allocation status.
+    #[display(fmt = "Unsupported allocation status: {}", _0)]
+    UnsupportedStatus(String),
 
-    /// Count of bytes received by allocation.
-    pub received_bytes: u64,
+    /// Unsupported allocation event type.
+    #[display(fmt = "Unsupported allocation event type: {}", _0)]
+    UnsupportedEventType(String),
 
-    /// Count of packets received by allocation.
-    pub sent_packets: u64,
+    /// Some traffic stats event's field not found.
+    #[display(fmt = "Field {} not found in traffic event", _0)]
+    FieldNotFoundInTrafficUpdate(String),
 
-    /// Count of bytes sent by allocation.
-    pub sent_bytes: u64,
+    /// Failed to parse traffic event stat metadata.
+    #[display(
+        fmt = "Failed to parse traffic stat '{}' from traffic event.",
+        _0
+    )]
+    FailedToParseTrafficMap(String),
+
+    /// Status is empty.
+    #[display(fmt = "Status is empty.")]
+    EmptyStatus,
+
+    /// Status doesn't have metadata.
+    #[display(fmt = "Status doesn't have metadata.")]
+    NoMetadataInStatus,
+
+    /// Allocation lifetime parsing failed.
+    #[display(fmt = "Allocation lifetime parsing failed.")]
+    FailedLifetimeParsing,
+
+    /// Redis channel info is empty.
+    #[display(fmt = "Redis channel info is empty.")]
+    NoChannelInfo,
+
+    /// No user metadata.
+    #[display(fmt = "No user metadata.")]
+    NoUserInfo,
+
+    /// No MemberId metadata.
+    #[display(fmt = "No MemberId metadata.")]
+    NoMemberId,
+
+    /// No [`PeerId`] metadata.
+    #[display(fmt = "No PeerId metadata.")]
+    NoPeerId,
+
+    /// No allocation ID metadata.
+    #[display(fmt = "No allocation ID metadata.")]
+    NoAllocationId,
+
+    /// Event type is not provided.
+    #[display(fmt = "No event type.")]
+    NoEventType,
+
+    /// Wrong Redis payload type.
+    #[display(fmt = "Wrong Redis paylod type.")]
+    WrongPayloadType,
 }
 
-impl Traffic {
-    /// Tries to parse [`Traffic`] stats from the provided [`str`].
+/// Allocation event received from the Coturn.
+#[derive(Debug)]
+pub struct CoturnEvent {
+    /// Actual allocation event received from the Coturn.
+    pub event: CoturnAllocationEvent,
+
+    /// [`RoomId`] for which this [`CoturnEvent`] was received.
+    pub room_id: RoomId,
+
+    /// [`PeerId`] for which this [`CoturnEvent`] was received.
+    pub peer_id: PeerId,
+
+    /// Allocation ID for which this [`CoturnEvent`] was received.
+    pub allocation_id: u64,
+}
+
+impl CoturnEvent {
+    /// Tries to parse [`CoturnEvnet]` from a provided Redis message.
     ///
     /// # Errors
     ///
+    /// All [`CoturnEventParseError`]s can be returned from this function, so
+    /// read docs of this error.
+    ///
     /// All errors from this function should never happen, so no sense to catch
     /// them individually.
-    pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
-        let mut items: HashMap<&str, u64> = body
-            .split(", ")
-            .map(|i| {
-                let mut splitted_item = i.split('=');
-                let key = splitted_item.next().ok_or_else(|| {
-                    CoturnEventParseError::FailedToParseTrafficMap(
-                        body.to_string(),
-                    )
-                })?;
-                let value: u64 = splitted_item
+    pub fn parse(
+        msg: &redis_pub_sub::Msg,
+    ) -> Result<Self, CoturnEventParseError> {
+        let channel: String = msg
+            .get_channel()
+            .map_err(|_| CoturnEventParseError::NoChannelInfo)?;
+        let mut channel_splitted = channel.split('/').skip(4);
+
+        let (room_id, peer_id) = {
+            let user = channel_splitted
+                .next()
+                .ok_or(CoturnEventParseError::NoUserInfo)?;
+            let mut user_splitted = user.split('_');
+            let room_id = RoomId::from(
+                user_splitted
                     .next()
-                    .ok_or_else(|| {
-                        CoturnEventParseError::FailedToParseTrafficMap(
-                            body.to_string(),
-                        )
-                    })?
+                    .ok_or(CoturnEventParseError::NoMemberId)?
+                    .to_string(),
+            );
+            let peer_id = PeerId(
+                user_splitted
+                    .next()
+                    .ok_or(CoturnEventParseError::NoPeerId)?
                     .parse()
-                    .map_err(|_| {
-                        CoturnEventParseError::FailedToParseTrafficMap(
-                            body.to_string(),
-                        )
-                    })?;
+                    .map_err(|_| CoturnEventParseError::NoPeerId)?,
+            );
 
-                Ok((key, value))
-            })
-            .collect::<Result<_, _>>()?;
+            (room_id, peer_id)
+        };
 
-        let received_packets = items.remove("rcvp").ok_or_else(|| {
-            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                "rcvp".to_string(),
-            )
-        })?;
-        let received_bytes = items.remove("rcvb").ok_or_else(|| {
-            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                "rcvb".to_string(),
-            )
-        })?;
-        let sent_packets = items.remove("sentp").ok_or_else(|| {
-            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                "sentp".to_string(),
-            )
-        })?;
-        let sent_bytes = items.remove("sentb").ok_or_else(|| {
-            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
-                "sentb".to_string(),
-            )
-        })?;
+        let mut channel_splitted = channel_splitted.skip(1);
 
-        Ok(Self {
-            received_packets,
-            received_bytes,
-            sent_packets,
-            sent_bytes,
+        let allocation_id: u64 = channel_splitted
+            .next()
+            .ok_or(CoturnEventParseError::NoAllocationId)?
+            .parse()
+            .map_err(|_| CoturnEventParseError::NoAllocationId)?;
+        let event_type = channel_splitted
+            .next()
+            .ok_or(CoturnEventParseError::NoEventType)?;
+
+        let event = CoturnAllocationEvent::parse(
+            event_type,
+            msg.get_payload::<String>()
+                .map_err(|_| CoturnEventParseError::WrongPayloadType)?
+                .as_str(),
+        )?;
+
+        Ok(CoturnEvent {
+            event,
+            room_id,
+            peer_id,
+            allocation_id,
         })
     }
 }
@@ -186,148 +251,83 @@ impl CoturnAllocationEvent {
     }
 }
 
-/// Allocation event received from the Coturn.
-#[derive(Debug)]
-pub struct CoturnEvent {
-    /// Actual allocation event received from the Coturn.
-    pub event: CoturnAllocationEvent,
+/// Traffic stats of some allocation.
+#[derive(Clone, Debug, Copy)]
+pub struct Traffic {
+    /// Count of packets received by allocation.
+    pub received_packets: u64,
 
-    /// [`RoomId`] for which this [`CoturnEvent`] was received.
-    pub room_id: RoomId,
+    /// Count of bytes received by allocation.
+    pub received_bytes: u64,
 
-    /// [`PeerId`] for which this [`CoturnEvent`] was received.
-    pub peer_id: PeerId,
+    /// Count of packets received by allocation.
+    pub sent_packets: u64,
 
-    /// Allocation ID for which this [`CoturnEvent`] was received.
-    pub allocation_id: u64,
+    /// Count of bytes sent by allocation.
+    pub sent_bytes: u64,
 }
 
-impl CoturnEvent {
-    /// Tries to parse [`CoturnEvnet]` from a provided Redis message.
+impl Traffic {
+    /// Tries to parse [`Traffic`] stats from the provided [`str`].
     ///
     /// # Errors
     ///
-    /// All [`CoturnEventParseError`]s can be returned from this function, so
-    /// read docs of this error.
-    ///
     /// All errors from this function should never happen, so no sense to catch
     /// them individually.
-    pub fn parse(
-        msg: &redis_pub_sub::Msg,
-    ) -> Result<Self, CoturnEventParseError> {
-        let channel: String = msg
-            .get_channel()
-            .map_err(|_| CoturnEventParseError::NoChannelInfo)?;
-        let mut channel_splitted = channel.split('/').skip(4);
-
-        let (room_id, peer_id) = {
-            let user = channel_splitted
-                .next()
-                .ok_or(CoturnEventParseError::NoUserInfo)?;
-            let mut user_splitted = user.split('_');
-            let room_id = RoomId::from(
-                user_splitted
+    pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
+        let mut items: HashMap<&str, u64> = body
+            .split(", ")
+            .map(|i| {
+                let mut splitted_item = i.split('=');
+                let key = splitted_item.next().ok_or_else(|| {
+                    CoturnEventParseError::FailedToParseTrafficMap(
+                        body.to_string(),
+                    )
+                })?;
+                let value: u64 = splitted_item
                     .next()
-                    .ok_or(CoturnEventParseError::NoMemberId)?
-                    .to_string(),
-            );
-            let peer_id = PeerId(
-                user_splitted
-                    .next()
-                    .ok_or(CoturnEventParseError::NoPeerId)?
+                    .ok_or_else(|| {
+                        CoturnEventParseError::FailedToParseTrafficMap(
+                            body.to_string(),
+                        )
+                    })?
                     .parse()
-                    .map_err(|_| CoturnEventParseError::NoPeerId)?,
-            );
+                    .map_err(|_| {
+                        CoturnEventParseError::FailedToParseTrafficMap(
+                            body.to_string(),
+                        )
+                    })?;
 
-            (room_id, peer_id)
-        };
+                Ok((key, value))
+            })
+            .collect::<Result<_, _>>()?;
 
-        let mut channel_splitted = channel_splitted.skip(1);
+        let received_packets = items.remove("rcvp").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "rcvp".to_string(),
+            )
+        })?;
+        let received_bytes = items.remove("rcvb").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "rcvb".to_string(),
+            )
+        })?;
+        let sent_packets = items.remove("sentp").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "sentp".to_string(),
+            )
+        })?;
+        let sent_bytes = items.remove("sentb").ok_or_else(|| {
+            CoturnEventParseError::FieldNotFoundInTrafficUpdate(
+                "sentb".to_string(),
+            )
+        })?;
 
-        let allocation_id: u64 = channel_splitted
-            .next()
-            .ok_or(CoturnEventParseError::NoAllocationId)?
-            .parse()
-            .map_err(|_| CoturnEventParseError::NoAllocationId)?;
-        let event_type = channel_splitted
-            .next()
-            .ok_or(CoturnEventParseError::NoEventType)?;
-
-        let event = CoturnAllocationEvent::parse(
-            event_type,
-            msg.get_payload::<String>()
-                .map_err(|_| CoturnEventParseError::WrongPayloadType)?
-                .as_str(),
-        )?;
-
-        Ok(CoturnEvent {
-            event,
-            room_id,
-            peer_id,
-            allocation_id,
+        Ok(Self {
+            received_packets,
+            received_bytes,
+            sent_packets,
+            sent_bytes,
         })
     }
-}
-
-/// Errors which can occur while [`CoturnEvent`] parsing.
-#[derive(Debug, Display)]
-pub enum CoturnEventParseError {
-    /// Unsupported allocation status.
-    #[display(fmt = "Unsupported allocation status: {}", _0)]
-    UnsupportedStatus(String),
-
-    /// Unsupported allocation event type.
-    #[display(fmt = "Unsupported allocation event type: {}", _0)]
-    UnsupportedEventType(String),
-
-    /// Some traffic stats event's field not found.
-    #[display(fmt = "Field {} not found in traffic event", _0)]
-    FieldNotFoundInTrafficUpdate(String),
-
-    /// Failed to parse traffic event stat metadata.
-    #[display(
-        fmt = "Failed to parse traffic stat '{}' from traffic event.",
-        _0
-    )]
-    FailedToParseTrafficMap(String),
-
-    /// Status is empty.
-    #[display(fmt = "Status is empty.")]
-    EmptyStatus,
-
-    /// Status doesn't have metadata.
-    #[display(fmt = "Status doesn't have metadata.")]
-    NoMetadataInStatus,
-
-    /// Allocation lifetime parsing failed.
-    #[display(fmt = "Allocation lifetime parsing failed.")]
-    FailedLifetimeParsing,
-
-    /// Redis channel info is empty.
-    #[display(fmt = "Redis channel info is empty.")]
-    NoChannelInfo,
-
-    /// No user metadata.
-    #[display(fmt = "No user metadata.")]
-    NoUserInfo,
-
-    /// No MemberId metadata.
-    #[display(fmt = "No MemberId metadata.")]
-    NoMemberId,
-
-    /// No [`PeerId`] metadata.
-    #[display(fmt = "No PeerId metadata.")]
-    NoPeerId,
-
-    /// No allocation ID metadata.
-    #[display(fmt = "No allocation ID metadata.")]
-    NoAllocationId,
-
-    /// Event type is not provided.
-    #[display(fmt = "No event type.")]
-    NoEventType,
-
-    /// Wrong Redis payload type.
-    #[display(fmt = "Wrong Redis paylod type.")]
-    WrongPayloadType,
 }
