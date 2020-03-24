@@ -474,7 +474,7 @@ endif
 ###################
 
 docker-env = $(strip $(if $(call eq,$(minikube),yes),\
-	$(subst export,,$(shell minikube docker-env | cut -d '#' -f1)),))
+	$(subst export,,$(shell minikube docker-env | cut -d '\#' -f1)),))
 
 # Authenticate to Container Registry where project Docker images are stored.
 #
