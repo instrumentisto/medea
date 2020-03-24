@@ -114,6 +114,7 @@ spec:
             - --listening-ip=$(EXTERNAL_IP)
             - --relay-ip=$(EXTERNAL_IP)
             - --redis-userdb=ip=127.0.0.1 port={{ $coturnDb.conf.port | int }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN__DB__REDIS__PASS)
+            - --redis-statsdb=ip=127.0.0.1 port={{ $coturnDb.conf.port | int }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN__DB__REDIS__PASS)
             - --user={{ .Values.server.conf.turn.user }}:$(MEDEA_TURN__PASS)
             - --cli-password=$(MEDEA_TURN__CLI__PASS)
           {{- with $coturn.extraArgs }}
