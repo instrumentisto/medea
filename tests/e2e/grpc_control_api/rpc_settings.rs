@@ -34,7 +34,7 @@ async fn rpc_settings_from_spec_works() {
                 .id("member")
                 .credentials("test")
                 .ping_interval(10u64)
-                .idle_timeout(2u64)
+                .idle_timeout(1u64)
                 .reconnect_timeout(0u64)
                 .build()
                 .unwrap(),
@@ -58,7 +58,7 @@ async fn rpc_settings_from_spec_works() {
             ConnectionEvent::Stopped => {
                 let deadline = connection_start_time.unwrap()
                     + Duration::from_millis(2500);
-                if deadline < Instant::now() {
+                if Instant::now() > deadline {
                     unreachable!()
                 }
 
