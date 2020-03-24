@@ -142,13 +142,13 @@ message Member {
   string credentials = 4;
   // Pipeline of this Member.
   map<string, Member.Element> pipeline = 5;
-  // Duration, after which remote RPC client will be considered idle if no
-  // heartbeat messages received. Defaults to `10s`.
+  // Duration, after which remote RPC client will be considered IDLE if no
+  // heartbeat messages received.
   uint64 idle_timeout = 6;
   // Duration, after which the server deletes the client session if
-  // the remote RPC client does not reconnect after it is idle.
+  // the remote RPC client does not reconnect after it is IDLE.
   uint64 reconnect_timeout = 7;
-  // Interval of sending `Ping`s from the server to the client.
+  // Interval of sending pings from the server to the client.
   uint64 ping_interval = 8;
 
   // Elements which Member's pipeline can contain.

@@ -473,10 +473,12 @@ impl ParticipantService {
             id.clone(),
             spec.credentials().to_string(),
             self.room_id.clone(),
-            spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
+            spec.idle_timeout()
+                .unwrap_or(self.rpc_conf.default_idle_timeout),
             spec.reconnect_timeout()
-                .unwrap_or(self.rpc_conf.reconnect_timeout),
-            spec.ping_interval().unwrap_or(self.rpc_conf.ping_interval),
+                .unwrap_or(self.rpc_conf.default_reconnect_timeout),
+            spec.ping_interval()
+                .unwrap_or(self.rpc_conf.default_ping_interval),
         );
 
         signalling_member.set_callback_urls(spec);
@@ -528,9 +530,11 @@ impl ParticipantService {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{api::control::pipeline::Pipeline, conf::Conf};
     use std::time::Duration;
+
+    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+
+    use super::*;
 
     pub fn empty_participants_service() -> ParticipantService {
         let room_spec = RoomSpec {
@@ -571,15 +575,15 @@ mod test {
 
         assert_eq!(
             test_member.get_ping_interval(),
-            default_rpc_conf.ping_interval
+            default_rpc_conf.default_ping_interval
         );
         assert_eq!(
             test_member.get_idle_timeout(),
-            default_rpc_conf.idle_timeout
+            default_rpc_conf.default_idle_timeout
         );
         assert_eq!(
             test_member.get_reconnect_timeout(),
-            default_rpc_conf.reconnect_timeout
+            default_rpc_conf.default_reconnect_timeout
         );
     }
 

@@ -61,10 +61,17 @@ pub struct MemberSpec {
     /// URL to which `OnLeave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
 
+    /// [`Duration`] for this [`Member`], after which remote RPC client
+    /// will be considered IDLE if no heartbeat messages received.
     idle_timeout: Option<Duration>,
 
+    /// [`Duration`] for this [`Member`], after which the server deletes
+    /// the client session if the remote RPC client does not reconnect after
+    /// it is IDLE.
     reconnect_timeout: Option<Duration>,
 
+    /// Interval of sending `Ping`s from the server to the client for
+    /// this [`Member`].
     ping_interval: Option<Duration>,
 }
 

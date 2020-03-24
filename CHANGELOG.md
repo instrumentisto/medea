@@ -14,7 +14,9 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Configuration:
-    - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]).
+    - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]);
+    - Rename `rpc.idle_timeout` as `rpc.default_idle_timeout` ([#95]);
+    - Rename `rpc.reconnect_timeout` as `rpc.default_reconnect_timeout` ([#95]);
 - RPC messaging:
     - Reverse `Ping`/`Pong` naming: server sends `Ping` and expects `Pongs` from client now. ([#75]).
 
@@ -29,6 +31,7 @@ All user visible changes to this project will be documented in this file. This p
     - gRPC Control API callbacks ([#63]):
         - `on_join`;
         - `on_leave`.
+    - Configuration of the `Member`'s RPC connection settings by Control API ([#95]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -62,6 +65,7 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#84]: /../../pull/84
 [#86]: /../../pull/86
+[#95]: /../../pull/95
 
 
 

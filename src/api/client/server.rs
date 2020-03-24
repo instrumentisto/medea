@@ -204,7 +204,7 @@ mod test {
     async fn forbidden_if_bad_credentials() {
         let conf = Conf {
             rpc: Rpc {
-                idle_timeout: Duration::new(1, 0),
+                default_idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()
@@ -226,7 +226,7 @@ mod test {
     async fn not_found_if_bad_url() {
         let conf = Conf {
             rpc: Rpc {
-                idle_timeout: Duration::new(1, 0),
+                default_idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()
@@ -251,7 +251,7 @@ mod test {
     async fn established() {
         let conf = Conf {
             rpc: Rpc {
-                idle_timeout: Duration::new(1, 0),
+                default_idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()

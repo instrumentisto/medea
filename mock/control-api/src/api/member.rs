@@ -34,13 +34,13 @@ pub struct Member {
     #[serde(skip_serializing_if = "Option::is_none")]
     on_leave: Option<String>,
 
-    /// Duration, after which remote RPC client will be considered IDLE if no
-    /// heartbeat messages received.
+    /// [`Duration`], after which remote RPC client will be considered IDLE if
+    /// no heartbeat messages received.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
     idle_timeout: Duration,
 
-    /// Duration, after which the server deletes the client session if
+    /// [`Duration`], after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is IDLE.
     #[serde(default)]
     #[serde(with = "humantime_serde")]

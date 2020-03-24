@@ -528,11 +528,15 @@ pub fn parse_members(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
-                member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
+                member
+                    .idle_timeout()
+                    .unwrap_or(rpc_conf.default_idle_timeout),
                 member
                     .reconnect_timeout()
-                    .unwrap_or(rpc_conf.reconnect_timeout),
-                member.ping_interval().unwrap_or(rpc_conf.ping_interval),
+                    .unwrap_or(rpc_conf.default_reconnect_timeout),
+                member
+                    .ping_interval()
+                    .unwrap_or(rpc_conf.default_ping_interval),
             );
             (id.clone(), new_member)
         })

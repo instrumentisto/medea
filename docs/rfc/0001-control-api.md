@@ -59,6 +59,14 @@ spec:
         on_join: "grpc://127.0.0.1:9091"
         # Fires when "caller" client disconnects from media server via WebSocket.
         on_leave: "grpc://127.0.0.1:9091"
+        # Duration, after which remote RPC client will be considered IDLE if no 
+        # heartbeat messages received.
+        idle_timeout: 1m
+        # Duration, after which the server deletes the client session if the remote
+        # RPC client does not reconnect after it is IDLE.
+        reconnect_timeout: 3m
+        # Interval of sending pings from the server to the client.
+        ping_interval: 10s
         pipeline:
           # Media element which is able to receive media data from client via WebRTC.
           publish:
@@ -781,6 +789,10 @@ message Member {
   optional string on_join = 1;
   optional string on_leave = 2;
   map<string, Member.Element> pipeline = 3;
+  optional string credentials = 4;
+  optional uint64 idle_timeout = 5;
+  optional uint64 reconnect_timeout = 7;
+  optional uint64 ping_interval = 8;
   
   message Element {
     oneof el {

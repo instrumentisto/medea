@@ -408,13 +408,14 @@ mod test {
     };
 
     use crate::api::{
-        client::rpc_connection::{ClosedReason, RpcConnection},
+        client::rpc_connection::{
+            ClosedReason, RpcConnection, WsSessionSettings,
+        },
         control::{MemberId, RoomId},
         MockRpcServer,
     };
 
     use super::WsSession;
-    use crate::api::client::rpc_connection::WsSessionSettings;
 
     type SharedChan<T> = (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
 
