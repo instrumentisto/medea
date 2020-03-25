@@ -14,7 +14,7 @@ mod track;
 use std::{
     cell::RefCell,
     collections::{hash_map::DefaultHasher, HashMap},
-    convert::{From, TryFrom},
+    convert::TryFrom as _,
     hash::{Hash, Hasher},
     rc::Rc,
 };
