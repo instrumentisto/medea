@@ -244,7 +244,7 @@ impl Handler<StartStaticRooms> for RoomService {
                 shutdown::Priority(2),
             );
             self.metrics_service.do_send(mcs::RegisterRoom {
-                room: room.clone(),
+                room: room.downgrade(),
                 room_id: spec.id,
             });
 
@@ -301,7 +301,7 @@ impl Handler<CreateRoom> for RoomService {
             Room::new(&room_spec, &self.app, self.metrics_service.clone())?;
         let room_addr = room.start();
         self.metrics_service.do_send(mcs::RegisterRoom {
-            room: room_addr.clone(),
+            room: room_addr.downgrade(),
             room_id: room_spec.id.clone(),
         });
 

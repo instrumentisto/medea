@@ -1742,8 +1742,8 @@ mod test {
             .unwrap()
     }
 
-    #[test]
-    fn command_validation_peer_not_found() {
+    #[actix_rt::test]
+    async fn command_validation_peer_not_found() {
         let mut room = empty_room();
 
         let member1 = MemberSpec::new(
@@ -1776,8 +1776,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn command_validation_peer_does_not_belong_to_member() {
+    #[actix_rt::test]
+    async fn command_validation_peer_does_not_belong_to_member() {
         let mut room = empty_room();
 
         let member1 = MemberSpec::new(

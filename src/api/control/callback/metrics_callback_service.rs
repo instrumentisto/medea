@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix::{Actor, Addr, AsyncContext, Handler, Message};
+use actix::{Actor, AsyncContext, Handler, Message, WeakAddr};
 use medea_client_api_proto::PeerId;
 use variant_count::VariantCount;
 
@@ -59,7 +59,9 @@ impl MetricsCallbacksService {
     fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.peers.remove(&peer_id);
-            room.room.do_send(PeerSpecContradiction { peer_id });
+            if let Some(room_addr) = room.room.upgrade() {
+                room_addr.do_send(PeerSpecContradiction { peer_id });
+            }
         }
     }
 
@@ -159,7 +161,9 @@ impl Handler<TrafficFlows> for MetricsCallbacksService {
                             },
                         );
 
-                        room.room.do_send(PeerStarted(peer.peer_id));
+                        if let Some(room_addr) = room.room.upgrade() {
+                            room_addr.do_send(PeerStarted(peer.peer_id));
+                        }
                     }
                 }
             }
@@ -199,7 +203,9 @@ impl Handler<TrafficStopped> for MetricsCallbacksService {
                     "Peer #{} stopped basic on {:?}.",
                     msg.peer_id, msg.source
                 );
-                room.room.do_send(PeerStopped(peer.peer_id));
+                if let Some(room_addr) = room.room.upgrade() {
+                    room_addr.do_send(PeerStopped(peer.peer_id));
+                }
             }
         }
         self.unsubscribe_from_peer(&msg.room_id, msg.peer_id);
@@ -287,7 +293,7 @@ pub struct RoomStats {
     room_id: RoomId,
 
     /// [`Addr`] of [`Room`] which is watching for this [`PeerStat`]s.
-    room: Addr<Room>,
+    room: WeakAddr<Room>,
 
     /// [`PeerStat`] for which some [`Room`] is watching.
     peers: HashMap<PeerId, PeerStat>,
@@ -309,7 +315,7 @@ pub struct RegisterRoom {
 
     /// [`Addr`] of room which requrested to register in the
     /// [`MetricsCallbackService`].
-    pub room: Addr<Room>,
+    pub room: WeakAddr<Room>,
 }
 
 impl Handler<RegisterRoom> for MetricsCallbacksService {
