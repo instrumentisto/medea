@@ -1738,7 +1738,8 @@ mod test {
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(&room_spec, &ctx).unwrap()
+        Room::new(&room_spec, &ctx, MetricsCallbacksService::new().start())
+            .unwrap()
     }
 
     #[test]

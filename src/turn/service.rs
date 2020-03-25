@@ -223,6 +223,7 @@ pub mod test {
     use crate::media::IceUser;
 
     use super::*;
+    use crate::api::control::room::Id;
 
     #[derive(Clone, Copy, Debug)]
     struct TurnAuthServiceMock;
@@ -244,6 +245,14 @@ pub mod test {
 
         async fn delete(&self, _: &[IceUser]) -> Result<(), TurnServiceErr> {
             Ok(())
+        }
+
+        async fn get_sessions(
+            &self,
+            _: Id,
+            _: PeerId,
+        ) -> Result<Vec<String>, TurnServiceErr> {
+            Ok(Vec::new())
         }
     }
 

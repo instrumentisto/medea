@@ -654,7 +654,10 @@ mod room_service_specs {
 
     use crate::{
         api::control::{
-            endpoints::webrtc_publish_endpoint::P2pMode,
+            endpoints::{
+                webrtc_publish_endpoint::P2pMode,
+                Unvalidated as UnvalidatedElement,
+            },
             refs::{Fid, ToEndpoint},
             RootElement,
         },
@@ -672,7 +675,11 @@ mod room_service_specs {
         const ROOM_SPEC: &str =
             include_str!("../../tests/specs/pub-sub-video-call.yml");
 
-        let parsed: RootElement = serde_yaml::from_str(ROOM_SPEC).unwrap();
+        let parsed =
+            serde_yaml::from_str::<RootElement<UnvalidatedElement>>(ROOM_SPEC)
+                .unwrap()
+                .validate()
+                .unwrap();
         RoomSpec::try_from(&parsed).unwrap()
     }
 
@@ -758,8 +765,15 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room = Room::new(
+            &spec,
+            &app_ctx(),
+            MetricsCallbacksService::new().start(),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
+            room_id.clone() => room,
         )));
 
         let member_parent_fid = Fid::<ToRoom>::new(room_id);
@@ -800,8 +814,15 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room = Room::new(
+            &spec,
+            &app_ctx(),
+            MetricsCallbacksService::new().start(),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
+            room_id.clone() => room,
         )));
 
         let endpoint_parent_fid =
@@ -861,8 +882,15 @@ mod room_service_specs {
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
+        let room = Room::new(
+            &room_spec(),
+            &app_ctx(),
+            MetricsCallbacksService::new().start(),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+            room_id => room,
         )));
 
         test_for_delete_and_get(room_service, room_full_id).await;
@@ -876,8 +904,15 @@ mod room_service_specs {
             "caller".to_string().into(),
         ));
 
+        let room = Room::new(
+            &room_spec(),
+            &app_ctx(),
+            MetricsCallbacksService::new().start(),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+            room_id => room,
         )));
 
         test_for_delete_and_get(room_service, member_fid).await;
@@ -892,8 +927,15 @@ mod room_service_specs {
             "publish".to_string().into(),
         ));
 
+        let room = Room::new(
+            &room_spec(),
+            &app_ctx(),
+            MetricsCallbacksService::new().start(),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+            room_id => room,
         )));
 
         test_for_delete_and_get(room_service, endpoint_fid).await;
