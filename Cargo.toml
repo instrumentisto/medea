@@ -51,10 +51,10 @@ rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
-slog-async = "2.3"
+slog-async = "2.5"
 slog-envlogger = "2.2"
 slog-json = "2.3"
-slog-scope = "4.1"
+slog-scope = "4.3"
 slog-stdlog = "4.0"
 smart-default = "0.6"
 tokio = { version = "0.2", features = ["signal", "time"] }
