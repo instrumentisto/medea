@@ -1,10 +1,14 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, future};
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
+use wasm_bindgen_futures::spawn_local;
 
-use crate::media::MediaManager;
+use crate::{
+    media::MediaManager,
+    utils::{delay_for, TaskHandle},
+};
 
 use super::{PeerConnection, PeerError, PeerEvent};
 
@@ -18,7 +22,7 @@ pub trait PeerRepository {
     ///
     /// Errors if creating [`PeerConnection`] fails.
     fn create_peer(
-        &mut self,
+        &self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -29,7 +33,7 @@ pub trait PeerRepository {
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
-    fn remove(&mut self, id: PeerId);
+    fn remove(&self, id: PeerId);
 
     /// Returns all [`PeerConnection`]s stored in repository.
     fn get_all(&self) -> Vec<Rc<PeerConnection>>;
@@ -41,17 +45,54 @@ pub struct Repository {
     media_manager: Rc<MediaManager>,
 
     /// Peer id to [`PeerConnection`],
-    peers: HashMap<PeerId, Rc<PeerConnection>>,
+    peers: Rc<RefCell<HashMap<PeerId, Rc<PeerConnection>>>>,
+
+    /// [`TaskHandle`] for a task which will call
+    /// [`PeerConnection::send_peer_stats`] of all [`PeerConnection`]s
+    /// every second and send updated [`RtcStat`]s to the server.
+    stats_scrape_task: Option<TaskHandle>,
 }
 
 impl Repository {
     /// Instantiates new [`Repository`] with a given [`MediaManager`].
     #[inline]
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
-        Self {
+        let mut this = Self {
             media_manager,
-            peers: HashMap::new(),
-        }
+            peers: Rc::new(RefCell::new(HashMap::new())),
+            stats_scrape_task: None,
+        };
+        this.schedule_peers_stats_scrape();
+
+        this
+    }
+
+    /// Schedules task which will call [`PeerConnection::send_peer_stats`] of
+    /// all [`PeerConnection`]s every second and send updated [`RtcStat`]s
+    /// to the server.
+    fn schedule_peers_stats_scrape(&mut self) {
+        let peers = self.peers.clone();
+        let (fut, abort) = future::abortable(async move {
+            loop {
+                delay_for(Duration::from_secs(1).into()).await;
+
+                future::join_all(
+                    peers
+                        .borrow()
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .iter()
+                        .map(|peer| peer.scrape_and_send_peer_stats()),
+                )
+                .await;
+            }
+        });
+
+        spawn_local(async move {
+            fut.await.ok();
+        });
+        self.stats_scrape_task = Some(abort.into());
     }
 }
 
@@ -59,7 +100,7 @@ impl PeerRepository for Repository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided
     /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
     fn create_peer(
-        &mut self,
+        &self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -75,25 +116,25 @@ impl PeerRepository for Repository {
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );
-        self.peers.insert(id, peer);
-        Ok(self.peers.get(&id).cloned().unwrap())
+        self.peers.borrow_mut().insert(id, Rc::clone(&peer));
+        Ok(peer)
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
-        self.peers.get(&id).cloned()
+        self.peers.borrow().get(&id).cloned()
     }
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
     #[inline]
-    fn remove(&mut self, id: PeerId) {
-        self.peers.remove(&id);
+    fn remove(&self, id: PeerId) {
+        self.peers.borrow_mut().remove(&id);
     }
 
     /// Returns all [`PeerConnection`]s stored in a repository.
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
-        self.peers.values().cloned().collect()
+        self.peers.borrow().values().cloned().collect()
     }
 }
