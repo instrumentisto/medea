@@ -9,8 +9,9 @@ use std::{
 };
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, Message, StreamHandler, WrapFuture as _,
+    fut::Either, Actor, ActorFuture, Addr, AsyncContext, Context,
+    ContextFutureSpawner as _, Handler, Message, StreamHandler,
+    WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -66,6 +67,7 @@ use crate::{
         },
         peers::PeerRepository,
     },
+    turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
     AppContext,
 };
@@ -123,6 +125,18 @@ pub enum RoomError {
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
     EndpointAlreadyExists(Fid<ToEndpoint>),
+
+    /// Some error happened in [`TurnAuthService`].
+    ///
+    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
+    #[display(fmt = "TurnService Error in Room: {}", _0)]
+    TurnServiceErr(TurnServiceErr),
+}
+
+impl From<TurnServiceErr> for RoomError {
+    fn from(err: TurnServiceErr) -> Self {
+        Self::TurnServiceErr(err)
+    }
 }
 
 /// Error of validating received [`Command`].
@@ -289,18 +303,27 @@ impl Room {
 
         Ok(Box::new(fut.into_actor(self).then(
             move |ice_user, this, _| {
-                let sender = this.peers.get_peer_by_id(sender_peer_id).unwrap();
-                let peer_created = Event::PeerCreated {
-                    peer_id: sender.id(),
-                    sdp_offer: None,
-                    tracks: sender.tracks(),
-                    ice_servers: ice_user.servers_list(),
-                    force_relay: sender.is_force_relayed(),
-                };
+                ice_user
+                    .and_then(|ice_user| {
+                        let sender =
+                            this.peers.get_peer_by_id(sender_peer_id)?;
+                        let peer_created = Event::PeerCreated {
+                            peer_id: sender.id(),
+                            sdp_offer: None,
+                            tracks: sender.tracks(),
+                            ice_servers: ice_user.servers_list(),
+                            force_relay: sender.is_force_relayed(),
+                        };
 
-                this.members
-                    .send_event_to_member(member_id, peer_created)
-                    .into_actor(this)
+                        Ok(this
+                            .members
+                            .send_event_to_member(member_id, peer_created)
+                            .into_actor(this))
+                    })
+                    .map_or_else(
+                        |e| Either::Left(actix::fut::err(e)),
+                        Either::Right,
+                    )
             },
         )))
     }
@@ -987,18 +1010,26 @@ impl CommandHandler for Room {
 
         Ok(Box::new(fut.into_actor(self).then(
             move |ice_user, this, _| {
-                let to_peer = this.peers.get_peer_by_id(to_peer_id).unwrap();
-                let event = Event::PeerCreated {
-                    peer_id: to_peer.id(),
-                    sdp_offer: Some(sdp_offer),
-                    tracks: to_peer.tracks(),
-                    ice_servers: ice_user.servers_list(),
-                    force_relay: to_peer.is_force_relayed(),
-                };
+                ice_user
+                    .and_then(|ice_user| {
+                        let to_peer = this.peers.get_peer_by_id(to_peer_id)?;
+                        let event = Event::PeerCreated {
+                            peer_id: to_peer.id(),
+                            sdp_offer: Some(sdp_offer),
+                            tracks: to_peer.tracks(),
+                            ice_servers: ice_user.servers_list(),
+                            force_relay: to_peer.is_force_relayed(),
+                        };
 
-                this.members
-                    .send_event_to_member(to_member_id, event)
-                    .into_actor(this)
+                        Ok(this
+                            .members
+                            .send_event_to_member(to_member_id, event)
+                            .into_actor(this))
+                    })
+                    .map_or_else(
+                        |e| Either::Left(actix::fut::err(e)),
+                        Either::Right,
+                    )
             },
         )))
     }

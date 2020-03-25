@@ -33,6 +33,7 @@ use crate::{
         room_repo::RoomRepository,
         Room,
     },
+    turn::coturn_metrics::CoturnMetrics,
     AppContext,
 };
 
@@ -126,23 +127,38 @@ pub struct RoomService {
     /// [`MetricsCallbacksService`] for all [`Room`]s from this
     /// [`RoomService`].
     metrics_service: Addr<MetricsCallbacksService>,
+
+    /// Service which is responsible for processing [`PeerConnection`]'s
+    /// metrics received from the Coturn.
+    _coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl RoomService {
     /// Creates new [`RoomService`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetrics`] fails to
+    /// connect to a Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, redis_pub_sub::RedisError> {
+        let metrics_service = MetricsCallbacksService::new().start();
+        Ok(Self {
+            _coturn_metrics: CoturnMetrics::new(
+                &app.config.turn,
+                metrics_service.clone(),
+            )?
+            .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
-            metrics_service: app.metrics_service.clone(),
+            metrics_service,
             room_repo,
             app,
             graceful_shutdown,
-        }
+        })
     }
 
     /// Closes [`Room`] with provided [`RoomId`].
@@ -675,7 +691,9 @@ mod room_service_specs {
         let app = app_ctx();
         let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
 
-        RoomService::new(room_repo, app, graceful_shutdown).start()
+        RoomService::new(room_repo, app, graceful_shutdown)
+            .unwrap()
+            .start()
     }
 
     /// Returns [`Future`] used for testing of all create methods of

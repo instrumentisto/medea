@@ -310,7 +310,7 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            TurnServiceErr(_) | MemberError(_) => Self::unexpected(&err),
+            MemberError(_) => Self::unexpected(&err),
         }
     }
 }
@@ -439,7 +439,8 @@ impl From<RoomError> for ErrorResponse {
             | TryFromElementError(_)
             | BadRoomSpec(_)
             | TurnServiceError(_)
-            | ClientError(_) => Self::unexpected(&err),
+            | ClientError(_)
+            | TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
 }

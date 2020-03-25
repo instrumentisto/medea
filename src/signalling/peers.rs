@@ -79,6 +79,7 @@ impl<T: Incrementable + Copy> Counter<T> {
 }
 
 impl PeerRepository {
+    /// Returns new [`PeerRepository`] for a [`Room`] with provided [`RoomId`].
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
@@ -139,7 +140,7 @@ impl PeerRepository {
     pub fn get_ice_user(
         &mut self,
         peer_id: PeerId,
-    ) -> impl Future<Output = IceUser> {
+    ) -> impl Future<Output = Result<IceUser, RoomError>> {
         let ice_users = Rc::clone(&self.ice_users);
         let turn_service = Arc::clone(&self.turn_service);
         let room_id = self.room_id.clone();
@@ -147,15 +148,14 @@ impl PeerRepository {
         async move {
             let ice_user = ice_users.borrow().get(&peer_id).cloned();
             if let Some(ice_user) = ice_user {
-                ice_user
+                Ok(ice_user)
             } else {
                 let ice_user = turn_service
                     .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
-                    .await
-                    .unwrap();
+                    .await?;
                 ice_users.borrow_mut().insert(peer_id, ice_user.clone());
 
-                ice_user
+                Ok(ice_user)
             }
         }
     }

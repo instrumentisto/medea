@@ -1,3 +1,5 @@
+//! Implementation of the Coturn events deserialization.
+
 use std::{collections::HashMap, time::Duration};
 
 use derive_more::Display;
@@ -23,6 +25,11 @@ pub struct Traffic {
 
 impl Traffic {
     /// Tries to parse [`Traffic`] stats from the provided [`str`].
+    ///
+    /// # Errors
+    ///
+    /// All errors from this function should never happen, so no sense to catch
+    /// them individually.
     pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
         let mut items: HashMap<&str, u64> = body
             .split(", ")
@@ -118,6 +125,11 @@ impl CoturnAllocationEvent {
     /// and `body`.
     ///
     /// `body` will be interpreted different based on provided `event_type`.
+    ///
+    /// # Errors
+    ///
+    /// All errors from this function should never happen, so no sense to catch
+    /// them individually.
     pub fn parse(
         event_type: &str,
         body: &str,
@@ -192,8 +204,16 @@ pub struct CoturnEvent {
 
 impl CoturnEvent {
     /// Tries to parse [`CoturnEvnet]` from a provided Redis message.
+    ///
+    /// # Errors
+    ///
+    /// All [`CoturnEventParseError`]s can be returned from this function, so
+    /// read docs of this error.
+    ///
+    /// All errors from this function should never happen, so no sense to catch
+    /// them individually.
     pub fn parse(
-        msg: &patched_redis::Msg,
+        msg: &redis_pub_sub::Msg,
     ) -> Result<Self, CoturnEventParseError> {
         let channel: String = msg
             .get_channel()
@@ -235,7 +255,9 @@ impl CoturnEvent {
 
         let event = CoturnAllocationEvent::parse(
             event_type,
-            msg.get_payload::<String>().unwrap().as_str(),
+            msg.get_payload::<String>()
+                .map_err(|_| CoturnEventParseError::WrongPayloadType)?
+                .as_str(),
         )?;
 
         Ok(CoturnEvent {
@@ -304,4 +326,8 @@ pub enum CoturnEventParseError {
     /// Event type is not provided.
     #[display(fmt = "No event type.")]
     NoEventType,
+
+    /// Wrong Redis payload type.
+    #[display(fmt = "Wrong Redis paylod type.")]
+    WrongPayloadType,
 }

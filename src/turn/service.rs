@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
 use medea_client_api_proto::PeerId;
-use medea_coturn_telnet_client::sessions_parser::Session;
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
@@ -23,6 +22,7 @@ use crate::{
         CoturnUsername,
     },
 };
+use medea_coturn_telnet_client::sessions_parser::Session;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -232,8 +232,8 @@ pub mod test {
     impl TurnAuthService for TurnAuthServiceMock {
         async fn create(
             &self,
-            _: MemberId,
             _: RoomId,
+            _: PeerId,
             _: UnreachablePolicy,
         ) -> Result<IceUser, TurnServiceErr> {
             Ok(IceUser::new(

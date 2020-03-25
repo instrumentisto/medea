@@ -13,17 +13,20 @@ fn pub_sub_video_call() {
         let test_fn = move |event: &Event,
                             _: &mut Context<TestMember>,
                             events: Vec<&Event>| {
+            let peers_count = events
+                .iter()
+                .filter(|e| match e {
+                    Event::PeerCreated { .. } => true,
+                    _ => false,
+                })
+                .count();
+            if peers_count < 1 {
+                return;
+            }
+            assert_eq!(peers_count, 1);
+
             // Start checking result of test.
             if let Event::IceCandidateDiscovered { .. } = event {
-                let peers_count = events
-                    .iter()
-                    .filter(|e| match e {
-                        Event::PeerCreated { .. } => true,
-                        _ => false,
-                    })
-                    .count();
-                assert_eq!(peers_count, 1);
-
                 let is_caller;
                 if let Event::PeerCreated {
                     peer_id,

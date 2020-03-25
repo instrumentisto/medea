@@ -196,7 +196,7 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    /// Returns [`Track`]'s of [`Peer`].
+    /// Returns [`Track`]s of this [`Peer`].
     pub fn tracks(&self) -> Vec<Track> {
         let tracks = self.context.senders.iter().fold(
             vec![],

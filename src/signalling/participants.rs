@@ -9,7 +9,6 @@
 
 use std::{
     collections::HashMap,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -43,18 +42,11 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnAuthService, TurnServiceErr},
     AppContext,
 };
 
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
-    /// Some error happened in [`TurnAuthService`].
-    ///
-    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
-    #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
-    TurnServiceErr(TurnServiceErr),
-
     /// [`Member`] with provided [`Fid`] not found.
     #[display(fmt = "Participant [id = {}] not found", _0)]
     ParticipantNotFound(Fid<ToMember>),
@@ -67,12 +59,6 @@ pub enum ParticipantServiceErr {
 
     /// Some error happened in [`Member`].
     MemberError(MemberError),
-}
-
-impl From<TurnServiceErr> for ParticipantServiceErr {
-    fn from(err: TurnServiceErr) -> Self {
-        Self::TurnServiceErr(err)
-    }
 }
 
 impl From<MemberError> for ParticipantServiceErr {
@@ -104,9 +90,6 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    /// Reference to [`TurnAuthService`].
-    turn_service: Arc<dyn TurnAuthService>,
-
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
@@ -127,7 +110,6 @@ impl ParticipantService {
             members: parse_members(room_spec)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
-            turn_service: context.turn_service.clone(),
             rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
         })
     }

@@ -147,7 +147,8 @@ async fn command_validation() {
                 assert_eq!(candidate, correct_candidate);
                 break;
             }
-            _ => unreachable!(),
+            Event::PeerCreated { .. } => (),
+            _ => unreachable!("{:?}", msg),
         }
     }
 }

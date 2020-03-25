@@ -69,6 +69,12 @@ url = "2.1"
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]
+# TODO: use 'redis' from the crates.io when mitsuhiko/redis-rs#287 will
+#       be released and used in 'deadpool-redis'.
+[dependencies.redis-pub-sub]
+    git = "https://github.com/mitsuhiko/redis-rs"
+    package = "redis"
+    rev = "1ea0bd0c2e7b450eb5279995142fd64e5db0fa69"
 
 [dev-dependencies]
 actix-codec = "0.2"

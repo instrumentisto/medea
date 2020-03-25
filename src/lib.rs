@@ -16,16 +16,12 @@ pub mod turn;
 
 use std::sync::Arc;
 
-use actix::{Actor, Addr};
-
 use crate::{
     api::control::callback::{
-        clients::CallbackClientFactoryImpl,
-        metrics_callback_service::MetricsCallbacksService,
-        service::CallbackService,
+        clients::CallbackClientFactoryImpl, service::CallbackService,
     },
     conf::Conf,
-    turn::{coturn_metrics::CoturnMetrics, TurnAuthService},
+    turn::TurnAuthService,
 };
 
 /// Global application context.
@@ -43,34 +39,16 @@ pub struct AppContext {
     ///
     /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
-
-    /// Service which responsible for the `Peer` metrics based Control API
-    /// callbacks.
-    ///
-    /// Will be used for the all [`Room`]s.
-    pub metrics_service: Addr<MetricsCallbacksService>,
-
-    /// Service which is responsible for processing [`PeerConnection`]'s
-    /// metrics received from the Coturn.
-    pub coturn_metrics: Addr<CoturnMetrics>,
 }
 
 impl AppContext {
     /// Creates new [`AppContext`].
     #[inline]
     pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
-        let metrics_service = MetricsCallbacksService::new().start();
-        let coturn_metrics =
-            CoturnMetrics::new(&config.turn, metrics_service.clone())
-                .unwrap()
-                .start();
-
         Self {
             config: Arc::new(config),
             turn_service: turn,
             callbacks: CallbackService::default(),
-            metrics_service,
-            coturn_metrics,
         }
     }
 }
