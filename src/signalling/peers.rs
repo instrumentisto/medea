@@ -14,6 +14,7 @@ use actix::{
     ActorFuture, AsyncContext, WrapFuture,
 };
 use derive_more::Display;
+use futures::Future;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -319,14 +320,22 @@ impl PeerRepository {
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
     pub fn remove_peers(
         &mut self,
-        member_id: &MemberId,
-        peer_ids: &HashSet<PeerId>,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
+        member_id: MemberId,
+        peer_ids: HashSet<PeerId>,
+    ) -> impl Future<Output = HashMap<MemberId, Vec<PeerId>>> {
         let mut removed_peers = HashMap::new();
+        let mut removed_ice_users = Vec::new();
         for peer_id in peer_ids {
+            if let Some(ice_user) = self.ice_users.remove(&peer_id) {
+                removed_ice_users.push(ice_user);
+            }
             if let Some(peer) = self.peers.remove(&peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
+                if let Some(ice_user) = self.ice_users.remove(&partner_peer_id)
+                {
+                    removed_ice_users.push(ice_user);
+                }
                 if self.peers.remove(&partner_peer_id).is_some() {
                     removed_peers
                         .entry(partner_member_id)
@@ -336,11 +345,22 @@ impl PeerRepository {
                 removed_peers
                     .entry(member_id.clone())
                     .or_insert_with(Vec::new)
-                    .push(*peer_id);
+                    .push(peer_id);
             }
         }
 
-        removed_peers
+        let turn_service = self.turn_service.clone();
+
+        async move {
+            if let Err(e) = turn_service.delete(&removed_ice_users).await {
+                warn!(
+                    "Error while deleting IceUsers [{:?}]: {:?}",
+                    removed_ice_users, e
+                );
+            }
+
+            removed_peers
+        }
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -351,53 +371,14 @@ impl PeerRepository {
     /// value - removed [`Peer`]'s [`PeerId`].
     pub fn remove_peers_related_to_member(
         &mut self,
-        member_id: &MemberId,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
-        let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
-            HashMap::new();
+        member_id: MemberId,
+    ) -> impl Future<Output = HashMap<MemberId, Vec<PeerId>>> {
+        let member_peers = self
+            .get_peers_by_member_id(&member_id)
+            .map(|peer| peer.id())
+            .collect();
 
-        self.get_peers_by_member_id(member_id).for_each(|peer| {
-            self.get_peers_by_member_id(&peer.partner_member_id())
-                .filter(|partner_peer| {
-                    &partner_peer.partner_member_id() == member_id
-                })
-                .for_each(|partner_peer| {
-                    peers_to_remove
-                        .entry(partner_peer.member_id())
-                        .or_insert_with(Vec::new)
-                        .push(partner_peer.id());
-                });
-
-            peers_to_remove
-                .entry(peer.member_id())
-                .or_insert_with(Vec::new)
-                .push(peer.id());
-        });
-
-        peers_to_remove
-            .values()
-            .flat_map(|peer_ids| peer_ids.iter())
-            .for_each(|peer_id| {
-                self.peers.remove(peer_id);
-            });
-
-        peers_to_remove
-    }
-
-    /// Deletes [`PeerStateMachine`] from this [`PeerRepository`] and send
-    /// [`Event::PeersRemoved`] to [`Member`]s.
-    ///
-    /// __Note:__ this also deletes partner peer.
-    ///
-    /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
-    pub fn remove_peer(
-        &mut self,
-        member_id: &MemberId,
-        peer_id: PeerId,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
-        let mut peers_id_to_delete = HashSet::new();
-        peers_id_to_delete.insert(peer_id);
-        self.remove_peers(&member_id, &peers_id_to_delete)
+        self.remove_peers(member_id, member_peers)
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
