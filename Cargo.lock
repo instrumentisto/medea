@@ -1612,7 +1612,6 @@ dependencies = [
  "deadpool",
  "derive_more",
  "futures 0.3.4",
- "nom 5.1.1",
  "once_cell",
  "regex",
  "tokio",

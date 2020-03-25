@@ -10,12 +10,9 @@ use futures::{SinkExt, StreamExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 
-use crate::{
-    proto::{
-        CoturnCliCodec, CoturnCliCodecError, CoturnCliRequest,
-        CoturnCliResponse, CoturnResponseParseError,
-    },
-    sessions_parser::{Session, SessionId},
+use crate::proto::{
+    CoturnCliCodec, CoturnCliCodecError, CoturnCliRequest, CoturnCliResponse,
+    CoturnResponseParseError,
 };
 
 /// Errors that can be returned by [`CoturnTelnetConnection`].
@@ -110,7 +107,7 @@ impl CoturnTelnetConnection {
     pub async fn print_sessions(
         &mut self,
         username: String,
-    ) -> Result<Vec<Session>, CoturnTelnetError> {
+    ) -> Result<Vec<String>, CoturnTelnetError> {
         use CoturnTelnetError::*;
 
         self.0
@@ -142,7 +139,7 @@ impl CoturnTelnetConnection {
     /// [Coturn]: https://github.com/coturn/coturn
     pub async fn delete_session(
         &mut self,
-        session_id: SessionId,
+        session_id: String,
     ) -> Result<(), CoturnTelnetError> {
         use CoturnTelnetError::*;
 
@@ -173,7 +170,7 @@ impl CoturnTelnetConnection {
     ///   from remote server.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
-    pub async fn delete_sessions<T: IntoIterator<Item = SessionId>>(
+    pub async fn delete_sessions<T: IntoIterator<Item = String>>(
         &mut self,
         session_ids: T,
     ) -> Result<(), CoturnTelnetError> {

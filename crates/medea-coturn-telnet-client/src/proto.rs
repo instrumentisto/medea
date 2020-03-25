@@ -15,8 +15,6 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::sessions_parser::{parse_sessions, Session, SessionId};
-
 /// [`CURSOR`] is received whenever [Telnet] server has finished writing
 /// response and is ready to receive new requests.
 ///
@@ -37,6 +35,11 @@ static UNKNOWN_COMMAND: &str = "Unknown command\r\n\r\n";
 /// [`CoturnCliResponse::Sessions`].
 static IS_SESSIONS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"Total sessions: \d"#).unwrap());
+
+/// Regular expression to extract session IDs from
+/// [`CoturnCliResponse::Sessions`].
+static EXTRACT_SESSIONS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\d\) id=(.*),").unwrap());
 
 /// Message that is received from [Coturn] server via [Telnet].
 ///
@@ -64,7 +67,7 @@ pub enum CoturnCliResponse {
     /// Answer to [`CoturnCliRequest::PrintSessions`], which contains list of
     /// session IDs associated with the provided username in
     /// [`CoturnCliRequest::PrintSessions`] message.
-    Sessions(Vec<Session>),
+    Sessions(Vec<String>),
 
     /// [Coturn] server hasn't recognized last [Telnet] command.
     ///
@@ -121,9 +124,15 @@ impl TryFrom<BytesMut> for CoturnCliResponse {
         }
 
         if IS_SESSIONS_REGEX.is_match(msg) {
-            let (_, sessions) = parse_sessions(msg).unwrap();
-
-            return Ok(CoturnCliResponse::Sessions(sessions));
+            let mut ids: Vec<String> = Vec::new();
+            for mat in EXTRACT_SESSIONS_REGEX.captures_iter(msg) {
+                if let Some(id) = mat.get(1) {
+                    ids.push(id.as_str().to_owned());
+                } else {
+                    return Err(BadResponseFormat(msg.to_owned()));
+                }
+            }
+            return Ok(CoturnCliResponse::Sessions(ids));
         }
 
         Err(BadResponseType(msg.to_owned()))
@@ -148,7 +157,7 @@ pub enum CoturnCliRequest {
     /// Close [Coturn] session by its ID.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
-    CloseSession(SessionId),
+    CloseSession(String),
 
     /// Ping request.
     Ping,
@@ -227,13 +236,6 @@ impl Encoder<CoturnCliRequest> for CoturnCliCodec {
 
 #[cfg(test)]
 mod spec {
-    use std::time::Duration;
-
-    use crate::{
-        proto::CoturnCliResponse::Sessions,
-        sessions_parser::{Protocol, TrafficUsage},
-    };
-
     use super::*;
 
     #[tokio::test]
@@ -288,8 +290,8 @@ mod spec {
       usage: rp=878759, rb=704147763, sp=878425, sb=705869096
        rate: r=1299165, s=1302341, total=2601506 (bytes per sec)
       peers:
-          ::1\r
-          [::1]:65282\r
+          ::1
+          [::1]:65282
 
     2) id=001000000000000002, user <777_Mireya>:
       realm: medea
@@ -327,7 +329,7 @@ mod spec {
       usage: rp=155, rb=21184, sp=154, sb=23228
        rate: r=0, s=0, total=0 (bytes per sec)
       peers:
-          ::1\r
+          ::1
 
   Total sessions: 4
 
@@ -343,109 +345,10 @@ mod spec {
                 assert_eq!(
                     sessions,
                     vec![
-                        Session {
-                            num: 1,
-                            id: SessionId(10000000000000001),
-                            user: "777_Mireya".to_string(),
-                            realm: "medea".to_string(),
-                            started: Duration::from_secs(545),
-                            expiring_in: Duration::from_secs(171),
-                            client_protocol: Protocol::Tcp,
-                            relay_protocol: Protocol::Udp,
-                            client_addr: "[::1]:56278".to_string(),
-                            server_addr: "[::1]:3478".to_string(),
-                            relay_addr: "[::1]:58490".to_string(),
-                            fingreprints_enforced: false,
-                            mobile: false,
-                            traffic_usage: TrafficUsage {
-                                received_packets: 878759,
-                                received_bytes: 704147763,
-                                sent_packets: 878425,
-                                sent_bytes: 705869096,
-                            },
-                            total_rate: 2601506,
-                            rate_sent: 1302341,
-                            rate_receive: 1299165,
-                            peers: vec![
-                                "::1".to_string(),
-                                "[::1]:65282".to_string()
-                            ],
-                        },
-                        Session {
-                            num: 2,
-                            id: SessionId(1000000000000002),
-                            user: "777_Mireya".to_string(),
-                            realm: "medea".to_string(),
-                            started: Duration::from_secs(545),
-                            expiring_in: Duration::from_secs(171),
-                            client_protocol: Protocol::Udp,
-                            relay_protocol: Protocol::Udp,
-                            client_addr: "192.168.31.183:45096".to_string(),
-                            server_addr: "127.0.0.1:3478".to_string(),
-                            relay_addr: "127.0.0.1:57758".to_string(),
-                            fingreprints_enforced: false,
-                            mobile: false,
-                            traffic_usage: TrafficUsage {
-                                received_packets: 16,
-                                received_bytes: 1080,
-                                sent_packets: 15,
-                                sent_bytes: 1568,
-                            },
-                            total_rate: 0,
-                            rate_sent: 0,
-                            rate_receive: 0,
-                            peers: vec![],
-                        },
-                        Session {
-                            num: 3,
-                            id: SessionId(11000000000000002),
-                            user: "777_Mireya".to_string(),
-                            realm: "medea".to_string(),
-                            started: Duration::from_secs(545),
-                            expiring_in: Duration::from_secs(171),
-                            client_protocol: Protocol::Udp,
-                            relay_protocol: Protocol::Udp,
-                            client_addr: "192.168.31.183:39916".to_string(),
-                            server_addr: "127.0.0.1:3478".to_string(),
-                            relay_addr: "127.0.0.1:55028".to_string(),
-                            fingreprints_enforced: false,
-                            mobile: false,
-                            traffic_usage: TrafficUsage {
-                                received_packets: 17,
-                                received_bytes: 1212,
-                                sent_packets: 15,
-                                sent_bytes: 1568,
-                            },
-                            total_rate: 0,
-                            rate_sent: 0,
-                            rate_receive: 0,
-                            peers: vec![],
-                        },
-                        Session {
-                            num: 4,
-                            id: SessionId(11000000000000003),
-                            user: "777_Mireya".to_string(),
-                            realm: "medea".to_string(),
-                            started: Duration::from_secs(545),
-                            expiring_in: Duration::from_secs(171),
-                            client_protocol: Protocol::Tcp,
-                            relay_protocol: Protocol::Udp,
-                            client_addr: "[::1]:56276".to_string(),
-                            server_addr: "[::1]:3478".to_string(),
-                            relay_addr: "[::1]:61957".to_string(),
-                            fingreprints_enforced: false,
-                            mobile: false,
-                            traffic_usage: TrafficUsage {
-                                received_packets: 155,
-                                received_bytes: 21184,
-                                sent_packets: 154,
-                                sent_bytes: 23228,
-                            },
-                            total_rate: 0,
-                            rate_sent: 0,
-                            rate_receive: 0,
-                            peers: vec!["::1".to_string()],
-                        },
+                        "010000000000000001",
+                        "001000000000000002",
+                        "011000000000000002",
+                        "011000000000000003",
                     ],
                 );
             }

@@ -11,7 +11,6 @@ use derive_more::{Display, From};
 use failure::Fail;
 use medea_coturn_telnet_client::{
     pool::{Error as PoolError, Manager as PoolManager, Pool},
-    sessions_parser::Session,
     CoturnTelnetError,
 };
 
@@ -64,8 +63,7 @@ impl CoturnTelnetClient {
             let sessions = conn
                 .print_sessions(u.user().clone().into())
                 .await?
-                .into_iter()
-                .map(|session| session.id);
+                .into_iter();
             conn.delete_sessions(sessions).await?;
         }
         Ok(())
@@ -76,7 +74,7 @@ impl CoturnTelnetClient {
     pub async fn get_sessions(
         &self,
         username: CoturnUsername,
-    ) -> Result<Vec<Session>, CoturnCliError> {
+    ) -> Result<Vec<String>, CoturnCliError> {
         let mut connection = self.0.get().await?;
 
         Ok(connection.print_sessions(username.to_string()).await?)

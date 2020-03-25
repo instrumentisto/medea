@@ -35,7 +35,6 @@ pub mod client;
 #[cfg_attr(docsrs, doc(cfg(feature = "pool")))]
 pub mod pool;
 pub mod proto;
-pub mod sessions_parser;
 
 #[doc(inline)]
 pub use self::client::{CoturnTelnetConnection, CoturnTelnetError};

@@ -22,7 +22,6 @@ use crate::{
         CoturnUsername,
     },
 };
-use medea_coturn_telnet_client::sessions_parser::Session;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -72,7 +71,7 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
         &self,
         room_id: RoomId,
         peer_id: PeerId,
-    ) -> Result<Vec<Session>, TurnServiceErr>;
+    ) -> Result<Vec<String>, TurnServiceErr>;
 }
 
 /// [`TurnAuthService`] implementation backed by Redis database.
@@ -166,7 +165,7 @@ impl TurnAuthService for Service {
         &self,
         room_id: RoomId,
         peer_id: PeerId,
-    ) -> Result<Vec<Session>, TurnServiceErr> {
+    ) -> Result<Vec<String>, TurnServiceErr> {
         Ok(self
             .coturn_cli
             .get_sessions(CoturnUsername { room_id, peer_id })
