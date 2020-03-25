@@ -28,6 +28,7 @@ const CREDENTIALS_LEN: usize = 32;
 
 /// ID of `Member`.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
+#[from(forward)]
 pub struct Id(pub String);
 
 /// Element of [`Member`]'s [`Pipeline`].

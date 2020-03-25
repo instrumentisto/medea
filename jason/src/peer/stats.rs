@@ -3,6 +3,9 @@
 use std::convert::TryFrom;
 
 use derive_more::{Display, From};
+use js_sys::{
+    Array as JsArray, Function as JsFunction, Iterator as JsIterator, JsString,
+};
 use medea_client_api_proto::stats::{RtcStat, RtcStatsType};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
@@ -10,59 +13,39 @@ use wasm_bindgen::{prelude::*, JsCast};
 use crate::utils::{get_property_by_name, JsCaused, JsError};
 
 /// Entry of the [`SysRtcStats`] dictionary.
-struct RtcStatsReportEntry(js_sys::JsString, JsValue);
+struct RtcStatsReportEntry(JsString, JsValue);
 
-/// Errors which can occur while deserialization of the [`RtcStatsType`].
-#[derive(Debug, Display, From, JsCaused)]
-pub enum RtcStatsError {
-    /// `RTCStats.id` is undefined.
-    #[display(fmt = "'RTCStats.id' is undefined.")]
-    UndefinedId,
-
-    /// `RTCStats.stats` is undefined.
-    #[display(fmt = "'RTCStats.stats' is undefined.")]
-    UndefinedStats,
-
-    /// Some JS error occured.
-    #[display(fmt = "Unexpected JS-side error: {}", _0)]
-    Js(JsError),
-
-    /// `RTCStats.entries` is undefined.
-    #[display(fmt = "'RTCStats.entries' is undefined.")]
-    EntriesNotFound,
-
-    /// Error while [`RtcStats`] deserialization.
-    #[display(fmt = "Error while 'RtcStats' deserialization: {:?}.", _0)]
-    ParseError(serde_json::Error),
-}
-
-impl TryFrom<js_sys::Array> for RtcStatsReportEntry {
+impl TryFrom<JsArray> for RtcStatsReportEntry {
     type Error = Traced<RtcStatsError>;
 
-    fn try_from(value: js_sys::Array) -> Result<Self, Self::Error> {
+    fn try_from(value: JsArray) -> Result<Self, Self::Error> {
+        use RtcStatsError::*;
+
         let id = value.get(0);
         let stats = value.get(1);
 
         if id.is_undefined() {
-            return Err(tracerr::new!(RtcStatsError::UndefinedId));
+            return Err(tracerr::new!(UndefinedId));
         }
 
         if stats.is_undefined() {
-            return Err(tracerr::new!(RtcStatsError::UndefinedStats));
+            return Err(tracerr::new!(UndefinedStats));
         }
 
         let id = id
-            .dyn_into::<js_sys::JsString>()
-            .map_err(|e| tracerr::new!(RtcStatsError::Js(JsError::from(e))))?;
+            .dyn_into::<JsString>()
+            .map_err(|e| tracerr::new!(Js(JsError::from(e))))?;
         let stats = stats
             .dyn_into::<JsValue>()
-            .map_err(|e| tracerr::new!(RtcStatsError::Js(JsError::from(e))))?;
+            .map_err(|e| tracerr::new!(Js(JsError::from(e))))?;
 
         Ok(RtcStatsReportEntry(id, stats))
     }
 }
 
-/// All available [`RtcStatsType`] of `PeerConnection`.
+/// All available [`RtcStatsType`] of [`PeerConnection`].
+///
+/// [`PeerConnection`]: crate::peer::PeerConnection
 #[derive(Debug)]
 pub struct RtcStats(pub Vec<RtcStat>);
 
@@ -70,24 +53,24 @@ impl TryFrom<&JsValue> for RtcStats {
     type Error = Traced<RtcStatsError>;
 
     fn try_from(stats: &JsValue) -> Result<Self, Self::Error> {
+        use RtcStatsError::*;
+
         let entries_fn =
             get_property_by_name(&stats, "entries", |func: JsValue| {
-                Some(func.unchecked_into::<js_sys::Function>())
+                Some(func.unchecked_into::<JsFunction>())
             })
-            .ok_or_else(|| tracerr::new!(RtcStatsError::EntriesNotFound))?;
+            .ok_or_else(|| tracerr::new!(UndefinedEntries))?;
 
         let iterator = entries_fn
             .call0(stats.as_ref())
-            .map_err(|e| tracerr::new!(RtcStatsError::Js(JsError::from(e))))?
-            .unchecked_into::<js_sys::Iterator>();
+            .map_err(|e| tracerr::new!(Js(JsError::from(e))))?
+            .unchecked_into::<JsIterator>();
 
         let mut stats = Vec::new();
 
         for stat in iterator {
-            let stat = stat.map_err(|e| {
-                tracerr::new!(RtcStatsError::Js(JsError::from(e)))
-            })?;
-            let stat = stat.unchecked_into::<js_sys::Array>();
+            let stat = stat.map_err(|e| tracerr::new!(Js(JsError::from(e))))?;
+            let stat = stat.unchecked_into::<JsArray>();
             let stat = RtcStatsReportEntry::try_from(stat)
                 .map_err(tracerr::map_from_and_wrap!())?;
             let stat: RtcStat = JsValue::from(&stat.1)
@@ -103,4 +86,32 @@ impl TryFrom<&JsValue> for RtcStats {
 
         Ok(RtcStats(stats))
     }
+}
+
+/// Errors which can occur during deserialization of the [`RtcStatsType`].
+#[derive(Debug, Display, From, JsCaused)]
+pub enum RtcStatsError {
+    /// [RTCStats.id][1] is undefined.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcstats-id
+    #[display(fmt = "RTCStats.id is undefined")]
+    UndefinedId,
+
+    /// [RTCStats.stats] is undefined.
+    ///
+    /// [1]: https://w3.org/TR/webrtc-stats/#dfn-stats-object
+    #[display(fmt = "RTCStats.stats is undefined")]
+    UndefinedStats,
+
+    /// Some JS error occurred.
+    #[display(fmt = "Unexpected JS side error: {}", _0)]
+    Js(JsError),
+
+    /// `RTCStats.entries` is undefined.
+    #[display(fmt = "RTCStats.entries is undefined")]
+    UndefinedEntries,
+
+    /// Error of [`RtcStats`] deserialization.
+    #[display(fmt = "Failed to deserialize into RtcStats: {}", _0)]
+    ParseError(serde_json::Error),
 }

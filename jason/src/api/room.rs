@@ -906,7 +906,11 @@ impl PeerEventHandler for InnerRoom {
         });
 
         if let PeerConnectionState::Connected = peer_connection_state {
-            self.peers.send_peer_stats(peer_id);
+            if let Some(peer) = self.peers.get(peer_id) {
+                spawn_local(async move {
+                    peer.scrape_and_send_peer_stats().await;
+                });
+            }
         }
     }
 

@@ -4,14 +4,15 @@
 //! [`Peer`]: crate::media::peer::Peer
 
 use std::{
-    cell::RefCell,
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
-    future::Future,
-    rc::Rc,
     sync::Arc,
 };
 
+use actix::{
+    fut::{self, wrap_future},
+    ActorFuture, AsyncContext, WrapFuture,
+};
 use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
@@ -24,7 +25,8 @@ use crate::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             WeakEndpoint,
         },
-        room::RoomError,
+        room::{ActFuture, RoomError},
+        Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
@@ -35,7 +37,7 @@ pub struct PeerRepository {
     room_id: RoomId,
 
     /// [`IceUser`]s for all [`PeerConnection`] of this [`PeerRepository`].
-    ice_users: Rc<RefCell<HashMap<PeerId, IceUser>>>,
+    ice_users: HashMap<PeerId, IceUser>,
 
     /// [`TurnAuthService`] with which [`IceUser`]s for the [`PeerConnection`]s
     /// from this [`PeerRepository`] will be created.
@@ -87,7 +89,7 @@ impl PeerRepository {
         Self {
             room_id,
             turn_service,
-            ice_users: Rc::new(RefCell::new(HashMap::new())),
+            ice_users: HashMap::new(),
             peers: HashMap::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
@@ -137,26 +139,63 @@ impl PeerRepository {
     ///
     /// If [`IceUser`] isn't already created then new [`IceUser`] will be
     /// created.
-    pub fn get_ice_user(
+    pub fn get_or_create_ice_user(
         &mut self,
         peer_id: PeerId,
-    ) -> impl Future<Output = Result<IceUser, RoomError>> {
-        let ice_users = Rc::clone(&self.ice_users);
-        let turn_service = Arc::clone(&self.turn_service);
-        let room_id = self.room_id.clone();
-
-        async move {
-            let ice_user = ice_users.borrow().get(&peer_id).cloned();
-            if let Some(ice_user) = ice_user {
-                Ok(ice_user)
-            } else {
-                let ice_user = turn_service
-                    .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
-                    .await?;
-                ice_users.borrow_mut().insert(peer_id, ice_user.clone());
-
-                Ok(ice_user)
-            }
+    ) -> ActFuture<Result<IceUser, RoomError>> {
+        if let Some(ice_user) = self.ice_users.get(&peer_id).cloned() {
+            // IceUser was created before, return it.
+            Box::new(fut::ok(ice_user))
+        } else {
+            // IceUser not found, so we should create it.
+            let turn_service = Arc::clone(&self.turn_service);
+            let room_id = self.room_id.clone();
+            Box::new(
+                wrap_future(async move {
+                    Ok(turn_service
+                        .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
+                        .await?)
+                })
+                .then(
+                    move |create_result, room: &mut Room, ctx| {
+                        // Check again, maybe some other invocation created
+                        // IceUser while we were waiting TurnAuthService
+                        // response.
+                        if let Some(ice_user) =
+                            room.peers.ice_users.get(&peer_id).cloned()
+                        {
+                            // Delete created IceUser and return found one.
+                            if let Ok(created_user) = create_result {
+                                let turn_service =
+                                    Arc::clone(&room.peers.turn_service);
+                                ctx.spawn(
+                                    async move {
+                                        if let Err(err) = turn_service
+                                            .delete(&[created_user])
+                                            .await
+                                        {
+                                            error!(
+                                                "Error deleting IceUser: {:?}",
+                                                err,
+                                            );
+                                        }
+                                    }
+                                    .into_actor(room),
+                                );
+                            }
+                            fut::ready(Ok(ice_user))
+                        } else {
+                            // Save and return created IceUser.
+                            if let Ok(ice_user) = &create_result {
+                                room.peers
+                                    .ice_users
+                                    .insert(peer_id, ice_user.clone());
+                            }
+                            fut::ready(create_result)
+                        }
+                    },
+                ),
+            )
         }
     }
 

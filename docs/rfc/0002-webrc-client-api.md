@@ -1067,9 +1067,9 @@ struct AddPeerConnectionMetrics {
 Related objects:
 ```rust
 pub enum PeerMetrics {
-    IceConnectionStateChanged(IceConnectionState),
-    PeerConnectionStateChanged(PeerConnectionState),
-    StatsUpdate(Vec<RtcStat>),
+    IceConnectionState(IceConnectionState),
+    PeerConnectionState(PeerConnectionState),
+    RtcStats(Vec<RtcStat>),
 }
 
 pub enum IceConnectionState {

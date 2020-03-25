@@ -1,6 +1,6 @@
 //! Client API protocol implementation for Medea media server.
 //!
-//! ## Feature flags
+//! # Features
 //!
 //! - `jason`: Enables [`Deserialize`] implementation for [`Event`]s, and
 //! [`Serialize`] implementation for [`Command`]s.
@@ -16,7 +16,7 @@ use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-use crate::stats::RtcStat;
+use self::stats::RtcStat;
 
 /// ID of `Peer`.
 #[cfg_attr(

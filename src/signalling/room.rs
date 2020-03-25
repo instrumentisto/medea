@@ -214,7 +214,7 @@ pub struct Room {
     pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    peers: PeerRepository,
+    pub peers: PeerRepository,
 
     /// Current state of this [`Room`].
     state: State,
@@ -299,33 +299,34 @@ impl Room {
         let member_id = sender.member_id();
         let sender_peer_id = sender.id();
         self.peers.add_peer(sender);
-        let fut = self.peers.get_ice_user(sender_peer_id);
 
-        Ok(Box::new(fut.into_actor(self).then(
-            move |ice_user, this, _| {
-                ice_user
-                    .and_then(|ice_user| {
-                        let sender =
-                            this.peers.get_peer_by_id(sender_peer_id)?;
-                        let peer_created = Event::PeerCreated {
-                            peer_id: sender.id(),
-                            sdp_offer: None,
-                            tracks: sender.tracks(),
-                            ice_servers: ice_user.servers_list(),
-                            force_relay: sender.is_force_relayed(),
-                        };
+        Ok(Box::new(
+            self.peers.get_or_create_ice_user(sender_peer_id).then(
+                move |ice_user, this, _| {
+                    ice_user
+                        .and_then(|ice_user| {
+                            let sender =
+                                this.peers.get_peer_by_id(sender_peer_id)?;
+                            let peer_created = Event::PeerCreated {
+                                peer_id: sender.id(),
+                                sdp_offer: None,
+                                tracks: sender.tracks(),
+                                ice_servers: ice_user.servers_list(),
+                                force_relay: sender.is_force_relayed(),
+                            };
 
-                        Ok(this
-                            .members
-                            .send_event_to_member(member_id, peer_created)
-                            .into_actor(this))
-                    })
-                    .map_or_else(
-                        |e| Either::Left(actix::fut::err(e)),
-                        Either::Right,
-                    )
-            },
-        )))
+                            Ok(this
+                                .members
+                                .send_event_to_member(member_id, peer_created)
+                                .into_actor(this))
+                        })
+                        .map_or_else(
+                            |e| Either::Left(actix::fut::err(e)),
+                            Either::Right,
+                        )
+                },
+            ),
+        ))
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
@@ -1006,32 +1007,33 @@ impl CommandHandler for Room {
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
 
-        let fut = self.peers.get_ice_user(to_peer_id);
+        Ok(Box::new(
+            self.peers.get_or_create_ice_user(to_peer_id).then(
+                move |ice_user, this, _| {
+                    ice_user
+                        .and_then(|ice_user| {
+                            let to_peer =
+                                this.peers.get_peer_by_id(to_peer_id)?;
+                            let event = Event::PeerCreated {
+                                peer_id: to_peer.id(),
+                                sdp_offer: Some(sdp_offer),
+                                tracks: to_peer.tracks(),
+                                ice_servers: ice_user.servers_list(),
+                                force_relay: to_peer.is_force_relayed(),
+                            };
 
-        Ok(Box::new(fut.into_actor(self).then(
-            move |ice_user, this, _| {
-                ice_user
-                    .and_then(|ice_user| {
-                        let to_peer = this.peers.get_peer_by_id(to_peer_id)?;
-                        let event = Event::PeerCreated {
-                            peer_id: to_peer.id(),
-                            sdp_offer: Some(sdp_offer),
-                            tracks: to_peer.tracks(),
-                            ice_servers: ice_user.servers_list(),
-                            force_relay: to_peer.is_force_relayed(),
-                        };
-
-                        Ok(this
-                            .members
-                            .send_event_to_member(to_member_id, event)
-                            .into_actor(this))
-                    })
-                    .map_or_else(
-                        |e| Either::Left(actix::fut::err(e)),
-                        Either::Right,
-                    )
-            },
-        )))
+                            Ok(this
+                                .members
+                                .send_event_to_member(to_member_id, event)
+                                .into_actor(this))
+                        })
+                        .map_or_else(
+                            |e| Either::Left(actix::fut::err(e)),
+                            Either::Right,
+                        )
+                },
+            ),
+        ))
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided

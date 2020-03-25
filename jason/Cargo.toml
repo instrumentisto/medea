@@ -65,6 +65,7 @@ wee_alloc = { version = "0.4", optional = true }
         "RtcRtpTransceiverInit",
         "RtcSdpType", "RtcStats",
         "RtcSessionDescription", "RtcSessionDescriptionInit",
+        "RtcStats",
         "RtcTrackEvent",
         "WebSocket", "Window",
     ]

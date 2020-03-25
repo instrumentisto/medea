@@ -1,6 +1,6 @@
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use medea_client_api_proto::{
     Direction as DirectionProto, IceServer, PeerConnectionState,
 };
@@ -137,27 +137,31 @@ pub enum SdpType {
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
-#[derive(Debug, Display, JsCaused)]
+#[derive(Debug, Display, From, JsCaused)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "Failed to add ICE candidate: {}", _0)]
+    #[from(ignore)]
     AddIceCandidateFailed(JsError),
 
     /// Occurs when cannot obtains [SDP answer][`SdpType::Answer`] from
     /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`].
     #[display(fmt = "Failed to create SDP answer: {}", _0)]
+    #[from(ignore)]
     CreateAnswerFailed(JsError),
 
     /// Occurs when a new [`RtcPeerConnection`] cannot be created.
     #[display(fmt = "Failed to create PeerConnection: {}", _0)]
+    #[from(ignore)]
     PeerCreationError(JsError),
 
     /// Occurs when cannot obtains [SDP offer][`SdpType::Offer`] from
     /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
     #[display(fmt = "Failed to create SDP offer: {}", _0)]
+    #[from(ignore)]
     CreateOfferFailed(JsError),
 
     /// Occurs when handler failed to bind to some [`RtcPeerConnection`] event.
@@ -169,34 +173,27 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to get RTCStats: {}", _0)]
     RtcStatsError(#[js(cause)] RtcStatsError),
 
-    /// `PeerConnection.getStats()` promise thrown exception.
+    /// [PeerConnection.getStats][1] promise thrown exception.
+    ///
+    /// [1]: https://tinyurl.com/w6hmt5f
     #[display(fmt = "PeerConnection.getStats() failed with error: {}", _0)]
+    #[from(ignore)]
     GetStatsException(JsError),
 
     /// Occurs if the local description associated with the
     /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set local SDP description: {}", _0)]
+    #[from(ignore)]
     SetLocalDescriptionFailed(JsError),
 
     /// Occurs if the description of the remote end of the
     /// [`RtcPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set remote SDP description: {}", _0)]
+    #[from(ignore)]
     SetRemoteDescriptionFailed(JsError),
 }
 
 type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
-
-impl From<EventListenerBindError> for RTCPeerConnectionError {
-    fn from(err: EventListenerBindError) -> Self {
-        Self::PeerConnectionEventBindFailed(err)
-    }
-}
-
-impl From<RtcStatsError> for RTCPeerConnectionError {
-    fn from(e: RtcStatsError) -> Self {
-        Self::RtcStatsError(e)
-    }
-}
 
 /// Representation of [RTCPeerConnection][1].
 ///
@@ -295,8 +292,10 @@ impl RtcPeerConnection {
     /// Errors with [`RTCPeerConnectionError::RtcStats`] if getting or parsing
     /// of [`RtcStats`] fails.
     ///
-    /// Errors with [`RTCPeerConncetionError::GetStatsException`] when
-    /// `RTCPeerConnection.getStats` promise throws exception.
+    /// Errors with [`RTCPeerConnectionError::GetStatsException`] when
+    /// [PeerConnection.getStats][1] promise throws exception.
+    ///
+    /// [1]: https://tinyurl.com/w6hmt5f
     pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats =
             JsFuture::from(self.peer.get_stats()).await.map_err(|e| {
