@@ -15,12 +15,16 @@ spec:
             spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
           # Media element which is able to play media data for client
           # via WebRTC.
           play-responder:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://video-call-1/responder/publish"
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
     responder:
       kind: Member
       credentials: test
@@ -30,7 +34,11 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://video-call-1/caller/publish"
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"

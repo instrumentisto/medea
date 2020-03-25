@@ -70,6 +70,7 @@ use super::{
     peers_metrics::{PeerMetricsEvent, PeerMetricsEventHandler, PeersMetrics},
     peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
 };
+use crate::signalling::peers_traffic_watcher::flow_metrics_sources;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -399,6 +400,9 @@ impl Room {
                                 metrics_service.do_send(mcs::SubscribePeer {
                                     peer_id: publisher_peer_id,
                                     room_id: room_id.clone(),
+                                    flow_metrics_sources: flow_metrics_sources(
+                                        publisher.is_force_relayed(),
+                                    ),
                                 });
                             }
                             if receiver.get_on_start().is_some()
@@ -407,6 +411,9 @@ impl Room {
                                 metrics_service.do_send(mcs::SubscribePeer {
                                     peer_id: receiver_peer_id,
                                     room_id: room_id.clone(),
+                                    flow_metrics_sources: flow_metrics_sources(
+                                        publisher.is_force_relayed(),
+                                    ),
                                 });
                             }
 

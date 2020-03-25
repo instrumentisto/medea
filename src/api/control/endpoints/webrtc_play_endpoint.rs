@@ -60,19 +60,13 @@ impl WebRtcPlayEndpoint<Unvalidated> {
     pub fn validate(
         self,
     ) -> Result<WebRtcPlayEndpoint<Validated>, ValidationError> {
-        if !self.force_relay
-            && (self.on_start.is_some() || self.on_stop.is_some())
-        {
-            Err(ValidationError::ForceRelayShouldBeEnabled)
-        } else {
-            Ok(WebRtcPlayEndpoint {
-                src: self.src,
-                on_start: self.on_start,
-                on_stop: self.on_stop,
-                force_relay: self.force_relay,
-                _validation_state: Validated,
-            })
-        }
+        Ok(WebRtcPlayEndpoint {
+            src: self.src,
+            on_start: self.on_start,
+            on_stop: self.on_stop,
+            force_relay: self.force_relay,
+            _validation_state: Validated,
+        })
     }
 }
 

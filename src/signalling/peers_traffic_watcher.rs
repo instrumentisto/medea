@@ -30,6 +30,29 @@ use crate::{
     },
 };
 
+pub fn flow_metrics_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
+    // This code is needed to pay attention to this function when changing
+    // 'FlowMetricSource'.
+    //
+    // Rustc shouldn't include it into binary.
+    {
+        match FlowMetricSource::PeerTraffic {
+            FlowMetricSource::PeerTraffic => (),
+            FlowMetricSource::Coturn => (),
+            FlowMetricSource::PartnerPeerTraffic => (),
+        }
+    }
+
+    let mut sources = HashSet::new();
+    sources.insert(FlowMetricSource::PeerTraffic);
+    sources.insert(FlowMetricSource::PartnerPeerTraffic);
+    if is_force_relay {
+        sources.insert(FlowMetricSource::Coturn);
+    }
+
+    sources
+}
+
 /// Service which responsible for the [`PeerConnection`] metrics based Control
 /// API callbacks.
 #[derive(Debug, Default)]
@@ -84,7 +107,7 @@ impl PeersTrafficWatcher {
         if let Some(peer) = peer {
             if let PeerState::Started(srcs) = &peer.state {
                 let is_not_all_sources_sent_start =
-                    srcs.len() < FlowMetricSource::VARIANT_COUNT;
+                    srcs.len() < peer.flow_metrics_sources.len();
                 if is_not_all_sources_sent_start {
                     self.fatal_peer_error(room_id, peer_id);
                 }
@@ -280,6 +303,10 @@ pub struct PeerStat {
     /// Current state of this [`PeerStat`].
     pub state: PeerState,
 
+    /// List of [`FlowMetricSource`]s from which [`TrafficFlows`] should be
+    /// received for validation that traffic is really going.
+    pub flow_metrics_sources: HashSet<FlowMetricSource>,
+
     /// Time of last received [`PeerState`] proof.
     ///
     /// If [`PeerStat`] doesn't updates withing `10secs` then this [`PeerStat`]
@@ -371,6 +398,10 @@ pub struct SubscribePeer {
 
     /// [`PeerId`] of [`PeerStat`] for which subscription is requested.
     pub peer_id: PeerId,
+
+    /// List of [`FlowMetricSource`]s from which [`TrafficFlows`] should be
+    /// received for validation that traffic is really going.
+    pub flow_metrics_sources: HashSet<FlowMetricSource>,
 }
 
 impl Handler<SubscribePeer> for PeersTrafficWatcher {
@@ -387,6 +418,7 @@ impl Handler<SubscribePeer> for PeersTrafficWatcher {
                 PeerStat {
                     peer_id: msg.peer_id,
                     state: PeerState::Stopped,
+                    flow_metrics_sources: msg.flow_metrics_sources,
                     last_update: Instant::now(),
                 },
             );
