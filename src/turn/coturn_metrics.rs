@@ -1,7 +1,10 @@
 //! Service which is responsible for processing [`PeerConnection`]'s metrics
 //! received from the Coturn.
 
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::Either, Actor, ActorFuture, Addr, AsyncContext, StreamHandler,
@@ -20,7 +23,6 @@ use crate::api::control::callback::metrics_callback_service::{
     FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
     TrafficFlows, TrafficStopped,
 };
-use std::time::Instant;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = CoturnMetrics, Output = O>>;

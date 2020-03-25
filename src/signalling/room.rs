@@ -1116,6 +1116,7 @@ impl CommandHandler for Room {
         ))
     }
 
+    /// [`PeerMetrics::RtcStats`] will be transferred [`PeerMetricsService`].
     #[allow(clippy::single_match)]
     fn on_add_peer_connection_metrics(
         &mut self,
@@ -1158,6 +1159,8 @@ impl CommandHandler for Room {
     }
 }
 
+/// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
+/// is started.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerStarted(pub PeerId);
@@ -1212,6 +1215,8 @@ impl Handler<PeerStarted> for Room {
     }
 }
 
+/// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
+/// is stopped.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerStopped(pub PeerId);
@@ -1689,6 +1694,8 @@ impl Handler<CreateEndpoint> for Room {
     }
 }
 
+/// Message which indicates that [`PeerConnection`] with provided [`PeerId`] is
+/// went into a state that does not coincide with spec.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerSpecContradiction {

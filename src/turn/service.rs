@@ -220,10 +220,9 @@ pub fn new_turn_auth_service<'a>(
 pub mod test {
     use std::sync::Arc;
 
-    use crate::media::IceUser;
+    use crate::{api::control::room::Id, media::IceUser};
 
     use super::*;
-    use crate::api::control::room::Id;
 
     #[derive(Clone, Copy, Debug)]
     struct TurnAuthServiceMock;
