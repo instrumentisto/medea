@@ -17,10 +17,10 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        endpoints::{Validated, WebRtcPlayEndpoint as WebRtcPlayEndpointSpec},
+        endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
-        TryFromElementError, WebRtcPlayId, WebRtcPublishId,
+        TryFromElementError, Validated, WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
 };
@@ -555,10 +555,9 @@ impl Into<proto::Element> for Member {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::control::{MemberId, RootElement};
+    use crate::api::control::{MemberId, RootElement, Unvalidated};
 
     use super::*;
-    use crate::api::control::endpoints::Unvalidated;
 
     const TEST_SPEC: &str = r#"
             kind: Room

@@ -12,13 +12,12 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrlParseError,
-        endpoints::ValidationError,
         grpc::server::GrpcControlApiError,
         refs::{
             fid::ParseFidError, local_uri::LocalUriParseError,
             src_uri::SrcParseError,
         },
-        TryFromElementError, TryFromProtobufError,
+        TryFromElementError, TryFromProtobufError, ValidationError,
     },
     signalling::{
         elements::{member::MemberError, MembersLoadError},

@@ -14,9 +14,6 @@ use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
-        callback::metrics_callback_service::{
-            self as mcs, MetricsCallbacksService,
-        },
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
@@ -25,16 +22,17 @@ use crate::{
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
-    signalling::{
-        room::{
-            Close, CreateEndpoint, CreateMember, Delete, RoomError,
-            SerializeProto,
-        },
-        room_repo::RoomRepository,
-        Room,
-    },
     turn::coturn_metrics::CoturnMetrics,
     AppContext,
+};
+
+use super::{
+    peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
+    room::{
+        Close, CreateEndpoint, CreateMember, Delete, RoomError, SerializeProto,
+    },
+    room_repo::RoomRepository,
+    Room,
 };
 
 /// Errors of [`RoomService`].
@@ -126,7 +124,7 @@ pub struct RoomService {
 
     /// [`MetricsCallbacksService`] for all [`Room`]s from this
     /// [`RoomService`].
-    metrics_service: Addr<MetricsCallbacksService>,
+    metrics_service: Addr<PeersTrafficWatcher>,
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
@@ -145,7 +143,7 @@ impl RoomService {
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
-        let metrics_service = MetricsCallbacksService::new().start();
+        let metrics_service = PeersTrafficWatcher::new().start();
         Ok(Self {
             _coturn_metrics: CoturnMetrics::new(
                 &app.config.turn,
@@ -654,12 +652,9 @@ mod room_service_specs {
 
     use crate::{
         api::control::{
-            endpoints::{
-                webrtc_publish_endpoint::P2pMode,
-                Unvalidated as UnvalidatedElement,
-            },
+            endpoints::webrtc_publish_endpoint::P2pMode,
             refs::{Fid, ToEndpoint},
-            RootElement,
+            RootElement, Unvalidated as UnvalidatedElement,
         },
         conf::Conf,
     };
@@ -765,13 +760,10 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(
-            &spec,
-            &app_ctx(),
-            MetricsCallbacksService::new().start(),
-        )
-        .unwrap()
-        .start();
+        let room =
+            Room::new(&spec, &app_ctx(), PeersTrafficWatcher::new().start())
+                .unwrap()
+                .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -814,13 +806,10 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(
-            &spec,
-            &app_ctx(),
-            MetricsCallbacksService::new().start(),
-        )
-        .unwrap()
-        .start();
+        let room =
+            Room::new(&spec, &app_ctx(), PeersTrafficWatcher::new().start())
+                .unwrap()
+                .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -885,7 +874,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            MetricsCallbacksService::new().start(),
+            PeersTrafficWatcher::new().start(),
         )
         .unwrap()
         .start();
@@ -907,7 +896,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            MetricsCallbacksService::new().start(),
+            PeersTrafficWatcher::new().start(),
         )
         .unwrap()
         .start();
@@ -930,7 +919,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            MetricsCallbacksService::new().start(),
+            PeersTrafficWatcher::new().start(),
         )
         .unwrap()
         .start();

@@ -26,8 +26,10 @@ message Request {
   }
 }
 
+// Event which fires when Endpoint starts sending media traffic.
 message OnStart {}
 
+// Event which fires when Endpoint stops sending media traffic.
 message OnStop {}
 
 // Empty response of the Callback service.

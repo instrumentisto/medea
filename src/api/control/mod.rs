@@ -22,10 +22,7 @@ use failure::{Error, Fail};
 use serde::Deserialize;
 
 use crate::{
-    api::control::{
-        callback::url::CallbackUrlParseError,
-        endpoints::{Unvalidated, Validated, ValidationError},
-    },
+    api::control::callback::url::CallbackUrlParseError,
     log::prelude::*,
     signalling::room_service::{
         RoomService, RoomServiceError, StartStaticRooms,
@@ -109,6 +106,29 @@ impl From<ValidationError> for TryFromProtobufError {
         Self::SpecValidationError(from)
     }
 }
+
+// TODO: correct docs
+/// Errors which can occur while endpoint validation.
+#[derive(Debug, Fail, Display)]
+pub enum ValidationError {
+    /// `OnStart` or `OnStop` callback is set, but `force_relay` field is set
+    /// to false.
+    ForceRelayShouldBeEnabled,
+}
+
+// TODO: correct docs
+/// Validation state of the [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`].
+///
+/// Indicates that endpoint needs validation and can't be used.
+#[derive(Debug, Default, Clone)]
+pub struct Unvalidated;
+
+// TODO: correct docs
+/// Validation state of the [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`].
+///
+/// Indicates that is validated and can be used.
+#[derive(Debug, Clone)]
+pub struct Validated;
 
 /// Root elements of [Control API] spec.
 ///

@@ -10,9 +10,8 @@ use serde::Deserialize;
 
 use crate::api::control::{
     callback::url::CallbackUrl, refs::SrcUri, TryFromProtobufError,
+    Unvalidated, Validated, ValidationError,
 };
-
-use super::{Unvalidated, Validated, ValidationError};
 
 /// ID of [`WebRtcPlayEndpoint`].
 #[derive(

@@ -166,12 +166,9 @@ mod test {
     use awc::error::WsClientError;
 
     use crate::{
-        api::{
-            control,
-            control::callback::metrics_callback_service::MetricsCallbacksService,
-        },
+        api::control,
         conf::Conf,
-        signalling::Room,
+        signalling::{peers_traffic_watcher::PeersTrafficWatcher, Room},
         turn::new_turn_auth_service_mock,
         AppContext,
     };
@@ -188,7 +185,7 @@ mod test {
 
         let room_id = room_spec.id.clone();
         let client_room =
-            Room::new(&room_spec, &app, MetricsCallbacksService::new().start())
+            Room::new(&room_spec, &app, PeersTrafficWatcher::new().start())
                 .unwrap()
                 .start();
         let room_hash_map = hashmap! {

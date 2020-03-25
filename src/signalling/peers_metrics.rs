@@ -19,12 +19,11 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 
-use crate::api::control::{
-    callback::metrics_callback_service::{
-        FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
-        TrafficFlows, TrafficStopped,
-    },
-    RoomId,
+use crate::api::control::RoomId;
+
+use super::peers_traffic_watcher::{
+    FlowMetricSource, PeersTrafficWatcher, StoppedMetricSource, TrafficFlows,
+    TrafficStopped,
 };
 
 /// Media type of a [`MediaTrack`].
@@ -117,7 +116,7 @@ impl SenderStat {
     /// Checks that this [`SenderStat`] is active.
     ///
     /// This will be calculated by checking that this [`SenderStat`] was updated
-    /// within `10secs`.
+    /// within `10s`.
     fn is_active(&self) -> bool {
         self.last_update > Instant::now() - Duration::from_secs(10)
     }
@@ -323,13 +322,13 @@ pub struct Peer {
 
 /// Service which responsible for [`PeerConnection`]'s metrics processing.
 #[derive(Debug)]
-pub struct PeerMetricsService {
+pub struct PeersMetrics {
     /// [`RoomId`] of [`Room`] to which this [`PeerMetricsService`] belongs to.
     room_id: RoomId,
 
     /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
     /// sent.
-    metrics_service: Addr<MetricsCallbacksService>,
+    metrics_service: Addr<PeersTrafficWatcher>,
 
     /// All `PeerConnection` for this this [`PeerMetricsService`] will proccess
     /// metrics.
@@ -342,11 +341,11 @@ pub struct PeerMetricsService {
     peer_metric_events_sender: Option<mpsc::UnboundedSender<PeerMetricsEvent>>,
 }
 
-impl PeerMetricsService {
+impl PeersMetrics {
     /// Returns new [`PeerMetricsService`] for provided [`Room`].
     pub fn new(
         room_id: RoomId,
-        metrics_service: Addr<MetricsCallbacksService>,
+        metrics_service: Addr<PeersTrafficWatcher>,
     ) -> Self {
         Self {
             room_id,

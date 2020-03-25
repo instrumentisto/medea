@@ -8,9 +8,10 @@ use derive_more::{Display, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use crate::api::control::{callback::url::CallbackUrl, TryFromProtobufError};
-
-use super::{Unvalidated, Validated, ValidationError};
+use crate::api::control::{
+    callback::url::CallbackUrl, TryFromProtobufError, Unvalidated, Validated,
+    ValidationError,
+};
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(

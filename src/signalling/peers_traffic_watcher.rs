@@ -1,10 +1,12 @@
-//! Service which is responsible to `Peer` metrics based Control API callbacks.
+//! Service which is responsible to [`PeerConnection`] metrics based Control API
+//! callbacks.
 //!
-//! `Peer` metrics will be collected from the many sources of metrics. All this
-//! metrics will be collected and based on them, [`MetricsCallbackService`] will
-//! consider which callback should be sent (or not sent).
+//! [`PeerConnection`] metrics will be collected from the many sources of
+//! metrics. All this metrics will be collected and based on them,
+//! [`MetricsCallbackService`] will consider which callback should be sent (or
+//! not sent).
 //!
-//! # List of `Peer` metrics based Control API callbacks:
+//! # List of [`PeerConnection`] metrics based Control API callbacks:
 //!
 //! 1. `WebRtcPublishEndpoint::on_start`;
 //! 2. `WebRtcPublishEndpoint::on_stop`;
@@ -28,15 +30,15 @@ use crate::{
     },
 };
 
-/// Service which responsible for the `Peer` metrics based Control API
-/// callbacks.
+/// Service which responsible for the [`PeerConnection`] metrics based Control
+/// API callbacks.
 #[derive(Debug, Default)]
-pub struct MetricsCallbacksService {
+pub struct PeersTrafficWatcher {
     /// All `Room` which exists on the Medea server.
     stats: HashMap<RoomId, RoomStats>,
 }
 
-impl MetricsCallbacksService {
+impl PeersTrafficWatcher {
     /// Returns new [`MetricsCallbacksService`].
     pub fn new() -> Self {
         Self {
@@ -44,8 +46,8 @@ impl MetricsCallbacksService {
         }
     }
 
-    /// Unsubscribes [`MetricsCallbackService`] from watching a `Peer` with
-    /// provided [`PeerId`].
+    /// Unsubscribes [`MetricsCallbackService`] from watching a
+    /// [`PeerConnection`] with provided [`PeerId`].
     ///
     /// Removes provided [`PeerId`] from [`RoomStat`] with provided [`RoomId`].
     pub fn unsubscribe_from_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
@@ -54,8 +56,8 @@ impl MetricsCallbacksService {
         }
     }
 
-    /// Unsubscribes [`MetricsCallbackService`] from a `Peer` with fatal error
-    /// and notifies [`Room`] about fatal error in [`PeerStat`].
+    /// Unsubscribes [`MetricsCallbackService`] from a [`PeerConnection`] with
+    /// fatal error and notifies [`Room`] about fatal error in [`PeerStat`].
     fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.peers.remove(&peer_id);
@@ -65,8 +67,8 @@ impl MetricsCallbacksService {
         }
     }
 
-    /// Checks that all metrics sources considered that `Peer` with provided
-    /// [`PeerId`] is started.
+    /// Checks that all metrics sources considered that [`PeerConnection`] with
+    /// provided [`PeerId`] is started.
     ///
     /// This function will be called on every [`PeerStat`] after `10sec` from
     /// first [`PeerStat`]'s [`TrafficFlows`] message.
@@ -91,7 +93,7 @@ impl MetricsCallbacksService {
     }
 }
 
-impl Actor for MetricsCallbacksService {
+impl Actor for PeersTrafficWatcher {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -116,25 +118,25 @@ impl Actor for MetricsCallbacksService {
     }
 }
 
-/// Some [`FlowMetricSource`] notifies [`MetricsCallbacksService`] that `Peer`
-/// with provided [`PeerId`] is normally flows.
+/// Some [`FlowMetricSource`] notifies [`MetricsCallbacksService`] that
+/// [`PeerConnection`] with provided [`PeerId`] is normally flows.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct TrafficFlows {
-    /// [`RoomId`] of [`Room`] where this `Peer` is stored.
+    /// [`RoomId`] of [`Room`] where this [`PeerConnection`] is stored.
     pub room_id: RoomId,
 
-    /// [`PeerId`] of `Peer` which flows.
+    /// [`PeerId`] of [`PeerConnection`] which flows.
     pub peer_id: PeerId,
 
-    /// Time when proof of `Peer`'s traffic flowing was gotten.
+    /// Time when proof of [`PeerConnection`]'s traffic flowing was gotten.
     pub timestamp: Instant,
 
     /// Source of this metric.
     pub source: FlowMetricSource,
 }
 
-impl Handler<TrafficFlows> for MetricsCallbacksService {
+impl Handler<TrafficFlows> for PeersTrafficWatcher {
     type Result = ();
 
     fn handle(
@@ -172,24 +174,24 @@ impl Handler<TrafficFlows> for MetricsCallbacksService {
 }
 
 /// Some [`StoppedMetricSource`] notifies [`MetricsCallbacksService`] that
-/// traffic flowing of `Peer` with provided [`PeerId`] was stopped.
+/// traffic flowing of [`PeerConnection`] with provided [`PeerId`] was stopped.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct TrafficStopped {
-    /// [`RoomId`] of [`Room`] where this `Peer` is stored.
+    /// [`RoomId`] of [`Room`] where this [`PeerConnection`] is stored.
     pub room_id: RoomId,
 
-    /// [`PeerId`] of `Peer` which traffic was stopped.
+    /// [`PeerId`] of [`PeerConnection`] which traffic was stopped.
     pub peer_id: PeerId,
 
-    /// Time when proof of `Peer`'s traffic stopping was gotten.
+    /// Time when proof of [`PeerConnection`]'s traffic stopping was gotten.
     pub timestamp: Instant,
 
     /// Source of this metric.
     pub source: StoppedMetricSource,
 }
 
-impl Handler<TrafficStopped> for MetricsCallbacksService {
+impl Handler<TrafficStopped> for PeersTrafficWatcher {
     type Result = ();
 
     fn handle(
@@ -318,7 +320,7 @@ pub struct RegisterRoom {
     pub room: WeakAddr<Room>,
 }
 
-impl Handler<RegisterRoom> for MetricsCallbacksService {
+impl Handler<RegisterRoom> for PeersTrafficWatcher {
     type Result = ();
 
     fn handle(
@@ -346,7 +348,7 @@ impl Handler<RegisterRoom> for MetricsCallbacksService {
 #[rtype(result = "()")]
 pub struct UnregisterRoom(pub RoomId);
 
-impl Handler<UnregisterRoom> for MetricsCallbacksService {
+impl Handler<UnregisterRoom> for PeersTrafficWatcher {
     type Result = ();
 
     fn handle(
@@ -371,7 +373,7 @@ pub struct SubscribePeer {
     pub peer_id: PeerId,
 }
 
-impl Handler<SubscribePeer> for MetricsCallbacksService {
+impl Handler<SubscribePeer> for PeersTrafficWatcher {
     type Result = ();
 
     fn handle(
@@ -405,7 +407,7 @@ pub struct UnsubscribePeers {
     pub peers_ids: HashSet<PeerId>,
 }
 
-impl Handler<UnsubscribePeers> for MetricsCallbacksService {
+impl Handler<UnsubscribePeers> for PeersTrafficWatcher {
     type Result = ();
 
     fn handle(

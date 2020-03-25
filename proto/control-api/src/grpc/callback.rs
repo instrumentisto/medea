@@ -25,9 +25,11 @@ pub mod request {
         OnStop(super::OnStop),
     }
 }
+/// Event which fires when Endpoint starts sending media traffic.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStart {
 }
+/// Event which fires when Endpoint stops sending media traffic.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStop {
 }

@@ -30,22 +30,18 @@ use crate::{
         },
         control::{
             callback::{
-                clients::CallbackClientFactoryImpl,
-                metrics_callback_service::{
-                    self as mcs, MetricsCallbacksService,
-                },
-                service::CallbackService,
+                clients::CallbackClientFactoryImpl, service::CallbackService,
                 OnJoinEvent, OnLeaveEvent, OnLeaveReason, OnStartEvent,
                 OnStopEvent,
             },
             endpoints::{
-                Validated, WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+                WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
             refs::{Fid, StatefulFid, ToEndpoint, ToMember},
             room::RoomSpec,
             EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
-            TryFromElementError, WebRtcPlayId, WebRtcPublishId,
+            TryFromElementError, Validated, WebRtcPlayId, WebRtcPublishId,
         },
         RpcServer,
     },
@@ -55,24 +51,25 @@ use crate::{
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
-    signalling::{
-        elements::{
-            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            member::MemberError,
-            Member, MembersLoadError,
-        },
-        participants::{ParticipantService, ParticipantServiceErr},
-        peer_metrics_service::{
-            PeerMetricsEvent, PeerMetricsEventHandler, PeerMetricsService,
-        },
-        peers::PeerRepository,
-    },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
     AppContext,
 };
 
-use super::elements::endpoints::Endpoint;
+use super::{
+    elements::{
+        endpoints::{
+            webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            Endpoint,
+        },
+        member::MemberError,
+        Member, MembersLoadError,
+    },
+    participants::{ParticipantService, ParticipantServiceErr},
+    peers::PeerRepository,
+    peers_metrics::{PeerMetricsEvent, PeerMetricsEventHandler, PeersMetrics},
+    peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
+};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -221,10 +218,10 @@ pub struct Room {
 
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
-    metrics_callbacks_service: Addr<MetricsCallbacksService>,
+    metrics_callbacks_service: Addr<PeersTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: PeerMetricsService,
+    peer_metrics_service: PeersMetrics,
 }
 
 impl Room {
@@ -237,7 +234,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
-        metrics_service: Addr<MetricsCallbacksService>,
+        metrics_service: Addr<PeersTrafficWatcher>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -248,7 +245,7 @@ impl Room {
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
-            peer_metrics_service: PeerMetricsService::new(
+            peer_metrics_service: PeersMetrics::new(
                 room_spec.id().clone(),
                 metrics_service.clone(),
             ),
@@ -433,7 +430,7 @@ impl Room {
         first_peer_id: PeerId,
         second_peer_id: PeerId,
     ) {
-        use super::peer_metrics_service as pms;
+        use super::peers_metrics as pms;
 
         let peers =
             self.peers.get_peer_by_id(first_peer_id).map(|first_peer| {
@@ -1747,8 +1744,7 @@ mod test {
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(&room_spec, &ctx, MetricsCallbacksService::new().start())
-            .unwrap()
+        Room::new(&room_spec, &ctx, PeersTrafficWatcher::new().start()).unwrap()
     }
 
     #[actix_rt::test]

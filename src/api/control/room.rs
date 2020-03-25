@@ -9,9 +9,8 @@ use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::url::CallbackUrl,
-    endpoints::{Unvalidated, Validated, ValidationError},
-    EndpointId, TryFromProtobufError,
+    callback::url::CallbackUrl, EndpointId, TryFromProtobufError, Unvalidated,
+    Validated, ValidationError,
 };
 
 use super::{

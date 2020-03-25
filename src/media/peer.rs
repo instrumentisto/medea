@@ -18,8 +18,8 @@ use crate::{
     api::control::MemberId,
     media::MediaTrack,
     signalling::{
-        peer_metrics_service, peer_metrics_service::TrackMediaType,
         peers::Counter,
+        peers_metrics::{PeerSpec, TrackMediaType},
     },
 };
 
@@ -77,7 +77,7 @@ impl PeerError {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn get_spec(&self) -> peer_metrics_service::PeerSpec)]
+#[enum_delegate(pub fn get_spec(&self) -> PeerSpec)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -241,7 +241,7 @@ impl<T> Peer<T> {
     }
 
     /// Returns [`PeerSpec`] of this [`PeerConnection`].
-    pub fn get_spec(&self) -> peer_metrics_service::PeerSpec {
+    pub fn get_spec(&self) -> PeerSpec {
         let senders = self
             .context
             .senders
@@ -255,7 +255,7 @@ impl<T> Peer<T> {
             .map(|recv| TrackMediaType::from(&recv.media_type))
             .collect();
 
-        peer_metrics_service::PeerSpec { senders, received }
+        PeerSpec { senders, received }
     }
 }
 

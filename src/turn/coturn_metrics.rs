@@ -19,9 +19,9 @@ use super::{
     allocation_event::{CoturnAllocationEvent, CoturnEvent},
     CoturnUsername,
 };
-use crate::api::control::callback::metrics_callback_service::{
-    FlowMetricSource, MetricsCallbacksService, StoppedMetricSource,
-    TrafficFlows, TrafficStopped,
+use crate::signalling::peers_traffic_watcher::{
+    FlowMetricSource, PeersTrafficWatcher, StoppedMetricSource, TrafficFlows,
+    TrafficStopped,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -33,7 +33,7 @@ pub type ActFuture<O> = Box<dyn ActorFuture<Actor = CoturnMetrics, Output = O>>;
 pub struct CoturnMetrics {
     /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
     /// sent.
-    metrics_service: Addr<MetricsCallbacksService>,
+    metrics_service: Addr<PeersTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates will be received.
     client: redis_pub_sub::Client,
@@ -50,7 +50,7 @@ impl CoturnMetrics {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
-        metrics_service: Addr<MetricsCallbacksService>,
+        metrics_service: Addr<PeersTrafficWatcher>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(

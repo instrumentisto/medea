@@ -1,7 +1,6 @@
 //! Control API callbacks implementation.
 
 pub mod clients;
-pub mod metrics_callback_service;
 pub mod service;
 pub mod url;
 
