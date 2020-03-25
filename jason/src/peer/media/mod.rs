@@ -184,10 +184,10 @@ impl MediaConnections {
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
-        let mut s = self.0.borrow_mut();
+        let mut inner = self.0.borrow_mut();
         let mut mids =
-            HashMap::with_capacity(s.senders.len() + s.receivers.len());
-        for (track_id, sender) in &s.senders {
+            HashMap::with_capacity(inner.senders.len() + inner.receivers.len());
+        for (track_id, sender) in &inner.senders {
             mids.insert(
                 *track_id,
                 sender
@@ -197,7 +197,7 @@ impl MediaConnections {
                     .map_err(tracerr::wrap!())?,
             );
         }
-        for (track_id, receiver) in &mut s.receivers {
+        for (track_id, receiver) in &mut inner.receivers {
             mids.insert(
                 *track_id,
                 receiver
@@ -223,29 +223,29 @@ impl MediaConnections {
         &self,
         tracks: I,
     ) -> Result<()> {
-        let mut s = self.0.borrow_mut();
+        let mut inner = self.0.borrow_mut();
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let sndr = Sender::new(
                         track.id,
                         track.media_type.into(),
-                        &s.peer,
+                        &inner.peer,
                         mid,
                         track.is_muted.into(),
                     )
                     .map_err(tracerr::wrap!())?;
-                    s.senders.insert(track.id, sndr);
+                    inner.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Receiver::new(
                         track.id,
                         track.media_type.into(),
                         sender,
-                        &s.peer,
+                        &inner.peer,
                         mid,
                     );
-                    s.receivers.insert(track.id, recv);
+                    inner.receivers.insert(track.id, recv);
                 }
             }
         }
@@ -299,11 +299,11 @@ impl MediaConnections {
         &self,
         stream: &MediaStream,
     ) -> Result<()> {
-        let s = self.0.borrow();
+        let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
-        let mut sender_and_track = Vec::with_capacity(s.senders.len());
-        for sender in s.senders.values() {
+        let mut sender_and_track = Vec::with_capacity(inner.senders.len());
+        for sender in inner.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
                 if sender.caps.satisfies(&track.track()) {
                     sender_and_track.push((sender, track));
@@ -319,11 +319,11 @@ impl MediaConnections {
             }
         }
 
-        future::try_join_all(
-            sender_and_track
-                .into_iter()
-                .map(|(s, t)| Sender::insert_and_enable_track(Rc::clone(s), t)),
-        )
+        future::try_join_all(sender_and_track.into_iter().map(
+            |(sender, track)| {
+                Sender::insert_and_enable_track(Rc::clone(sender), track)
+            },
+        ))
         .await?;
 
         Ok(())
@@ -339,9 +339,9 @@ impl MediaConnections {
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
     ) -> Option<PeerId> {
-        let mut s = self.0.borrow_mut();
+        let mut inner = self.0.borrow_mut();
         if let Some(mid) = transceiver.mid() {
-            for receiver in &mut s.receivers.values_mut() {
+            for receiver in &mut inner.receivers.values_mut() {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
                         let track = MediaTrack::new(
