@@ -6,16 +6,13 @@ use std::fmt;
 use medea_control_api_proto::grpc::callback::{
     callback_client::CallbackClient as ProtoCallbackClient
 };
-use futures::future::LocalBoxFuture;
+use futures::future::{FutureExt, LocalBoxFuture};
 use tonic::transport::Channel;
 
-use crate::{
-    api::control::callback::{
-        clients::{CallbackClient, CallbackClientError},
-        url::GrpcCallbackUrl,
-        CallbackRequest,
-    },
-    log::prelude::*,
+use crate::api::control::callback::{
+    clients::{CallbackClient, CallbackClientError},
+    url::GrpcCallbackUrl,
+    CallbackRequest,
 };
 
 /// gRPC client for sending [`CallbackRequest`]s.
@@ -43,12 +40,12 @@ impl CallbackClient for GrpcCallbackClient {
         &self,
         request: CallbackRequest,
     ) -> LocalBoxFuture<'static, Result<(), CallbackClientError>> {
-        debug!("Sending {:?} gRPC callback.", request);
         let mut client = self.client.clone();
-        Box::pin(async move {
+        async move {
             client.on_event(tonic::Request::new(request.into())).await?;
             Ok(())
-        })
+        }
+        .boxed_local()
     }
 }
 

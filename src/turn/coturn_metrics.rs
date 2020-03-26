@@ -13,15 +13,17 @@ use actix::{
 use futures::{channel::mpsc, StreamExt as _};
 use redis_pub_sub::ConnectionInfo;
 
-use crate::log::prelude::*;
+use crate::{
+    log::prelude::*,
+    signalling::peers_traffic_watcher::{
+        FlowMetricSource, PeersTrafficWatcher, StoppedMetricSource,
+        TrafficFlows, TrafficStopped,
+    },
+};
 
 use super::{
     allocation_event::{CoturnAllocationEvent, CoturnEvent},
     CoturnUsername,
-};
-use crate::signalling::peers_traffic_watcher::{
-    FlowMetricSource, PeersTrafficWatcher, StoppedMetricSource, TrafficFlows,
-    TrafficStopped,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].

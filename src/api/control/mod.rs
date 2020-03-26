@@ -107,26 +107,23 @@ impl From<ValidationError> for TryFromProtobufError {
     }
 }
 
-// TODO: correct docs
-/// Errors which can occur while endpoint validation.
+/// Errors which can occur while spec validation.
 #[derive(Debug, Fail, Display)]
 pub enum ValidationError {
-    /// `OnStart` or `OnStop` callback is set, but `force_relay` field is set
-    /// to false.
+    /// `Endpoint`'s `OnStart` or `OnStop` callback is set, but `force_relay`
+    /// field is set to `false`.
     ForceRelayShouldBeEnabled,
 }
 
-// TODO: correct docs
-/// Validation state of the [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`].
+/// Validation state of a spec.
 ///
-/// Indicates that endpoint needs validation and can't be used.
+/// Indicates that spec needs validation and can't be used.
 #[derive(Debug, Default, Clone)]
 pub struct Unvalidated;
 
-// TODO: correct docs
-/// Validation state of the [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`].
+/// Validation state of a spec.
 ///
-/// Indicates that is validated and can be used.
+/// Indicates that spec is validated and can be used.
 #[derive(Debug, Clone)]
 pub struct Validated;
 

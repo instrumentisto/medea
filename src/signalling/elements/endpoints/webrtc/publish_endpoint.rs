@@ -47,7 +47,8 @@ struct WebRtcPublishEndpointInner {
     /// this [`WebRtcPublishEndpoint`].
     peer_ids: HashSet<PeerId>,
 
-    // TODO: maybe delete this and just use `peer_ids`?
+    /// Publishing statuses of [`PeerConnection`] related to this
+    /// [`WebRtcPublishEndpoint`].
     peers_status: HashMap<PeerId, bool>,
 
     /// URL to which `OnStart` Control API callback will be sent.
@@ -219,6 +220,7 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    /// Changes publishing status of the provided [`PeerId`].
     pub fn change_peer_status(&self, peer_id: PeerId, is_publishing: bool) {
         if let Some(peer_status) =
             self.0.borrow_mut().peers_status.get_mut(&peer_id)
@@ -227,10 +229,13 @@ impl WebRtcPublishEndpoint {
         }
     }
 
+    /// Returns `true` if at least one [`PeerConnection`] related to this
+    /// [`WebRtcPublishEndpoint`] is publishing.
     pub fn is_endpoint_publishing(&self) -> bool {
         self.0.borrow().peers_status.values().any(|status| *status)
     }
 
+    /// Returns count of [`PeerConnection`] which are publishes.
     pub fn publishing_peers_count(&self) -> usize {
         self.0
             .borrow()

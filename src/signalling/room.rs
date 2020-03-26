@@ -68,9 +68,10 @@ use super::{
     participants::{ParticipantService, ParticipantServiceErr},
     peers::PeerRepository,
     peers_metrics::{PeerMetricsEvent, PeerMetricsEventHandler, PeersMetrics},
-    peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
+    peers_traffic_watcher::{
+        self as mcs, flow_metrics_sources, PeersTrafficWatcher,
+    },
 };
-use crate::signalling::peers_traffic_watcher::flow_metrics_sources;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1231,7 +1232,6 @@ impl Handler<PeerStopped> for Room {
         msg: PeerStopped,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        println!("Peer {} stopped!!!", msg.0);
         let peer_id = msg.0;
         if let Some(endpoints) = self.peers.get_endpoints_by_peer_id(peer_id) {
             let send_callbacks: HashMap<_, _> = endpoints
@@ -1311,6 +1311,7 @@ impl StreamHandler<PeerMetricsEvent> for Room {
 impl PeerMetricsEventHandler for Room {
     type Output = ActFuture<()>;
 
+    /// Notifies [`Room`] about fatal [`PeerConnection`] failure.
     fn on_fatal_peer_failure(&mut self, peer_id: PeerId) -> Self::Output {
         Box::new(async move { peer_id }.into_actor(self).map(
             |peer_id, _, ctx| {

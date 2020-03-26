@@ -20,7 +20,6 @@ use std::{
 
 use actix::{Actor, AsyncContext, Handler, Message, WeakAddr};
 use medea_client_api_proto::PeerId;
-use variant_count::VariantCount;
 
 use crate::{
     api::control::RoomId,
@@ -30,6 +29,8 @@ use crate::{
     },
 };
 
+/// Returns [`FlowMetricSources`] which should be used to validate that
+/// `Endpoint` is started based on `force_relay` property from Control API spec.
 #[allow(clippy::match_same_arms)]
 pub fn flow_metrics_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
     // This code is needed to pay attention to this function when changing
@@ -225,10 +226,6 @@ impl Handler<TrafficStopped> for PeersTrafficWatcher {
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             if let Some(peer) = room.peers.remove(&msg.peer_id) {
-                println!(
-                    "Peer #{} stopped basic on {:?}.",
-                    msg.peer_id, msg.source
-                );
                 if let Some(room_addr) = room.room.upgrade() {
                     room_addr.do_send(PeerStopped(peer.peer_id));
                 }
@@ -248,7 +245,7 @@ impl Handler<TrafficStopped> for PeersTrafficWatcher {
 /// [`PeerStat`]. If at least one [`FlowMetricSource`] doesn't sent
 /// [`TrafficFlows`] message, then `PeerConnection` will be considered as wrong
 /// and it will be stopped.
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, VariantCount)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
     /// Metrics from the partner `PeerConnection`.
     PartnerPeerTraffic,

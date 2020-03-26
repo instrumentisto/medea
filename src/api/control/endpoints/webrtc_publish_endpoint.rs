@@ -90,10 +90,7 @@ impl WebRtcPublishEndpoint<Unvalidated> {
     ///
     /// # Errors
     ///
-    /// 1. Returns [`ValidationError::ForceRelayShouldBeEnabled`] if
-    ///    [`WebRtcPublishEndpoint::on_start`] or [`WebRtcPublishEndpoint::
-    ///    on_stop`] is set, but [`WebRtcPlayEndpoint::force_relay`] is set to
-    ///    `false`.
+    /// No errors atm.
     pub fn validate(
         self,
     ) -> Result<WebRtcPublishEndpoint<Validated>, ValidationError> {
