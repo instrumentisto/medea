@@ -30,6 +30,7 @@ use crate::{
     },
 };
 
+#[allow(clippy::match_same_arms)]
 pub fn flow_metrics_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
     // This code is needed to pay attention to this function when changing
     // 'FlowMetricSource'.

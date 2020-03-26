@@ -320,16 +320,16 @@ impl PeerRepository {
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
     pub fn remove_peers(
         &mut self,
-        member_id: MemberId,
-        peer_ids: HashSet<PeerId>,
+        member_id: &MemberId,
+        peer_ids: &HashSet<PeerId>,
     ) -> impl Future<Output = HashMap<MemberId, Vec<PeerId>>> {
         let mut removed_peers = HashMap::new();
         let mut removed_ice_users = Vec::new();
         for peer_id in peer_ids {
-            if let Some(ice_user) = self.ice_users.remove(&peer_id) {
+            if let Some(ice_user) = self.ice_users.remove(peer_id) {
                 removed_ice_users.push(ice_user);
             }
-            if let Some(peer) = self.peers.remove(&peer_id) {
+            if let Some(peer) = self.peers.remove(peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
                 if let Some(ice_user) = self.ice_users.remove(&partner_peer_id)
@@ -345,7 +345,7 @@ impl PeerRepository {
                 removed_peers
                     .entry(member_id.clone())
                     .or_insert_with(Vec::new)
-                    .push(peer_id);
+                    .push(*peer_id);
             }
         }
 
@@ -371,14 +371,14 @@ impl PeerRepository {
     /// value - removed [`Peer`]'s [`PeerId`].
     pub fn remove_peers_related_to_member(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
     ) -> impl Future<Output = HashMap<MemberId, Vec<PeerId>>> {
         let member_peers = self
             .get_peers_by_member_id(&member_id)
-            .map(|peer| peer.id())
+            .map(PeerStateMachine::id)
             .collect();
 
-        self.remove_peers(member_id, member_peers)
+        self.remove_peers(&member_id, &member_peers)
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members

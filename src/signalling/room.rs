@@ -582,8 +582,8 @@ impl Room {
     /// [`Event::PeersRemoved`] event to [`Member`].
     fn remove_peers(
         &mut self,
-        member_id: MemberId,
-        peer_ids_to_remove: HashSet<PeerId>,
+        member_id: &MemberId,
+        peer_ids_to_remove: &HashSet<PeerId>,
         ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
@@ -622,15 +622,15 @@ impl Room {
                 )
                 .collect();
 
+            // Send PeersRemoved to `Member`s which have related to this
+            // `Member` `Peer`s.
+            self.remove_peers(member_id, &peers, ctx);
+
             self.metrics_callbacks_service
                 .do_send(mcs::UnsubscribePeers {
                     room_id: self.id.clone(),
-                    peers_ids: peers.clone(),
+                    peers_ids: peers,
                 });
-
-            // Send PeersRemoved to `Member`s which have related to this
-            // `Member` `Peer`s.
-            self.remove_peers(member.id(), peers, ctx);
 
             self.members.delete_member(member_id, ctx);
 
@@ -644,7 +644,7 @@ impl Room {
     /// Deletes endpoint from this [`Room`] by ID.
     fn delete_endpoint(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
@@ -653,7 +653,7 @@ impl Room {
              {}].",
             endpoint_id, member_id, self.id
         );
-        if let Some(member) = self.members.get_member_by_id(&member_id) {
+        if let Some(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
             if let Some(endpoint) = member.take_sink(&play_id) {
                 if let Some(peer_id) = endpoint.peer_id() {
@@ -666,9 +666,9 @@ impl Room {
                         },
                     );
 
-                    let mut peer_ids = HashSet::new();
-                    peer_ids.insert(peer_id);
-                    self.remove_peers(member_id, peer_ids, ctx);
+                    let mut peer_ids_to_remove = HashSet::new();
+                    peer_ids_to_remove.insert(peer_id);
+                    self.remove_peers(member_id, &peer_ids_to_remove, ctx);
                 }
             } else {
                 let publish_id = String::from(play_id).into();
@@ -680,7 +680,7 @@ impl Room {
                             peers_ids: peer_ids.clone(),
                         },
                     );
-                    self.remove_peers(member_id, peer_ids, ctx);
+                    self.remove_peers(member_id, &peer_ids, ctx);
                 }
             }
         }
@@ -1272,7 +1272,7 @@ impl Handler<PeerStopped> for Room {
             if let Some(member_id) = member_id {
                 let mut peers_ids = HashSet::new();
                 peers_ids.insert(peer_id);
-                self.remove_peers(member_id, peers_ids, ctx);
+                self.remove_peers(&member_id, &peers_ids, ctx);
             }
 
             for (fid, on_stop) in send_callbacks {
@@ -1566,7 +1566,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
             ctx.spawn(
                 self.peers
-                    .remove_peers_related_to_member(msg.member_id)
+                    .remove_peers_related_to_member(&msg.member_id)
                     .into_actor(self)
                     .map(|removed_peers, this, ctx| {
                         for (peer_member_id, peers_ids) in removed_peers {
@@ -1637,7 +1637,7 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            self.delete_endpoint(member_id, endpoint_id, ctx);
+            self.delete_endpoint(&member_id, endpoint_id, ctx);
         });
     }
 }
@@ -1734,7 +1734,7 @@ impl Handler<PeerSpecContradiction> for Room {
 
         let mut peers_ids = HashSet::new();
         peers_ids.insert(msg.peer_id);
-        self.remove_peers(member_id, peers_ids, ctx);
+        self.remove_peers(&member_id, &peers_ids, ctx);
     }
 }
 
