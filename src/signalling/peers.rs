@@ -390,22 +390,17 @@ impl PeerRepository {
             let turn_service = Arc::clone(&self.turn_service);
             Box::new(
                 wrap_future(async move {
-                    let src_ice_user = turn_service
-                        .create(
-                            room_id.clone(),
-                            src_peer_id,
-                            UnreachablePolicy::ReturnErr,
-                        )
-                        .await?;
-                    let sink_ice_user = turn_service
-                        .create(
-                            room_id,
-                            sink_peer_id,
-                            UnreachablePolicy::ReturnErr,
-                        )
-                        .await?;
-
-                    Ok((src_ice_user, sink_ice_user))
+                    let src_ice_user = turn_service.create(
+                        room_id.clone(),
+                        src_peer_id,
+                        UnreachablePolicy::ReturnErr,
+                    );
+                    let sink_ice_user = turn_service.create(
+                        room_id,
+                        sink_peer_id,
+                        UnreachablePolicy::ReturnErr,
+                    );
+                    Ok(futures::try_join!(src_ice_user, sink_ice_user)?)
                 })
                 .then(move |result, room: &mut Room, _| {
                     match result {
