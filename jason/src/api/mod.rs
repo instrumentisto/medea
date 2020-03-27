@@ -2,6 +2,7 @@
 
 mod connection;
 mod room;
+pub mod room_state;
 
 use std::{cell::RefCell, rc::Rc};
 

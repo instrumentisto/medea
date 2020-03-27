@@ -316,8 +316,9 @@ pub struct IceServer {
 }
 
 /// Direction of [`Track`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
@@ -331,19 +332,22 @@ pub enum Direction {
 }
 
 /// Type of [`Track`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub struct AudioSettings {}
 
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub struct VideoSettings {}
 
 #[cfg(feature = "jason")]

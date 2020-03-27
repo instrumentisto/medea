@@ -31,6 +31,8 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
+use crate::api::room_state::TrackPresenter;
+use medea_client_api_proto::TrackPatch;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -219,33 +221,32 @@ impl MediaConnections {
     /// Errors if creating new [`Sender`] or [`Receiver`] fails.
     // TODO: Doesnt really updates anything, but only generates new senders
     //       and receivers atm.
-    pub fn update_tracks<I: IntoIterator<Item = Track>>(
+    pub fn update_tracks<
+        I: IntoIterator<Item = Rc<RefCell<TrackPresenter>>>,
+    >(
         &self,
         tracks: I,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
-            match track.direction {
+            let track_id = track.borrow().get_id();
+            let direction = track.borrow().get_direction().clone();
+            match direction {
                 Direction::Send { mid, .. } => {
-                    let sndr = Sender::new(
-                        track.id,
-                        track.media_type.into(),
-                        &inner.peer,
-                        mid,
-                        track.is_muted.into(),
-                    )
-                    .map_err(tracerr::wrap!())?;
-                    inner.senders.insert(track.id, sndr);
+                    let sndr = Sender::new(&inner.peer, track, mid)
+                        .map_err(tracerr::wrap!())?;
+                    inner.senders.insert(track_id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
+                    let media_type = track.borrow().get_media_type().clone();
                     let recv = Receiver::new(
-                        track.id,
-                        track.media_type.into(),
+                        track_id,
+                        media_type.clone().into(),
                         sender,
                         &inner.peer,
                         mid,
                     );
-                    inner.receivers.insert(track.id, recv);
+                    inner.receivers.insert(track_id, recv);
                 }
             }
         }
@@ -432,13 +433,15 @@ impl Sender {
     /// from a provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`]
     /// lookup fails.
     fn new(
-        track_id: TrackId,
-        caps: TrackConstraints,
         peer: &RtcPeerConnection,
+        track_state: Rc<RefCell<TrackPresenter>>,
         mid: Option<String>,
-        mute_state: StableMuteState,
     ) -> Result<Rc<Self>> {
+        let track_state_ref = track_state.borrow();
+        let caps =
+            TrackConstraints::from(track_state_ref.get_media_type().clone());
         let kind = TransceiverKind::from(&caps);
+        let track_id = track_state_ref.get_id();
         let transceiver = match mid {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => peer
@@ -447,6 +450,7 @@ impl Sender {
                 .map_err(tracerr::wrap!())?,
         };
 
+        let mute_state = StableMuteState::from(track_state_ref.get_is_muted());
         let mute_state = ObservableCell::new(mute_state.into());
         let mut subscription = mute_state.subscribe();
         let this = Rc::new(Self {
@@ -455,6 +459,19 @@ impl Sender {
             track: RefCell::new(None),
             transceiver,
             mute_state,
+        });
+
+        let weak_this = Rc::downgrade(&this);
+        let mut on_track_update = track_state.borrow().on_track_update();
+        spawn_local(async move {
+            while let Some(is_muted) = on_track_update.next().await {
+                if let Some(this) = weak_this.upgrade() {
+                    this.update(&TrackPatch {
+                        id: this.track_id,
+                        is_muted: Some(is_muted),
+                    });
+                }
+            }
         });
 
         // TODO: remove when refactor muting to dropping tracks.

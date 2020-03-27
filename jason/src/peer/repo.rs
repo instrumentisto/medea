@@ -11,6 +11,7 @@ use crate::{
 };
 
 use super::{PeerConnection, PeerError, PeerEvent};
+use crate::api::room_state::PeerPresenter;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -23,10 +24,8 @@ pub trait PeerRepository {
     /// Errors if creating [`PeerConnection`] fails.
     fn create_peer(
         &self,
-        id: PeerId,
-        ice_servers: Vec<IceServer>,
+        peer_state: &PeerPresenter,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
-        is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -101,22 +100,18 @@ impl PeerRepository for Repository {
     /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
     fn create_peer(
         &self,
-        id: PeerId,
-        ice_servers: Vec<IceServer>,
+        peer_state: &PeerPresenter,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
-        let peer = Rc::new(
-            PeerConnection::new(
-                id,
-                peer_events_sender,
-                ice_servers,
-                Rc::clone(&self.media_manager),
-                is_force_relayed,
-            )
-            .map_err(tracerr::map_from_and_wrap!())?,
-        );
-        self.peers.borrow_mut().insert(id, Rc::clone(&peer));
+        let peer = PeerConnection::new(
+            peer_state,
+            peer_events_sender,
+            Rc::clone(&self.media_manager),
+        )
+        .map_err(tracerr::map_from_and_wrap!())?;
+        self.peers
+            .borrow_mut()
+            .insert(peer_state.get_id(), Rc::clone(&peer));
         Ok(peer)
     }
 

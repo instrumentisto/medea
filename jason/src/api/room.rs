@@ -39,6 +39,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::api::room_state::{PeerPresenter, RoomPresenter, TrackPresenter};
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -406,6 +407,36 @@ impl Room {
         let events_stream = rpc.subscribe();
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
+        let inner = Rc::downgrade(&room);
+        let mut on_peer_created = room.borrow().state.on_peer_created();
+        spawn_local(async move {
+            while let Some((new_peer_id, new_peer)) =
+                on_peer_created.next().await
+            {
+                if let Some(inner) = inner.upgrade() {
+                    inner
+                        .borrow_mut()
+                        .on_peer_created(new_peer_id, &new_peer.borrow());
+                } else {
+                    break;
+                }
+            }
+        });
+
+        let inner = Rc::downgrade(&room);
+        let mut on_peer_removed = room.borrow().state.on_peer_removed();
+        spawn_local(async move {
+            while let Some((removed_peer_id, removed_peer)) =
+                on_peer_removed.next().await
+            {
+                if let Some(inner) = inner.upgrade() {
+                    inner.borrow_mut().on_peer_removed(removed_peer_id);
+                } else {
+                    break;
+                }
+            }
+        });
+
         let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
         let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
 
@@ -429,7 +460,7 @@ impl Room {
                         match event {
                             RoomEvent::RpcEvent(event) => {
                                 event.dispatch_with(
-                                    inner.borrow_mut().deref_mut(),
+                                    &mut inner.borrow_mut().state,
                                 );
                             }
                             RoomEvent::PeerEvent(event) => {
@@ -517,6 +548,8 @@ struct InnerRoom {
     /// Note that `None` will be considered as error and `is_err` will be
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: CloseReason,
+
+    state: RoomPresenter,
 }
 
 impl InnerRoom {
@@ -542,6 +575,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             },
+            state: RoomPresenter::new(),
         }
     }
 
@@ -557,7 +591,10 @@ impl InnerRoom {
     /// [`Track`]s.
     // TODO: creates connections based on remote peer_ids atm, should create
     //       connections based on remote member_ids
-    fn create_connections_from_tracks(&mut self, tracks: &[Track]) {
+    fn create_connections_from_tracks(
+        &mut self,
+        tracks: Vec<Rc<RefCell<TrackPresenter>>>,
+    ) {
         let create_connection = |room: &mut Self, peer_id: &PeerId| {
             if !room.connections.contains_key(peer_id) {
                 let con = Connection::new();
@@ -567,7 +604,7 @@ impl InnerRoom {
         };
 
         for track in tracks {
-            match &track.direction {
+            match track.borrow().get_direction() {
                 Direction::Send { ref receivers, .. } => {
                     for receiver in receivers {
                         create_connection(self, receiver);
@@ -680,33 +717,15 @@ impl InnerRoom {
         });
         self.local_stream.replace(stream);
     }
-}
 
-/// RPC events handling.
-impl EventHandler for InnerRoom {
-    type Output = ();
-
-    /// Creates [`PeerConnection`] with a provided ID and all the
-    /// [`Connection`]s basing on provided [`Track`]s.
-    ///
-    /// If provided `sdp_offer` is `Some`, then offer is applied to a created
-    /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
-    fn on_peer_created(
+    pub fn on_peer_created(
         &mut self,
         peer_id: PeerId,
-        sdp_offer: Option<String>,
-        tracks: Vec<Track>,
-        ice_servers: Vec<IceServer>,
-        is_force_relayed: bool,
+        peer_state: &PeerPresenter,
     ) {
         let peer = match self
             .peers
-            .create_peer(
-                peer_id,
-                ice_servers,
-                self.peer_event_sender.clone(),
-                is_force_relayed,
-            )
+            .create_peer(peer_state, self.peer_event_sender.clone())
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
             Ok(peer) => peer,
@@ -716,17 +735,19 @@ impl EventHandler for InnerRoom {
             }
         };
 
-        self.create_connections_from_tracks(&tracks);
+        self.create_connections_from_tracks(peer_state.get_tracks());
 
         let local_stream = self.local_stream.clone();
         let rpc = Rc::clone(&self.rpc);
         let error_callback = Rc::clone(&self.on_failed_local_stream);
+        let tracks = peer_state.get_tracks();
+        let sdp_offer = peer_state.get_sdp_offer().clone();
         spawn_local(
             async move {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
-                            .get_offer(tracks, local_stream.as_ref())
+                            .get_offer(tracks.clone(), local_stream.as_ref())
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         let mids = peer
@@ -740,7 +761,11 @@ impl EventHandler for InnerRoom {
                     }
                     Some(offer) => {
                         let sdp_answer = peer
-                            .process_offer(offer, tracks, local_stream.as_ref())
+                            .process_offer(
+                                offer.to_string(),
+                                tracks,
+                                local_stream.as_ref(),
+                            )
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpAnswer {
@@ -766,6 +791,31 @@ impl EventHandler for InnerRoom {
                 };
             }),
         );
+    }
+
+    pub fn on_peer_removed(&mut self, peer_id: PeerId) {
+        self.peers.remove(peer_id);
+    }
+}
+
+// TODO: remove me
+/// RPC events handling.
+impl EventHandler for InnerRoom {
+    type Output = ();
+
+    /// Creates [`PeerConnection`] with a provided ID and all the
+    /// [`Connection`]s basing on provided [`Track`]s.
+    ///
+    /// If provided `sdp_offer` is `Some`, then offer is applied to a created
+    /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
+    fn on_peer_created(
+        &mut self,
+        peer_id: PeerId,
+        sdp_offer: Option<String>,
+        tracks: Vec<Track>,
+        ice_servers: Vec<IceServer>,
+        is_force_relayed: bool,
+    ) {
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].

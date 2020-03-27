@@ -164,6 +164,8 @@
     unused_results
 )]
 
+pub mod collections;
+
 use std::{
     cell::{Ref, RefCell},
     fmt,

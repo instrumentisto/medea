@@ -20,7 +20,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, StreamExt as _};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
@@ -55,6 +55,8 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
+use crate::api::room_state::{PeerPresenter, TrackPresenter};
+use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -225,22 +227,23 @@ impl PeerConnection {
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
     /// [`RtcPeerConnection`] can't be set.
-    pub fn new<I: IntoIterator<Item = IceServer>>(
-        id: Id,
+    pub fn new(
+        peer_state: &PeerPresenter,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        ice_servers: I,
         media_manager: Rc<MediaManager>,
-        is_force_relayed: bool,
-    ) -> Result<Self> {
+    ) -> Result<Rc<Self>> {
         let peer = Rc::new(
-            RtcPeerConnection::new(ice_servers, is_force_relayed)
-                .map_err(tracerr::map_from_and_wrap!())?,
+            RtcPeerConnection::new(
+                peer_state.get_ice_servers().to_vec(),
+                peer_state.get_is_force_relayed(),
+            )
+            .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections =
             Rc::new(MediaConnections::new(Rc::clone(&peer)));
 
         let peer = Self {
-            id,
+            id: peer_state.get_id(),
             peer,
             media_connections,
             media_manager,
@@ -294,6 +297,47 @@ impl PeerConnection {
                 Self::on_track(id, &media_connections, &sender, &track_event);
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
+
+        let peer = Rc::new(peer);
+
+        let this_weak = Rc::downgrade(&peer);
+        let mut on_sdp_answer_made = peer_state.on_sdp_answer_made();
+        spawn_local(async move {
+            while let Some(sdp_answer) = on_sdp_answer_made.next().await {
+                let this = if let Some(this) = this_weak.upgrade() {
+                    this
+                } else {
+                    break;
+                };
+                if let Err(err) = this.set_remote_answer(sdp_answer).await {
+                    JasonError::from(err).print()
+                }
+            }
+        });
+
+        let this_weak = Rc::downgrade(&peer);
+        let mut on_ice_candidate_discovered =
+            peer_state.on_ice_candidate_discovered();
+        spawn_local(async move {
+            while let Some(candidate) = on_ice_candidate_discovered.next().await
+            {
+                let this = if let Some(this) = this_weak.upgrade() {
+                    this
+                } else {
+                    break;
+                };
+                let add = this
+                    .add_ice_candidate(
+                        candidate.candidate,
+                        candidate.sdp_m_line_index,
+                        candidate.sdp_mid,
+                    )
+                    .await;
+                if let Err(err) = add {
+                    JasonError::from(err).print();
+                }
+            }
+        });
 
         Ok(peer)
     }
@@ -520,7 +564,7 @@ impl PeerConnection {
     /// sdp offer.
     pub async fn get_offer(
         &self,
-        tracks: Vec<Track>,
+        tracks: Vec<Rc<RefCell<TrackPresenter>>>,
         local_stream: Option<&SysMediaStream>,
     ) -> Result<String> {
         self.media_connections
@@ -663,14 +707,16 @@ impl PeerConnection {
     pub async fn process_offer(
         &self,
         offer: String,
-        tracks: Vec<Track>,
+        tracks: Vec<Rc<RefCell<TrackPresenter>>>,
         local_stream: Option<&SysMediaStream>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
-            tracks.into_iter().partition(|track| match track.direction {
-                Direction::Send { .. } => false,
-                Direction::Recv { .. } => true,
+            tracks.into_iter().partition(|track| {
+                match track.borrow().get_direction() {
+                    Direction::Send { .. } => false,
+                    Direction::Recv { .. } => true,
+                }
             });
 
         // update receivers
