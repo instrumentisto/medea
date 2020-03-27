@@ -30,7 +30,7 @@ use crate::{
         room_repo::RoomRepository,
         Room,
     },
-    turn::coturn_metrics::CoturnMetrics,
+    turn::coturn_metrics::CoturnMetricsService,
     AppContext,
 };
 
@@ -123,7 +123,7 @@ pub struct RoomService {
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
-    _coturn_metrics: Addr<CoturnMetrics>,
+    _coturn_metrics: Addr<CoturnMetricsService>,
 }
 
 impl RoomService {
@@ -131,15 +131,16 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetrics`] fails to
-    /// connect to a Redis stats server.
+    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetricsService`] fails
+    /// to connect to a Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         Ok(Self {
-            _coturn_metrics: CoturnMetrics::new(&app.config.turn)?.start(),
+            _coturn_metrics: CoturnMetricsService::new(&app.config.turn)?
+                .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             room_repo,

@@ -409,10 +409,7 @@ impl From<RoomError> for ErrorResponse {
             | ConnectionNotExists(_)
             | UnableToSendEvent(_)
             | PeerError(_)
-            | TryFromElementError(_)
             | BadRoomSpec(_)
-            | TurnServiceError(_)
-            | ClientError(_)
             | TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
