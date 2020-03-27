@@ -11,7 +11,7 @@ use crate::{
 };
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::peer::PeerPresenter;
+use crate::presenters::PeerPresenter;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
