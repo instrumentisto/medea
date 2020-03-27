@@ -14,6 +14,7 @@ pub mod utils;
 pub mod api;
 pub mod media;
 pub mod peer;
+pub mod presenters;
 pub mod rpc;
 
 // When the `console_error_panic_hook` feature is enabled, we can call the

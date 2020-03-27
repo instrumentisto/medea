@@ -33,6 +33,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
+    presenters::{PeerPresenter, TrackPresenter},
     utils::{console_error, JasonError, JsCaused, JsError},
 };
 
@@ -55,7 +56,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
-use crate::api::room_state::{PeerPresenter, TrackPresenter};
 use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].

@@ -38,8 +38,9 @@ use crate::{
     },
 };
 
+use crate::presenters::{PeerPresenter, RoomPresenter, TrackPresenter};
+
 use super::{connection::Connection, ConnectionHandle};
-use crate::api::room_state::{PeerPresenter, RoomPresenter, TrackPresenter};
 
 /// Reason of why [`Room`] has been closed.
 ///

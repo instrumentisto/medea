@@ -10,6 +10,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
+use medea_client_api_proto::TrackPatch;
 use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -20,6 +21,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
+    presenters::TrackPresenter,
     utils::{delay_for, JsCaused, JsError},
 };
 
@@ -31,8 +33,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use crate::api::room_state::TrackPresenter;
-use medea_client_api_proto::TrackPatch;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
