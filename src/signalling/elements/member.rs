@@ -20,7 +20,7 @@ use crate::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
-        TryFromElementError, Validated, WebRtcPlayId, WebRtcPublishId,
+        TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
 };
@@ -356,7 +356,7 @@ impl Member {
     pub fn create_sink(
         member: &Rc<Self>,
         id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec<Validated>,
+        spec: WebRtcPlayEndpointSpec,
     ) {
         let src = member.get_src_by_id(&spec.src.endpoint_id).unwrap();
 

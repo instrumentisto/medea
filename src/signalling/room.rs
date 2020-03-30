@@ -39,7 +39,7 @@ use crate::{
             },
             refs::{Fid, StatefulFid, ToEndpoint, ToMember},
             room::RoomSpec,
-            EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId, Validated,
+            EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
             WebRtcPlayId, WebRtcPublishId,
         },
         RpcServer,
@@ -578,7 +578,7 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         publish_id: WebRtcPublishId,
-        spec: &WebRtcPublishEndpointSpec<Validated>,
+        spec: &WebRtcPublishEndpointSpec,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -633,7 +633,7 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec<Validated>,
+        spec: WebRtcPlayEndpointSpec,
         ctx: &mut Context<Self>,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;

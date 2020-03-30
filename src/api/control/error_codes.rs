@@ -17,7 +17,7 @@ use crate::{
             fid::ParseFidError, local_uri::LocalUriParseError,
             src_uri::SrcParseError,
         },
-        TryFromElementError, TryFromProtobufError, ValidationError,
+        TryFromElementError, TryFromProtobufError,
     },
     signalling::{
         elements::{member::MemberError, MembersLoadError},
@@ -348,19 +348,6 @@ impl From<TryFromProtobufError> for ErrorResponse {
                 Some(id),
             ),
             CallbackNotSupportedInNotRelayMode => {
-                Self::without_id(ErrorCode::CallbackNotSupportedInNotRelayMode)
-            }
-            SpecValidationError(e) => e.into(),
-        }
-    }
-}
-
-impl From<ValidationError> for ErrorResponse {
-    fn from(err: ValidationError) -> Self {
-        use ValidationError::*;
-
-        match err {
-            ForceRelayShouldBeEnabled => {
                 Self::without_id(ErrorCode::CallbackNotSupportedInNotRelayMode)
             }
         }

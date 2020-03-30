@@ -9,8 +9,7 @@ use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::url::CallbackUrl, EndpointId, TryFromProtobufError, Unvalidated,
-    Validated, ValidationError,
+    callback::url::CallbackUrl, EndpointId, TryFromProtobufError,
 };
 
 use super::{
@@ -31,48 +30,15 @@ pub struct Id(String);
 /// [`Room`]: crate::signalling::room::Room
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum RoomElement<T> {
+pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
-        #[serde(bound = "T: From<Unvalidated> + Default")]
-        spec: Pipeline<EndpointId, MemberElement<T>>,
+        spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
     },
-}
-
-impl RoomElement<Unvalidated> {
-    /// Tries to validate [`RoomElement`].
-    ///
-    /// # Errors
-    ///
-    /// 1. [`ValidationError`] if underlying element fails validation.
-    pub fn validate(self) -> Result<RoomElement<Validated>, ValidationError> {
-        match self {
-            RoomElement::Member {
-                spec,
-                credentials,
-                on_leave,
-                on_join,
-            } => {
-                let validated_spec = spec
-                    .into_iter()
-                    .map(|(key, value)| {
-                        value.validate().map(move |res| (key, res))
-                    })
-                    .collect::<Result<HashMap<_, _>, _>>()?;
-
-                Ok(RoomElement::Member {
-                    credentials,
-                    on_leave,
-                    on_join,
-                    spec: Pipeline::new(validated_spec),
-                })
-            }
-        }
-    }
 }
 
 /// [Control API]'s `Room` element specification.
@@ -83,7 +49,7 @@ impl RoomElement<Unvalidated> {
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Pipeline<MemberId, RoomElement<Validated>>,
+    pub pipeline: Pipeline<MemberId, RoomElement>,
 }
 
 impl TryFrom<proto::create_request::El> for RoomSpec {
@@ -149,12 +115,12 @@ impl RoomSpec {
     }
 }
 
-impl TryFrom<&RootElement<Validated>> for RoomSpec {
+impl TryFrom<&RootElement> for RoomSpec {
     type Error = TryFromElementError;
 
     // TODO: delete this allow when some new RootElement will be added.
     #[allow(unreachable_patterns)]
-    fn try_from(from: &RootElement<Validated>) -> Result<Self, Self::Error> {
+    fn try_from(from: &RootElement) -> Result<Self, Self::Error> {
         match from {
             RootElement::Room { id, spec } => Ok(Self {
                 id: id.clone(),

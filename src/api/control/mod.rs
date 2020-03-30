@@ -11,10 +11,7 @@ pub mod pipeline;
 pub mod refs;
 pub mod room;
 
-use std::{
-    collections::HashMap, convert::TryFrom as _, fs::File, io::Read as _,
-    path::Path,
-};
+use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
 use actix::Addr;
 use derive_more::Display;
@@ -83,10 +80,6 @@ pub enum TryFromProtobufError {
         fmt = "Callback is not supported while 'force_relay' is set to false."
     )]
     CallbackNotSupportedInNotRelayMode,
-
-    /// Occurs when validation of a some element is failed.
-    #[display(fmt = "Validation of a some element is failed.")]
-    SpecValidationError(ValidationError),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
@@ -101,70 +94,18 @@ impl From<CallbackUrlParseError> for TryFromProtobufError {
     }
 }
 
-impl From<ValidationError> for TryFromProtobufError {
-    fn from(from: ValidationError) -> Self {
-        Self::SpecValidationError(from)
-    }
-}
-
-/// Errors which can occur while spec validation.
-#[derive(Debug, Fail, Display)]
-pub enum ValidationError {
-    /// `Endpoint`'s `OnStart` or `OnStop` callback is set, but `force_relay`
-    /// field is set to `false`.
-    ForceRelayShouldBeEnabled,
-}
-
-/// Validation state of a spec.
-///
-/// Indicates that spec needs validation and can't be used.
-#[derive(Debug, Default, Clone)]
-pub struct Unvalidated;
-
-/// Validation state of a spec.
-///
-/// Indicates that spec is validated and can be used.
-#[derive(Debug, Clone)]
-pub struct Validated;
-
 /// Root elements of [Control API] spec.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum RootElement<T> {
+pub enum RootElement {
     /// Represents [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room {
         id: RoomId,
-        #[serde(bound = "T: From<Unvalidated> + Default")]
-        spec: Pipeline<MemberId, RoomElement<T>>,
+        spec: Pipeline<MemberId, RoomElement>,
     },
-}
-
-impl RootElement<Unvalidated> {
-    /// Tries to validate [`RootElement`].
-    ///
-    /// # Errors
-    ///
-    /// 1. [`ValidationError`] if underlying element fails validation.
-    pub fn validate(self) -> Result<RootElement<Validated>, ValidationError> {
-        match self {
-            RootElement::Room { id, spec } => {
-                let validated_spec = spec
-                    .into_iter()
-                    .map(|(key, value)| {
-                        value.validate().map(move |res| (key, res))
-                    })
-                    .collect::<Result<HashMap<_, _>, _>>()?;
-
-                Ok(RootElement::Room {
-                    id,
-                    spec: Pipeline::new(validated_spec),
-                })
-            }
-        }
-    }
 }
 
 /// Errors that can occur when we try transform some spec from `Element`.
@@ -220,13 +161,6 @@ pub enum LoadStaticControlSpecsError {
     /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
     YamlDeserializationError(serde_yaml::Error),
-
-    /// Occurs when validation of a some element of a spec is failed.
-    #[display(
-        fmt = "Validation of a some element of a spec is failed. {}",
-        _0
-    )]
-    SpecValidationError(ValidationError),
 }
 
 impl From<std::io::Error> for LoadStaticControlSpecsError {
@@ -244,12 +178,6 @@ impl From<TryFromElementError> for LoadStaticControlSpecsError {
 impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
     fn from(err: serde_yaml::Error) -> Self {
         Self::YamlDeserializationError(err)
-    }
-}
-
-impl From<ValidationError> for LoadStaticControlSpecsError {
-    fn from(err: ValidationError) -> Self {
-        Self::SpecValidationError(err)
     }
 }
 
@@ -271,8 +199,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let unvalidated: RootElement<Unvalidated> = serde_yaml::from_str(&buf)?;
-    let room = RoomSpec::try_from(&unvalidated.validate()?)?;
+    let room = RoomSpec::try_from(&serde_yaml::from_str(&buf)?)?;
     Ok(room)
 }
 

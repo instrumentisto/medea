@@ -8,10 +8,7 @@ use derive_more::{Display, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use crate::api::control::{
-    callback::url::CallbackUrl, TryFromProtobufError, Unvalidated, Validated,
-    ValidationError,
-};
+use crate::api::control::{callback::url::CallbackUrl, TryFromProtobufError};
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(
@@ -57,7 +54,7 @@ impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
 #[derive(Clone, Deserialize, Debug)]
-pub struct WebRtcPublishEndpoint<T> {
+pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
 
@@ -70,43 +67,9 @@ pub struct WebRtcPublishEndpoint<T> {
 
     /// URL to which `OnStop` Control API callback will be sent.
     pub on_stop: Option<CallbackUrl>,
-
-    /// Validation state of the [`WebRtcPublishEndpoint`].
-    ///
-    /// Can be [`Validated`] or [`Unvalidated`].
-    ///
-    /// [`serde`] will deserialize [`WebRtcPublishEndpoint`] into
-    /// [`Unvalidated`] state. Converting from the gRPC's DTOs will cause
-    /// the same behavior.
-    ///
-    /// To use [`WebRtcPublishEndpoint`] you should call
-    /// [`WebRtcPublishEndpoint::validate`].
-    #[serde(skip)]
-    _validation_state: T,
 }
 
-impl WebRtcPublishEndpoint<Unvalidated> {
-    /// Validates this [`WebRtcPublishEndpoint`].
-    ///
-    /// # Errors
-    ///
-    /// No errors atm.
-    pub fn validate(
-        self,
-    ) -> Result<WebRtcPublishEndpoint<Validated>, ValidationError> {
-        Ok(WebRtcPublishEndpoint {
-            on_start: self.on_start,
-            on_stop: self.on_stop,
-            force_relay: self.force_relay,
-            p2p: self.p2p,
-            _validation_state: Validated,
-        })
-    }
-}
-
-impl TryFrom<&proto::WebRtcPublishEndpoint>
-    for WebRtcPublishEndpoint<Validated>
-{
+impl TryFrom<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     type Error = TryFromProtobufError;
 
     fn try_from(
@@ -121,7 +84,7 @@ impl TryFrom<&proto::WebRtcPublishEndpoint>
             .map(CallbackUrl::try_from)
             .transpose()?;
 
-        let unvalidated = WebRtcPublishEndpoint {
+        Ok(WebRtcPublishEndpoint {
             p2p: P2pMode::from(
                 proto::web_rtc_publish_endpoint::P2p::from_i32(value.p2p)
                     .unwrap_or_default(),
@@ -129,9 +92,6 @@ impl TryFrom<&proto::WebRtcPublishEndpoint>
             force_relay: value.force_relay,
             on_start,
             on_stop,
-            _validation_state: Unvalidated,
-        };
-
-        Ok(unvalidated.validate()?)
+        })
     }
 }

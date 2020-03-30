@@ -11,7 +11,7 @@ use derive_more::{Display, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use super::{member::MemberElement, TryFromProtobufError, Validated};
+use super::{member::MemberElement, TryFromProtobufError};
 
 #[doc(inline)]
 pub use webrtc_play_endpoint::{WebRtcPlayEndpoint, WebRtcPlayId};
@@ -47,14 +47,14 @@ impl_from_into!(WebRtcPlayId);
 #[derive(Debug, From)]
 pub enum EndpointSpec {
     /// [`WebRtcPublishEndpoint`] element.
-    WebRtcPublish(WebRtcPublishEndpoint<Validated>),
+    WebRtcPublish(WebRtcPublishEndpoint),
 
     /// [`WebRtcPlayEndpoint`] element.
-    WebRtcPlay(WebRtcPlayEndpoint<Validated>),
+    WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl Into<MemberElement<Validated>> for EndpointSpec {
-    fn into(self) -> MemberElement<Validated> {
+impl Into<MemberElement> for EndpointSpec {
+    fn into(self) -> MemberElement {
         match self {
             Self::WebRtcPublish(e) => {
                 MemberElement::WebRtcPublishEndpoint { spec: e }
