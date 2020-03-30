@@ -449,15 +449,16 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::media::WaitRemoteSdp;
+
+    use crate::{media::WaitRemoteSdp, turn::new_turn_auth_service_mock};
 
     #[test]
     fn take_inner_peer() {
         let peer = Peer::<Stable>::new(
             PeerId(1),
-            MemberId(String::from("member")),
+            MemberId::from("member"),
             PeerId(2),
-            MemberId(String::from("partner_member")),
+            MemberId::from("partner_member"),
             false,
         );
 
@@ -465,6 +466,8 @@ mod test {
         peers.insert(peer.id(), peer.into());
 
         let mut repo = PeerRepository {
+            room_id: RoomId::from("w/e"),
+            turn_service: new_turn_auth_service_mock(),
             peers,
             peers_count: Counter::default(),
             tracks_count: Counter::default(),

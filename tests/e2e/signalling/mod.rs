@@ -214,7 +214,9 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                         }
                         Event::SdpAnswerMade { peer_id, .. }
                         | Event::IceCandidateDiscovered { peer_id, .. }
-                        | Event::TracksUpdated { peer_id, .. } => {
+                        | Event::TracksUpdated { peer_id, .. }
+                        | Event::SdpOfferMade { peer_id, .. }
+                        | Event::RenegotiationStarted { peer_id, .. } => {
                             assert!(self.known_peers.contains(peer_id))
                         }
                         Event::PeersRemoved { .. } => {}

@@ -473,7 +473,7 @@ impl InterconnectedPeers {
             .unwrap();
 
         let offer = peer1
-            .get_offer(Self::get_peer1_tracks(), None)
+            .get_offer(Self::get_peer1_tracks(), None, false)
             .await
             .unwrap();
         let answer = peer2

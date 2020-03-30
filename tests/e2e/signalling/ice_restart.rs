@@ -107,7 +107,7 @@ async fn ice_restart() {
     member1
         .send(SendCommand(Command::AddPeerConnectionMetrics {
             peer_id: peer1_id,
-            metrics: PeerMetrics::PeerConnectionStateChanged(
+            metrics: PeerMetrics::PeerConnectionState(
                 PeerConnectionState::Connected,
             ),
         }))
@@ -118,7 +118,7 @@ async fn ice_restart() {
     member2
         .send(SendCommand(Command::AddPeerConnectionMetrics {
             peer_id: peer2_id,
-            metrics: PeerMetrics::PeerConnectionStateChanged(
+            metrics: PeerMetrics::PeerConnectionState(
                 PeerConnectionState::Connected,
             ),
         }))
@@ -129,7 +129,7 @@ async fn ice_restart() {
     member1
         .send(SendCommand(Command::AddPeerConnectionMetrics {
             peer_id: peer1_id,
-            metrics: PeerMetrics::PeerConnectionStateChanged(
+            metrics: PeerMetrics::PeerConnectionState(
                 PeerConnectionState::Failed,
             ),
         }))
@@ -143,7 +143,7 @@ async fn ice_restart() {
     member2
         .send(SendCommand(Command::AddPeerConnectionMetrics {
             peer_id: peer2_id,
-            metrics: PeerMetrics::PeerConnectionStateChanged(
+            metrics: PeerMetrics::PeerConnectionState(
                 PeerConnectionState::Failed,
             ),
         }))

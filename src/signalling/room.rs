@@ -972,12 +972,13 @@ impl CommandHandler for Room {
 
         Ok(Box::new(
             match metrics {
-                IceConnectionStateChanged(state) => {
+                IceConnectionState(state) => {
                     self.update_peer_connection_state(peer_id, state.into())
                 }
-                PeerConnectionStateChanged(state) => {
+                PeerConnectionState(state) => {
                     self.update_peer_connection_state(peer_id, state)
                 }
+                RtcStats(_) => future::ok(()).boxed_local(),
             }
             .into_actor(self),
         ))

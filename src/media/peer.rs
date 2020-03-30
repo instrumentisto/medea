@@ -9,13 +9,15 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerConnectionState, PeerId as Id,
-    Track, TrackId, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerConnectionState,
+    PeerId as Id, Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId, media::{MediaTrack, IceUser}, signalling::peers::Counter,
+    api::control::MemberId,
+    media::{IceUser, MediaTrack},
+    signalling::peers::Counter,
 };
 
 /// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
