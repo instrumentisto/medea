@@ -26,13 +26,18 @@ use super::{
     CoturnUsername,
 };
 
+/// Channel pattern used to subscribe to all allocation events published by
+/// Coturn.
+const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
+
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-pub type ActFuture<O> = Box<dyn ActorFuture<Actor = CoturnMetrics, Output = O>>;
+pub type ActFuture<O> =
+    Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
 
 /// Service which is responsible for processing [`PeerConnection`]'s metrics
 /// received from the Coturn.
 #[derive(Debug)]
-pub struct CoturnMetrics {
+pub struct CoturnMetricsService {
     /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
     /// sent.
     metrics_service: Addr<PeersTrafficWatcher>,
@@ -44,8 +49,8 @@ pub struct CoturnMetrics {
     allocations_count: HashMap<CoturnUsername, u64>,
 }
 
-impl CoturnMetrics {
-    /// Returns new [`CoturnMetrics`] service.
+impl CoturnMetricsService {
+    /// Returns new [`CoturnMetricsService`] service.
     ///
     /// # Errors
     ///
@@ -76,8 +81,9 @@ impl CoturnMetrics {
     }
 
     /// Opens new Redis connection, subscribes to the Coturn events and adds
-    /// [`Stream`] with this events to this the [`CoturnMetrics`]'s context.
-    fn add_redis_stream(
+    /// [`Stream`] with this events to this the [`CoturnMetricsService`]'s
+    /// context.
+    fn connect_and_subscribe(
         &mut self,
     ) -> ActFuture<Result<(), redis_pub_sub::RedisError>> {
         let (msg_tx, msg_stream) = mpsc::unbounded();
@@ -87,9 +93,7 @@ impl CoturnMetrics {
             async move {
                 let conn = client.get_async_connection().await?;
                 let mut pubsub = conn.into_pubsub();
-                pubsub
-                    .psubscribe("turn/realm/*/user/*/allocation/*")
-                    .await?;
+                pubsub.psubscribe(ALLOCATIONS_CHANNEL_PATTERN).await?;
 
                 Ok(pubsub)
             }
@@ -116,23 +120,20 @@ impl CoturnMetrics {
         )
     }
 
-    /// Tries to connect to the Redis until a connection will be successfully
-    /// opened.
-    ///
-    /// Will be resolved when Redis connection is successfully opened.
-    fn connect_redis(&mut self) -> ActFuture<()> {
-        Box::new(self.add_redis_stream().then(|res, this, _| {
+    /// Connects Redis until success.
+    fn connect_until_success(&mut self) -> ActFuture<()> {
+        Box::new(self.connect_and_subscribe().then(|res, this, _| {
             if let Err(err) = res {
                 warn!(
                     "Error while creating Redis PubSub connection for the \
-                     CoturnMetrics: {:?}",
+                     CoturnMetricsService: {:?}",
                     err
                 );
 
                 Either::Left(
                     tokio::time::delay_for(Duration::from_secs(1))
                         .into_actor(this)
-                        .then(|_, this, _| this.connect_redis()),
+                        .then(|_, this, _| this.connect_until_success()),
                 )
             } else {
                 Either::Right(async {}.into_actor(this))
@@ -141,15 +142,15 @@ impl CoturnMetrics {
     }
 }
 
-impl Actor for CoturnMetrics {
+impl Actor for CoturnMetricsService {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.wait(self.connect_redis());
+        ctx.wait(self.connect_until_success());
     }
 }
 
-impl StreamHandler<redis_pub_sub::Msg> for CoturnMetrics {
+impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
     fn handle(&mut self, msg: redis_pub_sub::Msg, _: &mut Self::Context) {
         let event = if let Ok(event) = CoturnEvent::parse(&msg) {
             event
@@ -194,6 +195,6 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetrics {
     }
 
     fn finished(&mut self, ctx: &mut Self::Context) {
-        ctx.wait(self.connect_redis());
+        ctx.wait(self.connect_until_success());
     }
 }

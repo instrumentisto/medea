@@ -9,10 +9,8 @@ use std::{
     sync::Arc,
 };
 
-use actix::{
-    fut::{self, wrap_future},
-    ActorFuture, AsyncContext, WrapFuture,
-};
+use actix::{fut::wrap_future, ActorFuture, Addr};
+use actix::WrapFuture as _;
 use derive_more::Display;
 use futures::Future;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
@@ -20,25 +18,24 @@ use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 use crate::{
     api::control::{MemberId, RoomId},
     log::prelude::*,
-    media::{IceUser, New, Peer, PeerStateMachine},
+    media::{New, Peer, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             WeakEndpoint,
         },
+        peers_traffic_watcher as mcs,
         room::{ActFuture, RoomError},
         Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
+use crate::signalling::peers_traffic_watcher::PeersTrafficWatcher;
 
 #[derive(Debug)]
 pub struct PeerRepository {
     /// [`RoomId`] of [`Room`] which owns this [`PeerRepository`].
     room_id: RoomId,
-
-    /// [`IceUser`]s for all [`PeerConnection`] of this [`PeerRepository`].
-    ice_users: HashMap<PeerId, IceUser>,
 
     /// [`TurnAuthService`] with which [`IceUser`]s for the [`PeerConnection`]s
     /// from this [`PeerRepository`] will be created.
@@ -64,6 +61,10 @@ pub struct PeerRepository {
     /// Weak references to the [`Endpoint`]s for which [`PeerConnection`] is
     /// created.
     peers_endpoints: HashMap<PeerId, Vec<WeakEndpoint>>,
+
+    /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
+    /// callbacks will be performed.
+    metrics_callbacks_service: Addr<PeersTrafficWatcher>,
 }
 
 /// Simple ID counter.
@@ -86,15 +87,16 @@ impl PeerRepository {
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
+        metrics_callbacks_service: Addr<PeersTrafficWatcher>,
     ) -> Self {
         Self {
             room_id,
             turn_service,
-            ice_users: HashMap::new(),
             peers: HashMap::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_endpoints: HashMap::new(),
+            metrics_callbacks_service,
         }
     }
 
@@ -138,66 +140,15 @@ impl PeerRepository {
 
     /// Returns [`IceUser`] for a provided [`PeerId`].
     ///
-    /// If [`IceUser`] isn't already created then new [`IceUser`] will be
-    /// created.
-    pub fn get_or_create_ice_user(
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn get_mut_peer_by_id(
         &mut self,
         peer_id: PeerId,
-    ) -> ActFuture<Result<IceUser, RoomError>> {
-        if let Some(ice_user) = self.ice_users.get(&peer_id).cloned() {
-            // IceUser was created before, return it.
-            Box::new(fut::ok(ice_user))
-        } else {
-            // IceUser not found, so we should create it.
-            let turn_service = Arc::clone(&self.turn_service);
-            let room_id = self.room_id.clone();
-            Box::new(
-                wrap_future(async move {
-                    Ok(turn_service
-                        .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
-                        .await?)
-                })
-                .then(
-                    move |create_result, room: &mut Room, ctx| {
-                        // Check again, maybe some other invocation created
-                        // IceUser while we were waiting TurnAuthService
-                        // response.
-                        if let Some(ice_user) =
-                            room.peers.ice_users.get(&peer_id).cloned()
-                        {
-                            // Delete created IceUser and return found one.
-                            if let Ok(created_user) = create_result {
-                                let turn_service =
-                                    Arc::clone(&room.peers.turn_service);
-                                ctx.spawn(
-                                    async move {
-                                        if let Err(err) = turn_service
-                                            .delete(&[created_user])
-                                            .await
-                                        {
-                                            error!(
-                                                "Error deleting IceUser: {:?}",
-                                                err,
-                                            );
-                                        }
-                                    }
-                                    .into_actor(room),
-                                );
-                            }
-                            fut::ready(Ok(ice_user))
-                        } else {
-                            // Save and return created IceUser.
-                            if let Ok(ice_user) = &create_result {
-                                room.peers
-                                    .ice_users
-                                    .insert(peer_id, ice_user.clone());
-                            }
-                            fut::ready(create_result)
-                        }
-                    },
-                ),
-            )
-        }
+    ) -> Result<&mut PeerStateMachine, RoomError> {
+        self.peers
+            .get_mut(&peer_id)
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
     /// Creates interconnected [`Peer`]s for provided [`Member`]s.
@@ -322,20 +273,12 @@ impl PeerRepository {
         &mut self,
         member_id: &MemberId,
         peer_ids: &HashSet<PeerId>,
-    ) -> impl Future<Output = HashMap<MemberId, Vec<PeerId>>> {
+    ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut removed_peers = HashMap::new();
-        let mut removed_ice_users = Vec::new();
         for peer_id in peer_ids {
-            if let Some(ice_user) = self.ice_users.remove(peer_id) {
-                removed_ice_users.push(ice_user);
-            }
             if let Some(peer) = self.peers.remove(peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
-                if let Some(ice_user) = self.ice_users.remove(&partner_peer_id)
-                {
-                    removed_ice_users.push(ice_user);
-                }
                 if self.peers.remove(&partner_peer_id).is_some() {
                     removed_peers
                         .entry(partner_member_id)
@@ -349,18 +292,7 @@ impl PeerRepository {
             }
         }
 
-        let turn_service = self.turn_service.clone();
-
-        async move {
-            if let Err(e) = turn_service.delete(&removed_ice_users).await {
-                warn!(
-                    "Error while deleting IceUsers [{:?}]: {:?}",
-                    removed_ice_users, e
-                );
-            }
-
-            removed_peers
-        }
+        removed_peers
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -372,7 +304,7 @@ impl PeerRepository {
     pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,
-    ) -> impl Future<Output = HashMap<MemberId, Vec<PeerId>>> {
+    ) -> HashMap<MemberId, Vec<PeerId>> {
         let member_peers = self
             .get_peers_by_member_id(&member_id)
             .map(PeerStateMachine::id)
@@ -385,18 +317,23 @@ impl PeerRepository {
     /// doesn't exist.
     ///
     /// Adds `send` track to source member's [`Peer`] and `recv` to
-    /// sink member's [`Peer`].
+    /// sink member's [`Peer`]. Registers TURN credentials for created
+    /// [`Peer`]s.
     ///
     /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
     ///
+    /// # Errors
+    ///
+    /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
+    ///
     /// # Panics
     ///
-    /// Panics if provided endpoints have interconnected [`Peer`]s already.
+    /// Panics if provided endpoints already have interconnected [`Peer`]s.
     pub fn connect_endpoints(
         &mut self,
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
-    ) -> Option<(PeerId, PeerId)> {
+    ) -> ActFuture<Result<Option<(PeerId, PeerId)>, RoomError>> {
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
             src.owner().id(),
@@ -431,6 +368,8 @@ impl PeerRepository {
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
+
+            Box::new(actix::fut::ready(Ok(None)))
         } else {
             let (mut src_peer, mut sink_peer) = self.create_peers(&src, &sink);
 
@@ -452,11 +391,75 @@ impl PeerRepository {
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
+            let is_subscribe_src = src.get_on_start().is_some() || src.get_on_stop().is_some();
+            let is_subscribe_sink = sink.get_on_start().is_some() || sink.get_on_stop().is_some();
+            let is_src_relayed = src.is_force_relayed();
+            let is_sink_relayed = sink.is_force_relayed();
 
-            return Some((src_peer_id, sink_peer_id));
-        };
+            let room_id = self.room_id.clone();
+            let turn_service = Arc::clone(&self.turn_service);
+            let metrics_service = self.metrics_callbacks_service.clone();
+            Box::new(
+                wrap_future(async move {
+                    let src_ice_user = turn_service.create(
+                        room_id.clone(),
+                        src_peer_id,
+                        UnreachablePolicy::ReturnErr,
+                    );
+                    let sink_ice_user = turn_service.create(
+                        room_id,
+                        sink_peer_id,
+                        UnreachablePolicy::ReturnErr,
+                    );
+                    Ok(futures::try_join!(src_ice_user, sink_ice_user)?)
+                })
+                    .then(move |result, room: &mut Room, _| {
+                        let room_id = room.id().clone();
+                        async move {
+                            if is_subscribe_src {
+                                metrics_service.send(mcs::SubscribePeer {
+                                    peer_id: src_peer_id,
+                                    room_id: room_id.clone(),
+                                    flow_metrics_sources: mcs::flow_metrics_sources(is_src_relayed),
+                                }).await;
+                            }
+                            if is_subscribe_sink {
+                                metrics_service.send(mcs::SubscribePeer {
+                                    peer_id: sink_peer_id,
+                                    room_id: room_id.clone(),
+                                    flow_metrics_sources: mcs::flow_metrics_sources(is_sink_relayed),
+                                }).await;
+                            }
 
-        None
+                            result
+                        }.into_actor(room)
+                    })
+                .then(move |result, room: &mut Room, _| {
+                    match result {
+                        Ok((src_ice_user, sink_ice_user)) => {
+                            match room.peers.get_mut_peer_by_id(src_peer_id) {
+                                Ok(src_peer) => {
+                                    src_peer.set_ice_user(src_ice_user);
+                                }
+                                Err(err) => {
+                                    return actix::fut::err(err);
+                                }
+                            };
+                            match room.peers.get_mut_peer_by_id(sink_peer_id) {
+                                Ok(sink_peer) => {
+                                    sink_peer.set_ice_user(sink_ice_user);
+                                }
+                                Err(err) => {
+                                    return actix::fut::err(err);
+                                }
+                            };
+                            actix::fut::ok(Some((src_peer_id, sink_peer_id)))
+                        }
+                        Err(err) => actix::fut::err(err),
+                    }
+                }),
+            )
+        }
     }
 
     /// Returns [`Weak`] references to the [`Endpoint`]s for which provided

@@ -22,17 +22,20 @@ use crate::{
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
-    turn::coturn_metrics::CoturnMetrics,
+    signalling::{
+        room::{
+            Close, CreateEndpoint, CreateMember, Delete, RoomError,
+            SerializeProto,
+        },
+        room_repo::RoomRepository,
+        Room,
+    },
+    turn::coturn_metrics::CoturnMetricsService,
     AppContext,
 };
 
 use super::{
     peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
-    room::{
-        Close, CreateEndpoint, CreateMember, Delete, RoomError, SerializeProto,
-    },
-    room_repo::RoomRepository,
-    Room,
 };
 
 /// Errors of [`RoomService`].
@@ -128,7 +131,7 @@ pub struct RoomService {
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
-    _coturn_metrics: Addr<CoturnMetrics>,
+    _coturn_metrics: Addr<CoturnMetricsService>,
 }
 
 impl RoomService {
@@ -136,8 +139,8 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetrics`] fails to
-    /// connect to a Redis stats server.
+    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetricsService`] fails
+    /// to connect to a Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -145,11 +148,8 @@ impl RoomService {
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let metrics_service = PeersTrafficWatcher::new().start();
         Ok(Self {
-            _coturn_metrics: CoturnMetrics::new(
-                &app.config.turn,
-                metrics_service.clone(),
-            )?
-            .start(),
+            _coturn_metrics: CoturnMetricsService::new(&app.config.turn, metrics_service.clone())?
+                .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             metrics_service,

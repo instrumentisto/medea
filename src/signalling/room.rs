@@ -13,7 +13,7 @@ use actix::{
     ContextFutureSpawner as _, Handler, Message, StreamHandler,
     WrapFuture as _,
 };
-use derive_more::Display;
+use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
@@ -57,6 +57,7 @@ use crate::{
 };
 
 use super::{
+    peers_metrics as pm,
     elements::{
         endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -76,7 +77,7 @@ use super::{
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
 
-#[derive(Debug, Fail, Display)]
+#[derive(Debug, Display, Fail, From)]
 pub enum RoomError {
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
@@ -84,12 +85,15 @@ pub enum RoomError {
     MemberError(MemberError),
 
     #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
+    #[from(ignore)]
     NoTurnCredentials(MemberId),
 
     #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
+    #[from(ignore)]
     ConnectionNotExists(MemberId),
 
     #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
+    #[from(ignore)]
     UnableToSendEvent(MemberId),
 
     #[display(fmt = "PeerError: {}", _0)]
@@ -98,19 +102,11 @@ pub enum RoomError {
     #[display(fmt = "{}", _0)]
     MembersLoadError(MembersLoadError),
 
-    #[display(fmt = "{}", _0)]
-    TryFromElementError(TryFromElementError),
-
     #[display(fmt = "Generic room error: {}", _0)]
+    #[from(ignore)]
     BadRoomSpec(String),
 
-    #[display(fmt = "Turn service error: {}", _0)]
-    TurnServiceError(String),
-
     ParticipantServiceErr(ParticipantServiceErr),
-
-    #[display(fmt = "Client error:{}", _0)]
-    ClientError(String),
 
     #[display(fmt = "Given Fid [fid = {}] to wrong Room [id = {}]", _0, _1)]
     WrongRoomId(StatefulFid, RoomId),
@@ -132,12 +128,6 @@ pub enum RoomError {
     TurnServiceErr(TurnServiceErr),
 }
 
-impl From<TurnServiceErr> for RoomError {
-    fn from(err: TurnServiceErr) -> Self {
-        Self::TurnServiceErr(err)
-    }
-}
-
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
 pub enum CommandValidationError {
@@ -153,36 +143,6 @@ pub enum CommandValidationError {
         _1
     )]
     PeerBelongsToAnotherMember(PeerId, MemberId),
-}
-
-impl From<PeerError> for RoomError {
-    fn from(err: PeerError) -> Self {
-        Self::PeerError(err)
-    }
-}
-
-impl From<TryFromElementError> for RoomError {
-    fn from(err: TryFromElementError) -> Self {
-        Self::TryFromElementError(err)
-    }
-}
-
-impl From<MembersLoadError> for RoomError {
-    fn from(err: MembersLoadError) -> Self {
-        Self::MembersLoadError(err)
-    }
-}
-
-impl From<ParticipantServiceErr> for RoomError {
-    fn from(err: ParticipantServiceErr) -> Self {
-        Self::ParticipantServiceErr(err)
-    }
-}
-
-impl From<MemberError> for RoomError {
-    fn from(err: MemberError) -> Self {
-        Self::MemberError(err)
-    }
 }
 
 /// Possible states of [`Room`].
@@ -243,6 +203,7 @@ impl Room {
             peers: PeerRepository::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
+                metrics_service.clone(),
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
@@ -292,39 +253,42 @@ impl Room {
                 peer1_id, peer2_id
             )));
         };
+
+        let sender_spec = sender.get_spec();
+        let sender_id = sender.id();
+        let receiver_spec = receiver.get_spec();
+        let received_id = receiver.id();
+
         self.peers.add_peer(receiver);
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        let sender_peer_id = sender.id();
+        let ice_servers = sender
+            .ice_servers_list()
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
+        let peer_created = Event::PeerCreated {
+            peer_id: sender.id(),
+            sdp_offer: None,
+            tracks: sender.tracks(),
+            ice_servers,
+            force_relay: sender.is_force_relayed(),
+        };
         self.peers.add_peer(sender);
 
-        Ok(Box::new(
-            self.peers.get_or_create_ice_user(sender_peer_id).then(
-                move |ice_user, this, _| {
-                    ice_user
-                        .and_then(|ice_user| {
-                            let sender =
-                                this.peers.get_peer_by_id(sender_peer_id)?;
-                            let peer_created = Event::PeerCreated {
-                                peer_id: sender.id(),
-                                sdp_offer: None,
-                                tracks: sender.tracks(),
-                                ice_servers: ice_user.servers_list(),
-                                force_relay: sender.is_force_relayed(),
-                            };
 
-                            Ok(this
-                                .members
-                                .send_event_to_member(member_id, peer_created)
-                                .into_actor(this))
-                        })
-                        .map_or_else(
-                            |e| Either::Left(actix::fut::err(e)),
-                            Either::Right,
-                        )
-                },
-            ),
+        self.peer_metrics_service.add_peers(pm::Peer {
+            peer_id: sender_id,
+            spec: sender_spec,
+        }, pm::Peer {
+            peer_id: received_id,
+            spec: receiver_spec,
+        });
+
+
+        Ok(Box::new(
+            self.members
+                .send_event_to_member(member_id, peer_created)
+                .into_actor(self),
         ))
     }
 
@@ -357,141 +321,52 @@ impl Room {
         member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
-        member
-            .srcs()
-            .into_iter()
-            .flat_map(|(_, publisher)| {
-                publisher
-                    .sinks()
-                    .into_iter()
-                    .map(move |receiver| (publisher.clone(), receiver))
-            })
-            .filter({
-                let members = &self.members;
-                move |(_, receiver)| {
-                    receiver.peer_id().is_none()
-                        && members.member_has_connection(&receiver.owner().id())
+        let mut connect_endpoints_tasks = Vec::new();
+
+        for publisher in member.srcs().values() {
+            for receiver in publisher.sinks() {
+                let receiver_owner = receiver.owner();
+
+                if receiver.peer_id().is_none()
+                    && self.members.member_has_connection(&receiver_owner.id())
+                {
+                    connect_endpoints_tasks.push(
+                        self.peers.connect_endpoints(publisher, &receiver),
+                    );
                 }
-            })
-            .chain(
-                member
-                    .sinks()
-                    .into_iter()
-                    .map(|(_, receiver)| (receiver.src(), receiver))
-                    .filter({
-                        let members = &self.members;
-                        move |(publisher, receiver)| {
-                            receiver.peer_id().is_none()
-                                && members.member_has_connection(
-                                    &publisher.owner().id(),
-                                )
-                        }
-                    }),
-            )
-            .filter_map({
-                let peers = &mut self.peers;
-                let metrics_service = self.metrics_callbacks_service.clone();
-                let room_id = self.id.clone();
-                move |(publisher, receiver)| {
-                    peers.connect_endpoints(&publisher, &receiver).map(
-                        |(publisher_peer_id, receiver_peer_id)| {
-                            if publisher.get_on_start().is_some()
-                                || publisher.get_on_stop().is_some()
-                            {
-                                metrics_service.do_send(mcs::SubscribePeer {
-                                    peer_id: publisher_peer_id,
-                                    room_id: room_id.clone(),
-                                    flow_metrics_sources: flow_metrics_sources(
-                                        publisher.is_force_relayed(),
-                                    ),
-                                });
-                            }
-                            if receiver.get_on_start().is_some()
-                                || receiver.get_on_stop().is_some()
-                            {
-                                metrics_service.do_send(mcs::SubscribePeer {
-                                    peer_id: receiver_peer_id,
-                                    room_id: room_id.clone(),
-                                    flow_metrics_sources: flow_metrics_sources(
-                                        publisher.is_force_relayed(),
-                                    ),
-                                });
-                            }
-
-                            (publisher_peer_id, receiver_peer_id)
-                        },
-                    )
-                }
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .for_each(|(first_peer_id, second_peer_id)| {
-                self.connect_peers(ctx, first_peer_id, second_peer_id);
-            });
-    }
-
-    /// Checks state of interconnected [`Peer`]s and sends [`Event`] about
-    /// [`Peer`] created to remote [`Member`].
-    fn connect_peers(
-        &mut self,
-        ctx: &mut Context<Self>,
-        first_peer_id: PeerId,
-        second_peer_id: PeerId,
-    ) {
-        use super::peers_metrics as pms;
-
-        let peers =
-            self.peers.get_peer_by_id(first_peer_id).map(|first_peer| {
-                self.peers
-                    .get_peer_by_id(second_peer_id)
-                    .map(|second_peer| {
-                        (first_peer.get_spec(), second_peer.get_spec())
-                    })
-            });
-        if let Ok(Ok((first_peer_spec, second_peer_spec))) = peers {
-            self.peer_metrics_service.add_peers(
-                pms::Peer {
-                    peer_id: first_peer_id,
-                    spec: first_peer_spec,
-                },
-                pms::Peer {
-                    peer_id: second_peer_id,
-                    spec: second_peer_spec,
-                },
-            );
-        } else {
-            error!(
-                "Failed to create subscription to Peer [id = {}] and Peer [id \
-                 = {}] metrics. Because some of this error: {:?}",
-                first_peer_id, second_peer_id, peers
-            );
-            self.close_gracefully(ctx).spawn(ctx);
-            return;
-        }
-
-        match self.send_peer_created(first_peer_id, second_peer_id) {
-            Ok(res) => Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
-                if res.is_ok() {
-                    return Box::new(actix::fut::ready(()));
-                }
-                error!(
-                    "Failed connect peers, because {}. Room [id = {}] will be \
-                     stopped.",
-                    res.unwrap_err(),
-                    this.id,
-                );
-                this.close_gracefully(ctx)
-            })),
-            Err(err) => {
-                error!(
-                    "Failed connect peers, because {}. Room [id = {}] will be \
-                     stopped.",
-                    err, self.id,
-                );
-                self.close_gracefully(ctx)
             }
         }
-        .spawn(ctx);
+
+        for receiver in member.sinks().values() {
+            let publisher = receiver.src();
+
+            if receiver.peer_id().is_none()
+                && self.members.member_has_connection(&publisher.owner().id())
+            {
+                connect_endpoints_tasks
+                    .push(self.peers.connect_endpoints(&publisher, receiver))
+            }
+        }
+
+        for connect_endpoints_task in connect_endpoints_tasks {
+            connect_endpoints_task
+                .then(|result, this, _| match result {
+                    Ok(Some((peer1, peer2))) => {
+                        match this.send_peer_created(peer1, peer2) {
+                            Ok(fut) => fut,
+                            Err(err) => Box::new(actix::fut::err(err)),
+                        }
+                    }
+                    Err(err) => Box::new(actix::fut::err(err)),
+                    _ => Box::new(actix::fut::ok(())),
+                })
+                .map(|res, _, _| {
+                    if let Err(err) = res {
+                        error!("Failed connect peers, because {}.", err);
+                    }
+                })
+                .spawn(ctx);
+        }
     }
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving
@@ -588,20 +463,14 @@ impl Room {
         ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
-        ctx.spawn(
-            self.peers
-                .remove_peers(member_id, peer_ids_to_remove)
-                .into_actor(self)
-                .map(|removed_peers, this, ctx| {
-                    removed_peers.into_iter().for_each(
-                        |(member_id, peers_id)| {
-                            this.member_peers_removed(peers_id, member_id, ctx)
-                                .map(|_, _, _| ())
-                                .spawn(ctx);
-                        },
-                    );
-                }),
-        );
+        self.peers
+            .remove_peers(&member_id, &peer_ids_to_remove)
+            .into_iter()
+            .for_each(|(member_id, peers_id)| {
+                self.member_peers_removed(peers_id, member_id, ctx)
+                    .map(|_, _, _| ())
+                    .spawn(ctx);
+            });
     }
 
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -1003,37 +872,25 @@ impl CommandHandler for Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-        let to_peer_id = to_peer.id();
+        let ice_servers = to_peer.ice_servers_list().ok_or_else(|| {
+            RoomError::NoTurnCredentials(to_member_id.clone())
+        })?;
+
+        let event = Event::PeerCreated {
+            peer_id: to_peer.id(),
+            sdp_offer: Some(sdp_offer),
+            tracks: to_peer.tracks(),
+            ice_servers,
+            force_relay: to_peer.is_force_relayed(),
+        };
 
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(
-            self.peers.get_or_create_ice_user(to_peer_id).then(
-                move |ice_user, this, _| {
-                    ice_user
-                        .and_then(|ice_user| {
-                            let to_peer =
-                                this.peers.get_peer_by_id(to_peer_id)?;
-                            let event = Event::PeerCreated {
-                                peer_id: to_peer.id(),
-                                sdp_offer: Some(sdp_offer),
-                                tracks: to_peer.tracks(),
-                                ice_servers: ice_user.servers_list(),
-                                force_relay: to_peer.is_force_relayed(),
-                            };
-
-                            Ok(this
-                                .members
-                                .send_event_to_member(to_member_id, event)
-                                .into_actor(this))
-                        })
-                        .map_or_else(
-                            |e| Either::Left(actix::fut::err(e)),
-                            Either::Right,
-                        )
-                },
-            ),
+            self.members
+                .send_event_to_member(to_member_id, event)
+                .into_actor(self),
         ))
     }
 
@@ -1565,29 +1422,20 @@ impl Handler<RpcConnectionClosed> for Room {
                 self.close_gracefully(ctx).spawn(ctx);
             }
 
-            ctx.spawn(
-                self.peers
-                    .remove_peers_related_to_member(&msg.member_id)
-                    .into_actor(self)
-                    .map(|removed_peers, this, ctx| {
-                        for (peer_member_id, peers_ids) in removed_peers {
-                            // Here we may have some problems. If two
-                            // participants
-                            // disconnect at one moment then sending event
-                            // to another participant fail,
-                            // because connection already closed but we don't
-                            // know about it because
-                            // message in event loop.
-                            this.member_peers_removed(
-                                peers_ids,
-                                peer_member_id,
-                                ctx,
-                            )
-                            .map(|_, _, _| ())
-                            .spawn(ctx);
-                        }
-                    }),
-            );
+
+            let removed_peers =
+                self.peers.remove_peers_related_to_member(&msg.member_id);
+
+            for (peer_member_id, peers_ids) in removed_peers {
+                // Here we may have some problems. If two participants
+                // disconnect at one moment then sending event
+                // to another participant fail,
+                // because connection already closed but we don't know about it
+                // because message in event loop.
+                self.member_peers_removed(peers_ids, peer_member_id, ctx)
+                    .map(|_, _, _| ())
+                    .spawn(ctx);
+            }
         }
     }
 }
