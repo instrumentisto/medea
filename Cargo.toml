@@ -70,8 +70,8 @@ url = "2.1"
 # TODO: use 'redis' from the crates.io when mitsuhiko/redis-rs#287 will
 #       be released and used in 'deadpool-redis'.
 [dependencies.redis-pub-sub]
-    git = "https://github.com/mitsuhiko/redis-rs"
     package = "redis"
+    git = "https://github.com/mitsuhiko/redis-rs"
     rev = "1ea0bd0c2e7b450eb5279995142fd64e5db0fa69"
     default-features = false
     features = ["tokio-comp"]

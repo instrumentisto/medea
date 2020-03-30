@@ -121,10 +121,10 @@ pub enum RoomError {
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
     EndpointAlreadyExists(Fid<ToEndpoint>),
 
-    /// Some error happened in [`TurnAuthService`].
+    /// [`TurnAuthService`] errored to perform an operation.
     ///
     /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
-    #[display(fmt = "TurnService Error in Room: {}", _0)]
+    #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 }
 

@@ -34,11 +34,11 @@ use crate::signalling::peers_traffic_watcher::PeersTrafficWatcher;
 
 #[derive(Debug)]
 pub struct PeerRepository {
-    /// [`RoomId`] of [`Room`] which owns this [`PeerRepository`].
+    /// [`RoomId`] of the [`Room`] which owns this [`PeerRepository`].
     room_id: RoomId,
 
-    /// [`TurnAuthService`] with which [`IceUser`]s for the [`PeerConnection`]s
-    /// from this [`PeerRepository`] will be created.
+    /// [`TurnAuthService`] that [`IceUser`]s for the [`PeerConnection`]s from
+    /// this [`PeerRepository`] will be created with.
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -83,7 +83,8 @@ impl<T: Incrementable + Copy> Counter<T> {
 }
 
 impl PeerRepository {
-    /// Returns new [`PeerRepository`] for a [`Room`] with provided [`RoomId`].
+    /// Returns new [`PeerRepository`] for a [`Room`] with the provided
+    /// [`RoomId`].
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
@@ -391,6 +392,7 @@ impl PeerRepository {
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
+
             let is_subscribe_src = src.get_on_start().is_some() || src.get_on_stop().is_some();
             let is_subscribe_sink = sink.get_on_start().is_some() || sink.get_on_stop().is_some();
             let is_src_relayed = src.is_force_relayed();

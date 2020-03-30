@@ -1,15 +1,9 @@
-//! Service which is responsible for processing [`PeerConnection`]'s metrics
-//! received from the Coturn.
+//! Service responsible for processing [`PeerConnection`]'s metrics received
+//! from Coturn.
 
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Duration};
 
-use actix::{
-    fut::Either, Actor, ActorFuture, Addr, AsyncContext, StreamHandler,
-    WrapFuture,
-};
+use actix::{fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture, Addr};
 use futures::{channel::mpsc, StreamExt as _};
 use redis_pub_sub::ConnectionInfo;
 
@@ -20,22 +14,24 @@ use crate::{
         TrafficFlows, TrafficStopped,
     },
 };
+use crate::log::prelude::*;
 
 use super::{
     allocation_event::{CoturnAllocationEvent, CoturnEvent},
     CoturnUsername,
 };
+use std::time::Instant;
 
 /// Channel pattern used to subscribe to all allocation events published by
 /// Coturn.
 const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
-/// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
+/// Ergonomic type alias for using [`ActorFuture`] by [`ControlMetricsService`].
 pub type ActFuture<O> =
-    Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
+Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
 
-/// Service which is responsible for processing [`PeerConnection`]'s metrics
-/// received from the Coturn.
+/// Service responsible for processing [`PeerConnection`]'s metrics received
+/// from Coturn.
 #[derive(Debug)]
 pub struct CoturnMetricsService {
     /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
@@ -80,8 +76,8 @@ impl CoturnMetricsService {
         })
     }
 
-    /// Opens new Redis connection, subscribes to the Coturn events and adds
-    /// [`Stream`] with this events to this the [`CoturnMetricsService`]'s
+    /// Opens new Redis connection, subscribes to Coturn events and injects
+    /// [`Stream`] with these events into the [`CoturnMetricsService`]'s
     /// context.
     fn connect_and_subscribe(
         &mut self,
@@ -120,7 +116,7 @@ impl CoturnMetricsService {
         )
     }
 
-    /// Connects Redis until success.
+    /// Connects Redis until succeeds.
     fn connect_until_success(&mut self) -> ActFuture<()> {
         Box::new(self.connect_and_subscribe().then(|res, this, _| {
             if let Err(err) = res {
