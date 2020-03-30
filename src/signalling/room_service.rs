@@ -34,9 +34,7 @@ use crate::{
     AppContext,
 };
 
-use super::{
-    peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
-};
+use super::peers_traffic_watcher::{self as mcs, PeersTrafficWatcher};
 
 /// Errors of [`RoomService`].
 #[derive(Debug, Fail, Display)]
@@ -148,8 +146,11 @@ impl RoomService {
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let metrics_service = PeersTrafficWatcher::new().start();
         Ok(Self {
-            _coturn_metrics: CoturnMetricsService::new(&app.config.turn, metrics_service.clone())?
-                .start(),
+            _coturn_metrics: CoturnMetricsService::new(
+                &app.config.turn,
+                metrics_service.clone(),
+            )?
+            .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             metrics_service,

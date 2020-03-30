@@ -9,10 +9,8 @@ use std::{
     sync::Arc,
 };
 
-use actix::{fut::wrap_future, ActorFuture, Addr};
-use actix::WrapFuture as _;
+use actix::{fut::wrap_future, ActorFuture, Addr, WrapFuture as _};
 use derive_more::Display;
-use futures::Future;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -25,12 +23,12 @@ use crate::{
             WeakEndpoint,
         },
         peers_traffic_watcher as mcs,
+        peers_traffic_watcher::PeersTrafficWatcher,
         room::{ActFuture, RoomError},
         Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
-use crate::signalling::peers_traffic_watcher::PeersTrafficWatcher;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -143,6 +141,11 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if [`Peer`] with provided
+    /// [`PeerId`] is not exist in [`PeerRepository`].
     pub fn get_mut_peer_by_id(
         &mut self,
         peer_id: PeerId,
@@ -393,8 +396,10 @@ impl PeerRepository {
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
 
-            let is_subscribe_src = src.get_on_start().is_some() || src.get_on_stop().is_some();
-            let is_subscribe_sink = sink.get_on_start().is_some() || sink.get_on_stop().is_some();
+            let is_subscribe_src =
+                src.get_on_start().is_some() || src.get_on_stop().is_some();
+            let is_subscribe_sink =
+                sink.get_on_start().is_some() || sink.get_on_stop().is_some();
             let is_src_relayed = src.is_force_relayed();
             let is_sink_relayed = sink.is_force_relayed();
 
@@ -415,27 +420,44 @@ impl PeerRepository {
                     );
                     Ok(futures::try_join!(src_ice_user, sink_ice_user)?)
                 })
-                    .then(move |result, room: &mut Room, _| {
-                        let room_id = room.id().clone();
-                        async move {
-                            if is_subscribe_src {
-                                metrics_service.send(mcs::SubscribePeer {
+                .then(move |result, room: &mut Room, _| {
+                    let room_id = room.id().clone();
+                    async move {
+                        if is_subscribe_src {
+                            metrics_service
+                                .send(mcs::SubscribePeer {
                                     peer_id: src_peer_id,
                                     room_id: room_id.clone(),
-                                    flow_metrics_sources: mcs::flow_metrics_sources(is_src_relayed),
-                                }).await;
-                            }
-                            if is_subscribe_sink {
-                                metrics_service.send(mcs::SubscribePeer {
+                                    flow_metrics_sources:
+                                        mcs::flow_metrics_sources(
+                                            is_src_relayed,
+                                        ),
+                                })
+                                .await
+                                .map_err(
+                                    RoomError::PeerTrafficWatcherMailbox,
+                                )?;
+                        }
+                        if is_subscribe_sink {
+                            metrics_service
+                                .send(mcs::SubscribePeer {
                                     peer_id: sink_peer_id,
                                     room_id: room_id.clone(),
-                                    flow_metrics_sources: mcs::flow_metrics_sources(is_sink_relayed),
-                                }).await;
-                            }
+                                    flow_metrics_sources:
+                                        mcs::flow_metrics_sources(
+                                            is_sink_relayed,
+                                        ),
+                                })
+                                .await
+                                .map_err(
+                                    RoomError::PeerTrafficWatcherMailbox,
+                                )?;
+                        }
 
-                            result
-                        }.into_actor(room)
-                    })
+                        result
+                    }
+                    .into_actor(room)
+                })
                 .then(move |result, room: &mut Room, _| {
                     match result {
                         Ok((src_ice_user, sink_ice_user)) => {

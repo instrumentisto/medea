@@ -16,11 +16,11 @@ use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
+    media::{IceUser, MediaTrack},
     signalling::{
+        peers::Counter,
         peers_metrics::{PeerSpec, TrackMediaType},
     },
-    media::{IceUser, MediaTrack},
-    signalling::peers::Counter,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.

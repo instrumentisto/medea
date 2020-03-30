@@ -9,9 +9,8 @@ use std::{
 };
 
 use actix::{
-    fut::Either, Actor, ActorFuture, Addr, AsyncContext, Context,
-    ContextFutureSpawner as _, Handler, Message, StreamHandler,
-    WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
+    Handler, MailboxError, Message, StreamHandler, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -40,8 +39,8 @@ use crate::{
             },
             refs::{Fid, StatefulFid, ToEndpoint, ToMember},
             room::RoomSpec,
-            EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
-            TryFromElementError, Validated, WebRtcPlayId, WebRtcPublishId,
+            EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId, Validated,
+            WebRtcPlayId, WebRtcPublishId,
         },
         RpcServer,
     },
@@ -57,7 +56,6 @@ use crate::{
 };
 
 use super::{
-    peers_metrics as pm,
     elements::{
         endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -68,10 +66,9 @@ use super::{
     },
     participants::{ParticipantService, ParticipantServiceErr},
     peers::PeerRepository,
+    peers_metrics as pm,
     peers_metrics::{PeerMetricsEvent, PeerMetricsEventHandler, PeersMetrics},
-    peers_traffic_watcher::{
-        self as mcs, flow_metrics_sources, PeersTrafficWatcher,
-    },
+    peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -126,6 +123,14 @@ pub enum RoomError {
     /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
+
+    #[display(
+        fmt = "Mailbox error while sending message to the \
+               'PeerTrafficWatcher' service. {:?}",
+        _0
+    )]
+    #[from(ignore)]
+    PeerTrafficWatcherMailbox(MailboxError),
 }
 
 /// Error of validating received [`Command`].
@@ -275,15 +280,16 @@ impl Room {
         };
         self.peers.add_peer(sender);
 
-
-        self.peer_metrics_service.add_peers(pm::Peer {
-            peer_id: sender_id,
-            spec: sender_spec,
-        }, pm::Peer {
-            peer_id: received_id,
-            spec: receiver_spec,
-        });
-
+        self.peer_metrics_service.add_peers(
+            pm::Peer {
+                peer_id: sender_id,
+                spec: sender_spec,
+            },
+            pm::Peer {
+                peer_id: received_id,
+                spec: receiver_spec,
+            },
+        );
 
         Ok(Box::new(
             self.members
@@ -1421,7 +1427,6 @@ impl Handler<RpcConnectionClosed> for Room {
                 );
                 self.close_gracefully(ctx).spawn(ctx);
             }
-
 
             let removed_peers =
                 self.peers.remove_peers_related_to_member(&msg.member_id);

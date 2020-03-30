@@ -3,7 +3,10 @@
 
 use std::{collections::HashMap, time::Duration};
 
-use actix::{fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture, Addr};
+use actix::{
+    fut::Either, Actor, ActorFuture, Addr, AsyncContext, StreamHandler,
+    WrapFuture,
+};
 use futures::{channel::mpsc, StreamExt as _};
 use redis_pub_sub::ConnectionInfo;
 
@@ -14,7 +17,6 @@ use crate::{
         TrafficFlows, TrafficStopped,
     },
 };
-use crate::log::prelude::*;
 
 use super::{
     allocation_event::{CoturnAllocationEvent, CoturnEvent},
@@ -28,7 +30,7 @@ const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`ControlMetricsService`].
 pub type ActFuture<O> =
-Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
+    Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
 
 /// Service responsible for processing [`PeerConnection`]'s metrics received
 /// from Coturn.
