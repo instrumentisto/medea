@@ -9,7 +9,7 @@ use smart_default::SmartDefault;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Rpc {
-    /// Duration, after which remote RPC client will be considered IDLE
+    /// Duration, after which remote RPC client will be considered idle
     /// if no heartbeat messages received.
     ///
     /// This duration can be overridden for some `Member` by Control API spec.
@@ -20,7 +20,7 @@ pub struct Rpc {
     pub idle_timeout: Duration,
 
     /// Duration, after which the server deletes the client session if
-    /// the remote RPC client does not reconnect after it is IDLE.
+    /// the remote RPC client does not reconnect after it is idle.
     ///
     /// This duration can be overridden for some `Member` by Control API spec.
     ///

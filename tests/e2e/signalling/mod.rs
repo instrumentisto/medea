@@ -20,7 +20,7 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, PeerId,RpcSettings, ServerMsg,
+    ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
 };
 
 pub type MessageHandler =

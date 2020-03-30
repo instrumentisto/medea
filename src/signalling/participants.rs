@@ -7,11 +7,7 @@
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-    sync::Arc
-};
+use std::{collections::HashMap, time::Instant};
 
 use actix::{
     fut::wrap_future, AsyncContext, Context, ContextFutureSpawner as _,
@@ -93,6 +89,11 @@ pub struct ParticipantService {
     /// If [`RpcConnection`] is lost, [`Room`] waits for `connect_timeout`
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
+
+    /// Default values for the RPC connection settings.
+    ///
+    /// If nothing provided into `Member` spec then this values will be used.
+    rpc_conf: RpcConf,
 }
 
 impl ParticipantService {
@@ -110,6 +111,7 @@ impl ParticipantService {
             members: parse_members(room_spec, context.config.rpc)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
+            rpc_conf: context.config.rpc,
         })
     }
 

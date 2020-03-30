@@ -63,7 +63,7 @@ pub trait RpcConnection: fmt::Debug + Send {
 /// Settings for the [`WsSession`].
 #[derive(Clone, Copy, Debug)]
 pub struct RpcConnectionSettings {
-    /// Duration, after which [`WsSession`] will be considered IDLE if no
+    /// Duration, after which [`WsSession`] will be considered idle if no
     /// heartbeat messages received.
     pub idle_timeout: Duration,
 

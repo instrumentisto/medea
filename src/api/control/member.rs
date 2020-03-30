@@ -67,12 +67,12 @@ pub struct MemberSpec {
     on_leave: Option<CallbackUrl>,
 
     /// [`Duration`] for this [`Member`], after which remote RPC client
-    /// will be considered IDLE if no heartbeat messages received.
+    /// will be considered idle if no heartbeat messages received.
     idle_timeout: Option<Duration>,
 
     /// [`Duration`] for this [`Member`], after which the server deletes
     /// the client session if the remote RPC client does not reconnect after
-    /// it is IDLE.
+    /// it is idle.
     reconnect_timeout: Option<Duration>,
 
     /// Interval of sending `Ping`s from the server to the client for
@@ -170,14 +170,14 @@ impl MemberSpec {
     }
 
     /// Returns [`Duration`] for this [`Member`], after which remote RPC client
-    /// will be considered IDLE if no heartbeat messages received.
+    /// will be considered idle if no heartbeat messages received.
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
 
     /// Returns [`Duration`] for this [`Member`], after which the server deletes
     /// the client session if the remote RPC client does not reconnect after
-    /// it is IDLE.
+    /// it is idle.
     pub fn reconnect_timeout(&self) -> Option<Duration> {
         self.reconnect_timeout
     }

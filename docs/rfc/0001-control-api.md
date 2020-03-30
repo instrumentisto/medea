@@ -59,11 +59,11 @@ spec:
         on_join: "grpc://127.0.0.1:9091"
         # Fires when "caller" client disconnects from media server via WebSocket.
         on_leave: "grpc://127.0.0.1:9091"
-        # Duration, after which remote RPC client will be considered IDLE if no 
+        # Duration, after which remote RPC client will be considered idle if no 
         # heartbeat messages received.
         idle_timeout: 1m
         # Duration, after which the server deletes the client session if the remote
-        # RPC client does not reconnect after it is IDLE.
+        # RPC client does not reconnect after it is idle.
         reconnect_timeout: 3m
         # Interval of sending pings from the server to the client.
         ping_interval: 10s

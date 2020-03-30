@@ -144,11 +144,11 @@ message Member {
   string credentials = 4;
   // Pipeline of this Member.
   map<string, Member.Element> pipeline = 5;
-  // Duration, after which remote RPC client will be considered IDLE if no
+  // Duration, after which remote RPC client will be considered idle if no
   // heartbeat messages received.
   google.protobuf.Duration idle_timeout = 6;
   // Duration, after which the server deletes the client session if
-  // the remote RPC client does not reconnect after it is IDLE.
+  // the remote RPC client does not reconnect after it is idle.
   google.protobuf.Duration reconnect_timeout = 7;
   // Interval of sending pings from the server to the client.
   google.protobuf.Duration ping_interval = 8;
