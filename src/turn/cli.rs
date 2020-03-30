@@ -60,7 +60,10 @@ impl CoturnTelnetClient {
     ) -> Result<(), CoturnCliError> {
         let mut conn = self.0.get().await?;
         for u in users {
-            let sessions = conn.print_sessions(u.user().clone().into()).await?;
+            let sessions = conn
+                .print_sessions(u.user().clone().into())
+                .await?
+                .into_iter();
             conn.delete_sessions(sessions).await?;
         }
         Ok(())

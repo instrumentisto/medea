@@ -6,16 +6,23 @@ mod conn;
 mod ice_server;
 mod media;
 mod repo;
+mod stats;
 mod stream;
 mod stream_request;
 mod track;
 
-use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{hash_map::DefaultHasher, HashMap},
+    convert::TryFrom as _,
+    hash::{Hash, Hasher},
+    rc::Rc,
+};
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    self as proto, Direction, IceConnectionState, IceServer,
+    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
@@ -26,7 +33,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
-    utils::{console_error, JsCaused, JsError},
+    utils::{console_error, JasonError, JsCaused, JsError},
 };
 
 #[cfg(feature = "mockable")]
@@ -43,6 +50,7 @@ pub use self::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, Sender, StableMuteState,
     },
+    stats::RtcStats,
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
@@ -157,6 +165,15 @@ pub enum PeerEvent {
         /// New [`PeerConnectionState`].
         peer_connection_state: PeerConnectionState,
     },
+
+    /// [`RtcPeerConnection`]'s [`RtcStats`] update.
+    StatsUpdate {
+        /// ID of the [`PeerConnection`] for which [`RtcStats`] was sent.
+        peer_id: Id,
+
+        /// [`RtcStats`] of this [`PeerConnection`].
+        stats: RtcStats,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -184,6 +201,13 @@ pub struct PeerConnection {
     /// Stores [`IceCandidate`]s received before remote description for
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
+
+    /// Last hashes of the all [`RtcStat`]s which was already sent to the
+    /// server, so we won't duplicate stats that were already sent.
+    ///
+    /// Stores precomputed hashes, since we don't need access to actual stats
+    /// values.
+    sent_stats_cache: RefCell<HashMap<StatId, u64>>,
 }
 
 impl PeerConnection {
@@ -221,6 +245,7 @@ impl PeerConnection {
             media_connections,
             media_manager,
             peer_events_sender,
+            sent_stats_cache: RefCell::new(HashMap::new()),
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(vec![]),
         };
@@ -271,6 +296,67 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(peer)
+    }
+
+    /// Filters already sent [`RtcStat`]s and send only new [`RtcStat`]s from
+    /// the provided [`RtcStats`].
+    pub fn send_peer_stats(&self, stats: RtcStats) {
+        let mut stats_cache = self.sent_stats_cache.borrow_mut();
+        let stats = RtcStats(
+            stats
+                .0
+                .into_iter()
+                .filter(|stat| {
+                    let mut hasher = DefaultHasher::new();
+                    stat.stats.hash(&mut hasher);
+                    let stat_hash = hasher.finish();
+
+                    if let Some(last_hash) = stats_cache.get_mut(&stat.id) {
+                        if *last_hash == stat_hash {
+                            false
+                        } else {
+                            *last_hash = stat_hash;
+                            true
+                        }
+                    } else {
+                        stats_cache.insert(stat.id.clone(), stat_hash);
+                        true
+                    }
+                })
+                .collect(),
+        );
+
+        if !stats.0.is_empty() {
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::StatsUpdate {
+                    peer_id: self.id,
+                    stats,
+                },
+            );
+        }
+    }
+
+    /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
+    pub async fn scrape_and_send_peer_stats(&self) {
+        match self.peer.get_stats().await {
+            Ok(stats) => self.send_peer_stats(stats),
+            Err(e) => {
+                JasonError::from(e).print();
+            }
+        };
+    }
+
+    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
+    /// [`RtcStats`].
+    pub async fn get_stats(&self) -> Result<RtcStats> {
+        self.peer
+            .get_stats()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in

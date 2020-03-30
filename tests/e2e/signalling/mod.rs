@@ -19,7 +19,7 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, ServerMsg,
+    ClientMsg, Command, Event, IceCandidate, PeerId, ServerMsg,
 };
 
 pub type MessageHandler =
@@ -35,6 +35,9 @@ pub struct TestMember {
     /// (most often, such a test will end on a timer of five seconds
     /// and display all events of this [`TestMember`]).
     events: Vec<Event>,
+
+    /// List of peers created on this client.
+    known_peers: Vec<PeerId>,
 
     /// Max test lifetime, will panic when it will be exceeded.
     deadline: Option<Duration>,
@@ -79,6 +82,7 @@ impl TestMember {
             Self {
                 sink,
                 events: Vec::new(),
+                known_peers: vec![],
                 deadline,
                 on_message,
             }
@@ -168,40 +172,52 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
             match server_msg {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event(event) => {
-                    if let Event::PeerCreated {
-                        peer_id,
-                        sdp_offer,
-                        tracks,
-                        ..
-                    } = &event
-                    {
-                        match sdp_offer {
-                            Some(_) => {
-                                self.send_command(Command::MakeSdpAnswer {
-                                    peer_id: *peer_id,
-                                    sdp_answer: "responder_answer".into(),
-                                })
-                            }
-                            None => self.send_command(Command::MakeSdpOffer {
-                                peer_id: *peer_id,
-                                sdp_offer: "caller_offer".into(),
-                                mids: tracks
-                                    .iter()
-                                    .map(|t| t.id)
-                                    .enumerate()
-                                    .map(|(mid, id)| (id, mid.to_string()))
-                                    .collect(),
-                            }),
-                        };
+                    match &event {
+                        Event::PeerCreated {
+                            peer_id,
+                            sdp_offer,
+                            tracks,
+                            ..
+                        } => {
+                            self.known_peers.push(*peer_id);
+                            match sdp_offer {
+                                Some(_) => {
+                                    self.send_command(Command::MakeSdpAnswer {
+                                        peer_id: *peer_id,
+                                        sdp_answer: "responder_answer".into(),
+                                    })
+                                }
+                                None => {
+                                    self.send_command(Command::MakeSdpOffer {
+                                        peer_id: *peer_id,
+                                        sdp_offer: "caller_offer".into(),
+                                        mids: tracks
+                                            .iter()
+                                            .map(|t| t.id)
+                                            .enumerate()
+                                            .map(|(mid, id)| {
+                                                (id, mid.to_string())
+                                            })
+                                            .collect(),
+                                    })
+                                }
+                            };
 
-                        self.send_command(Command::SetIceCandidate {
-                            peer_id: *peer_id,
-                            candidate: IceCandidate {
-                                candidate: "ice_candidate".to_string(),
-                                sdp_m_line_index: None,
-                                sdp_mid: None,
-                            },
-                        });
+                            self.send_command(Command::SetIceCandidate {
+                                peer_id: *peer_id,
+                                candidate: IceCandidate {
+                                    candidate: "ice_candidate".to_string(),
+                                    sdp_m_line_index: None,
+                                    sdp_mid: None,
+                                },
+                            });
+                        }
+                        Event::SdpAnswerMade { peer_id, .. }
+                        | Event::IceCandidateDiscovered { peer_id, .. }
+                        | Event::TracksUpdated { peer_id, .. } => {
+                            assert!(self.known_peers.contains(peer_id))
+                        }
+                        Event::PeersRemoved { .. } => {}
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);

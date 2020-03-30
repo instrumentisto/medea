@@ -25,7 +25,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     peer::{
         MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
         StableMuteState, TransceiverKind,
     },
     rpc::{
@@ -955,9 +955,7 @@ impl PeerEventHandler for InnerRoom {
     ) {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
-            metrics: PeerMetrics::IceConnectionStateChanged(
-                ice_connection_state,
-            ),
+            metrics: PeerMetrics::IceConnectionState(ice_connection_state),
         });
     }
 
@@ -970,9 +968,24 @@ impl PeerEventHandler for InnerRoom {
     ) {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
-            metrics: PeerMetrics::PeerConnectionStateChanged(
-                peer_connection_state,
-            ),
+            metrics: PeerMetrics::PeerConnectionState(peer_connection_state),
+        });
+
+        if let PeerConnectionState::Connected = peer_connection_state {
+            if let Some(peer) = self.peers.get(peer_id) {
+                spawn_local(async move {
+                    peer.scrape_and_send_peer_stats().await;
+                });
+            }
+        }
+    }
+
+    /// Handles [`PeerEvent::StatsUpdate`] event and sends new stats to the RPC
+    /// server.
+    fn on_stats_update(&mut self, peer_id: PeerId, stats: RtcStats) {
+        self.rpc.send_command(Command::AddPeerConnectionMetrics {
+            peer_id,
+            metrics: PeerMetrics::RtcStats(stats.0),
         });
     }
 }

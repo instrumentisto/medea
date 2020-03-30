@@ -40,7 +40,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send `Event::RenegotiationStarted` based on reported connection state ([#89]);
     - Send `Event::SdpOfferMade` on `Command::MakeSdpOffer` during renegotiation ([#89]).
 - [Coturn] integration:
-    - [Coturn] sessions destroying ([#84]).
+    - [Coturn] sessions destroying ([#84]);
+    - [Coturn] stats processing ([#94]).
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84]);
@@ -64,6 +65,7 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#84]: /../../pull/84
 [#86]: /../../pull/86
+[#94]: /../../pull/94
 [#89]: /../../pull/89
 
 

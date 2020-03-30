@@ -3,12 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::{Display, From, Mul};
-use futures::{
-    channel::mpsc,
-    future::{self, AbortHandle},
-    stream::LocalBoxStream,
-    StreamExt as _,
-};
+use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use wasm_bindgen_futures::spawn_local;
 
@@ -16,22 +11,13 @@ use crate::{
     rpc::{RpcTransport, TransportError},
     utils::{
         console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
+        TaskHandle,
     },
 };
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
-
-/// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
-#[derive(Debug, From)]
-struct TaskHandle(AbortHandle);
-
-impl Drop for TaskHandle {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
 
 /// Idle timeout of [`RpcClient`].
 ///

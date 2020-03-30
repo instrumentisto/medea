@@ -55,7 +55,8 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
-        - `ApplyTracks` for muting/unmuting ([#81]).
+        - `ApplyTracks` for muting/unmuting ([#81]);
+        - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handle `Event::RenegotiationStarted`([#89]);
     - Handle `Even::SdpOfferMade` ([#89]).
 - Error handling:
@@ -79,6 +80,7 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#87]: /../../pull/87
 [#89]: /../../pull/89
+[#90]: /../../pull/90
 
 
 
