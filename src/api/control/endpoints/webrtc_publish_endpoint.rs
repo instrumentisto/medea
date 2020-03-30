@@ -79,8 +79,8 @@ pub struct WebRtcPublishEndpoint<T> {
     /// [`Unvalidated`] state. Converting from the gRPC's DTOs will cause
     /// the same behavior.
     ///
-    /// To use [`WebRtcPunblishEndpoint`] you should call
-    /// [`WebRtcPunblishEndpoint::validate`].
+    /// To use [`WebRtcPublishEndpoint`] you should call
+    /// [`WebRtcPublishEndpoint::validate`].
     #[serde(skip)]
     _validation_state: T,
 }

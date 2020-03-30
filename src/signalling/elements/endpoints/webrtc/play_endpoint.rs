@@ -189,6 +189,12 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().on_stop.clone()
     }
 
+    /// Returns `true` if `on_start` or `on_stop` callback is set.
+    pub fn is_some_callback(&self) -> bool {
+        let inner = self.0.borrow();
+        inner.on_stop.is_some() && inner.on_start.is_some()
+    }
+
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
     /// pointer.
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {

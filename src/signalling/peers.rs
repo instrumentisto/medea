@@ -11,6 +11,7 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, Addr, WrapFuture as _};
 use derive_more::Display;
+use futures::{future, Future};
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -29,6 +30,7 @@ use crate::{
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
+use futures::future::Either;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -317,6 +319,35 @@ impl PeerRepository {
         self.remove_peers(&member_id, &member_peers)
     }
 
+    /// Subscribes provided [`Peer`] in the [`PeersTrafficWatcher`] service if
+    /// `is_need_subscription` is `true`.
+    fn traffic_watcher_subscribe(
+        &self,
+        peer: &Peer<New>,
+        is_need_subscription: bool,
+    ) -> impl Future<Output = Result<(), RoomError>> {
+        if is_need_subscription {
+            let room_id = self.room_id.clone();
+            let peer_id = peer.id();
+            let metrics_service = self.metrics_callbacks_service.clone();
+            let is_force_relayed = peer.is_force_relayed();
+            Either::Left(async move {
+                Ok(metrics_service
+                    .send(mcs::SubscribePeer {
+                        peer_id,
+                        room_id,
+                        flow_metrics_sources: mcs::flow_metrics_sources(
+                            is_force_relayed,
+                        ),
+                    })
+                    .await
+                    .map_err(RoomError::PeerTrafficWatcherMailbox)?)
+            })
+        } else {
+            Either::Right(future::ok(()))
+        }
+    }
+
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
     /// doesn't exist.
     ///
@@ -393,19 +424,16 @@ impl PeerRepository {
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();
 
+            let src_traffic_watcher_sub_fut = self
+                .traffic_watcher_subscribe(&src_peer, src.is_some_callback());
+            let sink_traffic_watcher_sub_fut = self
+                .traffic_watcher_subscribe(&sink_peer, sink.is_some_callback());
+
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
 
-            let is_subscribe_src =
-                src.get_on_start().is_some() || src.get_on_stop().is_some();
-            let is_subscribe_sink =
-                sink.get_on_start().is_some() || sink.get_on_stop().is_some();
-            let is_src_relayed = src.is_force_relayed();
-            let is_sink_relayed = sink.is_force_relayed();
-
             let room_id = self.room_id.clone();
             let turn_service = Arc::clone(&self.turn_service);
-            let metrics_service = self.metrics_callbacks_service.clone();
             Box::new(
                 wrap_future(async move {
                     let src_ice_user = turn_service.create(
@@ -421,38 +449,9 @@ impl PeerRepository {
                     Ok(futures::try_join!(src_ice_user, sink_ice_user)?)
                 })
                 .then(move |result, room: &mut Room, _| {
-                    let room_id = room.id().clone();
                     async move {
-                        if is_subscribe_src {
-                            metrics_service
-                                .send(mcs::SubscribePeer {
-                                    peer_id: src_peer_id,
-                                    room_id: room_id.clone(),
-                                    flow_metrics_sources:
-                                        mcs::flow_metrics_sources(
-                                            is_src_relayed,
-                                        ),
-                                })
-                                .await
-                                .map_err(
-                                    RoomError::PeerTrafficWatcherMailbox,
-                                )?;
-                        }
-                        if is_subscribe_sink {
-                            metrics_service
-                                .send(mcs::SubscribePeer {
-                                    peer_id: sink_peer_id,
-                                    room_id: room_id.clone(),
-                                    flow_metrics_sources:
-                                        mcs::flow_metrics_sources(
-                                            is_sink_relayed,
-                                        ),
-                                })
-                                .await
-                                .map_err(
-                                    RoomError::PeerTrafficWatcherMailbox,
-                                )?;
-                        }
+                        sink_traffic_watcher_sub_fut.await?;
+                        src_traffic_watcher_sub_fut.await?;
 
                         result
                     }
