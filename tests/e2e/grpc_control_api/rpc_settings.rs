@@ -61,9 +61,7 @@ async fn rpc_settings_from_spec_works() {
                 assert!(diff > Duration::from_secs(3));
                 assert!(diff < Duration::from_secs(4));
 
-                if let Some(test_end_tx) = test_end_tx.take() {
-                    test_end_tx.send(()).unwrap();
-                }
+                test_end_tx.take().unwrap().send(()).unwrap();
             }
             _ => {}
         })),
