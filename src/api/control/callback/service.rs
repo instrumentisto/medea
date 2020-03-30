@@ -93,7 +93,6 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
         let this = self.clone();
         Arbiter::spawn(async move {
             let req = CallbackRequest::new(fid, event.into());
-
             if let Err(e) = this.send_request(req, callback_url).await {
                 error!("Failed to send callback because {:?}.", e);
             }

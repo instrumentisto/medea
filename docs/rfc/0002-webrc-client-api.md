@@ -1092,11 +1092,11 @@ pub enum PeerConnectionState {
 }
 ```
 
-`RtcStat` object represents [`RTCStats`](https://www.w3.org/TR/webrtc/#dom-rtcstats) dictionary from the WebRTC specification.
+`RtcStat` object represents [RTCStats](https://www.w3.org/TR/webrtc/#dom-rtcstats) dictionary from the WebRTC specification.
 
 All types of the `RtcStat` object you can find [here](https://www.w3.org/TR/webrtc-stats/#rtcstatstype-str*).
 
-`Web Client` should send only updated `RtcStat`s in the `PeerMetrics::StatsUpdate` metric.
+`Web Client` should send only updated `RtcStat`s in the `PeerMetrics::RtcStats` metric.
 
 Metrics list will be extended as needed.
 

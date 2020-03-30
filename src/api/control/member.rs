@@ -2,8 +2,6 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-#![allow(clippy::type_repetition_in_bounds)]
-
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
@@ -76,8 +74,6 @@ impl Into<RoomElement> for MemberSpec {
     }
 }
 
-type PublishEndpointsItem<'a> = (WebRtcPublishId, &'a WebRtcPublishEndpoint);
-
 impl MemberSpec {
     /// Creates new [`MemberSpec`] with the given parameters.
     #[inline]
@@ -123,7 +119,7 @@ impl MemberSpec {
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> impl Iterator<Item = PublishEndpointsItem> {
+    ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint)> {
         self.pipeline.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPublishEndpoint { spec } => {
                 Some((id.clone().into(), spec))

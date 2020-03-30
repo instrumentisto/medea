@@ -3,7 +3,7 @@
 //!
 //! [`PeerConnection`] metrics will be collected from the many sources of
 //! metrics. All this metrics will be collected and based on them,
-//! [`MetricsCallbackService`] will consider which callback should be sent (or
+//! [`PeersTrafficWatcher`] will consider which callback should be sent (or
 //! not sent).
 //!
 //! # List of [`PeerConnection`] metrics based Control API callbacks:
@@ -71,7 +71,7 @@ impl PeersTrafficWatcher {
         }
     }
 
-    /// Unsubscribes [`MetricsCallbackService`] from watching a
+    /// Unsubscribes [`PeersTrafficWatcher`] from watching a
     /// [`PeerConnection`] with provided [`PeerId`].
     ///
     /// Removes provided [`PeerId`] from [`RoomStat`] with provided [`RoomId`].
@@ -81,7 +81,7 @@ impl PeersTrafficWatcher {
         }
     }
 
-    /// Unsubscribes [`MetricsCallbackService`] from a [`PeerConnection`] with
+    /// Unsubscribes [`PeersTrafficWatcher`] from a [`PeerConnection`] with
     /// fatal error and notifies [`Room`] about fatal error in [`PeerStat`].
     fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
@@ -98,7 +98,7 @@ impl PeersTrafficWatcher {
     /// This function will be called on every [`PeerStat`] after `10sec` from
     /// first [`PeerStat`]'s [`TrafficFlows`] message.
     ///
-    /// If this check fails then [`MetricsCallbackService::fatal_peer_error`]
+    /// If this check fails then [`PeersTrafficWatcher::fatal_peer_error`]
     /// will be called for this [`PeerStat`].
     fn check_on_start(&mut self, room_id: &RoomId, peer_id: PeerId) {
         let peer = self
@@ -240,7 +240,7 @@ impl Handler<TrafficStopped> for PeersTrafficWatcher {
 /// This is needed for checking that all metrics sources have the same opinion
 /// about current `PeerConnection`'s traffic state.
 ///
-/// [`MetricsCallbackService`] checks that all sources have the same opinion
+/// [`PeersTrafficWatcher`] checks that all sources have the same opinion
 /// after `10secs` from first [`TrafficFlows`] message received for some
 /// [`PeerStat`]. If at least one [`FlowMetricSource`] doesn't sent
 /// [`TrafficFlows`] message, then `PeerConnection` will be considered as wrong
@@ -272,14 +272,14 @@ pub enum StoppedMetricSource {
     /// All Coturn allocations related to this `PeerConnection` was removed.
     Coturn,
 
-    /// [`MetricsCallbackService`] doesn't receive [`TrafficFlows`] too long.
+    /// [`PeersTrafficWatcher`] doesn't receive [`TrafficFlows`] too long.
     Timeout,
 }
 
 /// Current state of [`PeerStat`].
 ///
 /// If [`PeerStat`] goes into [`PeerState::Started`] then all
-/// [`FlowMetricSource`]s should notify [`MetricsCallbackService`] about it.
+/// [`FlowMetricSource`]s should notify [`PeersTrafficWatcher`] about it.
 #[derive(Debug)]
 pub enum PeerState {
     /// [`PeerStat`] is started.
@@ -341,7 +341,7 @@ pub struct RegisterRoom {
     pub room_id: RoomId,
 
     /// [`Addr`] of room which requrested to register in the
-    /// [`MetricsCallbackService`].
+    /// [`PeersTrafficWatcher`].
     pub room: WeakAddr<Room>,
 }
 

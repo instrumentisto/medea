@@ -73,13 +73,6 @@ pub enum TryFromProtobufError {
 
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
-
-    /// Occurs when callback is not supported while 'force_relay' is set to
-    /// false.
-    #[display(
-        fmt = "Callback is not supported while 'force_relay' is set to false."
-    )]
-    CallbackNotSupportedInNotRelayMode,
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
@@ -199,7 +192,8 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let room = RoomSpec::try_from(&serde_yaml::from_str(&buf)?)?;
+    let parsed: RootElement = serde_yaml::from_str(&buf)?;
+    let room = RoomSpec::try_from(&parsed)?;
     Ok(room)
 }
 

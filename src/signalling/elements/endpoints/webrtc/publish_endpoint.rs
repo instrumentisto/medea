@@ -47,8 +47,10 @@ struct WebRtcPublishEndpointInner {
     /// this [`WebRtcPublishEndpoint`].
     peer_ids: HashSet<PeerId>,
 
-    /// Publishing statuses of [`PeerConnection`] related to this
+    /// Publishing statuses of the [`Peer`] related to this
     /// [`WebRtcPublishEndpoint`].
+    ///
+    /// `true` value indicated that [`Peer`] is publishes some media traffic.
     peers_status: HashMap<PeerId, bool>,
 
     /// URL to which `OnStart` Control API callback will be sent.
@@ -256,9 +258,9 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.
-    pub fn is_some_callback(&self) -> bool {
+    pub fn is_some_traffic_callbacks(&self) -> bool {
         let inner = self.0.borrow();
-        inner.on_stop.is_some() && inner.on_start.is_some()
+        inner.on_stop.is_some() || inner.on_start.is_some()
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer

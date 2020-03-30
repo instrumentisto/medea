@@ -356,7 +356,6 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-control-api-proto
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
-	@make test.unit crate=medea-coturn-telnet
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea

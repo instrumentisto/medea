@@ -18,6 +18,10 @@ All user visible changes to this project will be documented in this file. This p
 
 - `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68](/../../pull/68)).
 
+### Fixed
+
+- `#[enum_delegate]` macro now works fine with functions with multiple arguments ([#91](/../../pull/91).
+
 
 
 

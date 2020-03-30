@@ -1,7 +1,10 @@
 //! Service responsible for processing [`PeerConnection`]'s metrics received
 //! from Coturn.
 
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::Either, Actor, ActorFuture, Addr, AsyncContext, StreamHandler,
@@ -22,7 +25,6 @@ use super::{
     allocation_event::{CoturnAllocationEvent, CoturnEvent},
     CoturnUsername,
 };
-use std::time::Instant;
 
 /// Channel pattern used to subscribe to all allocation events published by
 /// Coturn.
@@ -36,9 +38,9 @@ pub type ActFuture<O> =
 /// from Coturn.
 #[derive(Debug)]
 pub struct CoturnMetricsService {
-    /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
+    /// [`Addr`] of [`PeersTrafficWatcher`] to which traffic updates will be
     /// sent.
-    metrics_service: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates will be received.
     client: redis_pub_sub::Client,
@@ -55,7 +57,7 @@ impl CoturnMetricsService {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
-        metrics_service: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(
@@ -74,7 +76,7 @@ impl CoturnMetricsService {
         Ok(Self {
             client,
             allocations_count: HashMap::new(),
-            metrics_service,
+            peers_traffic_watcher,
         })
     }
 
@@ -169,7 +171,7 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                 let is_traffic_really_going =
                     traffic.sent_packets + traffic.received_packets > 10;
                 if is_traffic_really_going {
-                    self.metrics_service.do_send(TrafficFlows {
+                    self.peers_traffic_watcher.do_send(TrafficFlows {
                         peer_id: event.peer_id,
                         room_id: event.room_id,
                         timestamp: Instant::now(),
@@ -180,7 +182,7 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
             CoturnAllocationEvent::Deleted => {
                 *allocations_count -= 1;
                 if *allocations_count == 0 {
-                    self.metrics_service.do_send(TrafficStopped {
+                    self.peers_traffic_watcher.do_send(TrafficStopped {
                         peer_id: event.peer_id,
                         room_id: event.room_id,
                         timestamp: Instant::now(),

@@ -26,9 +26,11 @@ All user visible changes to this project will be documented in this file. This p
         - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
         - `Delete` method for `Room`, `Member`, `Endpoint`.
-    - gRPC Control API callbacks ([#63]):
-        - `on_join`;
-        - `on_leave`.
+    - gRPC Control API callbacks:
+        - `on_join` ([#63]);
+        - `on_leave` ([#63]);
+        - `on_start` ([#91]);
+        - `on_stop` ([#91]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -36,7 +38,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
-    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]).
+    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]);
+    - Processing of a RTCStats received from a client ([#91]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -47,8 +50,6 @@ All user visible changes to this project will be documented in this file. This p
     - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
 - Testing:
     - E2E tests for signalling ([#28]).
-- Turn server integration:
-    - Turn sessions cancellation ([#84](/../../pull/84)).
 
 ### Fixed
 
@@ -66,6 +67,7 @@ All user visible changes to this project will be documented in this file. This p
 [#84]: /../../pull/84
 [#86]: /../../pull/86
 [#94]: /../../pull/94
+[#91]: /../../pull/91
 
 
 

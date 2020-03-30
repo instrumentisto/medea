@@ -1,4 +1,5 @@
-//! Service is which responsible for [`PeerConnection`]'s metrics processing.
+//! Service which is responsible for processing [`PeerConnection`]'s metrics
+//! received from a client.
 
 use std::{
     cell::RefCell,
@@ -60,12 +61,12 @@ impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
     }
 }
 
-/// Events which [`PeerMetricsService`] can throw to the
-/// [`PeerMetricsService::peer_metric_events_sender`]'s receiver (currently this
-/// is [`Room`] which owns this [`PeerMetricsService`]).
+/// Events which [`PeersMetrics`] can throw to the
+/// [`PeersMetrics::peer_metric_events_sender`]'s receiver (currently this
+/// is [`Room`] which owns this [`PeersMetrics`]).
 #[dispatchable]
 #[derive(Debug, Clone)]
-pub enum PeerMetricsEvent {
+pub enum PeersMetricsEvent {
     /// Fatal `PeerConnection`'s contradiction of metrics with specification.
     ///
     /// On this [`PeerMetricsEvent`] `PeerConnection` with provided [`PeerId`]
@@ -307,49 +308,50 @@ impl PeerStat {
     }
 }
 
-/// New `PeerConnection` for which this [`PeerMetricsService`] will receive
+/// New `PeerConnection` for which this [`PeersMetrics`] will receive
 /// metrics.
 #[derive(Debug)]
 pub struct Peer {
-    /// [`PeerId`] of `PeerConnection` for which this [`PeerMetricsService`]
+    /// [`PeerId`] of `PeerConnection` for which this [`PeersMetrics`]
     /// will receive metrics.
     pub peer_id: PeerId,
 
     /// Specification of a `PeerConnection` for which this
-    /// [`PeerMetricsService`] will receive metrics.
+    /// [`PeersMetrics`] will receive metrics.
     pub spec: PeerSpec,
 }
 
-/// Service which responsible for [`PeerConnection`]'s metrics processing.
+/// Service which responsible for processing [`PeerConnection`]'s metrics
+/// received from a client.
 #[derive(Debug)]
 pub struct PeersMetrics {
-    /// [`RoomId`] of [`Room`] to which this [`PeerMetricsService`] belongs to.
+    /// [`RoomId`] of [`Room`] to which this [`PeersMetrics`] belongs to.
     room_id: RoomId,
 
-    /// [`Addr`] of [`MetricsCallbackService`] to which traffic updates will be
+    /// [`Addr`] of [`PeersTrafficWatcher`] to which traffic updates will be
     /// sent.
-    metrics_service: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 
-    /// All `PeerConnection` for this this [`PeerMetricsService`] will proccess
+    /// All `PeerConnection` for this this [`PeersMetrics`] will proccess
     /// metrics.
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
 
     /// Sender of [`PeerMetricsEvent`]s.
     ///
     /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
-    /// [`PeerMetricsService`] belongs to.
-    peer_metric_events_sender: Option<mpsc::UnboundedSender<PeerMetricsEvent>>,
+    /// [`PeersMetrics`] belongs to.
+    peer_metric_events_sender: Option<mpsc::UnboundedSender<PeersMetricsEvent>>,
 }
 
 impl PeersMetrics {
-    /// Returns new [`PeerMetricsService`] for provided [`Room`].
+    /// Returns new [`PeersMetrics`] for provided [`Room`].
     pub fn new(
         room_id: RoomId,
-        metrics_service: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
     ) -> Self {
         Self {
             room_id,
-            metrics_service,
+            peers_traffic_watcher,
             peers: HashMap::new(),
             peer_metric_events_sender: None,
         }
@@ -361,15 +363,15 @@ impl PeersMetrics {
     fn fatal_peer_error(&self, peer_id: PeerId) {
         if let Some(sender) = &self.peer_metric_events_sender {
             let _ = sender
-                .unbounded_send(PeerMetricsEvent::FatalPeerFailure(peer_id));
+                .unbounded_send(PeersMetricsEvent::FatalPeerFailure(peer_id));
         }
     }
 
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///
     /// Currently this method will be called by [`Room`] to which this
-    /// [`PeerMetricsService`] belongs to.
-    pub fn subscribe(&mut self) -> impl Stream<Item = PeerMetricsEvent> {
+    /// [`PeersMetrics`] belongs to.
+    pub fn subscribe(&mut self) -> impl Stream<Item = PeersMetricsEvent> {
         let (tx, rx) = mpsc::unbounded();
         self.peer_metric_events_sender = Some(tx);
 
@@ -379,11 +381,11 @@ impl PeersMetrics {
     /// Checks that all [`PeerStat`]s is valid accordingly `PeerConnection`
     /// specification. If [`PeerStat`] is considered as invalid accrdingly to
     /// `PeerConnection` specification then
-    /// [`PeerMetricsService::fatal_peer_error`] will be called.
+    /// [`PeersMetrics::fatal_peer_error`] will be called.
     ///
     /// Also checks that all [`PeerStat`]'s senders/receivers is flowing. If all
     /// senders/receivers is stopped then [`TrafficStopped`] will be sent to
-    /// the [`MetricsCallbackService`].
+    /// the [`PeersTrafficWatcher`].
     pub fn check_peers_validity(&self) {
         for peer in self
             .peers
@@ -393,7 +395,7 @@ impl PeersMetrics {
             let peer_ref = peer.borrow();
 
             if peer_ref.is_stopped() {
-                self.metrics_service.do_send(TrafficStopped {
+                self.peers_traffic_watcher.do_send(TrafficStopped {
                     room_id: self.room_id.clone(),
                     peer_id: peer_ref.peer_id,
                     timestamp: peer_ref.get_stop_time(),
@@ -405,7 +407,7 @@ impl PeersMetrics {
         }
     }
 
-    /// [`Room`] notifies [`PeerMetricsService`] about new `PeerConnection`s
+    /// [`Room`] notifies [`PeersMetrics`] about new `PeerConnection`s
     /// creation.
     ///
     /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
@@ -436,7 +438,7 @@ impl PeersMetrics {
     }
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
-    /// [`PeerMetricsService`].
+    /// [`PeersMetrics`].
     pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
@@ -454,14 +456,14 @@ impl PeersMetrics {
             }
 
             if peer_ref.is_stopped() {
-                self.metrics_service.do_send(TrafficStopped {
+                self.peers_traffic_watcher.do_send(TrafficStopped {
                     source: StoppedMetricSource::PeerTraffic,
                     timestamp: peer_ref.get_stop_time(),
                     peer_id: peer_ref.peer_id,
                     room_id: self.room_id.clone(),
                 });
             } else if peer_ref.is_conforms_spec() {
-                self.metrics_service.do_send(TrafficFlows {
+                self.peers_traffic_watcher.do_send(TrafficFlows {
                     room_id: self.room_id.clone(),
                     peer_id,
                     source: FlowMetricSource::PeerTraffic,
@@ -469,7 +471,7 @@ impl PeersMetrics {
                 });
                 peer_ref.set_state(PeerStatState::Connected);
                 if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
-                    self.metrics_service.do_send(TrafficFlows {
+                    self.peers_traffic_watcher.do_send(TrafficFlows {
                         room_id: self.room_id.clone(),
                         peer_id: partner_peer_id,
                         source: FlowMetricSource::PartnerPeerTraffic,
@@ -482,13 +484,13 @@ impl PeersMetrics {
         }
     }
 
-    /// [`Room`] notifies [`PeerMetricsService`] that some [`Peer`] is removed.
+    /// [`Room`] notifies [`PeersMetrics`] that some [`Peer`] is removed.
     ///
     /// This will be considered as [`TrafficStopped`] for the
-    /// [`MetricsCallbackService`].
+    /// [`PeersTrafficWatcher`].
     pub fn peer_removed(&mut self, peer_id: PeerId) {
         if self.peers.remove(&peer_id).is_some() {
-            self.metrics_service.do_send(TrafficStopped {
+            self.peers_traffic_watcher.do_send(TrafficStopped {
                 peer_id,
                 room_id: self.room_id.clone(),
                 timestamp: Instant::now(),

@@ -6,12 +6,13 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
+    iter,
     sync::Arc,
 };
 
 use actix::{fut::wrap_future, ActorFuture, Addr, WrapFuture as _};
 use derive_more::Display;
-use futures::{future, Future};
+use futures::{future, future::Either, Future};
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -23,14 +24,13 @@ use crate::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             WeakEndpoint,
         },
-        peers_traffic_watcher as mcs,
+        peers_traffic_watcher as ptw,
         peers_traffic_watcher::PeersTrafficWatcher,
         room::{ActFuture, RoomError},
         Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
-use futures::future::Either;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -64,7 +64,7 @@ pub struct PeerRepository {
 
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
-    metrics_callbacks_service: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 }
 
 /// Simple ID counter.
@@ -88,7 +88,7 @@ impl PeerRepository {
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
-        metrics_callbacks_service: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
     ) -> Self {
         Self {
             room_id,
@@ -97,7 +97,7 @@ impl PeerRepository {
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_endpoints: HashMap::new(),
-            metrics_callbacks_service,
+            peers_traffic_watcher,
         }
     }
 
@@ -329,14 +329,14 @@ impl PeerRepository {
         if is_need_subscription {
             let room_id = self.room_id.clone();
             let peer_id = peer.id();
-            let metrics_service = self.metrics_callbacks_service.clone();
+            let peer_traffic_watcher = self.peers_traffic_watcher.clone();
             let is_force_relayed = peer.is_force_relayed();
             Either::Left(async move {
-                Ok(metrics_service
-                    .send(mcs::SubscribePeer {
+                Ok(peer_traffic_watcher
+                    .send(ptw::SubscribePeer {
                         peer_id,
                         room_id,
-                        flow_metrics_sources: mcs::flow_metrics_sources(
+                        flow_metrics_sources: ptw::flow_metrics_sources(
                             is_force_relayed,
                         ),
                     })
@@ -424,10 +424,14 @@ impl PeerRepository {
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();
 
-            let src_traffic_watcher_sub_fut = self
-                .traffic_watcher_subscribe(&src_peer, src.is_some_callback());
-            let sink_traffic_watcher_sub_fut = self
-                .traffic_watcher_subscribe(&sink_peer, sink.is_some_callback());
+            let src_traffic_watcher_sub_fut = self.traffic_watcher_subscribe(
+                &src_peer,
+                src.is_some_traffic_callbacks(),
+            );
+            let sink_traffic_watcher_sub_fut = self.traffic_watcher_subscribe(
+                &sink_peer,
+                sink.is_some_traffic_callbacks(),
+            );
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -458,28 +462,25 @@ impl PeerRepository {
                     .into_actor(room)
                 })
                 .then(move |result, room: &mut Room, _| {
-                    match result {
-                        Ok((src_ice_user, sink_ice_user)) => {
-                            match room.peers.get_mut_peer_by_id(src_peer_id) {
-                                Ok(src_peer) => {
-                                    src_peer.set_ice_user(src_ice_user);
-                                }
-                                Err(err) => {
-                                    return actix::fut::err(err);
-                                }
-                            };
-                            match room.peers.get_mut_peer_by_id(sink_peer_id) {
-                                Ok(sink_peer) => {
-                                    sink_peer.set_ice_user(sink_ice_user);
-                                }
-                                Err(err) => {
-                                    return actix::fut::err(err);
-                                }
-                            };
-                            actix::fut::ok(Some((src_peer_id, sink_peer_id)))
-                        }
-                        Err(err) => actix::fut::err(err),
+                    let result =
+                        result.and_then(|(src_ice_user, sink_ice_user)| {
+                            iter::once((src_peer_id, src_ice_user))
+                                .chain(iter::once((
+                                    sink_peer_id,
+                                    sink_ice_user,
+                                )))
+                                .map(|(peer_id, ice_user)| {
+                                    room.peers
+                                        .get_mut_peer_by_id(peer_id)
+                                        .map(|peer| peer.set_ice_user(ice_user))
+                                })
+                                .collect()
+                        });
+                    async move {
+                        result?;
+                        Ok(Some((src_peer_id, sink_peer_id)))
                     }
+                    .into_actor(room)
                 }),
             )
         }

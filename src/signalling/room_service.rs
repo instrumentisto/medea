@@ -125,7 +125,7 @@ pub struct RoomService {
 
     /// [`MetricsCallbacksService`] for all [`Room`]s from this
     /// [`RoomService`].
-    metrics_service: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
@@ -144,16 +144,16 @@ impl RoomService {
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
-        let metrics_service = PeersTrafficWatcher::new().start();
+        let peers_traffic_watcher = PeersTrafficWatcher::new().start();
         Ok(Self {
             _coturn_metrics: CoturnMetricsService::new(
                 &app.config.turn,
-                metrics_service.clone(),
+                peers_traffic_watcher.clone(),
             )?
             .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
-            metrics_service,
+            peers_traffic_watcher,
             room_repo,
             app,
             graceful_shutdown,
@@ -168,7 +168,7 @@ impl RoomService {
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
-            self.metrics_service
+            self.peers_traffic_watcher
                 .do_send(mcs::UnregisterRoom(id.clone()));
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
@@ -234,15 +234,18 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room =
-                Room::new(&spec, &self.app, self.metrics_service.clone())?
-                    .start();
+            let room = Room::new(
+                &spec,
+                &self.app,
+                self.peers_traffic_watcher.clone(),
+            )?
+            .start();
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
                 shutdown::Priority(2),
             );
-            self.metrics_service.do_send(mcs::RegisterRoom {
+            self.peers_traffic_watcher.do_send(mcs::RegisterRoom {
                 room: room.downgrade(),
                 room_id: spec.id,
             });
@@ -296,10 +299,13 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room =
-            Room::new(&room_spec, &self.app, self.metrics_service.clone())?;
+        let room = Room::new(
+            &room_spec,
+            &self.app,
+            self.peers_traffic_watcher.clone(),
+        )?;
         let room_addr = room.start();
-        self.metrics_service.do_send(mcs::RegisterRoom {
+        self.peers_traffic_watcher.do_send(mcs::RegisterRoom {
             room: room_addr.downgrade(),
             room_id: room_spec.id.clone(),
         });
@@ -655,7 +661,7 @@ mod room_service_specs {
         api::control::{
             endpoints::webrtc_publish_endpoint::P2pMode,
             refs::{Fid, ToEndpoint},
-            RootElement, Unvalidated as UnvalidatedElement,
+            RootElement,
         },
         conf::Conf,
     };
@@ -671,11 +677,7 @@ mod room_service_specs {
         const ROOM_SPEC: &str =
             include_str!("../../tests/specs/pub-sub-video-call.yml");
 
-        let parsed =
-            serde_yaml::from_str::<RootElement<UnvalidatedElement>>(ROOM_SPEC)
-                .unwrap()
-                .validate()
-                .unwrap();
+        let parsed = serde_yaml::from_str::<RootElement>(ROOM_SPEC).unwrap();
         RoomSpec::try_from(&parsed).unwrap()
     }
 

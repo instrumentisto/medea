@@ -67,8 +67,10 @@ use super::{
     participants::{ParticipantService, ParticipantServiceErr},
     peers::PeerRepository,
     peers_metrics as pm,
-    peers_metrics::{PeerMetricsEvent, PeerMetricsEventHandler, PeersMetrics},
-    peers_traffic_watcher::{self as mcs, PeersTrafficWatcher},
+    peers_metrics::{
+        PeersMetrics, PeersMetricsEvent, PeersMetricsEventHandler,
+    },
+    peers_traffic_watcher::{self as ptw, PeersTrafficWatcher},
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -185,7 +187,7 @@ pub struct Room {
 
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
-    metrics_callbacks_service: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetrics,
@@ -201,23 +203,23 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
-        metrics_service: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
             peers: PeerRepository::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
-                metrics_service.clone(),
+                peers_traffic_watcher.clone(),
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
             peer_metrics_service: PeersMetrics::new(
                 room_spec.id().clone(),
-                metrics_service.clone(),
+                peers_traffic_watcher.clone(),
             ),
-            metrics_callbacks_service: metrics_service,
+            peers_traffic_watcher,
         })
     }
 
@@ -502,11 +504,10 @@ impl Room {
             // `Member` `Peer`s.
             self.remove_peers(member_id, &peers, ctx);
 
-            self.metrics_callbacks_service
-                .do_send(mcs::UnsubscribePeers {
-                    room_id: self.id.clone(),
-                    peers_ids: peers,
-                });
+            self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
+                room_id: self.id.clone(),
+                peers_ids: peers,
+            });
 
             self.members.delete_member(member_id, ctx);
 
@@ -535,12 +536,10 @@ impl Room {
                 if let Some(peer_id) = endpoint.peer_id() {
                     let mut peers_ids = HashSet::new();
                     peers_ids.insert(peer_id);
-                    self.metrics_callbacks_service.do_send(
-                        mcs::UnsubscribePeers {
-                            room_id: self.id.clone(),
-                            peers_ids,
-                        },
-                    );
+                    self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
+                        room_id: self.id.clone(),
+                        peers_ids,
+                    });
 
                     let mut peer_ids_to_remove = HashSet::new();
                     peer_ids_to_remove.insert(peer_id);
@@ -550,12 +549,10 @@ impl Room {
                 let publish_id = String::from(play_id).into();
                 if let Some(endpoint) = member.take_src(&publish_id) {
                     let peer_ids = endpoint.peer_ids();
-                    self.metrics_callbacks_service.do_send(
-                        mcs::UnsubscribePeers {
-                            room_id: self.id.clone(),
-                            peers_ids: peer_ids.clone(),
-                        },
-                    );
+                    self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
+                        room_id: self.id.clone(),
+                        peers_ids: peer_ids.clone(),
+                    });
                     self.remove_peers(member_id, &peer_ids, ctx);
                 }
             }
@@ -982,7 +979,7 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// [`PeerMetrics::RtcStats`] will be transferred [`PeerMetricsService`].
+    /// [`PeerMetrics::RtcStats`] will be transferred [`PeersMetrics`].
     #[allow(clippy::single_match)]
     fn on_add_peer_connection_metrics(
         &mut self,
@@ -1165,13 +1162,13 @@ impl Actor for Room {
     }
 }
 
-impl StreamHandler<PeerMetricsEvent> for Room {
-    fn handle(&mut self, event: PeerMetricsEvent, ctx: &mut Self::Context) {
+impl StreamHandler<PeersMetricsEvent> for Room {
+    fn handle(&mut self, event: PeersMetricsEvent, ctx: &mut Self::Context) {
         ctx.spawn(event.dispatch_with(self));
     }
 }
 
-impl PeerMetricsEventHandler for Room {
+impl PeersMetricsEventHandler for Room {
     type Output = ActFuture<()>;
 
     /// Notifies [`Room`] about fatal [`PeerConnection`] failure.
