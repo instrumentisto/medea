@@ -528,15 +528,11 @@ pub fn parse_members(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
-                member
-                    .idle_timeout()
-                    .unwrap_or(rpc_conf.default_idle_timeout),
+                member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
                 member
                     .reconnect_timeout()
-                    .unwrap_or(rpc_conf.default_reconnect_timeout),
-                member
-                    .ping_interval()
-                    .unwrap_or(rpc_conf.default_ping_interval),
+                    .unwrap_or(rpc_conf.reconnect_timeout),
+                member.ping_interval().unwrap_or(rpc_conf.ping_interval),
             );
             (id.clone(), new_member)
         })
@@ -594,9 +590,9 @@ impl Into<proto::Member> for Member {
                 .get_on_join()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            reconnect_timeout: self.get_reconnect_timeout().as_secs(),
-            idle_timeout: self.get_idle_timeout().as_secs(),
-            ping_interval: self.get_ping_interval().as_secs(),
+            reconnect_timeout: Some(self.get_reconnect_timeout().into()),
+            idle_timeout: Some(self.get_idle_timeout().into()),
+            ping_interval: Some(self.get_ping_interval().into()),
             pipeline: member_pipeline,
         }
     }

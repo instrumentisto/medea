@@ -14,9 +14,9 @@ server:
           public_url: wss://demo.medea.stg.t11913.org/ws
           bind_port: 9980
     rpc:
-      default_idle_timeout: 60s
-      default_reconnect_timeout: 5m
-      default_ping_interval: 5s
+      idle_timeout: 60s
+      reconnect_timeout: 5m
+      ping_interval: 5s
     turn:
       host: demo.medea.stg.t11913.org
       pass: changeme

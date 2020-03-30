@@ -20,9 +20,7 @@ use medea_client_api_proto::{
 
 use crate::{
     api::{
-        client::rpc_connection::{
-            ClosedReason, EventMessage, RpcConnection, WsSessionSettings,
-        },
+        client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
         control::{MemberId, RoomId},
         RpcServer,
     },
@@ -84,17 +82,18 @@ impl WsSession {
         member_id: MemberId,
         room_id: RoomId,
         room: Box<dyn RpcServer>,
-        settings: WsSessionSettings,
+        idle_timeout: Duration,
+        ping_interval: Duration,
     ) -> Self {
         Self {
             id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
             member_id,
             room_id,
             room,
-            idle_timeout: settings.idle_timeout,
+            idle_timeout,
             last_activity: Instant::now(),
             last_ping_num: 0,
-            ping_interval: settings.ping_interval,
+            ping_interval,
             close_reason: None,
         }
     }
@@ -408,9 +407,7 @@ mod test {
     };
 
     use crate::api::{
-        client::rpc_connection::{
-            ClosedReason, RpcConnection, WsSessionSettings,
-        },
+        client::rpc_connection::{ClosedReason, RpcConnection},
         control::{MemberId, RoomId},
         MockRpcServer,
     };
@@ -450,10 +447,8 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                WsSessionSettings {
-                    idle_timeout: Duration::from_secs(5),
-                    ping_interval: Duration::from_secs(5),
-                },
+                Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         }
 
@@ -488,10 +483,8 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                WsSessionSettings {
-                    idle_timeout: Duration::from_secs(5),
-                    ping_interval: Duration::from_millis(50),
-                },
+                Duration::from_secs(5),
+                Duration::from_millis(50),
             )
         });
 
@@ -539,10 +532,8 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                WsSessionSettings {
-                    idle_timeout: Duration::from_millis(100),
-                    ping_interval: Duration::from_secs(10),
-                },
+                Duration::from_millis(100),
+                Duration::from_secs(10),
             )
         });
 
@@ -594,10 +585,8 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                WsSessionSettings {
-                    idle_timeout: Duration::from_secs(5),
-                    ping_interval: Duration::from_secs(5),
-                },
+                Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         });
 
@@ -660,10 +649,8 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                WsSessionSettings {
-                    idle_timeout: Duration::from_secs(5),
-                    ping_interval: Duration::from_secs(5),
-                },
+                Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         });
 
@@ -718,10 +705,8 @@ mod test {
                 member_id,
                 RoomId::from("room"),
                 Box::new(rpc_server),
-                WsSessionSettings {
-                    idle_timeout: Duration::from_secs(5),
-                    ping_interval: Duration::from_secs(5),
-                },
+                Duration::from_secs(5),
+                Duration::from_secs(5),
             )
         });
 

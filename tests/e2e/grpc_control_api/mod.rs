@@ -8,7 +8,7 @@ mod delete;
 mod rpc_settings;
 mod signaling;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use derive_builder::*;
 use medea_control_api_proto::grpc::api::{
@@ -210,12 +210,12 @@ pub struct Member {
     #[builder(default = "None")]
     #[builder(setter(strip_option))]
     on_leave: Option<String>,
-    #[builder(default = "0")]
-    ping_interval: u64,
-    #[builder(default = "0")]
-    idle_timeout: u64,
-    #[builder(default = "0")]
-    reconnect_timeout: u64,
+    #[builder(default = "None")]
+    ping_interval: Option<Duration>,
+    #[builder(default = "None")]
+    idle_timeout: Option<Duration>,
+    #[builder(default = "None")]
+    reconnect_timeout: Option<Duration>,
 }
 
 impl Into<proto::Member> for Member {
@@ -232,9 +232,9 @@ impl Into<proto::Member> for Member {
             on_leave: self.on_leave.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
             credentials: self.credentials.unwrap_or_default(),
-            ping_interval: self.ping_interval,
-            idle_timeout: self.idle_timeout,
-            reconnect_timeout: self.reconnect_timeout,
+            ping_interval: self.ping_interval.map(Into::into),
+            idle_timeout: self.idle_timeout.map(Into::into),
+            reconnect_timeout: self.reconnect_timeout.map(Into::into),
         }
     }
 }

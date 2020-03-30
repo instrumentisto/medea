@@ -4,6 +4,8 @@ syntax = "proto3";
 
 package api;
 
+import "google/protobuf/duration.proto";
+
 // Media server's Control API service.
 service ControlApi {
   // Creates new Element with a given ID.
@@ -144,12 +146,12 @@ message Member {
   map<string, Member.Element> pipeline = 5;
   // Duration, after which remote RPC client will be considered IDLE if no
   // heartbeat messages received.
-  uint64 idle_timeout = 6;
+  google.protobuf.Duration idle_timeout = 6;
   // Duration, after which the server deletes the client session if
   // the remote RPC client does not reconnect after it is IDLE.
-  uint64 reconnect_timeout = 7;
+  google.protobuf.Duration reconnect_timeout = 7;
   // Interval of sending pings from the server to the client.
-  uint64 ping_interval = 8;
+  google.protobuf.Duration ping_interval = 8;
 
   // Elements which Member's pipeline can contain.
   message Element {

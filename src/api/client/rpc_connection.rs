@@ -62,7 +62,7 @@ pub trait RpcConnection: fmt::Debug + Send {
 
 /// Settings for the [`WsSession`].
 #[derive(Clone, Copy, Debug)]
-pub struct WsSessionSettings {
+pub struct RpcConnectionSettings {
     /// Duration, after which [`WsSession`] will be considered IDLE if no
     /// heartbeat messages received.
     pub idle_timeout: Duration,
@@ -73,7 +73,7 @@ pub struct WsSessionSettings {
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<WsSessionSettings, AuthorizationError>")]
+#[rtype(result = "Result<RpcConnectionSettings, AuthorizationError>")]
 pub struct Authorize {
     /// ID of [`Member`] to authorize [`RpcConnection`] for.
     ///

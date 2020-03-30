@@ -1,6 +1,6 @@
 //! `Member` element related methods and entities.
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, convert::TryInto as _, time::Duration};
 
 use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
@@ -38,18 +38,18 @@ pub struct Member {
     /// no heartbeat messages received.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
-    idle_timeout: Duration,
+    idle_timeout: Option<Duration>,
 
     /// [`Duration`], after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is IDLE.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
-    reconnect_timeout: Duration,
+    reconnect_timeout: Option<Duration>,
 
     /// Interval of sending `Ping`s from the server to the client.
     #[serde(default)]
     #[serde(with = "humantime_serde")]
-    ping_interval: Duration,
+    ping_interval: Option<Duration>,
 }
 
 impl Member {
@@ -68,9 +68,9 @@ impl Member {
             credentials: self.credentials.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
             on_leave: self.on_leave.unwrap_or_default(),
-            idle_timeout: self.idle_timeout.as_secs(),
-            reconnect_timeout: self.reconnect_timeout.as_secs(),
-            ping_interval: self.ping_interval.as_secs(),
+            idle_timeout: self.idle_timeout.map(Into::into),
+            reconnect_timeout: self.reconnect_timeout.map(Into::into),
+            ping_interval: self.ping_interval.map(Into::into),
         }
     }
 
@@ -97,9 +97,13 @@ impl From<proto::Member> for Member {
             credentials: Some(proto.credentials),
             on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
-            idle_timeout: Duration::from_secs(proto.idle_timeout),
-            reconnect_timeout: Duration::from_secs(proto.reconnect_timeout),
-            ping_interval: Duration::from_secs(proto.ping_interval),
+            idle_timeout: proto.idle_timeout.map(|dur| dur.try_into().unwrap()),
+            reconnect_timeout: proto
+                .reconnect_timeout
+                .map(|dur| dur.try_into().unwrap()),
+            ping_interval: proto
+                .ping_interval
+                .map(|dur| dur.try_into().unwrap()),
         }
     }
 }

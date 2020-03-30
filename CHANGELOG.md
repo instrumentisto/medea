@@ -15,8 +15,6 @@ All user visible changes to this project will be documented in this file. This p
 
 - Configuration:
     - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]);
-    - Rename `rpc.idle_timeout` as `rpc.default_idle_timeout` ([#95]);
-    - Rename `rpc.reconnect_timeout` as `rpc.default_reconnect_timeout` ([#95]);
 - RPC messaging:
     - Reverse `Ping`/`Pong` naming: server sends `Ping` and expects `Pongs` from client now. ([#75]).
 

@@ -2,7 +2,11 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom, time::Duration};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    time::Duration,
+};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
@@ -203,6 +207,26 @@ impl TryFrom<proto::Member> for MemberSpec {
     type Error = TryFromProtobufError;
 
     fn try_from(member: proto::Member) -> Result<Self, Self::Error> {
+        fn parse_duration<T: TryInto<Duration>>(
+            duration: Option<T>,
+            member_id: &str,
+            field: &'static str,
+        ) -> Result<Option<Duration>, TryFromProtobufError> {
+            match duration {
+                None => Ok(None),
+                Some(dur) => {
+                    if let Ok(dur) = dur.try_into() {
+                        Ok(Some(dur))
+                    } else {
+                        Err(TryFromProtobufError::NegativeDuration(
+                            String::from(member_id),
+                            field,
+                        ))
+                    }
+                }
+            }
+        }
+
         let mut pipeline = HashMap::new();
         for (id, member_element) in member.pipeline {
             if let Some(elem) = member_element.el {
@@ -236,15 +260,18 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         };
 
-        let idle_timeout = Some(member.idle_timeout)
-            .filter(|t| t != &0)
-            .map(Duration::from_secs);
-        let reconnect_timeout = Some(member.reconnect_timeout)
-            .filter(|t| t != &0)
-            .map(Duration::from_secs);
-        let ping_interval = Some(member.ping_interval)
-            .filter(|t| t != &0)
-            .map(Duration::from_secs);
+        let idle_timeout = parse_duration(
+            member.idle_timeout,
+            &member.id,
+            "reconnect_timeout",
+        )?;
+        let reconnect_timeout = parse_duration(
+            member.reconnect_timeout,
+            &member.id,
+            "reconnect_timeout",
+        )?;
+        let ping_interval =
+            parse_duration(member.ping_interval, &member.id, "ping_interval")?;
 
         Ok(Self {
             pipeline: Pipeline::new(pipeline),

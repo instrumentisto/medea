@@ -73,6 +73,13 @@ pub enum TryFromProtobufError {
 
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
+
+    #[display(
+        fmt = "Element [id = {}] contains negative duration field `{}`",
+        _0,
+        _1
+    )]
+    NegativeDuration(String, &'static str),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {

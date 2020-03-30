@@ -2,6 +2,7 @@
 
 mod command_validation;
 mod pub_sub_signallng;
+mod rpc_settings;
 mod three_pubs;
 
 use std::time::Duration;
@@ -19,7 +20,7 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, ServerMsg,
+    ClientMsg, Command, Event, IceCandidate, RpcSettings, ServerMsg,
 };
 
 pub type MessageHandler =
@@ -32,6 +33,9 @@ pub type ConnectionEventHandler = Box<dyn FnMut(ConnectionEvent)>;
 pub enum ConnectionEvent {
     /// Connection established.
     Started,
+
+    /// [`RpcSettings`] [`ServerMsg`] received.
+    SettingsReceived(RpcSettings),
 
     /// Connection disconnected.
     Stopped,
@@ -53,11 +57,11 @@ pub struct TestMember {
 
     /// Function which will be called at every received [`Event`]
     /// by this [`TestMember`].
-    on_message: MessageHandler,
+    on_message: Option<MessageHandler>,
 
     /// Function which will be called when connection will be established and
     /// disconnected.
-    on_connection_event: ConnectionEventHandler,
+    on_connection_event: Option<ConnectionEventHandler>,
 }
 
 impl TestMember {
@@ -83,8 +87,8 @@ impl TestMember {
     /// [`TestMember`] actor.
     pub async fn connect(
         uri: &str,
-        on_message: MessageHandler,
-        on_connection_event: ConnectionEventHandler,
+        on_message: Option<MessageHandler>,
+        on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) -> Addr<Self> {
         let (_, framed) = awc::Client::new().ws(uri).connect().await.unwrap();
@@ -112,8 +116,8 @@ impl TestMember {
     /// will be established and disconnected.
     pub fn start(
         uri: String,
-        on_message: MessageHandler,
-        on_connection_event: ConnectionEventHandler,
+        on_message: Option<MessageHandler>,
+        on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(async move {
@@ -229,20 +233,30 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);
-                    (self.on_message)(&event, ctx, events);
+                    if let Some(func) = self.on_message.as_mut() {
+                        func(&event, ctx, events);
+                    }
                     self.events.push(event);
                 }
-                ServerMsg::RpcSettings(_) => {}
+                ServerMsg::RpcSettings(settings) => {
+                    if let Some(func) = self.on_connection_event.as_mut() {
+                        func(ConnectionEvent::SettingsReceived(settings))
+                    };
+                }
             }
         }
     }
 
     fn started(&mut self, _: &mut Self::Context) {
-        (self.on_connection_event)(ConnectionEvent::Started);
+        if let Some(func) = self.on_connection_event.as_mut() {
+            func(ConnectionEvent::Started)
+        };
     }
 
     fn finished(&mut self, ctx: &mut Self::Context) {
-        (self.on_connection_event)(ConnectionEvent::Stopped);
+        if let Some(func) = self.on_connection_event.as_mut() {
+            func(ConnectionEvent::Stopped)
+        };
 
         ctx.stop()
     }

@@ -83,8 +83,8 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
-        Box::new(on_event.clone()),
-        Box::new(|_| {}),
+        Some(Box::new(on_event.clone())),
+        None,
         deadline,
     )
     .await;
@@ -106,8 +106,8 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
     control_client.create(create_play_member).await;
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", TEST_NAME),
-        Box::new(on_event),
-        Box::new(|_| {}),
+        Some(Box::new(on_event)),
+        None,
         deadline,
     )
     .await;
@@ -149,8 +149,8 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
-        Box::new(on_event.clone()),
-        Box::new(|_| {}),
+        Some(Box::new(on_event.clone())),
+        None,
         deadline,
     )
     .await;
@@ -174,8 +174,8 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", TEST_NAME),
-        Box::new(on_event),
-        Box::new(|_| {}),
+        Some(Box::new(on_event)),
+        None,
         deadline,
     )
     .await;
@@ -217,8 +217,8 @@ async fn signalling_starts_in_loopback_scenario() {
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
-        Box::new(on_event),
-        Box::new(|_| {}),
+        Some(Box::new(on_event)),
+        None,
         deadline,
     )
     .await;
@@ -304,14 +304,14 @@ async fn peers_removed_on_delete_member() {
     let deadline = Some(Duration::from_secs(5));
     TestMember::start(
         format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
-        Box::new(on_event.clone()),
-        Box::new(|_| {}),
+        Some(Box::new(on_event.clone())),
+        None,
         deadline,
     );
     TestMember::start(
         format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME),
-        Box::new(on_event),
-        Box::new(|_| {}),
+        Some(Box::new(on_event)),
+        None,
         deadline,
     );
 }

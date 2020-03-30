@@ -70,7 +70,8 @@ async fn ws_index(
                         member_id,
                         room_id,
                         Box::new(room),
-                        ws_session_settings,
+                        ws_session_settings.idle_timeout,
+                        ws_session_settings.ping_interval,
                     ),
                     &request,
                     payload,
@@ -194,7 +195,7 @@ mod test {
             App::new()
                 .app_data(Server::app_data(
                     build_room_repo(conf.clone()),
-                    conf.rpc.clone(),
+                    conf.rpc,
                 ))
                 .configure(Server::configure)
         })
@@ -204,7 +205,7 @@ mod test {
     async fn forbidden_if_bad_credentials() {
         let conf = Conf {
             rpc: Rpc {
-                default_idle_timeout: Duration::new(1, 0),
+                idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()
@@ -226,7 +227,7 @@ mod test {
     async fn not_found_if_bad_url() {
         let conf = Conf {
             rpc: Rpc {
-                default_idle_timeout: Duration::new(1, 0),
+                idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()
@@ -251,7 +252,7 @@ mod test {
     async fn established() {
         let conf = Conf {
             rpc: Rpc {
-                default_idle_timeout: Duration::new(1, 0),
+                idle_timeout: Duration::new(1, 0),
                 ..Rpc::default()
             },
             ..Conf::default()

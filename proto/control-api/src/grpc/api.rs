@@ -167,15 +167,15 @@ pub struct Member {
     pub pipeline: ::std::collections::HashMap<std::string::String, member::Element>,
     /// Duration, after which remote RPC client will be considered IDLE if no
     /// heartbeat messages received.
-    #[prost(uint64, tag="6")]
-    pub idle_timeout: u64,
+    #[prost(message, optional, tag="6")]
+    pub idle_timeout: ::std::option::Option<::prost_types::Duration>,
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is IDLE.
-    #[prost(uint64, tag="7")]
-    pub reconnect_timeout: u64,
+    #[prost(message, optional, tag="7")]
+    pub reconnect_timeout: ::std::option::Option<::prost_types::Duration>,
     /// Interval of sending pings from the server to the client.
-    #[prost(uint64, tag="8")]
-    pub ping_interval: u64,
+    #[prost(message, optional, tag="8")]
+    pub ping_interval: ::std::option::Option<::prost_types::Duration>,
 }
 pub mod member {
     /// Elements which Member's pipeline can contain.

@@ -1,8 +1,6 @@
 //! Tests for the RPC settings in `Member` element spec.
 
-use std::time::{Duration, Instant};
-
-use futures::channel::oneshot;
+use std::time::Duration;
 
 use crate::{
     grpc_control_api::{ControlClient, MemberBuilder, RoomBuilder},
@@ -23,8 +21,8 @@ use crate::{
 /// 4. Wait for connection drop because idle, and verify that diff between
 /// connection open and drop if >3 and <4.
 #[actix_rt::test]
-async fn rpc_settings_from_spec_works() {
-    const ROOM_ID: &str = "rpc_settings_from_spec_works";
+async fn rpc_settings_server_msg() {
+    const ROOM_ID: &str = "rpc_settings_server_msg";
 
     let mut control_client = ControlClient::new().await;
     let create_room = RoomBuilder::default()
@@ -33,8 +31,8 @@ async fn rpc_settings_from_spec_works() {
             MemberBuilder::default()
                 .id("member")
                 .credentials("test")
-                .ping_interval(Some(Duration::from_secs(10)))
-                .idle_timeout(Some(Duration::from_secs(3)))
+                .ping_interval(Some(Duration::from_secs(111)))
+                .idle_timeout(Some(Duration::from_secs(222)))
                 .reconnect_timeout(Some(Duration::from_secs(0)))
                 .build()
                 .unwrap(),
@@ -44,31 +42,15 @@ async fn rpc_settings_from_spec_works() {
         .build_request(String::new());
     control_client.create(create_room).await;
 
-    let (test_end_tx, test_end_rx) = oneshot::channel();
-    let mut test_end_tx = Some(test_end_tx);
-
-    let mut opened = None;
     TestMember::start(
         format!("ws://127.0.0.1:8080/ws/{}/member/test", ROOM_ID),
         None,
-        Some(Box::new(move |event| match event {
-            ConnectionEvent::Started => {
-                opened = Some(Instant::now());
+        Some(Box::new(|event| {
+            if let ConnectionEvent::SettingsReceived(settings) = event {
+                assert_eq!(settings.idle_timeout_ms, 222_000);
+                assert_eq!(settings.ping_interval_ms, 111_000);
             }
-            ConnectionEvent::Stopped => {
-                let diff = Instant::now() - opened.unwrap();
-
-                assert!(diff > Duration::from_secs(3));
-                assert!(diff < Duration::from_secs(4));
-
-                if let Some(test_end_tx) = test_end_tx.take() {
-                    test_end_tx.send(()).unwrap();
-                }
-            }
-            _ => {}
         })),
         Some(Duration::from_secs(10)),
     );
-
-    test_end_rx.await.unwrap();
 }
