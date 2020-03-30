@@ -3,7 +3,7 @@
 //! [Coturn]: https://github.com/coturn/coturn
 
 use derive_more::{AsRef, Display, From, Into};
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, PeerId};
 
 use crate::api::control::RoomId;
 
@@ -37,12 +37,12 @@ impl IceUser {
     pub fn build(
         address: String,
         room_id: &RoomId,
-        name: &str,
+        peer_id: PeerId,
         pass: String,
     ) -> Self {
         Self {
             address,
-            username: IceUsername::from(format!("{}_{}", room_id, name)),
+            username: IceUsername::from(format!("{}_{}", room_id, peer_id)),
             pass,
             is_static: false,
         }

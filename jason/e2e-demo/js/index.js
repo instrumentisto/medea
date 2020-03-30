@@ -487,6 +487,8 @@ window.onload = async function() {
               console.log("Room not found. Creating new room...");
               await room.join(await createRoom(roomId, username));
               return;
+            } else {
+              throw e;
             }
           }
           try {
@@ -498,6 +500,7 @@ window.onload = async function() {
           }
           await room.join(baseUrl + roomId + '/' + username + '/test')
         } catch (e) {
+          console.error(e);
           console.error(
             "Join to room failed: Error[name:[", e.name(), "], ",
             "[msg:", e.message(), "], [source", e.source(), "]]",
