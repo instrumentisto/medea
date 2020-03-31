@@ -12,7 +12,7 @@ pub struct Rpc {
     /// Duration, after which remote RPC client will be considered idle
     /// if no heartbeat messages received.
     ///
-    /// This duration can be overridden for some `Member` by Control API spec.
+    /// This duration can be overridden for some `Member` by Control API.
     ///
     /// Defaults to `10s`.
     #[default(Duration::from_secs(10))]
@@ -22,7 +22,7 @@ pub struct Rpc {
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     ///
-    /// This duration can be overridden for some `Member` by Control API spec.
+    /// This duration can be overridden for some `Member` by Control API.
     ///
     /// Defaults to `10s`.
     #[default(Duration::from_secs(10))]
@@ -31,7 +31,7 @@ pub struct Rpc {
 
     /// Interval of sending `Ping`s from the server to the client.
     ///
-    /// This duration can be overridden for some `Member` by Control API spec.
+    /// This duration can be overridden for some `Member` by Control API.
     ///
     /// Defaults to `3s`.
     #[default(Duration::from_secs(3))]

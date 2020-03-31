@@ -14,7 +14,7 @@ categories = ["api-bindings", "network-programming"]
 
 [features]
 default = ["grpc"]
-grpc = ["prost", "prost-types", "tonic-build", "tonic"]
+grpc = ["prost", "prost-types", "tonic", "tonic-build"]
 
 [dependencies]
 prost = { version = "0.6", optional = true }

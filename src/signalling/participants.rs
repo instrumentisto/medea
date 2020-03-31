@@ -92,7 +92,8 @@ pub struct ParticipantService {
 
     /// Default values for the RPC connection settings.
     ///
-    /// If nothing provided into `Member` spec then this values will be used.
+    /// If nothing provided into `Member` element spec then this values will be
+    /// used.
     rpc_conf: RpcConf,
 }
 
