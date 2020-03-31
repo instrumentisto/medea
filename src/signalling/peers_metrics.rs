@@ -88,7 +88,7 @@ pub struct PeerSpec {
     /// All `MediaTrack`s with `Recv` direction of `PeerConnection`.
     ///
     /// Order isn't important.
-    pub received: Vec<TrackMediaType>,
+    pub receivers: Vec<TrackMediaType>,
 }
 
 /// Metrics which is available for `MediaTrack` with `Send` direction.
@@ -149,7 +149,7 @@ impl ReceiverStat {
     /// Checks that this [`ReceiverStat`] is active.
     ///
     /// This will be calculated by checking that this [`ReceiverStat`] was
-    /// updated within `10secs`.
+    /// updated within `10s`.
     fn is_active(&self) -> bool {
         self.last_update > Instant::now() - Duration::from_secs(10)
     }
@@ -237,7 +237,7 @@ impl PeerStat {
     #[allow(clippy::filter_map)]
     fn is_conforms_spec(&self) -> bool {
         let mut spec_senders: Vec<_> = self.spec.senders.clone();
-        let mut spec_receivers: Vec<_> = self.spec.received.clone();
+        let mut spec_receivers: Vec<_> = self.spec.receivers.clone();
         spec_senders.sort();
         spec_receivers.sort();
 
@@ -332,7 +332,7 @@ pub struct PeersMetrics {
     /// sent.
     peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 
-    /// All `PeerConnection` for this this [`PeersMetrics`] will proccess
+    /// All `PeerConnection` for this [`PeersMetrics`] will process
     /// metrics.
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
 
@@ -344,7 +344,7 @@ pub struct PeersMetrics {
 }
 
 impl PeersMetrics {
-    /// Returns new [`PeersMetrics`] for provided [`Room`].
+    /// Returns new [`PeersMetrics`] for a provided [`Room`].
     pub fn new(
         room_id: RoomId,
         peers_traffic_watcher: Addr<PeersTrafficWatcher>,
@@ -369,7 +369,7 @@ impl PeersMetrics {
 
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///
-    /// Currently this method will be called by [`Room`] to which this
+    /// Currently this method will be called by a [`Room`] to which this
     /// [`PeersMetrics`] belongs to.
     pub fn subscribe(&mut self) -> impl Stream<Item = PeersMetricsEvent> {
         let (tx, rx) = mpsc::unbounded();

@@ -251,14 +251,14 @@ impl<T> Peer<T> {
             .values()
             .map(|sender| TrackMediaType::from(&sender.media_type))
             .collect();
-        let received = self
+        let receivers = self
             .context
             .receivers
             .values()
             .map(|recv| TrackMediaType::from(&recv.media_type))
             .collect();
 
-        PeerSpec { senders, received }
+        PeerSpec { senders, receivers }
     }
 
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].

@@ -677,7 +677,7 @@ mod room_service_specs {
         const ROOM_SPEC: &str =
             include_str!("../../tests/specs/pub-sub-video-call.yml");
 
-        let parsed = serde_yaml::from_str::<RootElement>(ROOM_SPEC).unwrap();
+        let parsed: RootElement = serde_yaml::from_str(ROOM_SPEC).unwrap();
         RoomSpec::try_from(&parsed).unwrap()
     }
 

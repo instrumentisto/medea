@@ -45,13 +45,17 @@ struct WebRtcPublishEndpointInner {
     /// Currently this field used for nothing but in future this may be used
     /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
     /// this [`WebRtcPublishEndpoint`].
+    ///
+    /// [`Peer`]: crate::media::peer:Peer
     peer_ids: HashSet<PeerId>,
 
-    /// Publishing statuses of the [`Peer`] related to this
+    /// Publishing statuses of the [`Peer`]s related to this
     /// [`WebRtcPublishEndpoint`].
     ///
     /// `true` value indicated that [`Peer`] is publishes some media traffic.
-    peers_status: HashMap<PeerId, bool>,
+    ///
+    /// [`Peer`]: crate::media::peer:Peer
+    peers_statuses: HashMap<PeerId, bool>,
 
     /// URL to which `OnStart` Control API callback will be sent.
     on_start: Option<CallbackUrl>,
@@ -138,7 +142,7 @@ impl WebRtcPublishEndpoint {
             sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
-            peers_status: HashMap::new(),
+            peers_statuses: HashMap::new(),
             on_start,
             on_stop,
         })))
@@ -170,7 +174,7 @@ impl WebRtcPublishEndpoint {
 
     /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
     pub fn add_peer_id(&self, peer_id: PeerId) {
-        self.0.borrow_mut().peers_status.insert(peer_id, false);
+        self.0.borrow_mut().peers_statuses.insert(peer_id, false);
         self.0.borrow_mut().add_peer_id(peer_id)
     }
 
@@ -225,7 +229,7 @@ impl WebRtcPublishEndpoint {
     /// Changes publishing status of the provided [`PeerId`].
     pub fn change_peer_status(&self, peer_id: PeerId, is_publishing: bool) {
         if let Some(peer_status) =
-            self.0.borrow_mut().peers_status.get_mut(&peer_id)
+            self.0.borrow_mut().peers_statuses.get_mut(&peer_id)
         {
             *peer_status = is_publishing;
         }
@@ -234,14 +238,18 @@ impl WebRtcPublishEndpoint {
     /// Returns `true` if at least one [`PeerConnection`] related to this
     /// [`WebRtcPublishEndpoint`] is publishing.
     pub fn is_endpoint_publishing(&self) -> bool {
-        self.0.borrow().peers_status.values().any(|status| *status)
+        self.0
+            .borrow()
+            .peers_statuses
+            .values()
+            .any(|status| *status)
     }
 
     /// Returns count of [`PeerConnection`] which are publishes.
     pub fn publishing_peers_count(&self) -> usize {
         self.0
             .borrow()
-            .peers_status
+            .peers_statuses
             .values()
             .filter(|s| **s)
             .count()

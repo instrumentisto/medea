@@ -67,9 +67,8 @@ use super::{
     },
     participants::{ParticipantService, ParticipantServiceErr},
     peers::PeerRepository,
-    peers_metrics as pm,
     peers_metrics::{
-        PeersMetrics, PeersMetricsEvent, PeersMetricsEventHandler,
+        self as pm, PeersMetrics, PeersMetricsEvent, PeersMetricsEventHandler,
     },
     peers_traffic_watcher::{self as ptw, PeersTrafficWatcher},
 };

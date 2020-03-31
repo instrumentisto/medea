@@ -102,7 +102,7 @@ impl PeersTrafficWatcher {
     /// Checks that all metrics sources considered that [`Peer`] with
     /// provided [`PeerId`] is started.
     ///
-    /// This function will be called on every [`PeerStat`] after `10sec` from
+    /// This function will be called on every [`PeerStat`] after `10s` from
     /// first [`PeerStat`]'s [`TrafficFlows`] message.
     ///
     /// If this check fails then [`PeersTrafficWatcher::fatal_peer_error`]
@@ -266,7 +266,7 @@ impl Handler<TrafficStopped> for PeersTrafficWatcher {
 /// about current [`Peer`]'s traffic state.
 ///
 /// [`PeersTrafficWatcher`] checks that all sources have the same opinion
-/// after `10secs` from first [`TrafficFlows`] message received for some
+/// after `10s` from first [`TrafficFlows`] message received for some
 /// [`PeerStat`]. If at least one [`FlowMetricSource`] doesn't sent
 /// [`TrafficFlows`] message, then [`Peer`] will be considered as wrong
 /// and it will be stopped.
@@ -352,7 +352,7 @@ pub struct PeerStat {
 
     /// Time of last received [`PeerState`] proof.
     ///
-    /// If [`PeerStat`] doesn't updates withing `10secs` then this [`PeerStat`]
+    /// If [`PeerStat`] doesn't updates withing `10s` then this [`PeerStat`]
     /// will be considered as [`PeerState::Stopped`].
     pub last_update: Instant,
 }
@@ -387,7 +387,7 @@ pub struct RegisterRoom {
     /// [`MetricsCallbacksService`].
     pub room_id: RoomId,
 
-    /// [`Addr`] of room which requrested to register in the
+    /// [`Addr`] of room which requested to register in the
     /// [`PeersTrafficWatcher`].
     pub room: WeakAddr<Room>,
 }
@@ -411,7 +411,7 @@ impl Handler<RegisterRoom> for PeersTrafficWatcher {
     }
 }
 
-/// Unregister [`Room`] with provided [`RoomId`] from the
+/// Unregisters [`Room`] with provided [`RoomId`] from the
 /// [`MetricsCallbacksService`].
 ///
 /// This message will just remove subscription. This isn't considered as
