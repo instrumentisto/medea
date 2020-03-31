@@ -470,6 +470,10 @@ impl Room {
         debug!("Remove peers.");
         let removed_peers =
             self.peers.remove_peers(&member_id, &peer_ids_to_remove);
+        self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
+            room_id: self.id.clone(),
+            peers_ids: removed_peers.values().flatten().map(|id| *id).collect(),
+        });
         removed_peers
             .clone()
             .into_iter()
@@ -505,11 +509,6 @@ impl Room {
             // `Member` `Peer`s.
             self.remove_peers(member_id, &peers, ctx);
 
-            self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
-                room_id: self.id.clone(),
-                peers_ids: peers,
-            });
-
             self.members.delete_member(member_id, ctx);
 
             debug!(
@@ -537,10 +536,6 @@ impl Room {
                 if let Some(peer_id) = endpoint.peer_id() {
                     let mut peers_ids = HashSet::new();
                     peers_ids.insert(peer_id);
-                    self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
-                        room_id: self.id.clone(),
-                        peers_ids,
-                    });
 
                     let mut peer_ids_to_remove = HashSet::new();
                     peer_ids_to_remove.insert(peer_id);
@@ -550,10 +545,6 @@ impl Room {
                 let publish_id = String::from(play_id).into();
                 if let Some(endpoint) = member.take_src(&publish_id) {
                     let peer_ids = endpoint.peer_ids();
-                    self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
-                        room_id: self.id.clone(),
-                        peers_ids: peer_ids.clone(),
-                    });
                     self.remove_peers(member_id, &peer_ids, ctx);
                 }
             }
@@ -1443,10 +1434,7 @@ impl Handler<RpcConnectionClosed> for Room {
                     iter::once(peer.id())
                         .chain(iter::once(peer.partner_peer_id()))
                 })
-                .for_each({
-                    let peer_metrics_service = &mut self.peer_metrics_service;
-                    move |peer_id| peer_metrics_service.peer_removed(peer_id)
-                });
+                .for_each(|peer_id| ctx.notify(PeerStopped(peer_id)));
         }
     }
 }
