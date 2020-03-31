@@ -472,7 +472,7 @@ impl Room {
             self.peers.remove_peers(&member_id, &peer_ids_to_remove);
         self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
             room_id: self.id.clone(),
-            peers_ids: removed_peers.values().flatten().map(|id| *id).collect(),
+            peers_ids: removed_peers.values().flatten().copied().collect(),
         });
         removed_peers
             .clone()
