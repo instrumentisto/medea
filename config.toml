@@ -177,52 +177,8 @@
 # Default:
 #   recycle_timeout = "2s"
 
-[turn.cli]
-# Coturn server host.
-#
-# Env var: MEDEA_TURN__CLI__IP
-# Default:
-#   host = "127.0.0.1"
 
-# Port of Coturn's Redis database for client connections.
-#
-# Env var: MEDEA_TURN__CLI__PORT
-# Default:
-#   port = 5766
 
-# Port of Coturn's Redis database for client connections.
-#
-# Env var: MEDEA_TURN__CLI__PASS
-# Default:
-#   pass = "turn"
-
-[turn.cli.pool]
-# Maximum connection pool size.
-#
-# Env var: MEDEA_TURN__CLI__POOL__MAX_SIZE
-# Default:
-#   max_size = 16
-
-# Timeout when waiting for an available connection. 0 means no timeout and is
-# not recommended.
-#
-# Env var: MEDEA_TURN__CLI__POOL__WAIT
-# Default:
-#   wait = "5s"
-
-# Timeout when creating a new connection. 0 means no timeout and is not
-# recommended.
-#
-# Env var: MEDEA_TURN__CLI__POOL__CREATE
-# Default:
-#   create = "5s"
-
-# Timeout when recycling connection. 0 means no timeout and is not
-# recommended.
-#
-# Env var: MEDEA_TURN__CLI__POOL__RECYCLE
-# Default:
-#   recycle = "5s"
 
 [log]
 # Maximum allowed level of application log entries.

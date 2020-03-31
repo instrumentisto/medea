@@ -30,7 +30,7 @@ use super::{
 /// Coturn.
 const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
-/// Ergonomic type alias for using [`ActorFuture`] by [`ControlMetricsService`].
+/// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
 pub type ActFuture<O> =
     Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
 
@@ -42,10 +42,10 @@ pub struct CoturnMetricsService {
     /// sent.
     peers_traffic_watcher: Addr<PeersTrafficWatcher>,
 
-    /// Redis client with which Coturn stat updates will be received.
+    /// Redis client with which Coturn stat updates are received.
     client: redis_pub_sub::Client,
 
-    /// Count of allocations for the [`CoturnUsername`] (which acts as a key).
+    /// Count of allocations for each [`CoturnUsername`] (which acts as a key).
     allocations_count: HashMap<CoturnUsername, u64>,
 }
 

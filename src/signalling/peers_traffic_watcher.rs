@@ -1,17 +1,19 @@
-//! Service which is responsible to [`PeerConnection`] metrics based Control API
+//! Service which is responsible to [`Peer`] metrics based Control API
 //! callbacks.
 //!
-//! [`PeerConnection`] metrics will be collected from the many sources of
+//! [`Peer`] metrics will be collected from the many sources of
 //! metrics. All this metrics will be collected and based on them,
 //! [`PeersTrafficWatcher`] will consider which callback should be sent (or
 //! not sent).
 //!
-//! # List of [`PeerConnection`] metrics based Control API callbacks:
+//! # List of [`Peer`] metrics based Control API callbacks:
 //!
 //! 1. `WebRtcPublishEndpoint::on_start`;
 //! 2. `WebRtcPublishEndpoint::on_stop`;
 //! 3. `WebRtcPlayEndpoint::on_start`;
 //! 4. `WebRtcPlayEndpoint::on_stop`.
+//!
+//! [`Peer`]: crate::media::peer::Peer
 
 use std::{
     collections::{HashMap, HashSet},
@@ -31,7 +33,6 @@ use crate::{
 
 /// Returns [`FlowMetricSources`] which should be used to validate that
 /// `Endpoint` is started based on `force_relay` property from Control API spec.
-#[allow(clippy::match_same_arms)]
 pub fn flow_metrics_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
     // This code is needed to pay attention to this function when changing
     // 'FlowMetricSource'.
@@ -39,9 +40,9 @@ pub fn flow_metrics_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
     // Rustc shouldn't include it into binary.
     {
         match FlowMetricSource::PeerTraffic {
-            FlowMetricSource::PeerTraffic => (),
-            FlowMetricSource::Coturn => (),
-            FlowMetricSource::PartnerPeerTraffic => (),
+            FlowMetricSource::PeerTraffic
+            | FlowMetricSource::Coturn
+            | FlowMetricSource::PartnerPeerTraffic => (),
         }
     }
 
@@ -55,8 +56,10 @@ pub fn flow_metrics_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
     sources
 }
 
-/// Service which responsible for the [`PeerConnection`] metrics based Control
+/// Service which responsible for the [`Peer`] metrics based Control
 /// API callbacks.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Default)]
 pub struct PeersTrafficWatcher {
     /// All `Room` which exists on the Medea server.
@@ -72,17 +75,21 @@ impl PeersTrafficWatcher {
     }
 
     /// Unsubscribes [`PeersTrafficWatcher`] from watching a
-    /// [`PeerConnection`] with provided [`PeerId`].
+    /// [`Peer`] with provided [`PeerId`].
     ///
     /// Removes provided [`PeerId`] from [`RoomStat`] with provided [`RoomId`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub fn unsubscribe_from_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(room_id) {
             room.peers.remove(&peer_id);
         }
     }
 
-    /// Unsubscribes [`PeersTrafficWatcher`] from a [`PeerConnection`] with
+    /// Unsubscribes [`PeersTrafficWatcher`] from a [`Peer`] with
     /// fatal error and notifies [`Room`] about fatal error in [`PeerStat`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.peers.remove(&peer_id);
@@ -92,7 +99,7 @@ impl PeersTrafficWatcher {
         }
     }
 
-    /// Checks that all metrics sources considered that [`PeerConnection`] with
+    /// Checks that all metrics sources considered that [`Peer`] with
     /// provided [`PeerId`] is started.
     ///
     /// This function will be called on every [`PeerStat`] after `10sec` from
@@ -100,6 +107,8 @@ impl PeersTrafficWatcher {
     ///
     /// If this check fails then [`PeersTrafficWatcher::fatal_peer_error`]
     /// will be called for this [`PeerStat`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     fn check_on_start(&mut self, room_id: &RoomId, peer_id: PeerId) {
         let peer = self
             .stats
@@ -144,17 +153,25 @@ impl Actor for PeersTrafficWatcher {
 }
 
 /// Some [`FlowMetricSource`] notifies [`MetricsCallbacksService`] that
-/// [`PeerConnection`] with provided [`PeerId`] is normally flows.
+/// [`Peer`] with provided [`PeerId`] is normally flows.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct TrafficFlows {
-    /// [`RoomId`] of [`Room`] where this [`PeerConnection`] is stored.
+    /// [`RoomId`] of [`Room`] where this [`Peer`] is stored.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub room_id: RoomId,
 
-    /// [`PeerId`] of [`PeerConnection`] which flows.
+    /// [`PeerId`] of [`Peer`] which flows.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub peer_id: PeerId,
 
-    /// Time when proof of [`PeerConnection`]'s traffic flowing was gotten.
+    /// Time when proof of [`Peer`]'s traffic flowing was gotten.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub timestamp: Instant,
 
     /// Source of this metric.
@@ -199,17 +216,25 @@ impl Handler<TrafficFlows> for PeersTrafficWatcher {
 }
 
 /// Some [`StoppedMetricSource`] notifies [`MetricsCallbacksService`] that
-/// traffic flowing of [`PeerConnection`] with provided [`PeerId`] was stopped.
+/// traffic flowing of [`Peer`] with provided [`PeerId`] was stopped.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct TrafficStopped {
-    /// [`RoomId`] of [`Room`] where this [`PeerConnection`] is stored.
+    /// [`RoomId`] of [`Room`] where this [`Peer`] is stored.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub room_id: RoomId,
 
-    /// [`PeerId`] of [`PeerConnection`] which traffic was stopped.
+    /// [`PeerId`] of [`Peer`] which traffic was stopped.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub peer_id: PeerId,
 
-    /// Time when proof of [`PeerConnection`]'s traffic stopping was gotten.
+    /// Time when proof of [`Peer`]'s traffic stopping was gotten.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub timestamp: Instant,
 
     /// Source of this metric.
@@ -238,38 +263,54 @@ impl Handler<TrafficStopped> for PeersTrafficWatcher {
 /// All sources of [`TrafficFlows`] message.
 ///
 /// This is needed for checking that all metrics sources have the same opinion
-/// about current `PeerConnection`'s traffic state.
+/// about current [`Peer`]'s traffic state.
 ///
 /// [`PeersTrafficWatcher`] checks that all sources have the same opinion
 /// after `10secs` from first [`TrafficFlows`] message received for some
 /// [`PeerStat`]. If at least one [`FlowMetricSource`] doesn't sent
-/// [`TrafficFlows`] message, then `PeerConnection` will be considered as wrong
+/// [`TrafficFlows`] message, then [`Peer`] will be considered as wrong
 /// and it will be stopped.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
-    /// Metrics from the partner `PeerConnection`.
+    /// Metrics from the partner [`Peer`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     PartnerPeerTraffic,
 
-    /// Metrics from the `PeerConnection`.
+    /// Metrics from the [`Peer`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     PeerTraffic,
 
-    /// Metrics for this `PeerConnection` from the Coturn TURN server.
+    /// Metrics for this [`Peer`] from the Coturn TURN server.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     Coturn,
 }
 
 /// All sources of [`TrafficStopped`] message.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum StoppedMetricSource {
-    /// `PeerConnection` was removed.
+    /// [`Peer`] was removed.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     PeerRemoved,
 
-    /// Partner `PeerConnection` was removed.
+    /// Partner [`Peer`] was removed.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     PartnerPeerRemoved,
 
-    /// `PeerConnection` traffic stopped growing.
+    /// [`Peer`] traffic stopped growing.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     PeerTraffic,
 
-    /// All Coturn allocations related to this `PeerConnection` was removed.
+    /// All Coturn allocations related to this [`Peer`] was removed.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     Coturn,
 
     /// [`PeersTrafficWatcher`] doesn't receive [`TrafficFlows`] too long.
@@ -289,13 +330,17 @@ pub enum PeerState {
     Stopped,
 }
 
-/// Current state of `PeerConnection`.
+/// Current state of [`Peer`].
 ///
 /// Also this structure may be considered as subscription to Control API
 /// callbacks.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug)]
 pub struct PeerStat {
-    /// [`PeerId`] of `PeerConnection` which this [`PeerStat`] represents.
+    /// [`PeerId`] of [`Peer`] which this [`PeerStat`] represents.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub peer_id: PeerId,
 
     /// Current state of this [`PeerStat`].
@@ -312,8 +357,10 @@ pub struct PeerStat {
     pub last_update: Instant,
 }
 
-/// Stores [`PeerStat`]s of `PeerConnection`s for which [`PeerState`] [`Room`]
+/// Stores [`PeerStat`]s of [`Peer`]s for which [`PeerState`] [`Room`]
 /// is watching.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug)]
 pub struct RoomStats {
     /// [`RoomId`] of all [`PeerStat`] which stored here.
