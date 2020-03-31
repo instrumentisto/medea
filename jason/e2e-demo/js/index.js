@@ -18,7 +18,9 @@ async function createRoom(roomId, memberId) {
             publish: {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always',
-              force_relay: false
+              force_relay: false,
+              on_start: "grpc://127.0.0.1:9099",
+              on_stop: "grpc://127.0.0.1:9099"
             },
           },
           on_join: "grpc://127.0.0.1:9099",
@@ -38,7 +40,9 @@ async function createMember(roomId, memberId) {
     publish: {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
-      force_relay: false
+      force_relay: false,
+      on_start: "grpc://127.0.0.1:9099",
+      on_stop: "grpc://127.0.0.1:9099"
     }
   };
 
@@ -50,7 +54,9 @@ async function createMember(roomId, memberId) {
     pipeline["play-" + memberId] = {
       kind: 'WebRtcPlayEndpoint',
       src: 'local://' + roomId + '/' + memberId + "/publish",
-      force_relay: false
+      force_relay: false,
+      on_start: "grpc://127.0.0.1:9099",
+      on_stop: "grpc://127.0.0.1:9099"
     }
   }
 
@@ -75,7 +81,9 @@ async function createMember(roomId, memberId) {
         data: {
           kind: 'WebRtcPlayEndpoint',
           src: 'local://' + roomId + '/' + memberId + '/publish',
-          force_relay: false
+          force_relay: false,
+          on_start: "grpc://127.0.0.1:9099",
+          on_stop: "grpc://127.0.0.1:9099"
         }
       })
     }
