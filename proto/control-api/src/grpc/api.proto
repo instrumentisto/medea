@@ -142,16 +142,16 @@ message Member {
   string on_leave = 3;
   // Credentials of the Member to authorize via Client API with.
   string credentials = 4;
+  // Timeout of receiving heartbeat messages from the Member via Client API.
+  // Once reached, the Member is considered being idle.
+  google.protobuf.Duration idle_timeout = 5;
+  // Timeout of the Member reconnecting via Client API.
+  // Once reached, the Member is considered disconnected.
+  google.protobuf.Duration reconnect_timeout = 6;
+  // Interval of sending pings from a media server to the Member via Client API.
+  google.protobuf.Duration ping_interval = 7;
   // Pipeline of this Member.
-  map<string, Member.Element> pipeline = 5;
-  // Duration, after which remote RPC client will be considered idle if no
-  // heartbeat messages received.
-  google.protobuf.Duration idle_timeout = 6;
-  // Duration, after which the server deletes the client session if
-  // the remote RPC client does not reconnect after it is idle.
-  google.protobuf.Duration reconnect_timeout = 7;
-  // Interval of sending pings from the server to the client.
-  google.protobuf.Duration ping_interval = 8;
+  map<string, Member.Element> pipeline = 8;
 
   // Elements which Member's pipeline can contain.
   message Element {

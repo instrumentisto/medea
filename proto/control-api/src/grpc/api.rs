@@ -162,20 +162,20 @@ pub struct Member {
     /// Credentials of the Member to authorize via Client API with.
     #[prost(string, tag="4")]
     pub credentials: std::string::String,
-    /// Pipeline of this Member.
-    #[prost(map="string, message", tag="5")]
-    pub pipeline: ::std::collections::HashMap<std::string::String, member::Element>,
-    /// Duration, after which remote RPC client will be considered idle if no
-    /// heartbeat messages received.
-    #[prost(message, optional, tag="6")]
+    /// Timeout of receiving heartbeat messages from the Member via Client API.
+    /// Once reached, the Member is considered being idle.
+    #[prost(message, optional, tag="5")]
     pub idle_timeout: ::std::option::Option<::prost_types::Duration>,
-    /// Duration, after which the server deletes the client session if
-    /// the remote RPC client does not reconnect after it is idle.
-    #[prost(message, optional, tag="7")]
+    /// Timeout of the Member reconnecting via Client API.
+    /// Once reached, the Member is considered disconnected.
+    #[prost(message, optional, tag="6")]
     pub reconnect_timeout: ::std::option::Option<::prost_types::Duration>,
-    /// Interval of sending pings from the server to the client.
-    #[prost(message, optional, tag="8")]
+    /// Interval of sending pings from a media server to the Member via Client API.
+    #[prost(message, optional, tag="7")]
     pub ping_interval: ::std::option::Option<::prost_types::Duration>,
+    /// Pipeline of this Member.
+    #[prost(map="string, message", tag="8")]
+    pub pipeline: ::std::collections::HashMap<std::string::String, member::Element>,
 }
 pub mod member {
     /// Elements which Member's pipeline can contain.
