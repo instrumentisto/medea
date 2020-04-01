@@ -97,9 +97,6 @@ mod grpc {
             self.0
                 .iter()
                 .map(|filename| format!("{}/{}.rs", GRPC_DIR, filename))
-                .chain(self.0.iter().map(|filename| {
-                    format!("{}/{}_grpc.rs", GRPC_DIR, filename)
-                }))
                 .collect()
         }
     }
