@@ -1,15 +1,10 @@
 use std::{
     cell::RefCell,
-    collections::{
-        hash_map::{IntoIter, Iter, RandomState},
-        HashMap,
-    },
+    collections::{hash_map::Iter, HashMap},
     hash::Hash,
 };
 
 use futures::{channel::mpsc, Stream};
-
-use crate::collections::vec::ObservableVec;
 
 #[derive(Debug, Clone)]
 pub struct ObservableHashMap<K, V>
@@ -113,7 +108,7 @@ impl<'a, K: Hash + Eq + Clone, V: Clone> IntoIterator
 
 impl<K: Hash + Eq + Clone, V: Clone> Drop for ObservableHashMap<K, V> {
     fn drop(&mut self) {
-        let mut store = &mut self.store;
+        let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain().for_each(|(key, value)| {
             for sub in on_remove_subs.borrow().iter() {

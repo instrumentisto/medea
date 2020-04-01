@@ -155,7 +155,7 @@
 #![warn(
     deprecated_in_future,
     missing_copy_implementations,
-    missing_docs,
+//    missing_docs,
     unreachable_pub,
     unused_import_braces,
     unused_labels,

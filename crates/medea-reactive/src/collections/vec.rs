@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, slice::Iter, vec::IntoIter};
+use std::{cell::RefCell, slice::Iter};
 
 use futures::{channel::mpsc, Stream};
 
@@ -87,7 +87,7 @@ where
     T: Clone,
 {
     fn drop(&mut self) {
-        let mut store = &mut self.store;
+        let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain(..).for_each(|value| {
             for sub in on_remove_subs.borrow().iter() {

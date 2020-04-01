@@ -1,16 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
-use futures::{Stream, StreamExt};
-use medea_reactive::{
-    collections::{vec::ObservableVec, ObservableHashMap},
-    Observable, ObservableCell,
-};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    Direction, EventHandler, IceCandidate, IceServer, MediaType, PeerId, Track,
-    TrackId, TrackPatch,
-};
+use crate::{EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch};
 
 use crate::snapshots::peer::{PeerSnapshot, PeerSnapshotAccessor};
 

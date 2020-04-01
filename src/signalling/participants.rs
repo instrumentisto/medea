@@ -22,9 +22,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{
-    CloseDescription, CloseReason, Event, EventHandler,
-};
+use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
 use crate::{
     api::{
@@ -286,8 +284,6 @@ impl ParticipantService {
             )
         }
     }
-
-    async fn send_snapshot(&mut self, member_id: &MemberId) {}
 
     /// Inserts new [`RpcConnection`] into this [`ParticipantService`].
     fn insert_connection(
