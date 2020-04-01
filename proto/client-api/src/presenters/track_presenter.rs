@@ -1,13 +1,15 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{Stream, StreamExt};
-use medea_client_api_proto::{
-    Direction, EventHandler, IceCandidate, IceServer, MediaType, PeerId, Track,
-    TrackId, TrackPatch,
-};
 use medea_reactive::{
     collections::{vec::ObservableVec, ObservableHashMap},
     Observable, ObservableCell,
+};
+use serde::{Serialize, Deserialize};
+
+use crate::{
+    Direction, EventHandler, IceCandidate, IceServer, MediaType, PeerId, Track,
+    TrackId, TrackPatch,
 };
 
 #[derive(Debug)]

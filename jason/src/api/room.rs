@@ -13,6 +13,7 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
+    presenters::{PeerPresenter, RoomPresenter, TrackPresenter},
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
     IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
     Track, TrackId, TrackPatch,
@@ -37,8 +38,6 @@ use crate::{
         JsError,
     },
 };
-
-use crate::presenters::{PeerPresenter, RoomPresenter, TrackPresenter};
 
 use super::{connection::Connection, ConnectionHandle};
 

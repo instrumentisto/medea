@@ -10,7 +10,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::TrackPatch;
+use medea_client_api_proto::{presenters::TrackPresenter, TrackPatch};
 use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -21,7 +21,6 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    presenters::TrackPresenter,
     utils::{delay_for, JsCaused, JsError},
 };
 

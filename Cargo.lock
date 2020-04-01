@@ -1362,7 +1362,9 @@ name = "medea-client-api-proto"
 version = "0.2.0-dev"
 dependencies = [
  "derive_more 0.99.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0-dev",
+ "medea-reactive 0.1.0-dev",
  "serde 1.0.105 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

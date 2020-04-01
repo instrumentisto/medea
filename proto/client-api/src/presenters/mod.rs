@@ -1,6 +1,6 @@
-pub(crate) mod peer_presenter;
-pub(crate) mod room_presenter;
-pub(crate) mod track_presenter;
+pub mod peer_presenter;
+pub mod room_presenter;
+pub mod track_presenter;
 
 pub use peer_presenter::PeerPresenter;
 pub use room_presenter::RoomPresenter;

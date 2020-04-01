@@ -22,8 +22,11 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use medea_client_api_proto::{
-    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    self as proto,
+    presenters::{PeerPresenter, TrackPresenter},
+    stats::StatId,
+    Direction, IceConnectionState, IceServer, PeerConnectionState,
+    PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -33,7 +36,6 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
-    presenters::{PeerPresenter, TrackPresenter},
     utils::{console_error, JasonError, JsCaused, JsError},
 };
 

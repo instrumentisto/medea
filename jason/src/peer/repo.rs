@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::{IceServer, PeerId};
+use medea_client_api_proto::{presenters::PeerPresenter, IceServer, PeerId};
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
@@ -11,7 +11,6 @@ use crate::{
 };
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::presenters::PeerPresenter;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]

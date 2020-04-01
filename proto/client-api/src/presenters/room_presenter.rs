@@ -1,17 +1,20 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{Stream, StreamExt};
-use medea_client_api_proto::{
-    Direction, EventHandler, IceCandidate, IceServer, MediaType, PeerId, Track,
-    TrackId, TrackPatch,
-};
 use medea_reactive::{
     collections::{vec::ObservableVec, ObservableHashMap},
     Observable, ObservableCell,
 };
+use serde::{Serialize, Deserialize};
 
-use crate::presenters::{PeerPresenter, TrackPresenter};
+use crate::{
+    Direction, EventHandler, IceCandidate, IceServer, MediaType, PeerId, Track,
+    TrackId, TrackPatch,
+};
 
+use super::{PeerPresenter, TrackPresenter};
+
+#[derive(Debug)]
 pub struct RoomPresenter {
     pub(super) peers: ObservableHashMap<PeerId, Rc<RefCell<PeerPresenter>>>,
 }

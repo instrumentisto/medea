@@ -8,6 +8,7 @@
 //! [`Serialize`] implementation for [`Event`]s.
 //! - `extended-stats`: Enables unused RTC Stats DTOs.
 
+pub mod presenters;
 pub mod stats;
 
 use std::collections::HashMap;
@@ -17,6 +18,7 @@ use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
+use crate::presenters::RoomPresenter;
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -247,7 +249,10 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -258,7 +263,9 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<PeerId> },
+    PeersRemoved {
+        peer_ids: Vec<PeerId>,
+    },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// Peer.

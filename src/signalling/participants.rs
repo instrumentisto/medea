@@ -22,7 +22,9 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{CloseDescription, CloseReason, Event};
+use medea_client_api_proto::{
+    CloseDescription, CloseReason, Event, EventHandler,
+};
 
 use crate::{
     api::{
@@ -46,6 +48,7 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
+use medea_client_api_proto::presenters::RoomPresenter;
 
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
@@ -110,6 +113,8 @@ pub struct ParticipantService {
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
+
+    snapshots: HashMap<MemberId, RoomPresenter>,
 }
 
 impl ParticipantService {
@@ -129,6 +134,7 @@ impl ParticipantService {
             drop_connection_tasks: HashMap::new(),
             turn_service: context.turn_service.clone(),
             rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
+            snapshots: HashMap::new(),
         })
     }
 
@@ -205,6 +211,9 @@ impl ParticipantService {
         member_id: MemberId,
         event: Event,
     ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+        if let Some(snapshot) = self.snapshots.get_mut(&member_id) {
+            event.clone().dispatch_with(snapshot);
+        }
         if let Some(conn) = self.connections.get(&member_id) {
             conn.send_event(event)
                 .map_err(move |_| RoomError::UnableToSendEvent(member_id))
@@ -278,12 +287,16 @@ impl ParticipantService {
         }
     }
 
+    async fn send_snapshot(&mut self, member_id: &MemberId) {}
+
     /// Inserts new [`RpcConnection`] into this [`ParticipantService`].
     fn insert_connection(
         &mut self,
         member_id: MemberId,
         conn: Box<dyn RpcConnection>,
     ) {
+        self.snapshots
+            .insert(member_id.clone(), RoomPresenter::new());
         self.connections.insert(member_id, conn);
     }
 
