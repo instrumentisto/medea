@@ -66,18 +66,18 @@ pub struct MemberSpec {
     /// URL to which `OnLeave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
 
-    /// Timeout of receiving heartbeat messages from the [`Member`] via Client
+    /// Timeout of receiving heartbeat messages from the `Member` via Client
     /// API.
     ///
-    /// Once reached, the [`Member`] is considered being idle.
+    /// Once reached, the `Member` is considered being idle.
     idle_timeout: Option<Duration>,
 
-    /// Timeout of the [`Member`] reconnecting via Client API.
+    /// Timeout of the `Member` reconnecting via Client API.
     ///
-    /// Once reached, the [`Member`] is considered disconnected.
+    /// Once reached, the `Member` is considered disconnected.
     reconnect_timeout: Option<Duration>,
 
-    /// Interval of sending pings from a media server to the [`Member`] via
+    /// Interval of sending pings from a media server to the `Member` via
     /// Client API.
     ping_interval: Option<Duration>,
 }
@@ -171,13 +171,13 @@ impl MemberSpec {
         &self.on_leave
     }
 
-    /// Returns [`Duration`] for this [`Member`], after which remote RPC client
+    /// Returns [`Duration`] for this `Member`, after which remote RPC client
     /// will be considered idle if no heartbeat messages received.
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
 
-    /// Returns [`Duration`] for this [`Member`], after which the server deletes
+    /// Returns [`Duration`] for this `Member`, after which the server deletes
     /// the client session if the remote RPC client does not reconnect after
     /// it is idle.
     pub fn reconnect_timeout(&self) -> Option<Duration> {
@@ -185,7 +185,7 @@ impl MemberSpec {
     }
 
     /// Returns interval of sending `Ping`s from the server to the client for
-    /// this [`Member`].
+    /// this `Member`.
     pub fn ping_interval(&self) -> Option<Duration> {
         self.ping_interval
     }
@@ -263,11 +263,8 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         };
 
-        let idle_timeout = parse_duration(
-            member.idle_timeout,
-            &member.id,
-            "reconnect_timeout",
-        )?;
+        let idle_timeout =
+            parse_duration(member.idle_timeout, &member.id, "idle_timeout")?;
         let reconnect_timeout = parse_duration(
             member.reconnect_timeout,
             &member.id,

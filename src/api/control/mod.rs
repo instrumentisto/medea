@@ -69,7 +69,7 @@ pub enum TryFromProtobufError {
     #[display(fmt = "Element is None, expected Some. Id [{}]", _0)]
     EmptyElement(String),
 
-    /// Provided [`Endpoint`] is unimplemented.
+    /// Provided `Endpoint` is unimplemented.
     #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
     UnimplementedEndpoint(String),
 

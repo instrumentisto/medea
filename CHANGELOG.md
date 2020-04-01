@@ -14,7 +14,7 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Configuration:
-    - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]);
+    - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]).
 - RPC messaging:
     - Reverse `Ping`/`Pong` naming: server sends `Ping` and expects `Pongs` from client now. ([#75]).
 
