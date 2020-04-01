@@ -48,7 +48,7 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
-use medea_client_api_proto::presenters::RoomPresenter;
+use medea_client_api_proto::snapshots::room::RoomSnapshot;
 
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
@@ -114,7 +114,7 @@ pub struct ParticipantService {
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
 
-    snapshots: HashMap<MemberId, RoomPresenter>,
+    snapshots: HashMap<MemberId, RoomSnapshot>,
 }
 
 impl ParticipantService {
@@ -296,7 +296,7 @@ impl ParticipantService {
         conn: Box<dyn RpcConnection>,
     ) {
         self.snapshots
-            .insert(member_id.clone(), RoomPresenter::new());
+            .insert(member_id.clone(), RoomSnapshot::new());
         self.connections.insert(member_id, conn);
     }
 

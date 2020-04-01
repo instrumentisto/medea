@@ -13,7 +13,6 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    presenters::{PeerPresenter, RoomPresenter, TrackPresenter},
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
     IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
     Track, TrackId, TrackPatch,
@@ -32,6 +31,9 @@ use crate::{
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
         RpcClientError, TransportError,
+    },
+    snapshots::{
+        ObservablePeerSnapshot, ObservableRoomSnapshot, ObservableTrackSnapshot,
     },
     utils::{
         console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
@@ -549,7 +551,7 @@ struct InnerRoom {
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: CloseReason,
 
-    state: RoomPresenter,
+    state: ObservableRoomSnapshot,
 }
 
 impl InnerRoom {
@@ -575,7 +577,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             },
-            state: RoomPresenter::new(),
+            state: ObservableRoomSnapshot::new(),
         }
     }
 
@@ -593,7 +595,7 @@ impl InnerRoom {
     //       connections based on remote member_ids
     fn create_connections_from_tracks(
         &mut self,
-        tracks: Vec<Rc<RefCell<TrackPresenter>>>,
+        tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
     ) {
         let create_connection = |room: &mut Self, peer_id: &PeerId| {
             if !room.connections.contains_key(peer_id) {
@@ -721,7 +723,7 @@ impl InnerRoom {
     pub fn on_peer_created(
         &mut self,
         peer_id: PeerId,
-        peer_state: &PeerPresenter,
+        peer_state: &ObservablePeerSnapshot,
     ) {
         let peer = match self
             .peers

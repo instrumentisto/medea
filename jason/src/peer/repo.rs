@@ -1,12 +1,13 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::{presenters::PeerPresenter, IceServer, PeerId};
+use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaManager,
+    snapshots::ObservablePeerSnapshot,
     utils::{delay_for, TaskHandle},
 };
 
@@ -23,7 +24,7 @@ pub trait PeerRepository {
     /// Errors if creating [`PeerConnection`] fails.
     fn create_peer(
         &self,
-        peer_state: &PeerPresenter,
+        peer_state: &ObservablePeerSnapshot,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
@@ -99,7 +100,7 @@ impl PeerRepository for Repository {
     /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
     fn create_peer(
         &self,
-        peer_state: &PeerPresenter,
+        peer_state: &ObservablePeerSnapshot,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = PeerConnection::new(

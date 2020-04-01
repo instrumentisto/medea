@@ -22,11 +22,8 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use medea_client_api_proto::{
-    self as proto,
-    presenters::{PeerPresenter, TrackPresenter},
-    stats::StatId,
-    Direction, IceConnectionState, IceServer, PeerConnectionState,
-    PeerId as Id, PeerId, Track, TrackId,
+    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
+    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -36,6 +33,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
+    snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
     utils::{console_error, JasonError, JsCaused, JsError},
 };
 
@@ -230,7 +228,7 @@ impl PeerConnection {
     /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
     /// [`RtcPeerConnection`] can't be set.
     pub fn new(
-        peer_state: &PeerPresenter,
+        peer_state: &ObservablePeerSnapshot,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         media_manager: Rc<MediaManager>,
     ) -> Result<Rc<Self>> {
@@ -566,7 +564,7 @@ impl PeerConnection {
     /// sdp offer.
     pub async fn get_offer(
         &self,
-        tracks: Vec<Rc<RefCell<TrackPresenter>>>,
+        tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
         local_stream: Option<&SysMediaStream>,
     ) -> Result<String> {
         self.media_connections
@@ -709,7 +707,7 @@ impl PeerConnection {
     pub async fn process_offer(
         &self,
         offer: String,
-        tracks: Vec<Rc<RefCell<TrackPresenter>>>,
+        tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
         local_stream: Option<&SysMediaStream>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable

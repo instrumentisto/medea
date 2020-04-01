@@ -10,7 +10,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{presenters::TrackPresenter, TrackPatch};
+use medea_client_api_proto::TrackPatch;
 use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -21,6 +21,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
+    snapshots::ObservableTrackSnapshot,
     utils::{delay_for, JsCaused, JsError},
 };
 
@@ -221,7 +222,7 @@ impl MediaConnections {
     // TODO: Doesnt really updates anything, but only generates new senders
     //       and receivers atm.
     pub fn update_tracks<
-        I: IntoIterator<Item = Rc<RefCell<TrackPresenter>>>,
+        I: IntoIterator<Item = Rc<RefCell<ObservableTrackSnapshot>>>,
     >(
         &self,
         tracks: I,
@@ -433,7 +434,7 @@ impl Sender {
     /// lookup fails.
     fn new(
         peer: &RtcPeerConnection,
-        track_state: Rc<RefCell<TrackPresenter>>,
+        track_state: Rc<RefCell<ObservableTrackSnapshot>>,
         mid: Option<String>,
     ) -> Result<Rc<Self>> {
         let track_state_ref = track_state.borrow();
