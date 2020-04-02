@@ -12,7 +12,7 @@ use futures::{future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::TrackPatch;
 use medea_reactive::{DroppedError, ObservableCell};
-use proto::{Direction, PeerId, Track, TrackId};
+use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
@@ -233,7 +233,7 @@ impl MediaConnections {
             let direction = track.borrow().get_direction().clone();
             match direction {
                 Direction::Send { mid, .. } => {
-                    let sndr = Sender::new(&inner.peer, track, mid)
+                    let sndr = Sender::new(&inner.peer, &track, mid)
                         .map_err(tracerr::wrap!())?;
                     inner.senders.insert(track_id, sndr);
                 }
@@ -434,7 +434,7 @@ impl Sender {
     /// lookup fails.
     fn new(
         peer: &RtcPeerConnection,
-        track_state: Rc<RefCell<ObservableTrackSnapshot>>,
+        track_state: &Rc<RefCell<ObservableTrackSnapshot>>,
         mid: Option<String>,
     ) -> Result<Rc<Self>> {
         let track_state_ref = track_state.borrow();

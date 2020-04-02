@@ -22,21 +22,18 @@ where
     K: Clone + Eq + Hash,
     V: Clone,
 {
+    #[must_use]
+    #[inline]
     pub fn new() -> Self {
-        Self {
-            store: HashMap::new(),
-            on_insert_subs: RefCell::new(Vec::new()),
-            on_remove_subs: RefCell::new(Vec::new()),
-        }
+        Self::default()
     }
 
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         for sub in self.on_insert_subs.borrow().iter() {
             let _ = sub.unbounded_send((key.clone(), value.clone()));
         }
-        let out = self.store.insert(key, value);
 
-        out
+        self.store.insert(key, value)
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
@@ -78,6 +75,20 @@ where
 
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.into_iter()
+    }
+}
+
+impl<K, V> Default for ObservableHashMap<K, V>
+where
+    K: Hash + Eq + Clone,
+    V: Clone,
+{
+    fn default() -> Self {
+        Self {
+            store: HashMap::new(),
+            on_insert_subs: RefCell::new(Vec::new()),
+            on_remove_subs: RefCell::new(Vec::new()),
+        }
     }
 }
 

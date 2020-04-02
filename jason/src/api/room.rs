@@ -13,9 +13,8 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch,
+    Command, Direction, Event as RpcEvent, IceCandidate, IceConnectionState,
+    PeerConnectionState, PeerId, PeerMetrics, TrackId, TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -128,10 +127,6 @@ enum RoomError {
     /// [`MediaManager`].
     #[display(fmt = "Failed to get local stream: {}", _0)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
-
-    /// Returned if the requested [`PeerConnection`] is not found.
-    #[display(fmt = "Peer with id {} doesnt exist", _0)]
-    NoSuchPeer(PeerId),
 
     /// Returned if an error occurred during the webrtc signaling process
     /// with remote peer.
@@ -428,7 +423,7 @@ impl Room {
         let inner = Rc::downgrade(&room);
         let mut on_peer_removed = room.borrow().state.on_peer_removed();
         spawn_local(async move {
-            while let Some((removed_peer_id, removed_peer)) =
+            while let Some((removed_peer_id, _removed_peer)) =
                 on_peer_removed.next().await
             {
                 if let Some(inner) = inner.upgrade() {

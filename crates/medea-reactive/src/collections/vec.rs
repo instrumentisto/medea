@@ -13,12 +13,10 @@ impl<T> ObservableVec<T>
 where
     T: Clone,
 {
+    #[must_use]
+    #[inline]
     pub fn new() -> Self {
-        Self {
-            store: Vec::new(),
-            on_push_subs: RefCell::new(Vec::new()),
-            on_remove_subs: RefCell::new(Vec::new()),
-        }
+        Self::default()
     }
 
     pub fn push(&mut self, value: T) {
@@ -59,6 +57,19 @@ where
         self.on_remove_subs.borrow_mut().push(tx);
 
         rx
+    }
+}
+
+impl<T> Default for ObservableVec<T>
+where
+    T: Clone,
+{
+    fn default() -> Self {
+        Self {
+            store: Vec::new(),
+            on_push_subs: RefCell::new(Vec::new()),
+            on_remove_subs: RefCell::new(Vec::new()),
+        }
     }
 }
 

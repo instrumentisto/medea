@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::{IceServer, PeerId};
+use medea_client_api_proto::PeerId;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 

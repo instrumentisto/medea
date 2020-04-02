@@ -22,7 +22,9 @@ use failure::Fail;
 use futures::future::{
     self, Either, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{CloseDescription, CloseReason, Event};
+use medea_client_api_proto::{
+    snapshots::RoomSnapshot, CloseDescription, CloseReason, Event,
+};
 
 use crate::{
     api::{
@@ -46,7 +48,6 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
-use medea_client_api_proto::snapshots::room::RoomSnapshot;
 
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
@@ -260,10 +261,10 @@ impl ParticipantService {
                 ctx.cancel_future(handler);
             }
             self.insert_connection(member_id.clone(), conn);
-            let send_snapshot_fut = self.send_snapshot(member_id);
+            let send_snapshot_fut = self.send_snapshot(&member_id);
             Box::new(wrap_future(send_snapshot_fut.then(move |res| {
                 if let Err(e) = res {
-                    Either::Left(future::err(e.into()))
+                    Either::Left(future::err(e))
                 } else {
                     Either::Right(
                         connection
@@ -304,11 +305,11 @@ impl ParticipantService {
 
     fn send_snapshot(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
     ) -> LocalBoxFuture<'static, Result<(), ParticipantServiceErr>> {
-        let snapshot = self.snapshots.get(&member_id).cloned();
+        let snapshot = self.snapshots.get(member_id).cloned();
         if let Some(snapshot) = snapshot {
-            if let Some(conn) = self.connections.get(&member_id) {
+            if let Some(conn) = self.connections.get(member_id) {
                 Box::pin(
                     conn.send_event(Event::RestoreState { snapshot }).map_err(
                         |_| ParticipantServiceErr::MemberSnapshotSending,

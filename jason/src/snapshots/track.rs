@@ -1,25 +1,18 @@
 use futures::Stream;
 use medea_client_api_proto::{
-    snapshots::track::{TrackSnapshot, TrackSnapshotAccessor},
-    Direction, MediaType, TrackId, TrackPatch,
+    snapshots::track::TrackSnapshotAccessor, Direction, MediaType, TrackId,
 };
 use medea_reactive::ObservableCell;
 
 #[derive(Debug)]
 pub struct ObservableTrackSnapshot {
-    pub(super) id: TrackId,
-    pub(super) is_muted: ObservableCell<bool>,
-    pub(super) direction: Direction,
-    pub(super) media_type: MediaType,
+    id: TrackId,
+    is_muted: ObservableCell<bool>,
+    direction: Direction,
+    media_type: MediaType,
 }
 
 impl ObservableTrackSnapshot {
-    pub fn update(&mut self, patch: TrackPatch) {
-        if let Some(is_muted) = patch.is_muted {
-            self.is_muted.set(is_muted);
-        }
-    }
-
     pub fn on_track_update(&self) -> impl Stream<Item = bool> {
         self.is_muted.subscribe()
     }
@@ -58,21 +51,5 @@ impl TrackSnapshotAccessor for ObservableTrackSnapshot {
 
     fn set_is_muted(&mut self, is_muted: bool) {
         self.is_muted.set(is_muted);
-    }
-
-    fn get_direction(&self) -> &Direction {
-        &self.direction
-    }
-
-    fn get_media_type(&self) -> &MediaType {
-        &self.media_type
-    }
-
-    fn get_is_muted(&self) -> bool {
-        self.is_muted.get()
-    }
-
-    fn get_id(&self) -> TrackId {
-        self.id
     }
 }

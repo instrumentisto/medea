@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map::RandomState, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{IceCandidate, IceServer, PeerId, TrackId, TrackPatch};
 
-use crate::snapshots::track::{TrackSnapshot, TrackSnapshotAccessor};
-use std::collections::hash_map::RandomState;
+use super::{TrackSnapshot, TrackSnapshotAccessor};
 
 #[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct PeerSnapshot {

@@ -22,8 +22,8 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use medea_client_api_proto::{
-    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    self as proto, stats::StatId, Direction, IceConnectionState,
+    PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;

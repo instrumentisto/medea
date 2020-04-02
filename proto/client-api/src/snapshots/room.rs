@@ -2,12 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    snapshots::peer::{PeerSnapshot, PeerSnapshotAccessor},
-    EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch,
-};
+use crate::{EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch};
 
-use super::track::TrackSnapshotAccessor;
+use super::{PeerSnapshot, PeerSnapshotAccessor, TrackSnapshotAccessor};
 
 #[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct RoomSnapshot {
@@ -15,7 +12,15 @@ pub struct RoomSnapshot {
 }
 
 impl RoomSnapshot {
+    #[must_use]
+    #[inline]
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for RoomSnapshot {
+    fn default() -> Self {
         Self {
             peers: HashMap::new(),
         }

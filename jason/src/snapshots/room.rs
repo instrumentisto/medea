@@ -5,14 +5,10 @@ use medea_client_api_proto::{snapshots::room::RoomSnapshotAccessor, PeerId};
 use medea_reactive::collections::ObservableHashMap;
 
 use super::ObservablePeerSnapshot;
-use medea_client_api_proto::snapshots::{
-    peer::PeerSnapshotAccessor, room::RoomSnapshot,
-};
 
 #[derive(Debug)]
 pub struct ObservableRoomSnapshot {
-    pub(super) peers:
-        ObservableHashMap<PeerId, Rc<RefCell<ObservablePeerSnapshot>>>,
+    peers: ObservableHashMap<PeerId, Rc<RefCell<ObservablePeerSnapshot>>>,
 }
 
 impl ObservableRoomSnapshot {

@@ -1,28 +1,27 @@
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
+
 use futures::{Stream, StreamExt as _};
 use medea_client_api_proto::{
     snapshots::peer::PeerSnapshotAccessor, IceCandidate, IceServer, PeerId,
-    TrackId, TrackPatch,
+    TrackId,
 };
-use medea_reactive::{collections::vec::ObservableVec, Observable};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use medea_reactive::{collections::ObservableHashSet, Observable};
 
 use super::ObservableTrackSnapshot;
-use medea_client_api_proto::snapshots::{
-    peer::PeerSnapshot, track::TrackSnapshotAccessor,
-};
-use medea_reactive::collections::ObservableHashSet;
-use std::collections::HashSet;
-use wasm_bindgen::__rt::std::collections::hash_map::RandomState;
 
 #[derive(Debug)]
 pub struct ObservablePeerSnapshot {
-    pub(super) id: PeerId,
-    pub(super) sdp_offer: Observable<Option<String>>,
-    pub(super) sdp_answer: Observable<Option<String>>,
-    pub(super) tracks: HashMap<TrackId, Rc<RefCell<ObservableTrackSnapshot>>>,
-    pub(super) ice_servers: ObservableHashSet<IceServer>,
-    pub(super) is_force_relayed: Observable<bool>,
-    pub(super) ice_candidates: ObservableHashSet<IceCandidate>,
+    id: PeerId,
+    sdp_offer: Observable<Option<String>>,
+    sdp_answer: Observable<Option<String>>,
+    tracks: HashMap<TrackId, Rc<RefCell<ObservableTrackSnapshot>>>,
+    ice_servers: ObservableHashSet<IceServer>,
+    is_force_relayed: Observable<bool>,
+    ice_candidates: ObservableHashSet<IceCandidate>,
 }
 
 impl ObservablePeerSnapshot {
@@ -36,22 +35,6 @@ impl ObservablePeerSnapshot {
         &self,
     ) -> impl Stream<Item = IceCandidate> {
         self.ice_candidates.on_insert()
-    }
-
-    pub fn set_sdp_answer(&mut self, sdp_answer: String) {
-        *self.sdp_answer.borrow_mut() = Some(sdp_answer);
-    }
-
-    pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
-        self.ice_candidates.push(ice_candidate);
-    }
-
-    pub fn update_tracks(&mut self, patches: Vec<TrackPatch>) {
-        for patch in patches {
-            if let Some(track) = self.tracks.get(&patch.id) {
-                track.borrow_mut().update(patch);
-            }
-        }
     }
 
     pub fn get_ice_servers(&self) -> Vec<IceServer> {
@@ -115,15 +98,12 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
         *self.is_force_relayed.borrow_mut() = is_force_relayed;
     }
 
-    fn set_ice_candidates(
-        &mut self,
-        ice_candidates: HashSet<IceCandidate, RandomState>,
-    ) {
+    fn set_ice_candidates(&mut self, ice_candidates: HashSet<IceCandidate>) {
         self.ice_candidates.update(ice_candidates);
     }
 
     fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
-        self.ice_candidates.push(ice_candidate);
+        self.ice_candidates.insert(ice_candidate);
     }
 
     fn update_track<F>(&mut self, track_id: TrackId, update_fn: F)

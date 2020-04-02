@@ -17,20 +17,18 @@ impl<T> ObservableHashSet<T>
 where
     T: Clone + Hash + Eq,
 {
+    #[must_use]
+    #[inline]
     pub fn new() -> Self {
-        Self {
-            store: HashSet::new(),
-            on_insert_subs: RefCell::new(Vec::new()),
-            on_remove_subs: RefCell::new(Vec::new()),
-        }
+        Self::default()
     }
 
-    pub fn push(&mut self, value: T) {
+    pub fn insert(&mut self, value: T) -> bool {
         for sub in self.on_insert_subs.borrow().iter() {
             let _ = sub.unbounded_send(value.clone());
         }
 
-        self.store.insert(value);
+        self.store.insert(value)
     }
 
     pub fn remove(&mut self, index: &T) -> Option<T> {
@@ -73,17 +71,30 @@ where
 
         for removed_elem in removed_elems {
             for remove_sub in self.on_remove_subs.borrow().iter() {
-                remove_sub.unbounded_send(removed_elem.clone());
+                let _ = remove_sub.unbounded_send(removed_elem.clone());
             }
         }
 
         for inserted_elem in inserted_elems {
             for insert_sub in self.on_insert_subs.borrow().iter() {
-                insert_sub.unbounded_send(inserted_elem.clone());
+                let _ = insert_sub.unbounded_send(inserted_elem.clone());
             }
         }
 
         self.store = updated;
+    }
+}
+
+impl<T> Default for ObservableHashSet<T>
+where
+    T: Clone + Hash + Eq,
+{
+    fn default() -> Self {
+        Self {
+            store: HashSet::new(),
+            on_insert_subs: RefCell::new(Vec::new()),
+            on_remove_subs: RefCell::new(Vec::new()),
+        }
     }
 }
 

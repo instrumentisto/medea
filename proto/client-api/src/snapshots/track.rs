@@ -26,14 +26,6 @@ pub trait TrackSnapshotAccessor {
 
     fn set_is_muted(&mut self, is_muted: bool);
 
-    fn get_direction(&self) -> &Direction;
-
-    fn get_media_type(&self) -> &MediaType;
-
-    fn get_is_muted(&self) -> bool;
-
-    fn get_id(&self) -> TrackId;
-
     fn update_snapshot(&mut self, snapshot: TrackSnapshot) {
         self.set_is_muted(snapshot.is_muted);
     }
@@ -56,21 +48,5 @@ impl TrackSnapshotAccessor for TrackSnapshot {
 
     fn set_is_muted(&mut self, is_muted: bool) {
         self.is_muted = is_muted;
-    }
-
-    fn get_direction(&self) -> &Direction {
-        &self.direction
-    }
-
-    fn get_media_type(&self) -> &MediaType {
-        &self.media_type
-    }
-
-    fn get_is_muted(&self) -> bool {
-        self.is_muted
-    }
-
-    fn get_id(&self) -> TrackId {
-        self.id
     }
 }
