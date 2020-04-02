@@ -6,17 +6,21 @@ use chrono::Local;
 use slog::{
     o, Drain, Duplicate, FnValue, Fuse, Level, Logger, PushFnValue, Record,
 };
-use slog_async::{Async, OverflowStrategy};
+use slog_async::Async;
 use slog_json::Json;
 
 pub mod prelude;
 
 /// Builds JSON [`Logger`] which prints all its log records to `w_out` writer,
 /// but WARN level (and higher) to `w_err` writer. Logger will use [`Async`]
-/// drain with channel size of 2048 entries and [`OverflowStrategy::Block`].
+/// drain with channel size of 2048 entries and
+/// [`OverflowStrategy::DropAndReport`].
 ///
-/// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
-/// by default.
+/// Created [`Logger`] produces log records with `fqn`, `lvl`, `time` and `msg`
+/// fields by default.
+///
+/// Note: you may encounter log drops when running in debug mode, which should
+/// not be the case for release mode.
 pub fn new_dual_logger<W1, W2>(w_out: W1, w_err: W2) -> Logger
 where
     W1: io::Write + Send + 'static,
@@ -30,32 +34,15 @@ where
     )
     .map(Fuse);
     let drain = slog_envlogger::new(drain).fuse();
-    let drain = Async::new(drain)
-        .chan_size(2048)
-        .overflow_strategy(OverflowStrategy::Block)
-        .build()
-        .fuse();
-    add_default_keys(&Logger::root(drain, o!()))
-}
-
-/// Builds JSON [`Logger`] which writes all its logs to the specified writer.
-///
-/// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
-/// by default.
-#[allow(dead_code)]
-pub fn new_logger<W>(w: W) -> Logger
-where
-    W: io::Write + Send + 'static,
-{
-    let drain = Json::new(w).build().fuse();
-    let drain = Async::new(drain).build().fuse();
+    let drain = Async::new(drain).chan_size(2048).build().fuse();
     add_default_keys(&Logger::root(drain, o!()))
 }
 
 /// Adds default log record data (key-value pairs) to specified [`Logger`]:
+/// - `msg`: log record message.
+/// - `fqn`: path to code line that called log function
 /// - `time`: creation date and time of log record in [RFC 3339] format.
 /// - `lvl`: logging level of log record.
-/// - `msg`: log record message.
 ///
 /// [RFC 3339]: https://www.ietf.org/rfc/rfc3339.txt
 fn add_default_keys(logger: &Logger) -> Logger {
