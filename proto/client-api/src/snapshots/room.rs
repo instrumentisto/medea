@@ -6,12 +6,15 @@ use crate::{EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch};
 
 use super::{PeerSnapshot, PeerSnapshotAccessor, TrackSnapshotAccessor};
 
+/// Snapshot of the state for the `Room`.
 #[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct RoomSnapshot {
+    /// All `Peer`s of this `Room`.
     pub peers: HashMap<PeerId, PeerSnapshot>,
 }
 
 impl RoomSnapshot {
+    /// Returns new empty [`RoomSnapshot`].
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -30,14 +33,21 @@ impl Default for RoomSnapshot {
 pub trait RoomSnapshotAccessor {
     type Peer: PeerSnapshotAccessor;
 
+    /// Inserts new `Peer` to this `Room`.
     fn insert_peer(&mut self, peer_id: PeerId, peer: Self::Peer);
 
+    /// Removes `Peer` from this `Room`.
     fn remove_peer(&mut self, peer_id: PeerId);
 
+    /// Updates `Peer` with provided `peer_id`.
+    ///
+    /// To `update_fn` will be provided mutable reference to the
+    /// [`PeerSnapshotAccessor`] with which you can update `Peer`.
     fn update_peer<F>(&mut self, peer_id: PeerId, update_fn: F)
     where
         F: FnOnce(Option<&mut Self::Peer>);
 
+    /// Updates this `Room` by provided [`RoomSnapshot`].
     fn update_snapshot(&mut self, snapshot: RoomSnapshot) {
         for (peer_id, peer_snapshot) in snapshot.peers {
             self.update_peer(peer_id, |peer| {
@@ -138,7 +148,7 @@ where
     fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
         self.update_peer(peer_id, move |peer| {
             if let Some(peer) = peer {
-                peer.update_tracks(tracks);
+                peer.update_tracks_by_patches(tracks);
             }
         });
     }

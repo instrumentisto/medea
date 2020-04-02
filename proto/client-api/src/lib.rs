@@ -249,10 +249,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -263,9 +260,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved {
-        peer_ids: Vec<PeerId>,
-    },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// Peer.
@@ -277,9 +272,12 @@ pub enum Event {
         tracks_patches: Vec<TrackPatch>,
     },
 
-    RestoreState {
-        snapshot: RoomSnapshot,
-    },
+    /// [`Event`] which server will send if detects that `Member` is
+    /// reconnecting.
+    ///
+    /// On this [`Event`] client should upgrade/downgrade local state to the
+    /// state of the server.
+    RestoreState { snapshot: RoomSnapshot },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

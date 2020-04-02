@@ -13,46 +13,70 @@ use medea_reactive::{collections::ObservableHashSet, Observable};
 
 use super::ObservableTrackSnapshot;
 
+/// Reactive snapshot of the state for the `Peer`.
 #[derive(Debug)]
 pub struct ObservablePeerSnapshot {
+    /// ID of the `Peer`.
     id: PeerId,
+
+    /// Current SDP offer of the `Peer`.
     sdp_offer: Observable<Option<String>>,
+
+    /// Current SDP answer of the `Peer`.
     sdp_answer: Observable<Option<String>>,
+
+    /// Snapshots of the all `MediaTrack`s of this `Peer`.
     tracks: HashMap<TrackId, Rc<RefCell<ObservableTrackSnapshot>>>,
+
+    /// All [`IceServer`]s created for this `Peer`.
     ice_servers: ObservableHashSet<IceServer>,
+
+    /// Indicates whether all media is forcibly relayed through a TURN server.
     is_force_relayed: Observable<bool>,
+
+    /// All [`IceCandidate`]s of this `Peer`.
     ice_candidates: ObservableHashSet<IceCandidate>,
 }
 
 impl ObservablePeerSnapshot {
+    /// Returns [`Stream`] to which will be sent SDP answer when it changes.
     pub fn on_sdp_answer_made(&self) -> impl Stream<Item = String> {
         self.sdp_answer.subscribe().filter_map(|new_sdp_answer| {
             Box::pin(async move { new_sdp_answer })
         })
     }
 
+    /// Returns [`Stream`] to which will be sent new [`IceCandidate`] when it
+    /// added to the snapshot.
     pub fn on_ice_candidate_discovered(
         &self,
     ) -> impl Stream<Item = IceCandidate> {
         self.ice_candidates.on_insert()
     }
 
+    /// Returns all [`IceServer`]s created for this `Peer`.
     pub fn get_ice_servers(&self) -> Vec<IceServer> {
         self.ice_servers.iter().cloned().collect()
     }
 
+    /// Returns indicator of whether all media is forcibly relayed through a
+    /// TURN server.
     pub fn get_is_force_relayed(&self) -> bool {
         *self.is_force_relayed
     }
 
+    /// Returns SDP offer of this `Peer`.
     pub fn get_sdp_offer(&self) -> &Option<String> {
         &self.sdp_offer
     }
 
+    /// Returns references to the all [`ObservableTrackSnapshot`]s of this
+    /// [`ObservablePeerSnapshot`].
     pub fn get_tracks(&self) -> Vec<Rc<RefCell<ObservableTrackSnapshot>>> {
         self.tracks.values().cloned().collect()
     }
 
+    /// Returns [`PeerId`] of this [`ObservablePeerSnapshot`].
     pub fn get_id(&self) -> PeerId {
         self.id
     }
@@ -94,7 +118,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
         self.ice_servers.update(ice_servers);
     }
 
-    fn set_is_force_related(&mut self, is_force_relayed: bool) {
+    fn set_is_force_relayed(&mut self, is_force_relayed: bool) {
         *self.is_force_relayed.borrow_mut() = is_force_relayed;
     }
 

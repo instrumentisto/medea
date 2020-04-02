@@ -303,6 +303,17 @@ impl ParticipantService {
         }
     }
 
+    /// Sends [`Event::RestoreState`] to the [`Member`] with provided
+    /// [`MemberId`].
+    ///
+    /// # Errors
+    ///
+    /// [`ParticipantServiceErr::MemberSnapshotSending`] if some connection
+    /// error is happened while sending [`Event::RestoreState`].
+    ///
+    /// [`ParticipantServiceErr::ConnectionForMemberNotFound`] if
+    /// [`RpcConnection`] for the [`Member`] with provided [`MemberId`] is not
+    /// found.
     fn send_snapshot(
         &mut self,
         member_id: &MemberId,
