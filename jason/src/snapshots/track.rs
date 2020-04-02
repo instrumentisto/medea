@@ -1,7 +1,7 @@
 use futures::Stream;
 use medea_client_api_proto::{
-    snapshots::track::TrackSnapshotAccessor, Direction, MediaType, TrackId,
-    TrackPatch,
+    snapshots::track::{TrackSnapshot, TrackSnapshotAccessor},
+    Direction, MediaType, TrackId, TrackPatch,
 };
 use medea_reactive::ObservableCell;
 
@@ -74,5 +74,9 @@ impl TrackSnapshotAccessor for ObservableTrackSnapshot {
 
     fn get_id(&self) -> TrackId {
         self.id
+    }
+
+    fn update_snapshot(&mut self, snapshot: TrackSnapshot) {
+        self.is_muted.set(snapshot.is_muted);
     }
 }

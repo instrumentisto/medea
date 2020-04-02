@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -6,7 +6,7 @@ use crate::{EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch};
 
 use crate::snapshots::peer::{PeerSnapshot, PeerSnapshotAccessor};
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct RoomSnapshot {
     pub peers: HashMap<PeerId, PeerSnapshot>,
 }
@@ -29,6 +29,9 @@ pub trait RoomSnapshotAccessor {
     fn update_peer<F>(&mut self, peer_id: PeerId, update_fn: F)
     where
         F: FnOnce(Option<&mut Self::Peer>);
+
+    // TODO: break into pieces
+    fn update_snapshot(&mut self, snapshot: RoomSnapshot);
 }
 
 impl RoomSnapshotAccessor for RoomSnapshot {
@@ -48,6 +51,14 @@ impl RoomSnapshotAccessor for RoomSnapshot {
     {
         (update_fn)(self.peers.get_mut(&peer_id));
     }
+
+    fn update_snapshot(&mut self, snapshot: RoomSnapshot) {
+        for (peer_id, peer_snapshot) in snapshot.peers {
+            if let Some(peer) = self.peers.get_mut(&peer_id) {
+                peer.update_snapshot(peer_snapshot);
+            }
+        }
+    }
 }
 use super::track::TrackSnapshotAccessor;
 
@@ -62,7 +73,7 @@ where
         peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
-        ice_servers: Vec<IceServer>,
+        ice_servers: HashSet<IceServer>,
         is_force_relayed: bool,
     ) {
         type Peer<R> = <R as RoomSnapshotAccessor>::Peer;
@@ -124,5 +135,9 @@ where
                 peer.update_tracks(tracks);
             }
         });
+    }
+
+    fn on_restore_state(&mut self, snapshot: RoomSnapshot) {
+        self.update_snapshot(snapshot);
     }
 }

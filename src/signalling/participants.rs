@@ -251,12 +251,13 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
-            self.insert_connection(member_id, conn);
-            Box::new(wrap_future(
+            self.insert_connection(member_id.clone(), conn);
+            let send_snapshot_fut = self.send_snapshot(member_id);
+            Box::new(wrap_future(send_snapshot_fut.then(move |res| {
                 connection
                     .close(CloseDescription::new(CloseReason::Reconnected))
-                    .map(move |_| Ok(member)),
-            ))
+                    .map(move |_| Ok(member))
+            })))
         } else {
             let turn_service = self.turn_service.clone();
             let cloned_member_id = member_id.clone();
@@ -282,6 +283,22 @@ impl ParticipantService {
                     }
                 }),
             )
+        }
+    }
+
+    fn send_snapshot(
+        &mut self,
+        member_id: MemberId,
+    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+        let snapshot = self.snapshots.get(&member_id).cloned();
+        if let Some(snapshot) = snapshot {
+            self.send_event_to_member(
+                member_id,
+                Event::RestoreState { snapshot },
+            )
+        } else {
+            // TODO: maybe error here???
+            Box::pin(future::ok(()))
         }
     }
 

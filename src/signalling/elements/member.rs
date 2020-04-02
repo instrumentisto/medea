@@ -30,6 +30,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use std::collections::HashSet;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -271,7 +272,7 @@ impl Member {
     }
 
     /// Returns list of [`IceServer`] for this [`Member`].
-    pub fn servers_list(&self) -> Option<Vec<IceServer>> {
+    pub fn servers_list(&self) -> Option<HashSet<IceServer>> {
         self.0.borrow().ice_user.as_ref().map(IceUser::servers_list)
     }
 

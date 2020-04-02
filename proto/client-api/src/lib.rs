@@ -11,13 +11,14 @@
 pub mod snapshots;
 pub mod stats;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
+use crate::snapshots::room::RoomSnapshot;
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -242,13 +243,16 @@ pub enum Event {
         peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
-        ice_servers: Vec<IceServer>,
+        ice_servers: HashSet<IceServer>,
         force_relay: bool,
     },
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -259,7 +263,9 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<PeerId> },
+    PeersRemoved {
+        peer_ids: Vec<PeerId>,
+    },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// Peer.
@@ -270,12 +276,16 @@ pub enum Event {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     },
+
+    RestoreState {
+        snapshot: RoomSnapshot,
+    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, Hash)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
@@ -306,7 +316,7 @@ pub struct TrackPatch {
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
 /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Hash, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct IceServer {
     pub urls: Vec<String>,

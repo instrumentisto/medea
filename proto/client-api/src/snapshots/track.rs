@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Direction, MediaType, TrackId, TrackPatch};
 
-#[derive(Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct TrackSnapshot {
     pub id: TrackId,
     pub is_muted: bool,
@@ -33,6 +33,8 @@ pub trait TrackSnapshotAccessor {
     fn get_is_muted(&self) -> bool;
 
     fn get_id(&self) -> TrackId;
+
+    fn update_snapshot(&mut self, snapshot: TrackSnapshot);
 }
 
 impl TrackSnapshotAccessor for TrackSnapshot {
@@ -68,5 +70,9 @@ impl TrackSnapshotAccessor for TrackSnapshot {
 
     fn get_id(&self) -> TrackId {
         self.id
+    }
+
+    fn update_snapshot(&mut self, snapshot: TrackSnapshot) {
+        self.is_muted = snapshot.is_muted;
     }
 }

@@ -234,7 +234,7 @@ impl PeerConnection {
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(
-                peer_state.get_ice_servers().to_vec(),
+                peer_state.get_ice_servers(),
                 peer_state.get_is_force_relayed(),
             )
             .map_err(tracerr::map_from_and_wrap!())?,

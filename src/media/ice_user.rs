@@ -2,6 +2,8 @@
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 
+use std::{collections::HashSet, iter};
+
 use derive_more::{AsRef, Display, From, Into};
 use medea_client_api_proto::IceServer;
 
@@ -59,7 +61,7 @@ impl IceUser {
     }
 
     /// Build vector of [`IceServer`].
-    pub fn servers_list(&self) -> Vec<IceServer> {
+    pub fn servers_list(&self) -> HashSet<IceServer> {
         let stun_url = vec![format!("stun:{}", self.address)];
         let stun = IceServer {
             urls: stun_url,
@@ -75,7 +77,8 @@ impl IceUser {
             username: Some(self.username.0.clone()),
             credential: Some(self.pass.clone()),
         };
-        vec![stun, turn]
+
+        iter::once(stun).chain(iter::once(turn)).collect()
     }
 
     pub fn address(&self) -> &str {

@@ -7,6 +7,11 @@ use medea_reactive::{collections::vec::ObservableVec, Observable};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::ObservableTrackSnapshot;
+use medea_client_api_proto::snapshots::{
+    peer::PeerSnapshot, track::TrackSnapshotAccessor,
+};
+use medea_reactive::collections::ObservableHashSet;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct ObservablePeerSnapshot {
@@ -14,9 +19,9 @@ pub struct ObservablePeerSnapshot {
     pub(super) sdp_offer: Observable<Option<String>>,
     pub(super) sdp_answer: Observable<Option<String>>,
     pub(super) tracks: HashMap<TrackId, Rc<RefCell<ObservableTrackSnapshot>>>,
-    pub(super) ice_servers: ObservableVec<IceServer>,
+    pub(super) ice_servers: ObservableHashSet<IceServer>,
     pub(super) is_force_relayed: Observable<bool>,
-    pub(super) ice_candidates: ObservableVec<IceCandidate>,
+    pub(super) ice_candidates: ObservableHashSet<IceCandidate>,
 }
 
 impl ObservablePeerSnapshot {
@@ -29,7 +34,7 @@ impl ObservablePeerSnapshot {
     pub fn on_ice_candidate_discovered(
         &self,
     ) -> impl Stream<Item = IceCandidate> {
-        self.ice_candidates.on_push()
+        self.ice_candidates.on_insert()
     }
 
     pub fn set_sdp_answer(&mut self, sdp_answer: String) {
@@ -48,8 +53,8 @@ impl ObservablePeerSnapshot {
         }
     }
 
-    pub fn get_ice_servers(&self) -> &[IceServer] {
-        self.ice_servers.as_ref()
+    pub fn get_ice_servers(&self) -> Vec<IceServer> {
+        self.ice_servers.iter().cloned().collect()
     }
 
     pub fn get_is_force_relayed(&self) -> bool {
@@ -75,7 +80,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
     fn new(
         id: PeerId,
         sdp_offer: Option<String>,
-        ice_servers: Vec<IceServer>,
+        ice_servers: HashSet<IceServer>,
         is_force_relayed: bool,
         tracks: HashMap<TrackId, Self::Track>,
     ) -> Self {
@@ -85,7 +90,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
             sdp_offer: Observable::new(sdp_offer),
             ice_servers: ice_servers.into(),
             is_force_relayed: Observable::new(is_force_relayed),
-            ice_candidates: ObservableVec::new(),
+            ice_candidates: ObservableHashSet::new(),
             tracks: tracks
                 .into_iter()
                 .map(|(id, track)| (id, Rc::new(RefCell::new(track))))
@@ -109,6 +114,22 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
             (update_fn)(Some(&mut track.borrow_mut()));
         } else {
             (update_fn)(None);
+        }
+    }
+
+    fn update_snapshot(&mut self, snapshot: PeerSnapshot) {
+        *self.sdp_answer.borrow_mut() = snapshot.sdp_answer;
+        *self.is_force_relayed.borrow_mut() = snapshot.is_force_relayed;
+        *self.sdp_offer.borrow_mut() = snapshot.sdp_offer;
+        self.ice_servers.update(snapshot.ice_servers);
+        self.ice_candidates.update(snapshot.ice_candidates);
+
+        for (track_id, track_snapshot) in snapshot.tracks {
+            if let Some(track) = self.tracks.get(&track_id) {
+                track.borrow_mut().update_snapshot(track_snapshot);
+            } else {
+                todo!("Create new track.")
+            }
         }
     }
 }
