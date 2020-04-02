@@ -45,6 +45,13 @@ mod grpc {
                         .build_client(true)
                         .build_server(true)
                         .compile(&grpc_spec_files, &[GRPC_DIR.to_string()])?;
+                    fs::remove_file(format!("{}/google.protobuf.rs", GRPC_DIR))
+                        .expect(
+                            "'google.protobuf.rs' file isn't generated. This \
+                             is good news, because maybe hyperium/tonic#314 \
+                             issue was really fixed. Check it and if it is \
+                             then just remove this line of code.",
+                        );
                     break;
                 } else {
                     panic!("{}", e);
