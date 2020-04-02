@@ -295,6 +295,8 @@
               if (e.response.status === 400) {
                 console.log("Room not found. Creating new room...");
                 await createRoom(roomId)
+              } else {
+                throw e;
               }
             }
 
@@ -353,11 +355,15 @@
     };
 
     function logError(msg, e) {
-      console.error(
-        msg + ": Error[name:[", e.name(), "], ",
-        "[msg:", e.message(), "], [source", e.source(), "]]",
-      );
-      console.error(e.trace());
+      if (e.name && e.message && e.source && e.trace) {
+        console.error(
+          msg + ": Error[name:[", e.name(), "], ",
+          "[msg:", e.message(), "], [source", e.source(), "]]",
+        );
+        console.error(e.trace());
+      } else {
+        console.error(e);
+      }
     }
 
     function setCookie(name, value, days) {

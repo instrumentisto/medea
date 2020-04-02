@@ -299,8 +299,7 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            TurnServiceErr(_)
-            | MemberError(_)
+            MemberError(_)
             | ConnectionForMemberNotFound
             | MemberSnapshotSending => Self::unexpected(&err),
         }
@@ -412,10 +411,8 @@ impl From<RoomError> for ErrorResponse {
             | ConnectionNotExists(_)
             | UnableToSendEvent(_)
             | PeerError(_)
-            | TryFromElementError(_)
             | BadRoomSpec(_)
-            | TurnServiceError(_)
-            | ClientError(_) => Self::unexpected(&err),
+            | TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
 }

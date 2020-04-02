@@ -4,18 +4,25 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    fmt,
+    rc::Rc,
+};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
-    VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
+    TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId, media::MediaTrack, signalling::peers::Counter,
+    api::control::MemberId,
+    media::{IceUser, MediaTrack},
+    signalling::peers::Counter,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -71,6 +78,9 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
+#[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
+#[enum_delegate(pub fn ice_servers_list(&self) -> Option<HashSet<IceServer>>)]
+#[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -148,6 +158,7 @@ pub struct Context {
     member_id: MemberId,
     partner_peer: Id,
     partner_member: MemberId,
+    ice_user: Option<IceUser>,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
@@ -189,7 +200,7 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    /// Returns [`Track`]'s of [`Peer`].
+    /// Returns [`Track`]s of this [`Peer`].
     pub fn tracks(&self) -> Vec<Track> {
         let tracks = self.context.senders.iter().fold(
             vec![],
@@ -232,6 +243,16 @@ impl<T> Peer<T> {
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
     }
+
+    /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
+    pub fn ice_servers_list(&self) -> Option<HashSet<IceServer>> {
+        self.context.ice_user.as_ref().map(IceUser::servers_list)
+    }
+
+    /// Sets [`IceUser`], which is used to generate [`IceServer`]s
+    pub fn set_ice_user(&mut self, ice_user: IceUser) {
+        self.context.ice_user.replace(ice_user);
+    }
 }
 
 impl Peer<New> {
@@ -250,6 +271,7 @@ impl Peer<New> {
             member_id,
             partner_peer,
             partner_member,
+            ice_user: None,
             sdp_offer: None,
             sdp_answer: None,
             receivers: HashMap::new(),

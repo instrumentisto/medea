@@ -9,13 +9,12 @@
 
 use std::{
     collections::HashMap,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
 use actix::{
-    fut::wrap_future, ActorFuture as _, AsyncContext, Context,
-    ContextFutureSpawner as _, SpawnHandle,
+    fut::wrap_future, AsyncContext, Context, ContextFutureSpawner as _,
+    SpawnHandle,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -45,18 +44,11 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
 
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
-    /// Some error happened in [`TurnAuthService`].
-    ///
-    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
-    #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
-    TurnServiceErr(TurnServiceErr),
-
     /// [`Member`] with provided [`Fid`] not found.
     #[display(fmt = "Participant [id = {}] not found", _0)]
     ParticipantNotFound(Fid<ToMember>),
@@ -77,12 +69,6 @@ pub enum ParticipantServiceErr {
     /// [`RpcConnection`] for some [`Member`] not found.
     #[display(fmt = "RPC connection for some Member not found.")]
     ConnectionForMemberNotFound,
-}
-
-impl From<TurnServiceErr> for ParticipantServiceErr {
-    fn from(err: TurnServiceErr) -> Self {
-        Self::TurnServiceErr(err)
-    }
 }
 
 impl From<MemberError> for ParticipantServiceErr {
@@ -114,9 +100,6 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    /// Reference to [`TurnAuthService`].
-    turn_service: Arc<dyn TurnAuthService>,
-
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
@@ -139,7 +122,6 @@ impl ParticipantService {
             members: parse_members(room_spec)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
-            turn_service: context.turn_service.clone(),
             rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
             snapshots: HashMap::new(),
         })
@@ -276,30 +258,8 @@ impl ParticipantService {
                 }
             })))
         } else {
-            let turn_service = self.turn_service.clone();
-            let cloned_member_id = member_id.clone();
-            let room_id = self.room_id.clone();
-            Box::new(
-                wrap_future(async move {
-                    turn_service
-                        .create(
-                            cloned_member_id,
-                            room_id,
-                            UnreachablePolicy::ReturnErr,
-                        )
-                        .await
-                })
-                .map(move |result, room: &mut Room, _| {
-                    match result {
-                        Ok(ice_user) => {
-                            room.members.insert_connection(member_id, conn);
-                            member.replace_ice_user(ice_user);
-                            Ok(member)
-                        }
-                        Err(e) => Err(ParticipantServiceErr::from(e)),
-                    }
-                }),
-            )
+            self.insert_connection(member_id, conn);
+            Box::new(wrap_future(future::ok(member)))
         }
     }
 
@@ -363,18 +323,6 @@ impl ParticipantService {
             ClosedReason::Closed { .. } => {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
-                wrap_future::<_, Room>(
-                    self.delete_ice_user(&member_id)
-                        .map_err(move |e| {
-                            error!(
-                                "Error deleting IceUser of Member [id = {}]. \
-                                 {:?}",
-                                member_id, e,
-                            )
-                        })
-                        .map(|_| ()),
-                )
-                .spawn(ctx);
                 // TODO: we have no way to handle absence of RpcConnection right
                 //       now.
             }
@@ -392,25 +340,6 @@ impl ParticipantService {
                         })
                     }),
                 );
-            }
-        }
-    }
-
-    /// Deletes [`IceUser`] associated with provided [`Member`].
-    fn delete_ice_user(
-        &mut self,
-        member_id: &MemberId,
-    ) -> LocalBoxFuture<'static, Result<(), TurnServiceErr>> {
-        match self.get_member_by_id(&member_id) {
-            None => future::ok(()).boxed_local(),
-            Some(member) => {
-                if let Some(ice_user) = member.take_ice_user() {
-                    let turn_service = self.turn_service.clone();
-                    async move { turn_service.delete(&[ice_user]).await }
-                        .boxed_local()
-                } else {
-                    future::ok(()).boxed_local()
-                }
             }
         }
     }
@@ -440,23 +369,7 @@ impl ParticipantService {
                 },
             ));
 
-        // deleting all IceUsers
-        let ice_users: Vec<_> = self
-            .members
-            .values()
-            .filter_map(Member::take_ice_user)
-            .collect();
-
-        let turn_service = self.turn_service.clone();
-        let delete_ice_users = async move {
-            if let Err(e) = turn_service.delete(ice_users.as_slice()).await {
-                error!("Error removing IceUsers {:?}", e)
-            };
-        };
-
-        future::join(close_rpc_connections, delete_ice_users)
-            .map(|_| ())
-            .boxed_local()
+        close_rpc_connections.map(|_| ()).boxed_local()
     }
 
     /// Deletes [`Member`] from [`ParticipantService`], removes this user from
@@ -480,17 +393,7 @@ impl ParticipantService {
             .spawn(ctx);
         }
 
-        if let Some(member) = self.members.remove(member_id) {
-            if let Some(ice_user) = member.take_ice_user() {
-                let turn_service = self.turn_service.clone();
-                wrap_future::<_, Room>(async move {
-                    if let Err(e) = turn_service.delete(&[ice_user]).await {
-                        error!("Error removing IceUser {:?}", e)
-                    }
-                })
-                .spawn(ctx);
-            }
-        }
+        self.members.remove(member_id);
     }
 
     /// Inserts given [`Member`] into [`ParticipantService`].
