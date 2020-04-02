@@ -2,9 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch};
+use crate::{
+    snapshots::peer::{PeerSnapshot, PeerSnapshotAccessor},
+    EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch,
+};
 
-use crate::snapshots::peer::{PeerSnapshot, PeerSnapshotAccessor};
+use super::track::TrackSnapshotAccessor;
 
 #[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct RoomSnapshot {
@@ -30,8 +33,15 @@ pub trait RoomSnapshotAccessor {
     where
         F: FnOnce(Option<&mut Self::Peer>);
 
-    // TODO: break into pieces
-    fn update_snapshot(&mut self, snapshot: RoomSnapshot);
+    fn update_snapshot(&mut self, snapshot: RoomSnapshot) {
+        for (peer_id, peer_snapshot) in snapshot.peers {
+            self.update_peer(peer_id, |peer| {
+                if let Some(peer) = peer {
+                    peer.update_snapshot(peer_snapshot);
+                }
+            });
+        }
+    }
 }
 
 impl RoomSnapshotAccessor for RoomSnapshot {
@@ -51,16 +61,7 @@ impl RoomSnapshotAccessor for RoomSnapshot {
     {
         (update_fn)(self.peers.get_mut(&peer_id));
     }
-
-    fn update_snapshot(&mut self, snapshot: RoomSnapshot) {
-        for (peer_id, peer_snapshot) in snapshot.peers {
-            if let Some(peer) = self.peers.get_mut(&peer_id) {
-                peer.update_snapshot(peer_snapshot);
-            }
-        }
-    }
 }
-use super::track::TrackSnapshotAccessor;
 
 impl<R> EventHandler for R
 where
@@ -106,7 +107,7 @@ where
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         self.update_peer(peer_id, move |peer| {
             if let Some(peer) = peer {
-                peer.set_sdp_answer(sdp_answer);
+                peer.set_sdp_answer(Some(sdp_answer));
             }
         });
     }

@@ -20,7 +20,7 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{
-    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+    self, Either, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
 use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
@@ -68,6 +68,14 @@ pub enum ParticipantServiceErr {
 
     /// Some error happened in [`Member`].
     MemberError(MemberError),
+
+    /// [`Event::RestoreState`] sending is failed.
+    #[display(fmt = "Event::RestoreState sending is failed.")]
+    MemberSnapshotSending,
+
+    /// [`RpcConnection`] for some [`Member`] not found.
+    #[display(fmt = "RPC connection for some Member not found.")]
+    ConnectionForMemberNotFound,
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -254,9 +262,17 @@ impl ParticipantService {
             self.insert_connection(member_id.clone(), conn);
             let send_snapshot_fut = self.send_snapshot(member_id);
             Box::new(wrap_future(send_snapshot_fut.then(move |res| {
-                connection
-                    .close(CloseDescription::new(CloseReason::Reconnected))
-                    .map(move |_| Ok(member))
+                if let Err(e) = res {
+                    Either::Left(future::err(e.into()))
+                } else {
+                    Either::Right(
+                        connection
+                            .close(CloseDescription::new(
+                                CloseReason::Reconnected,
+                            ))
+                            .map(move |_| Ok(member)),
+                    )
+                }
             })))
         } else {
             let turn_service = self.turn_service.clone();
@@ -289,13 +305,20 @@ impl ParticipantService {
     fn send_snapshot(
         &mut self,
         member_id: MemberId,
-    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+    ) -> LocalBoxFuture<'static, Result<(), ParticipantServiceErr>> {
         let snapshot = self.snapshots.get(&member_id).cloned();
         if let Some(snapshot) = snapshot {
-            self.send_event_to_member(
-                member_id,
-                Event::RestoreState { snapshot },
-            )
+            if let Some(conn) = self.connections.get(&member_id) {
+                Box::pin(
+                    conn.send_event(Event::RestoreState { snapshot }).map_err(
+                        |_| ParticipantServiceErr::MemberSnapshotSending,
+                    ),
+                )
+            } else {
+                Box::pin(future::err(
+                    ParticipantServiceErr::ConnectionForMemberNotFound,
+                ))
+            }
         } else {
             // TODO: maybe error here???
             Box::pin(future::ok(()))

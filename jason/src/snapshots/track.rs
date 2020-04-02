@@ -75,8 +75,4 @@ impl TrackSnapshotAccessor for ObservableTrackSnapshot {
     fn get_id(&self) -> TrackId {
         self.id
     }
-
-    fn update_snapshot(&mut self, snapshot: TrackSnapshot) {
-        self.is_muted.set(snapshot.is_muted);
-    }
 }

@@ -12,6 +12,7 @@ use medea_client_api_proto::snapshots::{
 };
 use medea_reactive::collections::ObservableHashSet;
 use std::collections::HashSet;
+use wasm_bindgen::__rt::std::collections::hash_map::RandomState;
 
 #[derive(Debug)]
 pub struct ObservablePeerSnapshot {
@@ -98,8 +99,27 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
         }
     }
 
-    fn set_sdp_answer(&mut self, sdp_answer: String) {
-        *self.sdp_answer.borrow_mut() = Some(sdp_answer);
+    fn set_sdp_answer(&mut self, sdp_answer: Option<String>) {
+        *self.sdp_answer.borrow_mut() = sdp_answer;
+    }
+
+    fn set_sdp_offer(&mut self, sdp_offer: Option<String>) {
+        *self.sdp_offer.borrow_mut() = sdp_offer;
+    }
+
+    fn set_ice_servers(&mut self, ice_servers: HashSet<IceServer>) {
+        self.ice_servers.update(ice_servers);
+    }
+
+    fn set_is_force_related(&mut self, is_force_relayed: bool) {
+        *self.is_force_relayed.borrow_mut() = is_force_relayed;
+    }
+
+    fn set_ice_candidates(
+        &mut self,
+        ice_candidates: HashSet<IceCandidate, RandomState>,
+    ) {
+        self.ice_candidates.update(ice_candidates);
     }
 
     fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
@@ -114,22 +134,6 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
             (update_fn)(Some(&mut track.borrow_mut()));
         } else {
             (update_fn)(None);
-        }
-    }
-
-    fn update_snapshot(&mut self, snapshot: PeerSnapshot) {
-        *self.sdp_answer.borrow_mut() = snapshot.sdp_answer;
-        *self.is_force_relayed.borrow_mut() = snapshot.is_force_relayed;
-        *self.sdp_offer.borrow_mut() = snapshot.sdp_offer;
-        self.ice_servers.update(snapshot.ice_servers);
-        self.ice_candidates.update(snapshot.ice_candidates);
-
-        for (track_id, track_snapshot) in snapshot.tracks {
-            if let Some(track) = self.tracks.get(&track_id) {
-                track.borrow_mut().update_snapshot(track_snapshot);
-            } else {
-                todo!("Create new track.")
-            }
         }
     }
 }

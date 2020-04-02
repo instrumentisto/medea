@@ -34,7 +34,9 @@ pub trait TrackSnapshotAccessor {
 
     fn get_id(&self) -> TrackId;
 
-    fn update_snapshot(&mut self, snapshot: TrackSnapshot);
+    fn update_snapshot(&mut self, snapshot: TrackSnapshot) {
+        self.set_is_muted(snapshot.is_muted);
+    }
 }
 
 impl TrackSnapshotAccessor for TrackSnapshot {
@@ -70,9 +72,5 @@ impl TrackSnapshotAccessor for TrackSnapshot {
 
     fn get_id(&self) -> TrackId {
         self.id
-    }
-
-    fn update_snapshot(&mut self, snapshot: TrackSnapshot) {
-        self.is_muted = snapshot.is_muted;
     }
 }

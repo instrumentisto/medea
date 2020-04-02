@@ -299,7 +299,10 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            TurnServiceErr(_) | MemberError(_) => Self::unexpected(&err),
+            TurnServiceErr(_)
+            | MemberError(_)
+            | ConnectionForMemberNotFound
+            | MemberSnapshotSending => Self::unexpected(&err),
         }
     }
 }

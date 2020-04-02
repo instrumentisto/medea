@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{IceCandidate, IceServer, PeerId, TrackId, TrackPatch};
 
 use crate::snapshots::track::{TrackSnapshot, TrackSnapshotAccessor};
+use std::collections::hash_map::RandomState;
 
 #[derive(Clone, Eq, PartialEq, Debug, Deserialize, Serialize)]
 pub struct PeerSnapshot {
@@ -28,7 +29,15 @@ pub trait PeerSnapshotAccessor {
         tracks: HashMap<TrackId, Self::Track>,
     ) -> Self;
 
-    fn set_sdp_answer(&mut self, sdp_answer: String);
+    fn set_sdp_answer(&mut self, sdp_answer: Option<String>);
+
+    fn set_sdp_offer(&mut self, sdp_offer: Option<String>);
+
+    fn set_ice_servers(&mut self, ice_servers: HashSet<IceServer>);
+
+    fn set_is_force_related(&mut self, is_force_relayed: bool);
+
+    fn set_ice_candidates(&mut self, ice_candidates: HashSet<IceCandidate>);
 
     fn add_ice_candidate(&mut self, ice_candidate: IceCandidate);
 
@@ -46,7 +55,21 @@ pub trait PeerSnapshotAccessor {
         }
     }
 
-    fn update_snapshot(&mut self, snapshot: PeerSnapshot);
+    fn update_snapshot(&mut self, snapshot: PeerSnapshot) {
+        self.set_sdp_answer(snapshot.sdp_answer);
+        self.set_sdp_offer(snapshot.sdp_offer);
+        self.set_ice_candidates(snapshot.ice_candidates);
+        self.set_ice_servers(snapshot.ice_servers);
+        self.set_is_force_related(snapshot.is_force_relayed);
+
+        for (track_id, track_snapshot) in snapshot.tracks {
+            self.update_track(track_id, |track| {
+                if let Some(track) = track {
+                    track.update_snapshot(track_snapshot);
+                }
+            });
+        }
+    }
 }
 
 impl PeerSnapshotAccessor for PeerSnapshot {
@@ -70,8 +93,30 @@ impl PeerSnapshotAccessor for PeerSnapshot {
         }
     }
 
-    fn set_sdp_answer(&mut self, sdp_answer: String) {
-        self.sdp_answer = Some(sdp_answer);
+    fn set_sdp_answer(&mut self, sdp_answer: Option<String>) {
+        self.sdp_answer = sdp_answer;
+    }
+
+    fn set_sdp_offer(&mut self, sdp_offer: Option<String>) {
+        self.sdp_offer = sdp_offer
+    }
+
+    fn set_ice_servers(
+        &mut self,
+        ice_servers: HashSet<IceServer, RandomState>,
+    ) {
+        self.ice_servers = ice_servers;
+    }
+
+    fn set_is_force_related(&mut self, is_force_relayed: bool) {
+        self.is_force_relayed = is_force_relayed;
+    }
+
+    fn set_ice_candidates(
+        &mut self,
+        ice_candidates: HashSet<IceCandidate, RandomState>,
+    ) {
+        self.ice_candidates = ice_candidates;
     }
 
     fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
@@ -83,19 +128,5 @@ impl PeerSnapshotAccessor for PeerSnapshot {
         F: FnOnce(Option<&mut Self::Track>),
     {
         (update_fn)(self.tracks.get_mut(&track_id));
-    }
-
-    fn update_snapshot(&mut self, snapshot: PeerSnapshot) {
-        self.ice_servers = snapshot.ice_servers;
-        self.sdp_offer = snapshot.sdp_offer;
-        self.sdp_answer = snapshot.sdp_answer;
-        self.ice_candidates = snapshot.ice_candidates;
-        self.is_force_relayed = snapshot.is_force_relayed;
-
-        for (track_id, track_snapshot) in snapshot.tracks {
-            if let Some(track) = self.tracks.get_mut(&track_id) {
-                track.update_snapshot(track_snapshot);
-            }
-        }
     }
 }

@@ -58,14 +58,4 @@ impl RoomSnapshotAccessor for ObservableRoomSnapshot {
             (update_fn)(None);
         }
     }
-
-    fn update_snapshot(&mut self, snapshot: RoomSnapshot) {
-        for (peer_id, peer_snapshot) in snapshot.peers {
-            if let Some(peer) = self.peers.get_mut(&peer_id) {
-                peer.borrow_mut().update_snapshot(peer_snapshot)
-            } else {
-                todo!("Reset state");
-            }
-        }
-    }
 }
