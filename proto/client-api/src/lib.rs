@@ -17,8 +17,9 @@ use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-use self::stats::RtcStat;
 use crate::snapshots::room::RoomSnapshot;
+
+use self::stats::RtcStat;
 
 /// ID of `Peer`.
 #[cfg_attr(

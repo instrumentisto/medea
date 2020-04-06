@@ -5,6 +5,7 @@ use actix_http::ws::CloseCode;
 use medea_client_api_proto::{Direction, Event, PeerId};
 
 use crate::signalling::{CloseSocket, TestMember};
+use std::collections::HashSet;
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -28,18 +29,13 @@ fn three_members_p2p_video_call() {
             match event {
                 Event::PeerCreated { ice_servers, .. } => {
                     assert_eq!(ice_servers.len(), 2);
-                    assert_eq!(
-                        ice_servers[0].urls[0],
-                        "stun:localhost:3478".to_string()
-                    );
-                    assert_eq!(
-                        ice_servers[1].urls[0],
-                        "turn:localhost:3478".to_string()
-                    );
-                    assert_eq!(
-                        ice_servers[1].urls[1],
-                        "turn:localhost:3478?transport=tcp".to_string()
-                    );
+                    let urls: HashSet<_> = ice_servers
+                        .iter()
+                        .flat_map(|i| i.urls.iter().cloned())
+                        .collect();
+                    assert!(urls.contains("stun:localhost:3478"));
+                    assert!(urls.contains("turn:localhost:3478"));
+                    assert!(urls.contains("turn:localhost:3478?transport=tcp"));
 
                     peer_created_count += 1;
                 }

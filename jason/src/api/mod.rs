@@ -21,6 +21,7 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
+use crate::snapshots::ObservableRoomSnapshot;
 
 /// General library interface.
 ///
@@ -74,7 +75,11 @@ impl Jason {
             inner.borrow_mut().media_manager = Rc::default();
         }));
 
-        let room = Room::new(Rc::new(rpc), peer_repository);
+        let room = Room::new(
+            Rc::new(rpc),
+            peer_repository,
+            ObservableRoomSnapshot::new(),
+        );
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle

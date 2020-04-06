@@ -8,16 +8,16 @@ use medea_reactive::ObservableCell;
 #[derive(Debug)]
 pub struct ObservableTrackSnapshot {
     /// ID of this [`ObservableTrackSnapshot`].
-    id: TrackId,
+    pub id: TrackId,
 
     /// If `true` then `MediaTrack` is muted.
-    is_muted: ObservableCell<bool>,
+    pub is_muted: ObservableCell<bool>,
 
     /// Direction of `MediaTrack`.
-    direction: Direction,
+    pub direction: Direction,
 
     /// Media type of `MediaTrack`.
-    media_type: MediaType,
+    pub media_type: MediaType,
 }
 
 impl ObservableTrackSnapshot {

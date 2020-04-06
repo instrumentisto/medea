@@ -1,3 +1,6 @@
+//! Observable implementations for the [`medea_client_api_proto::snapshots`]
+//! which will be used in Jason.
+
 mod peer;
 mod room;
 mod track;

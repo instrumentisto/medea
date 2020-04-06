@@ -17,25 +17,25 @@ use super::ObservableTrackSnapshot;
 #[derive(Debug)]
 pub struct ObservablePeerSnapshot {
     /// ID of the `Peer`.
-    id: PeerId,
+    pub id: PeerId,
 
     /// Current SDP offer of the `Peer`.
-    sdp_offer: Observable<Option<String>>,
+    pub sdp_offer: Observable<Option<String>>,
 
     /// Current SDP answer of the `Peer`.
-    sdp_answer: Observable<Option<String>>,
+    pub sdp_answer: Observable<Option<String>>,
 
     /// Snapshots of the all `MediaTrack`s of this `Peer`.
-    tracks: HashMap<TrackId, Rc<RefCell<ObservableTrackSnapshot>>>,
+    pub tracks: HashMap<TrackId, Rc<RefCell<ObservableTrackSnapshot>>>,
 
     /// All [`IceServer`]s created for this `Peer`.
-    ice_servers: ObservableHashSet<IceServer>,
+    pub ice_servers: ObservableHashSet<IceServer>,
 
     /// Indicates whether all media is forcibly relayed through a TURN server.
-    is_force_relayed: Observable<bool>,
+    pub is_force_relayed: Observable<bool>,
 
     /// All [`IceCandidate`]s of this `Peer`.
-    ice_candidates: ObservableHashSet<IceCandidate>,
+    pub ice_candidates: ObservableHashSet<IceCandidate>,
 }
 
 impl ObservablePeerSnapshot {

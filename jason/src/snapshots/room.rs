@@ -10,19 +10,15 @@ use super::ObservablePeerSnapshot;
 #[derive(Debug)]
 pub struct ObservableRoomSnapshot {
     /// All `Peer`s of this `Room`.
-    peers: ObservableHashMap<PeerId, Rc<RefCell<ObservablePeerSnapshot>>>,
+    pub peers: ObservableHashMap<PeerId, Rc<RefCell<ObservablePeerSnapshot>>>,
 }
 
 impl ObservableRoomSnapshot {
     /// Returns new empty [`ObservableRoomSnapshot`].
     pub fn new() -> Self {
-        Self {
-            peers: ObservableHashMap::new(),
-        }
+        Self::default()
     }
-}
 
-impl ObservableRoomSnapshot {
     /// Returns [`Stream`] to which will be sent reference to the newly created
     /// [`ObservablePeerSnapshot`]s.
     pub fn on_peer_created(
@@ -37,6 +33,14 @@ impl ObservableRoomSnapshot {
         &self,
     ) -> impl Stream<Item = (PeerId, Rc<RefCell<ObservablePeerSnapshot>>)> {
         self.peers.on_remove()
+    }
+}
+
+impl Default for ObservableRoomSnapshot {
+    fn default() -> Self {
+        Self {
+            peers: ObservableHashMap::new(),
+        }
     }
 }
 

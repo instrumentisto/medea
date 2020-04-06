@@ -27,6 +27,7 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{
     MediaStream as SysMediaStream, RtcIceConnectionState, RtcTrackEvent,
 };
@@ -56,7 +57,6 @@ pub use self::{
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
-use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -86,8 +86,8 @@ pub enum PeerError {
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
-#[dispatchable]
 /// Events emitted from [`RtcPeerConnection`].
+#[dispatchable]
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
     ///

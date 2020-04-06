@@ -79,15 +79,22 @@ mod media;
 mod peer;
 mod rpc;
 
+use std::{cell::RefCell, rc::Rc};
+
 use futures::{
     channel::oneshot,
     future::{Either, LocalBoxFuture},
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
+    snapshots::{PeerSnapshotAccessor, TrackSnapshotAccessor},
+    AudioSettings, Direction, IceServer, MediaType, PeerId, Track, TrackId,
+    VideoSettings,
 };
-use medea_jason::utils::{window, JasonError};
+use medea_jason::{
+    snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
+    utils::{window, JasonError},
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -114,6 +121,67 @@ extern "C" {
 #[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
+}
+
+use futures::channel::mpsc;
+use medea_jason::{
+    media::MediaManager,
+    peer::{PeerConnection, PeerEvent},
+};
+use std::collections::{HashMap, HashSet};
+
+pub fn get_peer(
+    peer_id: PeerId,
+    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+    ice_servers: HashSet<IceServer>,
+    media_manager: Rc<MediaManager>,
+    is_force_relayed: bool,
+) -> (Rc<PeerConnection>, ObservablePeerSnapshot) {
+    let observable_peer = ObservablePeerSnapshot::new(
+        peer_id,
+        None,
+        ice_servers,
+        is_force_relayed,
+        HashMap::new(),
+    );
+    (
+        PeerConnection::new(
+            &observable_peer,
+            peer_events_sender,
+            media_manager,
+        )
+        .unwrap(),
+        observable_peer,
+    )
+}
+
+pub fn get_observable_tracks(
+    is_audio_muted: bool,
+    is_video_muted: bool,
+) -> (
+    Rc<RefCell<ObservableTrackSnapshot>>,
+    Rc<RefCell<ObservableTrackSnapshot>>,
+) {
+    (
+        Rc::new(RefCell::new(ObservableTrackSnapshot::new(
+            TrackId(1),
+            is_audio_muted,
+            Direction::Send {
+                receivers: vec![PeerId(2)],
+                mid: None,
+            },
+            MediaType::Audio(AudioSettings {}),
+        ))),
+        Rc::new(RefCell::new(ObservableTrackSnapshot::new(
+            TrackId(2),
+            is_video_muted,
+            Direction::Send {
+                receivers: vec![PeerId(2)],
+                mid: None,
+            },
+            MediaType::Video(VideoSettings {}),
+        ))),
+    )
 }
 
 pub fn get_test_tracks(

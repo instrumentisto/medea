@@ -2,6 +2,7 @@ use actix::{Context, System};
 use medea_client_api_proto::{Direction, Event};
 
 use crate::signalling::TestMember;
+use std::collections::HashSet;
 
 #[test]
 fn pub_sub_video_call() {
@@ -37,18 +38,13 @@ fn pub_sub_video_call() {
                 } = &events[0]
                 {
                     assert_eq!(ice_servers.len(), 2);
-                    assert_eq!(
-                        ice_servers[0].urls[0],
-                        "stun:localhost:3478".to_string()
-                    );
-                    assert_eq!(
-                        ice_servers[1].urls[0],
-                        "turn:localhost:3478".to_string()
-                    );
-                    assert_eq!(
-                        ice_servers[1].urls[1],
-                        "turn:localhost:3478?transport=tcp".to_string()
-                    );
+                    let urls: HashSet<_> = ice_servers
+                        .iter()
+                        .flat_map(|i| i.urls.iter().cloned())
+                        .collect();
+                    assert!(urls.contains("stun:localhost:3478"));
+                    assert!(urls.contains("turn:localhost:3478"));
+                    assert!(urls.contains("turn:localhost:3478?transport=tcp"));
                     assert_eq!(force_relay, &true);
 
                     if sdp_offer.is_some() {

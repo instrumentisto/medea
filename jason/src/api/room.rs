@@ -394,7 +394,11 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
-    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
+    pub fn new(
+        rpc: Rc<dyn RpcClient>,
+        peers: Box<dyn PeerRepository>,
+        snapshot: ObservableRoomSnapshot,
+    ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
             PeerEvent(PeerEvent),
@@ -402,7 +406,8 @@ impl Room {
 
         let (tx, peer_events_rx) = mpsc::unbounded();
         let events_stream = rpc.subscribe();
-        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
+        let room =
+            Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx, snapshot)));
 
         let inner = Rc::downgrade(&room);
         let mut on_peer_created = room.borrow().state.on_peer_created();
@@ -472,6 +477,24 @@ impl Room {
         });
 
         Self(room)
+    }
+
+    #[cfg(feature = "mockable")]
+    pub fn insert_track_snapshot(
+        &self,
+        peer_id: PeerId,
+        track_snapshot: Rc<RefCell<ObservableTrackSnapshot>>,
+    ) {
+        let track_id = track_snapshot.borrow().id;
+        self.0
+            .borrow_mut()
+            .state
+            .peers
+            .get(&peer_id)
+            .unwrap()
+            .borrow_mut()
+            .tracks
+            .insert(track_id, track_snapshot);
     }
 
     /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
@@ -546,6 +569,7 @@ struct InnerRoom {
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: CloseReason,
 
+    /// Snapshot of this [`Room`].
     state: ObservableRoomSnapshot,
 }
 
@@ -556,6 +580,7 @@ impl InnerRoom {
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+        snapshot: ObservableRoomSnapshot,
     ) -> Self {
         Self {
             rpc,
@@ -572,7 +597,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             },
-            state: ObservableRoomSnapshot::new(),
+            state: snapshot,
         }
     }
 

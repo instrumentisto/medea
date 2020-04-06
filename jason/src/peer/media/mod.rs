@@ -462,7 +462,8 @@ impl Sender {
         });
 
         let weak_this = Rc::downgrade(&this);
-        let mut on_track_update = track_state.borrow().on_track_update();
+        let mut on_track_update =
+            track_state.borrow().on_track_update().skip(1);
         spawn_local(async move {
             while let Some(is_muted) = on_track_update.next().await {
                 if let Some(this) = weak_this.upgrade() {

@@ -20,7 +20,16 @@ use medea_jason::{
 };
 use wasm_bindgen_test::*;
 
-use crate::{await_with_timeout, get_test_tracks, resolve_after};
+use crate::{
+    await_with_timeout, get_observable_tracks, get_peer, get_test_tracks,
+    resolve_after,
+};
+use medea_client_api_proto::snapshots::TrackSnapshotAccessor;
+use medea_jason::{
+    snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
+    utils::console_error,
+};
+use std::{cell::RefCell, collections::HashSet};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -44,9 +53,9 @@ const VIDEO_TRACK_ID: u64 = 2;
 async fn mute_unmute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, false);
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+    let (audio_track, video_track) = get_observable_tracks(false, false);
+    let (peer, _snapshot) =
+        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
     peer.get_offer(vec![audio_track, video_track], None)
         .await
@@ -70,9 +79,9 @@ async fn mute_unmute_audio() {
 async fn mute_unmute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, false);
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+    let (audio_track, video_track) = get_observable_tracks(false, false);
+    let (peer, _snapshot) =
+        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -95,9 +104,9 @@ async fn mute_unmute_video() {
 async fn new_with_mute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(true, false);
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+    let (audio_track, video_track) = get_observable_tracks(true, false);
+    let (peer, _snapshot) =
+        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
     peer.get_offer(vec![audio_track, video_track], None)
         .await
@@ -111,9 +120,9 @@ async fn new_with_mute_audio() {
 async fn new_with_mute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, true);
-    let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+    let (audio_track, video_track) = get_observable_tracks(false, true);
+    let (peer, _snapshot) =
+        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -128,13 +137,12 @@ async fn add_candidates_to_answerer_before_offer() {
     let (tx2, _) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let pc1 =
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap();
+    let (pc1, _snapshot1) =
+        get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
 
-    let pc2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (pc2, _snapshot2) =
+        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (audio_track, video_track) = get_observable_tracks(false, false);
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None)
         .await
@@ -156,15 +164,12 @@ async fn add_candidates_to_offerer_before_answer() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let pc1 = Rc::new(
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap(),
-    );
-    let pc2 = Rc::new(
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap(),
-    );
+    let (pc1, _snapshot1) =
+        get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
+    let (pc2, _snapshot2) =
+        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
 
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_observable_tracks(false, false);
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None)
         .await
@@ -186,12 +191,11 @@ async fn normal_exchange_of_candidates() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let peer1 =
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap();
-    let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (peer1, _snapshot1) =
+        get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
+    let (peer2, _snapshot2) =
+        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (audio_track, video_track) = get_observable_tracks(false, false);
 
     let offer = peer1
         .get_offer(vec![audio_track.clone(), video_track.clone()], None)
@@ -243,9 +247,9 @@ async fn handle_ice_candidates(
 async fn send_event_on_new_local_stream() {
     let (tx, mut rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, true);
+    let (audio_track, video_track) = get_observable_tracks(false, true);
     let id = PeerId(1);
-    let peer = PeerConnection::new(id, tx, vec![], manager, false).unwrap();
+    let (peer, _snapshot) = get_peer(id, tx, HashSet::new(), manager, false);
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -270,19 +274,22 @@ async fn ice_connection_state_changed_is_emitted() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let peer1 =
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap();
-    let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (peer1, _snapshot1) =
+        get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
+    let (peer2, _snapshot2) =
+        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (audio_track, video_track) = get_observable_tracks(false, false);
 
     let offer = peer1
         .get_offer(vec![audio_track.clone(), video_track.clone()], None)
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track], None)
+        .process_offer(
+            offer,
+            vec![audio_track.clone(), video_track.clone()],
+            None,
+        )
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
@@ -357,6 +364,14 @@ struct InterconnectedPeers {
     /// direction and one `audio` track with `recv` direction.
     pub second_peer: PeerConnection,
 
+    pub first_peer_tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
+
+    pub second_peer_tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
+
+    pub first_peer_snapshot: ObservablePeerSnapshot,
+
+    pub second_peer_snapshot: ObservablePeerSnapshot,
+
     /// All [`PeerEvent`]s of this two interconnected [`PeerConnection`]s.
     pub peer_events_recv: Pin<Box<dyn Stream<Item = PeerEvent>>>,
 }
@@ -368,23 +383,34 @@ impl InterconnectedPeers {
         let (tx2, peer_events_stream2) = mpsc::unbounded();
 
         let manager = Rc::new(MediaManager::default());
-        let peer1 = PeerConnection::new(
+        let (peer1, first_peer_snapshot) = get_peer(
             PeerId(1),
             tx1,
-            vec![],
+            HashSet::new(),
             Rc::clone(&manager),
             false,
-        )
-        .unwrap();
-        let peer2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, false)
-            .unwrap();
+        );
+        let peer1 = if let Ok(peer1) = Rc::try_unwrap(peer1) {
+            peer1
+        } else {
+            panic!("Failed to unwrap Rc of the PeerConnection.");
+        };
+        let (peer2, second_peer_snapshot) =
+            get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+        let peer2 = if let Ok(peer2) = Rc::try_unwrap(peer2) {
+            peer2
+        } else {
+            panic!("Failed to unwrap Rc of the PeerConnection.")
+        };
 
+        let first_peer_tracks = Self::get_peer1_tracks();
         let offer = peer1
-            .get_offer(Self::get_peer1_tracks(), None)
+            .get_offer(first_peer_tracks.clone(), None)
             .await
             .unwrap();
+        let second_peer_tracks = Self::get_peer2_tracks();
         let answer = peer2
-            .process_offer(offer, Self::get_peer2_tracks(), None)
+            .process_offer(offer, second_peer_tracks.clone(), None)
             .await
             .unwrap();
         peer1.set_remote_answer(answer).await.unwrap();
@@ -398,6 +424,10 @@ impl InterconnectedPeers {
             first_peer: peer1,
             second_peer: peer2,
             peer_events_recv: Box::pin(events),
+            first_peer_tracks,
+            second_peer_tracks,
+            first_peer_snapshot,
+            second_peer_snapshot,
         };
 
         interconnected_peers.handle_ice_candidates().await;
@@ -475,50 +505,50 @@ impl InterconnectedPeers {
     }
 
     /// Returns [`Track`]s for the `first_peer`.
-    fn get_peer1_tracks() -> Vec<Track> {
+    fn get_peer1_tracks() -> Vec<Rc<RefCell<ObservableTrackSnapshot>>> {
         vec![
-            Track {
-                id: TrackId(1),
-                direction: Direction::Send {
+            Rc::new(RefCell::new(ObservableTrackSnapshot::new(
+                TrackId(1),
+                false,
+                Direction::Send {
                     receivers: vec![PeerId(2)],
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {}),
-                is_muted: false,
-            },
-            Track {
-                id: TrackId(2),
-                direction: Direction::Send {
+                MediaType::Audio(AudioSettings {}),
+            ))),
+            Rc::new(RefCell::new(ObservableTrackSnapshot::new(
+                TrackId(2),
+                false,
+                Direction::Send {
                     receivers: vec![PeerId(2)],
                     mid: None,
                 },
-                media_type: MediaType::Video(VideoSettings {}),
-                is_muted: false,
-            },
+                MediaType::Video(VideoSettings {}),
+            ))),
         ]
     }
 
     /// Returns [`Track`]s for the `second_peer`.
-    fn get_peer2_tracks() -> Vec<Track> {
+    fn get_peer2_tracks() -> Vec<Rc<RefCell<ObservableTrackSnapshot>>> {
         vec![
-            Track {
-                id: TrackId(1),
-                direction: Direction::Recv {
+            Rc::new(RefCell::new(ObservableTrackSnapshot::new(
+                TrackId(1),
+                false,
+                Direction::Recv {
                     sender: PeerId(1),
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {}),
-                is_muted: false,
-            },
-            Track {
-                id: TrackId(2),
-                direction: Direction::Recv {
+                MediaType::Audio(AudioSettings {}),
+            ))),
+            Rc::new(RefCell::new(ObservableTrackSnapshot::new(
+                TrackId(2),
+                false,
+                Direction::Recv {
                     sender: PeerId(2),
                     mid: None,
                 },
-                media_type: MediaType::Video(VideoSettings {}),
-                is_muted: false,
-            },
+                MediaType::Video(VideoSettings {}),
+            ))),
         ]
     }
 }
@@ -598,8 +628,8 @@ mod peer_stats_caching {
     async fn works() {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
-        let peer =
-            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        let (peer, _snapshot) =
+            get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
         let stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
@@ -638,8 +668,8 @@ mod peer_stats_caching {
     async fn takes_into_account_stat_id() {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
-        let peer =
-            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        let (peer, _snapshot) =
+            get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
         let mut stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
@@ -678,8 +708,8 @@ mod peer_stats_caching {
     async fn sends_updated_stats() {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
-        let peer =
-            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        let (peer, _snapshot) =
+            get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
         let mut track_stat = Box::new(TrackStat {
             track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
