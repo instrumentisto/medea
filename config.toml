@@ -49,6 +49,9 @@
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
 #
+# It applies to all related pipelines as default value, but can be overridden
+# for each specific case via Control API.
+#
 # Env var: MEDEA_RPC__IDLE_TIMEOUT
 # Default:
 #   idle_timeout = "10s"
@@ -56,11 +59,17 @@
 # Duration, after which the server deletes client session if remote RPC client
 # does not reconnect after it is idle.
 #
+# It applies to all related pipelines as default value, but can be overridden
+# for each specific case via Control API.
+#
 # Env var: MEDEA_RPC__RECONNECT_TIMEOUT
 # Default:
 #   reconnect_timeout = "10s"
 
 # Interval between pings that server sends to clients.
+#
+# It applies to all related pipelines as default value, but can be overridden
+# for each specific case via Control API.
 #
 # Env var: MEDEA_RPC__PING_INTERVAL
 # Default:

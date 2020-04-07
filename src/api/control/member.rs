@@ -2,7 +2,11 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    time::Duration,
+};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
@@ -61,6 +65,20 @@ pub struct MemberSpec {
 
     /// URL to which `OnLeave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
+
+    /// Timeout of receiving heartbeat messages from the `Member` via Client
+    /// API.
+    ///
+    /// Once reached, the `Member` is considered being idle.
+    idle_timeout: Option<Duration>,
+
+    /// Timeout of the `Member` reconnecting via Client API.
+    ///
+    /// Once reached, the `Member` is considered disconnected.
+    reconnect_timeout: Option<Duration>,
+
+    /// Interval of sending `Ping`s to the `Member` via Client API.
+    ping_interval: Option<Duration>,
 }
 
 impl Into<RoomElement> for MemberSpec {
@@ -70,6 +88,9 @@ impl Into<RoomElement> for MemberSpec {
             credentials: self.credentials,
             on_join: self.on_join,
             on_leave: self.on_leave,
+            idle_timeout: self.idle_timeout,
+            reconnect_timeout: self.reconnect_timeout,
+            ping_interval: self.ping_interval,
         }
     }
 }
@@ -82,12 +103,18 @@ impl MemberSpec {
         credentials: String,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
+        idle_timeout: Option<Duration>,
+        reconnect_timeout: Option<Duration>,
+        ping_interval: Option<Duration>,
     ) -> Self {
         Self {
             pipeline,
             credentials,
             on_join,
             on_leave,
+            idle_timeout,
+            reconnect_timeout,
+            ping_interval,
         }
     }
 
@@ -142,6 +169,26 @@ impl MemberSpec {
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
     }
+
+    /// Returns timeout of receiving heartbeat messages from the `Member` via
+    /// Client API.
+    ///
+    /// Once reached, the `Member` is considered being idle.
+    pub fn idle_timeout(&self) -> Option<Duration> {
+        self.idle_timeout
+    }
+
+    /// Returns timeout of the `Member` reconnecting via Client API.
+    ///
+    /// Once reached, the `Member` is considered disconnected.
+    pub fn reconnect_timeout(&self) -> Option<Duration> {
+        self.reconnect_timeout
+    }
+
+    /// Returns interval of sending `Ping`s to the `Member` via Client API.
+    pub fn ping_interval(&self) -> Option<Duration> {
+        self.ping_interval
+    }
 }
 
 /// Generates alphanumeric credentials for [`Member`] with
@@ -163,6 +210,16 @@ impl TryFrom<proto::Member> for MemberSpec {
     type Error = TryFromProtobufError;
 
     fn try_from(member: proto::Member) -> Result<Self, Self::Error> {
+        fn parse_duration<T: TryInto<Duration>>(
+            duration: Option<T>,
+            member_id: &str,
+            field: &'static str,
+        ) -> Result<Option<Duration>, TryFromProtobufError> {
+            duration.map(TryInto::try_into).transpose().map_err(|_| {
+                TryFromProtobufError::NegativeDuration(member_id.into(), field)
+            })
+        }
+
         let mut pipeline = HashMap::new();
         for (id, member_element) in member.pipeline {
             if let Some(elem) = member_element.el {
@@ -196,11 +253,24 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         };
 
+        let idle_timeout =
+            parse_duration(member.idle_timeout, &member.id, "idle_timeout")?;
+        let reconnect_timeout = parse_duration(
+            member.reconnect_timeout,
+            &member.id,
+            "reconnect_timeout",
+        )?;
+        let ping_interval =
+            parse_duration(member.ping_interval, &member.id, "ping_interval")?;
+
         Ok(Self {
             pipeline: Pipeline::new(pipeline),
             credentials,
             on_join,
             on_leave,
+            idle_timeout,
+            reconnect_timeout,
+            ping_interval,
         })
     }
 }
@@ -242,11 +312,17 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 credentials,
                 on_leave,
                 on_join,
+                idle_timeout,
+                reconnect_timeout,
+                ping_interval,
             } => Ok(Self {
                 pipeline: spec.clone(),
                 credentials: credentials.clone(),
                 on_leave: on_leave.clone(),
                 on_join: on_join.clone(),
+                idle_timeout: *idle_timeout,
+                reconnect_timeout: *reconnect_timeout,
+                ping_interval: *ping_interval,
             }),
             _ => Err(TryFromElementError::NotMember),
         }

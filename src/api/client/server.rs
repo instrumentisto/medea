@@ -65,13 +65,13 @@ async fn ws_index(
                 })
                 .await?;
             match auth_result {
-                Ok(_) => ws::start(
+                Ok(settings) => ws::start(
                     WsSession::new(
                         member_id,
                         room_id,
                         Box::new(room),
-                        state.config.idle_timeout,
-                        state.config.ping_interval,
+                        settings.idle_timeout,
+                        settings.ping_interval,
                     ),
                     &request,
                     payload,
@@ -113,7 +113,7 @@ impl Server {
 
         let server = HttpServer::new(move || {
             App::new()
-                .app_data(Self::app_data(rooms.clone(), config.rpc.clone()))
+                .app_data(Self::app_data(rooms.clone(), config.rpc))
                 .configure(Self::configure)
                 .wrap(middleware::Logger::default())
         })
@@ -201,7 +201,7 @@ mod test {
             App::new()
                 .app_data(Server::app_data(
                     build_room_repo(conf.clone()),
-                    conf.rpc.clone(),
+                    conf.rpc,
                 ))
                 .configure(Server::configure)
         })

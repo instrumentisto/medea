@@ -2,7 +2,7 @@
 //!
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
 use actix::Message;
 use derive_more::{From, Into};
@@ -60,14 +60,28 @@ pub trait RpcConnection: fmt::Debug + Send {
         -> LocalBoxFuture<'static, Result<(), ()>>;
 }
 
+/// Settings of [`WsSession`].
+#[derive(Clone, Copy, Debug)]
+pub struct RpcConnectionSettings {
+    /// [`Duration`], after which [`WsSession`] will be considered idle if no
+    /// heartbeat messages were received.
+    pub idle_timeout: Duration,
+
+    /// Interval of sending `Ping`s to remote [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    pub ping_interval: Duration,
+}
+
 /// Signal for authorizing new [`RpcConnection`] before establishing.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), AuthorizationError>")]
+#[rtype(result = "Result<RpcConnectionSettings, AuthorizationError>")]
 pub struct Authorize {
     /// ID of [`Member`] to authorize [`RpcConnection`] for.
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
     /// Credentials to authorize [`RpcConnection`] with.
     pub credentials: String, // TODO: &str when futures will allow references
 }
@@ -82,6 +96,7 @@ pub enum AuthorizationError {
     /// [`Member`]: crate::signalling::elements::member::Member
     /// [`Room`]: crate::signalling::Room
     MemberNotExists,
+
     /// Provided credentials are invalid.
     InvalidCredentials,
 }
@@ -97,6 +112,7 @@ pub struct RpcConnectionEstablished {
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,
 }
@@ -110,6 +126,7 @@ pub struct RpcConnectionClosed {
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
     /// Reason of why [`RpcConnection`] is closed.
     pub reason: ClosedReason,
 }
@@ -130,6 +147,7 @@ pub enum ClosedReason {
         /// [`Away`]: actix_http::ws::CloseCode::Away
         normal: bool,
     },
+
     /// [`RpcConnection`] was lost, but may be reestablished.
     Lost,
 }
