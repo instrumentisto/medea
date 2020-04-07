@@ -194,7 +194,25 @@ const controlDebugWindows = {
       let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
       let credentials = container.getElementsByClassName('member-spec__credentials')[0].value;
 
-      await controlApi.createMember(roomId, memberId, credentials);
+      let idleTimeout = container.getElementsByClassName('member-spec__idle-timeout')[0].value;
+      let reconnectTimeout = container.getElementsByClassName('member-spec__reconnect-timeout')[0].value;
+      let pingInterval = container.getElementsByClassName('member-spec__ping-interval')[0].value;
+
+      let spec = {};
+      if (credentials.length > 0) {
+        spec.credentials = credentials;
+      }
+      if (idleTimeout.length > 0) {
+        spec.idle_timeout = idleTimeout;
+      }
+      if (reconnectTimeout.length > 0) {
+        spec.reconnect_timeout = reconnectTimeout;
+      }
+      if (pingInterval.length > 0) {
+        spec.ping_interval = pingInterval;
+      }
+
+      await controlApi.createMember(roomId, memberId, spec);
     });
   },
 
@@ -546,16 +564,15 @@ const controlApi = {
     }
   },
 
-  createMember: async function(roomId, memberId, credentials) {
+  createMember: async function(roomId, memberId, spec) {
+    spec.kind = 'Member';
+    spec.pipeline = {};
+
     try {
       await axios({
         method: 'post',
         url: controlUrl + roomId + '/' + memberId,
-        data: {
-          kind: 'Member',
-          credentials: credentials,
-          pipeline: {}
-        }
+        data: spec
       });
     } catch (e) {
       alert(JSON.stringify(e.response.data));
