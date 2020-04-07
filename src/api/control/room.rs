@@ -2,7 +2,7 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
@@ -38,6 +38,12 @@ pub enum RoomElement {
         credentials: String,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
+        #[serde(default, with = "humantime_serde")]
+        idle_timeout: Option<Duration>,
+        #[serde(default, with = "humantime_serde")]
+        reconnect_timeout: Option<Duration>,
+        #[serde(default, with = "humantime_serde")]
+        ping_interval: Option<Duration>,
     },
 }
 

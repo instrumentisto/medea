@@ -1,6 +1,6 @@
 //! `Member` element related methods and entities.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto as _, time::Duration};
 
 use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,20 @@ pub struct Member {
     /// URL to which `OnLeave` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     on_leave: Option<String>,
+
+    /// Timeout of receiving heartbeat messages from the `Member` via Client
+    /// API. Once reached, the `Member` is considered being idle.
+    #[serde(default, with = "humantime_serde")]
+    idle_timeout: Option<Duration>,
+
+    /// Timeout of the `Member` reconnecting via Client API.
+    /// Once reached, the `Member` is considered disconnected.
+    #[serde(default, with = "humantime_serde")]
+    reconnect_timeout: Option<Duration>,
+
+    /// Interval of sending pings from Medea to the `Member` via Client API.
+    #[serde(default, with = "humantime_serde")]
+    ping_interval: Option<Duration>,
 }
 
 impl Member {
@@ -51,6 +65,9 @@ impl Member {
             credentials: self.credentials.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
             on_leave: self.on_leave.unwrap_or_default(),
+            idle_timeout: self.idle_timeout.map(Into::into),
+            reconnect_timeout: self.reconnect_timeout.map(Into::into),
+            ping_interval: self.ping_interval.map(Into::into),
         }
     }
 
@@ -77,6 +94,13 @@ impl From<proto::Member> for Member {
             credentials: Some(proto.credentials),
             on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
+            idle_timeout: proto.idle_timeout.map(|dur| dur.try_into().unwrap()),
+            reconnect_timeout: proto
+                .reconnect_timeout
+                .map(|dur| dur.try_into().unwrap()),
+            ping_interval: proto
+                .ping_interval
+                .map(|dur| dur.try_into().unwrap()),
         }
     }
 }
