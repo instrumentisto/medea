@@ -23,3 +23,4 @@ derive_more = "0.99"
 medea-macro = { path = "../../crates/medea-macro" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_with = "1.4"
