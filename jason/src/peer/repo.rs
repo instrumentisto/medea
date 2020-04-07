@@ -79,7 +79,7 @@ impl Repository {
                 let peers =
                     peers.borrow().values().cloned().collect::<Vec<_>>();
                 future::join_all(
-                    peers.iter().map(|peer| peer.scrape_and_send_peer_stats()),
+                    peers.iter().map(|p| p.scrape_and_send_peer_stats()),
                 )
                 .await;
             }

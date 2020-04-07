@@ -19,8 +19,8 @@ pub mod prelude;
 /// Created [`Logger`] produces log records with `fqn`, `lvl`, `time` and `msg`
 /// fields by default.
 ///
-/// Note: you may encounter log drops when running in debug mode, which should
-/// not be the case for release mode.
+/// __Note:__ You may encounter log drops when running in debug mode, which
+/// should not be the case for release mode.
 pub fn new_dual_logger<W1, W2>(w_out: W1, w_err: W2) -> Logger
 where
     W1: io::Write + Send + 'static,
@@ -40,7 +40,7 @@ where
 
 /// Adds default log record data (key-value pairs) to specified [`Logger`]:
 /// - `msg`: log record message.
-/// - `fqn`: path to code line that called log function
+/// - `fqn`: path to code line that called log function.
 /// - `time`: creation date and time of log record in [RFC 3339] format.
 /// - `lvl`: logging level of log record.
 ///
