@@ -14,20 +14,18 @@ use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::{
-    MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-};
+use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{
-    media::TrackConstraints,
+    media::{MediaStreamTrack, TrackConstraints},
     utils::{delay_for, JsCaused, JsError},
 };
 
 use super::{
     conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-    stream::MediaStream,
+    stream::PeerMediaStream,
     stream_request::StreamRequest,
-    track::MediaTrack,
+    track::PeerMediaTrack,
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
@@ -297,7 +295,7 @@ impl MediaConnections {
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_stream(
         &self,
-        stream: &MediaStream,
+        stream: &PeerMediaStream,
     ) -> Result<()> {
         let inner = self.0.borrow();
 
@@ -305,7 +303,7 @@ impl MediaConnections {
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         for sender in inner.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                if sender.caps.satisfies(&track.track()) {
+                if sender.caps.satisfies(track.track().as_ref()) {
                     sender_and_track.push((sender, track));
                 } else {
                     return Err(tracerr::new!(
@@ -344,7 +342,7 @@ impl MediaConnections {
             for receiver in &mut inner.receivers.values_mut() {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
-                        let track = MediaTrack::new(
+                        let track = PeerMediaTrack::new(
                             receiver.track_id,
                             track,
                             receiver.caps.clone(),
@@ -364,9 +362,9 @@ impl MediaConnections {
     pub fn get_tracks_by_sender(
         &self,
         sender_id: PeerId,
-    ) -> Option<Vec<Rc<MediaTrack>>> {
+    ) -> Option<Vec<Rc<PeerMediaTrack>>> {
         let s = self.0.borrow();
-        let mut tracks: Vec<Rc<MediaTrack>> = Vec::new();
+        let mut tracks: Vec<Rc<PeerMediaTrack>> = Vec::new();
         for rcv in s.receivers.values() {
             if rcv.sender_id == sender_id {
                 match rcv.track() {
@@ -383,7 +381,7 @@ impl MediaConnections {
         &self,
         direction: TransceiverDirection,
         id: TrackId,
-    ) -> Option<Rc<MediaTrack>> {
+    ) -> Option<Rc<PeerMediaTrack>> {
         let inner = self.0.borrow();
         match direction {
             TransceiverDirection::Sendonly => inner
@@ -404,7 +402,7 @@ impl MediaConnections {
 
     /// Returns [`MediaTrack`] from this [`MediaConnections`] by its
     /// [`TrackId`].
-    pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<MediaTrack>> {
+    pub fn get_track_by_id(&self, id: TrackId) -> Option<Rc<PeerMediaTrack>> {
         let inner = self.0.borrow();
         inner
             .senders
@@ -421,7 +419,7 @@ impl MediaConnections {
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
-    track: RefCell<Option<Rc<MediaTrack>>>,
+    track: RefCell<Option<Rc<PeerMediaTrack>>>,
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
 }
@@ -464,8 +462,27 @@ impl Sender {
                 if let Some(this) = weak_this.upgrade() {
                     match mute_state_update {
                         MuteState::Stable(stable) => {
-                            if let Some(track) = this.track.borrow().as_ref() {
-                                track.set_enabled_by_mute_state(stable);
+                            match stable {
+                                StableMuteState::NotMuted => {
+                                    // do request
+                                    // unimplemented!()
+                                }
+                                StableMuteState::Muted => {
+                                    if let Some(track) =
+                                        this.track.borrow().as_ref()
+                                    {
+                                        track.set_enabled(false);
+                                    }
+
+                                    // cannot fail
+                                    let _ = JsFuture::from(
+                                        this.transceiver
+                                            .sender()
+                                            .replace_track(None),
+                                    )
+                                    .await;
+                                    this.track.borrow_mut().take();
+                                }
                             }
                         }
                         MuteState::Transition(_) => {
@@ -527,13 +544,13 @@ impl Sender {
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     async fn insert_and_enable_track(
         sender: Rc<Self>,
-        track: Rc<MediaTrack>,
+        track: Rc<PeerMediaTrack>,
     ) -> Result<()> {
         JsFuture::from(
             sender
                 .transceiver
                 .sender()
-                .replace_track(Some(track.track())),
+                .replace_track(Some(track.track().as_ref())),
         )
         .await
         .map_err(Into::into)
@@ -605,7 +622,7 @@ impl Sender {
         }
     }
 
-    /// Updates this [`Track`] basing on the provided [`proto::TrackPatch`].
+    /// Updates this [`Track`] based on the provided [`proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
         if track.id != self.track_id {
             return;
@@ -642,7 +659,7 @@ pub struct Receiver {
     sender_id: PeerId,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
-    track: Option<Rc<MediaTrack>>,
+    track: Option<Rc<PeerMediaTrack>>,
 }
 
 impl Receiver {
@@ -680,7 +697,7 @@ impl Receiver {
 
     /// Returns associated [`MediaTrack`] with this [`Receiver`], if any.
     #[inline]
-    pub(crate) fn track(&self) -> Option<&Rc<MediaTrack>> {
+    pub(crate) fn track(&self) -> Option<&Rc<PeerMediaTrack>> {
         self.track.as_ref()
     }
 

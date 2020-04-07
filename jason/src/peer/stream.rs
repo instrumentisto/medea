@@ -11,9 +11,12 @@ use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::{media::TrackConstraints, utils::HandlerDetachedError};
+use crate::{
+    media::{MediaStream, TrackConstraints},
+    utils::HandlerDetachedError,
+};
 
-use super::MediaTrack;
+use super::PeerMediaTrack;
 
 /// Actual data of a [`MediaStream`].
 ///
@@ -26,10 +29,10 @@ struct InnerStream {
     stream: SysMediaStream,
 
     /// List of audio tracks.
-    audio_tracks: HashMap<TrackId, Rc<MediaTrack>>,
+    audio_tracks: HashMap<TrackId, Rc<PeerMediaTrack>>,
 
     /// List of video tracks.
-    video_tracks: HashMap<TrackId, Rc<MediaTrack>>,
+    video_tracks: HashMap<TrackId, Rc<PeerMediaTrack>>,
 }
 
 impl InnerStream {
@@ -43,8 +46,8 @@ impl InnerStream {
     }
 
     /// Adds provided [`MediaTrack`] to a stream.
-    fn add_track(&mut self, track: Rc<MediaTrack>) {
-        self.stream.add_track(track.track());
+    fn add_track(&mut self, track: Rc<PeerMediaTrack>) {
+        self.stream.add_track(track.track().as_ref());
         let caps = track.caps();
         match caps {
             TrackConstraints::Audio(_) => {
@@ -64,13 +67,13 @@ impl InnerStream {
 /// For using [`MediaStream`] on JS side, consider the [`MediaStreamHandle`].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-pub struct MediaStream(Rc<InnerStream>);
+pub struct PeerMediaStream(Rc<InnerStream>);
 
-impl MediaStream {
+impl PeerMediaStream {
     /// Creates new [`MediaStream`] from a given collection of [`MediaTrack`]s.
     pub fn from_tracks<I>(tracks: I) -> Self
     where
-        I: IntoIterator<Item = Rc<MediaTrack>>,
+        I: IntoIterator<Item = Rc<PeerMediaTrack>>,
     {
         let mut stream = InnerStream::new();
         for track in tracks {
@@ -86,7 +89,10 @@ impl MediaStream {
     }
 
     /// Returns a [`MediaTrack`] of [`MediaStream`] by its ID, if any.
-    pub fn get_track_by_id(&self, track_id: TrackId) -> Option<Rc<MediaTrack>> {
+    pub fn get_track_by_id(
+        &self,
+        track_id: TrackId,
+    ) -> Option<Rc<PeerMediaTrack>> {
         match self.0.video_tracks.get(&track_id) {
             Some(track) => Some(Rc::clone(track)),
             None => match self.0.audio_tracks.get(&track_id) {
@@ -107,6 +113,19 @@ impl MediaStream {
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.stream)
     }
+
+    pub fn media_stream(&self) -> MediaStream {
+        let mut tracks = Vec::new();
+
+        self.0.audio_tracks.values().for_each(|track| {
+            tracks.push(track.track().clone());
+        });
+        self.0.video_tracks.values().for_each(|track| {
+            tracks.push(track.track().clone());
+        });
+
+        MediaStream::new(tracks)
+    }
 }
 
 /// JS side handle to [`MediaStream`].
@@ -121,6 +140,6 @@ pub struct MediaStreamHandle(Weak<InnerStream>);
 impl MediaStreamHandle {
     /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| inner.stream.clone())
+        upgrade_or_detached!(self.0).map(|inner| Clone::clone(&inner.stream))
     }
 }

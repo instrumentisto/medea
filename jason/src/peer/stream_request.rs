@@ -7,19 +7,16 @@ use std::{collections::HashMap, convert::TryFrom};
 use derive_more::Display;
 use medea_client_api_proto::TrackId;
 use tracerr::Traced;
-use web_sys::{
-    MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
-};
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
-        VideoTrackConstraints,
+        AudioTrackConstraints, MediaStream, MediaStreamConstraints,
+        TrackConstraints, TrackKind, VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
 
-use super::{MediaStream, MediaTrack};
+use super::{PeerMediaStream, PeerMediaTrack};
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
@@ -123,23 +120,27 @@ impl SimpleStreamRequest {
     ///
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
     /// [`SysMediaStream`] doesn't have expected video [`MediaTrack`].
-    pub fn parse_stream(&self, stream: &SysMediaStream) -> Result<MediaStream> {
+    pub fn parse_stream(
+        &self,
+        mut stream: MediaStream,
+    ) -> Result<PeerMediaStream> {
         use StreamRequestError::*;
+        crate::utils::console_error("parse_stream start");
 
-        let mut tracks = Vec::new();
+        let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
+            .take_tracks()
+            .into_iter()
+            .partition(|track| match track.kind() {
+                TrackKind::Audio { .. } => false,
+                TrackKind::Video { .. } => true,
+            });
+        let mut result_tracks = Vec::new();
 
         if let Some((id, audio)) = &self.audio {
-            let audio_tracks: Vec<_> =
-                js_sys::try_iter(&stream.get_audio_tracks())
-                    .unwrap()
-                    .unwrap()
-                    .map(|tr| SysMediaStreamTrack::from(tr.unwrap()))
-                    .collect();
-
             if audio_tracks.len() == 1 {
                 let track = audio_tracks.into_iter().next().unwrap();
-                if audio.satisfies(&track) {
-                    tracks.push(MediaTrack::new(
+                if audio.satisfies(track.as_ref()) {
+                    result_tracks.push(PeerMediaTrack::new(
                         *id,
                         track,
                         TrackConstraints::Audio(audio.clone()),
@@ -153,17 +154,10 @@ impl SimpleStreamRequest {
         }
 
         if let Some((id, video)) = &self.video {
-            let video_tracks: Vec<_> =
-                js_sys::try_iter(&stream.get_video_tracks())
-                    .unwrap()
-                    .unwrap()
-                    .map(|tr| SysMediaStreamTrack::from(tr.unwrap()))
-                    .collect();
-
             if video_tracks.len() == 1 {
                 let track = video_tracks.into_iter().next().unwrap();
-                if video.satisfies(&track) {
-                    tracks.push(MediaTrack::new(
+                if video.satisfies(track.as_ref()) {
+                    result_tracks.push(PeerMediaTrack::new(
                         *id,
                         track,
                         TrackConstraints::Video(video.clone()),
@@ -176,7 +170,8 @@ impl SimpleStreamRequest {
             }
         }
 
-        Ok(MediaStream::from_tracks(tracks))
+        crate::utils::console_error("parse_stream end");
+        Ok(PeerMediaStream::from_tracks(result_tracks))
     }
 }
 

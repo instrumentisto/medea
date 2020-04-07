@@ -10,18 +10,23 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{future, FutureExt as _, TryFutureExt as _};
+use futures::{future, FutureExt as _, StreamExt, TryFutureExt as _};
 use js_sys::Promise;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
     MediaDevices, MediaStream as SysMediaStream,
-    MediaStreamConstraints as SysMediaStreamConstraints, MediaStreamTrack,
+    MediaStreamConstraints as SysMediaStreamConstraints,
+    MediaStreamTrack as SysMediaStreamTrack,
 };
 
 use crate::{
-    media::{MediaStreamConstraints, MultiSourceMediaStreamConstraints},
+    media::{
+        stream::{MediaStream, MediaStreamTrack, WeakMediaStreamTrack},
+        MediaStreamConstraints, MultiSourceMediaStreamConstraints,
+        TrackConstraints,
+    },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
@@ -82,7 +87,7 @@ pub struct MediaManager(Rc<InnerMediaManager>);
 #[derive(Default)]
 struct InnerMediaManager {
     /// Obtained tracks storage
-    tracks: Rc<RefCell<Vec<MediaStreamTrack>>>,
+    tracks: Rc<RefCell<Vec<WeakMediaStreamTrack>>>,
 }
 
 impl InnerMediaManager {
@@ -128,43 +133,50 @@ impl InnerMediaManager {
     /// [2]: https://tinyurl.com/rnxcavf
     fn get_stream(
         &self,
-        caps: MediaStreamConstraints,
-    ) -> impl Future<Output = Result<(SysMediaStream, bool)>> {
-        if let Some(stream) = self.get_from_storage(&caps) {
-            future::ok((stream, false)).left_future().left_future()
-        } else {
-            let caps: MultiSourceMediaStreamConstraints = caps.into();
-            match caps {
-                MultiSourceMediaStreamConstraints::Display(caps) => self
-                    .get_display_media(caps)
-                    .and_then(|stream| future::ok((stream, true)))
-                    .left_future()
-                    .right_future(),
-                MultiSourceMediaStreamConstraints::Device(caps) => self
-                    .get_user_media(caps)
-                    .and_then(|stream| future::ok((stream, true)))
-                    .right_future()
-                    .left_future(),
-                MultiSourceMediaStreamConstraints::DeviceAndDisplay(
-                    device_caps,
-                    display_caps,
-                ) => {
-                    let get_user_media = self.get_user_media(device_caps);
-                    let get_display_media =
-                        self.get_display_media(display_caps);
+        mut caps: MediaStreamConstraints,
+    ) -> impl Future<Output = Result<(MediaStream, bool)>> {
+        let mut result = self.get_from_storage(&mut caps);
 
-                    async move {
-                        let get_user_media = get_user_media.await?;
-                        let get_display_media = get_display_media.await?;
+        let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
+        match caps {
+            None => future::ok((MediaStream::new(result), false))
+                .left_future()
+                .left_future(),
+            Some(MultiSourceMediaStreamConstraints::Display(caps)) => self
+                .get_display_media(caps)
+                .map_ok(|mut tracks| {
+                    result.append(&mut tracks);
+                    result
+                })
+                .map_ok(|result| (MediaStream::new(result), true))
+                .left_future()
+                .right_future(),
+            Some(MultiSourceMediaStreamConstraints::Device(caps)) => self
+                .get_user_media(caps)
+                .map_ok(|mut tracks| {
+                    result.append(&mut tracks);
+                    result
+                })
+                .map_ok(|result| (MediaStream::new(result), true))
+                .right_future()
+                .left_future(),
+            Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
+                device_caps,
+                display_caps,
+            )) => {
+                let get_user_media = self.get_user_media(device_caps);
+                let get_display_media = self.get_display_media(display_caps);
 
-                        let merged =
-                            merge_streams(&get_user_media, &get_display_media);
+                async move {
+                    let mut get_user_media = get_user_media.await?;
+                    let mut get_display_media = get_display_media.await?;
+                    result.append(&mut get_user_media);
+                    result.append(&mut get_display_media);
 
-                        Ok((merged, true))
-                    }
-                    .right_future()
-                    .right_future()
+                    Ok((MediaStream::new(result), true))
                 }
+                .right_future()
+                .right_future()
             }
         }
     }
@@ -177,37 +189,46 @@ impl InnerMediaManager {
     /// [3]: https://tinyurl.com/wotjrns
     fn get_from_storage(
         &self,
-        caps: &MediaStreamConstraints,
-    ) -> Option<SysMediaStream> {
+        caps: &mut MediaStreamConstraints,
+    ) -> Vec<MediaStreamTrack> {
+        // cleanup weak links
+        self.tracks
+            .borrow_mut()
+            .retain(WeakMediaStreamTrack::can_be_upgraded);
+
         let mut tracks = Vec::new();
-        let storage = self.tracks.borrow();
+        let storage: Vec<_> = self
+            .tracks
+            .borrow()
+            .iter()
+            .map(|track| track.upgrade().unwrap())
+            .collect();
 
         if let Some(audio) = caps.get_audio() {
-            let track = storage.iter().find(|track| audio.satisfies(track));
+            let track = storage
+                .iter()
+                .find(|track| audio.satisfies(track.as_ref()))
+                .cloned();
 
             if let Some(track) = track {
+                caps.take_audio();
                 tracks.push(track);
-            } else {
-                return None;
             }
         }
 
         if let Some(video) = caps.get_video() {
-            let track = storage.iter().find(|track| video.satisfies(track));
+            let track = storage
+                .iter()
+                .find(|track| video.satisfies(track.as_ref()))
+                .cloned();
 
             if let Some(track) = track {
+                caps.take_video();
                 tracks.push(track);
-            } else {
-                return None;
             }
         }
 
-        let stream = SysMediaStream::new().unwrap();
-        for track in tracks {
-            stream.add_track(track);
-        }
-
-        Some(stream)
+        tracks
     }
 
     /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and saves
@@ -218,7 +239,7 @@ impl InnerMediaManager {
     fn get_user_media(
         &self,
         caps: SysMediaStreamConstraints,
-    ) -> impl Future<Output = Result<SysMediaStream>> {
+    ) -> impl Future<Output = Result<Vec<MediaStreamTrack>>> {
         use MediaManagerError::*;
         let storage = Rc::clone(&self.tracks);
 
@@ -243,14 +264,17 @@ impl InnerMediaManager {
             .map_err(tracerr::from_and_wrap!())?;
 
             let stream = SysMediaStream::from(stream);
-
-            js_sys::try_iter(&stream.get_tracks())
+            let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
                 .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-                .for_each(|track| storage.borrow_mut().push(track));
+                .collect();
 
-            Ok(stream)
+            tracks
+                .iter()
+                .for_each(|track| storage.borrow_mut().push(track.downgrade()));
+
+            Ok(tracks)
         }
     }
 
@@ -262,7 +286,7 @@ impl InnerMediaManager {
     fn get_display_media(
         &self,
         caps: SysMediaStreamConstraints,
-    ) -> impl Future<Output = Result<SysMediaStream>> {
+    ) -> impl Future<Output = Result<Vec<MediaStreamTrack>>> {
         use MediaManagerError::*;
         let storage = Rc::clone(&self.tracks);
 
@@ -286,22 +310,17 @@ impl InnerMediaManager {
             .map_err(tracerr::from_and_wrap!())?;
 
             let stream = SysMediaStream::from(stream);
-
-            js_sys::try_iter(&stream.get_tracks())
+            let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
                 .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-                .for_each(|track| storage.borrow_mut().push(track));
+                .collect();
 
-            Ok(stream)
-        }
-    }
-}
+            tracks
+                .iter()
+                .for_each(|track| storage.borrow_mut().push(track.downgrade()));
 
-impl Drop for InnerMediaManager {
-    fn drop(&mut self) {
-        for track in self.tracks.borrow_mut().drain(..) {
-            track.stop();
+            Ok(tracks)
         }
     }
 }
@@ -320,7 +339,7 @@ impl MediaManager {
     pub async fn get_stream<I: Into<MediaStreamConstraints>>(
         &self,
         caps: I,
-    ) -> Result<(SysMediaStream, bool)> {
+    ) -> Result<(MediaStream, bool)> {
         self.0.get_stream(caps.into()).await
     }
 
@@ -377,26 +396,4 @@ impl MediaManagerHandle {
             Err(err) => future_to_promise(future::err(err)),
         }
     }
-}
-
-/// Builds new [`SysMediaStream`] from tracks in provided [`SysMediaStream`]s.
-fn merge_streams(
-    left: &SysMediaStream,
-    right: &SysMediaStream,
-) -> SysMediaStream {
-    let stream = SysMediaStream::new().unwrap();
-
-    js_sys::try_iter(&left.get_tracks())
-        .unwrap()
-        .unwrap()
-        .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-        .for_each(|track| stream.add_track(&track));
-
-    js_sys::try_iter(&right.get_tracks())
-        .unwrap()
-        .unwrap()
-        .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-        .for_each(|track| stream.add_track(&track));
-
-    stream
 }

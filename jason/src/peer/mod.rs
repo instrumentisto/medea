@@ -27,12 +27,10 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
-use web_sys::{
-    MediaStream as SysMediaStream, RtcIceConnectionState, RtcTrackEvent,
-};
+use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    media::{MediaManager, MediaManagerError},
+    media::{MediaManager, MediaManagerError, MediaStream},
     utils::{console_error, JasonError, JsCaused, JsError},
 };
 
@@ -51,9 +49,9 @@ pub use self::{
         MuteStateTransition, Sender, StableMuteState,
     },
     stats::RtcStats,
-    stream::{MediaStream, MediaStreamHandle},
+    stream::{MediaStreamHandle, PeerMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
-    track::MediaTrack,
+    track::PeerMediaTrack,
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -125,7 +123,7 @@ pub enum PeerEvent {
         sender_id: Id,
 
         /// Received [`MediaStream`].
-        remote_stream: MediaStream,
+        remote_stream: PeerMediaStream,
     },
 
     /// [`RtcPeerConnection`] sent new local stream to remote members.
@@ -135,7 +133,7 @@ pub enum PeerEvent {
         peer_id: Id,
 
         /// Local [`MediaStream`] that is sent to remote members.
-        local_stream: MediaStream,
+        local_stream: PeerMediaStream,
     },
 
     /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
@@ -456,7 +454,7 @@ impl PeerConnection {
         let track = track_event.track();
 
         if let Some(sender_id) =
-            media_connections.add_remote_track(transceiver, track)
+            media_connections.add_remote_track(transceiver, track.into())
         {
             if let Some(tracks) =
                 media_connections.get_tracks_by_sender(sender_id)
@@ -466,7 +464,7 @@ impl PeerConnection {
                 let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
                     peer_id: id,
                     sender_id,
-                    remote_stream: MediaStream::from_tracks(tracks),
+                    remote_stream: PeerMediaStream::from_tracks(tracks),
                 });
             };
         } else {
@@ -521,7 +519,7 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
-        local_stream: Option<&SysMediaStream>,
+        local_stream: Option<MediaStream>,
     ) -> Result<String> {
         self.media_connections
             .update_tracks(tracks)
@@ -548,7 +546,7 @@ impl PeerConnection {
     #[inline]
     pub async fn inject_local_stream(
         &self,
-        local_stream: &SysMediaStream,
+        local_stream: MediaStream,
     ) -> Result<()> {
         self.insert_local_stream(Some(local_stream))
             .await
@@ -565,7 +563,7 @@ impl PeerConnection {
     /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     async fn insert_local_stream(
         &self,
-        local_stream: Option<&SysMediaStream>,
+        local_stream: Option<MediaStream>,
     ) -> Result<()> {
         if let Some(request) = self.media_connections.get_stream_request() {
             let caps = SimpleStreamRequest::try_from(request)
@@ -583,7 +581,7 @@ impl PeerConnection {
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
                 (
-                    caps.parse_stream(&stream)
+                    caps.parse_stream(stream)
                         .map_err(tracerr::map_from_and_wrap!())?,
                     is_new,
                 )
@@ -664,7 +662,7 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-        local_stream: Option<&SysMediaStream>,
+        local_stream: Option<MediaStream>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =

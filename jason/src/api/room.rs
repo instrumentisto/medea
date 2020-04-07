@@ -23,9 +23,10 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
+    media::MediaStream,
     peer::{
-        MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
+        MediaConnectionsError, MediaStreamHandle, MuteState, PeerError,
+        PeerEvent, PeerEventHandler, PeerMediaStream, PeerRepository, RtcStats,
         StableMuteState, TransceiverKind,
     },
     rpc::{
@@ -341,7 +342,7 @@ impl RoomHandle {
     /// [`PeerConnection`]: crate::peer::PeerConnection
     pub fn inject_local_stream(
         &self,
-        stream: SysMediaStream,
+        stream: MediaStream,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.borrow_mut().inject_local_stream(stream))
@@ -477,7 +478,7 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
 
     /// Local media stream for injecting into new created [`PeerConnection`]s.
-    local_stream: Option<SysMediaStream>,
+    local_stream: Option<MediaStream>,
 
     /// [`PeerConnection`] repository.
     peers: Box<dyn PeerRepository>,
@@ -498,7 +499,7 @@ struct InnerRoom {
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
-    on_local_stream: Callback<MediaStreamHandle>,
+    on_local_stream: Callback<MediaStream>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
@@ -663,14 +664,14 @@ impl InnerRoom {
     ///
     /// If injecting fails, then invokes `on_failed_local_stream` callback with
     /// a failure error.
-    fn inject_local_stream(&mut self, stream: SysMediaStream) {
+    fn inject_local_stream(&mut self, stream: MediaStream) {
         let peers = self.peers.get_all();
         let injected_stream = Clone::clone(&stream);
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(async move {
             for peer in peers {
                 if let Err(err) = peer
-                    .inject_local_stream(&injected_stream)
+                    .inject_local_stream(injected_stream.clone())
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
@@ -726,7 +727,7 @@ impl EventHandler for InnerRoom {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
-                            .get_offer(tracks, local_stream.as_ref())
+                            .get_offer(tracks, local_stream)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         let mids = peer
@@ -740,7 +741,7 @@ impl EventHandler for InnerRoom {
                     }
                     Some(offer) => {
                         let sdp_answer = peer
-                            .process_offer(offer, tracks, local_stream.as_ref())
+                            .process_offer(offer, tracks, local_stream)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpAnswer {
@@ -864,7 +865,7 @@ impl PeerEventHandler for InnerRoom {
         &mut self,
         _: PeerId,
         sender_id: PeerId,
-        remote_stream: MediaStream,
+        remote_stream: PeerMediaStream,
     ) {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
@@ -876,8 +877,8 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Invokes `on_local_stream` [`Room`]'s callback.
-    fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
-        self.on_local_stream.call(stream.new_handle());
+    fn on_new_local_stream(&mut self, _: PeerId, stream: PeerMediaStream) {
+        self.on_local_stream.call(stream.media_stream());
     }
 
     /// Handles [`PeerEvent::IceConnectionStateChanged`] event and sends new

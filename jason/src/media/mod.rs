@@ -5,6 +5,7 @@
 mod constraints;
 mod device_info;
 mod manager;
+mod stream;
 
 #[doc(inline)]
 pub use self::{
@@ -16,4 +17,5 @@ pub use self::{
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
+    stream::{MediaStream, MediaStreamTrack, TrackKind},
 };

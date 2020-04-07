@@ -246,21 +246,10 @@ async fn different_constraints_produce_different_streams() {
 // Device({audio:false, video:false})
 #[wasm_bindgen_test]
 async fn multi_source_media_stream_constraints_build1() {
-    match MultiSourceMediaStreamConstraints::from(MediaStreamConstraints::new())
-    {
-        MultiSourceMediaStreamConstraints::Device(constraints) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        MediaStreamConstraints::new().into();
 
-            assert!(!has_video);
-            assert!(!has_audio);
-        }
-        _ => unreachable!(),
-    };
+    assert!(constraints.is_none());
 }
 
 // Make sure that MediaStreamConstraints{audio:true, video:false} =>
@@ -270,8 +259,11 @@ async fn multi_source_media_stream_constraints_build2() {
     let mut constraints = MediaStreamConstraints::new();
     constraints.audio(AudioTrackConstraints::new());
 
-    match MultiSourceMediaStreamConstraints::from(constraints) {
-        MultiSourceMediaStreamConstraints::Device(constraints) => {
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::Device(constraints)) => {
             let has_video =
                 get_property_by_name(&constraints, "video", js_val_to_option)
                     .is_some();
@@ -294,8 +286,11 @@ async fn multi_source_media_stream_constraints_build3() {
     constraints.audio(AudioTrackConstraints::new());
     constraints.device_video(DeviceVideoTrackConstraints::new());
 
-    match MultiSourceMediaStreamConstraints::from(constraints) {
-        MultiSourceMediaStreamConstraints::Device(constraints) => {
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::Device(constraints)) => {
             let has_video =
                 get_property_by_name(&constraints, "video", js_val_to_option)
                     .is_some();
@@ -318,11 +313,14 @@ async fn multi_source_media_stream_constraints_build4() {
     constraints.audio(AudioTrackConstraints::new());
     constraints.display_video(DisplayVideoTrackConstraints::new());
 
-    match MultiSourceMediaStreamConstraints::from(constraints) {
-        MultiSourceMediaStreamConstraints::DeviceAndDisplay(
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
             device,
             display,
-        ) => {
+        )) => {
             let device_has_video =
                 get_property_by_name(&device, "video", js_val_to_option)
                     .is_some();
@@ -352,8 +350,11 @@ async fn multi_source_media_stream_constraints_build5() {
     let mut constraints = MediaStreamConstraints::new();
     constraints.device_video(DeviceVideoTrackConstraints::new());
 
-    match MultiSourceMediaStreamConstraints::from(constraints) {
-        MultiSourceMediaStreamConstraints::Device(constraints) => {
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::Device(constraints)) => {
             let has_video =
                 get_property_by_name(&constraints, "video", js_val_to_option)
                     .is_some();
@@ -375,8 +376,11 @@ async fn multi_source_media_stream_constraints_build6() {
     let mut constraints = MediaStreamConstraints::new();
     constraints.display_video(DisplayVideoTrackConstraints::new());
 
-    match MultiSourceMediaStreamConstraints::from(constraints) {
-        MultiSourceMediaStreamConstraints::Display(constraints) => {
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::Display(constraints)) => {
             let has_video =
                 get_property_by_name(&constraints, "video", js_val_to_option)
                     .is_some();
@@ -399,8 +403,11 @@ async fn multi_source_media_stream_constraints_build7() {
     constraints.audio(AudioTrackConstraints::new());
     constraints.video(VideoTrackConstraints::from(VideoSettings {}));
 
-    match MultiSourceMediaStreamConstraints::from(constraints) {
-        MultiSourceMediaStreamConstraints::Device(constraints) => {
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::Device(constraints)) => {
             let has_video =
                 get_property_by_name(&constraints, "video", js_val_to_option)
                     .is_some();

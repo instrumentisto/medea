@@ -327,7 +327,7 @@ window.onload = async function() {
   let localVideo = document.querySelector('.local-video > video');
 
   const updateLocalVideo = async (stream) => {
-    localVideo.srcObject = stream;
+    localVideo.srcObject = stream.get_media_stream();
     await localVideo.play();
   };
 
@@ -338,7 +338,7 @@ window.onload = async function() {
     try {
       const stream = await getStream(audioSelect, videoSelect);
       await updateLocalVideo(stream);
-      await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
+      await fillMediaDevicesInputs(audioSelect, videoSelect, stream.get_media_stream());
       room.inject_local_stream(stream);
     } catch (e) {
       console.error("Init local video failed: " + e.message());
