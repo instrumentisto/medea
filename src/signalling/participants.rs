@@ -392,6 +392,8 @@ impl ParticipantService {
                 publish.p2p,
                 signalling_member.downgrade(),
                 publish.force_relay,
+                publish.on_start.clone(),
+                publish.on_stop.clone(),
             );
             signalling_member.insert_src(signalling_publish);
         }
@@ -414,6 +416,8 @@ impl ParticipantService {
                 src.downgrade(),
                 signalling_member.downgrade(),
                 play.force_relay,
+                play.on_start.clone(),
+                play.on_stop.clone(),
             );
 
             signalling_member.insert_sink(sink);
