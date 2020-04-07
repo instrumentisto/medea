@@ -59,13 +59,13 @@ spec:
         on_join: "grpc://127.0.0.1:9091"
         # Fires when "caller" client disconnects from media server via WebSocket.
         on_leave: "grpc://127.0.0.1:9091"
-        # Timeout of receiving heartbeat messages from the Member via Client API.
-        # Once reached, the Member is considered being idle.
+        # Timeout of receiving heartbeat messages from the member via WebSocket.
+        # Once reached, the member is considered being idle.
         idle_timeout: 1m
-        # Timeout of the Member reconnecting via Client API.
-        # Once reached, the Member is considered disconnected.
+        # Timeout of the member reconnecting via WebSocket.
+        # Once reached, the member is considered disconnected.
         reconnect_timeout: 3m
-        # Interval of sending pings from a media server to the Member via Client API.
+        # Interval of sending pings from media server to the member via WebSocket.
         ping_interval: 10s
         pipeline:
           # Media element which is able to receive media data from client via WebRTC.
@@ -788,11 +788,11 @@ message Room {
 message Member {
   optional string on_join = 1;
   optional string on_leave = 2;
-  map<string, Member.Element> pipeline = 3;
-  optional string credentials = 4;
-  optional uint64 idle_timeout = 5;
-  optional uint64 reconnect_timeout = 7;
-  optional uint64 ping_interval = 8;
+  optional string credentials = 3;
+  optional uint64 idle_timeout = 4;
+  optional uint64 reconnect_timeout = 5;
+  optional uint64 ping_interval = 6;
+  map<string, Member.Element> pipeline = 7;
   
   message Element {
     oneof el {

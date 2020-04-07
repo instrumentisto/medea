@@ -77,8 +77,8 @@ pub enum TryFromProtobufError {
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
 
-    /// Some element from a spec contains negative [`Duration`], but Medea
-    /// doesn't support it.
+    /// Some element from a spec contains negative [`Duration`], but it's not
+    /// supported.
     #[display(
         fmt = "Element [id = {}] contains negative duration field `{}`",
         _0,

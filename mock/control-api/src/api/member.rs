@@ -34,22 +34,18 @@ pub struct Member {
     #[serde(skip_serializing_if = "Option::is_none")]
     on_leave: Option<String>,
 
-    /// Timeout of receiving heartbeat messages from the [`Member`] via Client
-    /// API. Once reached, the [`Member`] is considered being idle.
-    #[serde(default)]
-    #[serde(with = "humantime_serde")]
+    /// Timeout of receiving heartbeat messages from the `Member` via Client
+    /// API. Once reached, the `Member` is considered being idle.
+    #[serde(default, with = "humantime_serde")]
     idle_timeout: Option<Duration>,
 
-    /// Timeout of the [`Member`] reconnecting via Client API.
-    /// Once reached, the [`Member`] is considered disconnected.
-    #[serde(default)]
-    #[serde(with = "humantime_serde")]
+    /// Timeout of the `Member` reconnecting via Client API.
+    /// Once reached, the `Member` is considered disconnected.
+    #[serde(default, with = "humantime_serde")]
     reconnect_timeout: Option<Duration>,
 
-    /// Interval of sending pings from a media server to the [`Member`] via
-    /// Client API.
-    #[serde(default)]
-    #[serde(with = "humantime_serde")]
+    /// Interval of sending pings from Medea to the `Member` via Client API.
+    #[serde(default, with = "humantime_serde")]
     ping_interval: Option<Duration>,
 }
 

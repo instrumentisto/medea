@@ -77,8 +77,7 @@ pub struct MemberSpec {
     /// Once reached, the `Member` is considered disconnected.
     reconnect_timeout: Option<Duration>,
 
-    /// Interval of sending pings from a media server to the `Member` via
-    /// Client API.
+    /// Interval of sending `Ping`s to the `Member` via Client API.
     ping_interval: Option<Duration>,
 }
 
@@ -171,21 +170,22 @@ impl MemberSpec {
         &self.on_leave
     }
 
-    /// Returns [`Duration`] for this `Member`, after which remote RPC client
-    /// will be considered idle if no heartbeat messages received.
+    /// Returns timeout of receiving heartbeat messages from the `Member` via
+    /// Client API.
+    ///
+    /// Once reached, the `Member` is considered being idle.
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
 
-    /// Returns [`Duration`] for this `Member`, after which the server deletes
-    /// the client session if the remote RPC client does not reconnect after
-    /// it is idle.
+    /// Returns timeout of the `Member` reconnecting via Client API.
+    ///
+    /// Once reached, the `Member` is considered disconnected.
     pub fn reconnect_timeout(&self) -> Option<Duration> {
         self.reconnect_timeout
     }
 
-    /// Returns interval of sending `Ping`s from the server to the client for
-    /// this `Member`.
+    /// Returns interval of sending `Ping`s to the `Member` via Client API.
     pub fn ping_interval(&self) -> Option<Duration> {
         self.ping_interval
     }
@@ -215,19 +215,9 @@ impl TryFrom<proto::Member> for MemberSpec {
             member_id: &str,
             field: &'static str,
         ) -> Result<Option<Duration>, TryFromProtobufError> {
-            match duration {
-                None => Ok(None),
-                Some(dur) => {
-                    if let Ok(dur) = dur.try_into() {
-                        Ok(Some(dur))
-                    } else {
-                        Err(TryFromProtobufError::NegativeDuration(
-                            String::from(member_id),
-                            field,
-                        ))
-                    }
-                }
-            }
+            duration.map(TryInto::try_into).transpose().map_err(|_| {
+                TryFromProtobufError::NegativeDuration(member_id.into(), field)
+            })
         }
 
         let mut pipeline = HashMap::new();

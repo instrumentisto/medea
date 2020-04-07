@@ -60,14 +60,16 @@ pub trait RpcConnection: fmt::Debug + Send {
         -> LocalBoxFuture<'static, Result<(), ()>>;
 }
 
-/// Settings for the [`WsSession`].
+/// Settings of [`WsSession`].
 #[derive(Clone, Copy, Debug)]
 pub struct RpcConnectionSettings {
-    /// Duration, after which [`WsSession`] will be considered idle if no
-    /// heartbeat messages received.
+    /// [`Duration`], after which [`WsSession`] will be considered idle if no
+    /// heartbeat messages were received.
     pub idle_timeout: Duration,
 
-    /// Interval of sending `Ping`s from the server to the client.
+    /// Interval of sending `Ping`s to remote [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub ping_interval: Duration,
 }
 
@@ -79,6 +81,7 @@ pub struct Authorize {
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
     /// Credentials to authorize [`RpcConnection`] with.
     pub credentials: String, // TODO: &str when futures will allow references
 }
@@ -93,6 +96,7 @@ pub enum AuthorizationError {
     /// [`Member`]: crate::signalling::elements::member::Member
     /// [`Room`]: crate::signalling::Room
     MemberNotExists,
+
     /// Provided credentials are invalid.
     InvalidCredentials,
 }
@@ -108,6 +112,7 @@ pub struct RpcConnectionEstablished {
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,
 }
@@ -121,6 +126,7 @@ pub struct RpcConnectionClosed {
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
     /// Reason of why [`RpcConnection`] is closed.
     pub reason: ClosedReason,
 }
@@ -141,6 +147,7 @@ pub enum ClosedReason {
         /// [`Away`]: actix_http::ws::CloseCode::Away
         normal: bool,
     },
+
     /// [`RpcConnection`] was lost, but may be reestablished.
     Lost,
 }

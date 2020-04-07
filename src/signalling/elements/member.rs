@@ -100,8 +100,7 @@ struct MemberInner {
     /// Once reached, the [`Member`] is considered disconnected.
     reconnect_timeout: Duration,
 
-    /// Interval of sending pings from a media server to the [`Member`] via
-    /// Client API.
+    /// Interval of sending heartbeat `Ping`s to the [`Member`] via Client API.
     ping_interval: Duration,
 }
 
@@ -441,17 +440,21 @@ impl Member {
 
     /// Returns timeout of receiving heartbeat messages from the [`Member`] via
     /// Client API.
+    ///
+    /// Once reached, the [`Member`] is considered being idle.
     pub fn get_idle_timeout(&self) -> Duration {
         self.0.borrow().idle_timeout
     }
 
     /// Returns timeout of the [`Member`] reconnecting via Client API.
+    ///
+    /// Once reached, the [`Member`] is considered disconnected.
     pub fn get_reconnect_timeout(&self) -> Duration {
         self.0.borrow().reconnect_timeout
     }
 
-    /// Returns interval of sending pings from a media server to the [`Member`]
-    /// via Client API.
+    /// Returns interval of sending heartbeat `Ping`s to the [`Member`] via
+    /// Client API.
     pub fn get_ping_interval(&self) -> Duration {
         self.0.borrow().ping_interval
     }

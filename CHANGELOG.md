@@ -29,7 +29,7 @@ All user visible changes to this project will be documented in this file. This p
     - gRPC Control API callbacks ([#63]):
         - `on_join`;
         - `on_leave`.
-    - Configuration of the `Member`'s RPC connection settings by Control API ([#95]).
+    - Configuration of `Member`'s Client API RPC settings ([#95]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);

@@ -65,13 +65,13 @@ async fn ws_index(
                 })
                 .await?;
             match auth_result {
-                Ok(ws_session_settings) => ws::start(
+                Ok(settings) => ws::start(
                     WsSession::new(
                         member_id,
                         room_id,
                         Box::new(room),
-                        ws_session_settings.idle_timeout,
-                        ws_session_settings.ping_interval,
+                        settings.idle_timeout,
+                        settings.ping_interval,
                     ),
                     &request,
                     payload,
