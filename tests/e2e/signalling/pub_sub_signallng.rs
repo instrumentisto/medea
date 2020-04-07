@@ -1,8 +1,9 @@
+use std::collections::HashSet;
+
 use actix::{Context, System};
 use medea_client_api_proto::{Direction, Event};
 
 use crate::signalling::TestMember;
-use std::collections::HashSet;
 
 #[test]
 fn pub_sub_video_call() {

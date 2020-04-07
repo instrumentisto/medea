@@ -79,10 +79,14 @@ mod media;
 mod peer;
 mod rpc;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use futures::{
-    channel::oneshot,
+    channel::{mpsc, oneshot},
     future::{Either, LocalBoxFuture},
 };
 use js_sys::Promise;
@@ -92,6 +96,8 @@ use medea_client_api_proto::{
     VideoSettings,
 };
 use medea_jason::{
+    media::MediaManager,
+    peer::{PeerConnection, PeerEvent},
     snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
     utils::{window, JasonError},
 };
@@ -122,13 +128,6 @@ extern "C" {
 extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
-
-use futures::channel::mpsc;
-use medea_jason::{
-    media::MediaManager,
-    peer::{PeerConnection, PeerEvent},
-};
-use std::collections::{HashMap, HashSet};
 
 pub fn get_peer(
     peer_id: PeerId,

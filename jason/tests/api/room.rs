@@ -1,6 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{collections::HashSet, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
@@ -28,7 +31,6 @@ use medea_jason::{
     snapshots::{ObservablePeerSnapshot, ObservableRoomSnapshot},
     utils::{console_error, JsError},
 };
-use std::collections::HashMap;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

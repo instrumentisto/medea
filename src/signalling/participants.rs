@@ -292,7 +292,7 @@ impl ParticipantService {
                 ))
             }
         } else {
-            // TODO: maybe error here???
+            warn!("Snapshot for Member [id = {}] not found!", member_id);
             Box::pin(future::ok(()))
         }
     }

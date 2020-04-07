@@ -2,10 +2,11 @@
 
 mod media;
 
-use std::{pin::Pin, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, pin::Pin, rc::Rc};
 
 use futures::{channel::mpsc, Stream, StreamExt as _};
 use medea_client_api_proto::{
+    snapshots::TrackSnapshotAccessor,
     stats::{
         HighResTimeStamp, KnownIceCandidatePairState, NonExhaustive,
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
@@ -17,6 +18,8 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent, RtcStats},
+    snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
+    utils::console_error,
 };
 use wasm_bindgen_test::*;
 
@@ -24,12 +27,6 @@ use crate::{
     await_with_timeout, get_observable_tracks, get_peer, get_test_tracks,
     resolve_after,
 };
-use medea_client_api_proto::snapshots::TrackSnapshotAccessor;
-use medea_jason::{
-    snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
-    utils::console_error,
-};
-use std::{cell::RefCell, collections::HashSet};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -364,12 +361,18 @@ struct InterconnectedPeers {
     /// direction and one `audio` track with `recv` direction.
     pub second_peer: PeerConnection,
 
+    /// All [`ObservableTrackSnapshot`]s created for the first
+    /// [`PeerConnection`].
     pub first_peer_tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
 
+    /// All [`ObservableTrackSnapshot`]s created for the second
+    /// [`PeerConnection`].
     pub second_peer_tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
 
+    /// [`ObservablePeerSnapshot`] of the first [`PeerConnection`].
     pub first_peer_snapshot: ObservablePeerSnapshot,
 
+    /// [`ObservablePeerSnapshot`] of the second [`PeerConnection`].
     pub second_peer_snapshot: ObservablePeerSnapshot,
 
     /// All [`PeerEvent`]s of this two interconnected [`PeerConnection`]s.

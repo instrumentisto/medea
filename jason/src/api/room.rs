@@ -410,7 +410,7 @@ impl Room {
             Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx, snapshot)));
 
         let inner = Rc::downgrade(&room);
-        let mut on_peer_created = room.borrow().state.on_peer_created();
+        let mut on_peer_created = room.borrow().snapshot.on_peer_created();
         spawn_local(async move {
             while let Some((new_peer_id, new_peer)) =
                 on_peer_created.next().await
@@ -426,7 +426,7 @@ impl Room {
         });
 
         let inner = Rc::downgrade(&room);
-        let mut on_peer_removed = room.borrow().state.on_peer_removed();
+        let mut on_peer_removed = room.borrow().snapshot.on_peer_removed();
         spawn_local(async move {
             while let Some((removed_peer_id, _removed_peer)) =
                 on_peer_removed.next().await
@@ -462,7 +462,7 @@ impl Room {
                         match event {
                             RoomEvent::RpcEvent(event) => {
                                 event.dispatch_with(
-                                    &mut inner.borrow_mut().state,
+                                    &mut inner.borrow_mut().snapshot,
                                 );
                             }
                             RoomEvent::PeerEvent(event) => {
@@ -479,6 +479,10 @@ impl Room {
         Self(room)
     }
 
+    /// Inserts provided [`ObservableTrackSnapshot`] to this [`Room`]'s
+    /// [`ObservableRoomSnapshot`].
+    ///
+    /// __Used for testing purposes.__
     #[cfg(feature = "mockable")]
     pub fn insert_track_snapshot(
         &self,
@@ -488,7 +492,7 @@ impl Room {
         let track_id = track_snapshot.borrow().id;
         self.0
             .borrow_mut()
-            .state
+            .snapshot
             .peers
             .get(&peer_id)
             .unwrap()
@@ -570,7 +574,7 @@ struct InnerRoom {
     close_reason: CloseReason,
 
     /// Snapshot of this [`Room`].
-    state: ObservableRoomSnapshot,
+    snapshot: ObservableRoomSnapshot,
 }
 
 impl InnerRoom {
@@ -597,7 +601,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             },
-            state: snapshot,
+            snapshot,
         }
     }
 

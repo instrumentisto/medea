@@ -17,11 +17,11 @@ use crate::{
         WebSocketRpcTransport,
     },
     set_panic_hook,
+    snapshots::ObservableRoomSnapshot,
 };
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
-use crate::snapshots::ObservableRoomSnapshot;
 
 /// General library interface.
 ///
