@@ -286,7 +286,7 @@ async fn on_start_works() {
 
     interconnected_members.trigger_on_start(100, 100);
 
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_secs(1)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
@@ -326,7 +326,7 @@ async fn on_stop_works_on_leave() {
         .member_2_client
         .do_send(CloseSocket(CloseCode::Normal));
 
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_secs(1)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
@@ -450,7 +450,7 @@ async fn on_stop_on_contradiction() {
         },
     ));
 
-    tokio::time::delay_for(Duration::from_secs(6)).await;
+    tokio::time::delay_for(Duration::from_secs(7)).await;
     interconnected_members.member_1_client.do_send(SendCommand(
         Command::AddPeerConnectionMetrics {
             peer_id: interconnected_members.member_1_peer_id,
@@ -518,7 +518,7 @@ async fn on_stop_didnt_fires_while_all_normal() {
     .await;
     interconnected_members.trigger_on_start(100, 100);
 
-    tokio::time::delay_for(Duration::from_secs(6)).await;
+    tokio::time::delay_for(Duration::from_secs(7)).await;
     interconnected_members.trigger_on_start(3000, 3000);
 
     tokio::time::delay_for(Duration::from_secs(10)).await;
