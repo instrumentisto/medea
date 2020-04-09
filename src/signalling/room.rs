@@ -27,6 +27,7 @@ use crate::{
         client::rpc_connection::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
+            RpcConnectionSettings,
         },
         control::{
             callback::{
@@ -678,82 +679,6 @@ impl Room {
         Ok(())
     }
 
-    /// Creates new [`Member`] in this [`ParticipantService`].
-    ///
-    /// This function will check that new [`Member`]'s ID is not present in
-    /// [`ParticipantService`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
-    /// provided [`MemberId`] already exists in [`ParticipantService`].
-    pub fn create_member(
-        &mut self,
-        id: MemberId,
-        spec: &MemberSpec,
-    ) -> Result<(), RoomError> {
-        if self.members.get_member_by_id(&id).is_some() {
-            return Err(RoomError::MemberAlreadyExists(
-                self.members.get_fid_to_member(id),
-            ));
-        }
-        let signalling_member = Member::new(
-            id.clone(),
-            spec.credentials().to_string(),
-            self.id.clone(),
-        );
-
-        signalling_member.set_callback_urls(spec);
-
-        for (id, publish) in spec.publish_endpoints() {
-            let signalling_publish = WebRtcPublishEndpoint::new(
-                id.clone(),
-                publish.p2p,
-                signalling_member.downgrade(),
-                publish.force_relay,
-                publish.on_start.clone(),
-                publish.on_stop.clone(),
-            );
-            signalling_member.insert_src(signalling_publish);
-        }
-
-        for (id, play) in spec.play_endpoints() {
-            let partner_member =
-                self.members.get_member(&play.src.member_id)?;
-            let src = partner_member
-                .get_src_by_id(&play.src.endpoint_id)
-                .ok_or_else(|| {
-                    MemberError::EndpointNotFound(
-                        partner_member.get_fid_to_endpoint(
-                            play.src.endpoint_id.clone().into(),
-                        ),
-                    )
-                })?;
-
-            let sink = WebRtcPlayEndpoint::new(
-                id.clone(),
-                play.src.clone(),
-                src.downgrade(),
-                signalling_member.downgrade(),
-                play.force_relay,
-                play.on_start.clone(),
-                play.on_stop.clone(),
-            );
-
-            signalling_member.insert_sink(sink);
-        }
-
-        // This is needed for atomicity.
-        for (_, sink) in signalling_member.sinks() {
-            let src = sink.src();
-            src.add_sink(sink.downgrade());
-        }
-
-        self.members.insert_member(id, signalling_member);
-
-        Ok(())
-    }
-
     /// Validates given [`CommandMessage`].
     ///
     /// Two assertions are made:
@@ -1261,7 +1186,7 @@ impl Handler<SerializeProto> for Room {
 }
 
 impl Handler<Authorize> for Room {
-    type Result = Result<(), AuthorizationError>;
+    type Result = Result<RpcConnectionSettings, AuthorizationError>;
 
     /// Responses with `Ok` if `RpcConnection` is authorized, otherwise `Err`s.
     fn handle(
@@ -1271,7 +1196,10 @@ impl Handler<Authorize> for Room {
     ) -> Self::Result {
         self.members
             .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
-            .map(|_| ())
+            .map(move |member| RpcConnectionSettings {
+                idle_timeout: member.get_idle_timeout(),
+                ping_interval: member.get_ping_interval(),
+            })
     }
 }
 
@@ -1502,7 +1430,7 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        self.create_member(msg.0.clone(), &msg.1)?;
+        self.members.create_member(msg.0.clone(), &msg.1)?;
         debug!(
             "Member [id = {}] created in Room [id = {}].",
             msg.0, self.id
@@ -1627,9 +1555,13 @@ mod test {
             String::from("w/e"),
             None,
             None,
+            None,
+            None,
+            None,
         );
 
-        room.create_member(MemberId(String::from("member1")), &member1)
+        room.members
+            .create_member(MemberId(String::from("member1")), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
@@ -1661,9 +1593,13 @@ mod test {
             String::from("w/e"),
             None,
             None,
+            None,
+            None,
+            None,
         );
 
-        room.create_member(MemberId(String::from("member1")), &member1)
+        room.members
+            .create_member(MemberId(String::from("member1")), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(

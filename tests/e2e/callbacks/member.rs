@@ -56,7 +56,8 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
     let deadline = Some(Duration::from_secs(5));
     let client = TestMember::connect(
         create_response.get(name).unwrap(),
-        Box::new(on_event),
+        Some(Box::new(on_event)),
+        None,
         deadline,
     )
     .await;

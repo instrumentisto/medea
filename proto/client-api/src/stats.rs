@@ -43,7 +43,6 @@ pub struct StatId(pub String);
 /// [stats object]: https://w3.org/TR/webrtc-stats/#dfn-stats-object
 /// [monitored object]: https://w3.org/TR/webrtc-stats/#dfn-monitored-object
 /// [1]: https://w3.org/TR/webrtc/#rtcstats-dictionary
-// TODO: Dont send null fields
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct RtcStat {
     /// Unique ID that is associated with the object that was inspected to
@@ -262,6 +261,7 @@ pub enum RtcStatsType {
     Other,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Contains statistics related to a specific [MediaStream].
 ///
 /// This is now obsolete.
@@ -272,20 +272,20 @@ pub enum RtcStatsType {
 ///
 /// [MediaStream]: https://w3.org/TR/mediacapture-streams/#mediastream
 /// [1]: https://w3.org/TR/webrtc-stats/#idl-def-rtcmediastreamstats
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct MediaStreamStat {
     /// [`stream.id`][1] property.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastream-id
-    #[serde(rename = "streamIdentifier")]
-    pub stream_id: String,
+    pub stream_identifier: String,
 
     /// ID of the stats object, not the `track.id`.
     pub track_ids: Vec<StatId>,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Statistics related to each [RTCDataChannel] ID.
 ///
 /// [`RtcStatsType::DataChannel`] variant.
@@ -294,9 +294,9 @@ pub struct MediaStreamStat {
 ///
 /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
 /// [1]: https://w3.org/TR/webrtc-stats/#dcstats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct DataChannelStat {
     /// [`label`][1] value of the [RTCDataChannel] object.
     ///
@@ -314,8 +314,7 @@ pub struct DataChannelStat {
     ///
     /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcdatachannel-id
-    #[serde(rename = "dataChannelIdentifier")]
-    pub data_channel_id: Option<u64>,
+    pub data_channel_identifier: Option<u64>,
 
     /// [Stats object reference][1] for the transport used to carry
     /// [RTCDataChannel].
@@ -389,6 +388,7 @@ pub enum KnownDataChannelState {
     Closed,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Stats for the [RTCPeerConnection] object.
 ///
 /// [`RtcStatsType::PeerConnection`] variant.
@@ -397,9 +397,9 @@ pub enum KnownDataChannelState {
 ///
 /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#pcstats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct RtcPeerConnectionStat {
     /// Number of unique `DataChannel`s that have entered the `open` state
     /// during their lifetime.
@@ -428,6 +428,7 @@ pub struct RtcPeerConnectionStat {
     pub data_channels_accepted: Option<u64>,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Statistics for a contributing source (CSRC) that contributed to an inbound
 /// [RTP] stream.
 ///
@@ -437,9 +438,9 @@ pub struct RtcPeerConnectionStat {
 ///
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
 /// [1]: https://w3.org/TR/webrtc-stats/#contributingsourcestats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct RtpContributingSourceStat {
     /// SSRC identifier of the contributing source represented by the stats
     /// object, as defined by [RFC 3550]. It is a 32-bit unsigned integer that
@@ -504,6 +505,7 @@ pub struct RtpContributingSourceStat {
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
 /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#remoteoutboundrtpstats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteOutboundRtpStreamStat {
@@ -545,6 +547,7 @@ pub struct RemoteOutboundRtpStreamStat {
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
 /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcinboundrtpstreamstats
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteInboundRtpStreamStat {
@@ -582,6 +585,7 @@ pub struct RemoteInboundRtpStreamStat {
     pub round_trip_time_measurements: Option<Float>,
 }
 
+#[cfg(feature = "extended-stats")]
 /// [RTCRtpTransceiverStats][1] object representing an [RTCRtpTransceiver] of an
 /// [RTCPeerConnection].
 ///
@@ -601,9 +605,9 @@ pub struct RemoteInboundRtpStreamStat {
 /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-addtransceiver
 /// [3]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack
 /// [4]: https://tinyurl.com/vejym8v
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct RtcRtpTransceiverStats {
     /// ID of the stats object representing the
     /// [RTCRtpSender associated with the RTCRtpTransceiver][1] represented by
@@ -636,6 +640,7 @@ pub struct RtcRtpTransceiverStats {
 ///
 /// [RTCSctpTransport]: https://w3.org/TR/webrtc/#dom-rtcsctptransport
 /// [1]: https://w3.org/TR/webrtc-stats/#sctptransportstats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcSctpTransportStats {
@@ -670,6 +675,7 @@ pub struct RtcSctpTransportStats {
 /// [WebRTC]: https://w3.org/TR/webrtc
 /// [1]: https://w3.org/TR/webrtc-stats/#transportstats-dict%2A
 /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcTransportStats {
@@ -725,6 +731,7 @@ pub enum IceRole {
     Controlled,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Statistics related to a specific [RTCRtpSender] and the corresponding
 /// media-level metrics.
 ///
@@ -734,10 +741,9 @@ pub enum IceRole {
 ///
 /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-sender
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(tag = "kind")]
-#[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SenderStatsKind {
     /// [RTCAudioSenderStats][1] object.
     ///
@@ -750,6 +756,7 @@ pub enum SenderStatsKind {
     Video { media_source_id: Option<String> },
 }
 
+#[cfg(feature = "extended-stats")]
 /// Statistics related to a specific [RTCRtpReceiver] and the corresponding
 /// media-level metrics.
 ///
@@ -759,10 +766,9 @@ pub enum SenderStatsKind {
 ///
 /// [RTCRtpReceiver]: https://w3.org/TR/webrtc/#dom-rtcrtpreceiver
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-receiver
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(tag = "kind")]
-#[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ReceiverStatsKind {
     /// [RTCAudioReceiverStats] object.
     ///
@@ -793,6 +799,7 @@ pub enum ReceiverStatsKind {
 /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
 /// [1]: https://w3.org/TR/webrtc-stats/#dfn-deleted
 /// [2]: https://w3.org/TR/webrtc-stats/#candidatepair-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceCandidatePairStats {
@@ -940,9 +947,9 @@ pub enum KnownCandidateType {
 pub type CandidateType = NonExhaustive<KnownCandidateType>;
 
 /// Fields of [`RtcStatsType::InboundRtp`] variant.
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "mediaType")]
+#[serde(tag = "mediaType", rename_all = "camelCase")]
 pub enum RtcInboundRtpStreamMediaType {
     /// Fields when `mediaType` is `audio`.
     Audio {
@@ -1033,8 +1040,7 @@ pub enum RtcInboundRtpStreamMediaType {
         total_inter_frame_delay: Option<Float>,
 
         /// Number of decoded frames in the last second.
-        #[serde(rename = "framesPerSecond")]
-        fps: Option<u64>,
+        frames_per_second: Option<u64>,
 
         /// Bit depth per pixel of the last decoded frame.
         ///
@@ -1081,6 +1087,7 @@ pub enum RtcInboundRtpStreamMediaType {
 ///
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcinboundrtpstreamstats
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcInboundRtpStreamStats {
@@ -1131,14 +1138,14 @@ pub struct RtcInboundRtpStreamStats {
 /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
 /// [2]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-track
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackStat {
     /// [`id` property][1] of the track.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
-    #[serde(rename = "trackIdentifier")]
-    pub track_id: String,
+    pub track_identifier: String,
 
     /// `true` if the source is remote, for instance if it is sourced from
     /// another host via an [RTCPeerConnection]. `false` otherwise.
@@ -1174,9 +1181,9 @@ pub enum TrackStatKind {
 
 /// [`RtcStat`] fields of [`RtcStatsType::OutboundRtp`] type based on
 /// `mediaType`.
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "mediaType")]
+#[serde(tag = "mediaType", rename_all = "camelCase")]
 pub enum RtcOutboundRtpStreamMediaType {
     /// Fields when `mediaType` is `audio`.
     Audio {
@@ -1243,6 +1250,7 @@ pub enum RtcOutboundRtpStreamMediaType {
 /// [3]: https://tinyurl.com/sefa5z4
 /// [4]: https://tinyurl.com/rkuvpl4
 /// [5]: https://w3.org/TR/webrtc-stats/#outboundrtpstats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcOutboundRtpStreamStats {
@@ -1276,6 +1284,7 @@ pub struct RtcOutboundRtpStreamStats {
 /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
 /// [1]: https://tools.ietf.org/html/rfc5245#section-15.1
 /// [2]: https://w3.org/TR/webrtc-stats/#icecandidate-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RtcIceCandidateStats {
@@ -1320,9 +1329,9 @@ pub struct RtcIceCandidateStats {
 
 /// [`RtcStat`] fields of [`RtcStatsType::MediaSource`] type based on its
 /// `kind`.
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum MediaSourceKind {
     /// Fields when `kind` is `video`.
     Video {
@@ -1337,8 +1346,7 @@ pub enum MediaSourceKind {
         /// Number of frames originating from the source, measured during the
         /// last second. For the first second of this object's lifetime this
         /// attribute is missing.
-        #[serde(rename = "framesPerSecond")]
-        fps: Option<u32>,
+        frames_per_second: Option<u32>,
     },
 
     /// Fields when `kind` is `audio`.
@@ -1367,20 +1375,21 @@ pub enum MediaSourceKind {
 /// [getUserMedia]: https://tinyurl.com/sngpyr6
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
 /// [2]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-media-source
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSourceStat {
     /// Value of the [MediaStreamTrack]'s ID attribute.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    #[serde(rename = "trackIdentifier")]
-    pub track_id: Option<String>,
+    pub track_identifier: Option<String>,
 
     /// Fields which should be in the [`RtcStat`] based on `kind`.
     #[serde(flatten)]
     pub kind: MediaSourceKind,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Statistics for a codec that is currently used by [RTP] streams being sent or
 /// received by [RTCPeerConnection] object.
 ///
@@ -1391,9 +1400,9 @@ pub struct MediaSourceStat {
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
 /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtccodecstats
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct RtcCodecStats {
     /// [Payload type][1] as used in [RTP] encoding or decoding.
     ///
@@ -1408,6 +1417,7 @@ pub struct RtcCodecStats {
     pub clock_rate: u32,
 }
 
+#[cfg(feature = "extended-stats")]
 /// Information about a certificate used by [RTCIceTransport].
 ///
 /// [`RtcStatsType::Certificate`] variant.
@@ -1416,9 +1426,9 @@ pub struct RtcCodecStats {
 ///
 /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
 /// [1]: https://w3.org/TR/webrtc-stats/#certificatestats-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct RtcCertificateStats {
     /// Fingerprint of the certificate.
     ///
@@ -1520,6 +1530,7 @@ impl PartialEq for Float {
     }
 }
 
+#[cfg(feature = "extended-stats")]
 /// Information about the connection to an ICE server (e.g. STUN or TURN).
 ///
 /// [`RtcStatsType::IceServer`] variant.
@@ -1527,9 +1538,9 @@ impl PartialEq for Float {
 /// [Full doc on W3C][1].
 ///
 /// [1]: https://w3.org/TR/webrtc-stats/#ice-server-dict%2A
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(feature = "extended-stats")]
 pub struct RtcIceServerStats {
     /// URL of the ICE server (e.g. TURN or STUN server).
     pub url: String,
