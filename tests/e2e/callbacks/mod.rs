@@ -13,10 +13,19 @@ use medea_control_api_proto::grpc::callback::{
 };
 use tonic::{transport::Server, Status};
 
+/// Contains [`GrpcCallbackServer`]'s port numbers for all tests from
+/// `callbacks` module.
+///
+/// If you're creating new test for which you need [`GrpcCallbackServer`] then
+/// add new unique port number to `ports!` macro invocation within this module.
+/// This macro will check that all ports numbers are unique at compile-time.
 mod test_ports {
+    /// Generates constant port numbers and checks that all port numbers are
+    /// unique at compile-time.
     macro_rules! ports {
         ($($name:ident => $value:expr),* $(,)*) => {
-            // This enum is needed for checking that all ports are unique.
+            /// This enum is needed for compile-time checking that
+            /// all ports are unique.
             #[allow(dead_code, non_camel_case_types)]
             enum _CheckTestPorts {
                 $($name = $value,)*
@@ -50,8 +59,12 @@ impl Actor for GrpcCallbackServer {
     type Context = Context<Self>;
 }
 
+/// Newtype for [`proto::Request`] callbacks which simplifies interacting with
+/// them.
 pub struct Callbacks(pub Vec<proto::Request>);
 
+/// Generates functions which are filters [`proto::Request`] by
+/// [`proto::request::Event`].
 macro_rules! gen_event_filter_fn {
     ($name:tt -> $event:path) => {
         pub fn $name(&self) -> impl Iterator<Item = &proto::Request> {
@@ -67,11 +80,11 @@ macro_rules! gen_event_filter_fn {
 }
 
 impl Callbacks {
-    gen_event_filter_fn!(get_on_starts -> proto::request::Event::OnStart);
+    gen_event_filter_fn!(filter_on_start -> proto::request::Event::OnStart);
 
-    gen_event_filter_fn!(get_on_stops -> proto::request::Event::OnStop);
+    gen_event_filter_fn!(filter_on_stop -> proto::request::Event::OnStop);
 
-    gen_event_filter_fn!(get_on_joins -> proto::request::Event::OnJoin);
+    gen_event_filter_fn!(filter_on_join -> proto::request::Event::OnJoin);
 }
 
 /// Returns all [`proto::Request`]s which this [`GrpcCallbackServer`] received.

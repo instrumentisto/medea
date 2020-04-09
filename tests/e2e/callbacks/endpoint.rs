@@ -1,3 +1,5 @@
+//! Tests for `on_start` and `on_stop` Control API callbacks of endpoints.
+
 use std::{collections::HashSet, time::Duration};
 
 use actix::{Addr, Context};
@@ -18,6 +20,12 @@ use crate::{
     signalling::{CloseSocket, SendCommand, TestMember},
 };
 
+/// Creates `Room` with two interconnected `Member`s with `on_start` and
+/// `on_stop` callbacks.
+///
+/// Returns [`InterconnectedMembers`] with which you can get callbacks of this
+/// `Member`s, this `Member`s and `PeerId`s of `Peer`s created for this
+/// `Member`s.
 async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
     let callback_server = super::run(port);
     let mut control_client = ControlClient::new().await;
@@ -137,14 +145,27 @@ async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
     }
 }
 
+/// Interconnected `Member`s with `on_start` and `on_stop` callbacks.
 struct InterconnectedMembers {
+    /// [`TestMember`] for `member-1`. Which interconnected with `member-2`.
     member_1_client: Addr<TestMember>,
+
+    /// [`TestMember`] for `member-2`. Which interconnected with `member-1`.
     member_2_client: Addr<TestMember>,
+
+    /// [`GrpcCallbackServer`] which will receive all callbacks of this
+    /// `Member`s.
     callback_server: Addr<GrpcCallbackServer>,
+
+    /// `PeerId` created for `Member` with `member-1` ID.
     member_1_peer_id: PeerId,
+
+    /// `PeerId` created for `Member` with `member-2` ID.
     member_2_peer_id: PeerId,
 }
 
+/// Sets `received_bytes` and `received_packets` fields of provided [`RtcStat`]
+/// to provided `received`.
 fn set_received(stat: &mut RtcStat, received: u64) {
     if let RtcStatsType::InboundRtp(inbound) = &mut stat.stats {
         inbound.packets_received = received;
@@ -152,6 +173,8 @@ fn set_received(stat: &mut RtcStat, received: u64) {
     }
 }
 
+/// Sets `sent_bytes` and `sent_packets` fields of provided [`RtcStat`] to
+/// provided `received`.
 fn set_sent(stat: &mut RtcStat, sent: u64) {
     if let RtcStatsType::OutboundRtp(outbound) = &mut stat.stats {
         outbound.packets_sent = sent;
@@ -160,6 +183,7 @@ fn set_sent(stat: &mut RtcStat, sent: u64) {
 }
 
 impl InterconnectedMembers {
+    /// Inbound stats for `Peer` with `audio` `mediaType`.
     const IN_AUDIO_RTC_STAT: &'static str = r#"
         {
             "id": "aa",
@@ -169,6 +193,7 @@ impl InterconnectedMembers {
             "packetsReceived": 100,
             "bytesReceived": 100
         }"#;
+    /// Inbound stats for `Peer` with `video` `mediaType`.
     const IN_VIDEO_RTC_STAT: &'static str = r#"
         {
             "id": "bb",
@@ -178,6 +203,7 @@ impl InterconnectedMembers {
             "packetsReceived": 100,
             "bytesReceived": 100
         }"#;
+    /// Outbound stats for `Peer` with `audio` `mediaType`.
     const OUT_AUDIO_RTC_STAT: &'static str = r#"
         {
             "id": "cc",
@@ -187,6 +213,7 @@ impl InterconnectedMembers {
             "packetsSent": 100,
             "bytesSent": 100
         }"#;
+    /// Outbound stats for `Peer` with `video` `mediaType`.
     const OUT_VIDEO_RTC_STAT: &'static str = r#"
         {
             "id": "dd",
@@ -197,6 +224,9 @@ impl InterconnectedMembers {
             "bytesSent": 100
         }"#;
 
+    /// Sends `outbound-rtp` and `inbound-rtp` [`RtcStats`] with `sent` and
+    /// `received` packets/bytes for `Peer`s related to this
+    /// [`InterconnectedMembers`].
     fn trigger_on_start(&self, sent: u64, received: u64) {
         let mut in_audio_rtc_stat: RtcStat =
             serde_json::from_str(Self::IN_AUDIO_RTC_STAT).unwrap();
@@ -236,6 +266,16 @@ impl InterconnectedMembers {
     }
 }
 
+/// Tests that `on_start` callback fires on `outbound-rtp` and `inbound-rtp`
+/// [`RtcStat`]s sending.
+///
+/// # Algorithm
+///
+/// 1. Interconnect `Member`s with `on_start` and `on_stop` callbacks.
+///
+/// 2. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s from both `Member`s
+///
+/// 3. Check that `on_start` callbacks received for all endpoints.
 #[actix_rt::test]
 async fn on_start_works() {
     const NAME: &str = "on_start_works";
@@ -253,7 +293,7 @@ async fn on_start_works() {
         .unwrap()
         .unwrap();
     let on_start_callbacks: HashSet<_> =
-        callbacks.get_on_starts().map(|req| &req.fid).collect();
+        callbacks.filter_on_start().map(|req| &req.fid).collect();
     assert!(on_start_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_start_callbacks
         .contains(&format!("{}/member-2/play-member-1", NAME)));
@@ -262,6 +302,17 @@ async fn on_start_works() {
     assert!(on_start_callbacks.contains(&format!("{}/member-2/publish", NAME)));
 }
 
+/// Tests that `on_stop` callback fires when `Member` leaves media server.
+///
+/// # Algorithm
+///
+/// 1. Interconnect `Member`s with `on_start` and `on_stop` callbacks.
+///
+/// 2. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s from both `Member`s
+///
+/// 3. Close connection of `member-2`.
+///
+/// 4. Check that `on_stop` callbacks received for all endpoints.
 #[actix_rt::test]
 async fn on_stop_works_on_leave() {
     const NAME: &str = "on_stop_works_on_leave";
@@ -283,7 +334,7 @@ async fn on_stop_works_on_leave() {
         .unwrap();
 
     let on_start_callbacks: HashSet<_> =
-        callbacks.get_on_starts().map(|req| &req.fid).collect();
+        callbacks.filter_on_start().map(|req| &req.fid).collect();
     assert!(on_start_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_start_callbacks.contains(&format!("{}/member-2/publish", NAME)));
     assert!(on_start_callbacks
@@ -292,7 +343,7 @@ async fn on_stop_works_on_leave() {
         .contains(&format!("{}/member-2/play-member-1", NAME)));
 
     let on_stop_callbacks: HashSet<_> =
-        callbacks.get_on_stops().map(|req| &req.fid).collect();
+        callbacks.filter_on_stop().map(|req| &req.fid).collect();
     assert!(on_stop_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_stop_callbacks.contains(&format!("{}/member-2/publish", NAME)));
     assert!(
@@ -303,6 +354,18 @@ async fn on_stop_works_on_leave() {
     );
 }
 
+/// Tests that `on_stop` callback fires when no stats received from `Member`
+/// within `10secs`.
+///
+/// # Algorithm
+///
+/// 1. Interconnect `Member`s with `on_start` and `on_stop` callbacks.
+///
+/// 2. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s from both `Member`s
+///
+/// 3. Wait `12secs`.
+///
+/// 4. Check that `on_stop` callbacks received for all endpoints.
 #[actix_rt::test]
 async fn on_stop_by_timeout() {
     const NAME: &str = "on_stop_by_timeout";
@@ -321,7 +384,7 @@ async fn on_stop_by_timeout() {
         .unwrap();
 
     let on_start_callbacks: HashSet<_> =
-        callbacks.get_on_starts().map(|req| &req.fid).collect();
+        callbacks.filter_on_start().map(|req| &req.fid).collect();
     assert!(on_start_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_start_callbacks.contains(&format!("{}/member-2/publish", NAME)));
     assert!(on_start_callbacks
@@ -330,7 +393,7 @@ async fn on_stop_by_timeout() {
         .contains(&format!("{}/member-2/play-member-1", NAME)));
 
     let on_stop_callbacks: HashSet<_> =
-        callbacks.get_on_stops().map(|req| &req.fid).collect();
+        callbacks.filter_on_stop().map(|req| &req.fid).collect();
     assert!(on_stop_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_stop_callbacks.contains(&format!("{}/member-2/publish", NAME)));
     assert!(
@@ -341,6 +404,22 @@ async fn on_stop_by_timeout() {
     );
 }
 
+/// Tests that `on_stop` callbacks fires when stats of `member-1` and `member-2`
+/// vary.
+///
+/// # Algorithm
+///
+/// 1. Interconnect `Member`s with `on_start` and `on_stop` callbacks.
+///
+/// 2. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s only from `member-1`.
+///
+/// 3. Wait `6secs`.
+///
+/// 4. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s only from `member-1`.
+///
+/// 5. Wait `10secs`.
+///
+/// 6. Check that `on_stop` callbacks received for all endpoints.
 #[actix_rt::test]
 async fn on_stop_on_contradiction() {
     const NAME: &str = "on_stop_on_contradiction";
@@ -392,7 +471,7 @@ async fn on_stop_on_contradiction() {
         .unwrap();
 
     let on_start_callbacks: HashSet<_> =
-        callbacks.get_on_starts().map(|req| &req.fid).collect();
+        callbacks.filter_on_start().map(|req| &req.fid).collect();
     assert!(on_start_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_start_callbacks.contains(&format!("{}/member-2/publish", NAME)));
     assert!(on_start_callbacks
@@ -401,7 +480,7 @@ async fn on_stop_on_contradiction() {
         .contains(&format!("{}/member-2/play-member-1", NAME)));
 
     let on_stop_callbacks: HashSet<_> =
-        callbacks.get_on_stops().map(|req| &req.fid).collect();
+        callbacks.filter_on_stop().map(|req| &req.fid).collect();
     assert!(on_stop_callbacks.contains(&format!("{}/member-1/publish", NAME)));
     assert!(on_stop_callbacks.contains(&format!("{}/member-2/publish", NAME)));
     assert!(
@@ -412,6 +491,21 @@ async fn on_stop_on_contradiction() {
     );
 }
 
+/// Tests that `on_stop` don't fires when media traffic goes normally.
+///
+/// # Algorithm
+///
+/// 1. Interconnect `Member`s with `on_start` and `on_stop` callbacks.
+///
+/// 2. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s from both `Member`s
+///
+/// 3. Wait `6secs`.
+///
+/// 4. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s from both `Member`s
+///
+/// 5. Wait `10secs`.
+///
+/// 6. Check that no `on_stop` callbacks received.
 #[actix_rt::test]
 async fn on_stop_didnt_fires_while_all_normal() {
     const NAME: &str = "on_stop_didnt_fires_while_all_normal";
@@ -433,5 +527,5 @@ async fn on_stop_didnt_fires_while_all_normal() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(callbacks.get_on_stops().count(), 0);
+    assert_eq!(callbacks.filter_on_stop().count(), 0);
 }

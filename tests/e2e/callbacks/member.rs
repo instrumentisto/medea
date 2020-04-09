@@ -80,7 +80,7 @@ async fn on_join() {
         callback_test(TEST_NAME, super::test_ports::MEMBER_ON_JOIN).await;
     delay_for(Duration::from_millis(300)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
-    let on_joins_count = callbacks.get_on_joins().count();
+    let on_joins_count = callbacks.filter_on_join().count();
     assert_eq!(on_joins_count, 1);
 }
 
