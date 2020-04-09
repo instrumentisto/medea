@@ -106,7 +106,8 @@ async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
         };
     let member_1_client = TestMember::connect(
         create_response.get("member-1").unwrap(),
-        Box::new(member_1_on_event),
+        Some(Box::new(member_1_on_event)),
+        None,
         deadline.clone(),
     )
     .await;
@@ -128,7 +129,8 @@ async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
         };
     let member_2_client = TestMember::connect(
         create_response.get("member-2").unwrap(),
-        Box::new(member_2_on_event),
+        Some(Box::new(member_2_on_event)),
+        None,
         deadline,
     )
     .await;
