@@ -76,19 +76,11 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
 async fn on_join() {
     const TEST_NAME: &str = "member_callback_on_join";
 
-    let (_, callback_server) = callback_test(TEST_NAME, 9096).await;
+    let (_, callback_server) =
+        callback_test(TEST_NAME, super::test_ports::MEMBER_ON_JOIN).await;
     delay_for(Duration::from_millis(300)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
-    let on_joins_count = callbacks
-        .into_iter()
-        .filter(|r| {
-            if let Some(Event::OnJoin(_)) = &r.event {
-                true
-            } else {
-                false
-            }
-        })
-        .count();
+    let on_joins_count = callbacks.get_on_joins().count();
     assert_eq!(on_joins_count, 1);
 }
 
@@ -108,13 +100,18 @@ async fn on_join() {
 async fn on_leave_normally_disconnected() {
     const TEST_NAME: &str = "member_callback_on_leave";
 
-    let (client, callback_server) = callback_test(TEST_NAME, 9097).await;
+    let (client, callback_server) = callback_test(
+        TEST_NAME,
+        super::test_ports::MEMBER_ON_LEAVE_NORMALLY_DISCONNECTED,
+    )
+    .await;
     client.send(CloseSocket(CloseCode::Normal)).await.unwrap();
     delay_for(Duration::from_millis(300)).await;
 
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
 
     let on_leaves_count = callbacks
+        .0
         .into_iter()
         .filter_map(|req| {
             if let Some(Event::OnLeave(on_leave)) = req.event {
@@ -146,7 +143,11 @@ async fn on_leave_normally_disconnected() {
 async fn on_leave_on_connection_loss() {
     const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";
 
-    let (client, callback_server) = callback_test(TEST_NAME, 9098).await;
+    let (client, callback_server) = callback_test(
+        TEST_NAME,
+        super::test_ports::MEMBER_ON_LEAVE_ON_CONNECTION_LOSS,
+    )
+    .await;
 
     client.send(CloseSocket(CloseCode::Abnormal)).await.unwrap();
     delay_for(Duration::from_millis(300)).await;
@@ -154,6 +155,7 @@ async fn on_leave_on_connection_loss() {
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
 
     let on_leaves_count = callbacks
+        .0
         .into_iter()
         .filter_map(|req| {
             if let Some(Event::OnLeave(on_leave)) = req.event {

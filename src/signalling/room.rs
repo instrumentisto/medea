@@ -1156,7 +1156,7 @@ impl Actor for Room {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
 
-        ctx.run_interval(Duration::from_secs(10), |this, _| {
+        ctx.run_interval(Duration::from_secs(2), |this, _| {
             this.peer_metrics_service.check_peers_validity();
         });
 
