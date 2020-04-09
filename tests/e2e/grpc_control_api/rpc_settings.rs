@@ -59,7 +59,7 @@ async fn rpc_settings_from_spec_works() {
                 let diff = Instant::now() - opened.unwrap();
 
                 assert!(diff > Duration::from_secs(3));
-                assert!(diff < Duration::from_secs(4));
+                assert!(diff < Duration::from_secs(5));
 
                 test_end_tx.take().unwrap().send(()).unwrap();
             }

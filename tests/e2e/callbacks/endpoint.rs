@@ -322,11 +322,14 @@ async fn on_stop_works_on_leave() {
         test(NAME, super::test_ports::ENDPOINT_ON_STOP_WORKS_ON_LEAVE).await;
 
     interconnected_members.trigger_on_start(100, 100);
+
+    tokio::time::delay_for(Duration::from_millis(500)).await;
+
     interconnected_members
         .member_2_client
         .do_send(CloseSocket(CloseCode::Normal));
 
-    tokio::time::delay_for(Duration::from_secs(1)).await;
+    tokio::time::delay_for(Duration::from_millis(500)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
