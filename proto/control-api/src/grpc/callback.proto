@@ -26,17 +26,17 @@ message Request {
   }
 }
 
-// Event which fires when Endpoint starts sending media traffic.
-message OnStart {}
-
-// Event which fires when Endpoint stops sending media traffic.
-message OnStop {}
-
 // Empty response of the Callback service.
 //
 // We don't use 'google.protobuf.Empty' to be able to add
 // some fields (if necessary) in the future.
 message Response {}
+
+// Event which fires when Endpoint starts sending/receiving media traffic.
+message OnStart {}
+
+// Event which fires when Endpoint stops sending/receiving media traffic.
+message OnStop {}
 
 // Event that fires when Member joins a Room.
 message OnJoin {}

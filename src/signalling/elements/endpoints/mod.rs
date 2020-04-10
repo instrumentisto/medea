@@ -6,6 +6,7 @@ pub mod webrtc;
 
 use derive_more::From;
 use medea_control_api_proto::grpc::api as proto;
+use medea_macro::enum_delegate;
 
 use self::webrtc::{
     play_endpoint::WeakWebRtcPlayEndpoint,
@@ -16,6 +17,8 @@ use self::webrtc::{
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
+#[enum_delegate(pub fn is_some_traffic_callbacks(&self) -> bool)]
+#[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),

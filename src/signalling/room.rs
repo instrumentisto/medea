@@ -6,6 +6,7 @@
 use std::{
     collections::{HashMap, HashSet},
     iter,
+    sync::Arc,
     time::Duration,
 };
 
@@ -71,7 +72,7 @@ use super::{
     peers_metrics::{
         self as pm, PeersMetrics, PeersMetricsEvent, PeersMetricsEventHandler,
     },
-    peers_traffic_watcher::{self as ptw, PeersTrafficWatcher},
+    peers_traffic_watcher::PeerTrafficWatcher,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -188,7 +189,7 @@ pub struct Room {
 
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
-    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetrics,
@@ -204,7 +205,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
-        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -332,7 +333,7 @@ impl Room {
     ) {
         let mut connect_endpoints_tasks = Vec::new();
 
-        for publisher in member.srcs().values() {
+        for (_, publisher) in member.srcs().drain() {
             for receiver in publisher.sinks() {
                 let receiver_owner = receiver.owner();
 
@@ -340,20 +341,21 @@ impl Room {
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
                     connect_endpoints_tasks.push(
-                        self.peers.connect_endpoints(publisher, &receiver),
+                        self.peers
+                            .connect_endpoints(publisher.clone(), receiver),
                     );
                 }
             }
         }
 
-        for receiver in member.sinks().values() {
+        for (_, receiver) in member.sinks().drain() {
             let publisher = receiver.src();
 
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
                 connect_endpoints_tasks
-                    .push(self.peers.connect_endpoints(&publisher, receiver))
+                    .push(self.peers.connect_endpoints(publisher, receiver))
             }
         }
 
@@ -470,10 +472,10 @@ impl Room {
         debug!("Remove peers.");
         let removed_peers =
             self.peers.remove_peers(&member_id, &peer_ids_to_remove);
-        self.peers_traffic_watcher.do_send(ptw::UnsubscribePeers {
-            room_id: self.id.clone(),
-            peers_ids: removed_peers.values().flatten().copied().collect(),
-        });
+        self.peers_traffic_watcher.unregister_peers(
+            self.id.clone(),
+            removed_peers.values().flatten().copied().collect(),
+        );
         removed_peers
             .clone()
             .into_iter()
@@ -718,39 +720,35 @@ impl Room {
         &self,
         peer_id: PeerId,
     ) -> HashMap<Fid<ToEndpoint>, CallbackUrl> {
-        if let Some(endpoints) = self.peers.get_endpoints_by_peer_id(peer_id) {
-            endpoints
-                .into_iter()
-                .filter_map(|e| {
-                    let endpoint = e.upgrade()?;
-                    match endpoint {
-                        Endpoint::WebRtcPublishEndpoint(publish) => {
-                            publish.change_peer_status(peer_id, false);
-                            if publish.publishing_peers_count() == 0 {
-                                if let Some(on_stop) = publish.get_on_stop() {
-                                    let fid =
-                                        publish.owner().get_fid_to_endpoint(
-                                            publish.id().into(),
-                                        );
-                                    return Some((fid, on_stop));
-                                }
-                            }
-                        }
-                        Endpoint::WebRtcPlayEndpoint(play) => {
-                            if let Some(on_stop) = play.get_on_stop() {
-                                let fid = play
+        self.peers
+            .get_endpoints_by_peer_id(peer_id)
+            .into_iter()
+            .filter_map(|e| {
+                let endpoint = e.upgrade()?;
+                match endpoint {
+                    Endpoint::WebRtcPublishEndpoint(publish) => {
+                        publish.change_peer_status(peer_id, false);
+                        if publish.publishing_peers_count() == 0 {
+                            if let Some(on_stop) = publish.get_on_stop() {
+                                let fid = publish
                                     .owner()
-                                    .get_fid_to_endpoint(play.id().into());
+                                    .get_fid_to_endpoint(publish.id().into());
                                 return Some((fid, on_stop));
                             }
                         }
                     }
-                    None
-                })
-                .collect()
-        } else {
-            HashMap::new()
-        }
+                    Endpoint::WebRtcPlayEndpoint(play) => {
+                        if let Some(on_stop) = play.get_on_stop() {
+                            let fid = play
+                                .owner()
+                                .get_fid_to_endpoint(play.id().into());
+                            return Some((fid, on_stop));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
     }
 }
 
@@ -997,43 +995,39 @@ impl Handler<PeerStarted> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let peer_id = msg.0;
-        if let Some(endpoints) = self.peers.get_endpoints_by_peer_id(peer_id) {
-            let send_callbacks: HashMap<_, _> = endpoints
-                .into_iter()
-                .filter_map(|e| {
-                    let endpoint = e.upgrade()?;
-                    match endpoint {
-                        Endpoint::WebRtcPublishEndpoint(publish) => {
-                            publish.change_peer_status(peer_id, true);
-                            if publish.publishing_peers_count() == 1 {
-                                if let Some(on_start) = publish.get_on_start() {
-                                    let fid =
-                                        publish.owner().get_fid_to_endpoint(
-                                            publish.id().into(),
-                                        );
-                                    return Some((fid, on_start));
-                                }
-                            }
-                        }
-                        Endpoint::WebRtcPlayEndpoint(play) => {
-                            if let Some(on_start) = play.get_on_start() {
-                                let fid = play
+        let send_callbacks: HashMap<_, _> = self
+            .peers
+            .get_endpoints_by_peer_id(peer_id)
+            .into_iter()
+            .filter_map(|e| {
+                let endpoint = e.upgrade()?;
+                match endpoint {
+                    Endpoint::WebRtcPublishEndpoint(publish) => {
+                        publish.change_peer_status(peer_id, true);
+                        if publish.publishing_peers_count() == 1 {
+                            if let Some(on_start) = publish.get_on_start() {
+                                let fid = publish
                                     .owner()
-                                    .get_fid_to_endpoint(play.id().into());
+                                    .get_fid_to_endpoint(publish.id().into());
                                 return Some((fid, on_start));
                             }
                         }
                     }
-                    None
-                })
-                .collect();
-            for (fid, on_start) in send_callbacks {
-                self.callbacks.send_callback(
-                    on_start,
-                    fid.into(),
-                    OnStartEvent {},
-                );
-            }
+                    Endpoint::WebRtcPlayEndpoint(play) => {
+                        if let Some(on_start) = play.get_on_start() {
+                            let fid = play
+                                .owner()
+                                .get_fid_to_endpoint(play.id().into());
+                            return Some((fid, on_start));
+                        }
+                    }
+                }
+                None
+            })
+            .collect();
+        for (fid, on_start) in send_callbacks {
+            self.callbacks
+                .send_callback(on_start, fid.into(), OnStartEvent {});
         }
     }
 }
@@ -1102,7 +1096,7 @@ impl PeersMetricsEventHandler for Room {
     fn on_fatal_peer_failure(&mut self, peer_id: PeerId) -> Self::Output {
         Box::new(async move { peer_id }.into_actor(self).map(
             |peer_id, _, ctx| {
-                ctx.notify(PeerSpecContradiction { peer_id });
+                ctx.notify(PeerFailed { peer_id });
             },
         ))
     }
@@ -1482,16 +1476,16 @@ impl Handler<CreateEndpoint> for Room {
 /// went into a state that does not coincide with spec.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct PeerSpecContradiction {
+pub struct PeerFailed {
     pub peer_id: PeerId,
 }
 
-impl Handler<PeerSpecContradiction> for Room {
+impl Handler<PeerFailed> for Room {
     type Result = ();
 
     fn handle(
         &mut self,
-        msg: PeerSpecContradiction,
+        msg: PeerFailed,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         error!(
@@ -1531,7 +1525,10 @@ impl Handler<PeerSpecContradiction> for Room {
 mod test {
     use super::*;
 
-    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+    use crate::{
+        api::control::pipeline::Pipeline, conf::Conf,
+        signalling::peers_traffic_watcher::build_peers_traffic_watcher,
+    };
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
@@ -1543,7 +1540,7 @@ mod test {
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(&room_spec, &ctx, PeersTrafficWatcher::new().start()).unwrap()
+        Room::new(&room_spec, &ctx, build_peers_traffic_watcher()).unwrap()
     }
 
     #[actix_rt::test]

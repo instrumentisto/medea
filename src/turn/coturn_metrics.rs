@@ -3,12 +3,12 @@
 
 use std::{
     collections::HashMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use actix::{
-    fut::Either, Actor, ActorFuture, Addr, AsyncContext, StreamHandler,
-    WrapFuture,
+    fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, StreamExt as _};
 use redis_pub_sub::ConnectionInfo;
@@ -16,8 +16,7 @@ use redis_pub_sub::ConnectionInfo;
 use crate::{
     log::prelude::*,
     signalling::peers_traffic_watcher::{
-        FlowMetricSource, PeersTrafficWatcher, StoppedMetricSource,
-        TrafficFlows, TrafficStopped,
+        FlowMetricSource, PeerTrafficWatcher, StoppedMetricSource,
     },
 };
 
@@ -40,7 +39,7 @@ pub type ActFuture<O> =
 pub struct CoturnMetricsService {
     /// [`Addr`] of [`PeersTrafficWatcher`] to which traffic updates will be
     /// sent.
-    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates are received.
     client: redis_pub_sub::Client,
@@ -57,7 +56,7 @@ impl CoturnMetricsService {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
-        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(
@@ -171,23 +170,23 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                 let is_traffic_really_going =
                     traffic.sent_packets + traffic.received_packets > 10;
                 if is_traffic_really_going {
-                    self.peers_traffic_watcher.do_send(TrafficFlows {
-                        peer_id: event.peer_id,
-                        room_id: event.room_id,
-                        timestamp: Instant::now(),
-                        source: FlowMetricSource::Coturn,
-                    })
+                    self.peers_traffic_watcher.traffic_flows(
+                        event.room_id,
+                        event.peer_id,
+                        Instant::now(),
+                        FlowMetricSource::Coturn,
+                    )
                 }
             }
             CoturnAllocationEvent::Deleted => {
                 *allocations_count -= 1;
                 if *allocations_count == 0 {
-                    self.peers_traffic_watcher.do_send(TrafficStopped {
-                        peer_id: event.peer_id,
-                        room_id: event.room_id,
-                        timestamp: Instant::now(),
-                        source: StoppedMetricSource::Coturn,
-                    });
+                    self.peers_traffic_watcher.traffic_stopped(
+                        event.room_id,
+                        event.peer_id,
+                        Instant::now(),
+                        StoppedMetricSource::Coturn,
+                    );
                 }
             }
             _ => (),
@@ -198,3 +197,6 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
         ctx.wait(self.connect_until_success());
     }
 }
+
+// TODO: tests: add stream, send different stuff, see what is send to
+// peers_traffic_watcher

@@ -1,14 +1,15 @@
 //! Service which provides CRUD actions for [`Room`].
 
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use actix::{
     Actor, Addr, Context, Handler, MailboxError, Message, ResponseFuture,
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{
-    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+use futures::{
+    future::{self, LocalBoxFuture},
+    FutureExt as _, TryFutureExt as _,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -23,6 +24,9 @@ use crate::{
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
+        peers_traffic_watcher::{
+            build_peers_traffic_watcher, PeerTrafficWatcher,
+        },
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
@@ -34,8 +38,6 @@ use crate::{
     AppContext,
 };
 
-use super::peers_traffic_watcher::{self as mcs, PeersTrafficWatcher};
-
 /// Errors of [`RoomService`].
 #[derive(Debug, Fail, Display)]
 pub enum RoomServiceError {
@@ -46,6 +48,10 @@ pub enum RoomServiceError {
     /// Wrapper for [`Room`]'s [`MailboxError`].
     #[display(fmt = "Room mailbox error: {:?}", _0)]
     RoomMailboxErr(MailboxError),
+
+    /// Wrapper for [`Room`]'s [`MailboxError`].
+    #[display(fmt = "Room mailbox error: {:?}", _0)]
+    TrafficWatcherMailBoxErr(MailboxError),
 
     /// Attempt to create [`Room`] with [`RoomId`] which already exists in
     /// [`RoomRepository`].
@@ -125,7 +131,7 @@ pub struct RoomService {
 
     /// [`MetricsCallbacksService`] for all [`Room`]s from this
     /// [`RoomService`].
-    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
@@ -144,7 +150,7 @@ impl RoomService {
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
-        let peers_traffic_watcher = PeersTrafficWatcher::new().start();
+        let peers_traffic_watcher = build_peers_traffic_watcher();
         Ok(Self {
             _coturn_metrics: CoturnMetricsService::new(
                 &app.config.turn,
@@ -168,8 +174,7 @@ impl RoomService {
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
-            self.peers_traffic_watcher
-                .do_send(mcs::UnregisterRoom(id.clone()));
+            self.peers_traffic_watcher.unregister_room(id.clone());
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -189,6 +194,52 @@ impl RoomService {
         } else {
             async { Ok(()) }.boxed_local()
         }
+    }
+
+    fn create_room(
+        &self,
+        spec: RoomSpec,
+    ) -> LocalBoxFuture<'static, Result<(), RoomServiceError>> {
+        if self.room_repo.contains_room_with_id(spec.id()) {
+            return future::err(RoomServiceError::RoomAlreadyExists(Fid::<
+                ToRoom,
+            >::new(
+                spec.id
+            )))
+            .boxed_local();
+        }
+
+        let room = match Room::new(
+            &spec,
+            &self.app,
+            self.peers_traffic_watcher.clone(),
+        ) {
+            Ok(room) => room.start(),
+            Err(err) => {
+                return future::err(RoomServiceError::RoomError(err))
+                    .boxed_local();
+            }
+        };
+
+        let graceful_shutdown = self.graceful_shutdown.clone();
+        let peers_traffic_watcher = self.peers_traffic_watcher.clone();
+        let room_repo = self.room_repo.clone();
+        async move {
+            peers_traffic_watcher
+                .register_room(spec.id().clone(), room.downgrade())
+                .await
+                .map_err(RoomServiceError::TrafficWatcherMailBoxErr)?;
+            shutdown::subscribe(
+                &graceful_shutdown,
+                room.clone().recipient(),
+                shutdown::Priority(2),
+            );
+
+            room_repo.add(spec.id().clone(), room);
+            debug!("New Room [id = {}] started.", spec.id());
+            Ok(())
+        }
+        .boxed_local()
     }
 
     /// Returns [Control API] sid based on provided arguments and
@@ -216,43 +267,29 @@ impl Actor for RoomService {
 pub struct StartStaticRooms;
 
 impl Handler<StartStaticRooms> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+    type Result = ResponseFuture<Result<(), RoomServiceError>>;
 
     fn handle(
         &mut self,
         _: StartStaticRooms,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let room_specs = load_static_specs_from_dir(&self.static_specs_dir)?;
+        let room_specs =
+            match load_static_specs_from_dir(&self.static_specs_dir) {
+                Ok(specs) => specs,
+                Err(err) => {
+                    return future::err(
+                        RoomServiceError::FailedToLoadStaticSpecs(err),
+                    )
+                    .boxed_local()
+                }
+            };
 
-        for spec in room_specs {
-            if self.room_repo.contains_room_with_id(spec.id()) {
-                return Err(RoomServiceError::RoomAlreadyExists(
-                    Fid::<ToRoom>::new(spec.id),
-                ));
-            }
-
-            let room_id = spec.id().clone();
-
-            let room = Room::new(
-                &spec,
-                &self.app,
-                self.peers_traffic_watcher.clone(),
-            )?
-            .start();
-            shutdown::subscribe(
-                &self.graceful_shutdown,
-                room.clone().recipient(),
-                shutdown::Priority(2),
-            );
-            self.peers_traffic_watcher.do_send(mcs::RegisterRoom {
-                room: room.downgrade(),
-                room_id: spec.id,
-            });
-
-            self.room_repo.add(room_id, room);
-        }
-        Ok(())
+        future::try_join_all(
+            room_specs.into_iter().map(|spec| self.create_room(spec)),
+        )
+        .map_ok(|_| ())
+        .boxed_local()
     }
 }
 
@@ -270,7 +307,7 @@ pub struct CreateRoom {
 }
 
 impl Handler<CreateRoom> for RoomService {
-    type Result = Result<Sids, RoomServiceError>;
+    type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
 
     fn handle(
         &mut self,
@@ -290,36 +327,13 @@ impl Handler<CreateRoom> for RoomService {
                     (member_id.clone().to_string(), uri)
                 })
                 .collect(),
-            Err(e) => return Err(RoomServiceError::TryFromElement(e)),
+            Err(e) => {
+                return future::err(RoomServiceError::TryFromElement(e))
+                    .boxed_local()
+            }
         };
 
-        if self.room_repo.get(&room_spec.id).is_some() {
-            return Err(RoomServiceError::RoomAlreadyExists(
-                Fid::<ToRoom>::new(room_spec.id),
-            ));
-        }
-
-        let room = Room::new(
-            &room_spec,
-            &self.app,
-            self.peers_traffic_watcher.clone(),
-        )?;
-        let room_addr = room.start();
-        self.peers_traffic_watcher.do_send(mcs::RegisterRoom {
-            room: room_addr.downgrade(),
-            room_id: room_spec.id.clone(),
-        });
-
-        shutdown::subscribe(
-            &self.graceful_shutdown,
-            room_addr.clone().recipient(),
-            shutdown::Priority(2),
-        );
-
-        debug!("New Room [id = {}] started.", room_spec.id);
-        self.room_repo.add(room_spec.id, room_addr);
-
-        Ok(sid)
+        self.create_room(room_spec).map_ok(|_| sid).boxed_local()
     }
 }
 
@@ -763,10 +777,9 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room =
-            Room::new(&spec, &app_ctx(), PeersTrafficWatcher::new().start())
-                .unwrap()
-                .start();
+        let room = Room::new(&spec, &app_ctx(), build_peers_traffic_watcher())
+            .unwrap()
+            .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -809,10 +822,9 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room =
-            Room::new(&spec, &app_ctx(), PeersTrafficWatcher::new().start())
-                .unwrap()
-                .start();
+        let room = Room::new(&spec, &app_ctx(), build_peers_traffic_watcher())
+            .unwrap()
+            .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -874,13 +886,10 @@ mod room_service_specs {
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
-        let room = Room::new(
-            &room_spec(),
-            &app_ctx(),
-            PeersTrafficWatcher::new().start(),
-        )
-        .unwrap()
-        .start();
+        let room =
+            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher())
+                .unwrap()
+                .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -896,13 +905,10 @@ mod room_service_specs {
             "caller".to_string().into(),
         ));
 
-        let room = Room::new(
-            &room_spec(),
-            &app_ctx(),
-            PeersTrafficWatcher::new().start(),
-        )
-        .unwrap()
-        .start();
+        let room =
+            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher())
+                .unwrap()
+                .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -919,13 +925,10 @@ mod room_service_specs {
             "publish".to_string().into(),
         ));
 
-        let room = Room::new(
-            &room_spec(),
-            &app_ctx(),
-            PeersTrafficWatcher::new().start(),
-        )
-        .unwrap()
-        .start();
+        let room =
+            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher())
+                .unwrap()
+                .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));

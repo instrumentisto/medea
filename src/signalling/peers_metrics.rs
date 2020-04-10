@@ -5,10 +5,10 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     rc::{Rc, Weak},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
-use actix::Addr;
 use futures::{channel::mpsc, Stream};
 use medea_client_api_proto::{
     stats::{
@@ -23,8 +23,7 @@ use medea_macro::dispatchable;
 use crate::api::control::RoomId;
 
 use super::peers_traffic_watcher::{
-    FlowMetricSource, PeersTrafficWatcher, StoppedMetricSource, TrafficFlows,
-    TrafficStopped,
+    FlowMetricSource, PeerTrafficWatcher, StoppedMetricSource,
 };
 
 /// Media type of a [`MediaTrack`].
@@ -91,7 +90,7 @@ pub struct PeerSpec {
     pub receivers: Vec<TrackMediaType>,
 }
 
-/// Metrics which is available for `MediaTrack` with `Send` direction.
+/// Metrics which are available for `MediaTrack` with `Send` direction.
 #[derive(Debug)]
 struct SenderStat {
     /// Last time when this stat was updated.
@@ -330,7 +329,7 @@ pub struct PeersMetrics {
 
     /// [`Addr`] of [`PeersTrafficWatcher`] to which traffic updates will be
     /// sent.
-    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// All `PeerConnection` for this [`PeersMetrics`] will process
     /// metrics.
@@ -347,7 +346,7 @@ impl PeersMetrics {
     /// Returns new [`PeersMetrics`] for a provided [`Room`].
     pub fn new(
         room_id: RoomId,
-        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Self {
         Self {
             room_id,
@@ -379,7 +378,7 @@ impl PeersMetrics {
     }
 
     /// Checks that all [`PeerStat`]s is valid accordingly `PeerConnection`
-    /// specification. If [`PeerStat`] is considered as invalid accrdingly to
+    /// specification. If [`PeerStat`] is considered as invalid accordingly to
     /// `PeerConnection` specification then
     /// [`PeersMetrics::fatal_peer_error`] will be called.
     ///
@@ -395,12 +394,12 @@ impl PeersMetrics {
             let peer_ref = peer.borrow();
 
             if peer_ref.is_stopped() {
-                self.peers_traffic_watcher.do_send(TrafficStopped {
-                    room_id: self.room_id.clone(),
-                    peer_id: peer_ref.peer_id,
-                    timestamp: peer_ref.get_stop_time(),
-                    source: StoppedMetricSource::PeerTraffic,
-                });
+                self.peers_traffic_watcher.traffic_stopped(
+                    self.room_id.clone(),
+                    peer_ref.peer_id,
+                    peer_ref.get_stop_time(),
+                    StoppedMetricSource::PeerTraffic,
+                );
             } else if !peer_ref.is_conforms_spec() {
                 self.fatal_peer_error(peer_ref.peer_id);
             }
@@ -456,27 +455,27 @@ impl PeersMetrics {
             }
 
             if peer_ref.is_stopped() {
-                self.peers_traffic_watcher.do_send(TrafficStopped {
-                    source: StoppedMetricSource::PeerTraffic,
-                    timestamp: peer_ref.get_stop_time(),
-                    peer_id: peer_ref.peer_id,
-                    room_id: self.room_id.clone(),
-                });
+                self.peers_traffic_watcher.traffic_stopped(
+                    self.room_id.clone(),
+                    peer_ref.peer_id,
+                    peer_ref.get_stop_time(),
+                    StoppedMetricSource::PeerTraffic,
+                );
             } else if peer_ref.is_conforms_spec() {
-                self.peers_traffic_watcher.do_send(TrafficFlows {
-                    room_id: self.room_id.clone(),
+                self.peers_traffic_watcher.traffic_flows(
+                    self.room_id.clone(),
                     peer_id,
-                    source: FlowMetricSource::PeerTraffic,
-                    timestamp: Instant::now(),
-                });
+                    Instant::now(),
+                    FlowMetricSource::PeerTraffic,
+                );
                 peer_ref.set_state(PeerStatState::Connected);
                 if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
-                    self.peers_traffic_watcher.do_send(TrafficFlows {
-                        room_id: self.room_id.clone(),
-                        peer_id: partner_peer_id,
-                        source: FlowMetricSource::PartnerPeerTraffic,
-                        timestamp: Instant::now(),
-                    });
+                    self.peers_traffic_watcher.traffic_flows(
+                        self.room_id.clone(),
+                        partner_peer_id,
+                        Instant::now(),
+                        FlowMetricSource::PartnerPeerTraffic,
+                    );
                 }
             } else {
                 self.fatal_peer_error(peer_ref.peer_id);
@@ -490,12 +489,12 @@ impl PeersMetrics {
     /// [`PeersTrafficWatcher`].
     pub fn peer_removed(&mut self, peer_id: PeerId) {
         if self.peers.remove(&peer_id).is_some() {
-            self.peers_traffic_watcher.do_send(TrafficStopped {
+            self.peers_traffic_watcher.traffic_stopped(
+                self.room_id.clone(),
                 peer_id,
-                room_id: self.room_id.clone(),
-                timestamp: Instant::now(),
-                source: StoppedMetricSource::PeerRemoved,
-            });
+                Instant::now(),
+                StoppedMetricSource::PeerRemoved,
+            );
         }
     }
 }

@@ -168,7 +168,9 @@ mod test {
     use crate::{
         api::control,
         conf::Conf,
-        signalling::{peers_traffic_watcher::PeersTrafficWatcher, Room},
+        signalling::{
+            peers_traffic_watcher::build_peers_traffic_watcher, Room,
+        },
         turn::new_turn_auth_service_mock,
         AppContext,
     };
@@ -185,7 +187,7 @@ mod test {
 
         let room_id = room_spec.id.clone();
         let client_room =
-            Room::new(&room_spec, &app, PeersTrafficWatcher::new().start())
+            Room::new(&room_spec, &app, build_peers_traffic_watcher())
                 .unwrap()
                 .start();
         let room_hash_map = hashmap! {

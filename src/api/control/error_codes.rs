@@ -492,7 +492,8 @@ impl From<RoomServiceError> for ErrorResponse {
             ),
             RoomMailboxErr(_)
             | FailedToLoadStaticSpecs(_)
-            | TryFromElement(_) => Self::unexpected(&err),
+            | TryFromElement(_)
+            | TrafficWatcherMailBoxErr(_) => Self::unexpected(&err),
         }
     }
 }

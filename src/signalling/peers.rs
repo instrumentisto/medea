@@ -6,26 +6,23 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
-    iter,
     sync::Arc,
 };
 
-use actix::{fut::wrap_future, ActorFuture, Addr, WrapFuture as _};
+use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use futures::{future, future::Either, Future};
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
     log::prelude::*,
-    media::{New, Peer, PeerStateMachine},
+    media::{IceUser, New, Peer, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            WeakEndpoint,
+            Endpoint, WeakEndpoint,
         },
-        peers_traffic_watcher as ptw,
-        peers_traffic_watcher::PeersTrafficWatcher,
+        peers_traffic_watcher::PeerTrafficWatcher,
         room::{ActFuture, RoomError},
         Room,
     },
@@ -60,11 +57,12 @@ pub struct PeerRepository {
 
     /// Weak references to the [`Endpoint`]s for which [`PeerConnection`] is
     /// created.
+    // TODO: i believe that this is redundant
     peers_endpoints: HashMap<PeerId, Vec<WeakEndpoint>>,
 
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
-    peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 }
 
 /// Simple ID counter.
@@ -88,7 +86,7 @@ impl PeerRepository {
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
-        peers_traffic_watcher: Addr<PeersTrafficWatcher>,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Self {
         Self {
             room_id,
@@ -130,24 +128,6 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn get_peer_by_id_mut(
-        &mut self,
-        peer_id: PeerId,
-    ) -> Result<&mut PeerStateMachine, RoomError> {
-        self.peers
-            .get_mut(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
-    }
-
-    /// Returns [`IceUser`] for a provided [`PeerId`].
-    ///
-    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
-    /// exist in [`PeerRepository`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::PeerNotFound`] if [`Peer`] with provided
-    /// [`PeerId`] is not exist in [`PeerRepository`].
     pub fn get_mut_peer_by_id(
         &mut self,
         peer_id: PeerId,
@@ -158,7 +138,7 @@ impl PeerRepository {
     }
 
     /// Creates interconnected [`Peer`]s for provided [`Member`]s.
-    pub fn create_peers(
+    fn create_peers(
         &mut self,
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
@@ -319,35 +299,6 @@ impl PeerRepository {
         self.remove_peers(&member_id, &member_peers)
     }
 
-    /// Subscribes provided [`Peer`] in the [`PeersTrafficWatcher`] service if
-    /// `is_need_subscription` is `true`.
-    fn traffic_watcher_subscribe(
-        &self,
-        peer: &Peer<New>,
-        is_need_subscription: bool,
-    ) -> impl Future<Output = Result<(), RoomError>> {
-        if is_need_subscription {
-            let room_id = self.room_id.clone();
-            let peer_id = peer.id();
-            let peer_traffic_watcher = self.peers_traffic_watcher.clone();
-            let is_force_relayed = peer.is_force_relayed();
-            Either::Left(async move {
-                Ok(peer_traffic_watcher
-                    .send(ptw::SubscribePeer {
-                        peer_id,
-                        room_id,
-                        flow_metrics_sources: ptw::flow_metrics_sources(
-                            is_force_relayed,
-                        ),
-                    })
-                    .await
-                    .map_err(RoomError::PeerTrafficWatcherMailbox)?)
-            })
-        } else {
-            Either::Right(future::ok(()))
-        }
-    }
-
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
     /// doesn't exist.
     ///
@@ -366,8 +317,8 @@ impl PeerRepository {
     /// Panics if provided endpoints already have interconnected [`Peer`]s.
     pub fn connect_endpoints(
         &mut self,
-        src: &WebRtcPublishEndpoint,
-        sink: &WebRtcPlayEndpoint,
+        src: WebRtcPublishEndpoint,
+        sink: WebRtcPlayEndpoint,
     ) -> ActFuture<Result<Option<(PeerId, PeerId)>, RoomError>> {
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
@@ -404,7 +355,7 @@ impl PeerRepository {
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
 
-            Box::new(actix::fut::ready(Ok(None)))
+            Box::new(actix::fut::ok(None))
         } else {
             let (mut src_peer, mut sink_peer) = self.create_peers(&src, &sink);
 
@@ -424,66 +375,77 @@ impl PeerRepository {
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();
 
-            let src_traffic_watcher_sub_fut = self.traffic_watcher_subscribe(
-                &src_peer,
-                src.is_some_traffic_callbacks(),
-            );
-            let sink_traffic_watcher_sub_fut = self.traffic_watcher_subscribe(
-                &sink_peer,
-                sink.is_some_traffic_callbacks(),
-            );
-
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
 
-            let room_id = self.room_id.clone();
-            let turn_service = Arc::clone(&self.turn_service);
-            Box::new(
-                wrap_future(async move {
-                    let src_ice_user = turn_service.create(
-                        room_id.clone(),
-                        src_peer_id,
-                        UnreachablePolicy::ReturnErr,
-                    );
-                    let sink_ice_user = turn_service.create(
-                        room_id,
-                        sink_peer_id,
-                        UnreachablePolicy::ReturnErr,
-                    );
-                    Ok(futures::try_join!(src_ice_user, sink_ice_user)?)
-                })
-                .then(move |result, room: &mut Room, _| {
-                    async move {
-                        sink_traffic_watcher_sub_fut.await?;
-                        src_traffic_watcher_sub_fut.await?;
-
-                        result
+            Box::new(self.peer_post_construct(src_peer_id, src.into()).then(
+                move |res, room, _| {
+                    match res {
+                        Ok(_) => Box::new(
+                            room.peers
+                                .peer_post_construct(sink_peer_id, sink.into())
+                                .map(move |res, _, _| {
+                                    res.map(|_| {
+                                        Some((src_peer_id, sink_peer_id))
+                                    })
+                                }),
+                        ),
+                        Err(err) => {
+                            Box::new(actix::fut::err(err)) as ActFuture<_>
+                        }
                     }
-                    .into_actor(room)
-                })
-                .then(move |result, room: &mut Room, _| {
-                    let result =
-                        result.and_then(|(src_ice_user, sink_ice_user)| {
-                            iter::once((src_peer_id, src_ice_user))
-                                .chain(iter::once((
-                                    sink_peer_id,
-                                    sink_ice_user,
-                                )))
-                                .map(|(peer_id, ice_user)| {
-                                    room.peers
-                                        .get_mut_peer_by_id(peer_id)
-                                        .map(|peer| peer.set_ice_user(ice_user))
-                                })
-                                .collect()
-                        });
-                    async move {
-                        result?;
-                        Ok(Some((src_peer_id, sink_peer_id)))
-                    }
-                    .into_actor(room)
-                }),
-            )
+                },
+            ))
         }
+    }
+
+    fn peer_post_construct(
+        &self,
+        peer_id: PeerId,
+        endpoint: Endpoint,
+    ) -> ActFuture<Result<(), RoomError>> {
+        let room_id = self.room_id.clone();
+        let turn_service = self.turn_service.clone();
+        Box::new(
+            wrap_future(async move {
+                Ok(turn_service
+                    .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
+                    .await?)
+            })
+            .map(move |res: Result<IceUser, RoomError>, room: &mut Room, _| {
+                res.map(|ice_user| {
+                    if let Ok(peer) = room.peers.get_mut_peer_by_id(peer_id) {
+                        peer.set_ice_user(ice_user)
+                    }
+                })
+            })
+            .then(move |res, room: &mut Room, _| {
+                let room_id = room.id().clone();
+                let traffic_watcher = room.peers.peers_traffic_watcher.clone();
+                async move {
+                    match res {
+                        Ok(_) => {
+                            if endpoint.is_some_traffic_callbacks() {
+                                traffic_watcher
+                                    .register_peer(
+                                        room_id,
+                                        peer_id,
+                                        endpoint.is_force_relayed(),
+                                    )
+                                    .await
+                                    .map_err(
+                                        RoomError::PeerTrafficWatcherMailbox,
+                                    )
+                            } else {
+                                Ok(())
+                            }
+                        }
+                        Err(err) => Err(err),
+                    }
+                }
+                .into_actor(room)
+            }),
+        )
     }
 
     /// Returns [`Weak`] references to the [`Endpoint`]s for which provided
@@ -491,7 +453,10 @@ impl PeerRepository {
     pub fn get_endpoints_by_peer_id(
         &self,
         peer_id: PeerId,
-    ) -> Option<Vec<WeakEndpoint>> {
-        self.peers_endpoints.get(&peer_id).cloned()
+    ) -> Vec<WeakEndpoint> {
+        self.peers_endpoints
+            .get(&peer_id)
+            .cloned()
+            .unwrap_or_default()
     }
 }

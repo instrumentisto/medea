@@ -28,12 +28,15 @@ All user visible changes to this project will be documented in this file. This p
             - `WebRtcPlayEndpoint`;
             - `WebRtcPublishEndpoint`.
     - `Callback` service:
-        - Callbacks ([#63]):
-            - `OnJoin`;
-            - `OnLeave`.
+        - Callbacks:
+            - `OnJoin` ([#63]);
+            - `OnLeave` ([#63]);
+            - `OnStart` ([#91]);
+            - `OnStop` ([#91]).
 
 [#57]: /../../pull/57
 [#63]: /../../pull/63
+[#91]: /../../pull/91
 
 
 

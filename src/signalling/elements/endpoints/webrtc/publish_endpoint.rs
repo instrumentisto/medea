@@ -40,15 +40,6 @@ struct WebRtcPublishEndpointInner {
     /// Owner [`Member`] of this [`WebRtcPublishEndpoint`].
     owner: WeakMember,
 
-    /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
-    ///
-    /// Currently this field used for nothing but in future this may be used
-    /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
-    /// this [`WebRtcPublishEndpoint`].
-    ///
-    /// [`Peer`]: crate::media::peer:Peer
-    peer_ids: HashSet<PeerId>,
-
     /// Publishing statuses of the [`Peer`]s related to this
     /// [`WebRtcPublishEndpoint`].
     ///
@@ -94,21 +85,17 @@ impl WebRtcPublishEndpointInner {
         self.owner.upgrade()
     }
 
-    fn add_peer_id(&mut self, peer_id: PeerId) {
-        self.peer_ids.insert(peer_id);
-    }
-
     fn peer_ids(&self) -> HashSet<PeerId> {
-        self.peer_ids.clone()
+        self.peers_statuses.keys().cloned().collect()
     }
 
     fn reset(&mut self) {
-        self.peer_ids = HashSet::new()
+        self.peers_statuses.clear();
     }
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn remove_peer_id(&mut self, peer_id: &PeerId) {
-        self.peer_ids.remove(peer_id);
+        self.peers_statuses.remove(peer_id);
     }
 
     fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
@@ -141,7 +128,6 @@ impl WebRtcPublishEndpoint {
             is_force_relayed,
             sinks: Vec::new(),
             owner,
-            peer_ids: HashSet::new(),
             peers_statuses: HashMap::new(),
             on_start,
             on_stop,
@@ -175,7 +161,6 @@ impl WebRtcPublishEndpoint {
     /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
     pub fn add_peer_id(&self, peer_id: PeerId) {
         self.0.borrow_mut().peers_statuses.insert(peer_id, false);
-        self.0.borrow_mut().add_peer_id(peer_id)
     }
 
     /// Returns all [`PeerId`]s of this [`WebRtcPublishEndpoint`].

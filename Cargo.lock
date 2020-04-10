@@ -93,7 +93,7 @@ dependencies = [
  "actix-service",
  "actix-threadpool",
  "actix-utils",
- "base64 0.11.0",
+ "base64",
  "bitflags",
  "brotli2",
  "bytes",
@@ -116,7 +116,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mime",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rand 0.7.3",
  "regex",
@@ -153,14 +153,15 @@ dependencies = [
 
 [[package]]
 name = "actix-rt"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f6a0a55507046441a496b2f0d26a84a65e67c8cafffe279072412f624b5fb6d"
+checksum = "20066d9200ef8d441ac156c76dd36c3f1e9a15976c34e69ae97f7f570b331882"
 dependencies = [
  "actix-macros",
  "actix-threadpool",
  "copyless",
- "futures 0.3.4",
+ "futures-channel",
+ "futures-util",
  "tokio",
 ]
 
@@ -452,13 +453,13 @@ dependencies = [
  "actix-http",
  "actix-rt",
  "actix-service",
- "base64 0.11.0",
+ "base64",
  "bytes",
  "derive_more",
  "futures-core",
  "log",
  "mime",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "rand 0.7.3",
  "serde 1.0.106",
  "serde_json",
@@ -485,15 +486,6 @@ checksum = "7de8aba10a69c8e8d7622c5710229485ec32e9d55fdad160ea559c086fdcd118"
 dependencies = [
  "cc",
  "libc",
-]
-
-[[package]]
-name = "base64"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b25d992356d2eb0ed82172f5248873db5560c4721f564b13cb5193bda5e668e"
-dependencies = [
- "byteorder",
 ]
 
 [[package]]
@@ -1796,12 +1788,6 @@ dependencies = [
 
 [[package]]
 name = "percent-encoding"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
-
-[[package]]
-name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
@@ -1957,9 +1943,9 @@ dependencies = [
 
 [[package]]
 name = "protobuf"
-version = "2.12.0"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71964f34fd51cf04882d7ae3325fa0794d4cad66a03d0003f38d8ae4f63ba126"
+checksum = "12b869b619141004a542c9e585b40c1432e7b0d67a826f68cb5fa4c1ee9aff56"
 
 [[package]]
 name = "quick-error"
@@ -2086,7 +2072,7 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "itoa",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project-lite",
  "sha1",
  "tokio",
@@ -2105,7 +2091,7 @@ dependencies = [
  "dtoa",
  "futures-util",
  "itoa",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project-lite",
  "tokio",
  "tokio-util 0.2.0",
@@ -2172,7 +2158,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bc8af4bda8e1ff4932523b94d3dd20ee30a87232323eda55903ffd71d2fb017"
 dependencies = [
- "base64 0.11.0",
+ "base64",
  "blake2b_simd",
  "constant_time_eq",
  "crossbeam-utils",
@@ -2482,9 +2468,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
+checksum = "05720e22615919e4734f6a99ceae50d00226c3c5aca406e102ebc33298214e0a"
 
 [[package]]
 name = "smart-default"
@@ -2620,9 +2606,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee5a0dd887e37d37390c13ff8ac830f992307fe30a1fff0ab8427af67211ba28"
+checksum = "39fb9142eb6e9cc37f4f29144e62618440b149a138eee01a7bbe9b9226aaf17c"
 dependencies = [
  "bytes",
  "fnv",
@@ -2690,25 +2676,25 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08283643b1d483eb7f3fc77069e63b5cba3e4db93514b3d45470e67f123e4e48"
+checksum = "b058d1caf0c61cd4d7425b4f161fa3c41a4e0ca2d2e9f63af842ad2f1eca1628"
 dependencies = [
  "async-stream",
  "async-trait",
- "base64 0.10.1",
+ "base64",
  "bytes",
  "futures-core",
  "futures-util",
  "http",
  "http-body",
  "hyper",
- "percent-encoding 1.0.1",
+ "percent-encoding",
  "pin-project",
  "prost",
  "prost-derive",
  "tokio",
- "tokio-util 0.2.0",
+ "tokio-util 0.3.1",
  "tower",
  "tower-balance",
  "tower-load",
@@ -2720,9 +2706,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0436413ba71545bcc6c2b9a0f9d78d72deb0123c6a75ccdfe7c056f9930f5e52"
+checksum = "71d8d21cb568e802d77055ab7fcd43f0992206de5028de95c8d3a41118d32e8e"
 dependencies = [
  "proc-macro2",
  "prost-build",
@@ -3062,7 +3048,7 @@ checksum = "829d4a8476c35c9bf0bbce5a3b23f4106f79728039b726d292bb93bc106787cb"
 dependencies = [
  "idna",
  "matches",
- "percent-encoding 2.1.0",
+ "percent-encoding",
 ]
 
 [[package]]
