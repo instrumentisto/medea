@@ -153,12 +153,12 @@ pub struct Member {
     pub id: std::string::String,
     /// Callback which fires when the Member establishes persistent connection
     /// with a media server via Client API.
-    #[prost(string, tag="2")]
-    pub on_join: std::string::String,
+    #[prost(message, optional, tag="2")]
+    pub on_join: ::std::option::Option<::std::string::String>,
     /// Callback which fires when the Member finishes persistent connection
     /// with a media server via Client API.
-    #[prost(string, tag="3")]
-    pub on_leave: std::string::String,
+    #[prost(message, optional, tag="3")]
+    pub on_leave: ::std::option::Option<::std::string::String>,
     /// Credentials of the Member to authorize via Client API with.
     #[prost(string, tag="4")]
     pub credentials: std::string::String,
@@ -205,11 +205,11 @@ pub struct WebRtcPublishEndpoint {
     #[prost(enumeration="web_rtc_publish_endpoint::P2p", tag="2")]
     pub p2p: i32,
     /// Callback which fires when a client starts publishing media data.
-    #[prost(string, tag="3")]
-    pub on_start: std::string::String,
+    #[prost(message, optional, tag="3")]
+    pub on_start: ::std::option::Option<::std::string::String>,
     /// Callback which fires when a client stops publishing media data.
-    #[prost(string, tag="4")]
-    pub on_stop: std::string::String,
+    #[prost(message, optional, tag="4")]
+    pub on_stop: ::std::option::Option<::std::string::String>,
     /// Option to relay all media through a TURN server forcibly.
     #[prost(bool, tag="5")]
     pub force_relay: bool,
@@ -239,12 +239,12 @@ pub struct WebRtcPlayEndpoint {
     pub src: std::string::String,
     /// Callback which fires when a client starts playing media data
     /// from the source.
-    #[prost(string, tag="3")]
-    pub on_start: std::string::String,
+    #[prost(message, optional, tag="3")]
+    pub on_start: ::std::option::Option<::std::string::String>,
     /// Callback which fires when a client stops playing media data
     /// from the source.
-    #[prost(string, tag="4")]
-    pub on_stop: std::string::String,
+    #[prost(message, optional, tag="4")]
+    pub on_stop: ::std::option::Option<::std::string::String>,
     /// Option to relay all media through a TURN server forcibly.
     #[prost(bool, tag="5")]
     pub force_relay: bool,

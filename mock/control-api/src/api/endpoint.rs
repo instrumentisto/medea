@@ -68,8 +68,8 @@ impl WebRtcPublishEndpoint {
             id,
             p2p: p2p as i32,
             force_relay: self.force_relay,
-            on_start: self.on_start.unwrap_or_default(),
-            on_stop: self.on_stop.unwrap_or_default(),
+            on_start: self.on_start,
+            on_stop: self.on_stop,
         }
     }
 }
@@ -82,8 +82,8 @@ impl From<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
                 .unwrap_or_default()
                 .into(),
             force_relay: proto.force_relay,
-            on_start: Some(proto.on_start).filter(|s| !s.is_empty()),
-            on_stop: Some(proto.on_stop).filter(|s| !s.is_empty()),
+            on_start: proto.on_start,
+            on_stop: proto.on_stop,
         }
     }
 }
@@ -123,8 +123,8 @@ impl WebRtcPlayEndpoint {
             id,
             src: self.src,
             force_relay: self.force_relay,
-            on_start: self.on_start.unwrap_or_default(),
-            on_stop: self.on_stop.unwrap_or_default(),
+            on_start: self.on_start,
+            on_stop: self.on_stop,
         }
     }
 }
@@ -135,8 +135,8 @@ impl From<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
             id: proto.id,
             src: proto.src,
             force_relay: proto.force_relay,
-            on_start: Some(proto.on_start).filter(|s| !s.is_empty()),
-            on_stop: Some(proto.on_stop).filter(|s| !s.is_empty()),
+            on_start: proto.on_start,
+            on_stop: proto.on_stop,
         }
     }
 }

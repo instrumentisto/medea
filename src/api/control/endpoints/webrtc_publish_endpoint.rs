@@ -75,12 +75,14 @@ impl TryFrom<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     fn try_from(
         value: &proto::WebRtcPublishEndpoint,
     ) -> Result<Self, Self::Error> {
-        let on_start = Some(value.on_start.clone())
-            .filter(|s| !s.is_empty())
+        let on_start = value
+            .on_start
+            .clone()
             .map(CallbackUrl::try_from)
             .transpose()?;
-        let on_stop = Some(value.on_stop.clone())
-            .filter(|s| !s.is_empty())
+        let on_stop = value
+            .on_stop
+            .clone()
             .map(CallbackUrl::try_from)
             .transpose()?;
 

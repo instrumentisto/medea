@@ -578,13 +578,12 @@ impl Into<proto::Member> for Member {
             id: self.id().to_string(),
             credentials: self.credentials(),
             on_leave: self
-                .get_on_leave()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
-            on_join: self
-                .get_on_join()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
+                .0
+                .borrow()
+                .on_leave
+                .as_ref()
+                .map(ToString::to_string),
+            on_join: self.0.borrow().on_join.as_ref().map(ToString::to_string),
             reconnect_timeout: Some(self.get_reconnect_timeout().into()),
             idle_timeout: Some(self.get_idle_timeout().into()),
             ping_interval: Some(self.get_ping_interval().into()),

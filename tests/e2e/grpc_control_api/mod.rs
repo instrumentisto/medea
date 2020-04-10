@@ -229,8 +229,8 @@ impl Into<proto::Member> for Member {
         proto::Member {
             id: self.id,
             pipeline,
-            on_leave: self.on_leave.unwrap_or_default(),
-            on_join: self.on_join.unwrap_or_default(),
+            on_leave: self.on_leave,
+            on_join: self.on_join,
             credentials: self.credentials.unwrap_or_default(),
             ping_interval: self.ping_interval.map(Into::into),
             idle_timeout: self.idle_timeout.map(Into::into),
@@ -320,8 +320,8 @@ impl Into<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
     fn into(self) -> proto::WebRtcPlayEndpoint {
         proto::WebRtcPlayEndpoint {
             src: self.src,
-            on_start: self.on_start.unwrap_or_default(),
-            on_stop: self.on_stop.unwrap_or_default(),
+            on_start: self.on_start,
+            on_stop: self.on_stop,
             id: self.id,
             force_relay: false,
         }
@@ -363,8 +363,8 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     fn into(self) -> proto::WebRtcPublishEndpoint {
         proto::WebRtcPublishEndpoint {
             p2p: self.p2p_mode as i32,
-            on_start: self.on_start.unwrap_or_default(),
-            on_stop: self.on_stop.unwrap_or_default(),
+            on_start: self.on_start,
+            on_stop: self.on_stop,
             id: self.id,
             force_relay: bool::default(),
         }

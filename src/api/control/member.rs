@@ -236,22 +236,9 @@ impl TryFrom<proto::Member> for MemberSpec {
             credentials = generate_member_credentials();
         }
 
-        let on_leave = {
-            let on_leave = member.on_leave;
-            if on_leave.is_empty() {
-                None
-            } else {
-                Some(CallbackUrl::try_from(on_leave)?)
-            }
-        };
-        let on_join = {
-            let on_join = member.on_join;
-            if on_join.is_empty() {
-                None
-            } else {
-                Some(CallbackUrl::try_from(on_join)?)
-            }
-        };
+        let on_leave =
+            member.on_leave.map(CallbackUrl::try_from).transpose()?;
+        let on_join = member.on_join.map(CallbackUrl::try_from).transpose()?;
 
         let idle_timeout =
             parse_duration(member.idle_timeout, &member.id, "idle_timeout")?;

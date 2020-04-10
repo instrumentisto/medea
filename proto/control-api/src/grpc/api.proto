@@ -5,6 +5,7 @@ syntax = "proto3";
 package api;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 // Media server's Control API service.
 service ControlApi {
@@ -136,10 +137,10 @@ message Member {
   string id = 1;
   // Callback which fires when the Member establishes persistent connection
   // with a media server via Client API.
-  string on_join = 2;
+  google.protobuf.StringValue on_join = 2;
   // Callback which fires when the Member finishes persistent connection
   // with a media server via Client API.
-  string on_leave = 3;
+  google.protobuf.StringValue on_leave = 3;
   // Credentials of the Member to authorize via Client API with.
   string credentials = 4;
   // Timeout of receiving heartbeat messages from the Member via Client API.
@@ -170,9 +171,9 @@ message WebRtcPublishEndpoint {
   // P2P mode for this element.
   P2P p2p = 2;
   // Callback which fires when a client starts publishing media data.
-  string on_start = 3;
+  google.protobuf.StringValue on_start = 3;
   // Callback which fires when a client stops publishing media data.
-  string on_stop = 4;
+  google.protobuf.StringValue on_stop = 4;
   // Option to relay all media through a TURN server forcibly.
   bool force_relay = 5;
 
@@ -196,10 +197,10 @@ message WebRtcPlayEndpoint {
   string src = 2;
   // Callback which fires when a client starts playing media data
   // from the source.
-  string on_start = 3;
+  google.protobuf.StringValue on_start = 3;
   // Callback which fires when a client stops playing media data
   // from the source.
-  string on_stop = 4;
+  google.protobuf.StringValue on_stop = 4;
   // Option to relay all media through a TURN server forcibly.
   bool force_relay = 5;
 }

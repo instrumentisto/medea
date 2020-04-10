@@ -27,6 +27,7 @@ use crate::{
 /// Returns [`InterconnectedMembers`] with which you can get callbacks of this
 /// `Member`s, this `Member`s and `PeerId`s of `Peer`s created for this
 /// `Member`s.
+#[allow(clippy::too_many_lines)]
 async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
     let callback_server = super::run(port);
     let mut control_client = ControlClient::new().await;
@@ -96,20 +97,17 @@ async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
         move |event: &RpcEvent,
               _: &mut Context<TestMember>,
               _: Vec<&RpcEvent>| {
-            match event {
-                RpcEvent::PeerCreated { peer_id, .. } => {
-                    if let Some(tx) = member_1_peer_id_tx.take() {
-                        tx.send(*peer_id).unwrap();
-                    }
+            if let RpcEvent::PeerCreated { peer_id, .. } = event {
+                if let Some(tx) = member_1_peer_id_tx.take() {
+                    tx.send(*peer_id).unwrap();
                 }
-                _ => (),
             }
         };
     let member_1_client = TestMember::connect(
         create_response.get("member-1").unwrap(),
         Some(Box::new(member_1_on_event)),
         None,
-        deadline.clone(),
+        deadline,
     )
     .await;
 
@@ -119,13 +117,10 @@ async fn test(name: &'static str, port: u16) -> InterconnectedMembers {
         move |event: &RpcEvent,
               _: &mut Context<TestMember>,
               _: Vec<&RpcEvent>| {
-            match event {
-                RpcEvent::PeerCreated { peer_id, .. } => {
-                    if let Some(tx) = member_2_peer_id_tx.take() {
-                        tx.send(*peer_id).unwrap();
-                    }
+            if let RpcEvent::PeerCreated { peer_id, .. } = event {
+                if let Some(tx) = member_2_peer_id_tx.take() {
+                    tx.send(*peer_id).unwrap();
                 }
-                _ => (),
             }
         };
     let member_2_client = TestMember::connect(
@@ -259,10 +254,10 @@ impl InterconnectedMembers {
             Command::AddPeerConnectionMetrics {
                 peer_id: self.member_2_peer_id,
                 metrics: PeerMetrics::RtcStats(vec![
-                    in_audio_rtc_stat.clone(),
-                    in_video_rtc_stat.clone(),
-                    out_audio_rtc_stat.clone(),
-                    out_video_rtc_stat.clone(),
+                    in_audio_rtc_stat,
+                    in_video_rtc_stat,
+                    out_audio_rtc_stat,
+                    out_video_rtc_stat,
                 ]),
             },
         ));

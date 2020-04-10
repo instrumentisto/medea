@@ -242,8 +242,13 @@ impl Into<proto::member::Element> for WebRtcPlayEndpoint {
 impl Into<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
     fn into(self) -> proto::WebRtcPlayEndpoint {
         proto::WebRtcPlayEndpoint {
-            on_start: String::new(),
-            on_stop: String::new(),
+            on_start: self
+                .0
+                .borrow()
+                .on_start
+                .as_ref()
+                .map(ToString::to_string),
+            on_stop: self.0.borrow().on_stop.as_ref().map(ToString::to_string),
             src: self.src_uri().to_string(),
             id: self.id().to_string(),
             force_relay: self.is_force_relayed(),
