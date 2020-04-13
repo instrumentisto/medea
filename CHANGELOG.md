@@ -29,6 +29,7 @@ All user visible changes to this project will be documented in this file. This p
     - gRPC Control API callbacks ([#63]):
         - `on_join`;
         - `on_leave`.
+    - Configuration of `Member`'s Client API RPC settings ([#95]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -65,8 +66,9 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#84]: /../../pull/84
 [#86]: /../../pull/86
-[#94]: /../../pull/94
 [#89]: /../../pull/89
+[#94]: /../../pull/94
+[#95]: /../../pull/95
 
 
 

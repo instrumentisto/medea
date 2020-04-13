@@ -3,12 +3,14 @@
 mod command_validation;
 mod ice_restart;
 mod pub_sub_signallng;
+mod rpc_settings;
 mod three_pubs;
 
 use std::time::Duration;
 
 use actix::{
-    Actor, Addr, Arbiter, AsyncContext, Context, Handler, StreamHandler,
+    Actor, ActorContext, Addr, Arbiter, AsyncContext, Context, Handler,
+    StreamHandler,
 };
 use actix_codec::Framed;
 use actix_http::ws;
@@ -19,11 +21,26 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, PeerId, ServerMsg,
+    ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
 };
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
+
+pub type ConnectionEventHandler = Box<dyn FnMut(ConnectionEvent)>;
+
+/// Event which will be provided into [`ConnectionEventHandler`] when connection
+/// will be established or disconnected.
+pub enum ConnectionEvent {
+    /// Connection established.
+    Started,
+
+    /// [`RpcSettings`] [`ServerMsg`] received.
+    SettingsReceived(RpcSettings),
+
+    /// Connection disconnected.
+    Stopped,
+}
 
 /// Medea client for testing purposes.
 pub struct TestMember {
@@ -44,7 +61,11 @@ pub struct TestMember {
 
     /// Function which will be called at every received [`Event`]
     /// by this [`TestMember`].
-    on_message: MessageHandler,
+    on_message: Option<MessageHandler>,
+
+    /// Function which will be called when connection will be established and
+    /// disconnected.
+    on_connection_event: Option<ConnectionEventHandler>,
 }
 
 impl TestMember {
@@ -70,7 +91,8 @@ impl TestMember {
     /// [`TestMember`] actor.
     pub async fn connect(
         uri: &str,
-        on_message: MessageHandler,
+        on_message: Option<MessageHandler>,
+        on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) -> Addr<Self> {
         let (_, framed) = awc::Client::new().ws(uri).connect().await.unwrap();
@@ -85,20 +107,27 @@ impl TestMember {
                 known_peers: vec![],
                 deadline,
                 on_message,
+                on_connection_event,
             }
         })
     }
 
     /// Starts test member on current thread by given URI.
+    ///
     /// `on_message` - is function which will be called at every [`Event`]
     /// received from server.
+    ///
+    /// `on_connection_event` - is function which will be called when connection
+    /// will be established and disconnected.
     pub fn start(
         uri: String,
-        on_message: MessageHandler,
+        on_message: Option<MessageHandler>,
+        on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(async move {
-            Self::connect(&uri, on_message, deadline).await;
+            Self::connect(&uri, on_message, on_connection_event, deadline)
+                .await;
         })
     }
 }
@@ -223,11 +252,31 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);
-                    (self.on_message)(&event, ctx, events);
+                    if let Some(func) = self.on_message.as_mut() {
+                        func(&event, ctx, events);
+                    }
                     self.events.push(event);
                 }
-                ServerMsg::RpcSettings(_) => {}
+                ServerMsg::RpcSettings(settings) => {
+                    if let Some(func) = self.on_connection_event.as_mut() {
+                        func(ConnectionEvent::SettingsReceived(settings))
+                    };
+                }
             }
         }
+    }
+
+    fn started(&mut self, _: &mut Self::Context) {
+        if let Some(func) = self.on_connection_event.as_mut() {
+            func(ConnectionEvent::Started)
+        };
+    }
+
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        if let Some(func) = self.on_connection_event.as_mut() {
+            func(ConnectionEvent::Stopped)
+        };
+
+        ctx.stop()
     }
 }

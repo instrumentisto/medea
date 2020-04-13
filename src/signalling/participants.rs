@@ -7,10 +7,7 @@
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Instant};
 
 use actix::{
     fut::wrap_future, AsyncContext, Context, ContextFutureSpawner as _,
@@ -31,13 +28,16 @@ use crate::{
         },
         control::{
             refs::{Fid, ToEndpoint, ToMember},
-            MemberId, RoomId, RoomSpec,
+            MemberId, MemberSpec, RoomId, RoomSpec,
         },
     },
+    conf::Rpc as RpcConf,
     log::prelude::*,
     signalling::{
         elements::{
-            member::MemberError, parse_members, Member, MembersLoadError,
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
+            parse_members, Member, MembersLoadError,
         },
         room::{ActFuture, RoomError},
         Room,
@@ -90,9 +90,11 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    /// Duration, after which the server deletes the client session if
-    /// the remote RPC client does not reconnect after it is idle.
-    rpc_reconnect_timeout: Duration,
+    /// Default values for the RPC connection settings.
+    ///
+    /// If nothing provided into [`Member`] element spec then this values will
+    /// be used.
+    rpc_conf: RpcConf,
 }
 
 impl ParticipantService {
@@ -107,10 +109,10 @@ impl ParticipantService {
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
-            members: parse_members(room_spec)?,
+            members: parse_members(room_spec, context.config.rpc)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
-            rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
+            rpc_conf: context.config.rpc,
         })
     }
 
@@ -266,19 +268,26 @@ impl ParticipantService {
                 //       now.
             }
             ClosedReason::Lost => {
-                self.drop_connection_tasks.insert(
-                    member_id.clone(),
-                    ctx.run_later(self.rpc_reconnect_timeout, move |_, ctx| {
-                        info!(
-                            "Member [id = {}] connection lost at {:?}.",
-                            member_id, closed_at,
-                        );
-                        ctx.notify(RpcConnectionClosed {
-                            member_id,
-                            reason: ClosedReason::Closed { normal: false },
-                        })
-                    }),
-                );
+                if let Some(member) = self.get_member_by_id(&member_id) {
+                    self.drop_connection_tasks.insert(
+                        member_id.clone(),
+                        ctx.run_later(
+                            member.get_reconnect_timeout(),
+                            move |_, ctx| {
+                                info!(
+                                    "Member [id = {}] connection lost at {:?}.",
+                                    member_id, closed_at,
+                                );
+                                ctx.notify(RpcConnectionClosed {
+                                    member_id,
+                                    reason: ClosedReason::Closed {
+                                        normal: false,
+                                    },
+                                })
+                            },
+                        ),
+                    );
+                }
             }
         }
     }
@@ -344,5 +353,171 @@ impl ParticipantService {
     /// [`ParticipantRepository`] stores.
     pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
         self.members.iter()
+    }
+
+    /// Creates new [`Member`] in this [`ParticipantService`].
+    ///
+    /// This function will check that new [`Member`]'s ID is not present in
+    /// [`ParticipantService`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
+    /// provided [`MemberId`] already exists in [`ParticipantService`].
+    pub fn create_member(
+        &mut self,
+        id: MemberId,
+        spec: &MemberSpec,
+    ) -> Result<(), RoomError> {
+        if self.get_member_by_id(&id).is_some() {
+            return Err(RoomError::MemberAlreadyExists(
+                self.get_fid_to_member(id),
+            ));
+        }
+        let signalling_member = Member::new(
+            id.clone(),
+            spec.credentials().to_string(),
+            self.room_id.clone(),
+            spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
+            spec.reconnect_timeout()
+                .unwrap_or(self.rpc_conf.reconnect_timeout),
+            spec.ping_interval().unwrap_or(self.rpc_conf.ping_interval),
+        );
+
+        signalling_member.set_callback_urls(spec);
+
+        for (id, publish) in spec.publish_endpoints() {
+            let signalling_publish = WebRtcPublishEndpoint::new(
+                id.clone(),
+                publish.p2p,
+                signalling_member.downgrade(),
+                publish.force_relay,
+            );
+            signalling_member.insert_src(signalling_publish);
+        }
+
+        for (id, play) in spec.play_endpoints() {
+            let partner_member = self.get_member(&play.src.member_id)?;
+            let src = partner_member
+                .get_src_by_id(&play.src.endpoint_id)
+                .ok_or_else(|| {
+                    MemberError::EndpointNotFound(
+                        partner_member.get_fid_to_endpoint(
+                            play.src.endpoint_id.clone().into(),
+                        ),
+                    )
+                })?;
+
+            let sink = WebRtcPlayEndpoint::new(
+                id.clone(),
+                play.src.clone(),
+                src.downgrade(),
+                signalling_member.downgrade(),
+                play.force_relay,
+            );
+
+            signalling_member.insert_sink(sink);
+        }
+
+        // This is needed for atomicity.
+        for (_, sink) in signalling_member.sinks() {
+            let src = sink.src();
+            src.add_sink(sink.downgrade());
+        }
+
+        self.insert_member(id, signalling_member);
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+
+    use super::*;
+
+    pub fn empty_participants_service() -> ParticipantService {
+        let room_spec = RoomSpec {
+            id: RoomId::from("test"),
+            pipeline: Pipeline::new(HashMap::new()),
+        };
+        let ctx = AppContext::new(
+            Conf::default(),
+            crate::turn::new_turn_auth_service_mock(),
+        );
+
+        ParticipantService::new(&room_spec, &ctx).unwrap()
+    }
+
+    /// Tests that when no RPC settings is provided in the `Member` element
+    /// spec, default RPC settings from config will be used.
+    #[test]
+    fn use_conf_when_no_rpc_settings_in_member_spec() {
+        let mut members = empty_participants_service();
+
+        let test_member_spec = MemberSpec::new(
+            Pipeline::new(HashMap::new()),
+            String::from("w/e"),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let test_member_id = MemberId(String::from("test-member"));
+        members
+            .create_member(test_member_id.clone(), &test_member_spec)
+            .unwrap();
+
+        let test_member = members.get_member_by_id(&test_member_id).unwrap();
+        let default_rpc_conf = Conf::default().rpc;
+
+        assert_eq!(
+            test_member.get_ping_interval(),
+            default_rpc_conf.ping_interval
+        );
+        assert_eq!(
+            test_member.get_idle_timeout(),
+            default_rpc_conf.idle_timeout
+        );
+        assert_eq!(
+            test_member.get_reconnect_timeout(),
+            default_rpc_conf.reconnect_timeout
+        );
+    }
+
+    /// Tests that when RPC settings is provided in the `Member` element spec,
+    /// this RPC settings will be used.
+    #[test]
+    fn use_rpc_settings_from_member_spec() {
+        let mut members = empty_participants_service();
+
+        let idle_timeout = Duration::from_secs(60);
+        let ping_interval = Duration::from_secs(61);
+        let reconnect_timeout = Duration::from_secs(62);
+
+        let test_member_spec = MemberSpec::new(
+            Pipeline::new(HashMap::new()),
+            String::from("w/e"),
+            None,
+            None,
+            Some(idle_timeout),
+            Some(reconnect_timeout),
+            Some(ping_interval),
+        );
+
+        let test_member_id = MemberId(String::from("test-member"));
+        members
+            .create_member(test_member_id.clone(), &test_member_spec)
+            .unwrap();
+
+        let test_member = members.get_member_by_id(&test_member_id).unwrap();
+        assert_eq!(test_member.get_ping_interval(), ping_interval);
+        assert_eq!(test_member.get_idle_timeout(), idle_timeout);
+        assert_eq!(test_member.get_reconnect_timeout(), reconnect_timeout);
     }
 }

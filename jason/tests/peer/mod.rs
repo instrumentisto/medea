@@ -698,7 +698,8 @@ mod peer_stats_caching {
             id: StatId("2ef2e34c".to_string()),
             timestamp: HighResTimeStamp(1584373509700.0),
             stats: RtcStatsType::Track(Box::new(TrackStat {
-                track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
+                track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
+                    .to_string(),
                 kind: Some(TrackStatKind::Audio),
                 remote_source: None,
                 ended: Some(false),
@@ -738,7 +739,8 @@ mod peer_stats_caching {
             id: StatId("2ef2e34c".to_string()),
             timestamp: HighResTimeStamp(1584373509700.0),
             stats: RtcStatsType::Track(Box::new(TrackStat {
-                track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
+                track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
+                    .to_string(),
                 kind: Some(TrackStatKind::Audio),
                 remote_source: None,
                 ended: Some(false),
@@ -775,7 +777,8 @@ mod peer_stats_caching {
             PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
 
         let mut track_stat = Box::new(TrackStat {
-            track_id: "0d4f8e05-51d8-4f9b-90b2-453401fc8041".to_string(),
+            track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
+                .to_string(),
             kind: Some(TrackStatKind::Audio),
             remote_source: None,
             ended: Some(false),
