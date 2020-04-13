@@ -238,8 +238,7 @@ impl InnerPeersTrafficWatcher {
                 let is_not_all_sources_sent_start =
                     srcs.len() < peer.flow_metrics_sources.len();
                 if is_not_all_sources_sent_start {
-                    let started_at =
-                        peer.started_at.unwrap_or_else(|| Utc::now());
+                    let started_at = peer.started_at.unwrap_or_else(Utc::now);
                     self.fatal_peer_error(room_id, peer_id, started_at);
                 }
             }
