@@ -336,8 +336,8 @@ impl PeerRepository {
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 
-            sink_peer.add_endpoint(&sink.clone().into());
-            src_peer.add_endpoint(&src.clone().into());
+            sink_peer.add_endpoint(&sink.into());
+            src_peer.add_endpoint(&src.into());
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);

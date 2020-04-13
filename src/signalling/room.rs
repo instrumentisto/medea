@@ -476,14 +476,17 @@ impl Room {
             self.id.clone(),
             removed_peers
                 .values()
-                .flat_map(|peer| peer.iter().map(|p| p.id()))
+                .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
                 .collect(),
         );
 
         removed_peers
             .iter()
             .map(|(member_id, peers)| {
-                (member_id.clone(), peers.iter().map(|p| p.id()).collect())
+                (
+                    member_id.clone(),
+                    peers.iter().map(PeerStateMachine::id).collect(),
+                )
             })
             .for_each(|(member_id, peers_id)| {
                 self.member_peers_removed(peers_id, member_id, ctx)
@@ -1022,7 +1025,7 @@ impl Handler<PeerStopped> for Room {
                 .chain(
                     self.peers
                         .get_peer_by_id(peer.partner_peer_id())
-                        .map(|peer| peer.endpoints())
+                        .map(PeerStateMachine::endpoints)
                         .unwrap_or_default()
                         .into_iter()
                         .filter_map(|e| {
@@ -1039,7 +1042,7 @@ impl Handler<PeerStopped> for Room {
                     .peers
                     .get_peer_by_id(peer.partner_peer_id())
                     .ok()
-                    .map(|p| p.endpoints())
+                    .map(PeerStateMachine::endpoints)
                     .unwrap_or_default(),
             );
             let member_id = peer.member_id();
