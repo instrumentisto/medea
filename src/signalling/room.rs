@@ -33,8 +33,8 @@ use crate::{
         control::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
-                url::CallbackUrl, OnJoinEvent, OnLeaveEvent, OnLeaveReason,
-                OnStartEvent, OnStopEvent,
+                OnJoinEvent, OnLeaveEvent, OnLeaveReason, OnStartEvent,
+                OnStopEvent,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -468,17 +468,23 @@ impl Room {
         member_id: &MemberId,
         peer_ids_to_remove: &HashSet<PeerId>,
         ctx: &mut Context<Self>,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
+    ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
         debug!("Remove peers.");
         let removed_peers =
             self.peers.remove_peers(&member_id, &peer_ids_to_remove);
         self.peers_traffic_watcher.unregister_peers(
             self.id.clone(),
-            removed_peers.values().flatten().copied().collect(),
+            removed_peers
+                .values()
+                .flat_map(|peer| peer.iter().map(|p| p.id()))
+                .collect(),
         );
+
         removed_peers
-            .clone()
-            .into_iter()
+            .iter()
+            .map(|(member_id, peers)| {
+                (member_id.clone(), peers.iter().map(|p| p.id()).collect())
+            })
             .for_each(|(member_id, peers_id)| {
                 self.member_peers_removed(peers_id, member_id, ctx)
                     .map(|_, _, _| ())
@@ -709,46 +715,6 @@ impl Room {
             return Err(PeerBelongsToAnotherMember(peer_id, peer.member_id()));
         }
         Ok(())
-    }
-
-    /// Returns [`CallbackUrl`]s and [`Fid`]s for the `on_stop` Control API
-    /// callback of a provided [`PeerId`].
-    ///
-    /// Also this function will change peer status of [`WebRtcPublishEndpoint`]
-    /// if provided [`PeerId`] related to this kind of endpoint.
-    fn get_on_stop_callbacks(
-        &self,
-        peer_id: PeerId,
-    ) -> HashMap<Fid<ToEndpoint>, CallbackUrl> {
-        self.peers
-            .get_endpoints_by_peer_id(peer_id)
-            .into_iter()
-            .filter_map(|e| {
-                let endpoint = e.upgrade()?;
-                match endpoint {
-                    Endpoint::WebRtcPublishEndpoint(publish) => {
-                        publish.change_peer_status(peer_id, false);
-                        if publish.publishing_peers_count() == 0 {
-                            if let Some(on_stop) = publish.get_on_stop() {
-                                let fid = publish
-                                    .owner()
-                                    .get_fid_to_endpoint(publish.id().into());
-                                return Some((fid, on_stop));
-                            }
-                        }
-                    }
-                    Endpoint::WebRtcPlayEndpoint(play) => {
-                        if let Some(on_stop) = play.get_on_stop() {
-                            let fid = play
-                                .owner()
-                                .get_fid_to_endpoint(play.id().into());
-                            return Some((fid, on_stop));
-                        }
-                    }
-                }
-                None
-            })
-            .collect()
     }
 }
 
@@ -999,8 +965,7 @@ impl Handler<PeerStarted> for Room {
             .peers
             .get_endpoints_by_peer_id(peer_id)
             .into_iter()
-            .filter_map(|e| {
-                let endpoint = e.upgrade()?;
+            .filter_map(|endpoint| {
                 match endpoint {
                     Endpoint::WebRtcPublishEndpoint(publish) => {
                         publish.change_peer_status(peer_id, true);
@@ -1047,22 +1012,49 @@ impl Handler<PeerStopped> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let peer_id = msg.0;
-        let send_callbacks = self.get_on_stop_callbacks(peer_id);
+        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
+            let send_callbacks: Vec<_> = peer
+                .endpoints()
+                .into_iter()
+                .filter_map(|e| {
+                    e.upgrade().map(|e| e.on_stop(peer.id())).flatten()
+                })
+                .chain(
+                    self.peers
+                        .get_peer_by_id(peer.partner_peer_id())
+                        .map(|peer| peer.endpoints())
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|e| {
+                            e.upgrade()
+                                .map(|e| e.on_stop(peer.partner_peer_id()))
+                                .flatten()
+                        }),
+                )
+                .collect();
 
-        let member_id = self
-            .peers
-            .get_peer_by_id(peer_id)
-            .map(PeerStateMachine::member_id)
-            .ok();
-        if let Some(member_id) = member_id {
+            let mut endpoints = peer.endpoints();
+            endpoints.append(
+                &mut self
+                    .peers
+                    .get_peer_by_id(peer.partner_peer_id())
+                    .ok()
+                    .map(|p| p.endpoints())
+                    .unwrap_or_default(),
+            );
+            let member_id = peer.member_id();
+
             let mut peers_ids = HashSet::new();
             peers_ids.insert(peer_id);
             self.remove_peers(&member_id, &peers_ids, ctx);
-        }
 
-        for (fid, on_stop) in send_callbacks {
-            self.callbacks
-                .send_callback(on_stop, fid.into(), OnStopEvent {});
+            for (fid, on_stop) in send_callbacks {
+                self.callbacks.send_callback(
+                    on_stop,
+                    fid.into(),
+                    OnStopEvent {},
+                );
+            }
         }
     }
 }
@@ -1508,9 +1500,12 @@ impl Handler<PeerFailed> for Room {
         removed_peers
             .values()
             .flatten()
-            .flat_map(|peer_id| {
-                self.get_on_stop_callbacks(*peer_id).into_iter()
+            .flat_map(|peer| {
+                peer.endpoints()
+                    .into_iter()
+                    .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
             })
+            .filter_map(|(peer_id, e)| e.on_stop(peer_id))
             .for_each(|(fid, on_stop)| {
                 self.callbacks.send_callback(
                     on_stop,

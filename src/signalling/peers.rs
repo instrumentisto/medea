@@ -20,7 +20,7 @@ use crate::{
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            Endpoint, WeakEndpoint,
+            Endpoint,
         },
         peers_traffic_watcher::PeerTrafficWatcher,
         room::{ActFuture, RoomError},
@@ -54,11 +54,6 @@ pub struct PeerRepository {
     /// [`MediaTrack`]: crate::media::track::MediaTrack
     /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
-
-    /// Weak references to the [`Endpoint`]s for which [`PeerConnection`] is
-    /// created.
-    // TODO: i believe that this is redundant
-    peers_endpoints: HashMap<PeerId, Vec<WeakEndpoint>>,
 
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
@@ -94,7 +89,6 @@ impl PeerRepository {
             peers: HashMap::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
-            peers_endpoints: HashMap::new(),
             peers_traffic_watcher,
         }
     }
@@ -259,22 +253,23 @@ impl PeerRepository {
         &mut self,
         member_id: &MemberId,
         peer_ids: &HashSet<PeerId>,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
+    ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
             if let Some(peer) = self.peers.remove(peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
-                if self.peers.remove(&partner_peer_id).is_some() {
+                if let Some(partner_peer) = self.peers.remove(&partner_peer_id)
+                {
                     removed_peers
                         .entry(partner_member_id)
                         .or_insert_with(Vec::new)
-                        .push(partner_peer_id);
+                        .push(partner_peer);
                 }
                 removed_peers
                     .entry(member_id.clone())
                     .or_insert_with(Vec::new)
-                    .push(*peer_id);
+                    .push(peer);
             }
         }
 
@@ -290,7 +285,7 @@ impl PeerRepository {
     pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
+    ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
         let member_peers = self
             .get_peers_by_member_id(&member_id)
             .map(PeerStateMachine::id)
@@ -341,16 +336,8 @@ impl PeerRepository {
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 
-            src.add_peer_id(src_peer_id);
-            self.peers_endpoints
-                .entry(src_peer_id)
-                .or_default()
-                .push(src.downgrade().into());
-            sink.set_peer_id(sink_peer_id);
-            self.peers_endpoints
-                .entry(sink_peer_id)
-                .or_default()
-                .push(sink.downgrade().into());
+            sink_peer.add_endpoint(&sink.clone().into());
+            src_peer.add_endpoint(&src.clone().into());
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -361,16 +348,8 @@ impl PeerRepository {
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
 
-            src.add_peer_id(src_peer.id());
-            self.peers_endpoints
-                .entry(src_peer.id())
-                .or_default()
-                .push(src.downgrade().into());
-            sink.set_peer_id(sink_peer.id());
-            self.peers_endpoints
-                .entry(sink_peer.id())
-                .or_default()
-                .push(sink.downgrade().into());
+            src_peer.add_endpoint(&src.clone().into());
+            sink_peer.add_endpoint(&sink.clone().into());
 
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();
@@ -450,13 +429,15 @@ impl PeerRepository {
 
     /// Returns [`Weak`] references to the [`Endpoint`]s for which provided
     /// [`PeerId`] was created.
-    pub fn get_endpoints_by_peer_id(
-        &self,
-        peer_id: PeerId,
-    ) -> Vec<WeakEndpoint> {
-        self.peers_endpoints
+    pub fn get_endpoints_by_peer_id(&self, peer_id: PeerId) -> Vec<Endpoint> {
+        self.peers
             .get(&peer_id)
-            .cloned()
+            .map(|peer| {
+                peer.endpoints()
+                    .into_iter()
+                    .filter_map(|e| e.upgrade())
+                    .collect()
+            })
             .unwrap_or_default()
     }
 }
