@@ -65,14 +65,26 @@ pub enum TryFromProtobufError {
     #[display(fmt = "Expected element of type [{}]. Id [{}]", _0, _1)]
     ExpectedOtherElement(String, String),
 
+    /// Element is `None`, but expected `Some`.
     #[display(fmt = "Element is None, expected Some. Id [{}]", _0)]
     EmptyElement(String),
 
+    /// Provided `Endpoint` is unimplemented.
     #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
     UnimplementedEndpoint(String),
 
+    /// Error while [`CallbackUrl`] parsing.
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
+
+    /// Some element from a spec contains negative [`Duration`], but it's not
+    /// supported.
+    #[display(
+        fmt = "Element [id = {}] contains negative duration field `{}`",
+        _0,
+        _1
+    )]
+    NegativeDuration(String, &'static str),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {

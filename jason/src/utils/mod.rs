@@ -9,6 +9,7 @@ mod event_listener;
 use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
 use derive_more::{From, Sub};
+use futures::future::AbortHandle;
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -152,4 +153,14 @@ pub async fn delay_for(delay_ms: JsDuration) {
     }))
     .await
     .unwrap();
+}
+
+/// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
+#[derive(Debug, From)]
+pub struct TaskHandle(AbortHandle);
+
+impl Drop for TaskHandle {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }

@@ -278,6 +278,12 @@ pub enum ErrorCode {
     #[display(fmt = "Invalid callback URL.")]
     InvalidCallbackUrl = 1022,
 
+    /// Encountered negative duration.
+    ///
+    /// Code: __1023__.
+    #[display(fmt = "Encountered negative duration")]
+    NegativeDuration = 1023,
+
     /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
@@ -299,7 +305,7 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            TurnServiceErr(_) | MemberError(_) => Self::unexpected(&err),
+            MemberError(_) => Self::unexpected(&err),
         }
     }
 }
@@ -335,6 +341,14 @@ impl From<TryFromProtobufError> for ErrorResponse {
             EmptyElement(id) => Self::with_explanation(
                 ErrorCode::NoElement,
                 String::from("No element was provided"),
+                Some(id),
+            ),
+            NegativeDuration(id, field) => Self::with_explanation(
+                ErrorCode::NegativeDuration,
+                format!(
+                    "Element [id = {}] contains negative duration field `{}`",
+                    id, field
+                ),
                 Some(id),
             ),
         }
@@ -409,10 +423,8 @@ impl From<RoomError> for ErrorResponse {
             | ConnectionNotExists(_)
             | UnableToSendEvent(_)
             | PeerError(_)
-            | TryFromElementError(_)
             | BadRoomSpec(_)
-            | TurnServiceError(_)
-            | ClientError(_) => Self::unexpected(&err),
+            | TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
 }

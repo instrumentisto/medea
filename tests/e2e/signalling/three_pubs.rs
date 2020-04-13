@@ -45,59 +45,6 @@ fn three_members_p2p_video_call() {
                 }
                 Event::IceCandidateDiscovered { .. } => {
                     ice_candidates += 1;
-                    if ice_candidates == 2 {
-                        // Start checking result of test.
-
-                        assert_eq!(peer_created_count, 2);
-
-                        events.iter().for_each(|e| {
-                            if let Event::PeerCreated {
-                                peer_id, tracks, ..
-                            } = e
-                            {
-                                assert_eq!(tracks.len(), 4);
-                                let recv_count = tracks
-                                    .iter()
-                                    .filter_map(|t| match &t.direction {
-                                        Direction::Recv { sender, .. } => {
-                                            assert_ne!(sender, peer_id);
-                                            Some(sender)
-                                        }
-                                        _ => None,
-                                    })
-                                    .count();
-                                assert_eq!(recv_count, 2);
-
-                                let send_count = tracks
-                                    .iter()
-                                    .filter_map(|t| match &t.direction {
-                                        Direction::Send {
-                                            receivers, ..
-                                        } => {
-                                            assert!(
-                                                !receivers.contains(peer_id)
-                                            );
-                                            assert_eq!(receivers.len(), 1);
-                                            Some(receivers)
-                                        }
-                                        _ => None,
-                                    })
-                                    .count();
-                                assert_eq!(send_count, 2);
-                            }
-                        });
-
-                        // Check peers removing.
-                        // After closing socket, server should send
-                        // Event::PeersRemoved to all remaining
-                        // members.
-                        // Close should happen when last TestMember pass
-                        // tests.
-                        if members_tested.get() == 2 {
-                            ctx.notify(CloseSocket(CloseCode::Normal));
-                        }
-                        members_tested.set(members_tested.get() + 1);
-                    }
                 }
                 Event::PeersRemoved { .. } => {
                     // This event should get two remaining members after closing
@@ -120,22 +67,75 @@ fn three_members_p2p_video_call() {
                 }
                 _ => (),
             }
+
+            if ice_candidates == 2 && peer_created_count >= 2 {
+                // Start checking result of test.
+
+                assert_eq!(peer_created_count, 2);
+
+                events.iter().for_each(|e| {
+                    if let Event::PeerCreated {
+                        peer_id, tracks, ..
+                    } = e
+                    {
+                        assert_eq!(tracks.len(), 4);
+                        let recv_count = tracks
+                            .iter()
+                            .filter_map(|t| match &t.direction {
+                                Direction::Recv { sender, .. } => {
+                                    assert_ne!(sender, peer_id);
+                                    Some(sender)
+                                }
+                                _ => None,
+                            })
+                            .count();
+                        assert_eq!(recv_count, 2);
+
+                        let send_count = tracks
+                            .iter()
+                            .filter_map(|t| match &t.direction {
+                                Direction::Send { receivers, .. } => {
+                                    assert!(!receivers.contains(peer_id));
+                                    assert_eq!(receivers.len(), 1);
+                                    Some(receivers)
+                                }
+                                _ => None,
+                            })
+                            .count();
+                        assert_eq!(send_count, 2);
+                    }
+                });
+
+                // Check peers removing.
+                // After closing socket, server should send
+                // Event::PeersRemoved to all remaining
+                // members.
+                // Close should happen when last TestMember pass
+                // tests.
+                if members_tested.get() == 2 {
+                    ctx.notify(CloseSocket(CloseCode::Normal));
+                }
+                members_tested.set(members_tested.get() + 1);
+            }
         };
 
         let deadline = Some(std::time::Duration::from_secs(5));
         TestMember::start(
             format!("{}/member-1/test", base_url),
-            Box::new(test_fn.clone()),
+            Some(Box::new(test_fn.clone())),
+            None,
             deadline,
         );
         TestMember::start(
             format!("{}/member-2/test", base_url),
-            Box::new(test_fn.clone()),
+            Some(Box::new(test_fn.clone())),
+            None,
             deadline,
         );
         TestMember::start(
             format!("{}/member-3/test", base_url),
-            Box::new(test_fn),
+            Some(Box::new(test_fn)),
+            None,
             deadline,
         );
     })

@@ -29,6 +29,7 @@ All user visible changes to this project will be documented in this file. This p
     - gRPC Control API callbacks ([#63]):
         - `on_join`;
         - `on_leave`.
+    - Configuration of `Member`'s Client API RPC settings ([#95]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -38,7 +39,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]).
 - [Coturn] integration:
-    - [Coturn] sessions destroying ([#84]).
+    - [Coturn] sessions destroying ([#84]);
+    - [Coturn] stats processing ([#94]).
 - Configuration:
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84]);
@@ -62,6 +64,8 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#84]: /../../pull/84
 [#86]: /../../pull/86
+[#94]: /../../pull/94
+[#95]: /../../pull/95
 
 
 

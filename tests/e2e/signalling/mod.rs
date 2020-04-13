@@ -2,12 +2,14 @@
 
 mod command_validation;
 mod pub_sub_signallng;
+mod rpc_settings;
 mod three_pubs;
 
 use std::time::Duration;
 
 use actix::{
-    Actor, Addr, Arbiter, AsyncContext, Context, Handler, StreamHandler,
+    Actor, ActorContext, Addr, Arbiter, AsyncContext, Context, Handler,
+    StreamHandler,
 };
 use actix_codec::Framed;
 use actix_http::ws;
@@ -18,11 +20,26 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, ServerMsg,
+    ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
 };
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
+
+pub type ConnectionEventHandler = Box<dyn FnMut(ConnectionEvent)>;
+
+/// Event which will be provided into [`ConnectionEventHandler`] when connection
+/// will be established or disconnected.
+pub enum ConnectionEvent {
+    /// Connection established.
+    Started,
+
+    /// [`RpcSettings`] [`ServerMsg`] received.
+    SettingsReceived(RpcSettings),
+
+    /// Connection disconnected.
+    Stopped,
+}
 
 /// Medea client for testing purposes.
 pub struct TestMember {
@@ -35,12 +52,19 @@ pub struct TestMember {
     /// and display all events of this [`TestMember`]).
     events: Vec<Event>,
 
+    /// List of peers created on this client.
+    known_peers: Vec<PeerId>,
+
     /// Max test lifetime, will panic when it will be exceeded.
     deadline: Option<Duration>,
 
     /// Function which will be called at every received [`Event`]
     /// by this [`TestMember`].
-    on_message: MessageHandler,
+    on_message: Option<MessageHandler>,
+
+    /// Function which will be called when connection will be established and
+    /// disconnected.
+    on_connection_event: Option<ConnectionEventHandler>,
 }
 
 impl TestMember {
@@ -66,7 +90,8 @@ impl TestMember {
     /// [`TestMember`] actor.
     pub async fn connect(
         uri: &str,
-        on_message: MessageHandler,
+        on_message: Option<MessageHandler>,
+        on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) -> Addr<Self> {
         let (_, framed) = awc::Client::new().ws(uri).connect().await.unwrap();
@@ -78,22 +103,30 @@ impl TestMember {
             Self {
                 sink,
                 events: Vec::new(),
+                known_peers: vec![],
                 deadline,
                 on_message,
+                on_connection_event,
             }
         })
     }
 
     /// Starts test member on current thread by given URI.
+    ///
     /// `on_message` - is function which will be called at every [`Event`]
     /// received from server.
+    ///
+    /// `on_connection_event` - is function which will be called when connection
+    /// will be established and disconnected.
     pub fn start(
         uri: String,
-        on_message: MessageHandler,
+        on_message: Option<MessageHandler>,
+        on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(async move {
-            Self::connect(&uri, on_message, deadline).await;
+            Self::connect(&uri, on_message, on_connection_event, deadline)
+                .await;
         })
     }
 }
@@ -167,48 +200,80 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
             match server_msg {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event(event) => {
-                    if let Event::PeerCreated {
-                        peer_id,
-                        sdp_offer,
-                        tracks,
-                        ..
-                    } = &event
-                    {
-                        match sdp_offer {
-                            Some(_) => {
-                                self.send_command(Command::MakeSdpAnswer {
-                                    peer_id: *peer_id,
-                                    sdp_answer: "responder_answer".into(),
-                                })
-                            }
-                            None => self.send_command(Command::MakeSdpOffer {
-                                peer_id: *peer_id,
-                                sdp_offer: "caller_offer".into(),
-                                mids: tracks
-                                    .iter()
-                                    .map(|t| t.id)
-                                    .enumerate()
-                                    .map(|(mid, id)| (id, mid.to_string()))
-                                    .collect(),
-                            }),
-                        };
+                    match &event {
+                        Event::PeerCreated {
+                            peer_id,
+                            sdp_offer,
+                            tracks,
+                            ..
+                        } => {
+                            self.known_peers.push(*peer_id);
+                            match sdp_offer {
+                                Some(_) => {
+                                    self.send_command(Command::MakeSdpAnswer {
+                                        peer_id: *peer_id,
+                                        sdp_answer: "responder_answer".into(),
+                                    })
+                                }
+                                None => {
+                                    self.send_command(Command::MakeSdpOffer {
+                                        peer_id: *peer_id,
+                                        sdp_offer: "caller_offer".into(),
+                                        mids: tracks
+                                            .iter()
+                                            .map(|t| t.id)
+                                            .enumerate()
+                                            .map(|(mid, id)| {
+                                                (id, mid.to_string())
+                                            })
+                                            .collect(),
+                                    })
+                                }
+                            };
 
-                        self.send_command(Command::SetIceCandidate {
-                            peer_id: *peer_id,
-                            candidate: IceCandidate {
-                                candidate: "ice_candidate".to_string(),
-                                sdp_m_line_index: None,
-                                sdp_mid: None,
-                            },
-                        });
+                            self.send_command(Command::SetIceCandidate {
+                                peer_id: *peer_id,
+                                candidate: IceCandidate {
+                                    candidate: "ice_candidate".to_string(),
+                                    sdp_m_line_index: None,
+                                    sdp_mid: None,
+                                },
+                            });
+                        }
+                        Event::SdpAnswerMade { peer_id, .. }
+                        | Event::IceCandidateDiscovered { peer_id, .. }
+                        | Event::TracksUpdated { peer_id, .. } => {
+                            assert!(self.known_peers.contains(peer_id))
+                        }
+                        Event::PeersRemoved { .. } => {}
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);
-                    (self.on_message)(&event, ctx, events);
+                    if let Some(func) = self.on_message.as_mut() {
+                        func(&event, ctx, events);
+                    }
                     self.events.push(event);
                 }
-                ServerMsg::RpcSettings(_) => {}
+                ServerMsg::RpcSettings(settings) => {
+                    if let Some(func) = self.on_connection_event.as_mut() {
+                        func(ConnectionEvent::SettingsReceived(settings))
+                    };
+                }
             }
         }
+    }
+
+    fn started(&mut self, _: &mut Self::Context) {
+        if let Some(func) = self.on_connection_event.as_mut() {
+            func(ConnectionEvent::Started)
+        };
+    }
+
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        if let Some(func) = self.on_connection_event.as_mut() {
+            func(ConnectionEvent::Stopped)
+        };
+
+        ctx.stop()
     }
 }

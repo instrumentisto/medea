@@ -51,10 +51,10 @@ rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
-slog-async = "2.3"
+slog-async = "2.5"
 slog-envlogger = "2.2"
 slog-json = "2.3"
-slog-scope = "4.1"
+slog-scope = "4.3"
 slog-stdlog = "4.0"
 smart-default = "0.6"
 tokio = { version = "0.2", features = ["signal", "time"] }
@@ -67,6 +67,14 @@ url = "2.1"
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]
+# TODO: use 'redis' from the crates.io when mitsuhiko/redis-rs#287 will
+#       be released and used in 'deadpool-redis'.
+[dependencies.redis-pub-sub]
+    package = "redis"
+    git = "https://github.com/mitsuhiko/redis-rs"
+    rev = "1ea0bd0c2e7b450eb5279995142fd64e5db0fa69"
+    default-features = false
+    features = ["tokio-comp"]
 
 [dev-dependencies]
 actix-codec = "0.2"
@@ -75,7 +83,7 @@ actix-rt = "1.0"
 awc = "1.0"
 derive_builder = "0.9"
 lazy_static = "1.4"
-mockall = "0.6"
+mockall = "0.7"
 serial_test = "0.4"
 serial_test_derive = "0.4"
 tempfile = "3.1"

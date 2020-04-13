@@ -7,11 +7,12 @@ use std::{
     collections::HashMap,
     convert::TryFrom as _,
     rc::{Rc, Weak},
+    time::Duration,
 };
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{IceServer, PeerId};
+use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -22,8 +23,8 @@ use crate::{
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },
+    conf::Rpc as RpcConf,
     log::prelude::*,
-    media::IceUser,
 };
 
 use super::endpoints::{
@@ -82,14 +83,25 @@ struct MemberInner {
     /// Credentials for this [`Member`].
     credentials: String,
 
-    /// [`IceUser`] of this [`Member`].
-    ice_user: Option<IceUser>,
-
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
 
     /// URL to which `on_leave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
+
+    /// Timeout of receiving heartbeat messages from the [`Member`] via Client
+    /// API.
+    ///
+    /// Once reached, the [`Member`] is considered being idle.
+    idle_timeout: Duration,
+
+    /// Timeout of the [`Member`] reconnecting via Client API.
+    ///
+    /// Once reached, the [`Member`] is considered disconnected.
+    reconnect_timeout: Duration,
+
+    /// Interval of sending heartbeat `Ping`s to the [`Member`] via Client API.
+    ping_interval: Duration,
 }
 
 impl Member {
@@ -97,16 +109,25 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
-    pub fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
+    pub fn new(
+        id: MemberId,
+        credentials: String,
+        room_id: RoomId,
+        idle_timeout: Duration,
+        reconnect_timeout: Duration,
+        ping_interval: Duration,
+    ) -> Self {
         Self(Rc::new(RefCell::new(MemberInner {
             id,
             srcs: HashMap::new(),
             sinks: HashMap::new(),
             credentials,
-            ice_user: None,
             room_id,
             on_leave: None,
             on_join: None,
+            idle_timeout,
+            reconnect_timeout,
+            ping_interval,
         })))
     }
 
@@ -270,21 +291,6 @@ impl Member {
             .for_each(|(_, p)| p.reset());
     }
 
-    /// Returns list of [`IceServer`] for this [`Member`].
-    pub fn servers_list(&self) -> Option<Vec<IceServer>> {
-        self.0.borrow().ice_user.as_ref().map(IceUser::servers_list)
-    }
-
-    /// Returns and sets to `None` [`IceUser`] of this [`Member`].
-    pub fn take_ice_user(&self) -> Option<IceUser> {
-        self.0.borrow_mut().ice_user.take()
-    }
-
-    /// Replaces and returns [`IceUser`] of this [`Member`].
-    pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
-        self.0.borrow_mut().ice_user.replace(new_ice_user)
-    }
-
     /// Returns [`MemberId`] of this [`Member`].
     pub fn id(&self) -> MemberId {
         self.0.borrow().id.clone()
@@ -432,6 +438,27 @@ impl Member {
         self.0.borrow().on_leave.clone()
     }
 
+    /// Returns timeout of receiving heartbeat messages from the [`Member`] via
+    /// Client API.
+    ///
+    /// Once reached, the [`Member`] is considered being idle.
+    pub fn get_idle_timeout(&self) -> Duration {
+        self.0.borrow().idle_timeout
+    }
+
+    /// Returns timeout of the [`Member`] reconnecting via Client API.
+    ///
+    /// Once reached, the [`Member`] is considered disconnected.
+    pub fn get_reconnect_timeout(&self) -> Duration {
+        self.0.borrow().reconnect_timeout
+    }
+
+    /// Returns interval of sending heartbeat `Ping`s to the [`Member`] via
+    /// Client API.
+    pub fn get_ping_interval(&self) -> Duration {
+        self.0.borrow().ping_interval
+    }
+
     /// Sets all [`CallbackUrl`]'s from [`MemberSpec`].
     pub fn set_callback_urls(&self, spec: &MemberSpec) {
         self.0.borrow_mut().on_leave = spec.on_leave().clone();
@@ -470,6 +497,7 @@ impl WeakMember {
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
+    rpc_conf: RpcConf,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -485,6 +513,11 @@ pub fn parse_members(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
+                member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
+                member
+                    .reconnect_timeout()
+                    .unwrap_or(rpc_conf.reconnect_timeout),
+                member.ping_interval().unwrap_or(rpc_conf.ping_interval),
             );
             (id.clone(), new_member)
         })
@@ -542,6 +575,9 @@ impl Into<proto::Member> for Member {
                 .get_on_join()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
+            reconnect_timeout: Some(self.get_reconnect_timeout().into()),
+            idle_timeout: Some(self.get_idle_timeout().into()),
+            ping_interval: Some(self.get_ping_interval().into()),
             pipeline: member_pipeline,
         }
     }
@@ -616,7 +652,7 @@ mod tests {
         let room_element: RootElement =
             serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        parse_members(&room_spec).unwrap()
+        parse_members(&room_spec, RpcConf::default()).unwrap()
     }
 
     #[test]

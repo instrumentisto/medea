@@ -42,7 +42,7 @@ fn main() -> Result<(), Error> {
                 room_repo.clone(),
                 app_context.clone(),
                 graceful_shutdown.clone(),
-            )
+            )?
             .start();
 
             medea::api::control::start_static_rooms(&room_service).await?;
