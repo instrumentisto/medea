@@ -26,6 +26,7 @@ use actix::{
     Actor, Addr, AsyncContext, Handler, MailboxError, Message, WeakAddr,
 };
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
 use crate::{
@@ -202,11 +203,16 @@ impl InnerPeersTrafficWatcher {
     /// fatal error and notifies [`Room`] about fatal error in [`PeerStat`].
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    fn fatal_peer_error(&mut self, room_id: &RoomId, peer_id: PeerId) {
+    fn fatal_peer_error(
+        &mut self,
+        room_id: &RoomId,
+        peer_id: PeerId,
+        at: DateTime<Utc>,
+    ) {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.peers.remove(&peer_id);
             if let Some(room_addr) = room.room.upgrade() {
-                room_addr.do_send(PeerFailed { peer_id });
+                room_addr.do_send(PeerFailed { peer_id, at });
             }
         }
     }
@@ -232,7 +238,9 @@ impl InnerPeersTrafficWatcher {
                 let is_not_all_sources_sent_start =
                     srcs.len() < peer.flow_metrics_sources.len();
                 if is_not_all_sources_sent_start {
-                    self.fatal_peer_error(room_id, peer_id);
+                    let started_at =
+                        peer.started_at.unwrap_or_else(|| Utc::now());
+                    self.fatal_peer_error(room_id, peer_id, started_at);
                 }
             }
         }
@@ -309,6 +317,7 @@ impl Handler<TrafficFlows> for InnerPeersTrafficWatcher {
                         let mut srcs = HashSet::new();
                         srcs.insert(msg.source);
                         peer.state = PeerState::Started(srcs);
+                        peer.started_at = Some(Utc::now());
 
                         ctx.run_later(
                             Duration::from_secs(15),
@@ -462,6 +471,12 @@ pub struct PeerStat {
     /// received for validation that traffic is really going.
     flow_metrics_sources: HashSet<FlowMetricSource>,
 
+    /// [`DateTime`] when this [`PeerStat`] went into [`PeerState::Started`]
+    /// state.
+    ///
+    /// If `None` then [`PeerStat`] not in [`PeerState::Started`] state.
+    started_at: Option<DateTime<Utc>>,
+
     /// Time of last received [`PeerState`] proof.
     ///
     /// If [`PeerStat`] doesn't updates withing `10s` then this [`PeerStat`]
@@ -577,6 +592,7 @@ impl Handler<RegisterPeer> for InnerPeersTrafficWatcher {
                     state: PeerState::Stopped,
                     flow_metrics_sources: msg.flow_metrics_sources,
                     last_update: Instant::now(),
+                    started_at: None,
                 },
             );
         }

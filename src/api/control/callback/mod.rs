@@ -126,22 +126,26 @@ impl Into<proto::request::Event> for CallbackEvent {
 #[rtype(result = "Result<(), CallbackClientError>")]
 pub struct CallbackRequest {
     /// FID (Full ID) of element with which event was occurred.
-    fid: StatefulFid,
+    pub fid: StatefulFid,
 
     /// [`CallbackEvent`] which occurred.
-    event: CallbackEvent,
+    pub event: CallbackEvent,
 
     /// Time at which event occurred.
-    at: DateTime<Utc>,
+    pub at: DateTime<Utc>,
 }
 
 impl CallbackRequest {
     /// Returns [`CallbackRequest`] with provided fields and current time as
     /// `at`.
-    pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
+    pub fn at_now<F, E>(fid: F, event: E) -> Self
+    where
+        E: Into<CallbackEvent>,
+        F: Into<StatefulFid>,
+    {
         Self {
-            fid: element,
-            event,
+            fid: fid.into(),
+            event: event.into(),
             at: Utc::now(),
         }
     }

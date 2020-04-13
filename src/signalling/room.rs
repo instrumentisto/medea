@@ -14,6 +14,7 @@ use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
     Handler, MailboxError, Message, StreamHandler, WrapFuture as _,
 };
+use chrono::{DateTime, Utc};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
@@ -33,8 +34,8 @@ use crate::{
         control::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
-                OnJoinEvent, OnLeaveEvent, OnLeaveReason, OnStartEvent,
-                OnStopEvent,
+                CallbackRequest, OnJoinEvent, OnLeaveEvent, OnLeaveReason,
+                OnStartEvent, OnStopEvent,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -179,7 +180,7 @@ pub struct Room {
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
-    pub members: ParticipantService,
+    members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     pub peers: PeerRepository,
@@ -399,8 +400,10 @@ impl Room {
             .for_each(|(member, on_leave)| {
                 self.callbacks.send_callback(
                     on_leave,
-                    member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                    CallbackRequest::at_now(
+                        member.get_fid(),
+                        OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                    ),
                 );
             });
 
@@ -994,8 +997,10 @@ impl Handler<PeerStarted> for Room {
             })
             .collect();
         for (fid, on_start) in send_callbacks {
-            self.callbacks
-                .send_callback(on_start, fid.into(), OnStartEvent {});
+            self.callbacks.send_callback(
+                on_start,
+                CallbackRequest::at_now(fid, OnStartEvent {}),
+            );
         }
     }
 }
@@ -1045,8 +1050,7 @@ impl Handler<PeerStopped> for Room {
             for (fid, on_stop) in send_callbacks {
                 self.callbacks.send_callback(
                     on_stop,
-                    fid.into(),
-                    OnStopEvent {},
+                    CallbackRequest::at_now(fid, OnStopEvent {}),
                 );
             }
         }
@@ -1079,10 +1083,14 @@ impl PeersMetricsEventHandler for Room {
     type Output = ActFuture<()>;
 
     /// Notifies [`Room`] about fatal [`PeerConnection`] failure.
-    fn on_fatal_peer_failure(&mut self, peer_id: PeerId) -> Self::Output {
+    fn on_fatal_peer_failure(
+        &mut self,
+        peer_id: PeerId,
+        at: DateTime<Utc>,
+    ) -> Self::Output {
         Box::new(async move { peer_id }.into_actor(self).map(
-            |peer_id, _, ctx| {
-                ctx.notify(PeerFailed { peer_id });
+            move |peer_id, _, ctx| {
+                ctx.notify(PeerFailed { peer_id, at });
             },
         ))
     }
@@ -1258,8 +1266,10 @@ impl Handler<RpcConnectionEstablished> for Room {
                     if let Some(callback_url) = member.get_on_join() {
                         room.callbacks.send_callback(
                             callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
+                            CallbackRequest::at_now(
+                                member.get_fid(),
+                                OnJoinEvent,
+                            ),
                         );
                     };
                     Ok(())
@@ -1322,8 +1332,10 @@ impl Handler<RpcConnectionClosed> for Room {
                     };
                     self.callbacks.send_callback(
                         on_leave_url,
-                        member.get_fid().into(),
-                        OnLeaveEvent::new(reason),
+                        CallbackRequest::at_now(
+                            member.get_fid(),
+                            OnLeaveEvent::new(reason),
+                        ),
                     );
                 }
             } else {
@@ -1458,12 +1470,17 @@ impl Handler<CreateEndpoint> for Room {
     }
 }
 
-/// Message which indicates that [`PeerConnection`] with provided [`PeerId`] is
+/// Message which indicates that [`Peer`] with provided [`PeerId`] is
 /// went into a state that does not coincide with spec.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerFailed {
+    /// [`PeerId`] of [`Peer`] which went into error state.
     pub peer_id: PeerId,
+
+    /// The [`DateTime`] from which it is believed that [`Peer`] went into an
+    /// erroneous state.
+    pub at: DateTime<Utc>,
 }
 
 impl Handler<PeerFailed> for Room {
@@ -1500,11 +1517,14 @@ impl Handler<PeerFailed> for Room {
                     .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
             })
             .filter_map(|(peer_id, e)| e.on_stop(peer_id))
-            .for_each(|(fid, on_stop)| {
+            .for_each(move |(fid, on_stop)| {
                 self.callbacks.send_callback(
                     on_stop,
-                    fid.into(),
-                    OnStopEvent {},
+                    CallbackRequest {
+                        fid: fid.into(),
+                        event: OnStopEvent {}.into(),
+                        at: msg.at,
+                    },
                 )
             });
     }

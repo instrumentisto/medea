@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, Stream};
 use medea_client_api_proto::{
     stats::{
@@ -70,7 +71,7 @@ pub enum PeersMetricsEvent {
     ///
     /// On this [`PeerMetricsEvent`] `PeerConnection` with provided [`PeerId`]
     /// should be stopped.
-    FatalPeerFailure(PeerId),
+    FatalPeerFailure { peer_id: PeerId, at: DateTime<Utc> },
 }
 
 /// Specification of `PeerConnection`.
@@ -189,7 +190,7 @@ struct PeerStat {
     state: PeerStatState,
 
     /// Time of the last metrics update of this [`PeerStat`].
-    last_update: Instant,
+    last_update: DateTime<Utc>,
 }
 
 impl PeerStat {
@@ -200,6 +201,7 @@ impl PeerStat {
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
     ) {
+        self.last_update = Utc::now();
         self.senders
             .entry(stat_id)
             .or_insert_with(|| SenderStat {
@@ -217,6 +219,7 @@ impl PeerStat {
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
     ) {
+        self.last_update = Utc::now();
         self.receivers
             .entry(stat_id)
             .or_insert_with(|| ReceiverStat {
@@ -359,10 +362,13 @@ impl PeersMetrics {
     /// Some fatal error with `PeerConnection`'s metrics happened.
     ///
     /// [`PeerMetricsEvent::FatalPeerFailure`] will be sent to the subscriber.
-    fn fatal_peer_error(&self, peer_id: PeerId) {
+    fn fatal_peer_error(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(sender) = &self.peer_metric_events_sender {
-            let _ = sender
-                .unbounded_send(PeersMetricsEvent::FatalPeerFailure(peer_id));
+            let _ =
+                sender.unbounded_send(PeersMetricsEvent::FatalPeerFailure {
+                    peer_id,
+                    at,
+                });
         }
     }
 
@@ -401,7 +407,7 @@ impl PeersMetrics {
                     StoppedMetricSource::PeerTraffic,
                 );
             } else if !peer_ref.is_conforms_spec() {
-                self.fatal_peer_error(peer_ref.peer_id);
+                self.fatal_peer_error(peer_ref.peer_id, Utc::now());
             }
         }
     }
@@ -414,7 +420,7 @@ impl PeersMetrics {
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: first_peer.peer_id,
             partner_peer: Weak::new(),
-            last_update: Instant::now(),
+            last_update: Utc::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
@@ -423,7 +429,7 @@ impl PeersMetrics {
         let second_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: second_peer.peer_id,
             partner_peer: Rc::downgrade(&first_peer_stat),
-            last_update: Instant::now(),
+            last_update: Utc::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
@@ -478,7 +484,7 @@ impl PeersMetrics {
                     );
                 }
             } else {
-                self.fatal_peer_error(peer_ref.peer_id);
+                self.fatal_peer_error(peer_ref.peer_id, peer_ref.last_update);
             }
         }
     }
