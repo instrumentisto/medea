@@ -109,7 +109,9 @@ jobs:
                 --version `cargo pkgid wasm-bindgen | grep -o '#.*'
                                                     | grep -o '[0-9\.]*'`
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason browser=chrome
+      script:
+        - make test.unit crate=medea-jason browser=chrome
+        - make test.unit crate=medea-jason browser=chrome version=74.0
 
     - name: unit medea-jason (stable, Firefox)
       stage: test
@@ -121,7 +123,9 @@ jobs:
                 --version `cargo pkgid wasm-bindgen | grep -o '#.*'
                                                     | grep -o '[0-9\.]*'`
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason browser=firefox
+      script:
+        - make test.unit crate=medea-jason browser=firefox
+        - make test.unit crate=medea-jason browser=firefox version=69.0
 
     - name: E2E (stable)
       stage: test

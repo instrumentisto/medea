@@ -720,6 +720,7 @@ endif
 #
 # Usage:
 #   make docker.up.webdriver [browser=(chrome|firefox)]
+#              [version=<browser-version>]
 
 docker.up.webdriver:
 	-@make docker.down.webdriver browser=chrome
@@ -727,11 +728,13 @@ docker.up.webdriver:
 ifeq ($(browser),firefox)
 	docker run --rm -d --network=host --shm-size 512m \
 		--name medea-webdriver-firefox \
-		instrumentisto/geckodriver:$(FIREFOX_VERSION)
+		instrumentisto/geckodriver:$(if \
+		$(call eq,$(version),),$(FIREFOX_VERSION),$(version))
 else
 	docker run --rm -d --network=host \
 		--name medea-webdriver-chrome \
-		selenoid/chrome:$(CHROME_VERSION)
+		selenoid/chrome:$(if \
+		$(call eq,$(version),),$(CHROME_VERSION),$(version))
 endif
 
 
