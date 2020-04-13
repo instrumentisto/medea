@@ -1036,15 +1036,6 @@ impl Handler<PeerStopped> for Room {
                 )
                 .collect();
 
-            let mut endpoints = peer.endpoints();
-            endpoints.append(
-                &mut self
-                    .peers
-                    .get_peer_by_id(peer.partner_peer_id())
-                    .ok()
-                    .map(PeerStateMachine::endpoints)
-                    .unwrap_or_default(),
-            );
             let member_id = peer.member_id();
 
             let mut peers_ids = HashSet::new();

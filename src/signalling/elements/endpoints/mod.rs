@@ -9,14 +9,15 @@ use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 use medea_macro::enum_delegate;
 
+use crate::api::control::{
+    callback::url::CallbackUrl,
+    refs::{Fid, ToEndpoint},
+};
+
 use self::webrtc::{
     play_endpoint::WeakWebRtcPlayEndpoint,
     publish_endpoint::WeakWebRtcPublishEndpoint, WebRtcPlayEndpoint,
     WebRtcPublishEndpoint,
-};
-use crate::api::control::{
-    callback::url::CallbackUrl,
-    refs::{Fid, ToEndpoint},
 };
 
 /// Enum which can store all kinds of [Medea] endpoints.
