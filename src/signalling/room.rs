@@ -1388,22 +1388,22 @@ mod test {
 
         room.peers.add_peer(Peer::new(
             PeerId(0),
-            MemberId::from(String::from("member_1")),
+            MemberId::from("member_1"),
             PeerId(1),
-            MemberId::from(String::from("member_2")),
+            MemberId::from("member_2"),
             false,
         ));
 
         room.peers.add_peer(Peer::new(
             PeerId(1),
-            MemberId::from(String::from("member_2")),
+            MemberId::from("member_2"),
             PeerId(0),
-            MemberId::from(String::from("member_1")),
+            MemberId::from("member_1"),
             false,
         ));
 
         let no_such_peer = CommandMessage::new(
-            MemberId(String::from("member1")),
+            MemberId::from("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -1432,9 +1432,9 @@ mod test {
 
         room.peers.add_peer(Peer::new(
             peer_id,
-            MemberId::from(String::from("member_1")),
+            MemberId::from("member_1"),
             PeerId(1),
-            MemberId::from(String::from("member_2")),
+            MemberId::from("member_2"),
             false,
         ));
 

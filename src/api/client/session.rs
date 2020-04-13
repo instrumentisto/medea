@@ -431,7 +431,7 @@ mod test {
     #[actix_rt::test]
     async fn close_if_rpc_established_failed() {
         fn factory() -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             let expected_member_id = member_id.clone();
@@ -469,7 +469,7 @@ mod test {
     #[actix_rt::test]
     async fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -512,7 +512,7 @@ mod test {
     #[actix_rt::test]
     async fn dropped_if_idle() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -566,7 +566,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -631,7 +631,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server.expect_connection_established().return_once(
@@ -687,7 +687,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server.expect_connection_established().return_once(

@@ -62,13 +62,14 @@ async fn ice_restart() {
     let deadline = Some(std::time::Duration::from_secs(5));
     let member1 = TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
-        Box::new(
+        Some(Box::new(
             move |event: &Event,
                   _: &mut Context<TestMember>,
                   _: Vec<&Event>| {
                 tx1.unbounded_send(event.clone()).unwrap();
             },
-        ),
+        )),
+        None,
         deadline,
     )
     .await;
@@ -76,13 +77,14 @@ async fn ice_restart() {
     let (tx2, mut rx2) = unbounded();
     let member2 = TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME),
-        Box::new(
+        Some(Box::new(
             move |event: &Event,
                   _: &mut Context<TestMember>,
                   _: Vec<&Event>| {
                 tx2.unbounded_send(event.clone()).unwrap();
             },
-        ),
+        )),
+        None,
         deadline,
     )
     .await;
