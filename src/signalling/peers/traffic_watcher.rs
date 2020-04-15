@@ -6,7 +6,7 @@
 //! Traffic metrics, consumed by [`PeerTrafficWatcher`] can originate from
 //! different sources:
 //! 1. Peer, received from member that owns target [`Peer`].
-//! 2. PartnerPeer, received from member, that owns [`Peer`], connected to
+//! 2. Partner Peer, received from member, that owns [`Peer`], connected to
 //! target [`Peer`].
 //! 3. Coturn, reported by Coturn TURN server.
 //!
@@ -26,13 +26,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
-use crate::{
-    api::control::{error_codes::ErrorCode::InvalidSrcUri, RoomId},
-    conf,
-    log::prelude::*,
-    signalling::Room,
-};
-use medea_client_api_proto::PeerMetrics::PeerConnectionState;
+use crate::{api::control::RoomId, conf, log::prelude::*, signalling::Room};
 
 /// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
 /// events. [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are

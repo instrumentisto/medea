@@ -26,7 +26,7 @@ use crate::{
     media::peer::{New, Peer},
 };
 
-use super::peers_traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
+use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]

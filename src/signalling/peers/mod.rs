@@ -3,8 +3,8 @@
 //! [`Room`]: crate::signalling::Room
 //! [`Peer`]: crate::media::peer::Peer
 
-mod peer_metrics;
-mod peers_traffic_watcher;
+mod metrics;
+mod traffic_watcher;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -34,13 +34,13 @@ use crate::{
     turn::{TurnAuthService, UnreachablePolicy},
 };
 
-use self::peer_metrics::PeersMetricsService;
+use self::metrics::PeersMetricsService;
 
 pub use self::{
-    peer_metrics::{
+    metrics::{
         PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
     },
-    peers_traffic_watcher::{
+    traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource, PeerInitTimeout,
         PeerStarted, PeerStopped, PeerTrafficWatcher,
     },

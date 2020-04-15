@@ -227,7 +227,7 @@ impl Room {
             peers: PeersService::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
-                peers_traffic_watcher.clone(),
+                peers_traffic_watcher,
                 &context.config.media_traffic,
             ),
             members: ParticipantService::new(room_spec, context)?,
