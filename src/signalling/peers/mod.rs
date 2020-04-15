@@ -16,6 +16,9 @@ use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
+use crate::conf;
+use std::time::Duration;
+
 use crate::{
     api::control::{MemberId, RoomId},
     log::prelude::*,
@@ -77,6 +80,8 @@ pub struct PeersService {
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetricsService,
+
+    peer_validity_timeout: Duration,
 }
 
 /// Simple ID counter.
@@ -101,6 +106,7 @@ impl PeersService {
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        media_traffic_conf: &conf::MediaTraffic,
     ) -> Self {
         Self {
             room_id: room_id.clone(),
@@ -113,6 +119,7 @@ impl PeersService {
                 room_id,
                 peers_traffic_watcher,
             ),
+            peer_validity_timeout: media_traffic_conf.peer_validity_timeout,
         }
     }
 
@@ -362,9 +369,13 @@ impl PeersService {
             sink_peer.add_endpoint(&sink.into());
             src_peer.add_endpoint(&src.into());
 
-            // TODO: update peer spec here and mode this line of code into
-            // `self.create_peers`.
-            self.peer_metrics_service.add_peers(&src_peer, &sink_peer);
+            // TODO: update peer spec here and move this line of code into
+            //       `self.create_peers`.
+            self.peer_metrics_service.add_peers(
+                &src_peer,
+                &sink_peer,
+                self.peer_validity_timeout,
+            );
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);

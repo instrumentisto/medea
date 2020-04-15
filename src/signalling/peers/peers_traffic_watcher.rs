@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
-use crate::{api::control::RoomId, log::prelude::*, signalling::Room};
+use crate::{api::control::RoomId, conf, log::prelude::*, signalling::Room};
 
 /// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
 /// events. [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are
@@ -44,8 +44,10 @@ fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
 }
 
 /// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
-pub fn build_peers_traffic_watcher() -> Arc<dyn PeerTrafficWatcher> {
-    Arc::new(PeersTrafficWatcherImpl::new().start())
+pub fn build_peers_traffic_watcher(
+    conf: &conf::MediaTraffic,
+) -> Arc<dyn PeerTrafficWatcher> {
+    Arc::new(PeersTrafficWatcherImpl::new(conf).start())
 }
 
 /// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
@@ -205,13 +207,19 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
 struct PeersTrafficWatcherImpl {
     /// All `Room` which exists on the Medea server.
     stats: HashMap<RoomId, RoomStats>,
+
+    traffic_flowing_timeout: Duration,
+
+    peer_init_timeout: Duration,
 }
 
 impl PeersTrafficWatcherImpl {
     /// Returns new [`MetricsCallbacksService`].
-    pub fn new() -> Self {
+    pub fn new(conf: &conf::MediaTraffic) -> Self {
         Self {
             stats: HashMap::new(),
+            traffic_flowing_timeout: conf.traffic_flowing_timeout,
+            peer_init_timeout: conf.peer_init_timeout,
         }
     }
 
@@ -279,16 +287,16 @@ impl Actor for PeersTrafficWatcherImpl {
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.run_interval(Duration::from_secs(1), |this, ctx| {
             for stat in this.stats.values() {
-                for track in stat.peers.values() {
+                for peer in stat.peers.values() {
                     // TODO: check coturn traffic not flowing with timeout
-                    if let PeerState::Started(_) = &track.state {
+                    if let PeerState::Started(_) = &peer.state {
                         // TODO: timeout to config
-                        if track.last_update
-                            < Instant::now() - Duration::from_secs(10)
+                        if peer.last_update
+                            < Instant::now() - this.traffic_flowing_timeout
                         {
                             ctx.notify(TrafficStopped {
                                 source: StoppedMetricSource::Timeout,
-                                peer_id: track.peer_id,
+                                peer_id: peer.peer_id,
                                 room_id: stat.room_id.clone(),
                                 at: Instant::now(),
                             });
@@ -348,9 +356,8 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                         peer.state = PeerState::Started(srcs);
                         peer.started_at = Some(Utc::now());
 
-                        // TODO: config, peer init timeout
                         ctx.run_later(
-                            Duration::from_secs(15),
+                            self.peer_init_timeout,
                             move |this, _| {
                                 this.check_on_start(&msg.room_id, msg.peer_id);
                             },

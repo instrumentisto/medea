@@ -89,15 +89,6 @@ impl SenderStat {
         self.last_update = Instant::now();
         self.packets_sent = upd.packets_sent;
     }
-
-    /// Checks that this [`SenderStat`] is active.
-    ///
-    /// This will be calculated by checking that this [`SenderStat`] was updated
-    /// within `10s`.
-    fn is_active(&self) -> bool {
-        // TODO: move to config
-        self.last_update > Instant::now() - Duration::from_secs(10)
-    }
 }
 
 /// Metrics which is available for `MediaTrack` with `Recv` direction.
@@ -121,14 +112,6 @@ impl ReceiverStat {
     fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.packets_received = upd.packets_received;
-    }
-
-    /// Checks that this [`ReceiverStat`] is active.
-    ///
-    /// This will be calculated by checking that this [`ReceiverStat`] was
-    /// updated within `10s`.
-    fn is_active(&self) -> bool {
-        self.last_update > Instant::now() - Duration::from_secs(10)
     }
 }
 
@@ -168,6 +151,8 @@ struct PeerStat {
 
     /// Time of the last metrics update of this [`PeerStat`].
     last_update: DateTime<Utc>,
+
+    peer_validity_timeout: Duration,
 }
 
 impl PeerStat {
@@ -207,6 +192,11 @@ impl PeerStat {
             .update(upd);
     }
 
+    // TODO: docs
+    fn is_track_active(&self, last_update: Instant) -> bool {
+        last_update > Instant::now() - self.peer_validity_timeout
+    }
+
     /// Checks that this [`PeerStat`] is conforms to `PeerConnection`
     /// specification.
     ///
@@ -223,13 +213,13 @@ impl PeerStat {
         let mut current_senders: Vec<_> = self
             .senders
             .values()
-            .filter(|sender| sender.is_active())
+            .filter(|sender| self.is_track_active(sender.last_update))
             .map(|sender| sender.media_type)
             .collect();
         let mut current_receivers: Vec<_> = self
             .receivers
             .values()
-            .filter(|receiver| receiver.is_active())
+            .filter(|receiver| self.is_track_active(receiver.last_update))
             .map(|receiver| receiver.media_type)
             .collect();
         current_receivers.sort();
@@ -244,12 +234,12 @@ impl PeerStat {
         let active_senders_count = self
             .senders
             .values()
-            .filter(|sender| sender.is_active())
+            .filter(|sender| self.is_track_active(sender.last_update))
             .count();
         let active_receivers_count = self
             .receivers
             .values()
-            .filter(|recv| recv.is_active())
+            .filter(|recv| self.is_track_active(recv.last_update))
             .count();
 
         active_receivers_count + active_senders_count == 0
@@ -384,6 +374,7 @@ impl PeersMetricsService {
         &mut self,
         first_peer: &Peer<New>,
         second_peer: &Peer<New>,
+        peer_validity_timeout: Duration,
     ) {
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: first_peer.id(),
@@ -393,6 +384,7 @@ impl PeersMetricsService {
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
             spec: first_peer.get_spec(),
+            peer_validity_timeout,
         }));
         let second_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: second_peer.id(),
@@ -402,6 +394,7 @@ impl PeersMetricsService {
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
             spec: second_peer.get_spec(),
+            peer_validity_timeout,
         }));
         first_peer_stat.borrow_mut().partner_peer =
             Rc::downgrade(&second_peer_stat);

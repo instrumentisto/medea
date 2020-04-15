@@ -228,6 +228,7 @@ impl Room {
                 room_spec.id().clone(),
                 context.turn_service.clone(),
                 peers_traffic_watcher.clone(),
+                &context.config.media_traffic,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
