@@ -26,9 +26,7 @@ use crate::{
     media::peer::{New, Peer},
 };
 
-use super::peers_traffic_watcher::{
-    FlowMetricSource, PeerTrafficWatcher, StoppedMetricSource,
-};
+use super::peers_traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
@@ -358,7 +356,6 @@ impl PeersMetricsService {
                     self.room_id.clone(),
                     peer_ref.peer_id,
                     peer_ref.get_stop_time(),
-                    StoppedMetricSource::PeerTraffic,
                 );
             } else if !peer_ref.is_conforms_spec() {
                 self.fatal_peer_error(peer_ref.peer_id, Utc::now());
@@ -426,7 +423,6 @@ impl PeersMetricsService {
                     self.room_id.clone(),
                     peer_ref.peer_id,
                     peer_ref.get_stop_time(),
-                    StoppedMetricSource::PeerTraffic,
                 );
             } else if peer_ref.is_conforms_spec() {
                 self.peers_traffic_watcher.traffic_flows(
@@ -461,7 +457,6 @@ impl PeersMetricsService {
                 self.room_id.clone(),
                 peer_id,
                 Instant::now(),
-                StoppedMetricSource::PeerRemoved,
             );
         }
     }

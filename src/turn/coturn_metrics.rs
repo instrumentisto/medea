@@ -15,9 +15,7 @@ use redis_pub_sub::ConnectionInfo;
 
 use crate::{
     log::prelude::*,
-    signalling::peers::{
-        FlowMetricSource, PeerTrafficWatcher, StoppedMetricSource,
-    },
+    signalling::peers::{FlowMetricSource, PeerTrafficWatcher},
 };
 
 use super::{
@@ -186,7 +184,6 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                         event.room_id,
                         event.peer_id,
                         Instant::now(),
-                        StoppedMetricSource::Coturn,
                     );
                 }
             }

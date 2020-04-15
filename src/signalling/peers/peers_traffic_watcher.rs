@@ -110,13 +110,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
         source: FlowMetricSource,
     );
 
-    fn traffic_stopped(
-        &self,
-        room_id: RoomId,
-        peer_id: PeerId,
-        at: Instant,
-        source: StoppedMetricSource,
-    );
+    fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant);
 }
 
 #[async_trait]
@@ -179,22 +173,12 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     }
 
     /// Sends [`TrafficStopped`] message to [`PeersTrafficWatcherImpl`].
-    fn traffic_stopped(
-        &self,
-        room_id: RoomId,
-        peer_id: PeerId,
-        at: Instant,
-        source: StoppedMetricSource,
-    ) {
-        debug!(
-            "TrafficStopped: in {}/{} from {:?}",
-            room_id, peer_id, source
-        );
+    fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant) {
+        debug!("TrafficStopped: in {}/{}", room_id, peer_id);
         self.do_send(TrafficStopped {
             room_id,
             peer_id,
             at,
-            source,
         })
     }
 }
@@ -295,7 +279,6 @@ impl Actor for PeersTrafficWatcherImpl {
                             < Instant::now() - this.traffic_flowing_timeout
                         {
                             ctx.notify(TrafficStopped {
-                                source: StoppedMetricSource::Timeout,
                                 peer_id: peer.peer_id,
                                 room_id: stat.room_id.clone(),
                                 at: Instant::now(),
@@ -394,9 +377,6 @@ struct TrafficStopped {
     ///
     /// [`Peer`]: crate::media::peer::Peer
     at: Instant,
-
-    /// Source of this metric.
-    source: StoppedMetricSource,
 }
 
 impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
@@ -446,34 +426,6 @@ pub enum FlowMetricSource {
     ///
     /// [`Peer`]: crate::media::peer::Peer
     Coturn,
-}
-
-/// All sources of [`TrafficStopped`] message.
-// TODO: seems redundant
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-pub enum StoppedMetricSource {
-    /// [`Peer`] was removed.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
-    PeerRemoved,
-
-    /// Partner [`Peer`] was removed.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
-    PartnerPeerRemoved,
-
-    /// [`Peer`] traffic stopped growing.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
-    PeerTraffic,
-
-    /// All Coturn allocations related to this [`Peer`] was removed.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
-    Coturn,
-
-    /// [`PeersTrafficWatcher`] doesn't receive [`TrafficFlows`] too long.
-    Timeout,
 }
 
 /// Current state of [`PeerStat`].

@@ -10,17 +10,17 @@ use std::{
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
     sync::Arc,
+    time::Duration,
 };
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
-
-use crate::conf;
-use std::time::Duration;
+use futures::Stream;
+use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
+    conf,
     log::prelude::*,
     media::{IceUser, New, Peer, PeerStateMachine},
     signalling::{
@@ -42,11 +42,9 @@ pub use self::{
     },
     peers_traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource, PeerInitTimeout,
-        PeerStarted, PeerStopped, PeerTrafficWatcher, StoppedMetricSource,
+        PeerStarted, PeerStopped, PeerTrafficWatcher,
     },
 };
-use futures::Stream;
-use medea_client_api_proto::stats::RtcStat;
 
 #[derive(Debug)]
 pub struct PeersService {
