@@ -26,7 +26,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
-use crate::{api::control::RoomId, conf, log::prelude::*, signalling::Room};
+use crate::{
+    api::control::{error_codes::ErrorCode::InvalidSrcUri, RoomId},
+    conf,
+    log::prelude::*,
+    signalling::Room,
+};
+use medea_client_api_proto::PeerMetrics::PeerConnectionState;
 
 /// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
 /// events. [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are
@@ -254,12 +260,17 @@ impl PeersTrafficWatcherImpl {
             .and_then(|room| room.peers.get_mut(&peer_id));
 
         if let Some(peer) = peer {
-            if let PeerState::Started(srcs) = &peer.state {
+            let srcs = if let PeerState::Starting(srcs) = &peer.state {
                 if srcs.len() < peer.flow_metrics_sources.len() {
                     let started_at = peer.started_at.unwrap_or_else(Utc::now);
                     self.fatal_peer_error(room_id, peer_id, started_at);
+                    return;
                 }
-            }
+                srcs.iter().map(|src| (*src, Instant::now())).collect()
+            } else {
+                return;
+            };
+            peer.state = PeerState::Started(srcs);
         }
     }
 }
@@ -272,18 +283,12 @@ impl Actor for PeersTrafficWatcherImpl {
         ctx.run_interval(Duration::from_secs(1), |this, ctx| {
             for stat in this.stats.values() {
                 for peer in stat.peers.values() {
-                    // TODO: check coturn traffic not flowing with timeout
-                    if let PeerState::Started(_) = &peer.state {
-                        // TODO: timeout to config
-                        if peer.last_update
-                            < Instant::now() - this.traffic_flowing_timeout
-                        {
-                            ctx.notify(TrafficStopped {
-                                peer_id: peer.peer_id,
-                                room_id: stat.room_id.clone(),
-                                at: Instant::now(),
-                            });
-                        }
+                    if !peer.is_valid(this.traffic_flowing_timeout) {
+                        ctx.notify(TrafficStopped {
+                            peer_id: peer.peer_id,
+                            room_id: stat.room_id.clone(),
+                            at: Instant::now(),
+                        });
                     }
                 }
             }
@@ -331,12 +336,15 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                 peer.last_update = msg.at;
                 match &mut peer.state {
                     PeerState::Started(sources) => {
+                        sources.insert(msg.source, Instant::now());
+                    }
+                    PeerState::Starting(sources) => {
                         sources.insert(msg.source);
                     }
-                    PeerState::Starting => {
+                    PeerState::NotStarted => {
                         let mut srcs = HashSet::new();
                         srcs.insert(msg.source);
-                        peer.state = PeerState::Started(srcs);
+                        peer.state = PeerState::Starting(srcs);
                         peer.started_at = Some(Utc::now());
 
                         ctx.run_later(
@@ -435,10 +443,12 @@ pub enum FlowMetricSource {
 #[derive(Debug)]
 pub enum PeerState {
     /// [`PeerStat`] is started.
-    Started(HashSet<FlowMetricSource>),
+    Started(HashMap<FlowMetricSource, Instant>),
 
     /// [`PeerStat`] is stopped.
-    Starting,
+    Starting(HashSet<FlowMetricSource>),
+
+    NotStarted,
 }
 
 /// Current state of [`Peer`].
@@ -472,6 +482,28 @@ pub struct PeerStat {
     /// If [`PeerStat`] doesn't updates withing `10s` then this [`PeerStat`]
     /// will be considered as [`PeerState::Stopped`].
     last_update: Instant,
+}
+
+impl PeerStat {
+    pub fn is_valid(&self, traffic_flowing_timeout: Duration) -> bool {
+        if let PeerState::Started(srcs) = &self.state {
+            for src in &self.flow_metrics_sources {
+                if let Some(src_last_update) = srcs.get(src) {
+                    if src_last_update.elapsed() > traffic_flowing_timeout {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+
+            if self.last_update.elapsed() > traffic_flowing_timeout {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// Stores [`PeerStat`]s of [`Peer`]s for which [`PeerState`] [`Room`]
@@ -579,7 +611,7 @@ impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
                 msg.peer_id,
                 PeerStat {
                     peer_id: msg.peer_id,
-                    state: PeerState::Starting,
+                    state: PeerState::NotStarted,
                     flow_metrics_sources: msg.flow_metrics_sources,
                     last_update: Instant::now(),
                     started_at: None,

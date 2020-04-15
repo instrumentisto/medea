@@ -192,7 +192,7 @@ impl PeerStat {
 
     // TODO: docs
     fn is_track_active(&self, last_update: Instant) -> bool {
-        last_update > Instant::now() - self.peer_validity_timeout
+        last_update.elapsed() < self.peer_validity_timeout
     }
 
     /// Checks that this [`PeerStat`] is conforms to `PeerConnection`
