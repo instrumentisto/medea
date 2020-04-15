@@ -1,17 +1,14 @@
-//! Service which is responsible to [`Peer`] metrics based Control API
-//! callbacks.
+//! Provides [`PeerTrafficWatcher`] trait and its impl.
 //!
-//! [`Peer`] metrics will be collected from the many sources of
-//! metrics. All this metrics will be collected and based on them,
-//! [`PeersTrafficWatcher`] will consider which callback should be sent (or
-//! not sent).
+//! [`PeerTrafficWatcher`] analyzes [`Peer`] traffic metrics and send messages
+//! ([`PeerStarted`], [`PeerStopped`], [`PeerFailed`]) to [`Room`].
 //!
-//! # List of [`Peer`] metrics based Control API callbacks:
-//!
-//! 1. `WebRtcPublishEndpoint::on_start`;
-//! 2. `WebRtcPublishEndpoint::on_stop`;
-//! 3. `WebRtcPlayEndpoint::on_start`;
-//! 4. `WebRtcPlayEndpoint::on_stop`.
+//! Traffic metrics, consumed by [`PeerTrafficWatcher`] can originate from
+//! different sources:
+//! 1. Peer, received from member that owns target [`Peer`].
+//! 2. PartnerPeer, received from member, that owns [`Peer`], connected to
+//! target [`Peer`].
+//! 3. Coturn, reported by Coturn TURN server.
 //!
 //! [`Peer`]: crate::media::peer::Peer
 
@@ -29,53 +26,67 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
-use crate::{
-    api::control::RoomId,
-    signalling::{
-        room::{PeerFailed, PeerStarted, PeerStopped},
-        Room,
-    },
-};
+use crate::{api::control::RoomId, log::prelude::*, signalling::Room};
 
-/// Returns [`FlowMetricSources`] which should be used to validate that
-/// `Endpoint` is started based on `force_relay` property from Control API spec.
-fn build_flow_sources(is_force_relay: bool) -> HashSet<FlowMetricSource> {
-    // This code is needed to pay attention to this function when changing
-    // 'FlowMetricSource'.
-    //
-    // Rustc shouldn't include it into binary.
-    {
-        match FlowMetricSource::PeerTraffic {
-            FlowMetricSource::PeerTraffic
-            | FlowMetricSource::Coturn
-            | FlowMetricSource::PartnerPeerTraffic => (),
-        }
-    }
-
+/// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state events. [`FlowMetricSource::Peer`] and
+/// [`FlowMetricSource::PartnerPeer`] are always returned,
+/// [`FlowMetricSource::Coturn`] is optional (should be used only if media is
+/// forcibly relayed).
+fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
     let mut sources = HashSet::new();
-    sources.insert(FlowMetricSource::PeerTraffic);
-    sources.insert(FlowMetricSource::PartnerPeerTraffic);
-    if is_force_relay {
+    sources.insert(FlowMetricSource::Peer);
+    sources.insert(FlowMetricSource::PartnerPeer);
+    if should_watch_turn {
         sources.insert(FlowMetricSource::Coturn);
     }
 
     sources
 }
 
+/// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
 pub fn build_peers_traffic_watcher() -> Arc<dyn PeerTrafficWatcher> {
-    Arc::new(InnerPeersTrafficWatcher::new().start())
+    Arc::new(PeersTrafficWatcherImpl::new().start())
 }
 
+/// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
+/// has started.
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerStarted(pub PeerId);
+
+/// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
+/// has stopped.
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerStopped(pub PeerId);
+
+/// Message which indicates that [`Peer`] with provided [`PeerId`] was not started during configured timeout.
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct PeerInitTimeout {
+    /// [`PeerId`] of [`Peer`] which went into error state.
+    pub peer_id: PeerId,
+
+    /// The [`DateTime`] from which it is believed that [`Peer`] went into an
+    /// erroneous state.
+    pub at: DateTime<Utc>,
+}
+
+/// Consumes [`Peer`] traffic metrics for further processing.
 #[async_trait]
 pub trait PeerTrafficWatcher: Debug + Send + Sync {
+
+    /// Registers [`Room`] as [`Peer`] state messages listener, preparing [`PeerTrafficWatcher`] for registering peers from this room.
     async fn register_room(
         &self,
         room_id: RoomId,
         room: WeakAddr<Room>,
     ) -> Result<(), MailboxError>;
 
+    /// Unregisters [`Room`].
     fn unregister_room(&self, room_id: RoomId);
 
+    /// Registers [`Peer`], so that [`PeerTrafficWatcher`] will be able to process traffic flow events.
     async fn register_peer(
         &self,
         room_id: RoomId,
@@ -83,8 +94,11 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
         should_watch_turn: bool,
     ) -> Result<(), MailboxError>;
 
+
+    /// Unregisters [`Peer`]s.
     fn unregister_peers(&self, room_id: RoomId, peers_ids: HashSet<PeerId>);
 
+    ///
     fn traffic_flows(
         &self,
         room_id: RoomId,
@@ -103,7 +117,9 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 }
 
 #[async_trait]
-impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
+impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
+    /// Sends [`RegisterRoom`] message to [`PeersTrafficWatcherImpl`] returning
+    /// send result.
     async fn register_room(
         &self,
         room_id: RoomId,
@@ -112,10 +128,13 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
         self.send(RegisterRoom { room_id, room }).await
     }
 
+    /// Sends [`UnregisterRoom`] message to [`PeersTrafficWatcherImpl`].
     fn unregister_room(&self, room_id: RoomId) {
         self.do_send(UnregisterRoom(room_id))
     }
 
+    /// Sends [`RegisterPeer`] message to [`PeersTrafficWatcherImpl`] returning
+    /// send result.
     async fn register_peer(
         &self,
         room_id: RoomId,
@@ -130,6 +149,7 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
         .await
     }
 
+    /// Sends [`UnregisterPeers`] message to [`PeersTrafficWatcherImpl`].
     fn unregister_peers(
         &self,
         room_id: RoomId,
@@ -138,6 +158,7 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
         self.do_send(UnregisterPeers { room_id, peers_ids })
     }
 
+    /// Sends [`TrafficFlows`] message to [`PeersTrafficWatcherImpl`].
     fn traffic_flows(
         &self,
         room_id: RoomId,
@@ -145,6 +166,7 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
         at: Instant,
         source: FlowMetricSource,
     ) {
+        debug!("TrafficFlows: in {}/{} from {:?}", room_id, peer_id, source);
         self.do_send(TrafficFlows {
             room_id,
             peer_id,
@@ -153,6 +175,7 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
         })
     }
 
+    /// Sends [`TrafficStopped`] message to [`PeersTrafficWatcherImpl`].
     fn traffic_stopped(
         &self,
         room_id: RoomId,
@@ -160,6 +183,10 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
         at: Instant,
         source: StoppedMetricSource,
     ) {
+        debug!(
+            "TrafficStopped: in {}/{} from {:?}",
+            room_id, peer_id, source
+        );
         self.do_send(TrafficStopped {
             room_id,
             peer_id,
@@ -174,12 +201,12 @@ impl PeerTrafficWatcher for Addr<InnerPeersTrafficWatcher> {
 ///
 /// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Default)]
-struct InnerPeersTrafficWatcher {
+struct PeersTrafficWatcherImpl {
     /// All `Room` which exists on the Medea server.
     stats: HashMap<RoomId, RoomStats>,
 }
 
-impl InnerPeersTrafficWatcher {
+impl PeersTrafficWatcherImpl {
     /// Returns new [`MetricsCallbacksService`].
     pub fn new() -> Self {
         Self {
@@ -212,7 +239,7 @@ impl InnerPeersTrafficWatcher {
         if let Some(room) = self.stats.get_mut(&room_id) {
             room.peers.remove(&peer_id);
             if let Some(room_addr) = room.room.upgrade() {
-                room_addr.do_send(PeerFailed { peer_id, at });
+                room_addr.do_send(PeerInitTimeout { peer_id, at });
             }
         }
     }
@@ -235,9 +262,7 @@ impl InnerPeersTrafficWatcher {
 
         if let Some(peer) = peer {
             if let PeerState::Started(srcs) = &peer.state {
-                let is_not_all_sources_sent_start =
-                    srcs.len() < peer.flow_metrics_sources.len();
-                if is_not_all_sources_sent_start {
+                if srcs.len() < peer.flow_metrics_sources.len() {
                     let started_at = peer.started_at.unwrap_or_else(Utc::now);
                     self.fatal_peer_error(room_id, peer_id, started_at);
                 }
@@ -246,14 +271,17 @@ impl InnerPeersTrafficWatcher {
     }
 }
 
-impl Actor for InnerPeersTrafficWatcher {
+impl Actor for PeersTrafficWatcherImpl {
     type Context = actix::Context<Self>;
 
+    // TODO: docs
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.run_interval(Duration::from_secs(10), |this, ctx| {
+        ctx.run_interval(Duration::from_secs(1), |this, ctx| {
             for stat in this.stats.values() {
                 for track in stat.peers.values() {
+                    // TODO: check coturn traffic not flowing with timeout
                     if let PeerState::Started(_) = &track.state {
+                        // TODO: timeout to config
                         if track.last_update
                             < Instant::now() - Duration::from_secs(10)
                         {
@@ -297,7 +325,8 @@ struct TrafficFlows {
     source: FlowMetricSource,
 }
 
-impl Handler<TrafficFlows> for InnerPeersTrafficWatcher {
+// TODO: add docs
+impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     type Result = ();
 
     fn handle(
@@ -312,12 +341,13 @@ impl Handler<TrafficFlows> for InnerPeersTrafficWatcher {
                     PeerState::Started(sources) => {
                         sources.insert(msg.source);
                     }
-                    PeerState::Stopped => {
+                    PeerState::Starting => {
                         let mut srcs = HashSet::new();
                         srcs.insert(msg.source);
                         peer.state = PeerState::Started(srcs);
                         peer.started_at = Some(Utc::now());
 
+                        // TODO: config, peer init timeout
                         ctx.run_later(
                             Duration::from_secs(15),
                             move |this, _| {
@@ -361,7 +391,7 @@ struct TrafficStopped {
     source: StoppedMetricSource,
 }
 
-impl Handler<TrafficStopped> for InnerPeersTrafficWatcher {
+impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
     type Result = ();
 
     fn handle(
@@ -397,12 +427,12 @@ pub enum FlowMetricSource {
     /// Metrics from the partner [`Peer`].
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    PartnerPeerTraffic,
+    PartnerPeer,
 
     /// Metrics from the [`Peer`].
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    PeerTraffic,
+    Peer,
 
     /// Metrics for this [`Peer`] from the Coturn TURN server.
     ///
@@ -411,6 +441,7 @@ pub enum FlowMetricSource {
 }
 
 /// All sources of [`TrafficStopped`] message.
+// TODO: seems redundant
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum StoppedMetricSource {
     /// [`Peer`] was removed.
@@ -447,7 +478,7 @@ pub enum PeerState {
     Started(HashSet<FlowMetricSource>),
 
     /// [`PeerStat`] is stopped.
-    Stopped,
+    Starting,
 }
 
 /// Current state of [`Peer`].
@@ -518,7 +549,7 @@ struct RegisterRoom {
     room: WeakAddr<Room>,
 }
 
-impl Handler<RegisterRoom> for InnerPeersTrafficWatcher {
+impl Handler<RegisterRoom> for PeersTrafficWatcherImpl {
     type Result = ();
 
     fn handle(
@@ -546,7 +577,7 @@ impl Handler<RegisterRoom> for InnerPeersTrafficWatcher {
 #[rtype(result = "()")]
 struct UnregisterRoom(pub RoomId);
 
-impl Handler<UnregisterRoom> for InnerPeersTrafficWatcher {
+impl Handler<UnregisterRoom> for PeersTrafficWatcherImpl {
     type Result = ();
 
     fn handle(
@@ -575,7 +606,7 @@ struct RegisterPeer {
     flow_metrics_sources: HashSet<FlowMetricSource>,
 }
 
-impl Handler<RegisterPeer> for InnerPeersTrafficWatcher {
+impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
     type Result = ();
 
     fn handle(
@@ -588,7 +619,7 @@ impl Handler<RegisterPeer> for InnerPeersTrafficWatcher {
                 msg.peer_id,
                 PeerStat {
                     peer_id: msg.peer_id,
-                    state: PeerState::Stopped,
+                    state: PeerState::Starting,
                     flow_metrics_sources: msg.flow_metrics_sources,
                     last_update: Instant::now(),
                     started_at: None,
@@ -611,7 +642,7 @@ struct UnregisterPeers {
     peers_ids: HashSet<PeerId>,
 }
 
-impl Handler<UnregisterPeers> for InnerPeersTrafficWatcher {
+impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
     type Result = ();
 
     fn handle(

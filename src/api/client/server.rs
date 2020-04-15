@@ -168,9 +168,7 @@ mod test {
     use crate::{
         api::control,
         conf::Conf,
-        signalling::{
-            peers_traffic_watcher::build_peers_traffic_watcher, Room,
-        },
+        signalling::{peers::build_peers_traffic_watcher, Room},
         turn::new_turn_auth_service_mock,
         AppContext,
     };

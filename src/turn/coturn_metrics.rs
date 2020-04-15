@@ -15,7 +15,7 @@ use redis_pub_sub::ConnectionInfo;
 
 use crate::{
     log::prelude::*,
-    signalling::peers_traffic_watcher::{
+    signalling::peers::{
         FlowMetricSource, PeerTrafficWatcher, StoppedMetricSource,
     },
 };
@@ -151,12 +151,13 @@ impl Actor for CoturnMetricsService {
 
 impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
     fn handle(&mut self, msg: redis_pub_sub::Msg, _: &mut Self::Context) {
-        let event = if let Ok(event) = CoturnEvent::parse(&msg) {
-            event
-        } else {
-            return;
+        let event = match CoturnEvent::parse(&msg) {
+            Ok(event) => event,
+            Err(err) => {
+                error!("Error parsing CoturnEvent: {}", err);
+                return;
+            }
         };
-
         let username = CoturnUsername {
             room_id: event.room_id.clone(),
             peer_id: event.peer_id,

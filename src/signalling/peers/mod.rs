@@ -3,6 +3,9 @@
 //! [`Room`]: crate::signalling::Room
 //! [`Peer`]: crate::media::peer::Peer
 
+mod peer_metrics;
+mod peers_traffic_watcher;
+
 use std::{
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
@@ -22,15 +25,28 @@ use crate::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Endpoint,
         },
-        peers_traffic_watcher::PeerTrafficWatcher,
         room::{ActFuture, RoomError},
         Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
 
+use self::peer_metrics::PeersMetricsService;
+
+pub use self::{
+    peer_metrics::{
+        PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
+    },
+    peers_traffic_watcher::{
+        build_peers_traffic_watcher, FlowMetricSource, PeerInitTimeout, PeerStarted,
+        PeerStopped, PeerTrafficWatcher, StoppedMetricSource,
+    },
+};
+use futures::Stream;
+use medea_client_api_proto::stats::RtcStat;
+
 #[derive(Debug)]
-pub struct PeerRepository {
+pub struct PeersService {
     /// [`RoomId`] of the [`Room`] which owns this [`PeerRepository`].
     room_id: RoomId,
 
@@ -58,6 +74,9 @@ pub struct PeerRepository {
     /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
     /// callbacks will be performed.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+
+    /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
+    peer_metrics_service: PeersMetricsService,
 }
 
 /// Simple ID counter.
@@ -75,7 +94,7 @@ impl<T: Incrementable + Copy> Counter<T> {
     }
 }
 
-impl PeerRepository {
+impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
     pub fn new(
@@ -84,12 +103,16 @@ impl PeerRepository {
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Self {
         Self {
-            room_id,
+            room_id: room_id.clone(),
             turn_service,
             peers: HashMap::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
-            peers_traffic_watcher,
+            peers_traffic_watcher: peers_traffic_watcher.clone(),
+            peer_metrics_service: PeersMetricsService::new(
+                room_id,
+                peers_traffic_watcher,
+            ),
         }
     }
 
@@ -131,12 +154,13 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Creates interconnected [`Peer`]s for provided [`Member`]s.
+    /// Creates interconnected [`Peer`]s for provided endpoints and adds them to
+    /// peer repository.
     fn create_peers(
         &mut self,
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
-    ) -> (Peer<New>, Peer<New>) {
+    ) -> (PeerId, PeerId) {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
@@ -147,22 +171,32 @@ impl PeerRepository {
         let src_peer_id = self.peers_count.next_id();
         let sink_peer_id = self.peers_count.next_id();
 
-        let first_peer = Peer::new(
+        let mut src_peer = Peer::new(
             src_peer_id,
             src_member_id.clone(),
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
         );
-        let second_peer = Peer::new(
+        src_peer.add_endpoint(&src.clone().into());
+
+        let mut sink_peer = Peer::new(
             sink_peer_id,
             sink_member_id,
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
         );
+        sink_peer.add_endpoint(&sink.clone().into());
 
-        (first_peer, second_peer)
+        src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+
+        self.peer_metrics_service.add_peers(&src_peer, &sink_peer);
+
+        self.add_peer(src_peer);
+        self.add_peer(sink_peer);
+
+        (src_peer_id, sink_peer_id)
     }
 
     /// Returns mutable reference to track counter.
@@ -271,27 +305,18 @@ impl PeerRepository {
                     .or_insert_with(Vec::new)
                     .push(peer);
             }
+            self.peer_metrics_service.peer_removed(*peer_id);
         }
 
+        self.peers_traffic_watcher.unregister_peers(
+            self.room_id.clone(),
+            removed_peers
+                .values()
+                .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
+                .collect(),
+        );
+
         removed_peers
-    }
-
-    /// Removes all [`Peer`]s related to given [`Member`].
-    /// Note, that this function will also remove all partners [`Peer`]s.
-    ///
-    /// Returns `HashMap` with all removed [`Peer`]s.
-    /// Key - [`Peer`]'s owner [`MemberId`],
-    /// value - removed [`Peer`]'s [`PeerId`].
-    pub fn remove_peers_related_to_member(
-        &mut self,
-        member_id: &MemberId,
-    ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
-        let member_peers = self
-            .get_peers_by_member_id(&member_id)
-            .map(PeerStateMachine::id)
-            .collect();
-
-        self.remove_peers(&member_id, &member_peers)
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
@@ -344,18 +369,7 @@ impl PeerRepository {
 
             Box::new(actix::fut::ok(None))
         } else {
-            let (mut src_peer, mut sink_peer) = self.create_peers(&src, &sink);
-
-            src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
-
-            src_peer.add_endpoint(&src.clone().into());
-            sink_peer.add_endpoint(&sink.clone().into());
-
-            let src_peer_id = src_peer.id();
-            let sink_peer_id = sink_peer.id();
-
-            self.add_peer(src_peer);
-            self.add_peer(sink_peer);
+            let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
 
             Box::new(self.peer_post_construct(src_peer_id, src.into()).then(
                 move |res, room, _| {
@@ -378,6 +392,8 @@ impl PeerRepository {
         }
     }
 
+    /// Creates and sets [`IceUser`], registers peer in
+    /// [`PeerTrafficWatcher`].
     fn peer_post_construct(
         &self,
         peer_id: PeerId,
@@ -427,8 +443,8 @@ impl PeerRepository {
         )
     }
 
-    /// Returns [`Weak`] references to the [`Endpoint`]s for which provided
-    /// [`PeerId`] was created.
+    /// Returns [`Endpoint`]s for which provided
+    /// [`Peer`] was created.
     pub fn get_endpoints_by_peer_id(&self, peer_id: PeerId) -> Vec<Endpoint> {
         self.peers
             .get(&peer_id)
@@ -439,5 +455,18 @@ impl PeerRepository {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Propagates stats to [`PeersMetricsService`].
+    pub fn add_stats(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+        self.peer_metrics_service.add_stat(peer_id, stats);
+    }
+
+    /// Returns [`Stream`] of [`PeerMetricsEvent`]s from underlying
+    /// [`PeerMetricsService`].
+    pub fn subscribe_to_metrics_events(
+        &mut self,
+    ) -> impl Stream<Item = PeersMetricsEvent> {
+        self.peer_metrics_service.subscribe()
     }
 }

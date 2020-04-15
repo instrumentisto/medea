@@ -21,7 +21,10 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 
-use crate::api::control::RoomId;
+use crate::{
+    api::control::RoomId,
+    media::peer::{New, Peer},
+};
 
 use super::peers_traffic_watcher::{
     FlowMetricSource, PeerTrafficWatcher, StoppedMetricSource,
@@ -32,33 +35,6 @@ use super::peers_traffic_watcher::{
 pub enum TrackMediaType {
     Audio,
     Video,
-}
-
-impl From<&RtcOutboundRtpStreamMediaType> for TrackMediaType {
-    fn from(from: &RtcOutboundRtpStreamMediaType) -> Self {
-        match from {
-            RtcOutboundRtpStreamMediaType::Audio { .. } => Self::Audio,
-            RtcOutboundRtpStreamMediaType::Video { .. } => Self::Video,
-        }
-    }
-}
-
-impl From<&RtcInboundRtpStreamMediaType> for TrackMediaType {
-    fn from(from: &RtcInboundRtpStreamMediaType) -> Self {
-        match from {
-            RtcInboundRtpStreamMediaType::Audio { .. } => Self::Audio,
-            RtcInboundRtpStreamMediaType::Video { .. } => Self::Video,
-        }
-    }
-}
-
-impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
-    fn from(from: &medea_client_api_proto::MediaType) -> Self {
-        match from {
-            medea_client_api_proto::MediaType::Audio(_) => Self::Audio,
-            medea_client_api_proto::MediaType::Video(_) => Self::Video,
-        }
-    }
 }
 
 /// Events which [`PeersMetrics`] can throw to the
@@ -119,6 +95,7 @@ impl SenderStat {
     /// This will be calculated by checking that this [`SenderStat`] was updated
     /// within `10s`.
     fn is_active(&self) -> bool {
+        // TODO: move to config
         self.last_update > Instant::now() - Duration::from_secs(10)
     }
 }
@@ -310,23 +287,10 @@ impl PeerStat {
     }
 }
 
-/// New `PeerConnection` for which this [`PeersMetrics`] will receive
-/// metrics.
-#[derive(Debug)]
-pub struct Peer {
-    /// [`PeerId`] of `PeerConnection` for which this [`PeersMetrics`]
-    /// will receive metrics.
-    pub peer_id: PeerId,
-
-    /// Specification of a `PeerConnection` for which this
-    /// [`PeersMetrics`] will receive metrics.
-    pub spec: PeerSpec,
-}
-
 /// Service which responsible for processing [`PeerConnection`]'s metrics
 /// received from a client.
 #[derive(Debug)]
-pub struct PeersMetrics {
+pub struct PeersMetricsService {
     /// [`RoomId`] of [`Room`] to which this [`PeersMetrics`] belongs to.
     room_id: RoomId,
 
@@ -345,7 +309,7 @@ pub struct PeersMetrics {
     peer_metric_events_sender: Option<mpsc::UnboundedSender<PeersMetricsEvent>>,
 }
 
-impl PeersMetrics {
+impl PeersMetricsService {
     /// Returns new [`PeersMetrics`] for a provided [`Room`].
     pub fn new(
         room_id: RoomId,
@@ -416,30 +380,34 @@ impl PeersMetrics {
     /// creation.
     ///
     /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
-    pub fn add_peers(&mut self, first_peer: Peer, second_peer: Peer) {
+    pub fn add_peers(
+        &mut self,
+        first_peer: &Peer<New>,
+        second_peer: &Peer<New>,
+    ) {
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: first_peer.peer_id,
+            peer_id: first_peer.id(),
             partner_peer: Weak::new(),
             last_update: Utc::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
-            spec: first_peer.spec,
+            spec: first_peer.get_spec(),
         }));
         let second_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: second_peer.peer_id,
+            peer_id: second_peer.id(),
             partner_peer: Rc::downgrade(&first_peer_stat),
             last_update: Utc::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Waiting,
-            spec: second_peer.spec,
+            spec: second_peer.get_spec(),
         }));
         first_peer_stat.borrow_mut().partner_peer =
             Rc::downgrade(&second_peer_stat);
 
-        self.peers.insert(first_peer.peer_id, first_peer_stat);
-        self.peers.insert(second_peer.peer_id, second_peer_stat);
+        self.peers.insert(first_peer.id(), first_peer_stat);
+        self.peers.insert(second_peer.id(), second_peer_stat);
     }
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
@@ -472,7 +440,7 @@ impl PeersMetrics {
                     self.room_id.clone(),
                     peer_id,
                     Instant::now(),
-                    FlowMetricSource::PeerTraffic,
+                    FlowMetricSource::Peer,
                 );
                 peer_ref.set_state(PeerStatState::Connected);
                 if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
@@ -480,7 +448,7 @@ impl PeersMetrics {
                         self.room_id.clone(),
                         partner_peer_id,
                         Instant::now(),
-                        FlowMetricSource::PartnerPeerTraffic,
+                        FlowMetricSource::PartnerPeer,
                     );
                 }
             } else {
@@ -495,12 +463,40 @@ impl PeersMetrics {
     /// [`PeersTrafficWatcher`].
     pub fn peer_removed(&mut self, peer_id: PeerId) {
         if self.peers.remove(&peer_id).is_some() {
+            // TODO: seems redundant
             self.peers_traffic_watcher.traffic_stopped(
                 self.room_id.clone(),
                 peer_id,
                 Instant::now(),
                 StoppedMetricSource::PeerRemoved,
             );
+        }
+    }
+}
+
+impl From<&RtcOutboundRtpStreamMediaType> for TrackMediaType {
+    fn from(from: &RtcOutboundRtpStreamMediaType) -> Self {
+        match from {
+            RtcOutboundRtpStreamMediaType::Audio { .. } => Self::Audio,
+            RtcOutboundRtpStreamMediaType::Video { .. } => Self::Video,
+        }
+    }
+}
+
+impl From<&RtcInboundRtpStreamMediaType> for TrackMediaType {
+    fn from(from: &RtcInboundRtpStreamMediaType) -> Self {
+        match from {
+            RtcInboundRtpStreamMediaType::Audio { .. } => Self::Audio,
+            RtcInboundRtpStreamMediaType::Video { .. } => Self::Video,
+        }
+    }
+}
+
+impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
+    fn from(from: &medea_client_api_proto::MediaType) -> Self {
+        match from {
+            medea_client_api_proto::MediaType::Audio(_) => Self::Audio,
+            medea_client_api_proto::MediaType::Video(_) => Self::Video,
         }
     }
 }

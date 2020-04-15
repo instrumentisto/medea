@@ -6,8 +6,6 @@
 pub mod elements;
 pub mod participants;
 pub mod peers;
-pub mod peers_metrics;
-pub mod peers_traffic_watcher;
 pub mod room;
 pub mod room_repo;
 pub mod room_service;

@@ -3,6 +3,28 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
+// TODO: This mod size is getting out of hand now. We should consider splitting
+//       it to multiple mod's for the sake of readability, e.g.:
+//       1. rpc_server.rs:
+//          1. impl RpcServer for Addr<Room>
+//          2. impl Handler<Authorize>
+//          3. impl Handler<CommandMessage>
+//          4. impl Handler<RpcConnectionEstablished>
+//          5. impl Handler<RpcConnectionClosed>
+//       2. command_handler.rs with impl CommandHandler for Room
+//       3. dynamic_api_impl.rs:
+//          1. impl Handler<SerializeProto> for Room
+//          2. impl Handler<Delete>
+//          3. impl Handler<CreateMember>
+//          4. impl Handler<CreateEndpoint>
+//       4. peer_metrics_events_handler.rs:
+//          1. impl Handler<PeerStopped>
+//          2. impl Handler<PeerFailed>
+//          3. impl Handler<PeerStarted>
+//       Each module could provide its own impl Room, with required methods,
+//       used in that module, and room.rs's impl Room would contain methods
+//       shared among other mods.
+
 use std::{
     collections::{HashMap, HashSet},
     iter,
@@ -69,11 +91,10 @@ use super::{
         Member, MembersLoadError,
     },
     participants::{ParticipantService, ParticipantServiceErr},
-    peers::PeerRepository,
-    peers_metrics::{
-        self as pm, PeersMetrics, PeersMetricsEvent, PeersMetricsEventHandler,
+    peers::{
+        PeerInitTimeout, PeerStarted, PeerStopped, PeerTrafficWatcher,
+        PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
     },
-    peers_traffic_watcher::PeerTrafficWatcher,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -183,17 +204,10 @@ pub struct Room {
     members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeerRepository,
+    pub peers: PeersService,
 
     /// Current state of this [`Room`].
     state: State,
-
-    /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
-    /// callbacks will be performed.
-    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-
-    /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: PeersMetrics,
 }
 
 impl Room {
@@ -210,7 +224,7 @@ impl Room {
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
-            peers: PeerRepository::new(
+            peers: PeersService::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
                 peers_traffic_watcher.clone(),
@@ -218,11 +232,6 @@ impl Room {
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
-            peer_metrics_service: PeersMetrics::new(
-                room_spec.id().clone(),
-                peers_traffic_watcher.clone(),
-            ),
-            peers_traffic_watcher,
         })
     }
 
@@ -263,12 +272,6 @@ impl Room {
                 peer1_id, peer2_id
             )));
         };
-
-        let sender_spec = sender.get_spec();
-        let sender_id = sender.id();
-        let receiver_spec = receiver.get_spec();
-        let received_id = receiver.id();
-
         self.peers.add_peer(receiver);
 
         let sender = sender.start();
@@ -284,18 +287,6 @@ impl Room {
             force_relay: sender.is_force_relayed(),
         };
         self.peers.add_peer(sender);
-
-        self.peer_metrics_service.add_peers(
-            pm::Peer {
-                peer_id: sender_id,
-                spec: sender_spec,
-            },
-            pm::Peer {
-                peer_id: received_id,
-                spec: receiver_spec,
-            },
-        );
-
         Ok(Box::new(
             self.members
                 .send_event_to_member(member_id, peer_created)
@@ -475,13 +466,6 @@ impl Room {
         debug!("Remove peers.");
         let removed_peers =
             self.peers.remove_peers(&member_id, &peer_ids_to_remove);
-        self.peers_traffic_watcher.unregister_peers(
-            self.id.clone(),
-            removed_peers
-                .values()
-                .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
-                .collect(),
-        );
 
         removed_peers
             .iter()
@@ -918,7 +902,7 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         match metrics {
             PeerMetrics::RtcStats(stats) => {
-                self.peer_metrics_service.add_stat(peer_id, stats);
+                self.peers.add_stats(peer_id, stats);
             }
             _ => (),
         }
@@ -952,12 +936,7 @@ impl CommandHandler for Room {
     }
 }
 
-/// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
-/// is started.
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct PeerStarted(pub PeerId);
-
+//TODO: add docs
 impl Handler<PeerStarted> for Room {
     type Result = ();
 
@@ -967,50 +946,38 @@ impl Handler<PeerStarted> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let peer_id = msg.0;
-        let send_callbacks: HashMap<_, _> = self
-            .peers
-            .get_endpoints_by_peer_id(peer_id)
-            .into_iter()
-            .filter_map(|endpoint| {
-                match endpoint {
-                    Endpoint::WebRtcPublishEndpoint(publish) => {
-                        publish.change_peer_status(peer_id, true);
-                        if publish.publishing_peers_count() == 1 {
-                            if let Some(on_start) = publish.get_on_start() {
-                                let fid = publish
-                                    .owner()
-                                    .get_fid_to_endpoint(publish.id().into());
-                                return Some((fid, on_start));
-                            }
-                        }
-                    }
-                    Endpoint::WebRtcPlayEndpoint(play) => {
-                        if let Some(on_start) = play.get_on_start() {
-                            let fid = play
+        for endpoint in self.peers.get_endpoints_by_peer_id(peer_id) {
+            match endpoint {
+                Endpoint::WebRtcPublishEndpoint(publish) => {
+                    publish.change_peer_status(peer_id, true);
+                    if publish.publishing_peers_count() == 1 {
+                        if let Some(on_start) = publish.get_on_start() {
+                            let fid = publish
                                 .owner()
-                                .get_fid_to_endpoint(play.id().into());
-                            return Some((fid, on_start));
+                                .get_fid_to_endpoint(publish.id().into());
+                            self.callbacks.send_callback(
+                                on_start,
+                                CallbackRequest::at_now(fid, OnStartEvent {}),
+                            );
                         }
                     }
                 }
-                None
-            })
-            .collect();
-        for (fid, on_start) in send_callbacks {
-            self.callbacks.send_callback(
-                on_start,
-                CallbackRequest::at_now(fid, OnStartEvent {}),
-            );
+                Endpoint::WebRtcPlayEndpoint(play) => {
+                    if let Some(on_start) = play.get_on_start() {
+                        let fid =
+                            play.owner().get_fid_to_endpoint(play.id().into());
+                        self.callbacks.send_callback(
+                            on_start,
+                            CallbackRequest::at_now(fid, OnStartEvent {}),
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-/// Message which indicates that [`PeerConnection`] with provided [`PeerId`]
-/// is stopped.
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct PeerStopped(pub PeerId);
-
+//TODO: add docs
 impl Handler<PeerStopped> for Room {
     type Result = ();
 
@@ -1065,11 +1032,11 @@ impl Actor for Room {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
 
-        ctx.run_interval(Duration::from_secs(2), |this, _| {
+        ctx.run_interval(Duration::from_secs(1), |this, _| {
             this.peer_metrics_service.check_peers_validity();
         });
 
-        ctx.add_stream(self.peer_metrics_service.subscribe());
+        ctx.add_stream(self.peers.subscribe_to_metrics_events());
     }
 }
 
@@ -1090,9 +1057,57 @@ impl PeersMetricsEventHandler for Room {
     ) -> Self::Output {
         Box::new(async move { peer_id }.into_actor(self).map(
             move |peer_id, _, ctx| {
-                ctx.notify(PeerFailed { peer_id, at });
+                ctx.notify(PeerInitTimeout { peer_id, at });
             },
         ))
+    }
+}
+
+//TODO: add docs
+impl Handler<PeerInitTimeout> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: PeerInitTimeout,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        error!(
+            "Real state of Peer [id = {}] from Room [id = {}] has fatal \
+             contradiction with spec!",
+            msg.peer_id, self.id
+        );
+
+        let member_id;
+        if let Ok(peer) = self.peers.get_peer_by_id(msg.peer_id) {
+            member_id = peer.member_id();
+        } else {
+            return;
+        }
+
+        let mut peers_ids = HashSet::new();
+        peers_ids.insert(msg.peer_id);
+        let removed_peers = self.remove_peers(&member_id, &peers_ids, ctx);
+
+        removed_peers
+            .values()
+            .flatten()
+            .flat_map(|peer| {
+                peer.endpoints()
+                    .into_iter()
+                    .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
+            })
+            .filter_map(|(peer_id, e)| e.on_stop(peer_id))
+            .for_each(move |(fid, on_stop)| {
+                self.callbacks.send_callback(
+                    on_stop,
+                    CallbackRequest {
+                        fid: fid.into(),
+                        event: OnStopEvent {}.into(),
+                        at: msg.at,
+                    },
+                )
+            });
     }
 }
 
@@ -1470,73 +1485,13 @@ impl Handler<CreateEndpoint> for Room {
     }
 }
 
-/// Message which indicates that [`Peer`] with provided [`PeerId`] is
-/// went into a state that does not coincide with spec.
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct PeerFailed {
-    /// [`PeerId`] of [`Peer`] which went into error state.
-    pub peer_id: PeerId,
-
-    /// The [`DateTime`] from which it is believed that [`Peer`] went into an
-    /// erroneous state.
-    pub at: DateTime<Utc>,
-}
-
-impl Handler<PeerFailed> for Room {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: PeerFailed,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        error!(
-            "Real state of Peer [id = {}] from Room [id = {}] has fatal \
-             contradiction with spec!",
-            msg.peer_id, self.id
-        );
-
-        let member_id;
-        if let Ok(peer) = self.peers.get_peer_by_id(msg.peer_id) {
-            member_id = peer.member_id();
-        } else {
-            return;
-        }
-
-        let mut peers_ids = HashSet::new();
-        peers_ids.insert(msg.peer_id);
-        let removed_peers = self.remove_peers(&member_id, &peers_ids, ctx);
-
-        removed_peers
-            .values()
-            .flatten()
-            .flat_map(|peer| {
-                peer.endpoints()
-                    .into_iter()
-                    .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
-            })
-            .filter_map(|(peer_id, e)| e.on_stop(peer_id))
-            .for_each(move |(fid, on_stop)| {
-                self.callbacks.send_callback(
-                    on_stop,
-                    CallbackRequest {
-                        fid: fid.into(),
-                        event: OnStopEvent {}.into(),
-                        at: msg.at,
-                    },
-                )
-            });
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     use crate::{
         api::control::pipeline::Pipeline, conf::Conf,
-        signalling::peers_traffic_watcher::build_peers_traffic_watcher,
+        signalling::peers::build_peers_traffic_watcher,
     };
 
     fn empty_room() -> Room {

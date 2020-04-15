@@ -19,8 +19,7 @@ use crate::{
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{Endpoint, WeakEndpoint},
-        peers::Counter,
-        peers_metrics::{PeerSpec, TrackMediaType},
+        peers::{Counter, PeerSpec, TrackMediaType},
     },
 };
 

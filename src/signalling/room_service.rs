@@ -24,9 +24,7 @@ use crate::{
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
-        peers_traffic_watcher::{
-            build_peers_traffic_watcher, PeerTrafficWatcher,
-        },
+        peers::{build_peers_traffic_watcher, PeerTrafficWatcher},
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
