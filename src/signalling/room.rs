@@ -936,7 +936,7 @@ impl CommandHandler for Room {
     }
 }
 
-//TODO: add docs
+// TODO: add docs
 impl Handler<PeerStarted> for Room {
     type Result = ();
 
@@ -977,7 +977,7 @@ impl Handler<PeerStarted> for Room {
     }
 }
 
-//TODO: add docs
+// TODO: add docs
 impl Handler<PeerStopped> for Room {
     type Result = ();
 
@@ -1033,7 +1033,7 @@ impl Actor for Room {
         debug!("Room [id = {}] started.", self.id);
 
         ctx.run_interval(Duration::from_secs(1), |this, _| {
-            this.peer_metrics_service.check_peers_validity();
+            this.peers.check_peers_validity();
         });
 
         ctx.add_stream(self.peers.subscribe_to_metrics_events());
@@ -1063,7 +1063,7 @@ impl PeersMetricsEventHandler for Room {
     }
 }
 
-//TODO: add docs
+// TODO: add docs
 impl Handler<PeerInitTimeout> for Room {
     type Result = ();
 

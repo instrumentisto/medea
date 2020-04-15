@@ -38,8 +38,8 @@ pub use self::{
         PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
     },
     peers_traffic_watcher::{
-        build_peers_traffic_watcher, FlowMetricSource, PeerInitTimeout, PeerStarted,
-        PeerStopped, PeerTrafficWatcher, StoppedMetricSource,
+        build_peers_traffic_watcher, FlowMetricSource, PeerInitTimeout,
+        PeerStarted, PeerStopped, PeerTrafficWatcher, StoppedMetricSource,
     },
 };
 use futures::Stream;
@@ -190,8 +190,6 @@ impl PeersService {
         sink_peer.add_endpoint(&sink.clone().into());
 
         src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
-
-        self.peer_metrics_service.add_peers(&src_peer, &sink_peer);
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -364,6 +362,10 @@ impl PeersService {
             sink_peer.add_endpoint(&sink.into());
             src_peer.add_endpoint(&src.into());
 
+            // TODO: update peer spec here and mode this line of code into
+            // `self.create_peers`.
+            self.peer_metrics_service.add_peers(&src_peer, &sink_peer);
+
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
 
@@ -468,5 +470,9 @@ impl PeersService {
         &mut self,
     ) -> impl Stream<Item = PeersMetricsEvent> {
         self.peer_metrics_service.subscribe()
+    }
+
+    pub fn check_peers_validity(&self) {
+        self.peer_metrics_service.check_peers_validity();
     }
 }

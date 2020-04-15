@@ -28,10 +28,10 @@ use medea_client_api_proto::PeerId;
 
 use crate::{api::control::RoomId, log::prelude::*, signalling::Room};
 
-/// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state events. [`FlowMetricSource::Peer`] and
-/// [`FlowMetricSource::PartnerPeer`] are always returned,
-/// [`FlowMetricSource::Coturn`] is optional (should be used only if media is
-/// forcibly relayed).
+/// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
+/// events. [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are
+/// always returned, [`FlowMetricSource::Coturn`] is optional (should be used
+/// only if media is forcibly relayed).
 fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
     let mut sources = HashSet::new();
     sources.insert(FlowMetricSource::Peer);
@@ -60,7 +60,8 @@ pub struct PeerStarted(pub PeerId);
 #[rtype(result = "()")]
 pub struct PeerStopped(pub PeerId);
 
-/// Message which indicates that [`Peer`] with provided [`PeerId`] was not started during configured timeout.
+/// Message which indicates that [`Peer`] with provided [`PeerId`] was not
+/// started during configured timeout.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerInitTimeout {
@@ -75,8 +76,8 @@ pub struct PeerInitTimeout {
 /// Consumes [`Peer`] traffic metrics for further processing.
 #[async_trait]
 pub trait PeerTrafficWatcher: Debug + Send + Sync {
-
-    /// Registers [`Room`] as [`Peer`] state messages listener, preparing [`PeerTrafficWatcher`] for registering peers from this room.
+    /// Registers [`Room`] as [`Peer`] state messages listener, preparing
+    /// [`PeerTrafficWatcher`] for registering peers from this room.
     async fn register_room(
         &self,
         room_id: RoomId,
@@ -86,14 +87,14 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     /// Unregisters [`Room`].
     fn unregister_room(&self, room_id: RoomId);
 
-    /// Registers [`Peer`], so that [`PeerTrafficWatcher`] will be able to process traffic flow events.
+    /// Registers [`Peer`], so that [`PeerTrafficWatcher`] will be able to
+    /// process traffic flow events.
     async fn register_peer(
         &self,
         room_id: RoomId,
         peer_id: PeerId,
         should_watch_turn: bool,
     ) -> Result<(), MailboxError>;
-
 
     /// Unregisters [`Peer`]s.
     fn unregister_peers(&self, room_id: RoomId, peers_ids: HashSet<PeerId>);
