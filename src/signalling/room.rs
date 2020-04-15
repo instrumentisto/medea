@@ -1491,7 +1491,7 @@ mod test {
     use super::*;
 
     use crate::{
-        api::control::pipeline::Pipeline, conf::Conf,
+        api::control::pipeline::Pipeline, conf::{Conf, self},
         signalling::peers::build_peers_traffic_watcher,
     };
 
@@ -1505,7 +1505,7 @@ mod test {
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(&room_spec, &ctx, build_peers_traffic_watcher()).unwrap()
+        Room::new(&room_spec, &ctx, build_peers_traffic_watcher(&conf::MediaTraffic::default())).unwrap()
     }
 
     #[actix_rt::test]

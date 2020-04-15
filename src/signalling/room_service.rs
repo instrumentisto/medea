@@ -676,7 +676,7 @@ mod room_service_specs {
             refs::{Fid, ToEndpoint},
             RootElement,
         },
-        conf::Conf,
+        conf::{Conf, self},
     };
 
     use super::*;
@@ -776,7 +776,7 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(&spec, &app_ctx(), build_peers_traffic_watcher())
+        let room = Room::new(&spec, &app_ctx(), build_peers_traffic_watcher(&conf::MediaTraffic::default()))
             .unwrap()
             .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
@@ -821,7 +821,7 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(&spec, &app_ctx(), build_peers_traffic_watcher())
+        let room = Room::new(&spec, &app_ctx(), build_peers_traffic_watcher(&conf::MediaTraffic::default()))
             .unwrap()
             .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
@@ -886,7 +886,7 @@ mod room_service_specs {
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
         let room =
-            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher())
+            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher(&conf::MediaTraffic::default()))
                 .unwrap()
                 .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
@@ -905,7 +905,7 @@ mod room_service_specs {
         ));
 
         let room =
-            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher())
+            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher(&conf::MediaTraffic::default()))
                 .unwrap()
                 .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
@@ -925,7 +925,7 @@ mod room_service_specs {
         ));
 
         let room =
-            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher())
+            Room::new(&room_spec(), &app_ctx(), build_peers_traffic_watcher(&conf::MediaTraffic::default()))
                 .unwrap()
                 .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
