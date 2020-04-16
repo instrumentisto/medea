@@ -41,7 +41,7 @@ pub use self::{
         PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
     },
     traffic_watcher::{
-        build_peers_traffic_watcher, FlowMetricSource, PeerInitTimeout,
+        build_peers_traffic_watcher, FatalPeerFailure, FlowMetricSource,
         PeerStarted, PeerStopped, PeerTrafficWatcher,
     },
 };
@@ -72,13 +72,14 @@ pub struct PeersService {
     /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
 
-    /// [`Addr`] of the [`MetricsCallbacksService`] to which subscription on
-    /// callbacks will be performed.
+    /// [`PeerTrafficWatcher`] which analyzes [`Peer`]s traffic metrics.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetricsService,
 
+    /// Duration after which media server will consider `Peer`'s media traffic
+    /// stats as invalid and will remove this `Peer`.
     peer_validity_timeout: Duration,
 }
 
@@ -104,7 +105,7 @@ impl PeersService {
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-        media_traffic_conf: &conf::MediaTraffic,
+        peer_media_traffic_conf: &conf::PeerMediaTraffic,
     ) -> Self {
         Self {
             room_id: room_id.clone(),
@@ -117,7 +118,8 @@ impl PeersService {
                 room_id,
                 peers_traffic_watcher,
             ),
-            peer_validity_timeout: media_traffic_conf.peer_validity_timeout,
+            peer_validity_timeout: peer_media_traffic_conf
+                .peer_validity_timeout,
         }
     }
 
@@ -160,7 +162,9 @@ impl PeersService {
     }
 
     /// Creates interconnected [`Peer`]s for provided endpoints and adds them to
-    /// peer repository.
+    /// [`PeerService`].
+    ///
+    /// Returns [`PeerId`]s of the created [`Peer`]s.
     fn create_peers(
         &mut self,
         src: &WebRtcPublishEndpoint,
@@ -403,7 +407,7 @@ impl PeersService {
         }
     }
 
-    /// Creates and sets [`IceUser`], registers peer in
+    /// Creates and sets [`IceUser`], registers [`Peer`] in
     /// [`PeerTrafficWatcher`].
     fn peer_post_construct(
         &self,
@@ -431,7 +435,7 @@ impl PeersService {
                 async move {
                     match res {
                         Ok(_) => {
-                            if endpoint.is_some_traffic_callbacks() {
+                            if endpoint.any_traffic_callback_is_some() {
                                 traffic_watcher
                                     .register_peer(
                                         room_id,
@@ -481,6 +485,9 @@ impl PeersService {
         self.peer_metrics_service.subscribe()
     }
 
+    /// Runs [`Peer`]s stats validation in the underlying [`PeerMetricsEvent`]s.
+    ///
+    /// This task should be ran every second.
     pub fn check_peers_validity(&self) {
         self.peer_metrics_service.check_peers_validity();
     }

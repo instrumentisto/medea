@@ -165,7 +165,7 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
-    /// Weak references to the [`Endpoint`]s for which this [`PeerConnection`]
+    /// Weak references to the [`Endpoint`]s for which this [`Peer`]
     /// is created.
     endpoints: Vec<WeakEndpoint>,
 }
@@ -249,19 +249,22 @@ impl<T> Peer<T> {
     }
 
     /// Returns [`PeerSpec`] of this [`PeerConnection`].
+    ///
+    /// This [`PeerSpec`] will be used in the [`PeerTrafficWatcher`] for
+    /// checking that [`Peer`]'s media traffic is flows same as expected in
+    /// [`PeerSpec`].
     pub fn get_spec(&self) -> PeerSpec {
-        let senders = self
-            .context
-            .senders
-            .values()
-            .map(|sender| TrackMediaType::from(&sender.media_type))
-            .collect();
-        let receivers = self
-            .context
-            .receivers
-            .values()
-            .map(|recv| TrackMediaType::from(&recv.media_type))
-            .collect();
+        let mut senders = HashMap::new();
+        let mut receivers = HashMap::new();
+
+        for sender in self.context.senders.values() {
+            let media_type = TrackMediaType::from(&sender.media_type);
+            *senders.entry(media_type).or_insert(0) += 1;
+        }
+        for receiver in self.context.receivers.values() {
+            let media_type = TrackMediaType::from(&receiver.media_type);
+            *receivers.entry(media_type).or_insert(0) += 1;
+        }
 
         PeerSpec { senders, receivers }
     }

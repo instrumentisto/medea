@@ -23,7 +23,7 @@ use self::webrtc::{
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-#[enum_delegate(pub fn is_some_traffic_callbacks(&self) -> bool)]
+#[enum_delegate(pub fn any_traffic_callback_is_some(&self) -> bool)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
@@ -43,7 +43,7 @@ impl Endpoint {
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.change_peer_status(peer_id, false);
+                publish.set_peer_status(peer_id, false);
                 if publish.publishing_peers_count() == 0 {
                     if let Some(on_stop) = publish.get_on_stop() {
                         let fid = publish

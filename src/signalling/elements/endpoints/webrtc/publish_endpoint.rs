@@ -45,8 +45,11 @@ struct WebRtcPublishEndpointInner {
     ///
     /// `true` value indicated that [`Peer`] is publishes some media traffic.
     ///
+    /// Also this field acts as store of all [`PeerId`]s related to this
+    /// [`WebRtcPublishEndpoint`].
+    ///
     /// [`Peer`]: crate::media::peer:Peer
-    peers_statuses: HashMap<PeerId, bool>,
+    peers_publishing_statuses: HashMap<PeerId, bool>,
 
     /// URL to which `OnStart` Control API callback will be sent.
     on_start: Option<CallbackUrl>,
@@ -86,16 +89,12 @@ impl WebRtcPublishEndpointInner {
     }
 
     fn peer_ids(&self) -> HashSet<PeerId> {
-        self.peers_statuses.keys().cloned().collect()
-    }
-
-    fn reset(&mut self) {
-        self.peers_statuses.clear();
+        self.peers_publishing_statuses.keys().cloned().collect()
     }
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn remove_peer_id(&mut self, peer_id: &PeerId) {
-        self.peers_statuses.remove(peer_id);
+        self.peers_publishing_statuses.remove(peer_id);
     }
 
     fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
@@ -128,7 +127,7 @@ impl WebRtcPublishEndpoint {
             is_force_relayed,
             sinks: Vec::new(),
             owner,
-            peers_statuses: HashMap::new(),
+            peers_publishing_statuses: HashMap::new(),
             on_start,
             on_stop,
         })))
@@ -158,27 +157,17 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().owner()
     }
 
-    /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
+    /// Adds [`PeerId`] related to this [`WebRtcPublishEndpoint`].
     pub fn add_peer_id(&self, peer_id: PeerId) {
-        self.0.borrow_mut().peers_statuses.insert(peer_id, false);
+        self.0
+            .borrow_mut()
+            .peers_publishing_statuses
+            .insert(peer_id, false);
     }
 
-    /// Returns all [`PeerId`]s of this [`WebRtcPublishEndpoint`].
+    /// Returns all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     pub fn peer_ids(&self) -> HashSet<PeerId> {
         self.0.borrow().peer_ids()
-    }
-
-    /// Resets state of this [`WebRtcPublishEndpoint`].
-    ///
-    /// _Atm this only resets `peer_ids`._
-    pub fn reset(&self) {
-        self.0.borrow_mut().reset()
-    }
-
-    /// Removes [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn remove_peer_id(&self, peer_id: &PeerId) {
-        self.0.borrow_mut().remove_peer_id(peer_id)
     }
 
     /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
@@ -211,10 +200,17 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().is_force_relayed
     }
 
-    /// Changes publishing status of the provided [`PeerId`].
-    pub fn change_peer_status(&self, peer_id: PeerId, is_publishing: bool) {
-        if let Some(peer_status) =
-            self.0.borrow_mut().peers_statuses.get_mut(&peer_id)
+    /// Sets publishing status of the provided [`PeerId`] related to this
+    /// [`WebRtcPublishEndpoint`].
+    ///
+    /// If provided [`PeerId`] is not related to this [`WebRtcPublishEndpoint`]
+    /// then nothing will be done.
+    pub fn set_peer_status(&self, peer_id: PeerId, is_publishing: bool) {
+        if let Some(peer_status) = self
+            .0
+            .borrow_mut()
+            .peers_publishing_statuses
+            .get_mut(&peer_id)
         {
             *peer_status = is_publishing;
         }
@@ -225,16 +221,16 @@ impl WebRtcPublishEndpoint {
     pub fn is_endpoint_publishing(&self) -> bool {
         self.0
             .borrow()
-            .peers_statuses
+            .peers_publishing_statuses
             .values()
             .any(|status| *status)
     }
 
-    /// Returns count of [`PeerConnection`] which are publishes.
+    /// Returns count of [`Peer`]s which are publishes.
     pub fn publishing_peers_count(&self) -> usize {
         self.0
             .borrow()
-            .peers_statuses
+            .peers_publishing_statuses
             .values()
             .filter(|s| **s)
             .count()
@@ -251,7 +247,7 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.
-    pub fn is_some_traffic_callbacks(&self) -> bool {
+    pub fn any_traffic_callback_is_some(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
     }

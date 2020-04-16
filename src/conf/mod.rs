@@ -2,7 +2,7 @@
 
 pub mod control;
 pub mod log;
-pub mod media_traffic;
+pub mod peer_media_traffic;
 pub mod rpc;
 pub mod server;
 pub mod shutdown;
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 pub use self::{
     control::ControlApi,
     log::Log,
-    media_traffic::MediaTraffic,
+    peer_media_traffic::PeerMediaTraffic,
     rpc::Rpc,
     server::Server,
     shutdown::Shutdown,
@@ -56,7 +56,8 @@ pub struct Conf {
     /// [Control API]: https://tinyurl.com/yxsqplq7
     pub control: ControlApi,
 
-    pub media_traffic: MediaTraffic,
+    /// [`Peer`] media traffic watcher configuration.
+    pub peer_media_traffic: PeerMediaTraffic,
 }
 
 impl Conf {

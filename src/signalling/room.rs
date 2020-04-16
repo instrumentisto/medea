@@ -92,7 +92,7 @@ use super::{
     },
     participants::{ParticipantService, ParticipantServiceErr},
     peers::{
-        PeerInitTimeout, PeerStarted, PeerStopped, PeerTrafficWatcher,
+        FatalPeerFailure, PeerStarted, PeerStopped, PeerTrafficWatcher,
         PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
     },
 };
@@ -150,6 +150,8 @@ pub enum RoomError {
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 
+    /// [`MailboxError`] return on sending message to the
+    /// [`PeerTrafficWatcher`] service.
     #[display(
         fmt = "Mailbox error while sending message to the \
                'PeerTrafficWatcher' service. {:?}",
@@ -228,7 +230,7 @@ impl Room {
                 room_spec.id().clone(),
                 context.turn_service.clone(),
                 peers_traffic_watcher,
-                &context.config.media_traffic,
+                &context.config.peer_media_traffic,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
@@ -894,7 +896,9 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// [`PeerMetrics::RtcStats`] will be transferred [`PeersMetrics`].
+    /// Provides received [`PeerMetrics::RtcStats`] into [`PeerTrafficWatcher`].
+    ///
+    /// On other [`PeerMetrics`] does nothing atm.
     #[allow(clippy::single_match)]
     fn on_add_peer_connection_metrics(
         &mut self,
@@ -937,10 +941,16 @@ impl CommandHandler for Room {
     }
 }
 
-// TODO: add docs
 impl Handler<PeerStarted> for Room {
     type Result = ();
 
+    /// Updates [`Peer`]s publishing status of the [`WebRtcPublishEndpoint`], if
+    /// [`WebRtcPublishEndpoint`] have only one publishing [`Peer`] and
+    /// `on_start` callback is set then `on_start` will be sent to the
+    /// Control API.
+    ///
+    /// If [`WebRtcPlayEndpoint`]'s `on_start` callback is set then `on_start`
+    /// will be sent to the Control API.
     fn handle(
         &mut self,
         msg: PeerStarted,
@@ -950,7 +960,7 @@ impl Handler<PeerStarted> for Room {
         for endpoint in self.peers.get_endpoints_by_peer_id(peer_id) {
             match endpoint {
                 Endpoint::WebRtcPublishEndpoint(publish) => {
-                    publish.change_peer_status(peer_id, true);
+                    publish.set_peer_status(peer_id, true);
                     if publish.publishing_peers_count() == 1 {
                         if let Some(on_start) = publish.get_on_start() {
                             let fid = publish
@@ -978,10 +988,16 @@ impl Handler<PeerStarted> for Room {
     }
 }
 
-// TODO: add docs
 impl Handler<PeerStopped> for Room {
     type Result = ();
 
+    /// Updates [`Peer`]s publishing state of all endpoints related to stopped
+    /// [`Peer`].
+    ///
+    /// `on_stop` callback will be sent for all endpoints which considered as
+    /// stopped and haves `on_stop` callback set.
+    ///
+    /// Also, this message will remove this stopped [`Peer`].
     fn handle(
         &mut self,
         msg: PeerStopped,
@@ -1030,6 +1046,10 @@ impl Handler<PeerStopped> for Room {
 impl Actor for Room {
     type Context = Context<Self>;
 
+    /// Starts watchdog for the [`PeerMetricsService`].
+    ///
+    /// Adds [`Stream`] of the [`PeerMetricsService`]'s [`PeersMetricsEvents`]
+    /// to this [`Actor`].
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
 
@@ -1058,24 +1078,24 @@ impl PeersMetricsEventHandler for Room {
     ) -> Self::Output {
         Box::new(async move { peer_id }.into_actor(self).map(
             move |peer_id, _, ctx| {
-                ctx.notify(PeerInitTimeout { peer_id, at });
+                ctx.notify(FatalPeerFailure { peer_id, at });
             },
         ))
     }
 }
 
-// TODO: add docs
-impl Handler<PeerInitTimeout> for Room {
+impl Handler<FatalPeerFailure> for Room {
     type Result = ();
 
+    /// Removes failured [`Peer`], and sends `on_stop` callbacks for all related
+    /// to this [`Peer`] endpoints which considered as stopped.
     fn handle(
         &mut self,
-        msg: PeerInitTimeout,
+        msg: FatalPeerFailure,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         error!(
-            "Real state of Peer [id = {}] from Room [id = {}] has fatal \
-             contradiction with spec!",
+            "Real state of Peer [id = {}] from Room [id = {}] has fatal error!",
             msg.peer_id, self.id
         );
 
@@ -1509,7 +1529,7 @@ mod test {
         Room::new(
             &room_spec,
             &ctx,
-            build_peers_traffic_watcher(&conf::MediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
         )
         .unwrap()
     }

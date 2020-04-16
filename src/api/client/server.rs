@@ -181,7 +181,8 @@ mod test {
             control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
 
-        let traffic_watcher = build_peers_traffic_watcher(&conf.media_traffic);
+        let traffic_watcher =
+            build_peers_traffic_watcher(&conf.peer_media_traffic);
         let app = AppContext::new(conf, new_turn_auth_service_mock());
 
         let room_id = room_spec.id.clone();

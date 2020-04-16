@@ -47,9 +47,9 @@ pub enum RoomServiceError {
     #[display(fmt = "Room mailbox error: {:?}", _0)]
     RoomMailboxErr(MailboxError),
 
-    /// Wrapper for [`Room`]'s [`MailboxError`].
-    #[display(fmt = "Room mailbox error: {:?}", _0)]
-    TrafficWatcherMailBoxErr(MailboxError),
+    /// Wrapper for the [`PeerTrafficWatcher`] [`MailboxError`].
+    #[display(fmt = "TrafficWatcher mailbox error: {:?}", _0)]
+    TrafficWatcherMailbox(MailboxError),
 
     /// Attempt to create [`Room`] with [`RoomId`] which already exists in
     /// [`RoomRepository`].
@@ -127,7 +127,7 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
-    /// [`MetricsCallbacksService`] for all [`Room`]s from this
+    /// [`PeerTrafficWatcher`] for all [`Room`]s from this
     /// [`RoomService`].
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
@@ -149,7 +149,7 @@ impl RoomService {
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let peers_traffic_watcher =
-            build_peers_traffic_watcher(&app.config.media_traffic);
+            build_peers_traffic_watcher(&app.config.peer_media_traffic);
         Ok(Self {
             _coturn_metrics: CoturnMetricsService::new(
                 &app.config.turn,
@@ -195,6 +195,10 @@ impl RoomService {
         }
     }
 
+    /// Creates [`Room`] based on provided [`RoomSpec`].
+    ///
+    /// Subscribes this [`Room`] to the [`GracefulShutdown`], and registers as
+    /// [`Peer`] stats listener to the [`PeersTrafficWatcher`].
     fn create_room(
         &self,
         spec: RoomSpec,
@@ -227,7 +231,7 @@ impl RoomService {
             peers_traffic_watcher
                 .register_room(spec.id().clone(), room.downgrade())
                 .await
-                .map_err(RoomServiceError::TrafficWatcherMailBoxErr)?;
+                .map_err(RoomServiceError::TrafficWatcherMailbox)?;
             shutdown::subscribe(
                 &graceful_shutdown,
                 room.clone().recipient(),
@@ -779,7 +783,7 @@ mod room_service_specs {
         let room = Room::new(
             &spec,
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::MediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
         )
         .unwrap()
         .start();
@@ -828,7 +832,7 @@ mod room_service_specs {
         let room = Room::new(
             &spec,
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::MediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
         )
         .unwrap()
         .start();
@@ -896,7 +900,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::MediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
         )
         .unwrap()
         .start();
@@ -918,7 +922,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::MediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
         )
         .unwrap()
         .start();
@@ -941,7 +945,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::MediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
         )
         .unwrap()
         .start();

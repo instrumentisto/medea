@@ -26,6 +26,9 @@ mod test_ports {
         ($($name:ident => $value:expr),* $(,)*) => {
             /// This enum is needed for compile-time checking that
             /// all ports are unique.
+            ///
+            /// We don't use this enum directly because port type is [`u64`],
+            /// but C-like enums can store only [`isize`] numbers.
             #[allow(dead_code, non_camel_case_types)]
             enum _CheckTestPorts {
                 $($name = $value,)*
