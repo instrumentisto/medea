@@ -375,7 +375,7 @@ async fn on_stop_by_timeout() {
 
     interconnected_members.trigger_on_start(100, 100);
 
-    delay_for(Duration::from_secs(12)).await;
+    delay_for(Duration::from_secs(4)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
@@ -449,7 +449,7 @@ async fn on_stop_on_contradiction() {
         },
     ));
 
-    delay_for(Duration::from_secs(7)).await;
+    delay_for(Duration::from_secs(3)).await;
     interconnected_members.member_1_client.do_send(SendCommand(
         Command::AddPeerConnectionMetrics {
             peer_id: interconnected_members.member_1_peer_id,
@@ -462,7 +462,7 @@ async fn on_stop_on_contradiction() {
         },
     ));
 
-    delay_for(Duration::from_secs(10)).await;
+    delay_for(Duration::from_secs(4)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
@@ -517,10 +517,10 @@ async fn on_stop_didnt_fires_while_all_normal() {
     .await;
     interconnected_members.trigger_on_start(100, 100);
 
-    delay_for(Duration::from_secs(7)).await;
+    delay_for(Duration::from_secs(2)).await;
     interconnected_members.trigger_on_start(3000, 3000);
 
-    delay_for(Duration::from_secs(10)).await;
+    delay_for(Duration::from_secs(2)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
