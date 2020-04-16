@@ -361,7 +361,8 @@ impl PeersMetricsService {
     /// Also checks that all [`PeerStat`]'s senders/receivers is flowing. If all
     /// senders/receivers is stopped then [`TrafficStopped`] will be sent to
     /// the [`PeersTrafficWatcher`].
-    pub fn check_peers_validity(&self) {
+    pub fn check_peers_validity(&mut self) {
+        let mut stopped_peers = Vec::new();
         for peer in self
             .peers
             .values()
@@ -375,9 +376,14 @@ impl PeersMetricsService {
                     peer_ref.peer_id,
                     peer_ref.get_stop_time(),
                 );
+                stopped_peers.push(peer_ref.peer_id);
             } else if !peer_ref.is_conforms_spec() {
                 self.fatal_peer_error(peer_ref.peer_id, Utc::now());
             }
+        }
+
+        for stopped_peer_id in stopped_peers {
+            self.peers.remove(&stopped_peer_id);
         }
     }
 

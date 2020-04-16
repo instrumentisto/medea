@@ -488,6 +488,11 @@ impl Room {
     }
 
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
+    ///
+    /// Sends `on_stop` callbacks for endpoints which was affected by this
+    /// action.
+    ///
+    /// `on_stop` wouldn't be sent for endpoints which deleted [`Member`] owns.
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
             "Deleting Member [id = {}] in Room [id = {}].",
@@ -508,7 +513,28 @@ impl Room {
 
             // Send PeersRemoved to `Member`s which have related to this
             // `Member` `Peer`s.
-            self.remove_peers(member_id, &peers, ctx);
+            let peers = self.remove_peers(member_id, &peers, ctx);
+            #[allow(clippy::filter_map)]
+            let on_stop_callbacks: HashMap<_, _> = peers
+                .into_iter()
+                .filter(|(key, _)| key != member_id)
+                .flat_map(|(_, peers)| peers.into_iter())
+                .flat_map(|peer| {
+                    peer.endpoints()
+                        .into_iter()
+                        .filter_map(|weak_end| weak_end.upgrade())
+                        .filter_map(move |endpoint: Endpoint| {
+                            endpoint.on_stop(peer.id())
+                        })
+                })
+                .collect();
+
+            for (fid, url) in on_stop_callbacks {
+                self.callbacks.send_callback(
+                    url,
+                    CallbackRequest::at_now(fid, OnStopEvent {}),
+                );
+            }
 
             self.members.delete_member(member_id, ctx);
 
@@ -520,6 +546,11 @@ impl Room {
     }
 
     /// Deletes endpoint from this [`Room`] by ID.
+    ///
+    /// Sends `on_stop` callbacks for endpoints which was affected by this
+    /// action.
+    ///
+    /// `on_stop` wouldn't be sent for endpoint which will be deleted by this function.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -531,6 +562,7 @@ impl Room {
              {}].",
             endpoint_id, member_id, self.id
         );
+        let mut removed_peers = None;
         if let Some(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
             if let Some(endpoint) = member.take_sink(&play_id) {
@@ -540,14 +572,42 @@ impl Room {
 
                     let mut peer_ids_to_remove = HashSet::new();
                     peer_ids_to_remove.insert(peer_id);
-                    self.remove_peers(member_id, &peer_ids_to_remove, ctx);
+                    removed_peers = Some(self.remove_peers(
+                        member_id,
+                        &peer_ids_to_remove,
+                        ctx,
+                    ));
                 }
             } else {
                 let publish_id = String::from(play_id).into();
                 if let Some(endpoint) = member.take_src(&publish_id) {
                     let peer_ids = endpoint.peer_ids();
-                    self.remove_peers(member_id, &peer_ids, ctx);
+                    removed_peers =
+                        Some(self.remove_peers(member_id, &peer_ids, ctx));
                 }
+            }
+        }
+
+        if let Some(removed_peers) = removed_peers {
+            let on_stop_callbacks: HashMap<_, _> = removed_peers
+                .values()
+                .flat_map(|peers| {
+                    peers.iter().flat_map(|peer| {
+                        peer.endpoints()
+                            .into_iter()
+                            .filter_map(|weak_endpoint| weak_endpoint.upgrade())
+                            .filter_map(move |endpoint| {
+                                endpoint.on_stop(peer.id())
+                            })
+                    })
+                })
+                .collect();
+
+            for (fid, url) in on_stop_callbacks {
+                self.callbacks.send_callback(
+                    url,
+                    CallbackRequest::at_now(fid, OnStopEvent {}),
+                );
             }
         }
     }
@@ -1403,9 +1463,6 @@ impl Handler<Close> for Room {
     type Result = ();
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) {
-        for id in self.members.members().keys() {
-            self.delete_member(id, ctx);
-        }
         self.members
             .drop_connections(ctx)
             .into_actor(self)

@@ -488,7 +488,7 @@ impl PeersService {
     /// Runs [`Peer`]s stats validation in the underlying [`PeerMetricsEvent`]s.
     ///
     /// This task should be ran every second.
-    pub fn check_peers_validity(&self) {
+    pub fn check_peers_validity(&mut self) {
         self.peer_metrics_service.check_peers_validity();
     }
 }
