@@ -361,6 +361,8 @@ impl PeersService {
             // TODO: when dynamic patching of [`Room`] will be done then we need
             //       rewrite this code to updating [`Peer`]s in not
             //       [`Peer<New>`] state.
+            //       Also, don't forget to update `PeerSpec` in the
+            //       [`PeerMetricsService`].
             let mut src_peer: Peer<New> =
                 self.take_inner_peer(src_peer_id).unwrap();
             let mut sink_peer: Peer<New> =
@@ -371,8 +373,6 @@ impl PeersService {
             sink_peer.add_endpoint(&sink.into());
             src_peer.add_endpoint(&src.into());
 
-            // TODO: update peer spec here and move this line of code into
-            //       `self.create_peers`.
             self.peer_metrics_service.add_peers(
                 &src_peer,
                 &sink_peer,

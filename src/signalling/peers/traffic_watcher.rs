@@ -98,7 +98,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     fn unregister_room(&self, room_id: RoomId);
 
     /// Registers [`Peer`], so that [`PeerTrafficWatcher`] will be able to
-    /// process traffic flow events.
+    /// process traffic flow events of this [`Peer`].
     async fn register_peer(
         &self,
         room_id: RoomId,
@@ -106,7 +106,8 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
         should_watch_turn: bool,
     ) -> Result<(), MailboxError>;
 
-    /// Unregisters [`Peer`]s.
+    /// Unregisters [`Peer`]s, so that [`PeerTrafficWatcher`] will not be able
+    /// to process traffic flow events of this [`Peer`] anymore.
     fn unregister_peers(&self, room_id: RoomId, peers_ids: HashSet<PeerId>);
 
     /// Notifies [`PeerTrafficWatcher`] that some [`Peer`] traffic flowing.
@@ -199,7 +200,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
 /// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Default)]
 struct PeersTrafficWatcherImpl {
-    /// All `Room` which exists on the Medea server.
+    /// All `Room`s which exists on the Medea server.
     stats: HashMap<RoomId, RoomStats>,
 
     /// Duration after which media server will consider that `Peer` stopped.
