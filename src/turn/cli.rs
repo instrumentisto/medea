@@ -69,8 +69,7 @@ impl CoturnTelnetClient {
         Ok(())
     }
 
-    /// Returns sessions IDs of the Coturn user with provided
-    /// [`CoturnUsername`].
+    /// Lists sessions by [`CoturnUsername`].
     pub async fn get_sessions(
         &self,
         username: CoturnUsername,

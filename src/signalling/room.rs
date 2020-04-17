@@ -394,7 +394,7 @@ impl Room {
             .for_each(|(member, on_leave)| {
                 self.callbacks.send_callback(
                     on_leave,
-                    CallbackRequest::at_now(
+                    CallbackRequest::new_at_now(
                         member.get_fid(),
                         OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
                     ),
@@ -532,7 +532,7 @@ impl Room {
             for (fid, url) in on_stop_callbacks {
                 self.callbacks.send_callback(
                     url,
-                    CallbackRequest::at_now(fid, OnStopEvent {}),
+                    CallbackRequest::new_at_now(fid, OnStopEvent {}),
                 );
             }
 
@@ -550,7 +550,8 @@ impl Room {
     /// Sends `on_stop` callbacks for endpoints which was affected by this
     /// action.
     ///
-    /// `on_stop` wouldn't be sent for endpoint which will be deleted by this function.
+    /// `on_stop` wouldn't be sent for endpoint which will be deleted by this
+    /// function.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -606,7 +607,7 @@ impl Room {
             for (fid, url) in on_stop_callbacks {
                 self.callbacks.send_callback(
                     url,
-                    CallbackRequest::at_now(fid, OnStopEvent {}),
+                    CallbackRequest::new_at_now(fid, OnStopEvent {}),
                 );
             }
         }
@@ -1028,7 +1029,10 @@ impl Handler<PeerStarted> for Room {
                                 .get_fid_to_endpoint(publish.id().into());
                             self.callbacks.send_callback(
                                 on_start,
-                                CallbackRequest::at_now(fid, OnStartEvent {}),
+                                CallbackRequest::new_at_now(
+                                    fid,
+                                    OnStartEvent {},
+                                ),
                             );
                         }
                     }
@@ -1039,7 +1043,7 @@ impl Handler<PeerStarted> for Room {
                             play.owner().get_fid_to_endpoint(play.id().into());
                         self.callbacks.send_callback(
                             on_start,
-                            CallbackRequest::at_now(fid, OnStartEvent {}),
+                            CallbackRequest::new_at_now(fid, OnStartEvent {}),
                         )
                     }
                 }
@@ -1094,7 +1098,7 @@ impl Handler<PeerStopped> for Room {
             for (fid, on_stop) in send_callbacks {
                 self.callbacks.send_callback(
                     on_stop,
-                    CallbackRequest::at_now(fid, OnStopEvent {}),
+                    CallbackRequest::new_at_now(fid, OnStopEvent {}),
                 );
             }
         }
@@ -1182,11 +1186,7 @@ impl Handler<FatalPeerFailure> for Room {
             .for_each(move |(fid, on_stop)| {
                 self.callbacks.send_callback(
                     on_stop,
-                    CallbackRequest {
-                        fid: fid.into(),
-                        event: OnStopEvent {}.into(),
-                        at: msg.at,
-                    },
+                    CallbackRequest::new(fid, OnStopEvent {}, msg.at),
                 )
             });
     }
@@ -1362,7 +1362,7 @@ impl Handler<RpcConnectionEstablished> for Room {
                     if let Some(callback_url) = member.get_on_join() {
                         room.callbacks.send_callback(
                             callback_url,
-                            CallbackRequest::at_now(
+                            CallbackRequest::new_at_now(
                                 member.get_fid(),
                                 OnJoinEvent,
                             ),
@@ -1428,7 +1428,7 @@ impl Handler<RpcConnectionClosed> for Room {
                     };
                     self.callbacks.send_callback(
                         on_leave_url,
-                        CallbackRequest::at_now(
+                        CallbackRequest::new_at_now(
                             member.get_fid(),
                             OnLeaveEvent::new(reason),
                         ),

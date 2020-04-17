@@ -65,8 +65,7 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Deletes batch of [`IceUser`]s.
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr>;
 
-    /// Returns [`Session`]s of the Coturn user created for a provided
-    /// [`RoomId`] and [`PeerId`].
+    /// Lists Coturn [`Session`]s associated with provided [`RoomId`] and [`PeerId`].
     async fn get_sessions(
         &self,
         room_id: RoomId,
@@ -159,8 +158,7 @@ impl TurnAuthService for Service {
         Ok(())
     }
 
-    /// Returns [`Session`]s of the Coturn user created for a provided
-    /// [`RoomId`] and [`PeerId`].
+    /// Lists Coturn [`Session`]s associated with provided [`RoomId`] and [`PeerId`].
     async fn get_sessions(
         &self,
         room_id: RoomId,

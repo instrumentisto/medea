@@ -113,7 +113,7 @@ mod tests {
 
     /// Returns [`CallbackRequest`] to a `foo` element.
     fn callback_request() -> CallbackRequest {
-        CallbackRequest::at_now(
+        CallbackRequest::new_at_now(
             StatefulFid::try_from("foo".to_string()).unwrap(),
             CallbackEvent::Join(OnJoinEvent),
         )

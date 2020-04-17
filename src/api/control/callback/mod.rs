@@ -68,7 +68,7 @@ impl Into<proto::OnJoin> for OnJoinEvent {
     }
 }
 
-/// `on_start` callback for the Control API.
+/// `on_start` Control API callback.
 #[derive(Debug)]
 pub struct OnStartEvent {}
 
@@ -78,7 +78,7 @@ impl Into<proto::OnStart> for OnStartEvent {
     }
 }
 
-/// `on_stop` callback for the Control API.
+/// `on_stop` Control API callback.
 #[derive(Debug)]
 pub struct OnStopEvent {}
 
@@ -88,7 +88,7 @@ impl Into<proto::OnStop> for OnStopEvent {
     }
 }
 
-/// All callbacks which can happen.
+/// All possible Control API callbacks.
 #[derive(Debug, From)]
 pub enum CallbackEvent {
     Join(OnJoinEvent),
@@ -126,19 +126,33 @@ impl Into<proto::request::Event> for CallbackEvent {
 #[rtype(result = "Result<(), CallbackClientError>")]
 pub struct CallbackRequest {
     /// FID (Full ID) of element with which event was occurred.
-    pub fid: StatefulFid,
+    fid: StatefulFid,
 
     /// [`CallbackEvent`] which occurred.
-    pub event: CallbackEvent,
+    event: CallbackEvent,
 
     /// Time at which event occurred.
-    pub at: DateTime<Utc>,
+    at: DateTime<Utc>,
 }
 
 impl CallbackRequest {
-    /// Returns [`CallbackRequest`] with provided fields and current time as
-    /// `at`.
-    pub fn at_now<F, E>(fid: F, event: E) -> Self
+    /// Returns new [`CallbackRequest`] with provided fields.
+    pub fn new<F, E, D>(fid: F, event: E, datetime: D) -> Self
+    where
+        E: Into<CallbackEvent>,
+        F: Into<StatefulFid>,
+        D: Into<DateTime<Utc>>,
+    {
+        Self {
+            fid: fid.into(),
+            event: event.into(),
+            at: datetime.into(),
+        }
+    }
+
+    /// Returns new [`CallbackRequest`] with provided fields and `at` field set
+    /// to current date time.
+    pub fn new_at_now<F, E>(fid: F, event: E) -> Self
     where
         E: Into<CallbackEvent>,
         F: Into<StatefulFid>,
