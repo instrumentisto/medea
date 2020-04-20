@@ -64,6 +64,7 @@ impl Actor for GrpcCallbackServer {
 
 /// Newtype for [`proto::Request`] callbacks which simplifies interacting with
 /// them.
+#[derive(Debug)]
 pub struct Callbacks(pub Vec<proto::Request>);
 
 /// Generates functions which are filters [`proto::Request`] by

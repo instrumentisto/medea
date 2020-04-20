@@ -312,11 +312,9 @@ impl PeersService {
                     .or_insert_with(Vec::new)
                     .push(peer);
             }
-            self.peer_metrics_service.peer_removed(*peer_id);
         }
 
-        self.peers_traffic_watcher.unregister_peers(
-            self.room_id.clone(),
+        self.peer_metrics_service.unregister_peers(
             removed_peers
                 .values()
                 .flat_map(|peer| peer.iter().map(PeerStateMachine::id))

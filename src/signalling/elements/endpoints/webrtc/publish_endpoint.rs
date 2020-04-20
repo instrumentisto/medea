@@ -21,6 +21,7 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
+use crate::api::control::refs::{Fid, ToEndpoint};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -250,6 +251,21 @@ impl WebRtcPublishEndpoint {
     pub fn any_traffic_callback_is_some(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
+    }
+
+    pub fn on_stop(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+        self.set_peer_status(peer_id, false);
+        if self.publishing_peers_count() == 0 {
+            if let Some(on_stop) = self.get_on_stop() {
+                let fid = self.owner().get_fid_to_endpoint(self.id().into());
+                return Some((fid, on_stop));
+            }
+        }
+
+        None
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer

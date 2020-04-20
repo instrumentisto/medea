@@ -43,26 +43,10 @@ impl Endpoint {
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.set_peer_status(peer_id, false);
-                if publish.publishing_peers_count() == 0 {
-                    if let Some(on_stop) = publish.get_on_stop() {
-                        let fid = publish
-                            .owner()
-                            .get_fid_to_endpoint(publish.id().into());
-                        return Some((fid, on_stop));
-                    }
-                }
+                publish.on_stop(peer_id)
             }
-            Endpoint::WebRtcPlayEndpoint(play) => {
-                if let Some(on_stop) = play.get_on_stop() {
-                    let fid =
-                        play.owner().get_fid_to_endpoint(play.id().into());
-                    return Some((fid, on_stop));
-                }
-            }
+            Endpoint::WebRtcPlayEndpoint(play) => play.on_stop(),
         }
-
-        None
     }
 
     /// Returns [`Weak`] reference to this [`Endpoint`].

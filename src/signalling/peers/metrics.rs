@@ -29,6 +29,7 @@ use crate::{
 };
 
 use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
+use std::collections::HashSet;
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
@@ -474,17 +475,12 @@ impl PeersMetricsService {
     }
 
     /// [`Room`] notifies [`PeersMetrics`] that some [`Peer`] is removed.
-    ///
-    /// This will be considered as [`TrafficStopped`] for the
-    /// [`PeersTrafficWatcher`].
-    pub fn peer_removed(&mut self, peer_id: PeerId) {
-        if self.peers.remove(&peer_id).is_some() {
-            self.peers_traffic_watcher.traffic_stopped(
-                self.room_id.clone(),
-                peer_id,
-                Instant::now(),
-            );
+    pub fn unregister_peers(&mut self, peers_ids: HashSet<PeerId>) {
+        for peer_id in &peers_ids {
+            self.peers.remove(peer_id);
         }
+        self.peers_traffic_watcher
+            .unregister_peers(self.room_id.clone(), peers_ids);
     }
 }
 

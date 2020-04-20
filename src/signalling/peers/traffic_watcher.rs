@@ -338,7 +338,7 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
 
     /// Updates [`PeerStat::last_update`] time.
     ///
-    /// If [`PeerStat`] in [`PeerState::NotStarted`] state then this stat will
+    /// If [`PeerStat`] in [`PeerState::Stopped`] state then this stat will
     /// be flowed into [`PeerState::Starting`] state in which [`Peer`] init
     /// check should be performed. Also [`PeersTrafficWatcherImpl::
     /// check_on_start`] function will be called after
@@ -383,6 +383,17 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                             room_addr.do_send(PeerStarted(peer.peer_id));
                         }
                     }
+                    PeerState::Stopped(received_flow_sources) => {
+                        received_flow_sources.insert(msg.source);
+                        if *received_flow_sources == peer.flow_metrics_sources {
+                            peer.state = PeerState::Started(
+                                received_flow_sources
+                                    .iter()
+                                    .map(|src| (*src, Instant::now()))
+                                    .collect(),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -424,13 +435,16 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            if let Some(peer) = room.peers.remove(&msg.peer_id) {
-                if let Some(room_addr) = room.room.upgrade() {
-                    room_addr.do_send(PeerStopped(peer.peer_id));
+            if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
+                if let PeerState::Stopped(_) = &peer.state {
+                } else {
+                    peer.state = PeerState::Stopped(HashSet::new());
+                    if let Some(room_addr) = room.room.upgrade() {
+                        room_addr.do_send(PeerStopped(peer.peer_id));
+                    }
                 }
             }
         }
-        self.unsubscribe_from_peer(&msg.room_id, msg.peer_id);
     }
 }
 
@@ -479,6 +493,8 @@ pub enum PeerState {
 
     /// [`Peer`] currently is not started, and waits for the first stats.
     NotStarted,
+
+    Stopped(HashSet<FlowMetricSource>),
 }
 
 /// Current stats of [`Peer`].

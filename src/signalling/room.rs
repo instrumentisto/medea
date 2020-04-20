@@ -1089,12 +1089,6 @@ impl Handler<PeerStopped> for Room {
                 )
                 .collect();
 
-            let member_id = peer.member_id();
-
-            let mut peers_ids = HashSet::new();
-            peers_ids.insert(peer_id);
-            self.remove_peers(&member_id, &peers_ids, ctx);
-
             for (fid, on_stop) in send_callbacks {
                 self.callbacks.send_callback(
                     on_stop,
@@ -1434,6 +1428,36 @@ impl Handler<RpcConnectionClosed> for Room {
                         ),
                     );
                 }
+
+                let peers = self
+                    .peers
+                    .get_peers_by_member_id(&msg.member_id)
+                    .map(|peer| peer.id())
+                    .collect();
+
+                // Send PeersRemoved to `Member`s which have related to this
+                // `Member` `Peer`s.
+                let peers = self.remove_peers(&msg.member_id, &peers, ctx);
+                #[allow(clippy::filter_map)]
+                let on_stop_callbacks: HashMap<_, _> = peers
+                    .into_iter()
+                    .flat_map(|(_, peers)| peers.into_iter())
+                    .flat_map(|peer| {
+                        peer.endpoints()
+                            .into_iter()
+                            .filter_map(|weak_end| weak_end.upgrade())
+                            .filter_map(move |endpoint: Endpoint| {
+                                endpoint.on_stop(peer.id())
+                            })
+                    })
+                    .collect();
+
+                for (fid, url) in on_stop_callbacks {
+                    self.callbacks.send_callback(
+                        url,
+                        CallbackRequest::new_at_now(fid, OnStopEvent {}),
+                    );
+                }
             } else {
                 error!(
                     "Member [id = {}] with ID from RpcConnectionClosed not \
@@ -1442,14 +1466,6 @@ impl Handler<RpcConnectionClosed> for Room {
                 );
                 self.close_gracefully(ctx).spawn(ctx);
             }
-
-            self.peers
-                .get_peers_by_member_id(&msg.member_id)
-                .flat_map(|peer| {
-                    iter::once(peer.id())
-                        .chain(iter::once(peer.partner_peer_id()))
-                })
-                .for_each(|peer_id| ctx.notify(PeerStopped(peer_id)));
         }
     }
 }

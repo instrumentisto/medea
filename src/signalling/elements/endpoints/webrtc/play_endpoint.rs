@@ -20,6 +20,7 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
+use crate::api::control::refs::{Fid, ToEndpoint};
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -193,6 +194,15 @@ impl WebRtcPlayEndpoint {
     pub fn any_traffic_callback_is_some(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
+    }
+
+    pub fn on_stop(&self) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+        if let Some(on_stop) = self.get_on_stop() {
+            let fid = self.owner().get_fid_to_endpoint(self.id().into());
+            return Some((fid, on_stop));
+        }
+
+        None
     }
 
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
