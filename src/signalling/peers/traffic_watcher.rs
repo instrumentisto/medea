@@ -221,18 +221,6 @@ impl PeersTrafficWatcherImpl {
         }
     }
 
-    /// Unsubscribes [`PeersTrafficWatcherImpl`] from watching a
-    /// [`Peer`] with provided [`PeerId`].
-    ///
-    /// Removes provided [`PeerId`] from [`RoomStat`] with provided [`RoomId`].
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
-    pub fn unsubscribe_from_peer(&mut self, room_id: &RoomId, peer_id: PeerId) {
-        if let Some(room) = self.stats.get_mut(room_id) {
-            room.peers.remove(&peer_id);
-        }
-    }
-
     /// Unsubscribes [`PeersTrafficWatcherImpl`] from a [`Peer`] with
     /// [`FatalPeerFailure`] error and notifies [`Room`] about this.
     ///
@@ -338,7 +326,7 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
 
     /// Updates [`PeerStat::last_update`] time.
     ///
-    /// If [`PeerStat`] in [`PeerState::Stopped`] state then this stat will
+    /// If [`PeerStat`] in [`PeerState::NotStarted`] state then this stat will
     /// be flowed into [`PeerState::Starting`] state in which [`Peer`] init
     /// check should be performed. Also [`PeersTrafficWatcherImpl::
     /// check_on_start`] function will be called after
@@ -351,6 +339,12 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     ///
     /// If [`PeerStat`] in [`PeerState::Started`] then last update time of the
     /// provided [`FlowMetricSource`] will be updated.
+    ///
+    /// If [`PeerStat`] in [`PeerState::Stopped`] state then
+    /// [`FlowMetricSource`] will be inserted and when all
+    /// [`FlowMetricSource`]s will be received then [`PeerStat`] will be
+    /// transferred into [`PeerState::Started`] with [`FlowMetricSource`]s from
+    /// the [`PeerStat::Stopped`] state with [`Instant::now`] time.
     fn handle(
         &mut self,
         msg: TrafficFlows,
@@ -426,9 +420,11 @@ struct TrafficStopped {
 impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
     type Result = ();
 
-    /// Removed subscription on the [`Peer`] stats with provided [`PeerStat`]
-    /// from the [`PeersTrafficWatcherImpl`], sends [`PeerStopped`] into
-    /// [`Room`].
+    /// Sends [`PeerStopped`] into [`Room`] if [`PeerStat`] isn't in
+    /// [`PeerState::Stopped`] state.
+    ///
+    /// Transfers [`PeerStat`] of the stopped [`Peer`] into
+    /// [`PeerState::Stopped`].
     fn handle(
         &mut self,
         msg: TrafficStopped,
@@ -494,6 +490,13 @@ pub enum PeerState {
     /// [`Peer`] currently is not started, and waits for the first stats.
     NotStarted,
 
+    /// [`Peer`] was started but currently it stopped. When traffic starts
+    /// flowing again then state will flew into [`PeerState::Started`].
+    ///
+    /// When all [`FlowMetricSource`]s from will sent [`TrafficFlows`] then
+    /// [`Peer`] will be considered as started again. All
+    /// [`FlowMetricSources`] from this state will be transferred into
+    /// [`PeerState::Started`] with [`Instant::now`] time.
     Stopped(HashSet<FlowMetricSource>),
 }
 

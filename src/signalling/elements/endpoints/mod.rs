@@ -37,15 +37,15 @@ impl Endpoint {
     ///
     /// Also this function will change peer status of [`WebRtcPublishEndpoint`]
     /// if provided [`PeerId`] related to this kind of endpoint.
-    pub fn on_stop(
+    pub fn get_on_stop(
         &self,
         peer_id: PeerId,
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.on_stop(peer_id)
+                publish.get_on_stop(peer_id)
             }
-            Endpoint::WebRtcPlayEndpoint(play) => play.on_stop(),
+            Endpoint::WebRtcPlayEndpoint(play) => play.get_on_stop(),
         }
     }
 

@@ -27,7 +27,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    iter,
     sync::Arc,
     time::Duration,
 };
@@ -524,7 +523,7 @@ impl Room {
                         .into_iter()
                         .filter_map(|weak_end| weak_end.upgrade())
                         .filter_map(move |endpoint: Endpoint| {
-                            endpoint.on_stop(peer.id())
+                            endpoint.get_on_stop(peer.id())
                         })
                 })
                 .collect();
@@ -598,7 +597,7 @@ impl Room {
                             .into_iter()
                             .filter_map(|weak_endpoint| weak_endpoint.upgrade())
                             .filter_map(move |endpoint| {
-                                endpoint.on_stop(peer.id())
+                                endpoint.get_on_stop(peer.id())
                             })
                     })
                 })
@@ -1060,12 +1059,10 @@ impl Handler<PeerStopped> for Room {
     ///
     /// `on_stop` callback will be sent for all endpoints which considered as
     /// stopped and haves `on_stop` callback set.
-    ///
-    /// Also, this message will remove this stopped [`Peer`].
     fn handle(
         &mut self,
         msg: PeerStopped,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let peer_id = msg.0;
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
@@ -1073,7 +1070,7 @@ impl Handler<PeerStopped> for Room {
                 .endpoints()
                 .into_iter()
                 .filter_map(|e| {
-                    e.upgrade().map(|e| e.on_stop(peer.id())).flatten()
+                    e.upgrade().map(|e| e.get_on_stop(peer.id())).flatten()
                 })
                 .chain(
                     self.peers
@@ -1083,7 +1080,7 @@ impl Handler<PeerStopped> for Room {
                         .into_iter()
                         .filter_map(|e| {
                             e.upgrade()
-                                .map(|e| e.on_stop(peer.partner_peer_id()))
+                                .map(|e| e.get_on_stop(peer.partner_peer_id()))
                                 .flatten()
                         }),
                 )
@@ -1176,7 +1173,7 @@ impl Handler<FatalPeerFailure> for Room {
                     .into_iter()
                     .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
             })
-            .filter_map(|(peer_id, e)| e.on_stop(peer_id))
+            .filter_map(|(peer_id, e)| e.get_on_stop(peer_id))
             .for_each(move |(fid, on_stop)| {
                 self.callbacks.send_callback(
                     on_stop,
@@ -1397,6 +1394,8 @@ impl Handler<RpcConnectionClosed> for Room {
     ///
     /// Removes all related for disconnected [`Member`] [`Peer`]s.
     ///
+    /// Sends [`Endpoint`]'s `on_stop` callbacks to the Control API.
+    ///
     /// Sends [`PeersRemoved`] message to [`Member`].
     ///
     /// Deletes all removed [`PeerId`]s from all [`Member`]'s endpoints.
@@ -1429,26 +1428,29 @@ impl Handler<RpcConnectionClosed> for Room {
                     );
                 }
 
-                let peers = self
+                let peers_to_remove = self
                     .peers
                     .get_peers_by_member_id(&msg.member_id)
-                    .map(|peer| peer.id())
+                    .map(PeerStateMachine::id)
                     .collect();
 
-                // Send PeersRemoved to `Member`s which have related to this
-                // `Member` `Peer`s.
-                let peers = self.remove_peers(&msg.member_id, &peers, ctx);
-                #[allow(clippy::filter_map)]
-                let on_stop_callbacks: HashMap<_, _> = peers
+                let removed_peers =
+                    self.remove_peers(&msg.member_id, &peers_to_remove, ctx);
+
+                let on_stop_callbacks: HashMap<_, _> = removed_peers
                     .into_iter()
                     .flat_map(|(_, peers)| peers.into_iter())
                     .flat_map(|peer| {
-                        peer.endpoints()
-                            .into_iter()
-                            .filter_map(|weak_end| weak_end.upgrade())
-                            .filter_map(move |endpoint: Endpoint| {
-                                endpoint.on_stop(peer.id())
-                            })
+                        peer.endpoints().into_iter().filter_map(
+                            move |weak_end| {
+                                weak_end
+                                    .upgrade()
+                                    .map(|endpoint| {
+                                        endpoint.get_on_stop(peer.id())
+                                    })
+                                    .flatten()
+                            },
+                        )
                     })
                     .collect();
 

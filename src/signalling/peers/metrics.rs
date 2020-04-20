@@ -5,7 +5,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
     sync::Arc,
     time::{Duration, Instant},
@@ -29,7 +29,6 @@ use crate::{
 };
 
 use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
-use std::collections::HashSet;
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]

@@ -13,6 +13,7 @@ use crate::{
     api::control::{
         callback::url::CallbackUrl,
         endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
+        refs::{Fid, ToEndpoint},
     },
     signalling::elements::{
         endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
@@ -21,7 +22,6 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-use crate::api::control::refs::{Fid, ToEndpoint};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -242,24 +242,24 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().on_start.clone()
     }
 
-    /// Returns [`CallbackUrl`] to which Medea should send `OnStop` callback.
-    pub fn get_on_stop(&self) -> Option<CallbackUrl> {
-        self.0.borrow().on_stop.clone()
-    }
-
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     pub fn any_traffic_callback_is_some(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
     }
 
-    pub fn on_stop(
+    /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
+    /// callback of this [`WebRtcPublishEndpoint`].
+    ///
+    /// Also this function changes peer status of [`WebRtcPublishEndpoint`].
+    pub fn get_on_stop(
         &self,
         peer_id: PeerId,
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         self.set_peer_status(peer_id, false);
         if self.publishing_peers_count() == 0 {
-            if let Some(on_stop) = self.get_on_stop() {
+            let on_stop = self.0.borrow().on_stop.clone();
+            if let Some(on_stop) = on_stop {
                 let fid = self.owner().get_fid_to_endpoint(self.id().into());
                 return Some((fid, on_stop));
             }

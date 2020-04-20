@@ -11,7 +11,8 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        endpoints::webrtc_play_endpoint::WebRtcPlayId as Id, refs::SrcUri,
+        endpoints::webrtc_play_endpoint::WebRtcPlayId as Id,
+        refs::{Fid, SrcUri, ToEndpoint},
     },
     signalling::elements::{
         endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
@@ -20,7 +21,6 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-use crate::api::control::refs::{Fid, ToEndpoint};
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -185,19 +185,17 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().on_start.clone()
     }
 
-    /// Returns [`CallbackUrl`] to which Medea should send `OnStop` callback.
-    pub fn get_on_stop(&self) -> Option<CallbackUrl> {
-        self.0.borrow().on_stop.clone()
-    }
-
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     pub fn any_traffic_callback_is_some(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
     }
 
-    pub fn on_stop(&self) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
-        if let Some(on_stop) = self.get_on_stop() {
+    /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
+    /// callback of this [`WebRtcPlayEndpoint`].
+    pub fn get_on_stop(&self) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+        let on_stop = self.0.borrow().on_stop.clone();
+        if let Some(on_stop) = on_stop {
             let fid = self.owner().get_fid_to_endpoint(self.id().into());
             return Some((fid, on_stop));
         }
