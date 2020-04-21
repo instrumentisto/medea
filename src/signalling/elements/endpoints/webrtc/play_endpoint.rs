@@ -15,13 +15,15 @@ use crate::{
         refs::{Fid, SrcUri, ToEndpoint},
     },
     signalling::elements::{
-        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
-        member::WeakMember, Member,
+        endpoints::webrtc::{
+            publish_endpoint::WeakWebRtcPublishEndpoint, EndpointState,
+        },
+        member::WeakMember,
+        Member,
     },
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-use crate::signalling::elements::endpoints::webrtc::EndpointState;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
