@@ -251,13 +251,17 @@ impl WebRtcPublishEndpoint {
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
     /// callback of this [`WebRtcPublishEndpoint`].
     ///
+    /// If [`WebRtcPublishEndpoint`] currently isn't in publishing state then
+    /// `None` will be returned.
+    ///
     /// Also this function changes peer status of [`WebRtcPublishEndpoint`].
     pub fn get_on_stop(
         &self,
         peer_id: PeerId,
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+        let is_publishing_before = self.is_endpoint_publishing();
         self.set_peer_status(peer_id, false);
-        if self.publishing_peers_count() == 0 {
+        if self.publishing_peers_count() == 0 && is_publishing_before {
             let on_stop = self.0.borrow().on_stop.clone();
             if let Some(on_stop) = on_stop {
                 let fid = self.owner().get_fid_to_endpoint(self.id().into());

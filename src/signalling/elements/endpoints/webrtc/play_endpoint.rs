@@ -28,11 +28,11 @@ struct WebRtcPlayEndpointInner {
     id: Id,
 
     /// Source URI of [`WebRtcPublishEndpoint`] from which this
-    /// [`WebRtcPlayEndpoint`] receive data.
+    /// [`WebRtcPlayEndpoint`] receives data.
     src_uri: SrcUri,
 
     /// Publisher [`WebRtcPublishEndpoint`] from which this
-    /// [`WebRtcPlayEndpoint`] receive data.
+    /// [`WebRtcPlayEndpoint`] receives data.
     src: WeakWebRtcPublishEndpoint,
 
     /// Owner [`Member`] of this [`WebRtcPlayEndpoint`].
@@ -56,6 +56,8 @@ struct WebRtcPlayEndpointInner {
 
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
+
+    is_stopped: bool,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -122,6 +124,7 @@ impl WebRtcPlayEndpoint {
             is_force_relayed,
             on_start,
             on_stop,
+            is_stopped: true,
         })))
     }
 
@@ -181,7 +184,10 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
+    ///
+    /// Sets [`WebRtcPlayEndpoint::is_stopped`] to `false`.
     pub fn get_on_start(&self) -> Option<CallbackUrl> {
+        self.0.borrow_mut().is_stopped = false;
         self.0.borrow().on_start.clone()
     }
 
@@ -193,11 +199,19 @@ impl WebRtcPlayEndpoint {
 
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
     /// callback of this [`WebRtcPlayEndpoint`].
+    ///
+    /// If [`WebRtcPlayEndpoint::is_stopped`] is already `true` then `None` will
+    /// be returned.
     pub fn get_on_stop(&self) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+        let is_stopped = self.0.borrow().is_stopped;
+        self.0.borrow_mut().is_stopped = true;
+
         let on_stop = self.0.borrow().on_stop.clone();
         if let Some(on_stop) = on_stop {
-            let fid = self.owner().get_fid_to_endpoint(self.id().into());
-            return Some((fid, on_stop));
+            if !is_stopped {
+                let fid = self.owner().get_fid_to_endpoint(self.id().into());
+                return Some((fid, on_stop));
+            }
         }
 
         None
