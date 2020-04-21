@@ -22,6 +22,7 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
+use crate::signalling::elements::endpoints::webrtc::EndpointState;
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -57,6 +58,8 @@ struct WebRtcPublishEndpointInner {
 
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
+
+    state: EndpointState,
 }
 
 impl Drop for WebRtcPublishEndpointInner {
@@ -131,6 +134,7 @@ impl WebRtcPublishEndpoint {
             peers_publishing_statuses: HashMap::new(),
             on_start,
             on_stop,
+            state: EndpointState::Stopped,
         })))
     }
 
@@ -238,7 +242,10 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
+    ///
+    /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
     pub fn get_on_start(&self) -> Option<CallbackUrl> {
+        self.0.borrow_mut().state = EndpointState::Started;
         self.0.borrow().on_start.clone()
     }
 
@@ -252,12 +259,21 @@ impl WebRtcPublishEndpoint {
     /// callback of this [`WebRtcPublishEndpoint`].
     ///
     /// Also this function changes peer status of [`WebRtcPublishEndpoint`].
+    ///
+    /// Sets [`WebRtcPublishEndpoint::state`] to the [`EndpointState::Stopped`].
+    ///
+    /// If [`WebRtcPublishEndpoint::state`] currently is
+    /// [`EndpointState::Stopped`] `None` will be returned.
     pub fn get_on_stop(
         &self,
         peer_id: PeerId,
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         self.set_peer_status(peer_id, false);
-        if self.publishing_peers_count() == 0 {
+        let is_endpoint_started_before =
+            self.0.borrow().state == EndpointState::Started;
+        self.0.borrow_mut().state = EndpointState::Stopped;
+
+        if self.publishing_peers_count() == 0 && is_endpoint_started_before {
             let on_stop = self.0.borrow().on_stop.clone();
             if let Some(on_stop) = on_stop {
                 let fid = self.owner().get_fid_to_endpoint(self.id().into());

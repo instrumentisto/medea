@@ -21,6 +21,7 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
+use crate::signalling::elements::endpoints::webrtc::EndpointState;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -56,6 +57,8 @@ struct WebRtcPlayEndpointInner {
 
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
+
+    state: EndpointState,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -122,6 +125,7 @@ impl WebRtcPlayEndpoint {
             is_force_relayed,
             on_start,
             on_stop,
+            state: EndpointState::Stopped,
         })))
     }
 
@@ -181,7 +185,10 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
+    ///
+    /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
     pub fn get_on_start(&self) -> Option<CallbackUrl> {
+        self.0.borrow_mut().state = EndpointState::Started;
         self.0.borrow().on_start.clone()
     }
 
@@ -193,11 +200,21 @@ impl WebRtcPlayEndpoint {
 
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
     /// callback of this [`WebRtcPlayEndpoint`].
+    ///
+    /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Stopped`].
+    ///
+    /// If [`WebRtcPlayEndpoint::state`] currently is [`EndpointState::Stopped`]
+    /// `None` will be returned.
     pub fn get_on_stop(&self) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+        let is_endpoints_started_before =
+            self.0.borrow().state == EndpointState::Started;
+        self.0.borrow_mut().state = EndpointState::Stopped;
         let on_stop = self.0.borrow().on_stop.clone();
         if let Some(on_stop) = on_stop {
-            let fid = self.owner().get_fid_to_endpoint(self.id().into());
-            return Some((fid, on_stop));
+            if is_endpoints_started_before {
+                let fid = self.owner().get_fid_to_endpoint(self.id().into());
+                return Some((fid, on_stop));
+            }
         }
 
         None
