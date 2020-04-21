@@ -17,6 +17,7 @@ use crate::{
 };
 
 use super::{PeerMediaStream, PeerMediaTrack};
+use crate::peer::stream_request::StreamRequestError::ExpectedAudioTracks;
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
@@ -125,7 +126,6 @@ impl SimpleStreamRequest {
         mut stream: MediaStream,
     ) -> Result<PeerMediaStream> {
         use StreamRequestError::*;
-        crate::utils::console_error("parse_stream start");
 
         let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
             .take_tracks()
@@ -170,8 +170,34 @@ impl SimpleStreamRequest {
             }
         }
 
-        crate::utils::console_error("parse_stream end");
         Ok(PeerMediaStream::from_tracks(result_tracks))
+    }
+
+    pub fn merge<T: Into<MediaStreamConstraints>>(
+        &mut self,
+        other: T,
+    ) -> Result<()> {
+        let mut other = other.into();
+
+        if let Some((track_id, audio)) = self.audio.as_mut() {
+            if let Some(other_audio) = other.take_audio() {
+                audio.merge(other_audio)
+            } else {
+                return Err(tracerr::new!(
+                    StreamRequestError::ExpectedAudioTracks
+                ));
+            }
+        };
+        if let Some((track_id, video)) = self.video.as_mut() {
+            if let Some(other_video) = other.take_video() {
+                video.merge(other_video)
+            } else {
+                return Err(tracerr::new!(
+                    StreamRequestError::ExpectedVideoTracks
+                ));
+            }
+        };
+        Ok(())
     }
 }
 

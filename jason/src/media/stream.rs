@@ -3,6 +3,8 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::MediaStreamConstraints;
+
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
@@ -12,17 +14,25 @@ use web_sys::{
 #[derive(Clone)]
 pub struct MediaStream {
     stream: SysMediaStream,
+    constraints: MediaStreamConstraints,
     tracks: Vec<MediaStreamTrack>,
 }
 
 impl MediaStream {
-    pub fn new(tracks: Vec<MediaStreamTrack>) -> Self {
+    pub fn new(
+        tracks: Vec<MediaStreamTrack>,
+        constraints: MediaStreamConstraints,
+    ) -> Self {
         let stream = SysMediaStream::new().unwrap();
         tracks
             .iter()
             .for_each(|track| stream.add_track(track.as_ref()));
 
-        MediaStream { stream, tracks }
+        MediaStream {
+            stream,
+            constraints,
+            tracks,
+        }
     }
 
     pub fn take_tracks(&mut self) -> Vec<MediaStreamTrack> {
@@ -34,6 +44,28 @@ impl MediaStream {
 impl MediaStream {
     pub fn get_media_stream(&self) -> SysMediaStream {
         Clone::clone(&self.stream)
+    }
+
+    pub fn free_audio(&mut self) {
+        self.tracks.retain(|track| match track.kind() {
+            TrackKind::Audio => {
+                false
+            },
+            TrackKind::Video => {
+                true
+            },
+        });
+    }
+
+    pub fn free_video(&mut self) {
+        self.tracks.retain(|track| match track.kind() {
+            TrackKind::Audio => {
+                true
+            },
+            TrackKind::Video => {
+                false
+            },
+        });
     }
 }
 
@@ -102,10 +134,10 @@ impl MediaStreamTrack {
 
 impl Drop for MediaStreamTrack {
     fn drop(&mut self) {
-        // Last strong ref is dropping, so stop the track
+        // Last strong ref being dropped, so stop underlying MediaTrack
         if Rc::strong_count(&self.0) == 1 {
             crate::utils::console_error(format!(
-                "Dropping {}, {}",
+                "Stopping {}, {}",
                 self.0.label(),
                 self.0.id()
             ));

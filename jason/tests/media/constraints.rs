@@ -422,6 +422,32 @@ async fn multi_source_media_stream_constraints_build7() {
     };
 }
 
+// Make sure that MediaStreamConstraints{audio:false, video:any} =>
+// Device({audio:false, video:true})
+#[wasm_bindgen_test]
+async fn multi_source_media_stream_constraints_build8() {
+    let mut constraints = MediaStreamConstraints::new();
+    constraints.video(VideoTrackConstraints::from(VideoSettings {}));
+
+    let constraints: Option<MultiSourceMediaStreamConstraints> =
+        constraints.into();
+
+    match constraints {
+        Some(MultiSourceMediaStreamConstraints::Device(constraints)) => {
+            let has_video =
+                get_property_by_name(&constraints, "video", js_val_to_option)
+                    .is_some();
+            let has_audio =
+                get_property_by_name(&constraints, "audio", js_val_to_option)
+                    .is_some();
+
+            assert!(has_video);
+            assert!(!has_audio);
+        }
+        _ => unreachable!(),
+    };
+}
+
 // Maps undefined to None.
 fn js_val_to_option(val: JsValue) -> Option<JsValue> {
     if val.is_undefined() {

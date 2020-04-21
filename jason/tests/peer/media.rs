@@ -91,8 +91,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(!video_track.is_muted());
 
     audio_track.mute_state_transition_to(StableMuteState::Muted);
     media_connections
@@ -101,8 +101,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(true),
         }])
         .unwrap();
-    assert!(audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(audio_track.is_muted());
+    assert!(!video_track.is_muted());
 
     video_track.mute_state_transition_to(StableMuteState::Muted);
     media_connections
@@ -111,8 +111,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(true),
         }])
         .unwrap();
-    assert!(audio_track.is_track_muted());
-    assert!(video_track.is_track_muted());
+    assert!(audio_track.is_muted());
+    assert!(video_track.is_muted());
 
     audio_track.mute_state_transition_to(StableMuteState::NotMuted);
     media_connections
@@ -121,8 +121,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(false),
         }])
         .unwrap();
-    assert!(!audio_track.is_track_muted());
-    assert!(video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(video_track.is_muted());
 
     video_track.mute_state_transition_to(StableMuteState::NotMuted);
     media_connections
@@ -131,8 +131,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(false),
         }])
         .unwrap();
-    assert!(!audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(!video_track.is_muted());
 }
 
 #[wasm_bindgen_test]
@@ -145,8 +145,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(audio_track.is_muted());
+    assert!(!video_track.is_muted());
 }
 
 #[wasm_bindgen_test]
@@ -159,8 +159,8 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_track_muted());
-    assert!(video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(video_track.is_muted());
 }
 
 /// Tests for [`Sender::update`] function.
@@ -189,7 +189,7 @@ mod sender_patch {
             is_muted: Some(true),
         });
 
-        assert!(!sender.is_track_muted());
+        assert!(!sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -200,7 +200,7 @@ mod sender_patch {
             is_muted: Some(true),
         });
 
-        assert!(sender.is_track_muted());
+        assert!(sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -211,7 +211,7 @@ mod sender_patch {
             is_muted: Some(false),
         });
 
-        assert!(!sender.is_track_muted());
+        assert!(!sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -221,14 +221,14 @@ mod sender_patch {
             id: track_id,
             is_muted: Some(true),
         });
-        assert!(sender.is_track_muted());
+        assert!(sender.is_muted());
 
         sender.update(&TrackPatch {
             id: track_id,
             is_muted: Some(true),
         });
 
-        assert!(sender.is_track_muted());
+        assert!(sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -239,6 +239,6 @@ mod sender_patch {
             is_muted: None,
         });
 
-        assert!(!sender.is_track_muted());
+        assert!(!sender.is_muted());
     }
 }

@@ -37,6 +37,7 @@ use crate::{
         console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
         JsError,
     },
+    MediaStreamConstraints,
 };
 
 use super::{connection::Connection, ConnectionHandle};
@@ -340,12 +341,15 @@ impl RoomHandle {
     /// in this [`Room`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    pub fn inject_local_stream(
+    pub fn set_local_media_constraints(
         &self,
-        stream: MediaStream,
+        constraints: &MediaStreamConstraints,
     ) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().inject_local_stream(stream))
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner
+                .borrow_mut()
+                .set_local_media_constraints(constraints.clone())
+        })
     }
 
     /// Mutes outbound audio in this [`Room`].
@@ -478,7 +482,7 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
 
     /// Local media stream for injecting into new created [`PeerConnection`]s.
-    local_stream: Option<MediaStream>,
+    local_stream: Option<MediaStreamConstraints>,
 
     /// [`PeerConnection`] repository.
     peers: Box<dyn PeerRepository>,
@@ -664,14 +668,18 @@ impl InnerRoom {
     ///
     /// If injecting fails, then invokes `on_failed_local_stream` callback with
     /// a failure error.
-    fn inject_local_stream(&mut self, stream: MediaStream) {
+    fn set_local_media_constraints(
+        &mut self,
+        constraints: MediaStreamConstraints,
+    ) {
         let peers = self.peers.get_all();
-        let injected_stream = Clone::clone(&stream);
+        let constraints_clone = constraints.clone();
         let error_callback = Rc::clone(&self.on_failed_local_stream);
+
         spawn_local(async move {
             for peer in peers {
                 if let Err(err) = peer
-                    .inject_local_stream(injected_stream.clone())
+                    .update_local_stream(Some(constraints_clone.clone()))
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
@@ -679,7 +687,7 @@ impl InnerRoom {
                 }
             }
         });
-        self.local_stream.replace(stream);
+        self.local_stream.replace(constraints);
     }
 }
 
@@ -719,7 +727,7 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
-        let local_stream = self.local_stream.clone();
+        let local_stream_constraints = self.local_stream.clone();
         let rpc = Rc::clone(&self.rpc);
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(
@@ -727,7 +735,7 @@ impl EventHandler for InnerRoom {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
-                            .get_offer(tracks, local_stream)
+                            .get_offer(tracks, local_stream_constraints)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         let mids = peer
@@ -741,7 +749,11 @@ impl EventHandler for InnerRoom {
                     }
                     Some(offer) => {
                         let sdp_answer = peer
-                            .process_offer(offer, tracks, local_stream)
+                            .process_offer(
+                                offer,
+                                tracks,
+                                local_stream_constraints,
+                            )
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpAnswer {
@@ -877,8 +889,8 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Invokes `on_local_stream` [`Room`]'s callback.
-    fn on_new_local_stream(&mut self, _: PeerId, stream: PeerMediaStream) {
-        self.on_local_stream.call(stream.media_stream());
+    fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
+        self.on_local_stream.call(stream);
     }
 
     /// Handles [`PeerEvent::IceConnectionStateChanged`] event and sends new
@@ -922,6 +934,26 @@ impl PeerEventHandler for InnerRoom {
             peer_id,
             metrics: PeerMetrics::RtcStats(stats.0),
         });
+    }
+
+    fn on_new_local_stream_required(&mut self, peer_id: PeerId) {
+        console_error("on_new_local_stream_required");
+        if let Some(peer) = self.peers.get(peer_id) {
+            let constraints_clone = self.local_stream.clone();
+            let error_callback = Rc::clone(&self.on_failed_local_stream);
+            spawn_local(async move {
+                if let Err(err) = peer
+                    .update_local_stream(constraints_clone)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                {
+                    error_callback.call(JasonError::from(err));
+                }
+            });
+        } else {
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
     }
 }
 

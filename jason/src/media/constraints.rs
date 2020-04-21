@@ -20,6 +20,30 @@ enum StreamSource<D, S> {
     Display(S),
 }
 
+impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
+    fn merge(
+        &mut self,
+        other: StreamSource<
+            DeviceVideoTrackConstraints,
+            DisplayVideoTrackConstraints,
+        >,
+    ) {
+        use StreamSource::*;
+        match self {
+            Device(this) => {
+                if let Device(that) = other {
+                    this.merge(that);
+                }
+            }
+            Display(this) => {
+                if let Display(that) = other {
+                    this.merge(that);
+                }
+            }
+        };
+    }
+}
+
 /// [MediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
@@ -111,6 +135,15 @@ pub enum MultiSourceMediaStreamConstraints {
     DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
 }
 
+/// TLDR:
+/// {None, None} => None
+/// {None, Device} => Device
+/// {None, Display} => Display
+/// {None, Any} => Device
+/// {Some, None} => Device
+/// {Some, Device} => Device
+/// {Some, Display} => DeviceAndDisplay
+/// {Some, Any} => Device
 impl From<MediaStreamConstraints>
     for Option<MultiSourceMediaStreamConstraints>
 {
@@ -265,6 +298,12 @@ impl AudioTrackConstraints {
         satisfies_by_device_id(&self.device_id, track)
         // TODO returns Result<bool, Error>
     }
+
+    pub fn merge(&mut self, other: AudioTrackConstraints) {
+        if self.device_id.is_none() && other.device_id.is_some() {
+            self.device_id = other.device_id;
+        }
+    }
 }
 
 impl From<ProtoAudioConstraints> for AudioTrackConstraints {
@@ -306,6 +345,14 @@ pub struct DeviceVideoTrackConstraints {
     device_id: Option<String>,
 }
 
+impl DeviceVideoTrackConstraints {
+    fn merge(&mut self, other: DeviceVideoTrackConstraints) {
+        if self.device_id.is_none() && other.device_id.is_some() {
+            self.device_id = other.device_id;
+        }
+    }
+}
+
 /// Constraints applicable to video tracks that are sourced from screen-capture.
 #[wasm_bindgen]
 impl DeviceVideoTrackConstraints {
@@ -328,6 +375,12 @@ impl DeviceVideoTrackConstraints {
 #[wasm_bindgen]
 #[derive(Clone, Default)]
 pub struct DisplayVideoTrackConstraints {}
+
+impl DisplayVideoTrackConstraints {
+    fn merge(&mut self, _: DisplayVideoTrackConstraints) {
+        // no constraints => nothing to do here atm
+    }
+}
 
 #[wasm_bindgen]
 impl DisplayVideoTrackConstraints {
@@ -386,6 +439,18 @@ impl VideoTrackConstraints {
             })
             .is_some()
         }
+    }
+
+    pub fn merge(&mut self, other: VideoTrackConstraints) {
+        match (self.0.as_mut(), other.0) {
+            (None, Some(other)) => {
+                self.0.replace(other);
+            }
+            (Some(this), Some(other)) => {
+                this.merge(other);
+            }
+            _ => {}
+        };
     }
 }
 

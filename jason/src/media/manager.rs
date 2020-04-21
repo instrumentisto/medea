@@ -135,20 +135,25 @@ impl InnerMediaManager {
         &self,
         mut caps: MediaStreamConstraints,
     ) -> impl Future<Output = Result<(MediaStream, bool)>> {
-        let mut result = self.get_from_storage(&mut caps);
+        let original_caps = caps.clone();
 
+        let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
         match caps {
-            None => future::ok((MediaStream::new(result), false))
-                .left_future()
-                .left_future(),
+            None => {
+                future::ok((MediaStream::new(result, original_caps), false))
+                    .left_future()
+                    .left_future()
+            }
             Some(MultiSourceMediaStreamConstraints::Display(caps)) => self
                 .get_display_media(caps)
                 .map_ok(|mut tracks| {
                     result.append(&mut tracks);
                     result
                 })
-                .map_ok(|result| (MediaStream::new(result), true))
+                .map_ok(|result| {
+                    (MediaStream::new(result, original_caps), true)
+                })
                 .left_future()
                 .right_future(),
             Some(MultiSourceMediaStreamConstraints::Device(caps)) => self
@@ -157,7 +162,9 @@ impl InnerMediaManager {
                     result.append(&mut tracks);
                     result
                 })
-                .map_ok(|result| (MediaStream::new(result), true))
+                .map_ok(|result| {
+                    (MediaStream::new(result, original_caps), true)
+                })
                 .right_future()
                 .left_future(),
             Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
@@ -173,7 +180,7 @@ impl InnerMediaManager {
                     result.append(&mut get_user_media);
                     result.append(&mut get_display_media);
 
-                    Ok((MediaStream::new(result), true))
+                    Ok((MediaStream::new(result, original_caps), true))
                 }
                 .right_future()
                 .right_future()
@@ -259,11 +266,11 @@ impl InnerMediaManager {
                     .map_err(tracerr::from_and_wrap!())?,
             )
             .await
+            .map(SysMediaStream::from)
             .map_err(JsError::from)
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?;
 
-            let stream = SysMediaStream::from(stream);
             let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
@@ -305,11 +312,11 @@ impl InnerMediaManager {
                     .map_err(tracerr::from_and_wrap!())?,
             )
             .await
+            .map(SysMediaStream::from)
             .map_err(JsError::from)
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?;
 
-            let stream = SysMediaStream::from(stream);
             let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
@@ -384,8 +391,10 @@ impl MediaManagerHandle {
     /// Returns [MediaStream][1] object.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
-        match upgrade_or_detached!(self.0).map(|inner| inner.get_stream(caps)) {
+    pub fn init_local_stream(&self, caps: &MediaStreamConstraints) -> Promise {
+        match upgrade_or_detached!(self.0)
+            .map(|inner| inner.get_stream(caps.clone()))
+        {
             Ok(stream) => future_to_promise(async {
                 stream
                     .await

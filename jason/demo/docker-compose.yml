@@ -3,7 +3,7 @@ version: "2"
 services:
   web-client:
     container_name: demo-web-client
-    image: instrumentisto/medea-demo:dev
+    image: alexlapa/medea-demo:test
     ports:
       - "80:80"        # web-client http
       - "6379:6379"    # coturn redis

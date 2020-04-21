@@ -113,19 +113,6 @@ impl PeerMediaStream {
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.stream)
     }
-
-    pub fn media_stream(&self) -> MediaStream {
-        let mut tracks = Vec::new();
-
-        self.0.audio_tracks.values().for_each(|track| {
-            tracks.push(track.track().clone());
-        });
-        self.0.video_tracks.values().for_each(|track| {
-            tracks.push(track.track().clone());
-        });
-
-        MediaStream::new(tracks)
-    }
 }
 
 /// JS side handle to [`MediaStream`].

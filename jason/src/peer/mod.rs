@@ -32,6 +32,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 use crate::{
     media::{MediaManager, MediaManagerError, MediaStream},
     utils::{console_error, JasonError, JsCaused, JsError},
+    MediaStreamConstraints,
 };
 
 #[cfg(feature = "mockable")]
@@ -133,7 +134,7 @@ pub enum PeerEvent {
         peer_id: Id,
 
         /// Local [`MediaStream`] that is sent to remote members.
-        local_stream: PeerMediaStream,
+        local_stream: MediaStream,
     },
 
     /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
@@ -171,6 +172,10 @@ pub enum PeerEvent {
 
         /// [`RtcStats`] of this [`PeerConnection`].
         stats: RtcStats,
+    },
+
+    NewLocalStreamRequired {
+        peer_id: Id,
     },
 }
 
@@ -234,8 +239,11 @@ impl PeerConnection {
             RtcPeerConnection::new(ice_servers, is_force_relayed)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
-        let media_connections =
-            Rc::new(MediaConnections::new(Rc::clone(&peer)));
+        let media_connections = Rc::new(MediaConnections::new(
+            id,
+            Rc::clone(&peer),
+            peer_events_sender.clone(),
+        ));
 
         let peer = Self {
             id,
@@ -519,13 +527,13 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
-        local_stream: Option<MediaStream>,
+        local_stream: Option<MediaStreamConstraints>,
     ) -> Result<String> {
         self.media_connections
             .update_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.insert_local_stream(local_stream)
+        self.update_local_stream(local_stream)
             .await
             .map_err(tracerr::wrap!())?;
 
@@ -538,21 +546,6 @@ impl PeerConnection {
         Ok(offer)
     }
 
-    /// Replaces local stream in the underlying [RTCPeerConnection][1]
-    /// with a provided [MediaStream][2] if its have all required tracks.
-    ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    #[inline]
-    pub async fn inject_local_stream(
-        &self,
-        local_stream: MediaStream,
-    ) -> Result<()> {
-        self.insert_local_stream(Some(local_stream))
-            .await
-            .map_err(tracerr::wrap!())
-    }
-
     /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
     /// Requests local stream from [`MediaManager`] if no stream was provided.
@@ -561,40 +554,40 @@ impl PeerConnection {
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    async fn insert_local_stream(
+    pub async fn update_local_stream(
         &self,
-        local_stream: Option<MediaStream>,
+        local_constraints: Option<MediaStreamConstraints>,
     ) -> Result<()> {
         if let Some(request) = self.media_connections.get_stream_request() {
-            let caps = SimpleStreamRequest::try_from(request)
+            let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
-            let (stream, is_new_stream) = if let Some(stream) = local_stream {
-                (
-                    caps.parse_stream(stream)
-                        .map_err(tracerr::map_from_and_wrap!())?,
-                    false,
-                )
-            } else {
-                let (stream, is_new) = self
-                    .media_manager
-                    .get_stream(&caps)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                (
-                    caps.parse_stream(stream)
-                        .map_err(tracerr::map_from_and_wrap!())?,
-                    is_new,
-                )
+
+            let used_caps: MediaStreamConstraints = match local_constraints {
+                None => (&required_caps).into(),
+                Some(local_constraints) => {
+                    required_caps.merge(local_constraints);
+                    (&required_caps).into()
+                }
             };
-            self.media_connections
-                .insert_local_stream(&stream)
+            let (media_stream, is_new_stream) = self
+                .media_manager
+                .get_stream(used_caps)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
+            let peer_stream = required_caps
+                .parse_stream(media_stream.clone())
+                .map_err(tracerr::map_from_and_wrap!())?;
+            self.media_connections
+                .insert_local_stream(&peer_stream)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
+
+            console_error(format!("is_new_stream = {}", is_new_stream));
             if is_new_stream {
                 let _ = self.peer_events_sender.unbounded_send(
                     PeerEvent::NewLocalStream {
                         peer_id: self.id,
-                        local_stream: stream,
+                        local_stream: media_stream,
                     },
                 );
             }
@@ -662,7 +655,7 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-        local_stream: Option<MediaStream>,
+        local_constraints: Option<MediaStreamConstraints>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
@@ -684,7 +677,7 @@ impl PeerConnection {
             .update_tracks(send)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.insert_local_stream(local_stream)
+        self.update_local_stream(local_constraints)
             .await
             .map_err(tracerr::wrap!())?;
 

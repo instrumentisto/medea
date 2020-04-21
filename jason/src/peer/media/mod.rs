@@ -8,7 +8,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{future, future::Either, StreamExt};
+use futures::{future, future::Either, SinkExt, StreamExt};
 use medea_client_api_proto as proto;
 use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
@@ -29,6 +29,8 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
+use crate::peer::PeerEvent;
+use futures::channel::mpsc;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -87,9 +89,12 @@ type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
+    peer_id: PeerId,
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
     peer: Rc<RtcPeerConnection>,
+
+    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// [`MediaTrack`] to its [`Sender`].
     senders: HashMap<TrackId, Rc<Sender>>,
@@ -115,9 +120,15 @@ impl MediaConnections {
     /// Instantiates new [`MediaConnections`] storage for a given
     /// [`RtcPeerConnection`].
     #[inline]
-    pub fn new(peer: Rc<RtcPeerConnection>) -> Self {
+    pub fn new(
+        peer_id: PeerId,
+        peer: Rc<RtcPeerConnection>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+    ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
+            peer_id,
             peer,
+            peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
         }))
@@ -154,7 +165,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .find(|s| s.is_track_muted())
+            .find(|s| s.is_muted())
             .is_none()
     }
 
@@ -164,7 +175,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .find(|s| s.is_track_muted())
+            .find(|s| s.is_muted())
             .is_none()
     }
 
@@ -226,9 +237,11 @@ impl MediaConnections {
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let sndr = Sender::new(
+                        inner.peer_id,
                         track.id,
                         track.media_type.into(),
                         &inner.peer,
+                        inner.peer_events_sender.clone(),
                         mid,
                         track.is_muted.into(),
                     )
@@ -259,13 +272,13 @@ impl MediaConnections {
     /// [`MediaTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
-            let track =
+            let sender =
                 self.get_sender_by_id(track_proto.id).ok_or_else(|| {
                     tracerr::new!(MediaConnectionsError::InvalidTrackPatch(
                         track_proto.id
                     ))
                 })?;
-            track.update(&track_proto);
+            sender.update(&track_proto);
         }
         Ok(())
     }
@@ -274,9 +287,13 @@ impl MediaConnections {
     pub fn get_stream_request(&self) -> Option<StreamRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            stream_request
-                .get_or_insert_with(StreamRequest::default)
-                .add_track_request(sender.track_id, sender.caps.clone());
+            if let MuteState::Stable(StableMuteState::NotMuted) =
+                sender.mute_state.get()
+            {
+                stream_request
+                    .get_or_insert_with(StreamRequest::default)
+                    .add_track_request(sender.track_id, sender.caps.clone());
+            }
         }
         stream_request
     }
@@ -302,6 +319,11 @@ impl MediaConnections {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         for sender in inner.senders.values() {
+            // skip senders that are not NotMuted
+            if !sender.is_not_muted() {
+                continue;
+            }
+
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
                 if sender.caps.satisfies(track.track().as_ref()) {
                     sender_and_track.push((sender, track));
@@ -430,9 +452,11 @@ impl Sender {
     /// from a provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`]
     /// lookup fails.
     fn new(
+        peer_id: PeerId,
         track_id: TrackId,
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
+        mut peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         mid: Option<String>,
         mute_state: StableMuteState,
     ) -> Result<Rc<Self>> {
@@ -446,7 +470,8 @@ impl Sender {
         };
 
         let mute_state = ObservableCell::new(mute_state.into());
-        let mut subscription = mute_state.subscribe();
+        // we dont care about initial state, cause transceiver is inactive atm
+        let mut mute_state_changes = mute_state.subscribe().skip(1);
         let this = Rc::new(Self {
             track_id,
             caps,
@@ -455,33 +480,31 @@ impl Sender {
             mute_state,
         });
 
-        // TODO: remove when refactor muting to dropping tracks.
         let weak_this = Rc::downgrade(&this);
         spawn_local(async move {
-            while let Some(mute_state_update) = subscription.next().await {
+            while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    match mute_state_update {
+                    match mute_state {
                         MuteState::Stable(stable) => {
                             match stable {
                                 StableMuteState::NotMuted => {
-                                    // do request
-                                    // unimplemented!()
+                                    crate::utils::console_error("NotMuted");
+                                    let _ = peer_events_sender.unbounded_send(
+                                        PeerEvent::NewLocalStreamRequired {
+                                            peer_id,
+                                        },
+                                    );
                                 }
                                 StableMuteState::Muted => {
-                                    if let Some(track) =
-                                        this.track.borrow().as_ref()
-                                    {
-                                        track.set_enabled(false);
-                                    }
-
+                                    crate::utils::console_error("Muted");
                                     // cannot fail
+                                    this.track.borrow_mut().take();
                                     let _ = JsFuture::from(
                                         this.transceiver
                                             .sender()
                                             .replace_track(None),
                                     )
                                     .await;
-                                    this.track.borrow_mut().take();
                                 }
                             }
                         }
@@ -544,39 +567,50 @@ impl Sender {
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     async fn insert_and_enable_track(
         sender: Rc<Self>,
-        track: Rc<PeerMediaTrack>,
+        new_track: Rc<PeerMediaTrack>,
     ) -> Result<()> {
-        JsFuture::from(
+        // no-op if we try to insert same track
+        if let Some(current_track) = sender.track.borrow().as_ref() {
+            if new_track.track().id() == current_track.track().id() {
+                return Ok(());
+            }
+        }
+
+        // no-op if transceiver is not NotMuted
+        if let MuteState::Stable(StableMuteState::NotMuted) =
+            sender.mute_state()
+        {
+            JsFuture::from(
+                sender
+                    .transceiver
+                    .sender()
+                    .replace_track(Some(new_track.track().as_ref())),
+            )
+            .await
+            .map_err(Into::into)
+            .map_err(MediaConnectionsError::CouldNotInsertTrack)
+            .map_err(tracerr::wrap!())?;
+
+            sender.track.borrow_mut().replace(new_track);
+
             sender
                 .transceiver
-                .sender()
-                .replace_track(Some(track.track().as_ref())),
-        )
-        .await
-        .map_err(Into::into)
-        .map_err(MediaConnectionsError::CouldNotInsertTrack)
-        .map_err(tracerr::wrap!())?;
+                .set_direction(RtcRtpTransceiverDirection::Sendonly);
 
-        sender
-            .transceiver
-            .set_direction(RtcRtpTransceiverDirection::Sendonly);
-        // TODO: this is temporary disabled, until we resolve case of muting
-        //       senders, that were added after muting room.
-        //       (instrumentisto/medea#85)
-
-        //        let stable_mute_state = match sender.mute_state() {
-        //            MuteState::Stable(stable) => stable,
-        //            MuteState::Transition(transition) =>
-        // transition.into_inner(),        };
-        //        track.set_enabled_by_mute_state(stable_mute_state);
-        sender.track.borrow_mut().replace(track);
+            crate::utils::console_error("insert_and_enable_track");
+        }
 
         Ok(())
     }
 
-    /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
-    pub fn is_track_muted(&self) -> bool {
+    /// Checks that [`Sender`] is in [`MuteState::Muted`].
+    pub fn is_muted(&self) -> bool {
         self.mute_state.get() == StableMuteState::Muted.into()
+    }
+
+    /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
+    pub fn is_not_muted(&self) -> bool {
+        self.mute_state.get() == StableMuteState::NotMuted.into()
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
@@ -607,13 +641,13 @@ impl Sender {
                 match state {
                     MuteState::Transition(_) => continue,
                     MuteState::Stable(s) => {
-                        if s == desired_state {
-                            return Ok(());
+                        return if s == desired_state {
+                            Ok(())
                         } else {
-                            return Err(tracerr::new!(
+                            Err(tracerr::new!(
                                 MediaConnectionsError::
                                 MuteStateTransitsIntoOppositeState
-                            ));
+                            ))
                         }
                     }
                 }
@@ -622,7 +656,8 @@ impl Sender {
         }
     }
 
-    /// Updates this [`Track`] based on the provided [`proto::TrackPatch`].
+    /// Updates this [`Sender`]s tracks based on the provided
+    /// [`proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
         if track.id != self.track_id {
             return;
