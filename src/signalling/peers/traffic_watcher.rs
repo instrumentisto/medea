@@ -386,6 +386,10 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                                     .map(|src| (*src, Instant::now()))
                                     .collect(),
                             );
+                            peer.started_at = Some(Utc::now());
+                            if let Some(room_addr) = room.room.upgrade() {
+                                room_addr.do_send(PeerStarted(peer.peer_id));
+                            }
                         }
                     }
                 }
