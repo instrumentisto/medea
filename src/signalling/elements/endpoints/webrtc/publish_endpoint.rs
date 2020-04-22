@@ -25,6 +25,10 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
+use crate::{
+    api::control::callback::{EndpointDirection, EndpointKind},
+    signalling::elements::endpoints::webrtc::TracksState,
+};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -61,7 +65,7 @@ struct WebRtcPublishEndpointInner {
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
 
-    state: EndpointState,
+    state: TracksState,
 }
 
 impl Drop for WebRtcPublishEndpointInner {
@@ -136,7 +140,7 @@ impl WebRtcPublishEndpoint {
             peers_publishing_statuses: HashMap::new(),
             on_start,
             on_stop,
-            state: EndpointState::Stopped,
+            state: TracksState::new(),
         })))
     }
 
@@ -246,8 +250,8 @@ impl WebRtcPublishEndpoint {
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
     ///
     /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
-    pub fn get_on_start(&self) -> Option<CallbackUrl> {
-        self.0.borrow_mut().state = EndpointState::Started;
+    pub fn get_on_start(&self, kind: EndpointKind) -> Option<CallbackUrl> {
+        self.0.borrow_mut().state.started(kind);
         self.0.borrow().on_start.clone()
     }
 
@@ -269,11 +273,11 @@ impl WebRtcPublishEndpoint {
     pub fn get_on_stop(
         &self,
         peer_id: PeerId,
+        kind: EndpointKind,
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         self.set_peer_status(peer_id, false);
-        let is_endpoint_started_before =
-            self.0.borrow().state == EndpointState::Started;
-        self.0.borrow_mut().state = EndpointState::Stopped;
+        let is_endpoint_started_before = self.0.borrow().state.is_started(kind);
+        self.0.borrow_mut().state.stopped(kind);
 
         if self.publishing_peers_count() == 0 && is_endpoint_started_before {
             let on_stop = self.0.borrow().on_stop.clone();
@@ -284,6 +288,10 @@ impl WebRtcPublishEndpoint {
         }
 
         None
+    }
+
+    pub const fn get_direction() -> EndpointDirection {
+        EndpointDirection::Publish
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer

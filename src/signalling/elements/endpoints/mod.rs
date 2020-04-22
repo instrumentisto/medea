@@ -4,13 +4,15 @@
 
 pub mod webrtc;
 
+use std::hash::Hash;
+
 use derive_more::From;
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 use medea_macro::enum_delegate;
 
 use crate::api::control::{
-    callback::url::CallbackUrl,
+    callback::{url::CallbackUrl, EndpointDirection, EndpointKind},
     refs::{Fid, ToEndpoint},
 };
 
@@ -40,12 +42,25 @@ impl Endpoint {
     pub fn get_on_stop(
         &self,
         peer_id: PeerId,
+        kind: EndpointKind,
     ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.get_on_stop(peer_id)
+                publish.get_on_stop(peer_id, kind)
             }
-            Endpoint::WebRtcPlayEndpoint(play) => play.get_on_stop(),
+            Endpoint::WebRtcPlayEndpoint(play) => play.get_on_stop(kind),
+        }
+    }
+
+    #[inline]
+    pub fn get_direction(&self) -> EndpointDirection {
+        match self {
+            Endpoint::WebRtcPlayEndpoint(_) => {
+                WebRtcPlayEndpoint::get_direction()
+            }
+            Endpoint::WebRtcPublishEndpoint(_) => {
+                WebRtcPublishEndpoint::get_direction()
+            }
         }
     }
 

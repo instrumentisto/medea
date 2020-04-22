@@ -95,6 +95,9 @@ use super::{
         PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
     },
 };
+use crate::api::control::callback::{
+    EndpointDirection, EndpointKind, OnStopReason,
+};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -523,16 +526,21 @@ impl Room {
                         .into_iter()
                         .filter_map(|weak_end| weak_end.upgrade())
                         .filter_map(move |endpoint: Endpoint| {
-                            endpoint.get_on_stop(peer.id())
+                            // TODO: Provided real EndpointKind
+                            endpoint.get_on_stop(peer.id(), EndpointKind::Both)
+                                .map(|(fid, url)| {
+                                    (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                        reason: OnStopReason::TrafficNotFlowing,
+                                        kind: EndpointKind::Both,
+                                        direction: endpoint.get_direction(),
+                                    })))
+                                })
                         })
                 })
                 .collect();
 
-            for (fid, url) in on_stop_callbacks {
-                self.callbacks.send_callback(
-                    url,
-                    CallbackRequest::new_at_now(fid, OnStopEvent {}),
-                );
+            for (_, (url, req)) in on_stop_callbacks {
+                self.callbacks.send_callback(url, req);
             }
 
             self.members.delete_member(member_id, ctx);
@@ -597,17 +605,22 @@ impl Room {
                             .into_iter()
                             .filter_map(|weak_endpoint| weak_endpoint.upgrade())
                             .filter_map(move |endpoint| {
-                                endpoint.get_on_stop(peer.id())
+                                // TODO: Provided real EndpointKind
+                                endpoint.get_on_stop(peer.id(), EndpointKind::Both)
+                                    .map(|(fid, url)| {
+                                        (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                            reason: OnStopReason::TrafficNotFlowing,
+                                            kind: EndpointKind::Both,
+                                            direction: endpoint.get_direction(),
+                                        })))
+                                    })
                             })
                     })
                 })
                 .collect();
 
-            for (fid, url) in on_stop_callbacks {
-                self.callbacks.send_callback(
-                    url,
-                    CallbackRequest::new_at_now(fid, OnStopEvent {}),
-                );
+            for (_, (url, req)) in on_stop_callbacks {
+                self.callbacks.send_callback(url, req);
             }
         }
     }
@@ -1022,7 +1035,9 @@ impl Handler<PeerStarted> for Room {
                 Endpoint::WebRtcPublishEndpoint(publish) => {
                     publish.set_peer_status(peer_id, true);
                     if publish.publishing_peers_count() == 1 {
-                        if let Some(on_start) = publish.get_on_start() {
+                        if let Some(on_start) =
+                            publish.get_on_start(EndpointKind::Both)
+                        {
                             let fid = publish
                                 .owner()
                                 .get_fid_to_endpoint(publish.id().into());
@@ -1030,19 +1045,31 @@ impl Handler<PeerStarted> for Room {
                                 on_start,
                                 CallbackRequest::new_at_now(
                                     fid,
-                                    OnStartEvent {},
+                                    OnStartEvent {
+                                        direction: WebRtcPublishEndpoint::get_direction(),
+                                        kind: EndpointKind::Both,
+                                    },
                                 ),
                             );
                         }
                     }
                 }
                 Endpoint::WebRtcPlayEndpoint(play) => {
-                    if let Some(on_start) = play.get_on_start() {
+                    if let Some(on_start) =
+                        play.get_on_start(EndpointKind::Both)
+                    {
                         let fid =
                             play.owner().get_fid_to_endpoint(play.id().into());
                         self.callbacks.send_callback(
                             on_start,
-                            CallbackRequest::new_at_now(fid, OnStartEvent {}),
+                            CallbackRequest::new_at_now(
+                                fid,
+                                OnStartEvent {
+                                    direction:
+                                        WebRtcPlayEndpoint::get_direction(),
+                                    kind: EndpointKind::Both,
+                                },
+                            ),
                         )
                     }
                 }
@@ -1066,11 +1093,17 @@ impl Handler<PeerStopped> for Room {
     ) -> Self::Result {
         let peer_id = msg.0;
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            let send_callbacks: Vec<_> = peer
+            let send_callbacks: HashMap<_, _> = peer
                 .endpoints()
                 .into_iter()
                 .filter_map(|e| {
-                    e.upgrade().map(|e| e.get_on_stop(peer.id())).flatten()
+                    e.upgrade().map(|e| e.get_on_stop(peer.id(), EndpointKind::Both).map(|(fid, url)| {
+                        (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                            direction: e.get_direction(),
+                            kind: EndpointKind::Both,
+                            reason: OnStopReason::TrafficNotFlowing,
+                        })))
+                    })).flatten()
                 })
                 .chain(
                     self.peers
@@ -1080,17 +1113,22 @@ impl Handler<PeerStopped> for Room {
                         .into_iter()
                         .filter_map(|e| {
                             e.upgrade()
-                                .map(|e| e.get_on_stop(peer.partner_peer_id()))
+                                .map(|e| e.get_on_stop(peer.partner_peer_id(), EndpointKind::Both)
+                                    .map(|(fid, url)| {
+                                        (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                            direction: e.get_direction(),
+                                            kind: EndpointKind::Both,
+                                            reason: OnStopReason::TrafficNotFlowing,
+                                        })))
+                                    })
+                                )
                                 .flatten()
                         }),
                 )
                 .collect();
 
-            for (fid, on_stop) in send_callbacks {
-                self.callbacks.send_callback(
-                    on_stop,
-                    CallbackRequest::new_at_now(fid, OnStopEvent {}),
-                );
+            for (_, (url, req)) in send_callbacks {
+                self.callbacks.send_callback(url, req);
             }
         }
     }
@@ -1173,12 +1211,30 @@ impl Handler<FatalPeerFailure> for Room {
                     .into_iter()
                     .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
             })
-            .filter_map(|(peer_id, e)| e.get_on_stop(peer_id))
-            .for_each(move |(fid, on_stop)| {
-                self.callbacks.send_callback(
-                    on_stop,
-                    CallbackRequest::new(fid, OnStopEvent {}, msg.at),
-                )
+            .filter_map(|(peer_id, e)| {
+                e.get_on_stop(peer_id, EndpointKind::Both)
+                    .map(|(fid, url)| {
+                        (
+                            fid.clone(),
+                            (
+                                url,
+                                CallbackRequest::new(
+                                    fid,
+                                    OnStopEvent {
+                                        direction: e.get_direction(),
+                                        reason: OnStopReason::TrafficNotFlowing,
+                                        kind: EndpointKind::Both,
+                                    },
+                                    msg.at,
+                                ),
+                            ),
+                        )
+                    })
+            })
+            .collect::<HashMap<_, _>>()
+            .into_iter()
+            .for_each(move |(_, (url, req))| {
+                self.callbacks.send_callback(url, req)
             });
     }
 }
@@ -1446,7 +1502,14 @@ impl Handler<RpcConnectionClosed> for Room {
                                 weak_end
                                     .upgrade()
                                     .map(|endpoint| {
-                                        endpoint.get_on_stop(peer.id())
+                                        endpoint.get_on_stop(peer.id(), EndpointKind::Both)
+                                            .map(|(fid, url)| {
+                                                (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                                    kind: EndpointKind::Both,
+                                                    direction: endpoint.get_direction(),
+                                                    reason: OnStopReason::TrafficNotFlowing,
+                                                })))
+                                            })
                                     })
                                     .flatten()
                             },
@@ -1454,11 +1517,8 @@ impl Handler<RpcConnectionClosed> for Room {
                     })
                     .collect();
 
-                for (fid, url) in on_stop_callbacks {
-                    self.callbacks.send_callback(
-                        url,
-                        CallbackRequest::new_at_now(fid, OnStopEvent {}),
-                    );
+                for (_, (url, req)) in on_stop_callbacks {
+                    self.callbacks.send_callback(url, req);
                 }
             } else {
                 error!(

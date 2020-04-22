@@ -11,6 +11,7 @@ use derive_more::From;
 use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
+use medea_control_api_proto::grpc::callback::on_stop::Reason;
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -70,21 +71,93 @@ impl Into<proto::OnJoin> for OnJoinEvent {
 
 /// `on_start` Control API callback.
 #[derive(Debug)]
-pub struct OnStartEvent {}
+pub struct OnStartEvent {
+    pub kind: EndpointKind,
+    pub direction: EndpointDirection,
+}
 
 impl Into<proto::OnStart> for OnStartEvent {
     fn into(self) -> proto::OnStart {
-        proto::OnStart {}
+        let kind: proto::EndpointKind = self.kind.into();
+        let direction: proto::EndpointDirection = self.direction.into();
+
+        proto::OnStart {
+            kind: kind as i32,
+            direction: direction as i32,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum EndpointKind {
+    Audio = 0b1,
+    Video = 0b10,
+    Both = 0b11,
+}
+
+impl Into<proto::EndpointKind> for EndpointKind {
+    fn into(self) -> proto::EndpointKind {
+        match self {
+            EndpointKind::Audio => proto::EndpointKind::Audio,
+            EndpointKind::Video => proto::EndpointKind::Video,
+            EndpointKind::Both => proto::EndpointKind::Both,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum EndpointDirection {
+    Publish,
+    Play,
+}
+
+impl Into<proto::EndpointDirection> for EndpointDirection {
+    fn into(self) -> proto::EndpointDirection {
+        match self {
+            EndpointDirection::Play => proto::EndpointDirection::Play,
+            EndpointDirection::Publish => proto::EndpointDirection::Publish,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum OnStopReason {
+    TrafficNotFlowing,
+    Muted,
+    SrcMuted,
+}
+
+impl Into<proto::on_stop::Reason> for OnStopReason {
+    fn into(self) -> proto::on_stop::Reason {
+        match self {
+            OnStopReason::TrafficNotFlowing => {
+                proto::on_stop::Reason::TrafficNotFlowing
+            }
+            OnStopReason::Muted => proto::on_stop::Reason::Muted,
+            OnStopReason::SrcMuted => proto::on_stop::Reason::SrcMuted,
+        }
     }
 }
 
 /// `on_stop` Control API callback.
 #[derive(Debug)]
-pub struct OnStopEvent {}
+pub struct OnStopEvent {
+    pub kind: EndpointKind,
+    pub direction: EndpointDirection,
+    pub reason: OnStopReason,
+}
 
 impl Into<proto::OnStop> for OnStopEvent {
     fn into(self) -> proto::OnStop {
-        proto::OnStop {}
+        let kind: proto::EndpointKind = self.kind.into();
+        let direction: proto::EndpointDirection = self.direction.into();
+        let reason: proto::on_stop::Reason = self.reason.into();
+
+        proto::OnStop {
+            kind: kind as i32,
+            direction: direction as i32,
+            reason: reason as i32,
+        }
     }
 }
 

@@ -5,7 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{Direction, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -24,6 +24,13 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
+use crate::{
+    api::control::callback::{
+        CallbackRequest, EndpointDirection, EndpointKind, OnStopEvent,
+    },
+    signalling::elements::endpoints::webrtc::TracksState,
+};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -60,7 +67,7 @@ struct WebRtcPlayEndpointInner {
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
 
-    state: EndpointState,
+    state: TracksState,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -127,7 +134,7 @@ impl WebRtcPlayEndpoint {
             is_force_relayed,
             on_start,
             on_stop,
-            state: EndpointState::Stopped,
+            state: TracksState::new(),
         })))
     }
 
@@ -189,8 +196,8 @@ impl WebRtcPlayEndpoint {
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
     ///
     /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
-    pub fn get_on_start(&self) -> Option<CallbackUrl> {
-        self.0.borrow_mut().state = EndpointState::Started;
+    pub fn get_on_start(&self, kind: EndpointKind) -> Option<CallbackUrl> {
+        self.0.borrow_mut().state.started(kind);
         self.0.borrow().on_start.clone()
     }
 
@@ -207,10 +214,13 @@ impl WebRtcPlayEndpoint {
     ///
     /// If [`WebRtcPlayEndpoint::state`] currently is [`EndpointState::Stopped`]
     /// `None` will be returned.
-    pub fn get_on_stop(&self) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+    pub fn get_on_stop(
+        &self,
+        kind: EndpointKind,
+    ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
         let is_endpoints_started_before =
-            self.0.borrow().state == EndpointState::Started;
-        self.0.borrow_mut().state = EndpointState::Stopped;
+            self.0.borrow().state.is_started(kind);
+        self.0.borrow_mut().state.stopped(kind);
         let on_stop = self.0.borrow().on_stop.clone();
         if let Some(on_stop) = on_stop {
             if is_endpoints_started_before {
@@ -220,6 +230,10 @@ impl WebRtcPlayEndpoint {
         }
 
         None
+    }
+
+    pub const fn get_direction() -> EndpointDirection {
+        EndpointDirection::Play
     }
 
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak

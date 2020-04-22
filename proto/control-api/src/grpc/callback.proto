@@ -32,11 +32,35 @@ message Request {
 // some fields (if necessary) in the future.
 message Response {}
 
+enum EndpointKind {
+  AUDIO = 0;
+  VIDEO = 1;
+  BOTH = 3;
+}
+
+enum EndpointDirection {
+  PUBLISH = 0;
+  PLAY = 1;
+}
+
 // Event which fires when Endpoint starts sending/receiving media traffic.
-message OnStart {}
+message OnStart {
+  EndpointKind kind = 1;
+  EndpointDirection direction = 2;
+}
 
 // Event which fires when Endpoint stops sending/receiving media traffic.
-message OnStop {}
+message OnStop {
+  EndpointKind kind = 1;
+  EndpointDirection direction = 2;
+  Reason reason = 3;
+
+  enum Reason {
+    TRAFFIC_NOT_FLOWING = 0;
+    MUTED = 1;
+    SRC_MUTED = 2;
+  }
+}
 
 // Event that fires when Member joins a Room.
 message OnJoin {}
