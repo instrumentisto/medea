@@ -6,7 +6,7 @@ use futures::channel::mpsc;
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
-    media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
+    media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{
         MockPeerRepository, PeerConnection, PeerEvent, StableMuteState,
         TransceiverKind,
@@ -421,7 +421,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     let media_manager = MediaManager::default();
-    let mut constraints = MediaStreamConstraints::new();
+    let mut constraints = MediaStreamSettings::new();
     let audio_constraints = AudioTrackConstraints::new();
     constraints.audio(audio_constraints);
     let (stream, _) = media_manager.get_stream(constraints).await.unwrap();
@@ -467,7 +467,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         .unwrap();
 
     let media_manager = MediaManager::default();
-    let mut constraints = MediaStreamConstraints::new();
+    let mut constraints = MediaStreamSettings::new();
     let audio_constraints = AudioTrackConstraints::new();
     constraints.audio(audio_constraints);
     let (stream, _) = media_manager.get_stream(constraints).await.unwrap();

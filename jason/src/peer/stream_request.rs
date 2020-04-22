@@ -10,14 +10,13 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStream, MediaStreamConstraints,
+        AudioTrackConstraints, MediaStream, MediaStreamSettings,
         TrackConstraints, TrackKind, VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
 
-use super::{PeerMediaStream, PeerMediaTrack};
-use crate::peer::stream_request::StreamRequestError::ExpectedAudioTracks;
+use super::PeerMediaStream;
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
@@ -104,7 +103,7 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`] wrapper.
+    /// Parses raw [`SysMediaStream`] and returns [`PeerMediaStream`] wrapper.
     ///
     /// # Errors
     ///
@@ -123,28 +122,24 @@ impl SimpleStreamRequest {
     /// [`SysMediaStream`] doesn't have expected video [`MediaTrack`].
     pub fn parse_stream(
         &self,
-        mut stream: MediaStream,
+        stream: MediaStream,
     ) -> Result<PeerMediaStream> {
         use StreamRequestError::*;
+        let result_stream = PeerMediaStream::new();
 
         let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
-            .take_tracks()
+            .into_tracks()
             .into_iter()
             .partition(|track| match track.kind() {
                 TrackKind::Audio { .. } => false,
                 TrackKind::Video { .. } => true,
             });
-        let mut result_tracks = Vec::new();
 
         if let Some((id, audio)) = &self.audio {
             if audio_tracks.len() == 1 {
                 let track = audio_tracks.into_iter().next().unwrap();
                 if audio.satisfies(track.as_ref()) {
-                    result_tracks.push(PeerMediaTrack::new(
-                        *id,
-                        track,
-                        TrackConstraints::Audio(audio.clone()),
-                    ))
+                    result_stream.add_track(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
                 }
@@ -157,11 +152,7 @@ impl SimpleStreamRequest {
             if video_tracks.len() == 1 {
                 let track = video_tracks.into_iter().next().unwrap();
                 if video.satisfies(track.as_ref()) {
-                    result_tracks.push(PeerMediaTrack::new(
-                        *id,
-                        track,
-                        TrackConstraints::Video(video.clone()),
-                    ))
+                    result_stream.add_track(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
                 }
@@ -170,16 +161,31 @@ impl SimpleStreamRequest {
             }
         }
 
-        Ok(PeerMediaStream::from_tracks(result_tracks))
+        Ok(result_stream)
     }
 
-    pub fn merge<T: Into<MediaStreamConstraints>>(
+    /// Merges [`SimpleStreamRequest`] with provided [`MediaStreamSettings`].
+    ///
+    /// Applies new settings if possible, meaning that if this
+    /// [`SimpleStreamRequest`] does not have some constraint, then it will be
+    /// applied from [`MediaStreamSettings`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if
+    /// [`SimpleStreamRequest`] contains [`AudioTrackConstraints`], but provided
+    /// [`MediaStreamSettings`] does not.
+    ///
+    /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
+    /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
+    /// [`MediaStreamSettings`] does not.
+    pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
     ) -> Result<()> {
         let mut other = other.into();
 
-        if let Some((track_id, audio)) = self.audio.as_mut() {
+        if let Some((_, audio)) = self.audio.as_mut() {
             if let Some(other_audio) = other.take_audio() {
                 audio.merge(other_audio)
             } else {
@@ -188,7 +194,7 @@ impl SimpleStreamRequest {
                 ));
             }
         };
-        if let Some((track_id, video)) = self.video.as_mut() {
+        if let Some((_, video)) = self.video.as_mut() {
             if let Some(other_video) = other.take_video() {
                 video.merge(other_video)
             } else {
@@ -231,7 +237,7 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
     }
 }
 
-impl From<&SimpleStreamRequest> for MediaStreamConstraints {
+impl From<&SimpleStreamRequest> for MediaStreamSettings {
     fn from(request: &SimpleStreamRequest) -> Self {
         let mut constraints = Self::new();
 

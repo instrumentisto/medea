@@ -10,7 +10,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{future, FutureExt as _, StreamExt, TryFutureExt as _};
+use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -18,14 +18,12 @@ use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
     MediaDevices, MediaStream as SysMediaStream,
     MediaStreamConstraints as SysMediaStreamConstraints,
-    MediaStreamTrack as SysMediaStreamTrack,
 };
 
 use crate::{
     media::{
         stream::{MediaStream, MediaStreamTrack, WeakMediaStreamTrack},
-        MediaStreamConstraints, MultiSourceMediaStreamConstraints,
-        TrackConstraints,
+        MediaStreamSettings, MultiSourceMediaStreamConstraints,
     },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
@@ -133,7 +131,7 @@ impl InnerMediaManager {
     /// [2]: https://tinyurl.com/rnxcavf
     fn get_stream(
         &self,
-        mut caps: MediaStreamConstraints,
+        mut caps: MediaStreamSettings,
     ) -> impl Future<Output = Result<(MediaStream, bool)>> {
         let original_caps = caps.clone();
 
@@ -196,7 +194,7 @@ impl InnerMediaManager {
     /// [3]: https://tinyurl.com/wotjrns
     fn get_from_storage(
         &self,
-        caps: &mut MediaStreamConstraints,
+        caps: &mut MediaStreamSettings,
     ) -> Vec<MediaStreamTrack> {
         // cleanup weak links
         self.tracks
@@ -343,7 +341,7 @@ impl MediaManager {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-    pub async fn get_stream<I: Into<MediaStreamConstraints>>(
+    pub async fn get_stream<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
     ) -> Result<(MediaStream, bool)> {
@@ -369,7 +367,9 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 #[wasm_bindgen]
 #[allow(clippy::unused_self)]
 impl MediaManagerHandle {
-    /// Returns the JS array of [`InputDeviceInfo`] objects.
+    /// Returns array of [`InputDeviceInfo`] objects, which represent available
+    /// media input and output devices, such as microphones, cameras, and so
+    /// forth.
     pub fn enumerate_devices(&self) -> Promise {
         future_to_promise(async {
             InnerMediaManager::enumerate_devices()
@@ -388,10 +388,11 @@ impl MediaManagerHandle {
         })
     }
 
-    /// Returns [MediaStream][1] object.
+    /// Returns [MediaStream][1] object, built from provided
+    /// [`MediaStreamConstraints`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    pub fn init_local_stream(&self, caps: &MediaStreamConstraints) -> Promise {
+    pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {
         match upgrade_or_detached!(self.0)
             .map(|inner| inner.get_stream(caps.clone()))
         {

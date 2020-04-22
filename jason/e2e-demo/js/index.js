@@ -312,7 +312,7 @@ window.onload = async function() {
   }
 
   async function build_constraints(audio_select, video_select) {
-    let constraints = new rust.MediaStreamConstraints();
+    let constraints = new rust.MediaStreamSettings();
     let audio = new rust.AudioTrackConstraints();
     let audioSource = audio_select.options[audio_select.selectedIndex];
     if (audioSource) {
@@ -362,7 +362,7 @@ window.onload = async function() {
       localStream = await jason.media_manager().init_local_stream(constraints)
       await updateLocalVideo(localStream);
       await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
-      room.set_local_media_constraints(constraints);
+      room.set_local_media_settings(constraints);
     } catch (e) {
       console.error("Init local video failed: " + e.message());
     }
@@ -450,7 +450,7 @@ window.onload = async function() {
           localStream = await jason.media_manager().init_local_stream(constraints)
           await updateLocalVideo(localStream);
         }
-        room.set_local_media_constraints(constraints);
+        room.set_local_media_settings(constraints);
       } catch (e) {
         console.error("Changing audio source failed: " + e);
       }
@@ -466,7 +466,7 @@ window.onload = async function() {
           localStream = await jason.media_manager().init_local_stream(constraints)
           await updateLocalVideo(localStream);
         }
-        room.set_local_media_constraints(constraints);
+        room.set_local_media_settings(constraints);
       } catch (e) {
         console.error("Changing video source failed: " + e);
       }

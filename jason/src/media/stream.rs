@@ -1,27 +1,26 @@
 use std::{
-    mem,
     rc::{Rc, Weak},
 };
 
-use crate::MediaStreamConstraints;
+use crate::MediaStreamSettings;
 
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-#[wasm_bindgen(js_name = AZAZAZAZAZAZ)]
+#[wasm_bindgen(js_name = LocalMediaStream)]
 #[derive(Clone)]
 pub struct MediaStream {
     stream: SysMediaStream,
-    constraints: MediaStreamConstraints,
+    constraints: MediaStreamSettings,
     tracks: Vec<MediaStreamTrack>,
 }
 
 impl MediaStream {
     pub fn new(
         tracks: Vec<MediaStreamTrack>,
-        constraints: MediaStreamConstraints,
+        constraints: MediaStreamSettings,
     ) -> Self {
         let stream = SysMediaStream::new().unwrap();
         tracks
@@ -35,12 +34,15 @@ impl MediaStream {
         }
     }
 
-    pub fn take_tracks(&mut self) -> Vec<MediaStreamTrack> {
-        mem::replace(&mut self.tracks, Vec::new())
+    pub fn into_tracks(self) -> Vec<MediaStreamTrack> {
+        for track in &self.tracks {
+            self.stream.remove_track(track.as_ref());
+        }
+        self.tracks
     }
 }
 
-#[wasm_bindgen(js_class = AZAZAZAZAZAZ)]
+#[wasm_bindgen(js_class = LocalMediaStream)]
 impl MediaStream {
     pub fn get_media_stream(&self) -> SysMediaStream {
         Clone::clone(&self.stream)
@@ -48,23 +50,15 @@ impl MediaStream {
 
     pub fn free_audio(&mut self) {
         self.tracks.retain(|track| match track.kind() {
-            TrackKind::Audio => {
-                false
-            },
-            TrackKind::Video => {
-                true
-            },
+            TrackKind::Audio => false,
+            TrackKind::Video => true,
         });
     }
 
     pub fn free_video(&mut self) {
         self.tracks.retain(|track| match track.kind() {
-            TrackKind::Audio => {
-                true
-            },
-            TrackKind::Video => {
-                false
-            },
+            TrackKind::Audio => true,
+            TrackKind::Video => false,
         });
     }
 }
@@ -115,10 +109,10 @@ impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
 }
 
 impl MediaStreamTrack {
-    pub fn downgrade(&self) -> WeakMediaStreamTrack {
-        WeakMediaStreamTrack(Rc::downgrade(&self.0))
-    }
-
+    /// Returns [`id`][1] of underlying [MediaStreamTrack][2].
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
+    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn id(&self) -> String {
         self.0.id()
     }
@@ -129,6 +123,10 @@ impl MediaStreamTrack {
             "video" => TrackKind::Video,
             _ => unreachable!(),
         }
+    }
+
+    pub fn downgrade(&self) -> WeakMediaStreamTrack {
+        WeakMediaStreamTrack(Rc::downgrade(&self.0))
     }
 }
 

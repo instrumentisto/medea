@@ -49,13 +49,13 @@ impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
 #[derive(Clone, Default)]
-pub struct MediaStreamConstraints {
+pub struct MediaStreamSettings {
     audio: Option<AudioTrackConstraints>,
     video: Option<VideoTrackConstraints>,
 }
 
 #[wasm_bindgen]
-impl MediaStreamConstraints {
+impl MediaStreamSettings {
     /// Creates new [`MediaStreamConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
@@ -82,7 +82,7 @@ impl MediaStreamConstraints {
     }
 }
 
-impl MediaStreamConstraints {
+impl MediaStreamSettings {
     /// Returns only audio constraints.
     pub fn get_audio(&self) -> &Option<AudioTrackConstraints> {
         &self.audio
@@ -136,18 +136,16 @@ pub enum MultiSourceMediaStreamConstraints {
 }
 
 /// TLDR:
-/// {None, None} => None
-/// {None, Device} => Device
-/// {None, Display} => Display
-/// {None, Any} => Device
-/// {Some, None} => Device
-/// {Some, Device} => Device
-/// {Some, Display} => DeviceAndDisplay
-/// {Some, Any} => Device
-impl From<MediaStreamConstraints>
-    for Option<MultiSourceMediaStreamConstraints>
-{
-    fn from(constraints: MediaStreamConstraints) -> Self {
+/// `{None, None}` => `None`
+/// `{None, Device}` => `Device`
+/// `{None, Display}` => `Display`
+/// `{None, Any}` => `Device`
+/// `{Some, None}` => `Device`
+/// `{Some, Device}` => `Device`
+/// `{Some, Display}` => `DeviceAndDisplay`
+/// `{Some, Any}` => `Device`
+impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
+    fn from(constraints: MediaStreamSettings) -> Self {
         use MultiSourceMediaStreamConstraints::*;
 
         let mut sys_constraints = SysMediaStreamConstraints::new();
@@ -232,7 +230,7 @@ impl TrackConstraints {
     /// [`TrackConstraints`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
         match self {
             Self::Audio(audio) => audio.satisfies(&track),
             Self::Video(video) => video.satisfies(&track),
@@ -286,7 +284,8 @@ impl AudioTrackConstraints {
     /// contained.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
+        let track = track.as_ref();
         if track.kind() != "audio" {
             return false;
         }
@@ -299,6 +298,9 @@ impl AudioTrackConstraints {
         // TODO returns Result<bool, Error>
     }
 
+    /// Merges this [`AudioTrackConstraints`] with other
+    /// [`AudioTrackConstraints`], meaning that if some constraint is not set on
+    /// this, then constraint from other will be applied to this.
     pub fn merge(&mut self, other: AudioTrackConstraints) {
         if self.device_id.is_none() && other.device_id.is_some() {
             self.device_id = other.device_id;
@@ -377,6 +379,7 @@ impl DeviceVideoTrackConstraints {
 pub struct DisplayVideoTrackConstraints {}
 
 impl DisplayVideoTrackConstraints {
+    #[allow(clippy::unused_self)]
     fn merge(&mut self, _: DisplayVideoTrackConstraints) {
         // no constraints => nothing to do here atm
     }
@@ -397,7 +400,8 @@ impl VideoTrackConstraints {
     /// contained.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
+        let track = track.as_ref();
         if track.kind() != "video" {
             return false;
         }
@@ -441,6 +445,9 @@ impl VideoTrackConstraints {
         }
     }
 
+    /// Merges this [`VideoTrackConstraints`] with other
+    /// [`VideoTrackConstraints`], meaning that if some constraint is not set on
+    /// this, then constraint from other will be applied to this.
     pub fn merge(&mut self, other: VideoTrackConstraints) {
         match (self.0.as_mut(), other.0) {
             (None, Some(other)) => {

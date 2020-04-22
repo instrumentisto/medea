@@ -9,7 +9,6 @@ mod repo;
 mod stats;
 mod stream;
 mod stream_request;
-mod track;
 
 use std::{
     cell::RefCell,
@@ -32,7 +31,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 use crate::{
     media::{MediaManager, MediaManagerError, MediaStream},
     utils::{console_error, JasonError, JsCaused, JsError},
-    MediaStreamConstraints,
+    MediaStreamSettings,
 };
 
 #[cfg(feature = "mockable")]
@@ -50,9 +49,8 @@ pub use self::{
         MuteStateTransition, Sender, StableMuteState,
     },
     stats::RtcStats,
-    stream::{MediaStreamHandle, PeerMediaStream},
+    stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
-    track::PeerMediaTrack,
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -174,7 +172,9 @@ pub enum PeerEvent {
         stats: RtcStats,
     },
 
+    /// [`RtcPeerConnection`] is signalling that it [`MediaStream`]
     NewLocalStreamRequired {
+        /// ID of the [`PeerConnection`] that requested new media stream.
         peer_id: Id,
     },
 }
@@ -464,15 +464,15 @@ impl PeerConnection {
         if let Some(sender_id) =
             media_connections.add_remote_track(transceiver, track.into())
         {
-            if let Some(tracks) =
-                media_connections.get_tracks_by_sender(sender_id)
+            if let Some(remote_stream) =
+                media_connections.get_stream_by_sender(sender_id)
             {
                 // got all tracks from this sender, so emit
                 // PeerEvent::NewRemoteStream
                 let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
                     peer_id: id,
                     sender_id,
-                    remote_stream: PeerMediaStream::from_tracks(tracks),
+                    remote_stream,
                 });
             };
         } else {
@@ -527,7 +527,7 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
-        local_stream: Option<MediaStreamConstraints>,
+        local_stream: Option<MediaStreamSettings>,
     ) -> Result<String> {
         self.media_connections
             .update_tracks(tracks)
@@ -556,16 +556,18 @@ impl PeerConnection {
     /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-        local_constraints: Option<MediaStreamConstraints>,
+        local_constraints: Option<MediaStreamSettings>,
     ) -> Result<()> {
         if let Some(request) = self.media_connections.get_stream_request() {
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            let used_caps: MediaStreamConstraints = match local_constraints {
+            let used_caps: MediaStreamSettings = match local_constraints {
                 None => (&required_caps).into(),
                 Some(local_constraints) => {
-                    required_caps.merge(local_constraints);
+                    required_caps
+                        .merge(local_constraints)
+                        .map_err(tracerr::map_from_and_wrap!())?;
                     (&required_caps).into()
                 }
             };
@@ -655,7 +657,7 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-        local_constraints: Option<MediaStreamConstraints>,
+        local_constraints: Option<MediaStreamSettings>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =

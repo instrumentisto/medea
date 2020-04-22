@@ -3,6 +3,7 @@
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
     rc::{Rc, Weak},
 };
@@ -12,16 +13,14 @@ use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::{MediaStream, TrackConstraints},
+    media::{MediaStreamTrack, TrackKind},
     utils::HandlerDetachedError,
 };
 
-use super::PeerMediaTrack;
-
-/// Actual data of a [`MediaStream`].
+/// Actual data of a [`PeerMediaStream`].
 ///
-/// Shared between JS side ([`MediaStreamHandle`]) and Rust side
-/// ([`MediaStream`]).
+/// Shared between JS side ([`RemoteMediaStream`]) and Rust side
+/// ([`PeerMediaStream`]).
 struct InnerStream {
     /// Actual underlying [MediaStream][1] object.
     ///
@@ -29,10 +28,10 @@ struct InnerStream {
     stream: SysMediaStream,
 
     /// List of audio tracks.
-    audio_tracks: HashMap<TrackId, Rc<PeerMediaTrack>>,
+    audio_tracks: HashMap<TrackId, MediaStreamTrack>,
 
     /// List of video tracks.
-    video_tracks: HashMap<TrackId, Rc<PeerMediaTrack>>,
+    video_tracks: HashMap<TrackId, MediaStreamTrack>,
 }
 
 impl InnerStream {
@@ -45,16 +44,15 @@ impl InnerStream {
         }
     }
 
-    /// Adds provided [`MediaTrack`] to a stream.
-    fn add_track(&mut self, track: Rc<PeerMediaTrack>) {
-        self.stream.add_track(track.track().as_ref());
-        let caps = track.caps();
-        match caps {
-            TrackConstraints::Audio(_) => {
-                self.audio_tracks.insert(track.id(), track);
+    /// Adds provided [`MediaStreamTrack`] to a stream.
+    fn add_track(&mut self, track_id: TrackId, track: MediaStreamTrack) {
+        self.stream.add_track(track.as_ref());
+        match track.kind() {
+            TrackKind::Audio => {
+                self.audio_tracks.insert(track_id, track);
             }
-            TrackConstraints::Video(_) => {
-                self.video_tracks.insert(track.id(), track);
+            TrackKind::Video => {
+                self.video_tracks.insert(track_id, track);
             }
         }
     }
@@ -64,69 +62,72 @@ impl InnerStream {
 ///
 /// It's used on Rust side and represents a handle to [`InnerStream`] data.
 ///
-/// For using [`MediaStream`] on JS side, consider the [`MediaStreamHandle`].
+/// For using [`PeerMediaStream`] on JS side, consider the
+/// [`RemoteMediaStream`].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-pub struct PeerMediaStream(Rc<InnerStream>);
+pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
 
+#[allow(clippy::new_without_default)]
 impl PeerMediaStream {
-    /// Creates new [`MediaStream`] from a given collection of [`MediaTrack`]s.
-    pub fn from_tracks<I>(tracks: I) -> Self
-    where
-        I: IntoIterator<Item = Rc<PeerMediaTrack>>,
-    {
-        let mut stream = InnerStream::new();
-        for track in tracks {
-            stream.add_track(track);
-        }
-        Self(Rc::new(stream))
+    pub fn new() -> Self {
+        Self(Rc::new(RefCell::new(InnerStream::new())))
     }
 
-    /// Checks if [`MediaStream`] contains a [`MediaTrack`] with specified ID.
+    pub fn add_track(&self, track_id: TrackId, track: MediaStreamTrack) {
+        self.0.borrow_mut().add_track(track_id, track);
+    }
+
+    /// Checks if [`PeerMediaStream`] contains a [`MediaStreamTrack`] with
+    /// specified ID.
     pub fn has_track(&self, id: TrackId) -> bool {
-        self.0.video_tracks.contains_key(&id)
-            || self.0.audio_tracks.contains_key(&id)
+        let inner = self.0.borrow();
+        inner.video_tracks.contains_key(&id)
+            || inner.audio_tracks.contains_key(&id)
     }
 
-    /// Returns a [`MediaTrack`] of [`MediaStream`] by its ID, if any.
+    /// Returns a [`MediaStreamTrack`] of [`PeerMediaStream`] by its ID, if any.
     pub fn get_track_by_id(
         &self,
         track_id: TrackId,
-    ) -> Option<Rc<PeerMediaTrack>> {
-        match self.0.video_tracks.get(&track_id) {
-            Some(track) => Some(Rc::clone(track)),
-            None => match self.0.audio_tracks.get(&track_id) {
-                Some(track) => Some(Rc::clone(track)),
+    ) -> Option<MediaStreamTrack> {
+        let inner = self.0.borrow();
+        match inner.video_tracks.get(&track_id) {
+            Some(track) => Some(track.clone()),
+            None => match inner.audio_tracks.get(&track_id) {
+                Some(track) => Some(track.clone()),
                 None => None,
             },
         }
     }
 
-    /// Instantiates new [`MediaStreamHandle`] for use on JS side.
-    pub fn new_handle(&self) -> MediaStreamHandle {
-        MediaStreamHandle(Rc::downgrade(&self.0))
+    /// Instantiates new [`RemoteMediaStream`] for use on JS side.
+    pub fn new_handle(&self) -> RemoteMediaStream {
+        RemoteMediaStream(Rc::downgrade(&self.0))
     }
 
     /// Returns actual underlying [MediaStream][1] object.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     pub fn stream(&self) -> SysMediaStream {
-        Clone::clone(&self.0.stream)
+        Clone::clone(&self.0.borrow().stream)
     }
 }
 
-/// JS side handle to [`MediaStream`].
+/// JS side handle to [`PeerMediaStream`].
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerStream`.
 ///
-/// For using [`MediaStreamHandle`] on Rust side, consider the [`MediaStream`].
+/// For using [`RemoteMediaStream`] on Rust side, consider the
+/// [`PeerMediaStream`].
 #[wasm_bindgen]
-pub struct MediaStreamHandle(Weak<InnerStream>);
+pub struct RemoteMediaStream(Weak<RefCell<InnerStream>>);
 
 #[wasm_bindgen]
-impl MediaStreamHandle {
-    /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
+impl RemoteMediaStream {
+    /// Returns the underlying [`PeerMediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| Clone::clone(&inner.stream))
+        upgrade_or_detached!(self.0)
+            .map(|inner| Clone::clone(&inner.borrow().stream))
     }
 }

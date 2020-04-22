@@ -20,13 +20,12 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
-use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::MediaStream,
+    media::{MediaStream, MediaStreamSettings},
     peer::{
-        MediaConnectionsError, MediaStreamHandle, MuteState, PeerError,
-        PeerEvent, PeerEventHandler, PeerMediaStream, PeerRepository, RtcStats,
+        MediaConnectionsError, MuteState, PeerError, PeerEvent,
+        PeerEventHandler, PeerMediaStream, PeerRepository, RtcStats,
         StableMuteState, TransceiverKind,
     },
     rpc::{
@@ -37,7 +36,6 @@ use crate::{
         console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
         JsError,
     },
-    MediaStreamConstraints,
 };
 
 use super::{connection::Connection, ConnectionHandle};
@@ -341,14 +339,14 @@ impl RoomHandle {
     /// in this [`Room`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    pub fn set_local_media_constraints(
+    pub fn set_local_media_settings(
         &self,
-        constraints: &MediaStreamConstraints,
+        settings: &MediaStreamSettings,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             inner
                 .borrow_mut()
-                .set_local_media_constraints(constraints.clone())
+                .set_local_media_settings(settings.clone())
         })
     }
 
@@ -482,7 +480,7 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
 
     /// Local media stream for injecting into new created [`PeerConnection`]s.
-    local_stream: Option<MediaStreamConstraints>,
+    local_stream_settings: Option<MediaStreamSettings>,
 
     /// [`PeerConnection`] repository.
     peers: Box<dyn PeerRepository>,
@@ -534,7 +532,7 @@ impl InnerRoom {
     ) -> Self {
         Self {
             rpc,
-            local_stream: None,
+            local_stream_settings: None,
             peers,
             peer_event_sender,
             connections: HashMap::new(),
@@ -668,18 +666,14 @@ impl InnerRoom {
     ///
     /// If injecting fails, then invokes `on_failed_local_stream` callback with
     /// a failure error.
-    fn set_local_media_constraints(
-        &mut self,
-        constraints: MediaStreamConstraints,
-    ) {
+    fn set_local_media_settings(&mut self, settings: MediaStreamSettings) {
         let peers = self.peers.get_all();
-        let constraints_clone = constraints.clone();
+        let settings_clone = settings.clone();
         let error_callback = Rc::clone(&self.on_failed_local_stream);
-
         spawn_local(async move {
             for peer in peers {
                 if let Err(err) = peer
-                    .update_local_stream(Some(constraints_clone.clone()))
+                    .update_local_stream(Some(settings_clone.clone()))
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
@@ -687,7 +681,7 @@ impl InnerRoom {
                 }
             }
         });
-        self.local_stream.replace(constraints);
+        self.local_stream_settings.replace(settings);
     }
 }
 
@@ -727,7 +721,7 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
-        let local_stream_constraints = self.local_stream.clone();
+        let local_stream_constraints = self.local_stream_settings.clone();
         let rpc = Rc::clone(&self.rpc);
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(
@@ -939,7 +933,7 @@ impl PeerEventHandler for InnerRoom {
     fn on_new_local_stream_required(&mut self, peer_id: PeerId) {
         console_error("on_new_local_stream_required");
         if let Some(peer) = self.peers.get(peer_id) {
-            let constraints_clone = self.local_stream.clone();
+            let constraints_clone = self.local_stream_settings.clone();
             let error_callback = Rc::clone(&self.on_failed_local_stream);
             spawn_local(async move {
                 if let Err(err) = peer
