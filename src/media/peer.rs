@@ -20,7 +20,6 @@ use crate::{
     signalling::{
         elements::endpoints::{Endpoint, WeakEndpoint},
         peers::{Counter, PeerSpec, TrackMediaType},
-        room::RoomError::EndpointAlreadyExists,
     },
 };
 
@@ -83,7 +82,9 @@ impl PeerError {
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
-#[enum_delegate(pub fn get_track_by_id(&self, track_id: TrackId) -> Option<Rc<MediaTrack>>)]
+#[enum_delegate(
+    pub fn get_track_by_id(&self, track_id: TrackId) -> Option<Rc<MediaTrack>>
+)]
 #[enum_delegate(pub fn is_senders_muted(&self, kind: EndpointKind) -> bool)]
 #[enum_delegate(pub fn is_receivers_muted(&self, kind: EndpointKind) -> bool)]
 #[derive(Debug)]

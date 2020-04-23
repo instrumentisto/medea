@@ -4,15 +4,16 @@
 
 pub mod webrtc;
 
-use std::hash::Hash;
-
 use derive_more::From;
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 use medea_macro::enum_delegate;
 
 use crate::api::control::{
-    callback::{url::CallbackUrl, EndpointDirection, EndpointKind},
+    callback::{
+        url::CallbackUrl, CallbackRequest, EndpointDirection, EndpointKind,
+        OnStopEvent, OnStopReason,
+    },
     refs::{Fid, ToEndpoint},
 };
 
@@ -55,11 +56,9 @@ impl Endpoint {
     #[inline]
     pub fn get_direction(&self) -> EndpointDirection {
         match self {
-            Endpoint::WebRtcPlayEndpoint(_) => {
-                WebRtcPlayEndpoint::get_direction()
-            }
+            Endpoint::WebRtcPlayEndpoint(_) => WebRtcPlayEndpoint::DIRECTION,
             Endpoint::WebRtcPublishEndpoint(_) => {
-                WebRtcPublishEndpoint::get_direction()
+                WebRtcPublishEndpoint::DIRECTION
             }
         }
     }
@@ -95,6 +94,28 @@ pub enum WeakEndpoint {
 }
 
 impl WeakEndpoint {
+    pub fn get_traffic_flowing_on_stop(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<(CallbackUrl, CallbackRequest)> {
+        self.upgrade()
+            .map(|e| {
+                e.get_on_stop(peer_id, EndpointKind::Both)
+                    .map(|(fid, url)| {
+                        let req = CallbackRequest::new_at_now(
+                            fid,
+                            OnStopEvent {
+                                direction: e.get_direction(),
+                                kind: EndpointKind::Both,
+                                reason: OnStopReason::TrafficNotFlowing,
+                            },
+                        );
+                        (url, req)
+                    })
+            })
+            .flatten()
+    }
+
     /// Upgrades this weak pointer to a strong [`Endpoint`] pointer.
     pub fn upgrade(&self) -> Option<Endpoint> {
         match self {

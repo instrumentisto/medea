@@ -16,11 +16,8 @@ use crate::{
         refs::{Fid, ToEndpoint},
     },
     signalling::elements::{
-        endpoints::webrtc::{
-            play_endpoint::WeakWebRtcPlayEndpoint, EndpointState,
-        },
-        member::WeakMember,
-        Member,
+        endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
+        member::WeakMember, Member,
     },
 };
 
@@ -122,6 +119,8 @@ impl WebRtcPublishEndpointInner {
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
+    pub const DIRECTION: EndpointDirection = EndpointDirection::Publish;
+
     /// Creates new [`WebRtcPublishEndpoint`].
     pub fn new(
         id: Id,
@@ -250,6 +249,7 @@ impl WebRtcPublishEndpoint {
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
     ///
     /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
+    #[allow(clippy::if_not_else)]
     pub fn get_on_start(&self, kind: EndpointKind) -> Option<CallbackUrl> {
         let mut inner = self.0.borrow_mut();
         if !inner.state.is_started(kind) {
@@ -293,10 +293,6 @@ impl WebRtcPublishEndpoint {
         }
 
         None
-    }
-
-    pub const fn get_direction() -> EndpointDirection {
-        EndpointDirection::Publish
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer

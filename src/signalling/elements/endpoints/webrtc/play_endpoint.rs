@@ -5,7 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{Direction, PeerId};
+use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -15,22 +15,16 @@ use crate::{
         refs::{Fid, SrcUri, ToEndpoint},
     },
     signalling::elements::{
-        endpoints::webrtc::{
-            publish_endpoint::WeakWebRtcPublishEndpoint, EndpointState,
-        },
-        member::WeakMember,
-        Member,
+        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
+        member::WeakMember, Member,
     },
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
 use crate::{
-    api::control::callback::{
-        CallbackRequest, EndpointDirection, EndpointKind, OnStopEvent,
-    },
+    api::control::callback::{EndpointDirection, EndpointKind},
     signalling::elements::endpoints::webrtc::TracksState,
 };
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -115,6 +109,8 @@ impl Drop for WebRtcPlayEndpointInner {
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
+    pub const DIRECTION: EndpointDirection = EndpointDirection::Play;
+
     /// Creates new [`WebRtcPlayEndpoint`].
     pub fn new(
         id: Id,
@@ -196,6 +192,7 @@ impl WebRtcPlayEndpoint {
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
     ///
     /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
+    #[allow(clippy::if_not_else)]
     pub fn get_on_start(&self, kind: EndpointKind) -> Option<CallbackUrl> {
         let mut inner = self.0.borrow_mut();
         if !inner.state.is_started(kind) {
@@ -235,10 +232,6 @@ impl WebRtcPlayEndpoint {
         }
 
         None
-    }
-
-    pub const fn get_direction() -> EndpointDirection {
-        EndpointDirection::Play
     }
 
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak

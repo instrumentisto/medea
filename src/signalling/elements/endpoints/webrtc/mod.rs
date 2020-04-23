@@ -4,6 +4,7 @@ pub mod play_endpoint;
 pub mod publish_endpoint;
 
 use crate::api::control::callback::EndpointKind;
+
 #[doc(inline)]
 pub use play_endpoint::WebRtcPlayEndpoint;
 #[doc(inline)]
@@ -13,36 +14,95 @@ pub use publish_endpoint::WebRtcPublishEndpoint;
 struct TracksState(u8);
 
 impl TracksState {
+    #[inline]
     pub const fn new() -> TracksState {
         Self(0)
     }
 
+    #[inline]
     pub fn started(&mut self, kind: EndpointKind) {
-        self.0 = self.0 | (kind as u8);
+        self.0 |= kind as u8;
     }
 
+    #[inline]
     pub fn stopped(&mut self, kind: EndpointKind) {
-        self.0 = self.0 & !(kind as u8);
+        self.0 &= !(kind as u8);
     }
 
-    pub const fn is_started(&self, kind: EndpointKind) -> bool {
+    #[inline]
+    pub const fn is_started(self, kind: EndpointKind) -> bool {
         let kind = kind as u8;
         (self.0 & kind) == kind
     }
 }
 
-/// Publishing state of the WebRTC endpoints.
-///
-/// This state should change only on `on_start`/`on_stop` callback sending.
-///
-/// Theoretically this state also can change if no `on_start`/`on_stop`
-/// callbacks was set but someone tries to get this kind of callbacks from
-/// endpoints.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum EndpointState {
-    /// Endpoint's `on_start` callback was sent.
-    Started,
+#[cfg(test)]
+mod tracks_state_tests {
+    use super::*;
 
-    /// Endpoint's `on_stop` callback was sent.
-    Stopped,
+    #[test]
+    fn normally_sets_started() {
+        let mut state = TracksState::new();
+
+        assert!(!state.is_started(EndpointKind::Audio));
+        assert!(!state.is_started(EndpointKind::Video));
+        assert!(!state.is_started(EndpointKind::Both));
+
+        state.started(EndpointKind::Audio);
+        assert!(state.is_started(EndpointKind::Audio));
+        assert!(!state.is_started(EndpointKind::Video));
+        assert!(!state.is_started(EndpointKind::Both));
+
+        state.started(EndpointKind::Video);
+        assert!(state.is_started(EndpointKind::Video));
+        assert!(state.is_started(EndpointKind::Audio));
+        assert!(state.is_started(EndpointKind::Both));
+    }
+
+    #[test]
+    fn normally_sets_started_on_both() {
+        let mut state = TracksState::new();
+
+        assert!(!state.is_started(EndpointKind::Video));
+        assert!(!state.is_started(EndpointKind::Audio));
+        assert!(!state.is_started(EndpointKind::Both));
+
+        state.started(EndpointKind::Both);
+        assert!(state.is_started(EndpointKind::Video));
+        assert!(state.is_started(EndpointKind::Audio));
+        assert!(state.is_started(EndpointKind::Both));
+    }
+
+    #[test]
+    fn normally_sets_stopped() {
+        let mut state = TracksState::new();
+        state.started(EndpointKind::Both);
+        assert!(state.is_started(EndpointKind::Video));
+        assert!(state.is_started(EndpointKind::Audio));
+        assert!(state.is_started(EndpointKind::Both));
+
+        state.stopped(EndpointKind::Audio);
+        assert!(!state.is_started(EndpointKind::Audio));
+        assert!(state.is_started(EndpointKind::Video));
+        assert!(!state.is_started(EndpointKind::Both));
+
+        state.stopped(EndpointKind::Video);
+        assert!(!state.is_started(EndpointKind::Audio));
+        assert!(!state.is_started(EndpointKind::Video));
+        assert!(!state.is_started(EndpointKind::Both));
+    }
+
+    #[test]
+    fn normally_sets_stopped_on_both() {
+        let mut state = TracksState::new();
+        state.started(EndpointKind::Both);
+        assert!(state.is_started(EndpointKind::Video));
+        assert!(state.is_started(EndpointKind::Audio));
+        assert!(state.is_started(EndpointKind::Both));
+
+        state.stopped(EndpointKind::Both);
+        assert!(!state.is_started(EndpointKind::Video));
+        assert!(!state.is_started(EndpointKind::Audio));
+        assert!(!state.is_started(EndpointKind::Both));
+    }
 }

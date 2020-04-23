@@ -10,9 +10,8 @@ use clients::CallbackClientError;
 use derive_more::From;
 use medea_control_api_proto::grpc::callback as proto;
 
-use crate::api::control::refs::{fid::StatefulFid::Endpoint, StatefulFid};
+use crate::api::control::refs::StatefulFid;
 use medea_client_api_proto::MediaType;
-use medea_control_api_proto::grpc::callback::on_stop::Reason;
 use std::convert::From;
 
 /// Event for `on_leave` `Member` callback.
@@ -136,6 +135,7 @@ pub enum OnStopReason {
     TrafficNotFlowing,
     Muted,
     SrcMuted,
+    WrongTrafficFlowing,
 }
 
 impl Into<proto::on_stop::Reason> for OnStopReason {
@@ -146,6 +146,9 @@ impl Into<proto::on_stop::Reason> for OnStopReason {
             }
             OnStopReason::Muted => proto::on_stop::Reason::Muted,
             OnStopReason::SrcMuted => proto::on_stop::Reason::SrcMuted,
+            OnStopReason::WrongTrafficFlowing => {
+                proto::on_stop::Reason::WrongTrafficFlowing
+            }
         }
     }
 }

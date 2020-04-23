@@ -59,6 +59,7 @@ message OnStop {
     TRAFFIC_NOT_FLOWING = 0;
     MUTED = 1;
     SRC_MUTED = 2;
+    WRONG_TRAFFIC_FLOWING = 3;
   }
 }
 

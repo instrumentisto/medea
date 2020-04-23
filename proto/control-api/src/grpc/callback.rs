@@ -57,6 +57,7 @@ pub mod on_stop {
         TrafficNotFlowing = 0,
         Muted = 1,
         SrcMuted = 2,
+        WrongTrafficFlowing = 3,
     }
 }
 /// Event that fires when Member joins a Room.

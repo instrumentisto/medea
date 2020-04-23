@@ -95,10 +95,7 @@ use super::{
         PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
     },
 };
-use crate::{
-    api::control::callback::{EndpointDirection, EndpointKind, OnStopReason},
-    signalling::elements::endpoints::WeakEndpoint,
-};
+use crate::api::control::callback::{EndpointKind, OnStopReason};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -518,31 +515,18 @@ impl Room {
             // `Member` `Peer`s.
             let peers = self.remove_peers(member_id, &peers, ctx);
             #[allow(clippy::filter_map)]
-            let on_stop_callbacks: HashMap<_, _> = peers
+            peers
                 .into_iter()
                 .filter(|(key, _)| key != member_id)
                 .flat_map(|(_, peers)| peers.into_iter())
                 .flat_map(|peer| {
-                    peer.endpoints()
-                        .into_iter()
-                        .filter_map(|weak_end| weak_end.upgrade())
-                        .filter_map(move |endpoint: Endpoint| {
-                            // TODO: Provided real EndpointKind
-                            endpoint.get_on_stop(peer.id(), EndpointKind::Both)
-                                .map(|(fid, url)| {
-                                    (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                        reason: OnStopReason::TrafficNotFlowing,
-                                        kind: EndpointKind::Both,
-                                        direction: endpoint.get_direction(),
-                                    })))
-                                })
-                        })
+                    peer.endpoints().into_iter().filter_map(move |endpoint| {
+                        endpoint.get_traffic_flowing_on_stop(peer.id())
+                    })
                 })
-                .collect();
-
-            for (_, (url, req)) in on_stop_callbacks {
-                self.callbacks.send_callback(url, req);
-            }
+                .for_each(|(url, req)| {
+                    self.callbacks.send_callback(url, req);
+                });
 
             self.members.delete_member(member_id, ctx);
 
@@ -598,31 +582,20 @@ impl Room {
         }
 
         if let Some(removed_peers) = removed_peers {
-            let on_stop_callbacks: HashMap<_, _> = removed_peers
+            removed_peers
                 .values()
                 .flat_map(|peers| {
                     peers.iter().flat_map(|peer| {
-                        peer.endpoints()
-                            .into_iter()
-                            .filter_map(|weak_endpoint| weak_endpoint.upgrade())
-                            .filter_map(move |endpoint| {
-                                // TODO: Provided real EndpointKind
-                                endpoint.get_on_stop(peer.id(), EndpointKind::Both)
-                                    .map(|(fid, url)| {
-                                        (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                            reason: OnStopReason::TrafficNotFlowing,
-                                            kind: EndpointKind::Both,
-                                            direction: endpoint.get_direction(),
-                                        })))
-                                    })
-                            })
+                        peer.endpoints().into_iter().filter_map(
+                            move |endpoint| {
+                                endpoint.get_traffic_flowing_on_stop(peer.id())
+                            },
+                        )
                     })
                 })
-                .collect();
-
-            for (_, (url, req)) in on_stop_callbacks {
-                self.callbacks.send_callback(url, req);
-            }
+                .for_each(|(url, req)| {
+                    self.callbacks.send_callback(url, req);
+                });
         }
     }
 
@@ -783,6 +756,91 @@ impl Room {
         }
         Ok(())
     }
+
+    fn endpoint_muted(
+        &self,
+        peer_id: PeerId,
+        publish: &WebRtcPublishEndpoint,
+        kind: EndpointKind,
+    ) {
+        if let Some((fid, url)) = publish.get_on_stop(peer_id, kind) {
+            self.callbacks.send_callback(
+                url,
+                CallbackRequest::new_at_now(
+                    fid,
+                    OnStopEvent {
+                        kind,
+                        direction: WebRtcPublishEndpoint::DIRECTION,
+                        reason: OnStopReason::Muted,
+                    },
+                ),
+            );
+            for sink in publish.sinks() {
+                if let Some((fid, url)) = sink.get_on_stop(kind) {
+                    self.callbacks.send_callback(
+                        url,
+                        CallbackRequest::new_at_now(
+                            fid,
+                            OnStopEvent {
+                                kind,
+                                direction: WebRtcPlayEndpoint::DIRECTION,
+                                reason: OnStopReason::SrcMuted,
+                            },
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn endpoint_unmuted(
+        &self,
+        publish: &WebRtcPublishEndpoint,
+        kind: EndpointKind,
+    ) {
+        if let Some(url) = publish.get_on_start(kind) {
+            let fid = publish.owner().get_fid_to_endpoint(publish.id().into());
+            self.callbacks.send_callback(
+                url,
+                CallbackRequest::new_at_now(
+                    fid,
+                    OnStartEvent {
+                        kind,
+                        direction: WebRtcPublishEndpoint::DIRECTION,
+                    },
+                ),
+            );
+            for sink in publish.sinks() {
+                if let Some(url) = sink.get_on_start(kind) {
+                    let fid =
+                        sink.owner().get_fid_to_endpoint(sink.id().into());
+                    self.callbacks.send_callback(
+                        url,
+                        CallbackRequest::new_at_now(
+                            fid,
+                            OnStartEvent {
+                                kind,
+                                direction: WebRtcPlayEndpoint::DIRECTION,
+                            },
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn perform_muting(
+        &self,
+        peer: &PeerStateMachine,
+        publish: &WebRtcPublishEndpoint,
+        kind: EndpointKind,
+    ) {
+        if peer.is_senders_muted(kind) {
+            self.endpoint_muted(peer.id(), publish, kind);
+        } else {
+            self.endpoint_unmuted(publish, kind);
+        }
+    }
 }
 
 impl RpcServer for Addr<Room> {
@@ -797,17 +855,17 @@ impl RpcServer for Addr<Room> {
             member_id,
             connection,
         })
-        .map(|res| match res {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                error!(
-                    "Failed to send RpcConnectionEstablished cause {:?}",
-                    e,
-                );
-                Err(())
-            }
-        })
-        .boxed_local()
+            .map(|res| match res {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    error!(
+                        "Failed to send RpcConnectionEstablished cause {:?}",
+                        e,
+                    );
+                    Err(())
+                }
+            })
+            .boxed_local()
     }
 
     /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
@@ -1005,107 +1063,11 @@ impl CommandHandler for Room {
                 .for_each(|(track, patch)| track.update(patch));
 
             for weak_endpoint in peer.endpoints() {
-                match weak_endpoint.upgrade() {
-                    Some(Endpoint::WebRtcPublishEndpoint(publish)) => {
-                        if peer.is_senders_muted(EndpointKind::Audio) {
-                            if let Some((fid, url)) = publish
-                                .get_on_stop(peer_id, EndpointKind::Audio)
-                            {
-                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                    kind: EndpointKind::Audio,
-                                    direction: WebRtcPublishEndpoint::get_direction(),
-                                    reason: OnStopReason::Muted,
-                                }));
-                                for sink in publish.sinks() {
-                                    if let Some((fid, url)) =
-                                        sink.get_on_stop(EndpointKind::Audio)
-                                    {
-                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                            kind: EndpointKind::Audio,
-                                            direction: WebRtcPlayEndpoint::get_direction(),
-                                            reason: OnStopReason::SrcMuted,
-                                        }));
-                                    }
-                                }
-                            }
-                        } else {
-                            if let Some(url) =
-                                publish.get_on_start(EndpointKind::Audio)
-                            {
-                                let fid = publish
-                                    .owner()
-                                    .get_fid_to_endpoint(publish.id().into());
-                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
-                                    kind: EndpointKind::Audio,
-                                    direction: WebRtcPublishEndpoint::get_direction(),
-                                }));
-                                for sink in publish.sinks() {
-                                    if let Some(url) =
-                                        sink.get_on_start(EndpointKind::Audio)
-                                    {
-                                        let fid =
-                                            sink.owner().get_fid_to_endpoint(
-                                                sink.id().into(),
-                                            );
-                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
-                                            kind: EndpointKind::Audio,
-                                            direction: WebRtcPlayEndpoint::get_direction(),
-                                        }));
-                                    }
-                                }
-                            }
-                        }
-
-                        if peer.is_senders_muted(EndpointKind::Video) {
-                            if let Some((fid, url)) = publish
-                                .get_on_stop(peer_id, EndpointKind::Video)
-                            {
-                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                    kind: EndpointKind::Video,
-                                    direction: WebRtcPublishEndpoint::get_direction(),
-                                    reason: OnStopReason::Muted,
-                                }));
-                                for sink in publish.sinks() {
-                                    if let Some((fid, url)) =
-                                        sink.get_on_stop(EndpointKind::Video)
-                                    {
-                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                            kind: EndpointKind::Video,
-                                            direction: WebRtcPlayEndpoint::get_direction(),
-                                            reason: OnStopReason::SrcMuted,
-                                        }));
-                                    }
-                                }
-                            }
-                        } else {
-                            if let Some(url) =
-                                publish.get_on_start(EndpointKind::Video)
-                            {
-                                let fid = publish
-                                    .owner()
-                                    .get_fid_to_endpoint(publish.id().into());
-                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
-                                    kind: EndpointKind::Video,
-                                    direction: WebRtcPublishEndpoint::get_direction(),
-                                }));
-                                for sink in publish.sinks() {
-                                    if let Some(url) =
-                                        sink.get_on_start(EndpointKind::Video)
-                                    {
-                                        let fid =
-                                            sink.owner().get_fid_to_endpoint(
-                                                sink.id().into(),
-                                            );
-                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
-                                            kind: EndpointKind::Video,
-                                            direction: WebRtcPlayEndpoint::get_direction(),
-                                        }));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    _ => (),
+                if let Some(Endpoint::WebRtcPublishEndpoint(publish)) =
+                    weak_endpoint.upgrade()
+                {
+                    self.perform_muting(peer, &publish, EndpointKind::Audio);
+                    self.perform_muting(peer, &publish, EndpointKind::Video);
                 }
             }
 
@@ -1159,7 +1121,8 @@ impl Handler<PeerStarted> for Room {
                                 CallbackRequest::new_at_now(
                                     fid,
                                     OnStartEvent {
-                                        direction: WebRtcPublishEndpoint::get_direction(),
+                                        direction:
+                                            WebRtcPublishEndpoint::DIRECTION,
                                         kind: EndpointKind::Both,
                                     },
                                 ),
@@ -1178,8 +1141,7 @@ impl Handler<PeerStarted> for Room {
                             CallbackRequest::new_at_now(
                                 fid,
                                 OnStartEvent {
-                                    direction:
-                                        WebRtcPlayEndpoint::get_direction(),
+                                    direction: WebRtcPlayEndpoint::DIRECTION,
                                     kind: EndpointKind::Both,
                                 },
                             ),
@@ -1206,18 +1168,9 @@ impl Handler<PeerStopped> for Room {
     ) -> Self::Result {
         let peer_id = msg.0;
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            let send_callbacks: HashMap<_, _> = peer
-                .endpoints()
+            peer.endpoints()
                 .into_iter()
-                .filter_map(|e| {
-                    e.upgrade().map(|e| e.get_on_stop(peer.id(), EndpointKind::Both).map(|(fid, url)| {
-                        (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                            direction: e.get_direction(),
-                            kind: EndpointKind::Both,
-                            reason: OnStopReason::TrafficNotFlowing,
-                        })))
-                    })).flatten()
-                })
+                .filter_map(|e| e.get_traffic_flowing_on_stop(peer.id()))
                 .chain(
                     self.peers
                         .get_peer_by_id(peer.partner_peer_id())
@@ -1225,24 +1178,14 @@ impl Handler<PeerStopped> for Room {
                         .unwrap_or_default()
                         .into_iter()
                         .filter_map(|e| {
-                            e.upgrade()
-                                .map(|e| e.get_on_stop(peer.partner_peer_id(), EndpointKind::Both)
-                                    .map(|(fid, url)| {
-                                        (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                            direction: e.get_direction(),
-                                            kind: EndpointKind::Both,
-                                            reason: OnStopReason::TrafficNotFlowing,
-                                        })))
-                                    })
-                                )
-                                .flatten()
+                            e.get_traffic_flowing_on_stop(
+                                peer.partner_peer_id(),
+                            )
                         }),
                 )
-                .collect();
-
-            for (_, (url, req)) in send_callbacks {
-                self.callbacks.send_callback(url, req);
-            }
+                .for_each(|(url, req)| {
+                    self.callbacks.send_callback(url, req);
+                });
         }
     }
 }
@@ -1328,27 +1271,20 @@ impl Handler<FatalPeerFailure> for Room {
                 e.get_on_stop(peer_id, EndpointKind::Both)
                     .map(|(fid, url)| {
                         (
-                            fid.clone(),
-                            (
-                                url,
-                                CallbackRequest::new(
-                                    fid,
-                                    OnStopEvent {
-                                        direction: e.get_direction(),
-                                        reason: OnStopReason::TrafficNotFlowing,
-                                        kind: EndpointKind::Both,
-                                    },
-                                    msg.at,
-                                ),
+                            url,
+                            CallbackRequest::new(
+                                fid,
+                                OnStopEvent {
+                                    direction: e.get_direction(),
+                                    reason: OnStopReason::TrafficNotFlowing,
+                                    kind: EndpointKind::Both,
+                                },
+                                msg.at,
                             ),
                         )
                     })
             })
-            .collect::<HashMap<_, _>>()
-            .into_iter()
-            .for_each(move |(_, (url, req))| {
-                self.callbacks.send_callback(url, req)
-            });
+            .for_each(move |(url, req)| self.callbacks.send_callback(url, req));
     }
 }
 
@@ -1606,33 +1542,17 @@ impl Handler<RpcConnectionClosed> for Room {
                 let removed_peers =
                     self.remove_peers(&msg.member_id, &peers_to_remove, ctx);
 
-                let on_stop_callbacks: HashMap<_, _> = removed_peers
+                removed_peers
                     .into_iter()
                     .flat_map(|(_, peers)| peers.into_iter())
                     .flat_map(|peer| {
-                        peer.endpoints().into_iter().filter_map(
-                            move |weak_end| {
-                                weak_end
-                                    .upgrade()
-                                    .map(|endpoint| {
-                                        endpoint.get_on_stop(peer.id(), EndpointKind::Both)
-                                            .map(|(fid, url)| {
-                                                (fid.clone(), (url, CallbackRequest::new_at_now(fid, OnStopEvent {
-                                                    kind: EndpointKind::Both,
-                                                    direction: endpoint.get_direction(),
-                                                    reason: OnStopReason::TrafficNotFlowing,
-                                                })))
-                                            })
-                                    })
-                                    .flatten()
-                            },
-                        )
+                        peer.endpoints().into_iter().filter_map(move |e| {
+                            e.get_traffic_flowing_on_stop(peer.id())
+                        })
                     })
-                    .collect();
-
-                for (_, (url, req)) in on_stop_callbacks {
-                    self.callbacks.send_callback(url, req);
-                }
+                    .for_each(|(url, req)| {
+                        self.callbacks.send_callback(url, req);
+                    });
             } else {
                 error!(
                     "Member [id = {}] with ID from RpcConnectionClosed not \
