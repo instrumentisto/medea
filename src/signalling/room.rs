@@ -95,8 +95,9 @@ use super::{
         PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
     },
 };
-use crate::api::control::callback::{
-    EndpointDirection, EndpointKind, OnStopReason,
+use crate::{
+    api::control::callback::{EndpointDirection, EndpointKind, OnStopReason},
+    signalling::elements::endpoints::WeakEndpoint,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -995,8 +996,120 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
-            let member_id = p.member_id();
+        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
+            tracks_patches
+                .iter()
+                .filter_map(|patch| {
+                    peer.get_track_by_id(patch.id).map(|t| (t, patch))
+                })
+                .for_each(|(track, patch)| track.update(patch));
+
+            for weak_endpoint in peer.endpoints() {
+                match weak_endpoint.upgrade() {
+                    Some(Endpoint::WebRtcPublishEndpoint(publish)) => {
+                        if peer.is_senders_muted(EndpointKind::Audio) {
+                            if let Some((fid, url)) = publish
+                                .get_on_stop(peer_id, EndpointKind::Audio)
+                            {
+                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                    kind: EndpointKind::Audio,
+                                    direction: WebRtcPublishEndpoint::get_direction(),
+                                    reason: OnStopReason::Muted,
+                                }));
+                                for sink in publish.sinks() {
+                                    if let Some((fid, url)) =
+                                        sink.get_on_stop(EndpointKind::Audio)
+                                    {
+                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                            kind: EndpointKind::Audio,
+                                            direction: WebRtcPlayEndpoint::get_direction(),
+                                            reason: OnStopReason::SrcMuted,
+                                        }));
+                                    }
+                                }
+                            }
+                        } else {
+                            if let Some(url) =
+                                publish.get_on_start(EndpointKind::Audio)
+                            {
+                                let fid = publish
+                                    .owner()
+                                    .get_fid_to_endpoint(publish.id().into());
+                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
+                                    kind: EndpointKind::Audio,
+                                    direction: WebRtcPublishEndpoint::get_direction(),
+                                }));
+                                for sink in publish.sinks() {
+                                    if let Some(url) =
+                                        sink.get_on_start(EndpointKind::Audio)
+                                    {
+                                        let fid =
+                                            sink.owner().get_fid_to_endpoint(
+                                                sink.id().into(),
+                                            );
+                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
+                                            kind: EndpointKind::Audio,
+                                            direction: WebRtcPlayEndpoint::get_direction(),
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+
+                        if peer.is_senders_muted(EndpointKind::Video) {
+                            if let Some((fid, url)) = publish
+                                .get_on_stop(peer_id, EndpointKind::Video)
+                            {
+                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                    kind: EndpointKind::Video,
+                                    direction: WebRtcPublishEndpoint::get_direction(),
+                                    reason: OnStopReason::Muted,
+                                }));
+                                for sink in publish.sinks() {
+                                    if let Some((fid, url)) =
+                                        sink.get_on_stop(EndpointKind::Video)
+                                    {
+                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStopEvent {
+                                            kind: EndpointKind::Video,
+                                            direction: WebRtcPlayEndpoint::get_direction(),
+                                            reason: OnStopReason::SrcMuted,
+                                        }));
+                                    }
+                                }
+                            }
+                        } else {
+                            if let Some(url) =
+                                publish.get_on_start(EndpointKind::Video)
+                            {
+                                let fid = publish
+                                    .owner()
+                                    .get_fid_to_endpoint(publish.id().into());
+                                self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
+                                    kind: EndpointKind::Video,
+                                    direction: WebRtcPublishEndpoint::get_direction(),
+                                }));
+                                for sink in publish.sinks() {
+                                    if let Some(url) =
+                                        sink.get_on_start(EndpointKind::Video)
+                                    {
+                                        let fid =
+                                            sink.owner().get_fid_to_endpoint(
+                                                sink.id().into(),
+                                            );
+                                        self.callbacks.send_callback(url, CallbackRequest::new_at_now(fid, OnStartEvent {
+                                            kind: EndpointKind::Video,
+                                            direction: WebRtcPlayEndpoint::get_direction(),
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+
+            let member_id = peer.member_id();
             Ok(Box::new(
                 self.members
                     .send_event_to_member(

@@ -197,8 +197,13 @@ impl WebRtcPlayEndpoint {
     ///
     /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
     pub fn get_on_start(&self, kind: EndpointKind) -> Option<CallbackUrl> {
-        self.0.borrow_mut().state.started(kind);
-        self.0.borrow().on_start.clone()
+        let mut inner = self.0.borrow_mut();
+        if !inner.state.is_started(kind) {
+            inner.state.started(kind);
+            inner.on_start.clone()
+        } else {
+            None
+        }
     }
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.

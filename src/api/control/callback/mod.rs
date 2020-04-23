@@ -10,8 +10,10 @@ use clients::CallbackClientError;
 use derive_more::From;
 use medea_control_api_proto::grpc::callback as proto;
 
-use crate::api::control::refs::StatefulFid;
+use crate::api::control::refs::{fid::StatefulFid::Endpoint, StatefulFid};
+use medea_client_api_proto::MediaType;
 use medea_control_api_proto::grpc::callback::on_stop::Reason;
+use std::convert::From;
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -88,7 +90,7 @@ impl Into<proto::OnStart> for OnStartEvent {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EndpointKind {
     Audio = 0b1,
     Video = 0b10,
@@ -101,6 +103,15 @@ impl Into<proto::EndpointKind> for EndpointKind {
             EndpointKind::Audio => proto::EndpointKind::Audio,
             EndpointKind::Video => proto::EndpointKind::Video,
             EndpointKind::Both => proto::EndpointKind::Both,
+        }
+    }
+}
+
+impl From<&MediaType> for EndpointKind {
+    fn from(media_type: &MediaType) -> Self {
+        match media_type {
+            MediaType::Audio(_) => EndpointKind::Audio,
+            MediaType::Video(_) => EndpointKind::Video,
         }
     }
 }
