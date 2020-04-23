@@ -42,6 +42,24 @@ macro_rules! hashmap {
     };
 }
 
+#[macro_export]
+macro_rules! hashset {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
+
+    ($($value:expr,)+) => { hashset!($($key => $value),+) };
+    ($($value:expr),*) => {
+        {
+            let _cap = hashset!(@count $($value),*);
+            let mut _map = ::std::collections::HashSet::with_capacity(_cap);
+            $(
+                let _ = _map.insert($value);
+            )*
+            _map
+        }
+    };
+}
+
 /// Generates [`Debug`] implementation for a provided structure with name of
 /// this structure.
 ///

@@ -33,7 +33,7 @@ use std::{
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, MailboxError, Message, StreamHandler, WrapFuture as _,
+    Handler, MailboxError, Message, StreamHandler, WrapFuture as _, WrapFuture,
 };
 use chrono::{DateTime, Utc};
 use derive_more::{Display, From};
@@ -560,14 +560,9 @@ impl Room {
             let play_id = endpoint_id.into();
             if let Some(endpoint) = member.take_sink(&play_id) {
                 if let Some(peer_id) = endpoint.peer_id() {
-                    let mut peers_ids = HashSet::new();
-                    peers_ids.insert(peer_id);
-
-                    let mut peer_ids_to_remove = HashSet::new();
-                    peer_ids_to_remove.insert(peer_id);
                     removed_peers = Some(self.remove_peers(
                         member_id,
-                        &peer_ids_to_remove,
+                        &hashset![peer_id],
                         ctx,
                     ));
                 }
@@ -1054,7 +1049,14 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
+        let member_id;
+        let peer_spec;
+        let partner_peer_spec;
+        let partner_peer_id;
+        let peer_spec_before;
+
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
+            peer_spec_before = peer.get_spec();
             tracks_patches
                 .iter()
                 .filter_map(|patch| {
@@ -1071,21 +1073,47 @@ impl CommandHandler for Room {
                 }
             }
 
-            let member_id = peer.member_id();
-            Ok(Box::new(
-                self.members
-                    .send_event_to_member(
-                        member_id,
-                        Event::TracksUpdated {
-                            peer_id,
-                            tracks_patches,
-                        },
-                    )
-                    .into_actor(self),
-            ))
+            partner_peer_id = peer.partner_peer_id();
+            partner_peer_spec = if let Ok(partner_peer) =
+                self.peers.get_peer_by_id(partner_peer_id)
+            {
+                partner_peer
+            } else {
+                return Ok(Box::new(actix::fut::ok(())));
+            };
+            peer_spec = peer.get_spec();
+            member_id = peer.member_id();
         } else {
-            Ok(Box::new(actix::fut::ok(())))
+            return Ok(Box::new(actix::fut::ok(())));
         }
+
+        let send_event_fut = self.members.send_event_to_member(
+            member_id,
+            Event::TracksUpdated {
+                peer_id,
+                tracks_patches,
+            },
+        );
+        // TODO: Do it with partner peer also.
+        if peer_spec.senders.is_empty() && peer_spec.receivers.is_empty() {
+            self.peers.unregister_peer(peer_id);
+        } else {
+            if self.peers.is_peer_registered(peer_id) {
+                self.peers.update_peer_spec(peer_id, peer_spec);
+            } else {
+                let reregister_fut = self.peers.reregister_peer(peer_id);
+
+                return Ok(Box::new(
+                    async move {
+                        reregister_fut.await?;
+                        send_event_fut.await
+                    }
+                    .into_actor(self),
+                ));
+            }
+        }
+
+        Ok(Box::new(send_event_fut.into_actor(self)))
     }
 }
 

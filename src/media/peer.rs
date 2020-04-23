@@ -263,12 +263,16 @@ impl<T> Peer<T> {
         let mut receivers = HashMap::new();
 
         for sender in self.context.senders.values() {
-            let media_type = TrackMediaType::from(&sender.media_type);
-            *senders.entry(media_type).or_insert(0) += 1;
+            if !sender.is_muted() {
+                let media_type = TrackMediaType::from(&sender.media_type);
+                *senders.entry(media_type).or_insert(0) += 1;
+            }
         }
         for receiver in self.context.receivers.values() {
-            let media_type = TrackMediaType::from(&receiver.media_type);
-            *receivers.entry(media_type).or_insert(0) += 1;
+            if !receiver.is_muted() {
+                let media_type = TrackMediaType::from(&receiver.media_type);
+                *receivers.entry(media_type).or_insert(0) += 1;
+            }
         }
 
         PeerSpec { senders, receivers }

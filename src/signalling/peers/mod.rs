@@ -15,7 +15,7 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use futures::Stream;
+use futures::{future, Stream, TryFutureExt};
 use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -45,6 +45,7 @@ pub use self::{
         PeerStarted, PeerStopped, PeerTrafficWatcher,
     },
 };
+use futures::future::LocalBoxFuture;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -371,6 +372,9 @@ impl PeersService {
             sink_peer.add_endpoint(&sink.into());
             src_peer.add_endpoint(&src.into());
 
+            let src_peer = PeerStateMachine::from(src_peer);
+            let sink_peer = PeerStateMachine::from(sink_peer);
+
             self.peer_metrics_service.add_peers(
                 &src_peer,
                 &sink_peer,
@@ -488,5 +492,51 @@ impl PeersService {
     /// This task should be ran every second.
     pub fn check_peers_validity(&mut self) {
         self.peer_metrics_service.check_peers_validity();
+    }
+
+    pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
+        self.peer_metrics_service.update_peer_spec(peer_id, spec);
+    }
+
+    pub fn unregister_peer(&mut self, peer_id: PeerId) {
+        self.peer_metrics_service
+            .unregister_peers(hashset![peer_id]);
+    }
+
+    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
+        self.peer_metrics_service.is_peer_registered(peer_id)
+    }
+
+    pub fn reregister_peer(
+        &mut self,
+        peer_id: PeerId,
+    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+        let peer = if let Some(peer) = self.peers.get(&peer_id) {
+            peer
+        } else {
+            return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
+        };
+        let partner_peer =
+            if let Some(peer) = self.peers.get(&peer.partner_peer_id()) {
+                peer
+            } else {
+                return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
+            };
+
+        self.peer_metrics_service.add_peers(
+            peer,
+            partner_peer,
+            self.peer_validity_timeout,
+        );
+
+        let is_force_relayed = peer.is_force_relayed();
+        let room_id = self.room_id.clone();
+        let peers_traffic_watcher = self.peers_traffic_watcher.clone();
+        Box::pin(async move {
+            peers_traffic_watcher
+                .register_peer(room_id, peer_id, is_force_relayed)
+                .await
+                .map_err(|e| RoomError::PeerTrafficWatcherMailbox(e))
+        })
     }
 }

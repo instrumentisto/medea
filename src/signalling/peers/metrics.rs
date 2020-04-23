@@ -25,7 +25,11 @@ use medea_macro::dispatchable;
 
 use crate::{
     api::control::RoomId,
-    media::peer::{New, Peer},
+    log::prelude::*,
+    media::{
+        peer::{New, Peer},
+        PeerStateMachine,
+    },
 };
 
 use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
@@ -240,8 +244,22 @@ impl PeerStat {
                 *current_receivers.entry(receiver.media_type).or_insert(0) += 1;
             });
 
-        self.spec.receivers == current_receivers
-            && self.spec.senders == current_senders
+        for (receivers_type, receiver_count) in &self.spec.receivers {
+            if let Some(spec_count) = current_receivers.get(receivers_type) {
+                if spec_count < receiver_count {
+                    return false;
+                }
+            }
+        }
+        for (senders_type, senders_count) in &self.spec.senders {
+            if let Some(spec_count) = current_senders.get(senders_type) {
+                if spec_count < senders_count {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 
     /// Returns `true` if all senders and receivers is not sending or receiving
@@ -393,8 +411,8 @@ impl PeersMetricsService {
     /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
     pub fn add_peers(
         &mut self,
-        first_peer: &Peer<New>,
-        second_peer: &Peer<New>,
+        first_peer: &PeerStateMachine,
+        second_peer: &PeerStateMachine,
         peer_validity_timeout: Duration,
     ) {
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
@@ -475,11 +493,27 @@ impl PeersMetricsService {
 
     /// [`Room`] notifies [`PeersMetrics`] that some [`Peer`] is removed.
     pub fn unregister_peers(&mut self, peers_ids: HashSet<PeerId>) {
+        debug!(
+            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
+             the PeerMetricsService.",
+            peers_ids, self.room_id
+        );
+
         for peer_id in &peers_ids {
             self.peers.remove(peer_id);
         }
         self.peers_traffic_watcher
             .unregister_peers(self.room_id.clone(), peers_ids);
+    }
+
+    pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
+        if let Some(peer) = self.peers.get(&peer_id) {
+            peer.borrow_mut().spec = spec;
+        }
+    }
+
+    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
+        self.peers.contains_key(&peer_id)
     }
 }
 
