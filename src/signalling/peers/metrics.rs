@@ -389,6 +389,11 @@ impl PeersMetricsService {
             let peer_ref = peer.borrow();
 
             if peer_ref.is_stopped() {
+                debug!(
+                    "Peer [id = {}] from Room [id = {}] traffic stopped \
+                     because invalid traffic flowing.",
+                    peer_ref.peer_id, self.room_id
+                );
                 self.peers_traffic_watcher.traffic_stopped(
                     self.room_id.clone(),
                     peer_ref.peer_id,
@@ -412,7 +417,6 @@ impl PeersMetricsService {
     pub fn add_peers(
         &mut self,
         first_peer: &PeerStateMachine,
-        second_peer: &PeerStateMachine,
         peer_validity_timeout: Duration,
     ) {
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
@@ -425,21 +429,16 @@ impl PeersMetricsService {
             spec: first_peer.get_spec(),
             peer_validity_timeout,
         }));
-        let second_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: second_peer.id(),
-            partner_peer: Rc::downgrade(&first_peer_stat),
-            last_update: Utc::now(),
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-            state: PeerStatState::Connecting,
-            spec: second_peer.get_spec(),
-            peer_validity_timeout,
-        }));
-        first_peer_stat.borrow_mut().partner_peer =
-            Rc::downgrade(&second_peer_stat);
+        if let Some(partner_peer_stat) =
+            self.peers.get(&first_peer.partner_peer_id())
+        {
+            first_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&partner_peer_stat);
+            partner_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&first_peer_stat);
+        }
 
         self.peers.insert(first_peer.id(), first_peer_stat);
-        self.peers.insert(second_peer.id(), second_peer_stat);
     }
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
@@ -462,6 +461,11 @@ impl PeersMetricsService {
             }
 
             if peer_ref.is_stopped() {
+                debug!(
+                    "Peer [id = {}] from Room [id = {}] traffic stopped \
+                     because traffic stats doesn't updated too long.",
+                    peer_ref.peer_id, self.room_id
+                );
                 self.peers_traffic_watcher.traffic_stopped(
                     self.room_id.clone(),
                     peer_ref.peer_id,

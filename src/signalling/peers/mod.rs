@@ -375,11 +375,10 @@ impl PeersService {
             let src_peer = PeerStateMachine::from(src_peer);
             let sink_peer = PeerStateMachine::from(sink_peer);
 
-            self.peer_metrics_service.add_peers(
-                &src_peer,
-                &sink_peer,
-                self.peer_validity_timeout,
-            );
+            self.peer_metrics_service
+                .add_peers(&src_peer, self.peer_validity_timeout);
+            self.peer_metrics_service
+                .add_peers(&sink_peer, self.peer_validity_timeout);
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -498,9 +497,13 @@ impl PeersService {
         self.peer_metrics_service.update_peer_spec(peer_id, spec);
     }
 
-    pub fn unregister_peer(&mut self, peer_id: PeerId) {
+    pub fn unregister_peer(
+        &mut self,
+        peer_id: PeerId,
+        partner_peer_id: PeerId,
+    ) {
         self.peer_metrics_service
-            .unregister_peers(hashset![peer_id]);
+            .unregister_peers(hashset![peer_id, partner_peer_id]);
     }
 
     pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
@@ -516,18 +519,18 @@ impl PeersService {
         } else {
             return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
         };
-        let partner_peer =
-            if let Some(peer) = self.peers.get(&peer.partner_peer_id()) {
-                peer
-            } else {
-                return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
-            };
+        let partner_peer = if let Some(partner_peer) =
+            self.peers.get(&peer.partner_peer_id())
+        {
+            partner_peer
+        } else {
+            return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
+        };
 
-        self.peer_metrics_service.add_peers(
-            peer,
-            partner_peer,
-            self.peer_validity_timeout,
-        );
+        self.peer_metrics_service
+            .add_peers(peer, self.peer_validity_timeout);
+        self.peer_metrics_service
+            .add_peers(partner_peer, self.peer_validity_timeout);
 
         let is_force_relayed = peer.is_force_relayed();
         let room_id = self.room_id.clone();

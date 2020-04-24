@@ -23,9 +23,13 @@ use crate::{
 
 use super::play_endpoint::WebRtcPlayEndpoint;
 use crate::{
-    api::control::callback::{EndpointDirection, EndpointKind},
+    api::control::callback::{
+        CallbackRequest, EndpointDirection, EndpointKind, OnStartEvent,
+        OnStopEvent, OnStopReason,
+    },
     signalling::elements::endpoints::webrtc::TracksState,
 };
+use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -63,6 +67,12 @@ struct WebRtcPublishEndpointInner {
     on_stop: Option<CallbackUrl>,
 
     state: TracksState,
+
+    awaits_start_state: Option<TracksState>,
+
+    awaits_stop_state: Option<TracksState>,
+
+    on_stop_reason: Option<OnStopReason>,
 }
 
 impl Drop for WebRtcPublishEndpointInner {
@@ -140,6 +150,11 @@ impl WebRtcPublishEndpoint {
             on_start,
             on_stop,
             state: TracksState::new(),
+            awaits_start_state: Some(TracksState::with_kind(
+                EndpointKind::Both,
+            )),
+            awaits_stop_state: None,
+            on_stop_reason: None,
         })))
     }
 
@@ -250,14 +265,75 @@ impl WebRtcPublishEndpoint {
     ///
     /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
     #[allow(clippy::if_not_else)]
-    pub fn get_on_start(&self, kind: EndpointKind) -> Option<CallbackUrl> {
+    pub fn get_on_start(
+        &self,
+        at: DateTime<Utc>,
+    ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if !inner.state.is_started(kind) {
-            inner.state.started(kind);
-            inner.on_start.clone()
-        } else {
-            None
+        if let Some(awaits_on_start) = inner.awaits_start_state {
+            if inner.state == awaits_on_start {
+                return None;
+            }
+            inner.state = awaits_on_start;
+            inner.awaits_start_state = None;
+            let fid =
+                inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+
+            if let Some(on_start) = inner.on_start.clone() {
+                return Some((
+                    on_start,
+                    CallbackRequest::new(
+                        fid,
+                        OnStartEvent {
+                            direction: Self::DIRECTION,
+                            kind: if awaits_on_start
+                                .is_started(EndpointKind::Both)
+                            {
+                                EndpointKind::Both
+                            } else if awaits_on_start
+                                .is_started(EndpointKind::Audio)
+                            {
+                                EndpointKind::Audio
+                            } else if awaits_on_start
+                                .is_started(EndpointKind::Video)
+                            {
+                                EndpointKind::Video
+                            } else {
+                                return None;
+                            },
+                        },
+                        at,
+                    ),
+                ));
+            }
         }
+
+        None
+    }
+
+    pub fn awaits_starting(&self, kind: EndpointKind) {
+        let mut inner = self.0.borrow_mut();
+        if let Some(awaits_start_state) = inner.awaits_start_state.as_mut() {
+            awaits_start_state.started(kind);
+        } else {
+            let state = TracksState::with_kind(kind);
+            inner.awaits_start_state = Some(state);
+        }
+    }
+
+    pub fn awaits_stopping(&self, kind: EndpointKind) {
+        let mut inner = self.0.borrow_mut();
+        if let Some(await_stop_state) = inner.awaits_stop_state.as_mut() {
+            await_stop_state.stopped(kind);
+        } else {
+            let state = TracksState::with_kind(kind);
+            inner.awaits_stop_state = Some(state);
+        }
+    }
+
+    pub fn set_on_stop_reason(&self, reason: OnStopReason) {
+        let mut inner = self.0.borrow_mut();
+        inner.on_stop_reason = Some(reason);
     }
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.
@@ -278,17 +354,33 @@ impl WebRtcPublishEndpoint {
     pub fn get_on_stop(
         &self,
         peer_id: PeerId,
+        at: DateTime<Utc>,
         kind: EndpointKind,
-    ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+    ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.set_peer_status(peer_id, false);
-        let is_endpoint_started_before = self.0.borrow().state.is_started(kind);
-        self.0.borrow_mut().state.stopped(kind);
+        let mut inner = self.0.borrow_mut();
 
-        if self.publishing_peers_count() == 0 && is_endpoint_started_before {
-            let on_stop = self.0.borrow().on_stop.clone();
-            if let Some(on_stop) = on_stop {
-                let fid = self.owner().get_fid_to_endpoint(self.id().into());
-                return Some((fid, on_stop));
+        if !inner.state.is_stopped(kind) {
+            inner.state.stopped(kind);
+
+            let fid =
+                inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+            if let Some(url) = inner.on_stop.clone() {
+                return Some((
+                    url,
+                    CallbackRequest::new(
+                        fid,
+                        OnStopEvent {
+                            reason: inner
+                                .on_stop_reason
+                                .take()
+                                .unwrap_or(OnStopReason::TrafficNotFlowing),
+                            kind,
+                            direction: Self::DIRECTION,
+                        },
+                        at,
+                    ),
+                ));
             }
         }
 

@@ -89,7 +89,9 @@ impl Into<proto::OnStart> for OnStartEvent {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use derive_more::Display;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 pub enum EndpointKind {
     Audio = 0b1,
     Video = 0b10,

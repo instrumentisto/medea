@@ -375,7 +375,7 @@ async fn on_stop_by_timeout() {
 
     interconnected_members.trigger_on_start(100, 100);
 
-    delay_for(Duration::from_secs(4)).await;
+    delay_for(Duration::from_secs(7)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server

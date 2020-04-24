@@ -87,6 +87,7 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn is_senders_muted(&self, kind: EndpointKind) -> bool)]
 #[enum_delegate(pub fn is_receivers_muted(&self, kind: EndpointKind) -> bool)]
+#[enum_delegate(pub fn is_senders_unmuted(&self, kind: EndpointKind) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -317,6 +318,12 @@ impl<T> Peer<T> {
     pub fn is_senders_muted(&self, kind: EndpointKind) -> bool {
         self.context.senders.values().any(|track| {
             EndpointKind::from(&track.media_type) == kind && track.is_muted()
+        })
+    }
+
+    pub fn is_senders_unmuted(&self, kind: EndpointKind) -> bool {
+        self.context.senders.values().any(|track| {
+            EndpointKind::from(&track.media_type) == kind && !track.is_muted()
         })
     }
 

@@ -22,6 +22,7 @@ use self::webrtc::{
     publish_endpoint::WeakWebRtcPublishEndpoint, WebRtcPlayEndpoint,
     WebRtcPublishEndpoint,
 };
+use chrono::{DateTime, Utc};
 
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
@@ -43,13 +44,25 @@ impl Endpoint {
     pub fn get_on_stop(
         &self,
         peer_id: PeerId,
+        at: DateTime<Utc>,
         kind: EndpointKind,
-    ) -> Option<(Fid<ToEndpoint>, CallbackUrl)> {
+    ) -> Option<(CallbackUrl, CallbackRequest)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.get_on_stop(peer_id, kind)
+                publish.get_on_stop(peer_id, at, kind)
             }
-            Endpoint::WebRtcPlayEndpoint(play) => play.get_on_stop(kind),
+            Endpoint::WebRtcPlayEndpoint(play) => play.get_on_stop(at, kind),
+        }
+    }
+
+    pub fn set_on_stop_reason(&self, reason: OnStopReason) {
+        match self {
+            Endpoint::WebRtcPublishEndpoint(publish) => {
+                publish.set_on_stop_reason(reason);
+            }
+            Endpoint::WebRtcPlayEndpoint(play) => {
+                play.set_on_stop_reason(reason);
+            }
         }
     }
 
@@ -99,20 +112,7 @@ impl WeakEndpoint {
         peer_id: PeerId,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.upgrade()
-            .map(|e| {
-                e.get_on_stop(peer_id, EndpointKind::Both)
-                    .map(|(fid, url)| {
-                        let req = CallbackRequest::new_at_now(
-                            fid,
-                            OnStopEvent {
-                                direction: e.get_direction(),
-                                kind: EndpointKind::Both,
-                                reason: OnStopReason::TrafficNotFlowing,
-                            },
-                        );
-                        (url, req)
-                    })
-            })
+            .map(|e| e.get_on_stop(peer_id, Utc::now(), EndpointKind::Both))
             .flatten()
     }
 
