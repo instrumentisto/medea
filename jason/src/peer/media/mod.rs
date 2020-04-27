@@ -304,9 +304,6 @@ impl MediaConnections {
     /// Inserts tracks from a provided [`PeerMediaStream`] into [`Sender`]s
     /// based on track IDs.
     ///
-    /// Enables or disables tracks in provided [`PeerMediaStream`] based on
-    /// current media connections state.
-    ///
     /// Provided [`PeerMediaStream`] must have all required
     /// [`MediaStreamTrack`]s. [`MediaStreamTrack`]s are inserted into
     /// [`Sender`]'s [`RtcRtpTransceiver`]s via [`replaceTrack` method][1],
