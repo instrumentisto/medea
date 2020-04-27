@@ -6,30 +6,28 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
-        callback::url::CallbackUrl,
+        callback::{
+            url::CallbackUrl, CallbackRequest, EndpointDirection, EndpointKind,
+            OnStartEvent, OnStopEvent, OnStopReason,
+        },
         endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
-        refs::{Fid, ToEndpoint},
     },
     signalling::elements::{
-        endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
-        member::WeakMember, Member,
+        endpoints::webrtc::{
+            play_endpoint::WeakWebRtcPlayEndpoint, TracksState,
+        },
+        member::WeakMember,
+        Member,
     },
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-use crate::{
-    api::control::callback::{
-        CallbackRequest, EndpointDirection, EndpointKind, OnStartEvent,
-        OnStopEvent, OnStopReason,
-    },
-    signalling::elements::endpoints::webrtc::TracksState,
-};
-use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -69,10 +67,6 @@ struct WebRtcPublishEndpointInner {
     state: TracksState,
 
     awaits_start_state: Option<TracksState>,
-
-    awaits_stop_state: Option<TracksState>,
-
-    on_stop_reason: Option<OnStopReason>,
 }
 
 impl Drop for WebRtcPublishEndpointInner {
@@ -153,8 +147,6 @@ impl WebRtcPublishEndpoint {
             awaits_start_state: Some(TracksState::with_kind(
                 EndpointKind::Both,
             )),
-            awaits_stop_state: None,
-            on_stop_reason: None,
         })))
     }
 
@@ -272,6 +264,7 @@ impl WebRtcPublishEndpoint {
         let mut inner = self.0.borrow_mut();
         if let Some(awaits_on_start) = inner.awaits_start_state {
             if inner.state == awaits_on_start {
+                inner.awaits_start_state = None;
                 return None;
             }
             inner.state = awaits_on_start;
@@ -321,21 +314,6 @@ impl WebRtcPublishEndpoint {
         }
     }
 
-    pub fn awaits_stopping(&self, kind: EndpointKind) {
-        let mut inner = self.0.borrow_mut();
-        if let Some(await_stop_state) = inner.awaits_stop_state.as_mut() {
-            await_stop_state.stopped(kind);
-        } else {
-            let state = TracksState::with_kind(kind);
-            inner.awaits_stop_state = Some(state);
-        }
-    }
-
-    pub fn set_on_stop_reason(&self, reason: OnStopReason) {
-        let mut inner = self.0.borrow_mut();
-        inner.on_stop_reason = Some(reason);
-    }
-
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     pub fn any_traffic_callback_is_some(&self) -> bool {
         let inner = self.0.borrow();
@@ -356,6 +334,7 @@ impl WebRtcPublishEndpoint {
         peer_id: PeerId,
         at: DateTime<Utc>,
         kind: EndpointKind,
+        reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.set_peer_status(peer_id, false);
         let mut inner = self.0.borrow_mut();
@@ -371,10 +350,7 @@ impl WebRtcPublishEndpoint {
                     CallbackRequest::new(
                         fid,
                         OnStopEvent {
-                            reason: inner
-                                .on_stop_reason
-                                .take()
-                                .unwrap_or(OnStopReason::TrafficNotFlowing),
+                            reason,
                             kind,
                             direction: Self::DIRECTION,
                         },

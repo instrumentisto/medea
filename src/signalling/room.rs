@@ -33,7 +33,7 @@ use std::{
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, MailboxError, Message, StreamHandler, WrapFuture as _, WrapFuture,
+    Handler, MailboxError, Message, StreamHandler, WrapFuture as _,
 };
 use chrono::{DateTime, Utc};
 use derive_more::{Display, From};
@@ -55,8 +55,8 @@ use crate::{
         control::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
-                CallbackRequest, OnJoinEvent, OnLeaveEvent, OnLeaveReason,
-                OnStartEvent, OnStopEvent,
+                CallbackRequest, EndpointKind, OnJoinEvent, OnLeaveEvent,
+                OnLeaveReason, OnStopReason,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -95,7 +95,6 @@ use super::{
         PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
     },
 };
-use crate::api::control::callback::{EndpointKind, OnStopReason};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -763,18 +762,21 @@ impl Room {
             publish.owner().get_fid_to_endpoint(publish.id().into()),
             kind
         );
-        publish.awaits_stopping(kind);
-        publish.set_on_stop_reason(OnStopReason::Muted);
+
         let callbacks_at = Utc::now();
-        if let Some((url, req)) =
-            publish.get_on_stop(peer_id, callbacks_at, kind)
-        {
+        if let Some((url, req)) = publish.get_on_stop(
+            peer_id,
+            callbacks_at,
+            kind,
+            OnStopReason::Muted,
+        ) {
             self.callbacks.send_callback(url, req);
         }
+
         for sink in publish.sinks() {
-            sink.awaits_stopping(kind);
-            sink.set_on_stop_reason(OnStopReason::SrcMuted);
-            if let Some((url, req)) = sink.get_on_stop(callbacks_at, kind) {
+            if let Some((url, req)) =
+                sink.get_on_stop(callbacks_at, kind, OnStopReason::SrcMuted)
+            {
                 self.callbacks.send_callback(url, req);
             }
         }
@@ -790,34 +792,18 @@ impl Room {
             publish.owner().get_fid_to_endpoint(publish.id().into()),
             kind
         );
+
         publish.awaits_starting(kind);
         let callback_at = Utc::now();
         if let Some((url, req)) = publish.get_on_start(callback_at) {
             self.callbacks.send_callback(url, req);
         }
+
         for sink in publish.sinks() {
             sink.awaits_starting(kind);
             if let Some((url, req)) = sink.get_on_start(callback_at) {
                 self.callbacks.send_callback(url, req);
             }
-        }
-    }
-
-    fn perform_muting(
-        &self,
-        peer: &PeerStateMachine,
-        publish: &WebRtcPublishEndpoint,
-        kind: EndpointKind,
-    ) {
-        debug!(
-            "Muting/unmuting of the Peer [id = {}] with {} kind.",
-            peer.id(),
-            kind
-        );
-        if peer.is_senders_muted(kind) {
-            self.endpoint_muted(peer.id(), publish, kind);
-        } else if peer.is_senders_unmuted(kind) {
-            self.endpoint_unmuted(publish, kind);
         }
     }
 }
@@ -1035,12 +1021,9 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         let member_id;
         let peer_spec;
-        let partner_peer_spec;
         let partner_peer_id;
-        let peer_spec_before;
 
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            peer_spec_before = peer.get_spec();
             let is_peer_video_muted =
                 peer.is_senders_muted(EndpointKind::Video);
             let is_peer_audio_muted =
@@ -1088,13 +1071,6 @@ impl CommandHandler for Room {
             }
 
             partner_peer_id = peer.partner_peer_id();
-            partner_peer_spec = if let Ok(partner_peer) =
-                self.peers.get_peer_by_id(partner_peer_id)
-            {
-                partner_peer.get_spec()
-            } else {
-                return Ok(Box::new(actix::fut::ok(())));
-            };
             peer_spec = peer.get_spec();
             member_id = peer.member_id();
         } else {
@@ -1290,8 +1266,12 @@ impl Handler<FatalPeerFailure> for Room {
                     .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
             })
             .filter_map(|(peer_id, e)| {
-                e.set_on_stop_reason(OnStopReason::WrongTrafficFlowing);
-                e.get_on_stop(peer_id, msg.at, EndpointKind::Both)
+                e.get_on_stop(
+                    peer_id,
+                    msg.at,
+                    EndpointKind::Both,
+                    OnStopReason::WrongTrafficFlowing,
+                )
             })
             .for_each(move |(url, req)| self.callbacks.send_callback(url, req));
     }
@@ -1541,27 +1521,6 @@ impl Handler<RpcConnectionClosed> for Room {
                         ),
                     );
                 }
-
-                let peers_to_remove = self
-                    .peers
-                    .get_peers_by_member_id(&msg.member_id)
-                    .map(PeerStateMachine::id)
-                    .collect();
-
-                let removed_peers =
-                    self.remove_peers(&msg.member_id, &peers_to_remove, ctx);
-
-                removed_peers
-                    .into_iter()
-                    .flat_map(|(_, peers)| peers.into_iter())
-                    .flat_map(|peer| {
-                        peer.endpoints().into_iter().filter_map(move |e| {
-                            e.get_traffic_flowing_on_stop(peer.id())
-                        })
-                    })
-                    .for_each(|(url, req)| {
-                        self.callbacks.send_callback(url, req);
-                    });
             } else {
                 error!(
                     "Member [id = {}] with ID from RpcConnectionClosed not \
@@ -1569,6 +1528,30 @@ impl Handler<RpcConnectionClosed> for Room {
                     msg.member_id,
                 );
                 self.close_gracefully(ctx).spawn(ctx);
+            }
+
+            let peers_to_remove = self
+                .peers
+                .get_peers_by_member_id(&msg.member_id)
+                .map(PeerStateMachine::id)
+                .collect();
+
+            let removed_peers = self
+                .remove_peers(&msg.member_id, &peers_to_remove, ctx)
+                .into_iter()
+                .map(|(member_id, peer)| {
+                    (member_id, peer.into_iter().map(|p| p.id()).collect())
+                });
+
+            for (peer_member_id, peers_ids) in removed_peers {
+                // Here we may have some problems. If two participants
+                // disconnect at one moment then sending event
+                // to another participant fail,
+                // because connection already closed but we don't know about it
+                // because message in event loop.
+                self.member_peers_removed(peers_ids, peer_member_id, ctx)
+                    .map(|_, _, _| ())
+                    .spawn(ctx);
             }
         }
     }

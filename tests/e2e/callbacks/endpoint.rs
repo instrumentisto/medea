@@ -300,61 +300,6 @@ async fn on_start_works() {
     assert!(on_start_callbacks.contains(&format!("{}/member-2/publish", NAME)));
 }
 
-/// Tests that `on_stop` callback fires when `Member` leaves media server.
-///
-/// # Algorithm
-///
-/// 1. Interconnect `Member`s with `on_start` and `on_stop` callbacks.
-///
-/// 2. Send `outbound-rtp` and `inbound-rtp` [`RtcStat`]s from both `Member`s
-///
-/// 3. Close connection of `member-2`.
-///
-/// 4. Check that `on_stop` callbacks received for all endpoints.
-#[actix_rt::test]
-async fn on_stop_works_on_leave() {
-    const NAME: &str = "on_stop_works_on_leave";
-    let interconnected_members =
-        test(NAME, super::test_ports::ENDPOINT_ON_STOP_WORKS_ON_LEAVE).await;
-
-    interconnected_members.trigger_on_start(100, 100);
-
-    delay_for(Duration::from_millis(500)).await;
-
-    interconnected_members
-        .member_2_client
-        .do_send(CloseSocket(CloseCode::Normal));
-
-    delay_for(Duration::from_millis(500)).await;
-
-    let callbacks: Callbacks = interconnected_members
-        .callback_server
-        .send(GetCallbacks)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let on_start_callbacks: HashSet<_> =
-        callbacks.filter_on_start().map(|req| &req.fid).collect();
-    assert!(on_start_callbacks.contains(&format!("{}/member-1/publish", NAME)));
-    assert!(on_start_callbacks.contains(&format!("{}/member-2/publish", NAME)));
-    assert!(on_start_callbacks
-        .contains(&format!("{}/member-1/play-member-2", NAME)));
-    assert!(on_start_callbacks
-        .contains(&format!("{}/member-2/play-member-1", NAME)));
-
-    let on_stop_callbacks: HashSet<_> =
-        callbacks.filter_on_stop().map(|req| &req.fid).collect();
-    assert!(on_stop_callbacks.contains(&format!("{}/member-1/publish", NAME)));
-    assert!(on_stop_callbacks.contains(&format!("{}/member-2/publish", NAME)));
-    assert!(
-        on_stop_callbacks.contains(&format!("{}/member-1/play-member-2", NAME))
-    );
-    assert!(
-        on_stop_callbacks.contains(&format!("{}/member-2/play-member-1", NAME))
-    );
-}
-
 /// Tests that `on_stop` callback fires when no stats received from `Member`
 /// within `10secs`.
 ///

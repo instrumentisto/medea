@@ -15,7 +15,7 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use futures::{future, Stream, TryFutureExt};
+use futures::{future, Stream};
 use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -376,9 +376,9 @@ impl PeersService {
             let sink_peer = PeerStateMachine::from(sink_peer);
 
             self.peer_metrics_service
-                .add_peers(&src_peer, self.peer_validity_timeout);
+                .register_peer(&src_peer, self.peer_validity_timeout);
             self.peer_metrics_service
-                .add_peers(&sink_peer, self.peer_validity_timeout);
+                .register_peer(&sink_peer, self.peer_validity_timeout);
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -528,16 +528,26 @@ impl PeersService {
         };
 
         self.peer_metrics_service
-            .add_peers(peer, self.peer_validity_timeout);
+            .register_peer(peer, self.peer_validity_timeout);
         self.peer_metrics_service
-            .add_peers(partner_peer, self.peer_validity_timeout);
+            .register_peer(partner_peer, self.peer_validity_timeout);
 
         let is_force_relayed = peer.is_force_relayed();
         let room_id = self.room_id.clone();
+        let partner_peer_id = partner_peer.id();
+        let partner_peer_is_force_relayed = partner_peer.is_force_relayed();
         let peers_traffic_watcher = self.peers_traffic_watcher.clone();
         Box::pin(async move {
             peers_traffic_watcher
-                .register_peer(room_id, peer_id, is_force_relayed)
+                .register_peer(room_id.clone(), peer_id, is_force_relayed)
+                .await
+                .map_err(|e| RoomError::PeerTrafficWatcherMailbox(e))?;
+            peers_traffic_watcher
+                .register_peer(
+                    room_id,
+                    partner_peer_id,
+                    partner_peer_is_force_relayed,
+                )
                 .await
                 .map_err(|e| RoomError::PeerTrafficWatcherMailbox(e))
         })

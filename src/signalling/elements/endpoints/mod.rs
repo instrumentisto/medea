@@ -4,17 +4,15 @@
 
 pub mod webrtc;
 
+use chrono::{DateTime, Utc};
 use derive_more::From;
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 use medea_macro::enum_delegate;
 
-use crate::api::control::{
-    callback::{
-        url::CallbackUrl, CallbackRequest, EndpointDirection, EndpointKind,
-        OnStopEvent, OnStopReason,
-    },
-    refs::{Fid, ToEndpoint},
+use crate::api::control::callback::{
+    url::CallbackUrl, CallbackRequest, EndpointDirection, EndpointKind,
+    OnStopReason,
 };
 
 use self::webrtc::{
@@ -22,13 +20,13 @@ use self::webrtc::{
     publish_endpoint::WeakWebRtcPublishEndpoint, WebRtcPlayEndpoint,
     WebRtcPublishEndpoint,
 };
-use chrono::{DateTime, Utc};
 
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 #[enum_delegate(pub fn any_traffic_callback_is_some(&self) -> bool)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
+#[enum_delegate(pub fn awaits_starting(&self, kind: EndpointKind))]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),
@@ -46,22 +44,14 @@ impl Endpoint {
         peer_id: PeerId,
         at: DateTime<Utc>,
         kind: EndpointKind,
+        reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.get_on_stop(peer_id, at, kind)
-            }
-            Endpoint::WebRtcPlayEndpoint(play) => play.get_on_stop(at, kind),
-        }
-    }
-
-    pub fn set_on_stop_reason(&self, reason: OnStopReason) {
-        match self {
-            Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.set_on_stop_reason(reason);
+                publish.get_on_stop(peer_id, at, kind, reason)
             }
             Endpoint::WebRtcPlayEndpoint(play) => {
-                play.set_on_stop_reason(reason);
+                play.get_on_stop(at, kind, reason)
             }
         }
     }
@@ -112,7 +102,15 @@ impl WeakEndpoint {
         peer_id: PeerId,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.upgrade()
-            .map(|e| e.get_on_stop(peer_id, Utc::now(), EndpointKind::Both))
+            .map(|e| {
+                e.awaits_starting(EndpointKind::Both);
+                e.get_on_stop(
+                    peer_id,
+                    Utc::now(),
+                    EndpointKind::Both,
+                    OnStopReason::TrafficNotFlowing,
+                )
+            })
             .flatten()
     }
 

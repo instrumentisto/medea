@@ -606,6 +606,10 @@ impl Handler<RegisterRoom> for PeersTrafficWatcherImpl {
         msg: RegisterRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
+        debug!(
+            "Room [id = {}] was registered in the PeersTrafficWatcher.",
+            msg.room_id
+        );
         self.stats.insert(
             msg.room_id.clone(),
             RoomStats {
@@ -634,7 +638,12 @@ impl Handler<UnregisterRoom> for PeersTrafficWatcherImpl {
         msg: UnregisterRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        self.stats.remove(&msg.0);
+        if let Some(_) = self.stats.remove(&msg.0) {
+            debug!(
+                "Room [id = {}] was unregistered in the PeersTrafficWatcher.",
+                msg.0
+            );
+        };
     }
 }
 
@@ -664,6 +673,11 @@ impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
+            debug!(
+                "Peer [id = {}] from a Room [id = {}] was registered in the \
+                 PeersTrafficWatcher with {:?} sources.",
+                msg.peer_id, msg.room_id, msg.flow_metrics_sources
+            );
             room.peers.insert(
                 msg.peer_id,
                 PeerStat {
@@ -700,8 +714,15 @@ impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room_stats) = self.stats.get_mut(&msg.room_id) {
+            let room_id = msg.room_id;
             for peer_id in msg.peers_ids {
-                room_stats.peers.remove(&peer_id);
+                if let Some(_) = room_stats.peers.remove(&peer_id) {
+                    debug!(
+                        "Peer [id = {}] from a Room [id = {}] was \
+                         unregistered in the PeersTrafficWatcher.",
+                        peer_id, room_id,
+                    );
+                };
             }
         }
     }

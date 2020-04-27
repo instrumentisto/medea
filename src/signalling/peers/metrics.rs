@@ -23,14 +23,7 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 
-use crate::{
-    api::control::RoomId,
-    log::prelude::*,
-    media::{
-        peer::{New, Peer},
-        PeerStateMachine,
-    },
-};
+use crate::{api::control::RoomId, log::prelude::*, media::PeerStateMachine};
 
 use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
 
@@ -391,7 +384,7 @@ impl PeersMetricsService {
             if peer_ref.is_stopped() {
                 debug!(
                     "Peer [id = {}] from Room [id = {}] traffic stopped \
-                     because invalid traffic flowing.",
+                     because all his traffic not flowing.",
                     peer_ref.peer_id, self.room_id
                 );
                 self.peers_traffic_watcher.traffic_stopped(
@@ -401,6 +394,11 @@ impl PeersMetricsService {
                 );
                 stopped_peers.push(peer_ref.peer_id);
             } else if !peer_ref.is_conforms_spec() {
+                debug!(
+                    "Peer [id = {}] from Room [id = {}] traffic stopped \
+                     because invalid traffic flowing.",
+                    peer_ref.peer_id, self.room_id
+                );
                 self.fatal_peer_error(peer_ref.peer_id, Utc::now());
             }
         }
@@ -414,23 +412,29 @@ impl PeersMetricsService {
     /// creation.
     ///
     /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
-    pub fn add_peers(
+    pub fn register_peer(
         &mut self,
-        first_peer: &PeerStateMachine,
+        peer: &PeerStateMachine,
         peer_validity_timeout: Duration,
     ) {
+        debug!(
+            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
+             = {}].",
+            peer.id(),
+            self.room_id
+        );
+
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: first_peer.id(),
+            peer_id: peer.id(),
             partner_peer: Weak::new(),
             last_update: Utc::now(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Connecting,
-            spec: first_peer.get_spec(),
+            spec: peer.get_spec(),
             peer_validity_timeout,
         }));
-        if let Some(partner_peer_stat) =
-            self.peers.get(&first_peer.partner_peer_id())
+        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
             first_peer_stat.borrow_mut().partner_peer =
                 Rc::downgrade(&partner_peer_stat);
@@ -438,7 +442,7 @@ impl PeersMetricsService {
                 Rc::downgrade(&first_peer_stat);
         }
 
-        self.peers.insert(first_peer.id(), first_peer_stat);
+        self.peers.insert(peer.id(), first_peer_stat);
     }
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
@@ -512,7 +516,13 @@ impl PeersMetricsService {
 
     pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
         if let Some(peer) = self.peers.get(&peer_id) {
-            peer.borrow_mut().spec = spec;
+            let mut peer_ref = peer.borrow_mut();
+            debug!(
+                "Spec of a Peer [id = {}] was updated. Spec before: {:?}. \
+                 Spec after: {:?}.",
+                peer_id, peer_ref.spec, spec
+            );
+            peer_ref.spec = spec;
         }
     }
 
