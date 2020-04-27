@@ -43,7 +43,8 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.join()`;
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_stream` callback ([#54]);
-        - `Room.on_close` callback for WebSocket close initiated by server ([#55]).
+        - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+    - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
@@ -55,8 +56,7 @@ All user visible changes to this project will be documented in this file. This p
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
         - `ApplyTracks` for muting/unmuting ([#81]);
-        - `AddPeerConnectionStats` with `RtcStats` ([#90]);
-    - `RtcIceTransportPolicy` configuration ([#79]).
+        - `AddPeerConnectionStats` with `RtcStats` ([#90]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
