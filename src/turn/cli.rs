@@ -53,6 +53,14 @@ impl CoturnTelnetClient {
 
     /// Forcibly closes provided [`IceUser`]s sessions on [Coturn] server.
     ///
+    /// # Errors
+    ///
+    /// Returns [`CoturnCliError::CliError`] if some error occurs while working
+    /// with [`CoturnTelnetConnection`].
+    ///
+    /// Returns [`CoturnCliError::PoolError`] if error occured while getting
+    /// [`CoturnTelnerConnection`] from the connections pool.
+    ///
     /// [Coturn]: https://github.com/coturn/coturn
     pub async fn delete_sessions(
         &self,
@@ -70,6 +78,14 @@ impl CoturnTelnetClient {
     }
 
     /// Lists sessions by [`CoturnUsername`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoturnCliError::CliError`] if some error occurs while working
+    /// with [`CoturnTelnetConnection`].
+    ///
+    /// Returns [`CoturnCliError::PoolError`] if error occured while getting
+    /// [`CoturnTelnerConnection`] from the connections pool.
     pub async fn get_sessions(
         &self,
         username: CoturnUsername,

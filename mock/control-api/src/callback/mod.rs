@@ -121,7 +121,7 @@ impl From<proto::MediaType> for MediaType {
 
 /// `on_start` callback's related entities and implementations.
 mod on_start {
-    use super::*;
+    use super::{proto, MediaDirection, MediaType, Serialize};
 
     /// `OnStart` callback of Control API.
     #[derive(Clone, Serialize)]
@@ -153,7 +153,7 @@ mod on_start {
 
 /// `on_stop` callback's related entities and implementations.
 mod on_stop {
-    use super::*;
+    use super::{proto, MediaDirection, MediaType, Serialize};
 
     /// Reason of why some `Endpoint` was stopped.
     #[derive(Clone, Serialize)]

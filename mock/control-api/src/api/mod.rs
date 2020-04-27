@@ -141,7 +141,7 @@ pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
 /// Implementation of `Delete` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::needless_pass_by_value, clippy::wildcard_imports)]
 mod delete {
     use super::*;
 
@@ -155,7 +155,7 @@ mod delete {
 /// Implementation of `Get` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::needless_pass_by_value, clippy::wildcard_imports)]
 mod get {
     use super::*;
 
@@ -171,7 +171,9 @@ mod get {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod create {
-    use super::*;
+    use super::{
+        error, Context, CreateResponse, Data, Element, Fid, HttpResponse, Json,
+    };
 
     pub async fn create1(
         path: actix_web::web::Path<String>,

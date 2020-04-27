@@ -3,7 +3,6 @@
 use std::{collections::HashSet, time::Duration};
 
 use actix::{Addr, Context};
-use awc::ws::CloseCode;
 use futures::channel::oneshot;
 use medea_client_api_proto::{
     stats::{RtcStat, RtcStatsType},
@@ -18,7 +17,7 @@ use crate::{
         ControlClient, MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
         WebRtcPublishEndpointBuilder,
     },
-    signalling::{CloseSocket, SendCommand, TestMember},
+    signalling::{SendCommand, TestMember},
 };
 
 /// Creates `Room` with two interconnected `Member`s with `on_start` and
@@ -320,7 +319,7 @@ async fn on_stop_by_timeout() {
 
     interconnected_members.trigger_on_start(100, 100);
 
-    delay_for(Duration::from_secs(7)).await;
+    delay_for(Duration::from_secs(8)).await;
 
     let callbacks: Callbacks = interconnected_members
         .callback_server
