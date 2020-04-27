@@ -20,7 +20,7 @@ use crate::{
     },
     signalling::elements::{
         endpoints::webrtc::{
-            publish_endpoint::WeakWebRtcPublishEndpoint, MuteState,
+            publish_endpoint::WeakWebRtcPublishEndpoint, MediaTrafficState,
         },
         member::WeakMember,
         Member,
@@ -64,9 +64,13 @@ struct WebRtcPlayEndpointInner {
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
 
-    mute_state: MuteState,
+    /// Current [`MediaTrafficState`] of this [`WebRtcPlayEndpoint`].
+    media_traffic_state: MediaTrafficState,
 
-    waiting_for_start_mute_state: Option<MuteState>,
+    /// [`MediaTrafficState`] which should be set as current after
+    /// [`WebRtcPlayEndpoint`] will be started by calling
+    /// [`WebRtcPlayEndpoint::get_on_start`].
+    on_start_media_traffic_state: Option<MediaTrafficState>,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -114,6 +118,7 @@ impl Drop for WebRtcPlayEndpointInner {
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
+    /// [`MediaDirection`] of the [`WebRtcPlayEndpoint`].
     pub const DIRECTION: MediaDirection = MediaDirection::Play;
 
     /// Creates new [`WebRtcPlayEndpoint`].
@@ -135,10 +140,10 @@ impl WebRtcPlayEndpoint {
             is_force_relayed,
             on_start,
             on_stop,
-            mute_state: MuteState::new(),
-            waiting_for_start_mute_state: Some(MuteState::with_media_type(
-                MediaType::Both,
-            )),
+            media_traffic_state: MediaTrafficState::new(),
+            on_start_media_traffic_state: Some(
+                MediaTrafficState::with_media_type(MediaType::Both),
+            ),
         })))
     }
 
@@ -199,19 +204,22 @@ impl WebRtcPlayEndpoint {
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnStart` callback.
     ///
-    /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Started`].
-    #[allow(clippy::if_not_else)]
+    /// Returns `None` if [`WebRtcPlayEndpoint::waiting_for_start_mute_state`]
+    /// is `None`.
+    ///
+    /// Sets [`WebRtcPlayEndpoint::mute_state`] to
+    /// [`WebRtcPlayEndpoint::waiting_for_start_mute_state`] if it `Some`.
     pub fn get_on_start(
         &self,
         at: DateTime<Utc>,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if let Some(awaits_on_start) = inner.waiting_for_start_mute_state {
-            if inner.mute_state == awaits_on_start {
+        if let Some(awaits_on_start) = inner.on_start_media_traffic_state {
+            if inner.media_traffic_state == awaits_on_start {
                 return None;
             }
-            inner.mute_state = awaits_on_start;
-            inner.waiting_for_start_mute_state = None;
+            inner.media_traffic_state = awaits_on_start;
+            inner.on_start_media_traffic_state = None;
             let fid =
                 inner.owner().get_fid_to_endpoint(inner.id.clone().into());
 
@@ -256,10 +264,11 @@ impl WebRtcPlayEndpoint {
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
     /// callback of this [`WebRtcPlayEndpoint`].
     ///
-    /// Sets [`WebRtcPlayEndpoint::state`] to the [`EndpointState::Stopped`].
+    /// Sets provided [`MediaType`] to stopped in the
+    /// [`WebRtcPlayEndpoint::media_traffic_state`].
     ///
-    /// If [`WebRtcPlayEndpoint::state`] currently is [`EndpointState::Stopped`]
-    /// `None` will be returned.
+    /// If provided [`MediaType`] will be already stopped then `None` will be
+    /// returned.
     pub fn get_on_stop(
         &self,
         at: DateTime<Utc>,
@@ -267,8 +276,8 @@ impl WebRtcPlayEndpoint {
         reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if !inner.mute_state.is_stopped(media_type) {
-            inner.mute_state.stopped(media_type);
+        if !inner.media_traffic_state.is_stopped(media_type) {
+            inner.media_traffic_state.stopped(media_type);
 
             let fid =
                 inner.owner().get_fid_to_endpoint(inner.id.clone().into());
@@ -291,15 +300,20 @@ impl WebRtcPlayEndpoint {
         None
     }
 
-    pub fn awaits_starting(&self, media_type: MediaType) {
+    /// Sets [`WebRtcPlayEndpoint::on_start_media_traffic_state`] to the
+    /// [`MediaTrafficState`] in which provided [`MediaType`] will be
+    /// started.
+    ///
+    /// When [`WebRtcPlayEndpoint::get_on_start`] will be called then
+    /// [`WebRtcPlayEndpoint::media_traffic_state`] will be set to the
+    /// [`WebRtcPlayEndpoint::on_start_media_traffic_state`].
+    pub fn set_on_start_media_traffic_state(&self, media_type: MediaType) {
         let mut inner = self.0.borrow_mut();
-        if let Some(awaits_start_state) =
-            inner.waiting_for_start_mute_state.as_mut()
-        {
-            awaits_start_state.started(media_type);
+        if let Some(s) = inner.on_start_media_traffic_state.as_mut() {
+            s.started(media_type);
         } else {
-            let state = MuteState::with_media_type(media_type);
-            inner.waiting_for_start_mute_state = Some(state);
+            inner.on_start_media_traffic_state =
+                Some(MediaTrafficState::with_media_type(media_type));
         }
     }
 

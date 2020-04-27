@@ -42,6 +42,18 @@ macro_rules! hashmap {
     };
 }
 
+/// Creates new [`HashSet`] from a list of values.
+///
+/// # Example
+///
+/// ```rust
+/// # use medea::hashset;
+/// let map = hashset![1, 1, 2];
+/// assert!(map.contains(&1));
+/// assert!(map.contains(&2));
+/// ```
+///
+/// [`HashSet`]: std::collections::HashSet
 #[macro_export]
 macro_rules! hashset {
     (@single $($x:tt)*) => (());
@@ -69,6 +81,7 @@ macro_rules! hashset {
 /// # Example
 ///
 /// ```
+/// # use medea::impl_debug_by_struct_name;
 /// struct Foo;
 ///
 /// impl_debug_by_struct_name!(Foo);

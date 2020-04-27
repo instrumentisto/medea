@@ -647,7 +647,7 @@ impl Handler<UnregisterRoom> for PeersTrafficWatcherImpl {
         msg: UnregisterRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(_) = self.stats.remove(&msg.0) {
+        if self.stats.remove(&msg.0).is_some() {
             debug!(
                 "Room [id = {}] was unregistered in the PeersTrafficWatcher.",
                 msg.0
@@ -725,7 +725,7 @@ impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
         if let Some(room_stats) = self.stats.get_mut(&msg.room_id) {
             let room_id = msg.room_id;
             for peer_id in msg.peers_ids {
-                if let Some(_) = room_stats.peers.remove(&peer_id) {
+                if room_stats.peers.remove(&peer_id).is_some() {
                     debug!(
                         "Peer [id = {}] from a Room [id = {}] was \
                          unregistered in the PeersTrafficWatcher.",

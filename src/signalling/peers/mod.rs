@@ -15,7 +15,7 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use futures::{future, Stream};
+use futures::{future, future::LocalBoxFuture, Stream};
 use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -45,7 +45,6 @@ pub use self::{
         PeerStarted, PeerStopped, PeerTrafficWatcher,
     },
 };
-use futures::future::LocalBoxFuture;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -493,23 +492,36 @@ impl PeersService {
         self.peer_metrics_service.check_peers_validity();
     }
 
+    /// Updates [`PeerSpec`] of the [`Peer`] with provided [`PeerId`] in the
+    /// [`PeerMetricsService`].
     pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
         self.peer_metrics_service.update_peer_spec(peer_id, spec);
     }
 
-    pub fn unregister_peer(
-        &mut self,
-        peer_id: PeerId,
-        partner_peer_id: PeerId,
-    ) {
-        self.peer_metrics_service
-            .unregister_peers(hashset![peer_id, partner_peer_id]);
+    /// Unregisters provided [`Peer`] with provided [`PeerId`] and his partner
+    /// [`Peer`] from the [`PeerMetricsService`].
+    pub fn unregister_peer(&mut self, peer_id: PeerId) {
+        if let Some(partner_peer_id) = self
+            .peers
+            .get(&peer_id)
+            .map(PeerStateMachine::partner_peer_id)
+        {
+            self.peer_metrics_service
+                .unregister_peers(hashset![peer_id, partner_peer_id]);
+        } else {
+            self.peer_metrics_service
+                .unregister_peers(hashset![peer_id]);
+        }
     }
 
+    /// Checks that [`Peer`] with provided [`PeerId`] is registered in the
+    /// [`PeerMetricsService`].
     pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
         self.peer_metrics_service.is_peer_registered(peer_id)
     }
 
+    /// Reregisters provided [`PeerId`] in the [`PeerMetricsService`] and
+    /// [`PeersTrafficWatcher`].
     pub fn reregister_peer(
         &mut self,
         peer_id: PeerId,
@@ -541,7 +553,7 @@ impl PeersService {
             peers_traffic_watcher
                 .register_peer(room_id.clone(), peer_id, is_force_relayed)
                 .await
-                .map_err(|e| RoomError::PeerTrafficWatcherMailbox(e))?;
+                .map_err(RoomError::PeerTrafficWatcherMailbox)?;
             peers_traffic_watcher
                 .register_peer(
                     room_id,
@@ -549,7 +561,7 @@ impl PeersService {
                     partner_peer_is_force_relayed,
                 )
                 .await
-                .map_err(|e| RoomError::PeerTrafficWatcherMailbox(e))
+                .map_err(RoomError::PeerTrafficWatcherMailbox)
         })
     }
 }

@@ -36,12 +36,14 @@ impl MediaTrack {
         self.mid.borrow_mut().as_ref().cloned()
     }
 
+    /// Updates this [`MediaTrack`] by provided [`TrackPatch`].
     pub fn update(&self, patch: &TrackPatch) {
         if let Some(is_muted) = patch.is_muted {
             *self.is_muted.borrow_mut() = is_muted;
         }
     }
 
+    /// Returns `true` if this [`MediaTrack`] is currently muted.
     pub fn is_muted(&self) -> bool {
         *self.is_muted.borrow()
     }

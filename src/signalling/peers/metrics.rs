@@ -81,7 +81,7 @@ struct RecvDir {
     packets_received: u64,
 }
 
-/// Metrics of the `MediaTrack` with [`Send`] or [`Recv`] direction.
+/// Metrics of the `MediaTrack` with [`SendDir`] or [`RecvDir`] state.
 #[derive(Debug)]
 struct TrackStat<T> {
     /// Last time when this [`TrackStat`] was updated.
@@ -97,15 +97,16 @@ struct TrackStat<T> {
 }
 
 impl<T> TrackStat<T> {
+    /// Returns [`Instant`] time on which this [`TrackStat`] was updated lastly.
     fn last_update(&self) -> &Instant {
         &self.last_update
     }
 }
 
 impl TrackStat<SendDir> {
-    /// Updates this [`SenderStat`] with provided [`RtcOutboundRtpStreamStats`].
+    /// Updates this [`TrackStat`] with provided [`RtcOutboundRtpStreamStats`].
     ///
-    /// [`SenderStat::last_update`] time will be updated.
+    /// [`TrackStat::last_update`] time will be updated.
     fn update(&mut self, upd: &RtcOutboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.direction.packets_sent = upd.packets_sent;
@@ -113,9 +114,9 @@ impl TrackStat<SendDir> {
 }
 
 impl TrackStat<RecvDir> {
-    /// Updates this [`SenderStat`] with provided [`RtcInboundRtpStreamStats`].
+    /// Updates this [`TrackStat`] with provided [`RtcInboundRtpStreamStats`].
     ///
-    /// [`ReceiverStat::last_update`] time will be updated.
+    /// [`TrackStat::last_update`] time will be updated.
     fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
         self.last_update = Instant::now();
         self.direction.packets_received = upd.packets_received;
@@ -159,13 +160,13 @@ struct PeerStat {
     /// Time of the last metrics update of this [`PeerStat`].
     last_update: DateTime<Utc>,
 
-    /// Duration after which media server will consider this [`Peer`]'s media
-    /// traffic stats as invalid and will remove this [`Peer`].
+    /// [`Duration`] after which media server will consider this [`Peer`]'s
+    /// media traffic stats as invalid and will remove this [`Peer`].
     peer_validity_timeout: Duration,
 }
 
 impl PeerStat {
-    /// Updates [`SenderStat`] with provided [`StatId`] by
+    /// Updates [`TrackStat`] with provided [`StatId`] by
     /// [`RtcOutboundRtpStreamStats`].
     fn update_sender(
         &mut self,
@@ -183,7 +184,7 @@ impl PeerStat {
             .update(upd);
     }
 
-    /// Updates [`ReceiverStat`] with provided [`StatId`] by
+    /// Updates [`TrackStat`] with provided [`StatId`] by
     /// [`RtcInboundRtpStreamStats`].
     fn update_receiver(
         &mut self,
@@ -219,7 +220,6 @@ impl PeerStat {
     ///
     /// Also media type of sender/receiver
     /// and activity taken into account.
-    #[allow(clippy::filter_map)]
     fn is_conforms_spec(&self) -> bool {
         let mut current_senders = HashMap::new();
         let mut current_receivers = HashMap::new();

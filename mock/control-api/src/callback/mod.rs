@@ -73,15 +73,21 @@ mod join {
     }
 }
 
+/// Media direction of the `Endpoint` for which `on_start` or `on_stop` Control
+/// API callback was received.
 #[derive(Clone, Serialize)]
 enum MediaDirection {
+    /// `Endpoint` is a publisher.
     Publish,
+
+    /// `Endpoint` is a player.
     Play,
 }
 
 impl From<proto::MediaDirection> for MediaDirection {
     fn from(proto: proto::MediaDirection) -> Self {
         use proto::MediaDirection::*;
+
         match proto {
             Publish => Self::Publish,
             Play => Self::Play,
@@ -89,10 +95,16 @@ impl From<proto::MediaDirection> for MediaDirection {
     }
 }
 
+/// Media type of the traffic which starts/stops flowing in some `Endpoint`.
 #[derive(Clone, Serialize)]
 enum MediaType {
+    /// Started/stopped video traffic.
     Video,
+
+    /// Started/stopped audio traffic.
     Audio,
+
+    /// Started/stopped audio and video traffic.
     Both,
 }
 
@@ -114,7 +126,12 @@ mod on_start {
     /// `OnStart` callback of Control API.
     #[derive(Clone, Serialize)]
     pub struct OnStart {
+        /// [`MediaDirection`] of the `Endpoint` for which this callback was
+        /// received.
         media_direction: MediaDirection,
+
+        /// [`MediaType`] of the traffic which starts flowing in some
+        /// `Endpoint`.
         media_type: MediaType,
     }
 
@@ -138,11 +155,20 @@ mod on_start {
 mod on_stop {
     use super::*;
 
+    /// Reason of why some `Endpoint` was stopped.
     #[derive(Clone, Serialize)]
     pub enum OnStopReason {
+        /// All traffic of some `Endpoint` was stopped flowing.
         TrafficNotFlowing,
+
+        /// `Endpoint` was muted.
         Muted,
+
+        /// Source `Endpoint` of a `Endpoint` for which received this `on_stop`
+        /// callback was muted.
         SrcMuted,
+
+        /// Some traffic flows within `Endpoint`, but incorrectly.
         WrongTrafficFlowing,
     }
 
@@ -161,9 +187,16 @@ mod on_stop {
     /// `OnStop` callback of Control API.
     #[derive(Clone, Serialize)]
     pub struct OnStop {
-        reason: OnStopReason,
+        /// [`MediaType`] of the traffic which stops flowing in some
+        /// `Endpoint`.
         media_type: MediaType,
+
+        /// [`MediaDirection`] of the `Endpoint` for which this callback was
+        /// received.
         media_direction: MediaDirection,
+
+        /// Reason of why `Endpoint` was stopped.
+        reason: OnStopReason,
     }
 
     impl From<proto::OnStop> for OnStop {

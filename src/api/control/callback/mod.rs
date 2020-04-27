@@ -73,7 +73,11 @@ impl Into<proto::OnJoin> for OnJoinEvent {
 /// `on_start` Control API callback.
 #[derive(Debug)]
 pub struct OnStartEvent {
+    /// [`MediaType`] of the traffic which starts flowing in some `Endpoint`.
     pub media_type: MediaType,
+
+    /// [`MediaDirection`] of the `Endpoint` for which this callback was
+    /// received.
     pub direction: MediaDirection,
 }
 
@@ -89,10 +93,22 @@ impl Into<proto::OnStart> for OnStartEvent {
     }
 }
 
+/// Media type of the traffic which starts/stops flowing in some `Endpoint`.
+///
+/// This enum is used in the [`MuteState`] of the `Endpoint`s. Because of it,
+/// this structure is bitflag enum.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 pub enum MediaType {
+    /// Started/stopped audio traffic.
     Audio = 0b1,
+
+    /// Started/stopped video traffic.
     Video = 0b10,
+
+    /// Started/stopped audio and video traffic.
+    ///
+    /// In bitflag representation this variant will be equal to
+    /// [`MediaType::Audio`] + [`MediaType::Video`].
     Both = 0b11,
 }
 
@@ -117,9 +133,14 @@ impl From<&medea_client_api_proto::MediaType> for MediaType {
     }
 }
 
+/// Media direction of the `Endpoint` for which `on_start` or `on_stop` Control
+/// API callback was received.
 #[derive(Clone, Copy, Debug)]
 pub enum MediaDirection {
+    /// `Endpoint` is a publisher.
     Publish,
+
+    /// `Endpoint` is a player.
     Play,
 }
 
@@ -132,11 +153,20 @@ impl Into<proto::MediaDirection> for MediaDirection {
     }
 }
 
+/// Reason of why some `Endpoint` was stopped.
 #[derive(Clone, Copy, Debug)]
 pub enum OnStopReason {
+    /// All traffic of some `Endpoint` was stopped flowing.
     TrafficNotFlowing,
+
+    /// `Endpoint` was muted.
     Muted,
+
+    /// Source `Endpoint` of a `Endpoint` for which received this `on_stop`
+    /// callback was muted.
     SrcMuted,
+
+    /// Some traffic flows within `Endpoint`, but incorrectly.
     WrongTrafficFlowing,
 }
 
@@ -158,8 +188,14 @@ impl Into<proto::on_stop::Reason> for OnStopReason {
 /// `on_stop` Control API callback.
 #[derive(Debug)]
 pub struct OnStopEvent {
+    /// [`MediaType`] of the traffic which stops flowing in some `Endpoint`.
     pub media_type: MediaType,
+
+    /// [`MediaDirection`] of the `Endpoint` for which this callback was
+    /// received.
     pub media_direction: MediaDirection,
+
+    /// Reason of why `Endpoint` was stopped.
     pub reason: OnStopReason,
 }
 

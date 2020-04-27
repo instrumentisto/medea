@@ -465,7 +465,10 @@ impl Room {
         peer_ids_to_remove: &HashSet<PeerId>,
         ctx: &mut Context<Self>,
     ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
-        debug!("Remove peers.");
+        debug!(
+            "Remove Peers {:?} from Room [id = {}].",
+            peer_ids_to_remove, self.id
+        );
         let removed_peers =
             self.peers.remove_peers(&member_id, &peer_ids_to_remove);
 
@@ -520,8 +523,10 @@ impl Room {
                 .flat_map(|(_, peers)| peers.into_iter())
                 .flat_map(|peer| {
                     peer.endpoints().into_iter().filter_map(move |endpoint| {
-                        endpoint
-                            .get_traffic_flowing_on_stop(peer.id(), Utc::now())
+                        endpoint.get_traffic_not_flowing_on_stop(
+                            peer.id(),
+                            Utc::now(),
+                        )
                     })
                 })
                 .for_each(|(url, req)| {
@@ -583,7 +588,7 @@ impl Room {
                     peers.iter().flat_map(|peer| {
                         peer.endpoints().into_iter().filter_map(
                             move |endpoint| {
-                                endpoint.get_traffic_flowing_on_stop(
+                                endpoint.get_traffic_not_flowing_on_stop(
                                     peer.id(),
                                     Utc::now(),
                                 )
@@ -755,7 +760,16 @@ impl Room {
         Ok(())
     }
 
-    fn endpoint_muted(
+    /// Sends needed `on_stop` Control API callbacks of the provided
+    /// [`WebRtcPublishEndpoint`] and sinks of this
+    /// [`WebRtcPublishEndpoint`].
+    ///
+    /// Callbacks will be sent only for `Endpoint`s which was considered as
+    /// stopped.
+    ///
+    /// This function will be called if provided [`WebRtcPublishEndpoint`] was
+    /// muted.
+    fn send_stop_callback_on_mute(
         &self,
         peer_id: PeerId,
         publish: &WebRtcPublishEndpoint,
@@ -788,7 +802,16 @@ impl Room {
         }
     }
 
-    fn endpoint_unmuted(
+    /// Sends needed `on_start` Control API callbacks of the provided
+    /// [`WebRtcPublishEndpoint`] and sinks of this
+    /// [`WebRtcPublishEndpoint`].
+    ///
+    /// Callbacks will be sent only for `Endpoint`s which was considered as
+    /// started.
+    ///
+    /// This function will be called if provided [`WebRtcPublishEndpoint`] was
+    /// unmuted.
+    fn send_start_callback_on_unmute(
         &self,
         publish: &WebRtcPublishEndpoint,
         media_type: MediaType,
@@ -799,14 +822,14 @@ impl Room {
             media_type
         );
 
-        publish.awaits_starting(media_type);
+        publish.set_on_start_media_traffic_state(media_type);
         let callback_at = Utc::now();
         if let Some((url, req)) = publish.get_on_start(callback_at) {
             self.callbacks.send_callback(url, req);
         }
 
         for sink in publish.sinks() {
-            sink.awaits_starting(media_type);
+            sink.set_on_start_media_traffic_state(media_type);
             if let Some((url, req)) = sink.get_on_start(callback_at) {
                 self.callbacks.send_callback(url, req);
             }
@@ -1020,6 +1043,15 @@ impl CommandHandler for Room {
 
     /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
+    ///
+    /// Updates [`MediaTrack`], sends `on_start`/`on_stop` callbacks on
+    /// mute/unmute of the `MediaTrack`s.
+    ///
+    /// Unregisters [`Peer`]s which was stopped after [`MediaTrack`]s updates
+    /// from the [`PeersTrafficWatcher`] and [`PeerMetricsService`].
+    ///
+    /// Reregisters [`Peer`]s which was stopped after [`MediaTrack`]s updates in
+    /// the [`PeersTrafficWatcher`] and [`PeerMetricsService`].
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
@@ -1027,17 +1059,13 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         let member_id;
         let peer_spec;
-        let partner_peer_id;
 
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
             let is_peer_video_muted = peer.is_senders_muted(MediaType::Video);
             let is_peer_audio_muted = peer.is_senders_muted(MediaType::Audio);
             tracks_patches
                 .iter()
-                .filter_map(|patch| {
-                    peer.get_track_by_id(patch.id).map(|t| (t, patch))
-                })
-                .for_each(|(track, patch)| track.update(patch));
+                .for_each(|patch| peer.update_track(patch));
 
             for weak_endpoint in peer.endpoints() {
                 if let Some(Endpoint::WebRtcPublishEndpoint(publish)) =
@@ -1049,11 +1077,14 @@ impl CommandHandler for Room {
                         peer.is_senders_muted(MediaType::Audio);
 
                     if !is_peer_audio_currently_muted && is_peer_audio_muted {
-                        self.endpoint_unmuted(&publish, MediaType::Audio);
+                        self.send_start_callback_on_unmute(
+                            &publish,
+                            MediaType::Audio,
+                        );
                     } else if is_peer_audio_currently_muted
                         && !is_peer_audio_muted
                     {
-                        self.endpoint_muted(
+                        self.send_stop_callback_on_mute(
                             peer.id(),
                             &publish,
                             MediaType::Audio,
@@ -1061,11 +1092,14 @@ impl CommandHandler for Room {
                     }
 
                     if !is_peer_video_currently_muted && is_peer_video_muted {
-                        self.endpoint_unmuted(&publish, MediaType::Video);
+                        self.send_start_callback_on_unmute(
+                            &publish,
+                            MediaType::Video,
+                        );
                     } else if is_peer_video_currently_muted
                         && !is_peer_video_muted
                     {
-                        self.endpoint_muted(
+                        self.send_stop_callback_on_mute(
                             peer.id(),
                             &publish,
                             MediaType::Video,
@@ -1074,7 +1108,6 @@ impl CommandHandler for Room {
                 }
             }
 
-            partner_peer_id = peer.partner_peer_id();
             peer_spec = peer.get_spec();
             member_id = peer.member_id();
         } else {
@@ -1089,23 +1122,20 @@ impl CommandHandler for Room {
             },
         );
 
-        // TODO: Do it with partner peer also.
         if peer_spec.senders.is_empty() && peer_spec.receivers.is_empty() {
-            self.peers.unregister_peer(peer_id, partner_peer_id);
+            self.peers.unregister_peer(peer_id);
+        } else if self.peers.is_peer_registered(peer_id) {
+            self.peers.update_peer_spec(peer_id, peer_spec);
         } else {
-            if self.peers.is_peer_registered(peer_id) {
-                self.peers.update_peer_spec(peer_id, peer_spec);
-            } else {
-                let reregister_fut = self.peers.reregister_peer(peer_id);
+            let reregister_fut = self.peers.reregister_peer(peer_id);
 
-                return Ok(Box::new(
-                    async move {
-                        reregister_fut.await?;
-                        send_event_fut.await
-                    }
-                    .into_actor(self),
-                ));
-            }
+            return Ok(Box::new(
+                async move {
+                    reregister_fut.await?;
+                    send_event_fut.await
+                }
+                .into_actor(self),
+            ));
         }
 
         Ok(Box::new(send_event_fut.into_actor(self)))
@@ -1168,7 +1198,9 @@ impl Handler<PeerStopped> for Room {
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
             peer.endpoints()
                 .into_iter()
-                .filter_map(|e| e.get_traffic_flowing_on_stop(peer.id(), at))
+                .filter_map(|e| {
+                    e.get_traffic_not_flowing_on_stop(peer.id(), at)
+                })
                 .chain(
                     self.peers
                         .get_peer_by_id(peer.partner_peer_id())
@@ -1176,7 +1208,7 @@ impl Handler<PeerStopped> for Room {
                         .unwrap_or_default()
                         .into_iter()
                         .filter_map(|e| {
-                            e.get_traffic_flowing_on_stop(
+                            e.get_traffic_not_flowing_on_stop(
                                 peer.partner_peer_id(),
                                 at,
                             )
@@ -1248,7 +1280,8 @@ impl Handler<FatalPeerFailure> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         warn!(
-            "Real state of Peer [id = {}] from Room [id = {}] has fatal error!",
+            "Traffic of the Peer [id = {}] from Room [id = {}] is flowing \
+             wrongly!",
             msg.peer_id, self.id
         );
 
