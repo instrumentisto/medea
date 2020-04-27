@@ -76,6 +76,22 @@ impl MediaTrafficState {
 
         (self.0 | media_type) == media_type
     }
+
+    /// Returns [`MediaType`] which started according to this
+    /// [`MediaTrafficState`].
+    ///
+    /// Returns `None` if all [`MediaType`]s stopped.
+    pub fn into_media_type(self) -> Option<MediaType> {
+        if self.is_started(MediaType::Both) {
+            Some(MediaType::Both)
+        } else if self.is_started(MediaType::Audio) {
+            Some(MediaType::Audio)
+        } else if self.is_started(MediaType::Video) {
+            Some(MediaType::Video)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

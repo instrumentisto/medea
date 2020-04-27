@@ -230,21 +230,7 @@ impl WebRtcPlayEndpoint {
                         fid,
                         OnStartEvent {
                             direction: Self::DIRECTION,
-                            media_type: if awaits_on_start
-                                .is_started(MediaType::Both)
-                            {
-                                MediaType::Both
-                            } else if awaits_on_start
-                                .is_started(MediaType::Audio)
-                            {
-                                MediaType::Audio
-                            } else if awaits_on_start
-                                .is_started(MediaType::Video)
-                            {
-                                MediaType::Video
-                            } else {
-                                return None;
-                            },
+                            media_type: awaits_on_start.into_media_type()?,
                         },
                         at,
                     ),

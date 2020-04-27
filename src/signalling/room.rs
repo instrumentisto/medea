@@ -1061,8 +1061,10 @@ impl CommandHandler for Room {
         let peer_spec;
 
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            let is_peer_video_muted = peer.is_senders_muted(MediaType::Video);
-            let is_peer_audio_muted = peer.is_senders_muted(MediaType::Audio);
+            let is_peer_video_muted_before =
+                peer.is_senders_muted(MediaType::Video);
+            let is_peer_audio_muted_before =
+                peer.is_senders_muted(MediaType::Audio);
             tracks_patches
                 .iter()
                 .for_each(|patch| peer.update_track(patch));
@@ -1076,13 +1078,15 @@ impl CommandHandler for Room {
                     let is_peer_audio_currently_muted =
                         peer.is_senders_muted(MediaType::Audio);
 
-                    if !is_peer_audio_currently_muted && is_peer_audio_muted {
+                    if !is_peer_audio_currently_muted
+                        && is_peer_audio_muted_before
+                    {
                         self.send_start_callback_on_unmute(
                             &publish,
                             MediaType::Audio,
                         );
                     } else if is_peer_audio_currently_muted
-                        && !is_peer_audio_muted
+                        && !is_peer_audio_muted_before
                     {
                         self.send_stop_callback_on_mute(
                             peer.id(),
@@ -1091,13 +1095,15 @@ impl CommandHandler for Room {
                         );
                     }
 
-                    if !is_peer_video_currently_muted && is_peer_video_muted {
+                    if !is_peer_video_currently_muted
+                        && is_peer_video_muted_before
+                    {
                         self.send_start_callback_on_unmute(
                             &publish,
                             MediaType::Video,
                         );
                     } else if is_peer_video_currently_muted
-                        && !is_peer_video_muted
+                        && !is_peer_video_muted_before
                     {
                         self.send_stop_callback_on_mute(
                             peer.id(),
