@@ -100,15 +100,23 @@ impl WeakEndpoint {
         &self,
         peer_id: PeerId,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
+        self.get_both_on_stop(
+            peer_id,
+            OnStopReason::TrafficNotFlowing,
+            Utc::now(),
+        )
+    }
+
+    pub fn get_both_on_stop(
+        &self,
+        peer_id: PeerId,
+        reason: OnStopReason,
+        at: DateTime<Utc>,
+    ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.upgrade()
             .map(|e| {
                 e.awaits_starting(MediaType::Both);
-                e.get_on_stop(
-                    peer_id,
-                    Utc::now(),
-                    MediaType::Both,
-                    OnStopReason::TrafficNotFlowing,
-                )
+                e.get_on_stop(peer_id, at, MediaType::Both, reason)
             })
             .flatten()
     }

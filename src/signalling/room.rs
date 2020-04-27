@@ -1239,41 +1239,42 @@ impl Handler<FatalPeerFailure> for Room {
     fn handle(
         &mut self,
         msg: FatalPeerFailure,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        error!(
+        warn!(
             "Real state of Peer [id = {}] from Room [id = {}] has fatal error!",
             msg.peer_id, self.id
         );
 
-        let member_id;
-        if let Ok(peer) = self.peers.get_peer_by_id(msg.peer_id) {
-            member_id = peer.member_id();
-        } else {
-            return;
-        }
-
-        let mut peers_ids = HashSet::new();
-        peers_ids.insert(msg.peer_id);
-        let removed_peers = self.remove_peers(&member_id, &peers_ids, ctx);
-
-        removed_peers
-            .values()
-            .flatten()
-            .flat_map(|peer| {
-                peer.endpoints()
-                    .into_iter()
-                    .filter_map(move |e| e.upgrade().map(|e| (peer.id(), e)))
-            })
-            .filter_map(|(peer_id, e)| {
-                e.get_on_stop(
-                    peer_id,
-                    msg.at,
-                    MediaType::Both,
-                    OnStopReason::WrongTrafficFlowing,
+        let peer_id = msg.peer_id;
+        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
+            peer.endpoints()
+                .into_iter()
+                .filter_map(|e| {
+                    e.get_both_on_stop(
+                        peer.id(),
+                        OnStopReason::WrongTrafficFlowing,
+                        msg.at,
+                    )
+                })
+                .chain(
+                    self.peers
+                        .get_peer_by_id(peer.partner_peer_id())
+                        .map(PeerStateMachine::endpoints)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|e| {
+                            e.get_both_on_stop(
+                                peer.partner_peer_id(),
+                                OnStopReason::WrongTrafficFlowing,
+                                msg.at,
+                            )
+                        }),
                 )
-            })
-            .for_each(move |(url, req)| self.callbacks.send_callback(url, req));
+                .for_each(|(url, req)| {
+                    self.callbacks.send_callback(url, req);
+                });
+        }
     }
 }
 
