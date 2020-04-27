@@ -35,18 +35,18 @@ pub struct Response {
 /// Event which fires when Endpoint starts sending/receiving media traffic.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStart {
-    #[prost(enumeration="EndpointKind", tag="1")]
-    pub kind: i32,
-    #[prost(enumeration="EndpointDirection", tag="2")]
-    pub direction: i32,
+    #[prost(enumeration="MediaType", tag="1")]
+    pub media_type: i32,
+    #[prost(enumeration="MediaDirection", tag="2")]
+    pub media_direction: i32,
 }
 /// Event which fires when Endpoint stops sending/receiving media traffic.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OnStop {
-    #[prost(enumeration="EndpointKind", tag="1")]
-    pub kind: i32,
-    #[prost(enumeration="EndpointDirection", tag="2")]
-    pub direction: i32,
+    #[prost(enumeration="MediaType", tag="1")]
+    pub media_type: i32,
+    #[prost(enumeration="MediaDirection", tag="2")]
+    pub media_direction: i32,
     #[prost(enumeration="on_stop::Reason", tag="3")]
     pub reason: i32,
 }
@@ -85,14 +85,14 @@ pub mod on_leave {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
-pub enum EndpointKind {
+pub enum MediaType {
     Audio = 0,
     Video = 1,
-    Both = 3,
+    Both = 2,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
-pub enum EndpointDirection {
+pub enum MediaDirection {
     Publish = 0,
     Play = 1,
 }

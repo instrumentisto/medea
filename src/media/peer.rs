@@ -15,7 +15,7 @@ use medea_client_api_proto::{
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::{callback::EndpointKind, MemberId},
+    api::control::{callback::MediaType as CallbackMediaType, MemberId},
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{Endpoint, WeakEndpoint},
@@ -85,9 +85,15 @@ impl PeerError {
 #[enum_delegate(
     pub fn get_track_by_id(&self, track_id: TrackId) -> Option<Rc<MediaTrack>>
 )]
-#[enum_delegate(pub fn is_senders_muted(&self, kind: EndpointKind) -> bool)]
-#[enum_delegate(pub fn is_receivers_muted(&self, kind: EndpointKind) -> bool)]
-#[enum_delegate(pub fn is_senders_unmuted(&self, kind: EndpointKind) -> bool)]
+#[enum_delegate(
+    pub fn is_senders_muted(&self, kind: CallbackMediaType) -> bool
+)]
+#[enum_delegate(
+    pub fn is_receivers_muted(&self, kind: CallbackMediaType) -> bool
+)]
+#[enum_delegate(
+    pub fn is_senders_unmuted(&self, kind: CallbackMediaType) -> bool
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -315,21 +321,24 @@ impl<T> Peer<T> {
             .cloned()
     }
 
-    pub fn is_senders_muted(&self, kind: EndpointKind) -> bool {
+    pub fn is_senders_muted(&self, kind: CallbackMediaType) -> bool {
         self.context.senders.values().any(|track| {
-            EndpointKind::from(&track.media_type) == kind && track.is_muted()
+            CallbackMediaType::from(&track.media_type) == kind
+                && track.is_muted()
         })
     }
 
-    pub fn is_senders_unmuted(&self, kind: EndpointKind) -> bool {
+    pub fn is_senders_unmuted(&self, kind: CallbackMediaType) -> bool {
         self.context.senders.values().any(|track| {
-            EndpointKind::from(&track.media_type) == kind && !track.is_muted()
+            CallbackMediaType::from(&track.media_type) == kind
+                && !track.is_muted()
         })
     }
 
-    pub fn is_receivers_muted(&self, kind: EndpointKind) -> bool {
+    pub fn is_receivers_muted(&self, kind: CallbackMediaType) -> bool {
         self.context.receivers.values().any(|track| {
-            EndpointKind::from(&track.media_type) == kind && track.is_muted()
+            CallbackMediaType::from(&track.media_type) == kind
+                && track.is_muted()
         })
     }
 }

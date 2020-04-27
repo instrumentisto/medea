@@ -3,7 +3,7 @@
 pub mod play_endpoint;
 pub mod publish_endpoint;
 
-use crate::api::control::callback::EndpointKind;
+use crate::api::control::callback::MediaType;
 
 #[doc(inline)]
 pub use play_endpoint::WebRtcPlayEndpoint;
@@ -11,39 +11,40 @@ pub use play_endpoint::WebRtcPlayEndpoint;
 pub use publish_endpoint::WebRtcPublishEndpoint;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TracksState(u8);
+struct MuteState(u8);
 
-impl TracksState {
+impl MuteState {
     #[inline]
-    pub const fn new() -> TracksState {
+    pub const fn new() -> MuteState {
         Self(0)
     }
 
     #[inline]
-    pub const fn with_kind(kind: EndpointKind) -> TracksState {
-        Self(kind as u8)
+    pub const fn with_media_type(media_type: MediaType) -> MuteState {
+        Self(media_type as u8)
     }
 
     #[inline]
-    pub fn started(&mut self, kind: EndpointKind) {
-        self.0 |= kind as u8;
+    pub fn started(&mut self, media_type: MediaType) {
+        self.0 |= media_type as u8;
     }
 
     #[inline]
-    pub fn stopped(&mut self, kind: EndpointKind) {
-        self.0 &= !(kind as u8);
+    pub fn stopped(&mut self, media_type: MediaType) {
+        self.0 &= !(media_type as u8);
     }
 
     #[inline]
-    pub const fn is_started(self, kind: EndpointKind) -> bool {
-        let kind = kind as u8;
-        (self.0 & kind) == kind
+    pub const fn is_started(self, media_type: MediaType) -> bool {
+        let media_type = media_type as u8;
+        (self.0 & media_type) == media_type
     }
 
-    pub const fn is_stopped(self, kind: EndpointKind) -> bool {
-        let kind = !(kind as u8);
+    #[inline]
+    pub const fn is_stopped(self, media_type: MediaType) -> bool {
+        let media_type = !(media_type as u8);
 
-        (self.0 | kind) == kind
+        (self.0 | media_type) == media_type
     }
 }
 
@@ -53,88 +54,88 @@ mod tracks_state_tests {
 
     #[test]
     fn normally_sets_started() {
-        let mut state = TracksState::new();
+        let mut state = MuteState::new();
 
-        assert!(!state.is_started(EndpointKind::Audio));
-        assert!(!state.is_started(EndpointKind::Video));
-        assert!(!state.is_started(EndpointKind::Both));
+        assert!(!state.is_started(MediaType::Audio));
+        assert!(!state.is_started(MediaType::Video));
+        assert!(!state.is_started(MediaType::Both));
 
-        state.started(EndpointKind::Audio);
-        assert!(state.is_started(EndpointKind::Audio));
-        assert!(!state.is_started(EndpointKind::Video));
-        assert!(!state.is_started(EndpointKind::Both));
+        state.started(MediaType::Audio);
+        assert!(state.is_started(MediaType::Audio));
+        assert!(!state.is_started(MediaType::Video));
+        assert!(!state.is_started(MediaType::Both));
 
-        state.started(EndpointKind::Video);
-        assert!(state.is_started(EndpointKind::Video));
-        assert!(state.is_started(EndpointKind::Audio));
-        assert!(state.is_started(EndpointKind::Both));
+        state.started(MediaType::Video);
+        assert!(state.is_started(MediaType::Video));
+        assert!(state.is_started(MediaType::Audio));
+        assert!(state.is_started(MediaType::Both));
     }
 
     #[test]
     fn normally_sets_started_on_both() {
-        let mut state = TracksState::new();
+        let mut state = MuteState::new();
 
-        assert!(!state.is_started(EndpointKind::Video));
-        assert!(!state.is_started(EndpointKind::Audio));
-        assert!(!state.is_started(EndpointKind::Both));
+        assert!(!state.is_started(MediaType::Video));
+        assert!(!state.is_started(MediaType::Audio));
+        assert!(!state.is_started(MediaType::Both));
 
-        state.started(EndpointKind::Both);
-        assert!(state.is_started(EndpointKind::Video));
-        assert!(state.is_started(EndpointKind::Audio));
-        assert!(state.is_started(EndpointKind::Both));
+        state.started(MediaType::Both);
+        assert!(state.is_started(MediaType::Video));
+        assert!(state.is_started(MediaType::Audio));
+        assert!(state.is_started(MediaType::Both));
     }
 
     #[test]
     fn normally_sets_stopped() {
-        let mut state = TracksState::new();
-        state.started(EndpointKind::Both);
-        assert!(state.is_started(EndpointKind::Video));
-        assert!(state.is_started(EndpointKind::Audio));
-        assert!(state.is_started(EndpointKind::Both));
+        let mut state = MuteState::new();
+        state.started(MediaType::Both);
+        assert!(state.is_started(MediaType::Video));
+        assert!(state.is_started(MediaType::Audio));
+        assert!(state.is_started(MediaType::Both));
 
-        state.stopped(EndpointKind::Audio);
-        assert!(!state.is_started(EndpointKind::Audio));
-        assert!(state.is_started(EndpointKind::Video));
-        assert!(!state.is_started(EndpointKind::Both));
+        state.stopped(MediaType::Audio);
+        assert!(!state.is_started(MediaType::Audio));
+        assert!(state.is_started(MediaType::Video));
+        assert!(!state.is_started(MediaType::Both));
 
-        state.stopped(EndpointKind::Video);
-        assert!(!state.is_started(EndpointKind::Audio));
-        assert!(!state.is_started(EndpointKind::Video));
-        assert!(!state.is_started(EndpointKind::Both));
+        state.stopped(MediaType::Video);
+        assert!(!state.is_started(MediaType::Audio));
+        assert!(!state.is_started(MediaType::Video));
+        assert!(!state.is_started(MediaType::Both));
     }
 
     #[test]
     fn normally_sets_stopped_on_both() {
-        let mut state = TracksState::new();
-        state.started(EndpointKind::Both);
-        assert!(state.is_started(EndpointKind::Video));
-        assert!(state.is_started(EndpointKind::Audio));
-        assert!(state.is_started(EndpointKind::Both));
+        let mut state = MuteState::new();
+        state.started(MediaType::Both);
+        assert!(state.is_started(MediaType::Video));
+        assert!(state.is_started(MediaType::Audio));
+        assert!(state.is_started(MediaType::Both));
 
-        state.stopped(EndpointKind::Both);
-        assert!(!state.is_started(EndpointKind::Video));
-        assert!(!state.is_started(EndpointKind::Audio));
-        assert!(!state.is_started(EndpointKind::Both));
+        state.stopped(MediaType::Both);
+        assert!(!state.is_started(MediaType::Video));
+        assert!(!state.is_started(MediaType::Audio));
+        assert!(!state.is_started(MediaType::Both));
     }
 
     #[test]
     fn normally_works_is_stopped() {
-        let mut state = TracksState::new();
-        assert!(state.is_stopped(EndpointKind::Both));
+        let mut state = MuteState::new();
+        assert!(state.is_stopped(MediaType::Both));
 
-        state.started(EndpointKind::Audio);
-        assert!(state.is_stopped(EndpointKind::Video));
-        assert!(!state.is_stopped(EndpointKind::Both));
-        assert!(!state.is_stopped(EndpointKind::Audio));
+        state.started(MediaType::Audio);
+        assert!(state.is_stopped(MediaType::Video));
+        assert!(!state.is_stopped(MediaType::Both));
+        assert!(!state.is_stopped(MediaType::Audio));
 
-        state.started(EndpointKind::Video);
-        assert!(!state.is_stopped(EndpointKind::Video));
-        assert!(!state.is_stopped(EndpointKind::Audio));
-        assert!(!state.is_stopped(EndpointKind::Both));
+        state.started(MediaType::Video);
+        assert!(!state.is_stopped(MediaType::Video));
+        assert!(!state.is_stopped(MediaType::Audio));
+        assert!(!state.is_stopped(MediaType::Both));
 
-        state.stopped(EndpointKind::Both);
-        assert!(state.is_stopped(EndpointKind::Video));
-        assert!(state.is_stopped(EndpointKind::Audio));
-        assert!(state.is_stopped(EndpointKind::Both));
+        state.stopped(MediaType::Both);
+        assert!(state.is_stopped(MediaType::Video));
+        assert!(state.is_stopped(MediaType::Audio));
+        assert!(state.is_stopped(MediaType::Both));
     }
 }

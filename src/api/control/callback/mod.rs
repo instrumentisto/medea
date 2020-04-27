@@ -4,15 +4,15 @@ pub mod clients;
 pub mod service;
 pub mod url;
 
+use std::convert::From;
+
 use actix::Message;
 use chrono::{DateTime, Utc};
 use clients::CallbackClientError;
-use derive_more::From;
+use derive_more::{Display, From};
 use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
-use medea_client_api_proto::MediaType;
-use std::convert::From;
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -73,61 +73,61 @@ impl Into<proto::OnJoin> for OnJoinEvent {
 /// `on_start` Control API callback.
 #[derive(Debug)]
 pub struct OnStartEvent {
-    pub kind: EndpointKind,
-    pub direction: EndpointDirection,
+    pub media_type: MediaType,
+    pub direction: MediaDirection,
 }
 
 impl Into<proto::OnStart> for OnStartEvent {
     fn into(self) -> proto::OnStart {
-        let kind: proto::EndpointKind = self.kind.into();
-        let direction: proto::EndpointDirection = self.direction.into();
+        let media_type: proto::MediaType = self.media_type.into();
+        let direction: proto::MediaDirection = self.direction.into();
 
         proto::OnStart {
-            kind: kind as i32,
-            direction: direction as i32,
+            media_type: media_type as i32,
+            media_direction: direction as i32,
         }
     }
 }
 
-use derive_more::Display;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
-pub enum EndpointKind {
+pub enum MediaType {
     Audio = 0b1,
     Video = 0b10,
     Both = 0b11,
 }
 
-impl Into<proto::EndpointKind> for EndpointKind {
-    fn into(self) -> proto::EndpointKind {
+impl Into<proto::MediaType> for MediaType {
+    fn into(self) -> proto::MediaType {
         match self {
-            EndpointKind::Audio => proto::EndpointKind::Audio,
-            EndpointKind::Video => proto::EndpointKind::Video,
-            EndpointKind::Both => proto::EndpointKind::Both,
+            MediaType::Audio => proto::MediaType::Audio,
+            MediaType::Video => proto::MediaType::Video,
+            MediaType::Both => proto::MediaType::Both,
         }
     }
 }
 
-impl From<&MediaType> for EndpointKind {
-    fn from(media_type: &MediaType) -> Self {
+impl From<&medea_client_api_proto::MediaType> for MediaType {
+    fn from(media_type: &medea_client_api_proto::MediaType) -> Self {
+        use medea_client_api_proto::MediaType as MediaTypeProto;
+
         match media_type {
-            MediaType::Audio(_) => EndpointKind::Audio,
-            MediaType::Video(_) => EndpointKind::Video,
+            MediaTypeProto::Audio(_) => MediaType::Audio,
+            MediaTypeProto::Video(_) => MediaType::Video,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum EndpointDirection {
+pub enum MediaDirection {
     Publish,
     Play,
 }
 
-impl Into<proto::EndpointDirection> for EndpointDirection {
-    fn into(self) -> proto::EndpointDirection {
+impl Into<proto::MediaDirection> for MediaDirection {
+    fn into(self) -> proto::MediaDirection {
         match self {
-            EndpointDirection::Play => proto::EndpointDirection::Play,
-            EndpointDirection::Publish => proto::EndpointDirection::Publish,
+            MediaDirection::Play => proto::MediaDirection::Play,
+            MediaDirection::Publish => proto::MediaDirection::Publish,
         }
     }
 }
@@ -158,20 +158,21 @@ impl Into<proto::on_stop::Reason> for OnStopReason {
 /// `on_stop` Control API callback.
 #[derive(Debug)]
 pub struct OnStopEvent {
-    pub kind: EndpointKind,
-    pub direction: EndpointDirection,
+    pub media_type: MediaType,
+    pub media_direction: MediaDirection,
     pub reason: OnStopReason,
 }
 
 impl Into<proto::OnStop> for OnStopEvent {
     fn into(self) -> proto::OnStop {
-        let kind: proto::EndpointKind = self.kind.into();
-        let direction: proto::EndpointDirection = self.direction.into();
+        let media_type: proto::MediaType = self.media_type.into();
+        let media_direction: proto::MediaDirection =
+            self.media_direction.into();
         let reason: proto::on_stop::Reason = self.reason.into();
 
         proto::OnStop {
-            kind: kind as i32,
-            direction: direction as i32,
+            media_type: media_type as i32,
+            media_direction: media_direction as i32,
             reason: reason as i32,
         }
     }

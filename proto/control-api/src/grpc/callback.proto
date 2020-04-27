@@ -32,27 +32,27 @@ message Request {
 // some fields (if necessary) in the future.
 message Response {}
 
-enum EndpointKind {
+enum MediaType {
   AUDIO = 0;
   VIDEO = 1;
-  BOTH = 3;
+  BOTH = 2;
 }
 
-enum EndpointDirection {
+enum MediaDirection {
   PUBLISH = 0;
   PLAY = 1;
 }
 
 // Event which fires when Endpoint starts sending/receiving media traffic.
 message OnStart {
-  EndpointKind kind = 1;
-  EndpointDirection direction = 2;
+  MediaType media_type = 1;
+  MediaDirection media_direction = 2;
 }
 
 // Event which fires when Endpoint stops sending/receiving media traffic.
 message OnStop {
-  EndpointKind kind = 1;
-  EndpointDirection direction = 2;
+  MediaType media_type = 1;
+  MediaDirection media_direction = 2;
   Reason reason = 3;
 
   enum Reason {

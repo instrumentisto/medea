@@ -11,8 +11,7 @@ use medea_control_api_proto::grpc::api as proto;
 use medea_macro::enum_delegate;
 
 use crate::api::control::callback::{
-    url::CallbackUrl, CallbackRequest, EndpointDirection, EndpointKind,
-    OnStopReason,
+    url::CallbackUrl, CallbackRequest, MediaDirection, MediaType, OnStopReason,
 };
 
 use self::webrtc::{
@@ -26,7 +25,7 @@ use self::webrtc::{
 /// [Medea]: https://github.com/instrumentisto/medea
 #[enum_delegate(pub fn any_traffic_callback_is_some(&self) -> bool)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn awaits_starting(&self, kind: EndpointKind))]
+#[enum_delegate(pub fn awaits_starting(&self, media_type: MediaType))]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),
@@ -43,21 +42,21 @@ impl Endpoint {
         &self,
         peer_id: PeerId,
         at: DateTime<Utc>,
-        kind: EndpointKind,
+        media_type: MediaType,
         reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.get_on_stop(peer_id, at, kind, reason)
+                publish.get_on_stop(peer_id, at, media_type, reason)
             }
             Endpoint::WebRtcPlayEndpoint(play) => {
-                play.get_on_stop(at, kind, reason)
+                play.get_on_stop(at, media_type, reason)
             }
         }
     }
 
     #[inline]
-    pub fn get_direction(&self) -> EndpointDirection {
+    pub fn get_direction(&self) -> MediaDirection {
         match self {
             Endpoint::WebRtcPlayEndpoint(_) => WebRtcPlayEndpoint::DIRECTION,
             Endpoint::WebRtcPublishEndpoint(_) => {
@@ -103,11 +102,11 @@ impl WeakEndpoint {
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.upgrade()
             .map(|e| {
-                e.awaits_starting(EndpointKind::Both);
+                e.awaits_starting(MediaType::Both);
                 e.get_on_stop(
                     peer_id,
                     Utc::now(),
-                    EndpointKind::Both,
+                    MediaType::Both,
                     OnStopReason::TrafficNotFlowing,
                 )
             })

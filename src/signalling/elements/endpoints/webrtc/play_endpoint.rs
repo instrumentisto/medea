@@ -12,7 +12,7 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::{
-            url::CallbackUrl, CallbackRequest, EndpointDirection, EndpointKind,
+            url::CallbackUrl, CallbackRequest, MediaDirection, MediaType,
             OnStartEvent, OnStopEvent, OnStopReason,
         },
         endpoints::webrtc_play_endpoint::WebRtcPlayId as Id,
@@ -20,7 +20,7 @@ use crate::{
     },
     signalling::elements::{
         endpoints::webrtc::{
-            publish_endpoint::WeakWebRtcPublishEndpoint, TracksState,
+            publish_endpoint::WeakWebRtcPublishEndpoint, MuteState,
         },
         member::WeakMember,
         Member,
@@ -64,9 +64,9 @@ struct WebRtcPlayEndpointInner {
     /// URL to which `OnStop` Control API callback will be sent.
     on_stop: Option<CallbackUrl>,
 
-    state: TracksState,
+    mute_state: MuteState,
 
-    awaits_start_state: Option<TracksState>,
+    waiting_for_start_mute_state: Option<MuteState>,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -114,7 +114,7 @@ impl Drop for WebRtcPlayEndpointInner {
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
-    pub const DIRECTION: EndpointDirection = EndpointDirection::Play;
+    pub const DIRECTION: MediaDirection = MediaDirection::Play;
 
     /// Creates new [`WebRtcPlayEndpoint`].
     pub fn new(
@@ -135,9 +135,9 @@ impl WebRtcPlayEndpoint {
             is_force_relayed,
             on_start,
             on_stop,
-            state: TracksState::new(),
-            awaits_start_state: Some(TracksState::with_kind(
-                EndpointKind::Both,
+            mute_state: MuteState::new(),
+            waiting_for_start_mute_state: Some(MuteState::with_media_type(
+                MediaType::Both,
             )),
         })))
     }
@@ -206,12 +206,12 @@ impl WebRtcPlayEndpoint {
         at: DateTime<Utc>,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if let Some(awaits_on_start) = inner.awaits_start_state {
-            if inner.state == awaits_on_start {
+        if let Some(awaits_on_start) = inner.waiting_for_start_mute_state {
+            if inner.mute_state == awaits_on_start {
                 return None;
             }
-            inner.state = awaits_on_start;
-            inner.awaits_start_state = None;
+            inner.mute_state = awaits_on_start;
+            inner.waiting_for_start_mute_state = None;
             let fid =
                 inner.owner().get_fid_to_endpoint(inner.id.clone().into());
 
@@ -222,18 +222,18 @@ impl WebRtcPlayEndpoint {
                         fid,
                         OnStartEvent {
                             direction: Self::DIRECTION,
-                            kind: if awaits_on_start
-                                .is_started(EndpointKind::Both)
+                            media_type: if awaits_on_start
+                                .is_started(MediaType::Both)
                             {
-                                EndpointKind::Both
+                                MediaType::Both
                             } else if awaits_on_start
-                                .is_started(EndpointKind::Audio)
+                                .is_started(MediaType::Audio)
                             {
-                                EndpointKind::Audio
+                                MediaType::Audio
                             } else if awaits_on_start
-                                .is_started(EndpointKind::Video)
+                                .is_started(MediaType::Video)
                             {
-                                EndpointKind::Video
+                                MediaType::Video
                             } else {
                                 return None;
                             },
@@ -263,12 +263,12 @@ impl WebRtcPlayEndpoint {
     pub fn get_on_stop(
         &self,
         at: DateTime<Utc>,
-        kind: EndpointKind,
+        media_type: MediaType,
         reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if !inner.state.is_stopped(kind) {
-            inner.state.stopped(kind);
+        if !inner.mute_state.is_stopped(media_type) {
+            inner.mute_state.stopped(media_type);
 
             let fid =
                 inner.owner().get_fid_to_endpoint(inner.id.clone().into());
@@ -279,8 +279,8 @@ impl WebRtcPlayEndpoint {
                         fid,
                         OnStopEvent {
                             reason,
-                            kind,
-                            direction: Self::DIRECTION,
+                            media_type,
+                            media_direction: Self::DIRECTION,
                         },
                         at,
                     ),
@@ -291,13 +291,15 @@ impl WebRtcPlayEndpoint {
         None
     }
 
-    pub fn awaits_starting(&self, kind: EndpointKind) {
+    pub fn awaits_starting(&self, media_type: MediaType) {
         let mut inner = self.0.borrow_mut();
-        if let Some(awaits_start_state) = inner.awaits_start_state.as_mut() {
-            awaits_start_state.started(kind);
+        if let Some(awaits_start_state) =
+            inner.waiting_for_start_mute_state.as_mut()
+        {
+            awaits_start_state.started(media_type);
         } else {
-            let state = TracksState::with_kind(kind);
-            inner.awaits_start_state = Some(state);
+            let state = MuteState::with_media_type(media_type);
+            inner.waiting_for_start_mute_state = Some(state);
         }
     }
 

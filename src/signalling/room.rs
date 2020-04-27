@@ -55,7 +55,7 @@ use crate::{
         control::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
-                CallbackRequest, EndpointKind, OnJoinEvent, OnLeaveEvent,
+                CallbackRequest, MediaType, OnJoinEvent, OnLeaveEvent,
                 OnLeaveReason, OnStopReason,
             },
             endpoints::{
@@ -755,28 +755,30 @@ impl Room {
         &self,
         peer_id: PeerId,
         publish: &WebRtcPublishEndpoint,
-        kind: EndpointKind,
+        media_type: MediaType,
     ) {
         debug!(
             "Endpoint [fid = {}] with {} kind is muted.",
             publish.owner().get_fid_to_endpoint(publish.id().into()),
-            kind
+            media_type
         );
 
         let callbacks_at = Utc::now();
         if let Some((url, req)) = publish.get_on_stop(
             peer_id,
             callbacks_at,
-            kind,
+            media_type,
             OnStopReason::Muted,
         ) {
             self.callbacks.send_callback(url, req);
         }
 
         for sink in publish.sinks() {
-            if let Some((url, req)) =
-                sink.get_on_stop(callbacks_at, kind, OnStopReason::SrcMuted)
-            {
+            if let Some((url, req)) = sink.get_on_stop(
+                callbacks_at,
+                media_type,
+                OnStopReason::SrcMuted,
+            ) {
                 self.callbacks.send_callback(url, req);
             }
         }
@@ -785,22 +787,22 @@ impl Room {
     fn endpoint_unmuted(
         &self,
         publish: &WebRtcPublishEndpoint,
-        kind: EndpointKind,
+        media_type: MediaType,
     ) {
         debug!(
             "Endpoint [fid = {}] with {} kind is unmuted.",
             publish.owner().get_fid_to_endpoint(publish.id().into()),
-            kind
+            media_type
         );
 
-        publish.awaits_starting(kind);
+        publish.awaits_starting(media_type);
         let callback_at = Utc::now();
         if let Some((url, req)) = publish.get_on_start(callback_at) {
             self.callbacks.send_callback(url, req);
         }
 
         for sink in publish.sinks() {
-            sink.awaits_starting(kind);
+            sink.awaits_starting(media_type);
             if let Some((url, req)) = sink.get_on_start(callback_at) {
                 self.callbacks.send_callback(url, req);
             }
@@ -1024,10 +1026,8 @@ impl CommandHandler for Room {
         let partner_peer_id;
 
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            let is_peer_video_muted =
-                peer.is_senders_muted(EndpointKind::Video);
-            let is_peer_audio_muted =
-                peer.is_senders_muted(EndpointKind::Audio);
+            let is_peer_video_muted = peer.is_senders_muted(MediaType::Video);
+            let is_peer_audio_muted = peer.is_senders_muted(MediaType::Audio);
             tracks_patches
                 .iter()
                 .filter_map(|patch| {
@@ -1040,31 +1040,31 @@ impl CommandHandler for Room {
                     weak_endpoint.upgrade()
                 {
                     let is_peer_video_currently_muted =
-                        peer.is_senders_muted(EndpointKind::Video);
+                        peer.is_senders_muted(MediaType::Video);
                     let is_peer_audio_currently_muted =
-                        peer.is_senders_muted(EndpointKind::Audio);
+                        peer.is_senders_muted(MediaType::Audio);
 
                     if !is_peer_audio_currently_muted && is_peer_audio_muted {
-                        self.endpoint_unmuted(&publish, EndpointKind::Audio);
+                        self.endpoint_unmuted(&publish, MediaType::Audio);
                     } else if is_peer_audio_currently_muted
                         && !is_peer_audio_muted
                     {
                         self.endpoint_muted(
                             peer.id(),
                             &publish,
-                            EndpointKind::Audio,
+                            MediaType::Audio,
                         );
                     }
 
                     if !is_peer_video_currently_muted && is_peer_video_muted {
-                        self.endpoint_unmuted(&publish, EndpointKind::Video);
+                        self.endpoint_unmuted(&publish, MediaType::Video);
                     } else if is_peer_video_currently_muted
                         && !is_peer_video_muted
                     {
                         self.endpoint_muted(
                             peer.id(),
                             &publish,
-                            EndpointKind::Video,
+                            MediaType::Video,
                         );
                     }
                 }
@@ -1269,7 +1269,7 @@ impl Handler<FatalPeerFailure> for Room {
                 e.get_on_stop(
                     peer_id,
                     msg.at,
-                    EndpointKind::Both,
+                    MediaType::Both,
                     OnStopReason::WrongTrafficFlowing,
                 )
             })
