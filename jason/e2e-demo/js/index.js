@@ -270,7 +270,12 @@ const controlDebugWindows = {
       for (callback of callbacks) {
         let row = document.createElement('tr');
         let event = document.createElement('th');
-        event.innerHTML = JSON.stringify(callback.event);
+        let callback_event = callback.event;
+        row.onclick = () => {
+          alert(JSON.stringify(callback_event));
+        }
+        row.style.cursor = 'pointer';
+        event.innerHTML = callback.event.type;
         row.appendChild(event);
         let time = document.createElement('th');
         time.innerHTML = callback.at;

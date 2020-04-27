@@ -73,17 +73,63 @@ mod join {
     }
 }
 
+#[derive(Clone, Serialize)]
+enum MediaDirection {
+    Publish,
+    Play,
+}
+
+impl From<proto::MediaDirection> for MediaDirection {
+    fn from(proto: proto::MediaDirection) -> Self {
+        use proto::MediaDirection::*;
+        match proto {
+            Publish => Self::Publish,
+            Play => Self::Play,
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+enum MediaType {
+    Video,
+    Audio,
+    Both,
+}
+
+impl From<proto::MediaType> for MediaType {
+    fn from(proto: proto::MediaType) -> Self {
+        use proto::MediaType::*;
+        match proto {
+            Audio => Self::Audio,
+            Video => Self::Video,
+            Both => Self::Both,
+        }
+    }
+}
+
 /// `on_start` callback's related entities and implementations.
 mod on_start {
     use super::*;
 
     /// `OnStart` callback of Control API.
     #[derive(Clone, Serialize)]
-    pub struct OnStart;
+    pub struct OnStart {
+        media_direction: MediaDirection,
+        media_type: MediaType,
+    }
 
     impl From<proto::OnStart> for OnStart {
-        fn from(_: proto::OnStart) -> Self {
-            Self
+        fn from(proto: proto::OnStart) -> Self {
+            Self {
+                media_direction: proto::MediaDirection::from_i32(
+                    proto.media_direction,
+                )
+                .unwrap_or_default()
+                .into(),
+                media_type: proto::MediaType::from_i32(proto.media_type)
+                    .unwrap_or_default()
+                    .into(),
+            }
         }
     }
 }
@@ -92,13 +138,49 @@ mod on_start {
 mod on_stop {
     use super::*;
 
+    #[derive(Clone, Serialize)]
+    pub enum OnStopReason {
+        TrafficNotFlowing,
+        Muted,
+        SrcMuted,
+        WrongTrafficFlowing,
+    }
+
+    impl From<proto::on_stop::Reason> for OnStopReason {
+        fn from(proto: proto::on_stop::Reason) -> Self {
+            use proto::on_stop::Reason::*;
+            match proto {
+                TrafficNotFlowing => Self::TrafficNotFlowing,
+                Muted => Self::Muted,
+                SrcMuted => Self::SrcMuted,
+                WrongTrafficFlowing => Self::WrongTrafficFlowing,
+            }
+        }
+    }
+
     /// `OnStop` callback of Control API.
     #[derive(Clone, Serialize)]
-    pub struct OnStop;
+    pub struct OnStop {
+        reason: OnStopReason,
+        media_type: MediaType,
+        media_direction: MediaDirection,
+    }
 
     impl From<proto::OnStop> for OnStop {
-        fn from(_: proto::OnStop) -> Self {
-            Self
+        fn from(proto: proto::OnStop) -> Self {
+            Self {
+                reason: proto::on_stop::Reason::from_i32(proto.reason)
+                    .unwrap_or_default()
+                    .into(),
+                media_type: proto::MediaType::from_i32(proto.media_type)
+                    .unwrap_or_default()
+                    .into(),
+                media_direction: proto::MediaDirection::from_i32(
+                    proto.media_direction,
+                )
+                .unwrap_or_default()
+                .into(),
+            }
         }
     }
 }
