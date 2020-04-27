@@ -99,12 +99,9 @@ impl WeakEndpoint {
     pub fn get_traffic_flowing_on_stop(
         &self,
         peer_id: PeerId,
+        at: DateTime<Utc>,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
-        self.get_both_on_stop(
-            peer_id,
-            OnStopReason::TrafficNotFlowing,
-            Utc::now(),
-        )
+        self.get_both_on_stop(peer_id, OnStopReason::TrafficNotFlowing, at)
     }
 
     pub fn get_both_on_stop(

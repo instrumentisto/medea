@@ -66,7 +66,10 @@ pub struct PeerStarted(pub PeerId);
 /// has stopped.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct PeerStopped(pub PeerId);
+pub struct PeerStopped {
+    pub peer_id: PeerId,
+    pub at: DateTime<Utc>,
+}
 
 /// Message which indicates that [`Peer`] with provided [`PeerId`] was fallen
 /// into failure state and should be removed.
@@ -440,7 +443,13 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
                 } else {
                     peer.state = PeerState::Stopped(HashSet::new());
                     if let Some(room_addr) = room.room.upgrade() {
-                        room_addr.do_send(PeerStopped(peer.peer_id));
+                        let at = Utc::now()
+                            - chrono::Duration::from_std(msg.at.elapsed())
+                                .unwrap();
+                        room_addr.do_send(PeerStopped {
+                            peer_id: peer.peer_id,
+                            at,
+                        });
                     }
                 }
             }

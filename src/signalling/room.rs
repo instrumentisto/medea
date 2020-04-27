@@ -520,7 +520,8 @@ impl Room {
                 .flat_map(|(_, peers)| peers.into_iter())
                 .flat_map(|peer| {
                     peer.endpoints().into_iter().filter_map(move |endpoint| {
-                        endpoint.get_traffic_flowing_on_stop(peer.id())
+                        endpoint
+                            .get_traffic_flowing_on_stop(peer.id(), Utc::now())
                     })
                 })
                 .for_each(|(url, req)| {
@@ -582,7 +583,10 @@ impl Room {
                     peers.iter().flat_map(|peer| {
                         peer.endpoints().into_iter().filter_map(
                             move |endpoint| {
-                                endpoint.get_traffic_flowing_on_stop(peer.id())
+                                endpoint.get_traffic_flowing_on_stop(
+                                    peer.id(),
+                                    Utc::now(),
+                                )
                             },
                         )
                     })
@@ -1159,11 +1163,12 @@ impl Handler<PeerStopped> for Room {
         msg: PeerStopped,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let peer_id = msg.0;
+        let peer_id = msg.peer_id;
+        let at = msg.at;
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
             peer.endpoints()
                 .into_iter()
-                .filter_map(|e| e.get_traffic_flowing_on_stop(peer.id()))
+                .filter_map(|e| e.get_traffic_flowing_on_stop(peer.id(), at))
                 .chain(
                     self.peers
                         .get_peer_by_id(peer.partner_peer_id())
@@ -1173,6 +1178,7 @@ impl Handler<PeerStopped> for Room {
                         .filter_map(|e| {
                             e.get_traffic_flowing_on_stop(
                                 peer.partner_peer_id(),
+                                at,
                             )
                         }),
                 )
