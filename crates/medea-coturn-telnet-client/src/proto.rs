@@ -102,7 +102,7 @@ impl TryFrom<BytesMut> for CoturnCliResponse {
     type Error = CoturnResponseParseError;
 
     fn try_from(mut msg: BytesMut) -> Result<Self, Self::Error> {
-        use CoturnResponseParseError::*;
+        use CoturnResponseParseError::{BadResponseFormat, BadResponseType};
 
         // delete cursor if message ends with it
         if msg.ends_with(CURSOR.as_bytes()) {
@@ -165,7 +165,7 @@ pub enum CoturnCliRequest {
 
 impl From<CoturnCliRequest> for Bytes {
     fn from(req: CoturnCliRequest) -> Self {
-        use CoturnCliRequest::*;
+        use CoturnCliRequest::{Auth, CloseSession, Ping, PrintSessions};
         match req {
             Auth(pass) => pass,
             PrintSessions(username) => format!("ps {}", username).into(),

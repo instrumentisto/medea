@@ -58,7 +58,8 @@ impl InnerStream {
     }
 }
 
-/// Representation of [MediaStream][1] object.
+/// Representation of [MediaStream][1] object. Each of its tracks has
+/// association with [`TrackId`].
 ///
 /// It's used on Rust side and represents a handle to [`InnerStream`] data.
 ///
@@ -70,10 +71,12 @@ pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
 
 #[allow(clippy::new_without_default)]
 impl PeerMediaStream {
+    /// Creates empty [`PeerMediaStream`].
     pub fn new() -> Self {
         Self(Rc::new(RefCell::new(InnerStream::new())))
     }
 
+    /// Adds provided [`MediaStreamTrack`] to a stream.
     pub fn add_track(&self, track_id: TrackId, track: MediaStreamTrack) {
         self.0.borrow_mut().add_track(track_id, track);
     }

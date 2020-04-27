@@ -304,8 +304,8 @@ impl PeerConnection {
         Ok(peer)
     }
 
-    /// Filters already sent [`RtcStat`]s and send only new [`RtcStat`]s from
-    /// the provided [`RtcStats`].
+    /// Filters out already sent stats, and send new statss from
+    /// provided [`RtcStats`].
     pub fn send_peer_stats(&self, stats: RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
@@ -365,7 +365,7 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of this [`PeerConnection`] is in
+    /// Returns `true` if all [`Sender`]s of this [`PeerConnection`] is in
     /// the provided `mute_state`.
     #[inline]
     pub fn is_all_senders_in_mute_state(
@@ -389,7 +389,7 @@ impl PeerConnection {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
+    /// provided [`proto::TrackPatch`] contains unknown ID.
     pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         Ok(self
             .media_connections
@@ -521,9 +521,24 @@ impl PeerConnection {
         Ok(mids)
     }
 
-    /// Sync provided tracks creating all required `Sender`s and
+    /// Syncs provided tracks creating all required `Sender`s and
     /// `Receiver`s, request local stream if required, get, set and return
     /// sdp offer.
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaConnectionsError::TransceiverNotFound`] if could not find
+    /// transceiver by `mid`.
+    ///
+    ///
+    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
+    /// [`RtcPeerConnection.createOffer()`][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [`RtcPeerConnection.setLocalDescription()`][2] fails
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
+    /// [2]: https://tinyurl.com/ycyh4fcx
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
@@ -551,6 +566,28 @@ impl PeerConnection {
     /// Requests local stream from [`MediaManager`] if no stream was provided.
     /// Will produce [`PeerEvent::NewLocalStream`] if new stream was received
     /// from [`MediaManager`].
+    ///
+    /// # Errors
+    ///
+    /// With [`StreamRequestError`] if current state
+    /// of Peer [`Sender`]s could not be represented as [`SimpleStreamRequest`]
+    /// (max 1 audio [`Sender`] and max 1 video [`Sender`]), or [`MediaStream`]
+    /// requested from [`MediaManager`] does not satisfy [`Sender`]s
+    /// constraints.
+    ///
+    /// With [`StreamRequestError::ExpectedAudioTracks`] or
+    /// [`StreamRequestError::ExpectedVideoTracks`] if provided
+    /// [`MediaStreamSettings`] are incompatible with this peer [`Sender`]s
+    /// constraints.
+    ///
+    /// With [`MediaManagerError::GetUserMediaFailed`] or
+    /// [`MediaManagerError::GetDisplayMediaFailed`] if corresponding request to
+    /// UA failed.
+    ///
+    /// With [`MediaConnectionsError::InvalidMediaStream`] or
+    /// [`MediaConnectionsError::InvalidMediaTrack`] or
+    /// [`MediaConnectionsError::CouldNotInsertTrack`] if [`MediaStream`] could
+    /// not be inserted into Peer's [`Sender`]s.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -584,7 +621,6 @@ impl PeerConnection {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            console_error(format!("is_new_stream = {}", is_new_stream));
             if is_new_stream {
                 let _ = self.peer_events_sender.unbounded_send(
                     PeerEvent::NewLocalStream {
@@ -599,7 +635,13 @@ impl PeerConnection {
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
     ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://tinyurl.com/y8tyy7gv
     pub async fn set_remote_answer(&self, answer: String) -> Result<()> {
         self.set_remote_description(SdpType::Answer(answer))
             .await
@@ -608,7 +650,13 @@ impl PeerConnection {
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from offer.
     ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://tinyurl.com/y8tyy7gv
     async fn set_remote_offer(&self, offer: String) -> Result<()> {
         self.set_remote_description(SdpType::Offer(offer))
             .await
@@ -618,7 +666,18 @@ impl PeerConnection {
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP with given
     /// description.
     ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    ///
+    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// [`RtcPeerConnection.addIceCandidate()`][3] fails when adding buffered
+    /// ICE candidates.
+    ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://tinyurl.com/y8tyy7gv
+    /// [3]: https://www.w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     async fn set_remote_description(&self, desc: SdpType) -> Result<()> {
         self.peer
             .set_remote_description(desc)
@@ -652,7 +711,28 @@ impl PeerConnection {
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
     ///
+    /// # Errors
+    ///
+    /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
+    /// new [`Sender`] cause transceiver with specified `mid` does not
+    /// exist.
+    ///
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    ///
+    /// With [`StreamRequestError`] or [`MediaManagerError`] or
+    /// [`MediaConnectionsError`] if could not get / insert [`MediaStream`].
+    ///
+    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
+    /// [`RtcPeerConnection.createAnswer()`][3] fails
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [`RtcPeerConnection.setLocalDescription()`][4] fails
+    ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://tinyurl.com/y8tyy7gv
+    /// [3]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
+    /// [4]: https://tinyurl.com/ycyh4fcx
     pub async fn process_offer(
         &self,
         offer: String,
@@ -694,7 +774,14 @@ impl PeerConnection {
 
     /// Adds remote peers [ICE Candidate][1] to this peer.
     ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// [`RtcPeerConnection.addIceCandidate()`][2] fails when adding buffered
+    /// ICE candidates.
+    ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     pub async fn add_ice_candidate(
         &self,
         candidate: String,

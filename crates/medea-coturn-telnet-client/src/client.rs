@@ -55,7 +55,7 @@ pub enum CoturnTelnetError {
 
 impl From<CoturnCliCodecError> for CoturnTelnetError {
     fn from(err: CoturnCliCodecError) -> Self {
-        use CoturnCliCodecError::*;
+        use CoturnCliCodecError::{BadResponse, IoFailed};
         match err {
             IoFailed(e) => Self::from(e),
             BadResponse(e) => Self::from(e),
@@ -108,7 +108,7 @@ impl CoturnTelnetConnection {
         &mut self,
         username: String,
     ) -> Result<Vec<String>, CoturnTelnetError> {
-        use CoturnTelnetError::*;
+        use CoturnTelnetError::{Disconnected, UnexpectedMessage};
 
         self.0
             .send(CoturnCliRequest::PrintSessions(username))
@@ -141,7 +141,7 @@ impl CoturnTelnetConnection {
         &mut self,
         session_id: String,
     ) -> Result<(), CoturnTelnetError> {
-        use CoturnTelnetError::*;
+        use CoturnTelnetError::{Disconnected, UnexpectedMessage};
 
         self.0
             .send(CoturnCliRequest::CloseSession(session_id))
@@ -193,7 +193,9 @@ impl CoturnTelnetConnection {
     /// - First message received is not [`CoturnCliResponse::EnterPassword`].
     /// - Second message received is not [`CoturnCliResponse::Ready`].
     async fn auth(&mut self, pass: Bytes) -> Result<(), CoturnTelnetError> {
-        use CoturnTelnetError::*;
+        use CoturnTelnetError::{
+            Disconnected, UnexpectedMessage, WrongPassword,
+        };
 
         let response = self.0.next().await.ok_or(Disconnected)??;
         if let CoturnCliResponse::EnterPassword = response {
@@ -222,7 +224,7 @@ impl CoturnTelnetConnection {
     /// [Coturn]: https://github.com/coturn/coturn
     /// [Telnet]: https://en.wikipedia.org/wiki/Telnet
     pub async fn ping(&mut self) -> Result<(), CoturnTelnetError> {
-        use CoturnTelnetError::*;
+        use CoturnTelnetError::{Disconnected, UnexpectedMessage};
 
         self.0.send(CoturnCliRequest::Ping).await?;
 

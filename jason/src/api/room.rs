@@ -140,7 +140,7 @@ enum RoomError {
     #[display(fmt = "Remote stream from unknown peer")]
     UnknownRemotePeer,
 
-    /// Returned if [`MediaTrack`] update failed.
+    /// Returned if [`MediaStreamTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
@@ -191,11 +191,20 @@ impl From<MediaConnectionsError> for RoomError {
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
+// TODO: get rid of this RefCell.
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 impl RoomHandle {
     /// Implements externally visible `RoomHandle::join`.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
+    /// `on_connection_loss` callbacks are not set.
+    ///
+    /// With [`RoomError::CouldNotConnectToServer`] if could not connect to
+    /// `Medea`.
     pub fn inner_join(
         &self,
         token: String,
@@ -290,16 +299,19 @@ impl RoomHandle {
             .map(|inner| inner.borrow_mut().on_close.set_func(f))
     }
 
-    /// Sets `on_local_stream` callback, which will be invoked once media
-    /// acquisition request will resolve successfully. Only invoked if media
-    /// request was initiated by media server.
+    /// Sets `on_local_stream` callback. This callback is invoked each time
+    /// media acquisition request will resolve successfully. This might
+    /// happen in such cases:
+    /// 1. Media server initiates media request.
+    /// 2. `unmute_audio`/`unmute_video` is called.
+    /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
-    /// media acquisition or media injection failures.
+    /// media acquisition failures.
     pub fn on_failed_local_stream(
         &self,
         f: js_sys::Function,
@@ -324,6 +336,7 @@ impl RoomHandle {
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
     ///   - `on_failed_local_stream` callback is not set
+    ///   - `on_connection_loss` callback is not set
     ///   - unable to connect to media server.
     ///
     /// Effectively returns `Result<(), JasonError>`.
@@ -335,18 +348,27 @@ impl RoomHandle {
         )
     }
 
-    /// Injects local media stream for all created and new [`PeerConnection`]s
-    /// in this [`Room`].
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// configured for some [`Room`], then this [`Room`] can only send media
+    /// stream that corresponds to this settings. [`MediaStreamSettings`] update
+    /// will change media stream in all sending peers, so that might cause new
+    /// `getUserMedia` request.
+    ///
+    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
-    ) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner
-                .borrow_mut()
-                .set_local_media_settings(settings.clone())
+    ) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        let settings = settings.clone();
+        future_to_promise(async move {
+            let inner = inner?;
+            inner.borrow_mut().set_local_media_settings(settings).await;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
@@ -661,16 +683,26 @@ impl InnerRoom {
             .is_none()
     }
 
-    /// Injects given local stream into all [`PeerConnection`]s of this [`Room`]
-    /// and stores its for injecting into new [`PeerConnection`]s.
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// configured for some [`Room`], then this [`Room`] can only send media
+    /// stream that corresponds to this settings. [`MediaStreamSettings`] update
+    /// will change media stream in all sending peers, so that might cause
+    /// media requests to UA.
     ///
-    /// If injecting fails, then invokes `on_failed_local_stream` callback with
-    /// a failure error.
-    fn set_local_media_settings(&mut self, settings: MediaStreamSettings) {
+    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// callback.
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
+    fn set_local_media_settings(
+        &mut self,
+        settings: MediaStreamSettings,
+    ) -> impl Future<Output = ()> + 'static {
         let peers = self.peers.get_all();
         let settings_clone = settings.clone();
         let error_callback = Rc::clone(&self.on_failed_local_stream);
-        spawn_local(async move {
+        self.local_stream_settings.replace(settings);
+        async move {
             for peer in peers {
                 if let Err(err) = peer
                     .update_local_stream(Some(settings_clone.clone()))
@@ -680,8 +712,7 @@ impl InnerRoom {
                     error_callback.call(JasonError::from(err));
                 }
             }
-        });
-        self.local_stream_settings.replace(settings);
+        }
     }
 }
 
@@ -930,8 +961,9 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
+    /// Handles [`PeerEvent::NewLocalStreamRequired`] event, updates local
+    /// stream of [`PeerConnection`] that sent request.
     fn on_new_local_stream_required(&mut self, peer_id: PeerId) {
-        console_error("on_new_local_stream_required");
         if let Some(peer) = self.peers.get(peer_id) {
             let constraints_clone = self.local_stream_settings.clone();
             let error_callback = Rc::clone(&self.on_failed_local_stream);

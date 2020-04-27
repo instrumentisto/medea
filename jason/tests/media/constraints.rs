@@ -3,15 +3,13 @@
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
-use web_sys::{
-    MediaDeviceInfo, MediaDeviceKind, MediaStream, MediaStreamTrack,
-};
+use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
 use medea_client_api_proto::VideoSettings;
 use medea_jason::{
     media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints, MediaManager,
-        MediaStreamSettings, MultiSourceMediaStreamConstraints,
+        MediaStreamSettings, MultiSourceMediaStreamConstraints, TrackKind,
         VideoTrackConstraints,
     },
     utils::{get_property_by_name, window},
@@ -19,50 +17,6 @@ use medea_jason::{
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
-
-#[wasm_bindgen_test]
-async fn not_satisfies_stopped_video_track() {
-    let video_device = video_devices().await.unwrap().pop().unwrap();
-
-    let mut constraints = MediaStreamSettings::new();
-    let mut track_constraints = DeviceVideoTrackConstraints::new();
-    track_constraints.device_id(video_device.device_id());
-    constraints.device_video(track_constraints.clone());
-
-    let media_manager = MediaManager::default();
-    let (stream, _) =
-        media_manager.get_stream(constraints.clone()).await.unwrap();
-
-    assert!(stream.get_tracks().length() == 1);
-
-    let track = MediaStreamTrack::from(stream.get_tracks().pop());
-    track.stop();
-
-    assert!(track.kind() == "video");
-    assert!(!VideoTrackConstraints::from(track_constraints).satisfies(&track));
-}
-
-#[wasm_bindgen_test]
-async fn not_satisfies_stopped_audio_track() {
-    let audio_device = audio_devices().await.unwrap().pop().unwrap();
-
-    let mut constraints = MediaStreamSettings::new();
-    let mut track_constraints = AudioTrackConstraints::new();
-    track_constraints.device_id(audio_device.device_id());
-    constraints.audio(track_constraints.clone());
-
-    let media_manager = MediaManager::default();
-    let (stream, _) =
-        media_manager.get_stream(constraints.clone()).await.unwrap();
-
-    assert!(stream.get_tracks().length() == 1);
-
-    let track = MediaStreamTrack::from(stream.get_tracks().pop());
-    track.stop();
-
-    assert!(track.kind() == "audio");
-    assert!(!track_constraints.satisfies(&track));
-}
 
 // 1. Get device id of non default video device from enumerate_devices();
 // 2. Add it to constraints;
@@ -80,12 +34,13 @@ async fn video_constraints_satisfies() {
     let media_manager = MediaManager::default();
     let (stream, _) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
+    let mut tracks = stream.into_tracks();
 
-    assert!(stream.get_tracks().length() == 1);
+    assert_eq!(tracks.len(), 1);
 
-    let track = MediaStreamTrack::from(stream.get_tracks().pop());
+    let track = tracks.pop().unwrap();
 
-    assert!(track.kind() == "video");
+    assert!(track.kind() == TrackKind::Video);
     assert!(VideoTrackConstraints::from(track_constraints).satisfies(&track));
 }
 
@@ -106,11 +61,12 @@ async fn audio_constraints_satisfies() {
     let (stream, _) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
 
-    assert!(stream.get_tracks().length() == 1);
+    let mut tracks = stream.into_tracks();
+    assert_eq!(tracks.len(), 1);
 
-    let track = MediaStreamTrack::from(stream.get_tracks().pop());
+    let track = tracks.pop().unwrap();
 
-    assert!(track.kind() == "audio");
+    assert!(track.kind() == TrackKind::Audio);
     assert!(track_constraints.satisfies(&track));
 }
 
@@ -145,18 +101,25 @@ async fn both_constraints_satisfies() {
     let (stream, _) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
 
-    assert!(stream.get_tracks().length() == 2);
-
     let video_constraints = constraints.get_video().clone().unwrap();
     let audio_constraints = constraints.get_audio().clone().unwrap();
 
-    let audio_track = MediaStreamTrack::from(stream.get_audio_tracks().pop());
-    let video_track = MediaStreamTrack::from(stream.get_video_tracks().pop());
+    let tracks = stream.into_tracks();
+    assert_eq!(tracks.len(), 2);
 
-    assert!(audio_track.kind() == "audio");
+    let (mut audio, mut video): (Vec<_>, Vec<_>) =
+        tracks.into_iter().partition(|track| match track.kind() {
+            TrackKind::Audio => true,
+            TrackKind::Video => false,
+        });
+
+    let audio_track = audio.pop().unwrap();
+    let video_track = video.pop().unwrap();
+
+    assert!(audio_track.kind() == TrackKind::Audio);
     assert!(audio_constraints.satisfies(&audio_track));
 
-    assert!(video_track.kind() == "video");
+    assert!(video_track.kind() == TrackKind::Video);
     assert!(video_constraints.satisfies(&video_track));
 }
 
@@ -179,40 +142,40 @@ async fn equal_constraints_produce_equal_streams() {
     let manager = MediaManager::default();
 
     let (stream, _) = manager.get_stream(constraints.clone()).await.unwrap();
-    let stream_tracks = get_stream_tracks(stream);
+    let stream_tracks = stream.into_tracks();
 
     let (stream, _) = manager.get_stream(constraints.clone()).await.unwrap();
-    let another_stream_tracks = get_stream_tracks(stream);
+    let another_stream_tracks = stream.into_tracks();
 
     let audio_track = stream_tracks
         .iter()
-        .find(|track| track.kind() == "audio")
+        .find(|track| track.kind() == TrackKind::Audio)
         .unwrap();
     let some_audio_track = another_stream_tracks
         .iter()
-        .find(|track| track.kind() == "audio")
+        .find(|track| track.kind() == TrackKind::Audio)
         .unwrap();
     assert_eq!(audio_track.id(), some_audio_track.id());
 
     let video_track = stream_tracks
         .iter()
-        .find(|track| track.kind() == "video")
+        .find(|track| track.kind() == TrackKind::Video)
         .unwrap();
     let some_video_track = another_stream_tracks
         .iter()
-        .find(|track| track.kind() == "video")
+        .find(|track| track.kind() == TrackKind::Video)
         .unwrap();
     assert_eq!(video_track.id(), some_video_track.id());
 }
 
-// 0. If audio_devices.len() > 1 (otherwise this test makes no sense);
-// 1. Get device id of non default audio device from enumerate_devices();
-// 2. Add it to constraints;
-// 3. Get stream1 by constraints;
-// 4. Get next device id of non default audio device from enumerate_devices();
-// 5. Create new constraints;
-// 6. Get stream2 by constraints;
-// 7. Assert (stream1.track().id() != stream2.track().id());
+/// 1. If audio_devices.len() > 1 (otherwise this test makes no sense);
+/// 2. Get device id of non default audio device from enumerate_devices();
+/// 3. Add it to constraints;
+/// 4. Get stream1 by constraints;
+/// 5. Get next device id of non default audio device from
+/// `enumerate_devices()`; 6. Create new constraints;
+/// 7. Get stream2 by constraints;
+/// 8. Assert `(stream1.track().id() != stream2.track().id())`.
 #[wasm_bindgen_test]
 async fn different_constraints_produce_different_streams() {
     let mut audio_devices = audio_devices().await.unwrap().into_iter();
@@ -223,20 +186,20 @@ async fn different_constraints_produce_different_streams() {
         let manager = MediaManager::default();
 
         let (stream, _) = manager.get_stream(constraints).await.unwrap();
-        let stream_tracks = get_stream_tracks(stream);
+        let stream_tracks = stream.into_tracks();
 
         let constraints = build_constraints(audio_devices.next(), None);
         let (another_stream, _) =
             manager.get_stream(constraints).await.unwrap();
-        let another_stream_tracks = get_stream_tracks(another_stream);
+        let another_stream_tracks = another_stream.into_tracks();
 
         let audio_track = stream_tracks
             .iter()
-            .find(|track| track.kind() == "audio")
+            .find(|track| track.kind() == TrackKind::Audio)
             .unwrap();
         let another_audio_track = another_stream_tracks
             .iter()
-            .find(|track| track.kind() == "audio")
+            .find(|track| track.kind() == TrackKind::Audio)
             .unwrap();
         assert_ne!(audio_track.id(), another_audio_track.id());
     }
@@ -448,6 +411,12 @@ async fn multi_source_media_stream_constraints_build8() {
     };
 }
 
+#[wasm_bindgen_test]
+async fn merge_audio() {}
+
+#[wasm_bindgen_test]
+async fn merge_video() {}
+
 // Maps undefined to None.
 fn js_val_to_option(val: JsValue) -> Option<JsValue> {
     if val.is_undefined() {
@@ -513,13 +482,4 @@ fn build_constraints(
         constraints.device_video(track_constraints);
     }
     constraints
-}
-
-/// Returns [MediaStreamTrack]s of given [MediaStream].
-fn get_stream_tracks(stream: MediaStream) -> Vec<MediaStreamTrack> {
-    js_sys::try_iter(&stream.get_tracks())
-        .unwrap()
-        .unwrap()
-        .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
-        .collect()
 }

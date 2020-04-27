@@ -1,7 +1,8 @@
 {
   "moz:firefoxOptions": {
     "prefs": {
-      "media.navigator.streams.fake": true
+      "media.navigator.streams.fake": true,
+      "media.navigator.permission.disabled": true
     },
     "args": []
   },

@@ -34,25 +34,25 @@ pub enum StreamRequestError {
     #[display(fmt = "SimpleStreamRequest should have at least one track")]
     NoTracks,
 
-    /// Provided [`MediaStream`] has multiple audio [`MediaTrack`]s.
+    /// Provided [`MediaStream`] has multiple audio tracks.
     #[display(
         fmt = "provided MediaStream was expected to have single audio track"
     )]
     ExpectedAudioTracks,
 
-    /// Provided [`MediaStream`] has multiple video [`MediaTrack`]s.
+    /// Provided [`MediaStream`] has multiple video tracks.
     #[display(
         fmt = "provided MediaStream was expected to have single video track"
     )]
     ExpectedVideoTracks,
 
-    /// Audio [`MediaTrack`] fails to satisfy specified constraints.
+    /// Audio track fails to satisfy specified constraints.
     #[display(
         fmt = "provided audio track does not satisfy specified constraints"
     )]
     InvalidAudioTrack,
 
-    /// Video [`MediaTrack`] fails to satisfy specified constraints.
+    /// Video track fails to satisfy specified constraints.
     #[display(
         fmt = "provided video track does not satisfy specified constraints"
     )]
@@ -65,7 +65,7 @@ type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
 ///
 /// It's used for invoking [getUserMedia()][2] to specify what kinds of tracks
 /// should be included into returned [`MediaStream`], and, optionally,
-/// to establish constraints for those [`MediaTrack`]'s settings.
+/// to establish constraints for those track's settings.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 /// [2]:
@@ -103,27 +103,24 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parses raw [`SysMediaStream`] and returns [`PeerMediaStream`] wrapper.
+    /// Parses [`MediaStream`] and returns [`PeerMediaStream`] wrapper.
     ///
     /// # Errors
     ///
     /// Errors with [`StreamRequestError::InvalidAudioTrack`] if some audio
-    /// [`MediaTrack`] from provided [`SysMediaStream`] not satisfies
+    /// track from provided [`MediaStream`] not satisfies
     /// contained constrains.
     ///
     /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if provided
-    /// [`SysMediaStream`] doesn't have expected audio [`MediaTrack`].
+    /// [`MediaStream`] doesn't have expected audio track.
     ///
     /// Errors with [`StreamRequestError::InvalidVideoTrack`] if some video
-    /// [`MediaTrack`] from provided [`SysMediaStream`] not satisfies
+    /// track from provided [`MediaStream`] not satisfies
     /// contained constrains.
     ///
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
-    /// [`SysMediaStream`] doesn't have expected video [`MediaTrack`].
-    pub fn parse_stream(
-        &self,
-        stream: MediaStream,
-    ) -> Result<PeerMediaStream> {
+    /// [`MediaStream`] doesn't have expected video track.
+    pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
         use StreamRequestError::*;
         let result_stream = PeerMediaStream::new();
 

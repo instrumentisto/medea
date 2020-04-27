@@ -26,6 +26,11 @@ impl GrpcCallbackClient {
     ///
     /// Note that this function doesn't check availability of gRPC server on
     /// provided [`GrpcCallbackUrl`].
+    ///
+    /// # Errors
+    ///
+    /// With [`CallbackClientError::TonicTransport`] if tonic transport could
+    /// not be created.
     pub async fn new(
         addr: &GrpcCallbackUrl,
     ) -> Result<Self, CallbackClientError> {

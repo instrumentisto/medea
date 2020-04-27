@@ -2,7 +2,8 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use medea_client_api_proto::{TrackId, TrackPatch};
+use futures::channel::mpsc;
+use medea_client_api_proto::{PeerId, TrackId, TrackPatch};
 use medea_jason::{
     media::MediaManager,
     peer::{
@@ -20,9 +21,13 @@ async fn get_test_media_connections(
     enabled_audio: bool,
     enabled_video: bool,
 ) -> (MediaConnections, TrackId, TrackId) {
-    let media_connections = MediaConnections::new(Rc::new(
-        RtcPeerConnection::new(vec![], false).unwrap(),
-    ));
+    let (tx, rx) = mpsc::unbounded();
+    std::mem::forget(rx);
+    let media_connections = MediaConnections::new(
+        PeerId(0),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        tx,
+    );
     let (audio_track, video_track) =
         get_test_tracks(!enabled_audio, !enabled_video);
     let audio_track_id = audio_track.id;
@@ -36,7 +41,7 @@ async fn get_test_media_connections(
     let (stream, _) = manager.get_stream(&caps).await.unwrap();
 
     media_connections
-        .insert_local_stream(&caps.parse_stream(&stream).unwrap())
+        .insert_local_stream(&caps.parse_stream(stream).unwrap())
         .await
         .unwrap();
 
@@ -53,20 +58,31 @@ async fn get_test_media_connections(
 }
 
 #[wasm_bindgen_test]
-fn get_stream_request() {
-    let media_connections = MediaConnections::new(Rc::new(
-        RtcPeerConnection::new(vec![], false).unwrap(),
-    ));
+fn get_stream_request1() {
+    let (tx, rx) = mpsc::unbounded();
+    std::mem::forget(rx);
+    let media_connections = MediaConnections::new(
+        PeerId(0),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        tx,
+    );
     let (audio_track, video_track) = get_test_tracks(false, false);
     media_connections
         .update_tracks(vec![audio_track, video_track])
         .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_some());
+}
 
-    let media_connections = MediaConnections::new(Rc::new(
-        RtcPeerConnection::new(vec![], false).unwrap(),
-    ));
+#[wasm_bindgen_test]
+fn get_stream_request2() {
+    let (tx, rx) = mpsc::unbounded();
+    std::mem::forget(rx);
+    let media_connections = MediaConnections::new(
+        PeerId(0),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        tx,
+    );
     media_connections.update_tracks(vec![]).unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());

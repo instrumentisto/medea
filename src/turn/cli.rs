@@ -54,6 +54,14 @@ impl CoturnTelnetClient {
     /// Forcibly closes provided [`IceUser`]s sessions on [Coturn] server.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
+    ///
+    /// # Errors
+    ///
+    /// With [`CoturnCliError::PoolError`] if could not get/create connection
+    /// from pool.
+    ///
+    /// With [`CoturnCliError::CoturnTelnetError`] in case of unexpected
+    /// protocol error.
     pub async fn delete_sessions(
         &self,
         users: &[&IceUser],

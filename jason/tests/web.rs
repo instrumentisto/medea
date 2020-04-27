@@ -104,8 +104,17 @@ extern "C" {
     #[wasm_bindgen(method, setter = errorGetUserMedia)]
     fn error_get_user_media(this: &MockNavigator, err: JsValue);
 
+    #[wasm_bindgen(method, setter = errorGetDisplayMedia)]
+    fn error_get_display_media(this: &MockNavigator, err: JsValue);
+
     #[wasm_bindgen(method, setter = errorEnumerateDevices)]
     fn error_enumerate_devices(this: &MockNavigator, err: JsValue);
+
+    #[wasm_bindgen(method, getter = getUserMediaRequestsCount)]
+    fn get_user_media_requests_count(this: &MockNavigator) -> i32;
+
+    #[wasm_bindgen(method, getter = getDisplayMediaRequestsCount)]
+    fn get_display_media_requests_count(this: &MockNavigator) -> i32;
 
     #[wasm_bindgen(method)]
     fn stop(this: &MockNavigator);
@@ -190,4 +199,12 @@ async fn await_with_timeout<T>(
         Either::Left((res, _)) => Ok(res),
         Either::Right((_, _)) => Err("Future timed out.".to_string()),
     }
+}
+
+// TODO: Might be extended to proc macro at some point.
+#[wasm_bindgen(inline_js = "export function is_firefox() { return \
+                            navigator.userAgent.toLowerCase().indexOf('\
+                            firefox') > -1; }")]
+extern "C" {
+    fn is_firefox() -> bool;
 }

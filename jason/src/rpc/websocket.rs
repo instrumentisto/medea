@@ -208,6 +208,17 @@ pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
+    ///
+    /// # Errors
+    ///
+    /// With [`TransportError::CreateSocket`] if could not open WebSocket to
+    /// specified url.
+    ///
+    /// With [`TransportError::InitSocket`] if [`WebSocket.onclose`][1] callback
+    /// fired before [`WebSocket.onopen`][2] callback.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
     pub async fn new(url: &str) -> Result<Self> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();

@@ -168,6 +168,7 @@
       let videoSelect = document.getElementById('connect__select-device_video');
       let localVideo = document.getElementById('local-video__video');
       let isForceRelayCheckbox = document.getElementById("is_force_relay");
+
       let joinCallerButton = document.getElementById('join__join');
       let usernameInput = document.getElementById('join__username');
 
@@ -175,6 +176,7 @@
       if (userNameFromCookies) {
         usernameInput.value = userNameFromCookies;
       }
+
       let room = await jason.init_room();
 
       const updateLocalVideo = async (stream) => {
@@ -192,7 +194,7 @@
             localStream = await jason.media_manager().init_local_stream(constraints)
             await updateLocalVideo(localStream);
           }
-          room.set_local_media_settings(constraints);
+          await room.set_local_media_settings(constraints);
         } catch (e) {
           console.error("Changing audio source failed: " + e);
         }
@@ -208,7 +210,7 @@
             localStream = await jason.media_manager().init_local_stream(constraints)
             await updateLocalVideo(localStream);
           }
-          room.set_local_media_settings(constraints);
+          await room.set_local_media_settings(constraints);
         } catch (e) {
           console.error("Changing video source failed: " + e);
         }
@@ -363,7 +365,7 @@
           localStream = await jason.media_manager().init_local_stream(constraints)
           await updateLocalVideo(localStream);
           await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
-          room.set_local_media_settings(constraints);
+          await room.set_local_media_settings(constraints);
         } catch (e) {
           console.error("Init local video failed: " + e.message());
         }
@@ -380,7 +382,7 @@
             localStream = await jason.media_manager().init_local_stream(constraints)
             await updateLocalVideo(localStream);
             await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
-            room.set_local_media_settings(constraints);
+            await room.set_local_media_settings(constraints);
           } catch (e) {
             console.error("Init local video failed: " + e.message());
           }

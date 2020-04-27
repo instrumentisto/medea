@@ -348,6 +348,9 @@ pub struct DeviceVideoTrackConstraints {
 }
 
 impl DeviceVideoTrackConstraints {
+    /// Merges this [`DeviceVideoTrackConstraints`] with other
+    /// [`DeviceVideoTrackConstraints`], meaning that if some constraint is not
+    /// set on this, then constraint from other will be applied to this.
     fn merge(&mut self, other: DeviceVideoTrackConstraints) {
         if self.device_id.is_none() && other.device_id.is_some() {
             self.device_id = other.device_id;
@@ -379,6 +382,9 @@ impl DeviceVideoTrackConstraints {
 pub struct DisplayVideoTrackConstraints {}
 
 impl DisplayVideoTrackConstraints {
+    /// Merges this [`DisplayVideoTrackConstraints`] with other
+    /// [`DisplayVideoTrackConstraints`], meaning that if some constraint is not
+    /// set on this, then constraint from other will be applied to this.
     #[allow(clippy::unused_self)]
     fn merge(&mut self, _: DisplayVideoTrackConstraints) {
         // no constraints => nothing to do here atm
@@ -422,8 +428,8 @@ impl VideoTrackConstraints {
         }
     }
 
-    /// Detect is video track captured from display searching [specific
-    /// fields][1] in its settings. Only works in Chrome atm.
+    /// Detect is video track captured from display searching
+    /// [specific fields][1] in its settings. Only works in Chrome atm.
     ///
     /// [1]: https://tinyurl.com/ufx7mcw
     fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {

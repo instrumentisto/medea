@@ -75,9 +75,16 @@ pub enum MediaManagerError {
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 
-/// Manager that is responsible for [MediaStream][1] acquisition and storing.
+/// [`MediaManager`] performs all media acquisition requests
+/// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
+/// for further reusage.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+/// [`MediaManager`] stores weak references to
+/// [`MediaStreamTrack`]s, so if there are no strong references to some track,
+/// then this track is stopped and deleted from [`MediaManager`].
+///
+/// [1]: https://tinyurl.com/rnxcavf
+/// [2]: https://tinyurl.com/wotjrns
 #[derive(Default)]
 pub struct MediaManager(Rc<InnerMediaManager>);
 
@@ -123,12 +130,22 @@ impl InnerMediaManager {
         }
     }
 
-    /// Returns [MediaStream][1] and information if this stream is new one,
-    /// meaning that it was obtained via new [getUserMedia()][2] call or was
-    /// build from already owned tracks.
+    /// Obtains [`MediaStream`] based on a provided [`MediaStreamSettings`].
+    /// This can be a stream built from tracks that were acquired earlier, or
+    /// from new tracks, acquired via [getUserMedia()][1] or/and
+    /// [getDisplayMedia()][2] requests.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://tinyurl.com/rnxcavf
+    /// # Errors
+    ///
+    /// With [`MediaManagerError::GetUserMediaFailed`] IF [getUserMedia()][1]
+    /// request failed.
+    ///
+    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// [getDisplayMedia()][2] request failed.
+    ///
+    ///
+    /// [1]: https://tinyurl.com/rnxcavf
+    /// [2]: https://tinyurl.com/wotjrns
     fn get_stream(
         &self,
         mut caps: MediaStreamSettings,
@@ -186,12 +203,12 @@ impl InnerMediaManager {
         }
     }
 
-    /// Tries to build new [MediaStream][1] from already owned tracks to avoid
-    /// redundant [getUserMedia()][2]/[getDisplayMedia()][3] calls.
+    /// Tries to find [`MediaStreamTrack`]s that satisfies
+    /// [`MediaStreamSettings`], from tracks that were acquired earlier to avoid
+    /// redundant [getUserMedia()][1]/[getDisplayMedia()][2] calls.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://tinyurl.com/rnxcavf
-    /// [3]: https://tinyurl.com/wotjrns
+    /// [1]: https://tinyurl.com/rnxcavf
+    /// [2]: https://tinyurl.com/wotjrns
     fn get_from_storage(
         &self,
         caps: &mut MediaStreamSettings,
@@ -236,8 +253,9 @@ impl InnerMediaManager {
         tracks
     }
 
-    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call and saves
-    /// its tracks to storage.
+    /// Obtains new [MediaStream][1] making [getUserMedia()][2] call, saves
+    /// received tracks weak refs to storage, returns list of tracks strong
+    /// refs.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/rnxcavf
@@ -269,22 +287,21 @@ impl InnerMediaManager {
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?;
 
+            let mut storage_mut = storage.borrow_mut();
             let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
                 .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+                .inspect(|track| storage_mut.push(track.downgrade()))
                 .collect();
-
-            tracks
-                .iter()
-                .for_each(|track| storage.borrow_mut().push(track.downgrade()));
 
             Ok(tracks)
         }
     }
 
-    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call and
-    /// saves its tracks to storage.
+    /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call, saves
+    /// received tracks weak refs to storage, returns list of tracks strong
+    /// refs.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/wotjrns
@@ -315,15 +332,13 @@ impl InnerMediaManager {
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?;
 
+            let mut storage_mut = storage.borrow_mut();
             let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
                 .unwrap()
                 .unwrap()
                 .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+                .inspect(|track| storage_mut.push(track.downgrade()))
                 .collect();
-
-            tracks
-                .iter()
-                .for_each(|track| storage.borrow_mut().push(track.downgrade()));
 
             Ok(tracks)
         }
@@ -331,16 +346,22 @@ impl InnerMediaManager {
 }
 
 impl MediaManager {
-    /// Obtains [MediaStream][1] basing on a provided
-    /// [MediaStreamConstraints][2].
-    /// Acquired streams are cached and cloning existing stream is preferable
-    /// over obtaining new ones.
+    /// Obtains [`MediaStream`] based on a provided [`MediaStreamSettings`].
+    /// This can be a stream built from tracks that were acquired earlier, or
+    /// from new tracks, acquired via [getUserMedia()][1] or/and
+    /// [getDisplayMedia()][2] requests.
     ///
-    /// `on_local_stream` callback will be invoked each time new stream was
-    /// obtained.
+    /// # Errors
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+    /// With [`MediaManagerError::GetUserMediaFailed`] IF [getUserMedia()][1]
+    /// request failed.
+    ///
+    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// [getDisplayMedia()][2] request failed.
+    ///
+    ///
+    /// [1]: https://tinyurl.com/rnxcavf
+    /// [2]: https://tinyurl.com/wotjrns
     pub async fn get_stream<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
@@ -357,10 +378,16 @@ impl MediaManager {
 
 /// JS side handle to [`MediaManager`].
 ///
-/// Actually, represents a [`Weak`]-based handle to [`InnerMediaManager`].
+/// [`MediaManager`] performs all media acquisition requests
+/// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
+/// for further reusage.
 ///
-/// For using [`MediaManagerHandle`] on Rust side,
-/// consider the [`MediaManager`].
+/// [`MediaManager`] stores weak references to [`MediaStreamTrack`]s, so if
+/// there are no strong references to some track, then this track is stopped
+/// and deleted from [`MediaManager`].
+///
+/// [1]: https://tinyurl.com/rnxcavf
+/// [2]: https://tinyurl.com/wotjrns
 #[wasm_bindgen]
 pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 
@@ -388,8 +415,8 @@ impl MediaManagerHandle {
         })
     }
 
-    /// Returns [MediaStream][1] object, built from provided
-    /// [`MediaStreamConstraints`].
+    /// Returns [`MediaStream`](`LocalMediaStream`) object, built from provided
+    /// [`MediaStreamSettings`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {

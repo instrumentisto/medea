@@ -143,7 +143,7 @@ pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod delete {
-    use super::*;
+    use super::{error, Context, Data, HttpResponse, Response};
 
     gen_request_macro!(delete, Response);
 
@@ -157,7 +157,7 @@ mod delete {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod get {
-    use super::*;
+    use super::{error, Context, Data, HttpResponse, SingleGetResponse};
 
     gen_request_macro!(get, SingleGetResponse);
 
@@ -171,7 +171,9 @@ mod get {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod create {
-    use super::*;
+    use super::{
+        error, Context, CreateResponse, Data, Element, Fid, HttpResponse, Json,
+    };
 
     pub async fn create1(
         path: actix_web::web::Path<String>,
