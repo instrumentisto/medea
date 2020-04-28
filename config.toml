@@ -214,7 +214,8 @@
 
 [peer_media_traffic]
 # Duration after which media server will consider `Peer`'s media traffic
-# stats as invalid and will remove this `Peer`.
+# stats as invalid and will send notification about this by `on_stop`
+# Control API callback.
 #
 # Env var: MEDEA_PEER_MEDIA_TRAFFIC__PEER_VALIDITY_TIMEOUT
 # Default:
@@ -230,8 +231,8 @@
 # Duration within which media server should receive signal of `Peer`
 # start from all sources.
 #
-# If media server wouldn't receive those signals, then this `Peer` will
-# be removed within this duration.
+# If media server wouldn't receive this signal, then `on_stop` callback
+# will be sent for a `Endpoint` related to this `Peer`.
 #
 # Env var: MEDEA_PEER_MEDIA_TRAFFIC__PEER_INIT_TIMEOUT
 # Default:
