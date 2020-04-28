@@ -55,11 +55,10 @@ impl CoturnTelnetClient {
     ///
     /// # Errors
     ///
-    /// Returns [`CoturnCliError::CliError`] if some error occurs while working
-    /// with [`CoturnTelnetConnection`].
-    ///
-    /// Returns [`CoturnCliError::PoolError`] if error occured while getting
-    /// [`CoturnTelnerConnection`] from the connections pool.
+    /// When:
+    /// - establishing connection with [Coturn] fails;
+    /// - retrieving all `users`' sessions from [Coturn] fails;
+    /// - deleting all retrieved `users`' sessions fails.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
     pub async fn delete_sessions(

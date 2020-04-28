@@ -517,7 +517,14 @@ impl PeerConnection {
 
     /// Sync provided tracks creating all required `Sender`s and
     /// `Receiver`s, request local stream if required, get, set and return
-    /// sdp offer.
+    /// SDP offer.
+    ///
+    /// # Errors
+    ///
+    /// When:
+    /// - creating new [`Sender`] or [`Receiver`] fails;
+    /// - inserting or creating `local_stream` fails;
+    /// - creating or setting SDP offer fails.
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
@@ -543,8 +550,13 @@ impl PeerConnection {
     /// Replaces local stream in the underlying [RTCPeerConnection][1]
     /// with a provided [MediaStream][2] if its have all required tracks.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// # Errors
+    ///
+    /// When inserting [MediaStream][2] into underlying [RTCPeerConnection][1]
+    /// fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastream
     #[inline]
     pub async fn inject_local_stream(
         &self,
@@ -561,8 +573,15 @@ impl PeerConnection {
     /// Will produce [`PeerEvent::NewLocalStream`] if new stream was received
     /// from [`MediaManager`].
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// # Errors
+    ///
+    /// When:
+    /// - requesting local stream from [`MediaManager`] fails;
+    /// - inserting [MediaStream][1] into underlying [RTCPeerConnection][2]
+    ///   fails.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     async fn insert_local_stream(
         &self,
         local_stream: Option<&SysMediaStream>,
@@ -605,6 +624,10 @@ impl PeerConnection {
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
+    ///
+    /// # Errors
+    ///
+    /// If setting given SDP `answer` as remote description fails.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn set_remote_answer(&self, answer: String) -> Result<()> {
@@ -659,6 +682,10 @@ impl PeerConnection {
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
     ///
+    /// # Errors
+    ///
+    /// When setting remote SDP offer or creating SDP answer fails.
+    ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn process_offer(
         &self,
@@ -700,6 +727,10 @@ impl PeerConnection {
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.
+    ///
+    /// # Errors
+    ///
+    /// If fails to add given ICE `candidate` to this peer.
     ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2
     pub async fn add_ice_candidate(

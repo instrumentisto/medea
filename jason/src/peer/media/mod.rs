@@ -291,8 +291,14 @@ impl MediaConnections {
     ///
     /// Provided [`MediaStream`] must have all required [`MediaTrack`]s.
     /// [`MediaTrack`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
-    /// via [`replaceTrack` method][1], changing its
-    /// direction to `sendonly`.
+    /// via [`replaceTrack` method][1], changing its direction to `sendonly`.
+    ///
+    /// # Errors
+    ///
+    /// - [`MediaConnectionsError::InvalidMediaTrack`] if some [`MediaTrack`]
+    ///   doesn't satisfy [`Sender`]'s [`TrackConstraints`].
+    /// - [`MediaConnectionsError::InvalidMediaStream`] if [`MediaStream`]
+    ///   doesn't contain [`MediaTrack`] for some [`Sender`].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_stream(

@@ -5,12 +5,7 @@
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
 // TODO (evdokimovs): Fix `clippy::missing_errors_doc` in a separate PR.
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::must_use_candidate,
-    clippy::enum_glob_use,
-    clippy::missing_errors_doc
-)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 

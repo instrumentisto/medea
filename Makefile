@@ -20,9 +20,9 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.42
-CHROME_VERSION := 80.0
-FIREFOX_VERSION := 74.0.1
+RUST_VER := 1.43
+CHROME_VERSION := 81.0
+FIREFOX_VERSION := 75.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -274,7 +274,9 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings \
+		-A clippy::enum_glob_use \
+		-A clippy::wildcard_imports
 
 
 
