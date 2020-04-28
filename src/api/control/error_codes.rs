@@ -424,6 +424,7 @@ impl From<RoomError> for ErrorResponse {
             | UnableToSendEvent(_)
             | PeerError(_)
             | BadRoomSpec(_)
+            | PeerTrafficWatcherMailbox(_)
             | TurnServiceErr(_) => Self::unexpected(&err),
         }
     }

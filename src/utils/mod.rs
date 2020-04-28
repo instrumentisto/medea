@@ -42,6 +42,36 @@ macro_rules! hashmap {
     };
 }
 
+/// Creates new [`HashSet`] from a list of values.
+///
+/// # Example
+///
+/// ```rust
+/// # use medea::hashset;
+/// let map = hashset![1, 1, 2];
+/// assert!(map.contains(&1));
+/// assert!(map.contains(&2));
+/// ```
+///
+/// [`HashSet`]: std::collections::HashSet
+#[macro_export]
+macro_rules! hashset {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
+
+    ($($value:expr,)+) => { hashset!($($key => $value),+) };
+    ($($value:expr),*) => {
+        {
+            let _cap = hashset!(@count $($value),*);
+            let mut _map = ::std::collections::HashSet::with_capacity(_cap);
+            $(
+                let _ = _map.insert($value);
+            )*
+            _map
+        }
+    };
+}
+
 /// Generates [`Debug`] implementation for a provided structure with name of
 /// this structure.
 ///
@@ -51,6 +81,7 @@ macro_rules! hashmap {
 /// # Example
 ///
 /// ```
+/// # use medea::impl_debug_by_struct_name;
 /// struct Foo;
 ///
 /// impl_debug_by_struct_name!(Foo);

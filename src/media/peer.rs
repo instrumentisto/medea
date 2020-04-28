@@ -10,14 +10,17 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings,
+    TrackId, TrackPatch, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
     media::{IceUser, MediaTrack},
-    signalling::peers::Counter,
+    signalling::{
+        elements::endpoints::{Endpoint, WeakEndpoint},
+        peers::{Counter, PeerSpec, TrackMediaType},
+    },
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -74,8 +77,11 @@ impl PeerError {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
+#[enum_delegate(pub fn get_spec(&self) -> PeerSpec)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
+#[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
+#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -159,6 +165,9 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
+    /// Weak references to the [`Endpoint`]s for which this [`Peer`]
+    /// is created.
+    endpoints: Vec<WeakEndpoint>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -239,6 +248,27 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
+    /// Returns [`PeerSpec`] of this [`PeerConnection`].
+    ///
+    /// This [`PeerSpec`] will be used in the [`PeerTrafficWatcher`] for
+    /// checking that [`Peer`]'s media traffic is flows same as expected in
+    /// [`PeerSpec`].
+    pub fn get_spec(&self) -> PeerSpec {
+        let mut senders = HashMap::new();
+        let mut receivers = HashMap::new();
+
+        for sender in self.context.senders.values() {
+            let media_type = TrackMediaType::from(&sender.media_type);
+            *senders.entry(media_type).or_insert(0) += 1;
+        }
+        for receiver in self.context.receivers.values() {
+            let media_type = TrackMediaType::from(&receiver.media_type);
+            *receivers.entry(media_type).or_insert(0) += 1;
+        }
+
+        PeerSpec { senders, receivers }
+    }
+
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
     pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
         self.context.ice_user.as_ref().map(IceUser::servers_list)
@@ -247,6 +277,24 @@ impl<T> Peer<T> {
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s
     pub fn set_ice_user(&mut self, ice_user: IceUser) {
         self.context.ice_user.replace(ice_user);
+    }
+
+    /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
+    pub fn endpoints(&self) -> Vec<WeakEndpoint> {
+        self.context.endpoints.clone()
+    }
+
+    /// Adds [`Endpoint`] for which this [`Peer`] was created.
+    pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
+        match endpoint {
+            Endpoint::WebRtcPlayEndpoint(play) => {
+                play.set_peer_id(self.id());
+            }
+            Endpoint::WebRtcPublishEndpoint(publish) => {
+                publish.add_peer_id(self.id());
+            }
+        }
+        self.context.endpoints.push(endpoint.downgrade());
     }
 }
 
@@ -272,6 +320,7 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
+            endpoints: Vec::new(),
         };
         Self {
             context,

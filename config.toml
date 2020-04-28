@@ -208,3 +208,31 @@
 # Env var: MEDEA_SHUTDOWN__TIMEOUT
 # Default:
 #   timeout = "5s"
+
+
+
+
+[peer_media_traffic]
+# Duration after which media server will consider `Peer`'s media traffic
+# stats as invalid and will remove this `Peer`.
+#
+# Env var: MEDEA_PEER_MEDIA_TRAFFIC__PEER_VALIDITY_TIMEOUT
+# Default:
+#   peer_validity_timeout = "10s"
+
+# Duration after which media server will consider that `Peer`'s media
+# traffic is stopped.
+#
+# Env var: MEDEA_PEER_MEDIA_TRAFFIC__TRAFFIC_FLOWING_TIMEOUT
+# Default:
+#   traffic_flowing_timeout = "10s"
+
+# Duration within which media server should receive signal of `Peer`
+# start from all sources.
+#
+# If media server wouldn't receive those signals, then this `Peer` will
+# be removed within this duration.
+#
+# Env var: MEDEA_PEER_MEDIA_TRAFFIC__PEER_INIT_TIMEOUT
+# Default:
+#   peer_init_timeout = "15s"

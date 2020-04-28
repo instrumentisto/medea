@@ -23,6 +23,7 @@ use crate::{
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
+        peers::{build_peers_traffic_watcher, PeerTrafficWatcher},
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
@@ -33,6 +34,7 @@ use crate::{
     turn::coturn_metrics::CoturnMetricsService,
     AppContext,
 };
+use std::sync::Arc;
 
 /// Errors of [`RoomService`].
 #[derive(Debug, Fail, Display)]
@@ -121,6 +123,10 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
+    /// [`PeerTrafficWatcher`] for all [`Room`]s from this
+    /// [`RoomService`].
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
     _coturn_metrics: Addr<CoturnMetricsService>,
@@ -138,11 +144,17 @@ impl RoomService {
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
+        let peers_traffic_watcher =
+            build_peers_traffic_watcher(&app.config.peer_media_traffic);
         Ok(Self {
-            _coturn_metrics: CoturnMetricsService::new(&app.config.turn)?
-                .start(),
+            _coturn_metrics: CoturnMetricsService::new(
+                &app.config.turn,
+                peers_traffic_watcher.clone(),
+            )?
+            .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
+            peers_traffic_watcher,
             room_repo,
             app,
             graceful_shutdown,
@@ -221,7 +233,12 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room = Room::new(&spec, &self.app)?.start();
+            let room = Room::new(
+                &spec,
+                &self.app,
+                self.peers_traffic_watcher.clone(),
+            )?
+            .start();
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -277,7 +294,11 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(&room_spec, &self.app)?;
+        let room = Room::new(
+            &room_spec,
+            &self.app,
+            self.peers_traffic_watcher.clone(),
+        )?;
         let room_addr = room.start();
 
         shutdown::subscribe(
@@ -633,7 +654,7 @@ mod room_service_specs {
             refs::{Fid, ToEndpoint},
             RootElement,
         },
-        conf::Conf,
+        conf::{self, Conf},
     };
 
     use super::*;
@@ -733,8 +754,15 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room = Room::new(
+            &spec,
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
+            room_id.clone() => room,
         )));
 
         let member_parent_fid = Fid::<ToRoom>::new(room_id);
@@ -775,8 +803,15 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room = Room::new(
+            &spec,
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
+            room_id.clone() => room,
         )));
 
         let endpoint_parent_fid =
@@ -836,8 +871,15 @@ mod room_service_specs {
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
+        let room = Room::new(
+            &room_spec(),
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+            room_id => room,
         )));
 
         test_for_delete_and_get(room_service, room_full_id).await;
@@ -851,8 +893,15 @@ mod room_service_specs {
             "caller".to_string().into(),
         ));
 
+        let room = Room::new(
+            &room_spec(),
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+            room_id => room,
         )));
 
         test_for_delete_and_get(room_service, member_fid).await;
@@ -867,8 +916,15 @@ mod room_service_specs {
             "publish".to_string().into(),
         ));
 
+        let room = Room::new(
+            &room_spec(),
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+        )
+        .unwrap()
+        .start();
         let room_service = room_service(RoomRepository::new(hashmap!(
-            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+            room_id => room,
         )));
 
         test_for_delete_and_get(room_service, endpoint_fid).await;
