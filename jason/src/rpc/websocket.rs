@@ -208,6 +208,10 @@ pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
+    ///
+    /// # Errors
+    ///
+    /// If establishing WebSocket connection fails.
     pub async fn new(url: &str) -> Result<Self> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();

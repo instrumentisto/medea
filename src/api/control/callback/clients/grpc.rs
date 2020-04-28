@@ -26,6 +26,10 @@ impl GrpcCallbackClient {
     ///
     /// Note that this function doesn't check availability of gRPC server on
     /// provided [`GrpcCallbackUrl`].
+    ///
+    /// # Errors
+    ///
+    /// If establishing gRPC connection fails.
     pub async fn new(
         addr: &GrpcCallbackUrl,
     ) -> Result<Self, CallbackClientError> {

@@ -53,6 +53,13 @@ impl CoturnTelnetClient {
 
     /// Forcibly closes provided [`IceUser`]s sessions on [Coturn] server.
     ///
+    /// # Errors
+    ///
+    /// When:
+    /// - establishing connection with [Coturn] fails;
+    /// - retrieving all `users`' sessions from [Coturn] fails;
+    /// - deleting all retrieved `users`' sessions fails.
+    ///
     /// [Coturn]: https://github.com/coturn/coturn
     pub async fn delete_sessions(
         &self,

@@ -315,6 +315,10 @@ impl MediaManager {
     /// `on_local_stream` callback will be invoked each time new stream was
     /// obtained.
     ///
+    /// # Errors
+    ///
+    /// When fails to obtain [MediaStream][1].
+    ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
     pub async fn get_stream<I: Into<MediaStreamConstraints>>(

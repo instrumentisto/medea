@@ -497,6 +497,11 @@ impl RtcPeerConnection {
     /// Adds remote [RTCPeerConnection][1]'s [ICE candidate][2] to this
     /// [`RtcPeerConnection`].
     ///
+    /// # Errors
+    ///
+    /// - [`RTCPeerConnectionError::AddIceCandidateFailed`] if fails to add [ICE
+    ///   candidate][2].
+    ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://tools.ietf.org/html/rfc5245#section-2
     pub async fn add_ice_candidate(
@@ -522,10 +527,17 @@ impl RtcPeerConnection {
     }
 
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as a local
+    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
     /// description.
     ///
     /// Should be called whenever remote description has been changed.
+    ///
+    /// # Errors
+    ///
+    /// - [`RTCPeerConnectionError::CreateAnswerFailed`] if fails to obtain SDP
+    ///   answer.
+    /// - [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if fails to set
+    ///   obtained SDP answer as local description.
     pub async fn create_and_set_answer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
@@ -549,11 +561,18 @@ impl RtcPeerConnection {
     }
 
     /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as a local
+    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
     /// description.
     ///
     /// Should be called after local tracks changes, which require
     /// renegotiation.
+    ///
+    /// # Errors
+    ///
+    /// - [`RTCPeerConnectionError::CreateOfferFailed`] if fails to obtain SDP
+    ///   offer.
+    /// - [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if fails to set
+    ///   obtained SDP offer as local description.
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
@@ -581,6 +600,11 @@ impl RtcPeerConnection {
     /// [offer][`SdpType::Offer`] or [answer][`SdpType::Answer`].
     ///
     /// Changes the local media state.
+    ///
+    /// # Errors
+    ///
+    /// - [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if applying the
+    ///   supplied [SDP] as remote description fails.
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         let description = match sdp {
             SdpType::Offer(offer) => {

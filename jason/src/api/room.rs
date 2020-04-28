@@ -196,6 +196,13 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 impl RoomHandle {
     /// Implements externally visible `RoomHandle::join`.
+    ///
+    /// # Errors
+    ///
+    /// When:
+    /// - `on_failed_local_stream` callback is not set;
+    /// - `on_connection_loss` callback is not set;
+    /// - fails to connect to media server.
     pub fn inner_join(
         &self,
         token: String,
