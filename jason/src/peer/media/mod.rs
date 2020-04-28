@@ -312,17 +312,17 @@ impl MediaConnections {
     /// # Errors
     ///
     /// With [`MediaConnectionsError::InvalidMediaStream`] if provided
-    /// [`PeerMediaStream`] does not contain required track.
+    /// [`PeerMediaStream`] doesn't contain required [`MediaStreamTrack`].
     ///
-    /// With [`MediaConnectionsError::InvalidMediaTrack`] some
-    /// [`MediaStreamTrack`] could not be inserted into associated
-    /// [`Sender`] because of constraints mismatch.
+    /// With [`MediaConnectionsError::InvalidMediaTrack`] if some
+    /// [`MediaStreamTrack`] cannot be inserted into associated [`Sender`]
+    /// because of constraints mismatch.
     ///
-    /// With [`MediaConnectionsError::CouldNotInsertTrack`] if some track from
-    /// provided [`PeerMediaStream`] could not be inserted into
-    /// provided [`Sender`]s transceiver.
+    /// With [`MediaConnectionsError::CouldNotInsertTrack`] if some
+    /// [`MediaStreamTrack`] from provided [`PeerMediaStream`] cannot be
+    /// inserted into provided [`Sender`]s transceiver.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_stream(
         &self,
         stream: &PeerMediaStream,
@@ -575,7 +575,7 @@ impl Sender {
     /// transceiver and enables transceivers sender by changing its
     /// direction to `sendonly`.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     async fn insert_and_enable_track(
         sender: Rc<Self>,
         new_track: MediaStreamTrack,

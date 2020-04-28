@@ -1,6 +1,6 @@
 //! Adapters to [RTCPeerConnection][1] and related objects.
 //!
-//! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+//! [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 mod conn;
 mod ice_server;
@@ -510,7 +510,7 @@ impl PeerConnection {
     /// local description if offerer, and remote if answerer.
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-    /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
+    /// [2]: https://w3.org/TR/webrtc/#rtcrtptransceiver-interface
     #[inline]
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let mids = self
@@ -521,24 +521,22 @@ impl PeerConnection {
         Ok(mids)
     }
 
-    /// Syncs provided tracks creating all required `Sender`s and
-    /// `Receiver`s, request local stream if required, get, set and return
-    /// sdp offer.
+    /// Syncs provided tracks creating all required `Sender`s and `Receiver`s,
+    /// request local stream if required, get, set and return SDP offer.
     ///
     /// # Errors
     ///
-    /// With [`MediaConnectionsError::TransceiverNotFound`] if could not find
+    /// With [`MediaConnectionsError::TransceiverNotFound`] if cannot find
     /// transceiver by `mid`.
-    ///
     ///
     /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
     /// [`RtcPeerConnection.createOffer()`][1] fails.
     ///
     /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [`RtcPeerConnection.setLocalDescription()`][2] fails
+    /// [`RtcPeerConnection.setLocalDescription()`][2] fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
-    /// [2]: https://tinyurl.com/ycyh4fcx
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
@@ -569,11 +567,10 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`StreamRequestError`] if current state
-    /// of Peer [`Sender`]s could not be represented as [`SimpleStreamRequest`]
-    /// (max 1 audio [`Sender`] and max 1 video [`Sender`]), or [`MediaStream`]
-    /// requested from [`MediaManager`] does not satisfy [`Sender`]s
-    /// constraints.
+    /// With [`StreamRequestError`] if current state of peer's [`Sender`]s
+    /// cannot be represented as [`SimpleStreamRequest`] (max 1 audio [`Sender`]
+    /// and max 1 video [`Sender`]), or [`MediaStream`] requested from
+    /// [`MediaManager`] does not satisfy [`Sender`]s constraints.
     ///
     /// With [`StreamRequestError::ExpectedAudioTracks`] or
     /// [`StreamRequestError::ExpectedVideoTracks`] if provided
@@ -584,13 +581,13 @@ impl PeerConnection {
     /// [`MediaManagerError::GetDisplayMediaFailed`] if corresponding request to
     /// UA failed.
     ///
-    /// With [`MediaConnectionsError::InvalidMediaStream`] or
+    /// With [`MediaConnectionsError::InvalidMediaStream`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
-    /// [`MediaConnectionsError::CouldNotInsertTrack`] if [`MediaStream`] could
-    /// not be inserted into Peer's [`Sender`]s.
+    /// [`MediaConnectionsError::CouldNotInsertTrack`] if [`MediaStream`] cannot
+    /// be inserted into peer's [`Sender`]s.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
         local_constraints: Option<MediaStreamSettings>,
@@ -640,8 +637,8 @@ impl PeerConnection {
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://tinyurl.com/y8tyy7gv
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     pub async fn set_remote_answer(&self, answer: String) -> Result<()> {
         self.set_remote_description(SdpType::Answer(answer))
             .await
@@ -655,8 +652,8 @@ impl PeerConnection {
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://tinyurl.com/y8tyy7gv
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     async fn set_remote_offer(&self, offer: String) -> Result<()> {
         self.set_remote_description(SdpType::Offer(offer))
             .await
@@ -675,9 +672,9 @@ impl PeerConnection {
     /// [`RtcPeerConnection.addIceCandidate()`][3] fails when adding buffered
     /// ICE candidates.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://tinyurl.com/y8tyy7gv
-    /// [3]: https://www.w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
+    /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     async fn set_remote_description(&self, desc: SdpType) -> Result<()> {
         self.peer
             .set_remote_description(desc)
@@ -713,26 +710,25 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
-    /// new [`Sender`] cause transceiver with specified `mid` does not
-    /// exist.
+    /// With [`MediaConnectionsError::TransceiverNotFound`] if cannot create
+    /// new [`Sender`] because of transceiver with specified `mid` being absent.
     ///
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
     ///
-    /// With [`StreamRequestError`] or [`MediaManagerError`] or
-    /// [`MediaConnectionsError`] if could not get / insert [`MediaStream`].
+    /// With [`StreamRequestError`], [`MediaManagerError`] or
+    /// [`MediaConnectionsError`] if cannot get or insert [`MediaStream`].
     ///
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
-    /// [`RtcPeerConnection.createAnswer()`][3] fails
+    /// [`RtcPeerConnection.createAnswer()`][3] fails.
     ///
     /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [`RtcPeerConnection.setLocalDescription()`][4] fails
+    /// [`RtcPeerConnection.setLocalDescription()`][4] fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://tinyurl.com/y8tyy7gv
-    /// [3]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
-    /// [4]: https://tinyurl.com/ycyh4fcx
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
+    /// [3]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
+    /// [4]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn process_offer(
         &self,
         offer: String,
@@ -777,11 +773,11 @@ impl PeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
-    /// [`RtcPeerConnection.addIceCandidate()`][2] fails when adding buffered
-    /// ICE candidates.
+    /// [`RtcPeerConnection.addIceCandidate()`][2] fails to add buffered
+    /// [ICE candidates][1].
     ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2
-    /// [2]: https://www.w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     pub async fn add_ice_candidate(
         &self,
         candidate: String,

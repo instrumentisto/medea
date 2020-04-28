@@ -203,8 +203,8 @@ impl RoomHandle {
     /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
     /// `on_connection_loss` callbacks are not set.
     ///
-    /// With [`RoomError::CouldNotConnectToServer`] if could not connect to
-    /// `Medea`.
+    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
+    /// server.
     pub fn inner_join(
         &self,
         token: String,
@@ -520,7 +520,7 @@ struct InnerRoom {
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
     /// its actual underlying [MediaStream][1] object.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
     on_local_stream: Callback<MediaStream>,

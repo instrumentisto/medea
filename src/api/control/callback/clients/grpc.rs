@@ -29,8 +29,8 @@ impl GrpcCallbackClient {
     ///
     /// # Errors
     ///
-    /// With [`CallbackClientError::TonicTransport`] if tonic transport could
-    /// not be created.
+    /// With [`CallbackClientError::TonicTransport`] if [`tonic`] transport
+    /// cannot be created (so gRPC connection cannot be established).
     pub async fn new(
         addr: &GrpcCallbackUrl,
     ) -> Result<Self, CallbackClientError> {

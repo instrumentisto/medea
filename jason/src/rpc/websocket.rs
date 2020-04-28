@@ -211,11 +211,11 @@ impl WebSocketRpcTransport {
     ///
     /// # Errors
     ///
-    /// With [`TransportError::CreateSocket`] if could not open WebSocket to
-    /// specified url.
+    /// With [`TransportError::CreateSocket`] if cannot establish WebSocket to
+    /// specified URL.
     ///
-    /// With [`TransportError::InitSocket`] if [`WebSocket.onclose`][1] callback
-    /// fired before [`WebSocket.onopen`][2] callback.
+    /// With [`TransportError::InitSocket`] if [WebSocket.onclose][1] callback
+    /// fired before [WebSocket.onopen][2] callback.
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen

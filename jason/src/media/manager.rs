@@ -30,7 +30,7 @@ use crate::{
 
 use super::InputDeviceInfo;
 
-// TODO: Screen capture API (https://www.w3.org/TR/screen-capture/) is in draft
+// TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
 //       Discussion https://github.com/rustwasm/wasm-bindgen/issues/1950
 #[wasm_bindgen(inline_js = "export function get_display_media(media_devices, \
@@ -60,9 +60,9 @@ pub enum MediaManagerError {
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
     GetUserMediaFailed(JsError),
 
-    /// Occurs if the [getDisplayMedia][1] request failed.
+    /// Occurs if the [MediaDevices.getDisplayMedia()][1] request failed.
     ///
-    /// [1]: https://tinyurl.com/wotjrns
+    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
     GetDisplayMediaFailed(JsError),
 
@@ -83,8 +83,8 @@ type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 /// [`MediaStreamTrack`]s, so if there are no strong references to some track,
 /// then this track is stopped and deleted from [`MediaManager`].
 ///
-/// [1]: https://tinyurl.com/rnxcavf
-/// [2]: https://tinyurl.com/wotjrns
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Default)]
 pub struct MediaManager(Rc<InnerMediaManager>);
 
@@ -145,7 +145,7 @@ impl InnerMediaManager {
     ///
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    /// [2]: https://tinyurl.com/wotjrns
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     fn get_stream(
         &self,
         mut caps: MediaStreamSettings,
@@ -208,7 +208,7 @@ impl InnerMediaManager {
     /// redundant [getUserMedia()][1]/[getDisplayMedia()][2] calls.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    /// [2]: https://tinyurl.com/wotjrns
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     fn get_from_storage(
         &self,
         caps: &mut MediaStreamSettings,
@@ -304,7 +304,7 @@ impl InnerMediaManager {
     /// refs.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    /// [2]: https://tinyurl.com/wotjrns
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     fn get_display_media(
         &self,
         caps: SysMediaStreamConstraints,
@@ -353,15 +353,14 @@ impl MediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] IF [getUserMedia()][1]
+    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.
     ///
     /// With [`MediaManagerError::GetDisplayMediaFailed`] if
     /// [getDisplayMedia()][2] request failed.
     ///
-    ///
     /// [1]: https://tinyurl.com/rnxcavf
-    /// [2]: https://tinyurl.com/wotjrns
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub async fn get_stream<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
@@ -386,8 +385,8 @@ impl MediaManager {
 /// there are no strong references to some track, then this track is stopped
 /// and deleted from [`MediaManager`].
 ///
-/// [1]: https://tinyurl.com/rnxcavf
-/// [2]: https://tinyurl.com/wotjrns
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[wasm_bindgen]
 pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 
