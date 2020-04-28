@@ -10,7 +10,7 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, TrackPatch, VideoSettings,
+    TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -258,10 +258,12 @@ impl<T> Peer<T> {
         let mut receivers = HashMap::new();
 
         for sender in self.context.senders.values() {
+            // TODO: filter muted MediaTracks.
             let media_type = TrackMediaType::from(&sender.media_type);
             *senders.entry(media_type).or_insert(0) += 1;
         }
         for receiver in self.context.receivers.values() {
+            // TODO: filter muted MediaTracks.
             let media_type = TrackMediaType::from(&receiver.media_type);
             *receivers.entry(media_type).or_insert(0) += 1;
         }

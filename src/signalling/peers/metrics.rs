@@ -40,17 +40,14 @@ pub enum TrackMediaType {
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
-    /// Fatal `PeerConnection`'s contradiction of the client metrics with
+    /// Fatal [`Peer`]'s contradiction of the client metrics with
     /// [`PeerSpec`].
-    ///
-    /// On this [`PeerMetricsEvent`] [`Peer`] with provided [`PeerId`]
-    /// should be stopped.
     FatalPeerFailure { peer_id: PeerId, at: DateTime<Utc> },
 }
 
-/// Specification of [`Peer`].
+/// Specification of a [`Peer`].
 ///
-/// Based on this specification fatal [`Peer`]'s  media traffic contradictions
+/// Based on this specification fatal [`Peer`]'s media traffic contradictions
 /// will be determined.
 #[derive(Debug)]
 pub struct PeerSpec {
@@ -92,12 +89,13 @@ struct TrackStat<T> {
 
     /// Direction state of this [`TrackStat`].
     ///
-    /// Can be [`Sender`] and [`Receiver`].
+    /// Can be [`SendDir`] or [`RecvDir`].
     direction: T,
 }
 
 impl<T> TrackStat<T> {
-    /// Returns [`Instant`] time on which this [`TrackStat`] was updated lastly.
+    /// Returns [`Instant`] time on which this [`TrackStat`] was updated last
+    /// time.
     fn last_update(&self) -> &Instant {
         &self.last_update
     }

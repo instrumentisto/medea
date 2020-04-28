@@ -3,7 +3,10 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use actix::{
     Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
@@ -63,7 +66,6 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
-use std::sync::Arc;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1292,10 +1294,10 @@ impl Handler<PeerStarted> for Room {
 
     fn handle(
         &mut self,
-        msg: PeerStarted,
-        ctx: &mut Self::Context,
+        _: PeerStarted,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        unimplemented!()
+        // TODO: Implement PeerStarted logic.
     }
 }
 
@@ -1304,10 +1306,10 @@ impl Handler<PeerStopped> for Room {
 
     fn handle(
         &mut self,
-        msg: PeerStopped,
-        ctx: &mut Self::Context,
+        _: PeerStopped,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        unimplemented!()
+        // TODO: Implement PeerStopped logic.
     }
 }
 
@@ -1316,10 +1318,10 @@ impl Handler<FatalPeerFailure> for Room {
 
     fn handle(
         &mut self,
-        msg: FatalPeerFailure,
-        ctx: &mut Self::Context,
+        _: FatalPeerFailure,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        unimplemented!()
+        // TODO: Implement FatalPeerFailure logic.
     }
 }
 

@@ -1,6 +1,6 @@
 //! Service which provides CRUD actions for [`Room`].
 
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use actix::{
     Actor, Addr, Context, Handler, MailboxError, Message, ResponseFuture,
@@ -34,7 +34,6 @@ use crate::{
     turn::coturn_metrics::CoturnMetricsService,
     AppContext,
 };
-use std::sync::Arc;
 
 /// Errors of [`RoomService`].
 #[derive(Debug, Fail, Display)]
