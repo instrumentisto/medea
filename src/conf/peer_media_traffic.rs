@@ -9,7 +9,8 @@ use smart_default::SmartDefault;
 #[serde(default)]
 pub struct PeerMediaTraffic {
     /// Duration after which media server will consider `Peer`'s media traffic
-    /// stats as invalid and will remove this `Peer`.
+    /// stats as invalid and will send notification about this by `on_stop`
+    /// Control API callback.
     #[default(Duration::from_secs(10))]
     #[serde(with = "humantime_serde")]
     pub peer_validity_timeout: Duration,
@@ -23,8 +24,8 @@ pub struct PeerMediaTraffic {
     /// Duration within which media server should receive signal of `Peer`
     /// start from all sources.
     ///
-    /// If media server wouldn't receive those signals, then this `Peer` will
-    /// be removed within this duration.
+    /// If media server wouldn't receive this signal, then `on_stop` callback
+    /// will be sent for a `Endpoint` related to this `Peer`.
     #[default(Duration::from_secs(15))]
     #[serde(with = "humantime_serde")]
     pub peer_init_timeout: Duration,

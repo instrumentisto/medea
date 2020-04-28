@@ -124,7 +124,7 @@ pub struct RoomService {
 
     /// [`PeerTrafficWatcher`] for all [`Room`]s from this
     /// [`RoomService`].
-    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+    peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
@@ -153,7 +153,7 @@ impl RoomService {
             .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
-            peers_traffic_watcher,
+            peer_traffic_watcher: peers_traffic_watcher,
             room_repo,
             app,
             graceful_shutdown,
@@ -232,12 +232,9 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room = Room::new(
-                &spec,
-                &self.app,
-                self.peers_traffic_watcher.clone(),
-            )?
-            .start();
+            let room =
+                Room::new(&spec, &self.app, self.peer_traffic_watcher.clone())?
+                    .start();
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -296,7 +293,7 @@ impl Handler<CreateRoom> for RoomService {
         let room = Room::new(
             &room_spec,
             &self.app,
-            self.peers_traffic_watcher.clone(),
+            self.peer_traffic_watcher.clone(),
         )?;
         let room_addr = room.start();
 

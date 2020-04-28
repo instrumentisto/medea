@@ -34,9 +34,9 @@ pub enum TrackMediaType {
     Video,
 }
 
-/// Events which [`PeersMetrics`] can throw to the
-/// [`PeersMetrics::peer_metric_events_sender`]'s receiver (currently this
-/// is [`Room`] which owns this [`PeersMetrics`]).
+/// Events which [`PeersMetricsService`] can throw to the
+/// [`PeersMetricsService::peer_metric_events_sender`]'s receiver (currently
+/// this is [`Room`] which owns this [`PeersMetricsService`]).
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
@@ -158,8 +158,9 @@ struct PeerStat {
     /// Time of the last metrics update of this [`PeerStat`].
     last_update: DateTime<Utc>,
 
-    /// [`Duration`] after which media server will consider this [`Peer`]'s
-    /// media traffic stats as invalid and will remove this [`Peer`].
+    /// Duration after which media server will consider [`Peer`]'s media
+    /// traffic stats as invalid and will send notification about this by
+    /// `on_stop` Control API callback.
     peer_validity_timeout: Duration,
 }
 
@@ -270,7 +271,7 @@ impl PeerStat {
         active_receivers_count + active_senders_count == 0
     }
 
-    /// Returns time of [`TrackStat`] which haven't updated longest.
+    /// Returns [`Instant`] time of [`TrackStat`] which haven't updated longest.
     fn get_stop_time(&self) -> Instant {
         self.senders
             .values()
@@ -306,26 +307,27 @@ impl PeerStat {
 /// received from a client.
 #[derive(Debug)]
 pub struct PeersMetricsService {
-    /// [`RoomId`] of [`Room`] to which this [`PeersMetrics`] belongs to.
+    /// [`RoomId`] of [`Room`] to which this [`PeersMetricsService`] belongs
+    /// to.
     room_id: RoomId,
 
     /// [`Addr`] of [`PeersTrafficWatcher`] to which traffic updates will be
     /// sent.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
-    /// All `PeerConnection` for this [`PeersMetrics`] will process
+    /// All `PeerConnection` for this [`PeersMetricsService`] will process
     /// metrics.
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
 
     /// Sender of [`PeerMetricsEvent`]s.
     ///
     /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
-    /// [`PeersMetrics`] belongs to.
+    /// [`PeersMetricsService`] belongs to.
     peer_metric_events_sender: Option<mpsc::UnboundedSender<PeersMetricsEvent>>,
 }
 
 impl PeersMetricsService {
-    /// Returns new [`PeersMetrics`] for a provided [`Room`].
+    /// Returns new [`PeersMetricsService`] for a provided [`Room`].
     pub fn new(
         room_id: RoomId,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
@@ -354,7 +356,7 @@ impl PeersMetricsService {
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///
     /// Currently this method will be called by a [`Room`] to which this
-    /// [`PeersMetrics`] belongs to.
+    /// [`PeersMetricsService`] belongs to.
     pub fn subscribe(&mut self) -> impl Stream<Item = PeersMetricsEvent> {
         let (tx, rx) = mpsc::unbounded();
         self.peer_metric_events_sender = Some(tx);
@@ -365,7 +367,7 @@ impl PeersMetricsService {
     /// Checks that all [`PeerStat`]s is valid accordingly `PeerConnection`
     /// specification. If [`PeerStat`] is considered as invalid accordingly to
     /// `PeerConnection` specification then
-    /// [`PeersMetrics::fatal_peer_error`] will be called.
+    /// [`PeersMetricsService::fatal_peer_error`] will be called.
     ///
     /// Also checks that all [`PeerStat`]'s senders/receivers is flowing. If all
     /// senders/receivers is stopped then [`TrafficStopped`] will be sent to
@@ -406,7 +408,7 @@ impl PeersMetricsService {
         }
     }
 
-    /// [`Room`] notifies [`PeersMetrics`] about new `PeerConnection`s
+    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
     /// creation.
     ///
     /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
@@ -444,7 +446,7 @@ impl PeersMetricsService {
     }
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
-    /// [`PeersMetrics`].
+    /// [`PeersMetricsService`].
     pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
@@ -497,7 +499,7 @@ impl PeersMetricsService {
         }
     }
 
-    /// [`Room`] notifies [`PeersMetrics`] that some [`Peer`] is removed.
+    /// [`Room`] notifies [`PeersMetricsService`] that some [`Peer`] is removed.
     pub fn unregister_peers(&mut self, peers_ids: HashSet<PeerId>) {
         debug!(
             "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \

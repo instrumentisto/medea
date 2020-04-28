@@ -571,6 +571,7 @@ impl PeersService {
     /// Returns `HashMap` with all removed [`Peer`]s.
     /// Key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
+    // TODO: this function will be removed in the #91.
     pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,

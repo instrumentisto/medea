@@ -36,7 +36,7 @@ pub type ActFuture<O> =
 #[derive(Debug)]
 pub struct CoturnMetricsService {
     /// [`PeersTrafficWatcher`] which will be notified of all traffic events.
-    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+    peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates are received.
     client: redis_pub_sub::Client,
@@ -72,7 +72,7 @@ impl CoturnMetricsService {
         Ok(Self {
             client,
             allocations_count: HashMap::new(),
-            peers_traffic_watcher,
+            peer_traffic_watcher: peers_traffic_watcher,
         })
     }
 
@@ -169,7 +169,7 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                 let is_traffic_really_going =
                     traffic.sent_packets + traffic.received_packets > 10;
                 if is_traffic_really_going {
-                    self.peers_traffic_watcher.traffic_flows(
+                    self.peer_traffic_watcher.traffic_flows(
                         event.room_id,
                         event.peer_id,
                         Instant::now(),
@@ -180,7 +180,7 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
             CoturnAllocationEvent::Deleted => {
                 *allocations_count -= 1;
                 if *allocations_count == 0 {
-                    self.peers_traffic_watcher.traffic_stopped(
+                    self.peer_traffic_watcher.traffic_stopped(
                         event.room_id,
                         event.peer_id,
                         Instant::now(),

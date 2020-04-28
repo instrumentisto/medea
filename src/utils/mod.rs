@@ -59,7 +59,7 @@ macro_rules! hashset {
     (@single $($x:tt)*) => (());
     (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
 
-    ($($value:expr,)+) => { hashset!($($key => $value),+) };
+    ($($value:expr,)+) => { hashset!($($value),+) };
     ($($value:expr),*) => {
         {
             let _cap = hashset!(@count $($value),*);

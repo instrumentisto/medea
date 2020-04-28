@@ -22,6 +22,8 @@ pub enum Endpoint {
 }
 
 impl Endpoint {
+    /// Indicates whether only `relay` ICE candidates are allowed for this
+    /// [`Endpoint`].
     pub fn is_force_relayed(&self) -> bool {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
@@ -58,7 +60,7 @@ impl Into<proto::Element> for Endpoint {
     }
 }
 
-/// Weak pointer to a some [`Endpoint`].
+/// Weak pointer to a [`Endpoint`].
 ///
 /// Can be upgraded to the [`Endpoint`] by calling [`WeakEndpoint::upgrade`].
 #[derive(Clone, Debug, From)]

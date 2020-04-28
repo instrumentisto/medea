@@ -72,7 +72,7 @@ pub struct PeerStopped {
 }
 
 /// Message which indicates that [`Peer`] with provided [`PeerId`] was fallen
-/// into failure state and should be removed.
+/// into failure state.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct FatalPeerFailure {
@@ -209,8 +209,9 @@ struct PeersTrafficWatcherImpl {
     /// Duration after which media server will consider that `Peer` stopped.
     traffic_flowing_timeout: Duration,
 
-    /// Duration within which media server should receive `Peer` start signal
-    /// from all sources.
+    /// Duration after which media server will consider `Peer`'s media traffic
+    /// stats as invalid and will send notification about this by `on_stop`
+    /// Control API callback.
     peer_init_timeout: Duration,
 }
 
