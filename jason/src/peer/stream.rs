@@ -1,6 +1,6 @@
 //! [MediaStream][1] related objects.
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+//! [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 
 use std::{
     cell::RefCell,
@@ -24,7 +24,7 @@ use crate::{
 struct InnerStream {
     /// Actual underlying [MediaStream][1] object.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     stream: SysMediaStream,
 
     /// List of audio tracks.
@@ -66,7 +66,7 @@ impl InnerStream {
 /// For using [`PeerMediaStream`] on JS side, consider the
 /// [`RemoteMediaStream`].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
 
 #[allow(clippy::new_without_default)]
@@ -111,7 +111,7 @@ impl PeerMediaStream {
 
     /// Returns actual underlying [MediaStream][1] object.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.borrow().stream)
     }

@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{convert::TryFrom, rc::Rc};
+use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{PeerId, TrackId, TrackPatch};
@@ -22,7 +22,7 @@ async fn get_test_media_connections(
     enabled_video: bool,
 ) -> (MediaConnections, TrackId, TrackId) {
     let (tx, rx) = mpsc::unbounded();
-    std::mem::forget(rx);
+    mem::forget(rx);
     let media_connections = MediaConnections::new(
         PeerId(0),
         Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
@@ -60,7 +60,7 @@ async fn get_test_media_connections(
 #[wasm_bindgen_test]
 fn get_stream_request1() {
     let (tx, rx) = mpsc::unbounded();
-    std::mem::forget(rx);
+    mem::forget(rx);
     let media_connections = MediaConnections::new(
         PeerId(0),
         Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
@@ -77,7 +77,7 @@ fn get_stream_request1() {
 #[wasm_bindgen_test]
 fn get_stream_request2() {
     let (tx, rx) = mpsc::unbounded();
-    std::mem::forget(rx);
+    mem::forget(rx);
     let media_connections = MediaConnections::new(
         PeerId(0),
         Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),

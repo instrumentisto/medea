@@ -67,10 +67,9 @@ type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
 /// should be included into returned [`MediaStream`], and, optionally,
 /// to establish constraints for those track's settings.
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-/// [2]:
-/// https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
-/// [3]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+/// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [3]: https://w3.org/TR/mediacapture-streams/#mediastream
 #[derive(Default)]
 pub struct StreamRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
@@ -121,7 +120,11 @@ impl SimpleStreamRequest {
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
     /// [`MediaStream`] doesn't have expected video track.
     pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
-        use StreamRequestError::*;
+        use StreamRequestError::{
+            ExpectedAudioTracks, ExpectedVideoTracks, InvalidAudioTrack,
+            InvalidVideoTrack,
+        };
+
         let result_stream = PeerMediaStream::new();
 
         let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
@@ -171,11 +174,11 @@ impl SimpleStreamRequest {
     ///
     /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if
     /// [`SimpleStreamRequest`] contains [`AudioTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] does not.
+    /// [`MediaStreamSettings`] doesn't.
     ///
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
     /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] does not.
+    /// [`MediaStreamSettings`] doesn't.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
@@ -210,7 +213,9 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
     fn try_from(
         value: StreamRequest,
     ) -> std::result::Result<Self, Self::Error> {
-        use StreamRequestError::*;
+        use StreamRequestError::{
+            NoTracks, TooManyAudioTracks, TooManyVideoTracks,
+        };
 
         if value.video.len() > 1 {
             return Err(TooManyVideoTracks);

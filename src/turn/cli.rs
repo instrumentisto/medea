@@ -64,8 +64,8 @@ impl CoturnTelnetClient {
     ///
     /// # Errors
     ///
-    /// With [`CoturnCliError::PoolError`] if could not get/create connection
-    /// from pool.
+    /// With [`CoturnCliError::PoolError`] if could not get or establish new
+    /// connection in pool.
     ///
     /// With [`CoturnCliError::CoturnTelnetError`] in case of unexpected
     /// protocol error.

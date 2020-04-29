@@ -347,14 +347,15 @@ impl Element {
 
 impl From<proto::Element> for Element {
     fn from(proto: proto::Element) -> Self {
-        use proto::element::El::*;
+        use proto::element::El;
+
         match proto.el.unwrap() {
-            Room(room) => Self::Room(room.into()),
-            Member(member) => Self::Member(member.into()),
-            WebrtcPub(webrtc_pub) => {
+            El::Room(room) => Self::Room(room.into()),
+            El::Member(member) => Self::Member(member.into()),
+            El::WebrtcPub(webrtc_pub) => {
                 Self::WebRtcPublishEndpoint(webrtc_pub.into())
             }
-            WebrtcPlay(webrtc_play) => {
+            El::WebrtcPlay(webrtc_play) => {
                 Self::WebRtcPlayEndpoint(webrtc_play.into())
             }
         }

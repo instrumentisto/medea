@@ -164,7 +164,10 @@ impl From<TransportError> for RoomError {
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
-        use PeerError::*;
+        use PeerError::{
+            MediaConnections, MediaManager, RtcPeerConnection, StreamRequest,
+        };
+
         match err {
             MediaConnections(ref e) => match e {
                 MediaConnectionsError::InvalidTrackPatch(id) => {
@@ -350,15 +353,16 @@ impl RoomHandle {
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
-    /// configured for some [`Room`], then this [`Room`] can only send media
-    /// stream that corresponds to this settings. [`MediaStreamSettings`] update
-    /// will change media stream in all sending peers, so that might cause new
-    /// `getUserMedia` request.
+    /// configured for some [`Room`], then this [`Room`] can only send
+    /// [`MediaStream`] that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_stream`
     /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [1]: https://tinyurl.com/rnxcavf
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
@@ -685,15 +689,16 @@ impl InnerRoom {
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
-    /// configured for some [`Room`], then this [`Room`] can only send media
-    /// stream that corresponds to this settings. [`MediaStreamSettings`] update
-    /// will change media stream in all sending peers, so that might cause
-    /// media requests to UA.
+    /// configured for some [`Room`], then this [`Room`] can only send
+    /// [`MediaStream`] that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_stream`
     /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [1]: https://tinyurl.com/rnxcavf
     fn set_local_media_settings(
         &mut self,
         settings: MediaStreamSettings,
@@ -961,7 +966,7 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
-    /// Handles [`PeerEvent::NewLocalStreamRequired`] event, updates local
+    /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
     /// stream of [`PeerConnection`] that sent request.
     fn on_new_local_stream_required(&mut self, peer_id: PeerId) {
         if let Some(peer) = self.peers.get(peer_id) {

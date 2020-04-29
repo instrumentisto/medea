@@ -56,6 +56,7 @@ pub enum CoturnTelnetError {
 impl From<CoturnCliCodecError> for CoturnTelnetError {
     fn from(err: CoturnCliCodecError) -> Self {
         use CoturnCliCodecError::{BadResponse, IoFailed};
+
         match err {
             IoFailed(e) => Self::from(e),
             BadResponse(e) => Self::from(e),

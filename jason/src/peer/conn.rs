@@ -99,11 +99,13 @@ pub enum TransceiverDirection {
 }
 
 impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
+    #[inline]
     fn from(direction: TransceiverDirection) -> Self {
-        use TransceiverDirection::*;
+        use TransceiverDirection as D;
+
         match direction {
-            Sendonly => Self::Sendonly,
-            Recvonly => Self::Recvonly,
+            D::Sendonly => Self::Sendonly,
+            D::Recvonly => Self::Recvonly,
         }
     }
 }
@@ -136,13 +138,13 @@ pub enum SdpType {
 /// Errors that may occur during signaling between this and remote
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
-/// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection.
+/// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 #[derive(Debug, Display, From, JsCaused)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection.
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "Failed to add ICE candidate: {}", _0)]
     #[from(ignore)]
     AddIceCandidateFailed(JsError),
@@ -500,7 +502,7 @@ impl RtcPeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
-    /// [`RtcPeerConnection.addIceCandidate()`][3] fails.
+    /// [RtcPeerConnection.addIceCandidate()][3] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://tools.ietf.org/html/rfc5245#section-2
@@ -536,10 +538,10 @@ impl RtcPeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
-    /// [`RtcPeerConnection.createAnswer()`][1] fails.
+    /// [RtcPeerConnection.createAnswer()][1] fails.
     ///
     /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [`RtcPeerConnection.setLocalDescription()`][2] fails.
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -575,10 +577,10 @@ impl RtcPeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
-    /// [`RtcPeerConnection.createOffer()`][1] fails.
+    /// [RtcPeerConnection.createOffer()][1] fails.
     ///
     /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [`RtcPeerConnection.setLocalDescription()`][2] fails.
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -613,7 +615,7 @@ impl RtcPeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
-    /// [`RTCPeerConnection.setRemoteDescription()`][1] fails.
+    /// [RTCPeerConnection.setRemoteDescription()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {

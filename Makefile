@@ -275,7 +275,6 @@ endif
 
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings \
-		-A clippy::enum_glob_use \
 		-A clippy::wildcard_imports
 
 

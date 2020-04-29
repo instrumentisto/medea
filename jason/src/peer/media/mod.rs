@@ -612,12 +612,12 @@ impl Sender {
         Ok(())
     }
 
-    /// Checks that [`Sender`] is in [`MuteState::Muted`].
+    /// Checks whether [`Sender`] is in [`MuteState::Muted`].
     pub fn is_muted(&self) -> bool {
         self.mute_state.get() == StableMuteState::Muted.into()
     }
 
-    /// Checks that [`Sender`] is in [`MuteState::NotMuted`].
+    /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
     pub fn is_not_muted(&self) -> bool {
         self.mute_state.get() == StableMuteState::NotMuted.into()
     }

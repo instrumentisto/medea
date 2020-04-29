@@ -28,7 +28,8 @@ impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
             DisplayVideoTrackConstraints,
         >,
     ) {
-        use StreamSource::*;
+        use StreamSource::{Device, Display};
+
         match self {
             Device(this) => {
                 if let Device(that) = other {
@@ -135,7 +136,7 @@ pub enum MultiSourceMediaStreamConstraints {
     DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
 }
 
-/// TLDR:
+/// TL;DR:
 /// `{None, None}` => `None`
 /// `{None, Device}` => `Device`
 /// `{None, Display}` => `Display`
@@ -146,7 +147,7 @@ pub enum MultiSourceMediaStreamConstraints {
 /// `{Some, Any}` => `Device`
 impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
     fn from(constraints: MediaStreamSettings) -> Self {
-        use MultiSourceMediaStreamConstraints::*;
+        use MultiSourceMediaStreamConstraints as C;
 
         let mut sys_constraints = SysMediaStreamConstraints::new();
         let video = match constraints.video {
@@ -174,20 +175,20 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
         match (constraints.audio, video) {
             (Some(audio), Some(StreamSource::Device(mut caps))) => {
                 caps.audio(&SysMediaTrackConstraints::from(audio).into());
-                Some(Device(caps))
+                Some(C::Device(caps))
             }
             (Some(audio), Some(StreamSource::Display(caps))) => {
                 let mut audio_caps = SysMediaStreamConstraints::new();
                 audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
 
-                Some(DeviceAndDisplay(audio_caps, caps))
+                Some(C::DeviceAndDisplay(audio_caps, caps))
             }
-            (None, Some(StreamSource::Device(caps))) => Some(Device(caps)),
-            (None, Some(StreamSource::Display(caps))) => Some(Display(caps)),
+            (None, Some(StreamSource::Device(caps))) => Some(C::Device(caps)),
+            (None, Some(StreamSource::Display(caps))) => Some(C::Display(caps)),
             (Some(audio), None) => {
                 let mut audio_caps = SysMediaStreamConstraints::new();
                 audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
-                Some(Device(audio_caps))
+                Some(C::Device(audio_caps))
             }
             (None, None) => None,
         }
@@ -298,12 +299,12 @@ impl AudioTrackConstraints {
         // TODO returns Result<bool, Error>
     }
 
-    /// Merges this [`AudioTrackConstraints`] with other
-    /// [`AudioTrackConstraints`], meaning that if some constraint is not set on
-    /// this, then constraint from other will be applied to this.
-    pub fn merge(&mut self, other: AudioTrackConstraints) {
-        if self.device_id.is_none() && other.device_id.is_some() {
-            self.device_id = other.device_id;
+    /// Merges this [`AudioTrackConstraints`] with `another` one, meaning that
+    /// if some constraint is not set on this one, then it will be applied from
+    /// `another`.
+    pub fn merge(&mut self, another: AudioTrackConstraints) {
+        if self.device_id.is_none() && another.device_id.is_some() {
+            self.device_id = another.device_id;
         }
     }
 }
@@ -348,12 +349,12 @@ pub struct DeviceVideoTrackConstraints {
 }
 
 impl DeviceVideoTrackConstraints {
-    /// Merges this [`DeviceVideoTrackConstraints`] with other
-    /// [`DeviceVideoTrackConstraints`], meaning that if some constraint is not
-    /// set on this, then constraint from other will be applied to this.
-    fn merge(&mut self, other: DeviceVideoTrackConstraints) {
-        if self.device_id.is_none() && other.device_id.is_some() {
-            self.device_id = other.device_id;
+    /// Merges this [`DeviceVideoTrackConstraints`] with `another` one , meaning
+    /// that if some constraint is not set on this one, then it will be applied
+    /// from `another`.
+    fn merge(&mut self, another: DeviceVideoTrackConstraints) {
+        if self.device_id.is_none() && another.device_id.is_some() {
+            self.device_id = another.device_id;
         }
     }
 }
@@ -382,9 +383,9 @@ impl DeviceVideoTrackConstraints {
 pub struct DisplayVideoTrackConstraints {}
 
 impl DisplayVideoTrackConstraints {
-    /// Merges this [`DisplayVideoTrackConstraints`] with other
-    /// [`DisplayVideoTrackConstraints`], meaning that if some constraint is not
-    /// set on this, then constraint from other will be applied to this.
+    /// Merges this [`DisplayVideoTrackConstraints`] with `another` one, meaning
+    /// that if some constraint is not set on this one, then it will be applied
+    /// from `another`.
     #[allow(clippy::unused_self)]
     fn merge(&mut self, _: DisplayVideoTrackConstraints) {
         // no constraints => nothing to do here atm
@@ -428,7 +429,7 @@ impl VideoTrackConstraints {
         }
     }
 
-    /// Detect is video track captured from display searching
+    /// Detects if video track captured from display searching
     /// [specific fields][1] in its settings. Only works in Chrome atm.
     ///
     /// [1]: https://tinyurl.com/ufx7mcw
@@ -451,16 +452,16 @@ impl VideoTrackConstraints {
         }
     }
 
-    /// Merges this [`VideoTrackConstraints`] with other
-    /// [`VideoTrackConstraints`], meaning that if some constraint is not set on
-    /// this, then constraint from other will be applied to this.
-    pub fn merge(&mut self, other: VideoTrackConstraints) {
-        match (self.0.as_mut(), other.0) {
-            (None, Some(other)) => {
-                self.0.replace(other);
+    /// Merges this [`VideoTrackConstraints`] with `another` one, meaning that
+    /// if some constraint is not set on this one, then it will be applied from
+    /// `another`.
+    pub fn merge(&mut self, another: VideoTrackConstraints) {
+        match (self.0.as_mut(), another.0) {
+            (None, Some(another)) => {
+                self.0.replace(another);
             }
-            (Some(this), Some(other)) => {
-                this.merge(other);
+            (Some(this), Some(another)) => {
+                this.merge(another);
             }
             _ => {}
         };

@@ -166,6 +166,7 @@ pub enum CoturnCliRequest {
 impl From<CoturnCliRequest> for Bytes {
     fn from(req: CoturnCliRequest) -> Self {
         use CoturnCliRequest::{Auth, CloseSession, Ping, PrintSessions};
+
         match req {
             Auth(pass) => pass,
             PrintSessions(username) => format!("ps {}", username).into(),

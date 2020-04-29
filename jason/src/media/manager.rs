@@ -99,7 +99,10 @@ impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices() -> impl Future<Output = Result<Vec<InputDeviceInfo>>>
     {
-        use MediaManagerError::*;
+        use MediaManagerError::{
+            CouldNotGetMediaDevices, EnumerateDevicesFailed,
+        };
+
         async {
             let devices = window()
                 .navigator()
@@ -263,7 +266,8 @@ impl InnerMediaManager {
         &self,
         caps: SysMediaStreamConstraints,
     ) -> impl Future<Output = Result<Vec<MediaStreamTrack>>> {
-        use MediaManagerError::*;
+        use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
+
         let storage = Rc::clone(&self.tracks);
 
         async move {
@@ -309,7 +313,10 @@ impl InnerMediaManager {
         &self,
         caps: SysMediaStreamConstraints,
     ) -> impl Future<Output = Result<Vec<MediaStreamTrack>>> {
-        use MediaManagerError::*;
+        use MediaManagerError::{
+            CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
+        };
+
         let storage = Rc::clone(&self.tracks);
 
         async move {
@@ -414,10 +421,8 @@ impl MediaManagerHandle {
         })
     }
 
-    /// Returns [`MediaStream`](`LocalMediaStream`) object, built from provided
+    /// Returns [`MediaStream`](LocalMediaStream) object, built from provided
     /// [`MediaStreamSettings`].
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {
         match upgrade_or_detached!(self.0)
             .map(|inner| inner.get_stream(caps.clone()))

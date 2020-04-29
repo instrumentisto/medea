@@ -1,23 +1,25 @@
 //! [MediaStream][1] related objects.
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+//! [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 
 use std::rc::{Rc, Weak};
 
-use crate::MediaStreamSettings;
-
+use derive_more::AsRef;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
+use crate::MediaStreamSettings;
+
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 #[wasm_bindgen(js_name = LocalMediaStream)]
-#[derive(Clone)]
+#[derive(AsRef, Clone)]
 pub struct MediaStream {
+    #[as_ref]
     stream: SysMediaStream,
     constraints: MediaStreamSettings,
     tracks: Vec<MediaStreamTrack>,
@@ -54,7 +56,8 @@ impl MediaStream {
 impl MediaStream {
     /// Returns underlying [MediaStream][1].
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    #[inline]
     pub fn get_media_stream(&self) -> SysMediaStream {
         Clone::clone(&self.stream)
     }
@@ -84,22 +87,20 @@ impl MediaStream {
     }
 }
 
-impl AsRef<SysMediaStream> for MediaStream {
-    fn as_ref(&self) -> &SysMediaStream {
-        &self.stream
-    }
-}
-
 /// Weak reference to [MediaStreamTrack][1].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 pub struct WeakMediaStreamTrack(Weak<SysMediaStreamTrack>);
 
 impl WeakMediaStreamTrack {
+    /// Tries to upgrade this weak reference to a strong one.
+    #[inline]
     pub fn upgrade(&self) -> Option<MediaStreamTrack> {
         self.0.upgrade().map(MediaStreamTrack)
     }
 
+    /// Checks whether this weak reference can be upgraded to a strong one.
+    #[inline]
     pub fn can_be_upgraded(&self) -> bool {
         self.0.strong_count() > 0
     }
@@ -110,13 +111,13 @@ impl WeakMediaStreamTrack {
 /// Track will be automatically stopped when there are no strong references
 /// left.
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[derive(Clone)]
 pub struct MediaStreamTrack(Rc<SysMediaStreamTrack>);
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TrackKind {
     /// Audio track.
@@ -130,12 +131,14 @@ impl<T> From<T> for MediaStreamTrack
 where
     SysMediaStreamTrack: From<T>,
 {
+    #[inline]
     fn from(track: T) -> Self {
         MediaStreamTrack(Rc::new(<SysMediaStreamTrack as From<T>>::from(track)))
     }
 }
 
 impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
+    #[inline]
     fn as_ref(&self) -> &SysMediaStreamTrack {
         &self.0
     }
@@ -144,13 +147,15 @@ impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
 impl MediaStreamTrack {
     /// Returns [`id`][1] of underlying [MediaStreamTrack][2].
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
-    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
+    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[inline]
     pub fn id(&self) -> String {
         self.0.id()
     }
 
     /// Returns track kind (audio/video).
+    #[inline]
     pub fn kind(&self) -> TrackKind {
         match self.0.kind().as_ref() {
             "audio" => TrackKind::Audio,
@@ -159,13 +164,17 @@ impl MediaStreamTrack {
         }
     }
 
-    /// Creates weak reference to underlying track.
+    /// Creates weak reference to underlying [MediaStreamTrack][2].
+    ///
+    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[inline]
     pub fn downgrade(&self) -> WeakMediaStreamTrack {
         WeakMediaStreamTrack(Rc::downgrade(&self.0))
     }
 }
 
 impl Drop for MediaStreamTrack {
+    #[inline]
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
         if Rc::strong_count(&self.0) == 1 {

@@ -5,11 +5,7 @@
 
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::must_use_candidate,
-    clippy::enum_glob_use
-)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 pub mod api;
 pub mod callback;

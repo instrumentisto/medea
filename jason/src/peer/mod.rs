@@ -69,7 +69,7 @@ pub enum PeerError {
     /// Errors that may occur during signaling between this and remote
     /// [RTCPeerConnection][1] and event handlers setting errors.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection.
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
@@ -426,16 +426,16 @@ impl PeerConnection {
         sender: &mpsc::UnboundedSender<PeerEvent>,
         ice_connection_state: RtcIceConnectionState,
     ) {
-        use RtcIceConnectionState::*;
+        use RtcIceConnectionState as S;
 
         let ice_connection_state = match ice_connection_state {
-            New => IceConnectionState::New,
-            Checking => IceConnectionState::Checking,
-            Connected => IceConnectionState::Connected,
-            Completed => IceConnectionState::Completed,
-            Failed => IceConnectionState::Failed,
-            Disconnected => IceConnectionState::Disconnected,
-            Closed => IceConnectionState::Closed,
+            S::New => IceConnectionState::New,
+            S::Checking => IceConnectionState::Checking,
+            S::Connected => IceConnectionState::Connected,
+            S::Completed => IceConnectionState::Completed,
+            S::Failed => IceConnectionState::Failed,
+            S::Disconnected => IceConnectionState::Disconnected,
+            S::Closed => IceConnectionState::Closed,
             _ => {
                 console_error("Unknown ICE connection state");
                 return;
@@ -530,10 +530,10 @@ impl PeerConnection {
     /// transceiver by `mid`.
     ///
     /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
-    /// [`RtcPeerConnection.createOffer()`][1] fails.
+    /// [RtcPeerConnection.createOffer()][1] fails.
     ///
     /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [`RtcPeerConnection.setLocalDescription()`][2] fails.
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -635,7 +635,7 @@ impl PeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
-    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
@@ -650,7 +650,7 @@ impl PeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
-    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
@@ -666,11 +666,11 @@ impl PeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
-    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
-    /// [`RtcPeerConnection.addIceCandidate()`][3] fails when adding buffered
-    /// ICE candidates.
+    /// [RtcPeerConnection.addIceCandidate()][3] fails when adding buffered ICE
+    /// candidates.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
@@ -714,16 +714,16 @@ impl PeerConnection {
     /// new [`Sender`] because of transceiver with specified `mid` being absent.
     ///
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
-    /// [`RTCPeerConnection.setRemoteDescription()`][2] fails.
+    /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// With [`StreamRequestError`], [`MediaManagerError`] or
     /// [`MediaConnectionsError`] if cannot get or insert [`MediaStream`].
     ///
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
-    /// [`RtcPeerConnection.createAnswer()`][3] fails.
+    /// [RtcPeerConnection.createAnswer()][3] fails.
     ///
     /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [`RtcPeerConnection.setLocalDescription()`][4] fails.
+    /// [RtcPeerConnection.setLocalDescription()][4] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
@@ -773,7 +773,7 @@ impl PeerConnection {
     /// # Errors
     ///
     /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
-    /// [`RtcPeerConnection.addIceCandidate()`][2] fails to add buffered
+    /// [RtcPeerConnection.addIceCandidate()][2] fails to add buffered
     /// [ICE candidates][1].
     ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2

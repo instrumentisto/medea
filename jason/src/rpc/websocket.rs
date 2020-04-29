@@ -81,7 +81,8 @@ impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = TransportError;
 
     fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
-        use TransportError::*;
+        use TransportError::{MessageNotString, ParseServerMessage};
+
         let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
