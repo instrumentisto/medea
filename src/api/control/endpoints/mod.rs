@@ -72,13 +72,14 @@ impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
     fn try_from(
         (_, proto): (Id, proto::member::element::El),
     ) -> Result<Self, Self::Error> {
-        use proto::member::element::El::*;
+        use proto::member::element::El;
+
         match proto {
-            WebrtcPlay(elem) => {
+            El::WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPlay(play))
             }
-            WebrtcPub(elem) => {
+            El::WebrtcPub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
             }
@@ -92,17 +93,18 @@ impl TryFrom<(Id, proto::create_request::El)> for EndpointSpec {
     fn try_from(
         (id, proto): (Id, proto::create_request::El),
     ) -> Result<Self, Self::Error> {
-        use proto::create_request::El::*;
+        use proto::create_request::El;
+
         match proto {
-            WebrtcPlay(elem) => {
+            El::WebrtcPlay(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPlay(play))
             }
-            WebrtcPub(elem) => {
+            El::WebrtcPub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
             }
-            Member(_) | Room(_) => {
+            El::Member(_) | El::Room(_) => {
                 Err(TryFromProtobufError::ExpectedOtherElement(
                     String::from("Endpoint"),
                     id.0,

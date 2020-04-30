@@ -81,7 +81,8 @@ impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = TransportError;
 
     fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
-        use TransportError::*;
+        use TransportError::{MessageNotString, ParseServerMessage};
+
         let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
@@ -211,7 +212,14 @@ impl WebSocketRpcTransport {
     ///
     /// # Errors
     ///
-    /// If establishing WebSocket connection fails.
+    /// With [`TransportError::CreateSocket`] if cannot establish WebSocket to
+    /// specified URL.
+    ///
+    /// With [`TransportError::InitSocket`] if [WebSocket.onclose][1] callback
+    /// fired before [WebSocket.onopen][2] callback.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
     pub async fn new(url: &str) -> Result<Self> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();

@@ -99,11 +99,13 @@ pub enum TransceiverDirection {
 }
 
 impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
+    #[inline]
     fn from(direction: TransceiverDirection) -> Self {
-        use TransceiverDirection::*;
+        use TransceiverDirection as D;
+
         match direction {
-            Sendonly => Self::Sendonly,
-            Recvonly => Self::Recvonly,
+            D::Sendonly => Self::Sendonly,
+            D::Recvonly => Self::Recvonly,
         }
     }
 }
@@ -136,13 +138,13 @@ pub enum SdpType {
 /// Errors that may occur during signaling between this and remote
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
+/// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 #[derive(Debug, Display, From, JsCaused)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "Failed to add ICE candidate: {}", _0)]
     #[from(ignore)]
     AddIceCandidateFailed(JsError),
@@ -201,17 +203,17 @@ type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
 pub struct RtcPeerConnection {
     /// Underlying [RTCPeerConnection][1].
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
 
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
     /// [`icecandidate`][3] event. It fires when [RTCPeerConnection][1]
     /// discovers a new [RTCIceCandidate][4].
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
-    /// [3]: https://www.w3.org/TR/webrtc/#event-icecandidate
-    /// [4]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidate
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
+    /// [3]: https://w3.org/TR/webrtc/#event-icecandidate
+    /// [4]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
     on_ice_candidate: RefCell<
         Option<EventListener<SysRtcPeerConnection, RtcPeerConnectionIceEvent>>,
     >,
@@ -235,7 +237,7 @@ pub struct RtcPeerConnection {
     /// <https://bugzilla.mozilla.org/show_bug.cgi?id=1265827>
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
+    /// [2]: https://w3.org/TR/webrtc/#event-connectionstatechange
     on_connection_state_changed:
         RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
 
@@ -243,9 +245,9 @@ pub struct RtcPeerConnection {
     /// [`track`][3] event. It fires when [RTCPeerConnection][1] receives
     /// new [MediaStreamTrack][4] from remote peer.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
-    /// [3]: https://www.w3.org/TR/webrtc/#event-track
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
+    /// [3]: https://w3.org/TR/webrtc/#event-track
     /// [4]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
     on_track:
         RefCell<Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>>,
@@ -315,8 +317,8 @@ impl RtcPeerConnection {
     /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
-    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
+    /// [1]: https://w3.org/TR/webrtc/#rtctrackevent
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
     pub fn on_track<F>(&self, f: Option<F>) -> Result<()>
     where
         F: 'static + FnMut(RtcTrackEvent),
@@ -350,8 +352,8 @@ impl RtcPeerConnection {
     /// Errors with [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
-    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
     pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<()>
     where
         F: 'static + FnMut(IceCandidate),
@@ -394,7 +396,7 @@ impl RtcPeerConnection {
     /// Will return [`RTCPeerConnectionError::PeerConnectionEventBindFailed`] if
     /// [`EventListener`] binding fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
+    /// [1]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
     pub fn on_ice_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
     where
         F: 'static + FnMut(RtcIceConnectionState),
@@ -431,7 +433,7 @@ impl RtcPeerConnection {
     /// This error can be ignored, since this event is currently implemented
     /// only in Chrome and Safari.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#event-connectionstatechange
+    /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
     pub fn on_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
     where
         F: 'static + FnMut(PeerConnectionState),
@@ -499,11 +501,12 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// - [`RTCPeerConnectionError::AddIceCandidateFailed`] if fails to add [ICE
-    ///   candidate][2].
+    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// [RtcPeerConnection.addIceCandidate()][3] fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://tools.ietf.org/html/rfc5245#section-2
+    /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     pub async fn add_ice_candidate(
         &self,
         candidate: &str,
@@ -534,10 +537,14 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// - [`RTCPeerConnectionError::CreateAnswerFailed`] if fails to obtain SDP
-    ///   answer.
-    /// - [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if fails to set
-    ///   obtained SDP answer as local description.
+    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
+    /// [RtcPeerConnection.createAnswer()][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn create_and_set_answer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
@@ -569,10 +576,14 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// - [`RTCPeerConnectionError::CreateOfferFailed`] if fails to obtain SDP
-    ///   offer.
-    /// - [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if fails to set
-    ///   obtained SDP offer as local description.
+    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
+    /// [RtcPeerConnection.createOffer()][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
@@ -603,8 +614,10 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// - [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if applying the
-    ///   supplied [SDP] as remote description fails.
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// [RTCPeerConnection.setRemoteDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         let description = match sdp {
             SdpType::Offer(offer) => {
@@ -633,8 +646,8 @@ impl RtcPeerConnection {
     /// Creates new [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1])
     /// and adds it to the [set of this RTCPeerConnection's transceivers][2].
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
-    /// [2]: https://www.w3.org/TR/webrtc/#transceivers-set
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
+    /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn add_transceiver(
         &self,
         kind: TransceiverKind,
@@ -649,8 +662,8 @@ impl RtcPeerConnection {
     /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
     /// [set of this RTCPeerConnection's transceivers][2] by provided `mid`.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
-    /// [2]: https://www.w3.org/TR/webrtc/#transceivers-set
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
+    /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn get_transceiver_by_mid(
         &self,
         mid: &str,
@@ -680,7 +693,7 @@ impl Drop for RtcPeerConnection {
     /// and [closes][1] the underlying
     /// [RTCPeerConnection][`SysRtcPeerConnection`].
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-close
     fn drop(&mut self) {
         self.on_track.borrow_mut().take();
         self.on_ice_candidate.borrow_mut().take();
@@ -693,7 +706,7 @@ impl Drop for RtcPeerConnection {
 /// Returns [RTCPeerConnection.connectionState][1] property of provided
 /// [`SysRtcPeerConnection`] using reflection.
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#dom-peerconnection-connection-state
+/// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-connection-state
 fn get_peer_connection_state(peer: &SysRtcPeerConnection) -> Option<String> {
     get_property_by_name(peer, "connectionState", |v| v.as_string())
 }

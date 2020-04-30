@@ -19,7 +19,7 @@ impl TryFrom<JsArray> for RtcStatsReportEntry {
     type Error = Traced<RtcStatsError>;
 
     fn try_from(value: JsArray) -> Result<Self, Self::Error> {
-        use RtcStatsError::*;
+        use RtcStatsError::{Js, UndefinedId, UndefinedStats};
 
         let id = value.get(0);
         let stats = value.get(1);
@@ -53,7 +53,7 @@ impl TryFrom<&JsValue> for RtcStats {
     type Error = Traced<RtcStatsError>;
 
     fn try_from(stats: &JsValue) -> Result<Self, Self::Error> {
-        use RtcStatsError::*;
+        use RtcStatsError::{Js, UndefinedEntries};
 
         let entries_fn =
             get_property_by_name(&stats, "entries", |func: JsValue| {

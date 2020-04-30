@@ -101,23 +101,24 @@ impl CoturnEvent {
     pub fn parse(
         msg: &redis_pub_sub::Msg,
     ) -> Result<Self, CoturnEventParseError> {
-        use CoturnEventParseError::*;
+        use CoturnEventParseError as E;
 
-        let channel: String = msg.get_channel().map_err(|_| NoChannelInfo)?;
+        let channel: String =
+            msg.get_channel().map_err(|_| E::NoChannelInfo)?;
         let mut channel_splitted = channel.split('/').skip(4);
 
         let (room_id, peer_id) = {
-            let user = channel_splitted.next().ok_or(NoUserInfo)?;
+            let user = channel_splitted.next().ok_or(E::NoUserInfo)?;
             let mut user_splitted = user.split('_');
             let room_id = RoomId::from(
-                user_splitted.next().ok_or(NoMemberId)?.to_string(),
+                user_splitted.next().ok_or(E::NoMemberId)?.to_string(),
             );
             let peer_id = PeerId(
                 user_splitted
                     .next()
-                    .ok_or(NoPeerId)?
+                    .ok_or(E::NoPeerId)?
                     .parse()
-                    .map_err(|_| NoPeerId)?,
+                    .map_err(|_| E::NoPeerId)?,
             );
 
             (room_id, peer_id)
@@ -127,15 +128,15 @@ impl CoturnEvent {
 
         let allocation_id: u64 = channel_splitted
             .next()
-            .ok_or(NoAllocationId)?
+            .ok_or(E::NoAllocationId)?
             .parse()
-            .map_err(|_| NoAllocationId)?;
-        let event_type = channel_splitted.next().ok_or(NoEventType)?;
+            .map_err(|_| E::NoAllocationId)?;
+        let event_type = channel_splitted.next().ok_or(E::NoEventType)?;
 
         let event = CoturnAllocationEvent::parse(
             event_type,
             msg.get_payload::<String>()
-                .map_err(|_| WrongPayloadType)?
+                .map_err(|_| E::WrongPayloadType)?
                 .as_str(),
         )?;
 
@@ -194,7 +195,10 @@ impl CoturnAllocationEvent {
         event_type: &str,
         body: &str,
     ) -> Result<Self, CoturnEventParseError> {
-        use CoturnEventParseError::*;
+        use CoturnEventParseError::{
+            EmptyStatus, FailedLifetimeParsing, NoMetadataInStatus,
+            UnsupportedEventType, UnsupportedStatus,
+        };
 
         match event_type {
             "total_traffic" => Ok(CoturnAllocationEvent::TotalTraffic {
@@ -262,7 +266,9 @@ impl Traffic {
     /// All errors from this function should never happen, so there is no sense
     /// to catch them individually.
     pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
-        use CoturnEventParseError::*;
+        use CoturnEventParseError::{
+            FailedToParseTrafficMap, FieldNotFoundInTrafficUpdate,
+        };
 
         let mut items: HashMap<&str, u64> = body
             .split(", ")

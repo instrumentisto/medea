@@ -61,6 +61,14 @@ impl CoturnTelnetClient {
     /// - deleting all retrieved `users`' sessions fails.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
+    ///
+    /// # Errors
+    ///
+    /// With [`CoturnCliError::PoolError`] if could not get or establish new
+    /// connection in pool.
+    ///
+    /// With [`CoturnCliError::CoturnTelnetError`] in case of unexpected
+    /// protocol error.
     pub async fn delete_sessions(
         &self,
         users: &[&IceUser],
