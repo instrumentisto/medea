@@ -45,9 +45,6 @@ impl MediaStream {
 
     /// Consumes `self` returning all underlying [`MediaStreamTrack`]s.
     pub fn into_tracks(self) -> Vec<MediaStreamTrack> {
-        for track in &self.tracks {
-            self.stream.remove_track(track.as_ref());
-        }
         self.tracks
     }
 }
@@ -57,32 +54,23 @@ impl MediaStream {
     /// Returns underlying [MediaStream][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    #[inline]
     pub fn get_media_stream(&self) -> SysMediaStream {
         Clone::clone(&self.stream)
     }
 
     /// Drops all audio tracks contained in ths stream.
     pub fn free_audio(&mut self) {
-        let stream = Clone::clone(&self.stream);
         self.tracks.retain(|track| match track.kind() {
-            TrackKind::Audio => {
-                stream.remove_track(track.as_ref());
-                false
-            }
+            TrackKind::Audio => false,
             TrackKind::Video => true,
         });
     }
 
     /// Drops all video tracks contained in ths stream.
     pub fn free_video(&mut self) {
-        let stream = Clone::clone(&self.stream);
         self.tracks.retain(|track| match track.kind() {
             TrackKind::Audio => true,
-            TrackKind::Video => {
-                stream.remove_track(track.as_ref());
-                false
-            }
+            TrackKind::Video => false,
         });
     }
 }

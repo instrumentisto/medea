@@ -47,7 +47,7 @@ impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
 
 /// [MediaStreamConstraints][1] wrapper.
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
 #[derive(Clone, Default)]
 pub struct MediaStreamSettings {
@@ -65,7 +65,7 @@ impl MediaStreamSettings {
 
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn audio(&mut self, constraints: AudioTrackConstraints) {
         self.audio.replace(constraints);
     }
@@ -117,7 +117,7 @@ impl MediaStreamSettings {
 /// source (device or display), and allows to group two requests with different
 /// sources.
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamconstraints
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamconstraints
 pub enum MultiSourceMediaStreamConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
@@ -126,13 +126,13 @@ pub enum MultiSourceMediaStreamConstraints {
 
     /// Only [getDisplayMedia()][1] request is required.
     ///
-    /// [1]: https://tinyurl.com/wotjrns
+    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     Display(SysMediaStreamConstraints),
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    /// [2]: https://tinyurl.com/wotjrns
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
 }
 
@@ -274,7 +274,7 @@ impl AudioTrackConstraints {
 
     /// Sets [deviceId][1] constraint.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+    /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(device_id);
     }
@@ -284,7 +284,7 @@ impl AudioTrackConstraints {
     /// Checks if provided [MediaStreamTrack][1] satisfies constraints
     /// contained.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
         let track = track.as_ref();
         if track.kind() != "audio" {
@@ -371,7 +371,7 @@ impl DeviceVideoTrackConstraints {
 
     /// Sets [deviceId][1] constraint.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+    /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(device_id);
     }
@@ -406,7 +406,7 @@ impl VideoTrackConstraints {
     /// Checks if provided [MediaStreamTrack][1] satisfies constraints
     /// contained.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
         let track = track.as_ref();
         if track.kind() != "video" {

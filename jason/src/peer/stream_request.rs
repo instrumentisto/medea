@@ -1,6 +1,6 @@
 //! [MediaStreamConstraints][1] related objects.
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+//! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 
 use std::{collections::HashMap, convert::TryFrom};
 
