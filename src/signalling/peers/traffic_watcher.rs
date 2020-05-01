@@ -237,15 +237,11 @@ impl PeersTrafficWatcherImpl {
     fn check_is_started(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(room_id) {
             if let Some(peer) = room.peers.get_mut(&peer_id) {
-                if let PeerState::Starting(srcs) = &peer.state {
-                    if srcs.len() == peer.tracked_sources.len() {
-                        let srcs = srcs
-                            .iter()
-                            .map(|src| (*src, Instant::now()))
-                            .collect();
-                        peer.state = PeerState::Started(srcs);
+                if peer.state == PeerState::Starting {
+                    if peer.is_all_sources_received() {
+                        peer.state = PeerState::Started;
                     } else {
-                        peer.state = PeerState::Stopped(HashSet::new());
+                        peer.stop();
                         let at = peer.started_at.unwrap_or_else(Utc::now);
                         if let Some(room) = room.room.upgrade() {
                             room.do_send(PeerStopped { peer_id, at });
@@ -265,8 +261,9 @@ impl Actor for PeersTrafficWatcherImpl {
     /// event will be sent to this [`PeersTrafficWatcherImpl`].
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.run_interval(Duration::from_secs(1), |this, ctx| {
-            for stat in this.stats.values() {
-                for peer in stat.peers.values() {
+            for stat in this.stats.values_mut() {
+                for peer in stat.peers.values_mut() {
+                    peer.remove_outdated_sources(this.traffic_flowing_timeout);
                     if !peer.is_valid(this.traffic_flowing_timeout) {
                         ctx.notify(TrafficStopped {
                             peer_id: peer.peer_id,
@@ -337,9 +334,10 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
                 peer.updated_at = Instant::now();
+                peer.received_sources.insert(msg.source, Instant::now());
                 match &mut peer.state {
                     PeerState::New => {
-                        peer.state = PeerState::Starting(hashset![msg.source]);
+                        peer.state = PeerState::Starting;
                         peer.started_at = Some(Utc::now());
 
                         if let Some(room_addr) = room.room.upgrade() {
@@ -356,27 +354,16 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                             },
                         );
                     }
-                    PeerState::Starting(sources) => {
-                        sources.insert(msg.source);
-                    }
-                    PeerState::Started(sources) => {
-                        sources.insert(msg.source, Instant::now());
-                    }
-                    PeerState::Stopped(sources) => {
-                        sources.insert(msg.source);
-                        if *sources == peer.tracked_sources {
-                            peer.state = PeerState::Started(
-                                sources
-                                    .iter()
-                                    .map(|src| (*src, Instant::now()))
-                                    .collect(),
-                            );
+                    PeerState::Stopped => {
+                        if peer.is_all_sources_received() {
+                            peer.state = PeerState::Started;
                             peer.started_at = Some(Utc::now());
                             if let Some(room_addr) = room.room.upgrade() {
                                 room_addr.do_send(PeerStarted(peer.peer_id));
                             }
                         }
                     }
+                    _ => (),
                 }
             }
         }
@@ -421,9 +408,8 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
-                if let PeerState::Stopped(_) = &peer.state {
-                } else {
-                    peer.state = PeerState::Stopped(HashSet::new());
+                if peer.state != PeerState::Stopped {
+                    peer.stop();
                     if let Some(room_addr) = room.room.upgrade() {
                         let at = Utc::now()
                             - chrono::Duration::from_std(msg.at.elapsed())
@@ -473,20 +459,20 @@ pub enum FlowMetricSource {
 ///
 /// If [`PeerStat`] goes into [`PeerState::Started`] then all
 /// [`FlowMetricSource`]s should notify [`PeersTrafficWatcher`] about it.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum PeerState {
     /// [`Peer`] was just added and have not received any traffic events.
     New,
 
     /// Some sources have reported that traffic is flowing, but not all of
     /// them.
-    Starting(HashSet<FlowMetricSource>),
+    Starting,
 
     /// All of the sources have reported that traffic is flowing.
-    Started(HashMap<FlowMetricSource, Instant>),
+    Started,
 
     /// At least one of sources have reported that traffic has stopped.
-    Stopped(HashSet<FlowMetricSource>),
+    Stopped,
 }
 
 /// Current stats of [`Peer`].
@@ -520,6 +506,10 @@ struct PeerStat {
     /// [`PeerTrafficWatcherImpl::traffic_flowing_timeout`] then this
     /// [`PeerStat`] will be considered as stopped and will be removed.
     updated_at: Instant,
+
+    /// All [`FlowMetricSource`]s received at this moment with time at which
+    /// they are received lastly.
+    received_sources: HashMap<FlowMetricSource, Instant>,
 }
 
 impl PeerStat {
@@ -528,15 +518,9 @@ impl PeerStat {
     /// Checks that all [`FlowMetricSource`]s reported that traffic is flowing
     /// within `now() - traffic_flowing_timeout`.
     fn is_valid(&self, traffic_flowing_timeout: Duration) -> bool {
-        if let PeerState::Started(srcs) = &self.state {
-            for src in &self.tracked_sources {
-                if let Some(src_updated_at) = srcs.get(src) {
-                    if src_updated_at.elapsed() > traffic_flowing_timeout {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
+        if self.state == PeerState::Started {
+            if !self.is_all_sources_received() {
+                return false;
             }
 
             if self.updated_at.elapsed() > traffic_flowing_timeout {
@@ -545,6 +529,40 @@ impl PeerStat {
         }
 
         true
+    }
+
+    /// Returns `false` if not all tracked [`FlowMetricSource`]s received by
+    /// this [`PeerSpec`].
+    ///
+    /// Returns `true` if all tracked [`FlowMetricSource`]s received by this
+    /// [`PeerSpec`].
+    fn is_all_sources_received(&self) -> bool {
+        for tracked_source in &self.tracked_sources {
+            if !self.received_sources.contains_key(tracked_source) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Removes all received [`FlowMetricSource`]s which received more than
+    /// `traffic_flowing_timeout` ago.
+    fn remove_outdated_sources(&mut self, traffic_flowing_timeout: Duration) {
+        for src in &self.tracked_sources {
+            if let Some(src_updated_at) = self.received_sources.get(src) {
+                if src_updated_at.elapsed() > traffic_flowing_timeout {
+                    self.received_sources.remove(src);
+                }
+            }
+        }
+    }
+
+    /// Sets [`PeerStat`] state to the [`PeerState::Stopped`] and resets
+    /// [`PeerStat::received_sources`].
+    fn stop(&mut self) {
+        self.state = PeerState::Stopped;
+        self.received_sources = HashMap::new();
     }
 }
 
@@ -671,6 +689,7 @@ impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
                     tracked_sources: msg.flow_metrics_sources,
                     updated_at: Instant::now(),
                     started_at: None,
+                    received_sources: HashMap::new(),
                 },
             );
         }
