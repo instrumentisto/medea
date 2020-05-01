@@ -57,10 +57,7 @@ use crate::{
             Member, MembersLoadError,
         },
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{
-            FatalPeerFailure, PeerStarted, PeerStopped, PeerTrafficWatcher,
-            PeersService,
-        },
+        peers::{PeerStarted, PeerStopped, PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
@@ -430,15 +427,15 @@ impl Room {
     ///
     /// This will delete [`Peer`]s from [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] event to [`Member`].
-    fn remove_peers(
+    fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,
-        peer_ids_to_remove: &HashSet<PeerId>,
+        peer_ids_to_remove: Peers,
         ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
         self.peers
-            .remove_peers(&member_id, &peer_ids_to_remove)
+            .remove_peers(&member_id, peer_ids_to_remove)
             .into_iter()
             .for_each(|(member_id, peers)| {
                 self.member_peers_removed(
@@ -490,36 +487,35 @@ impl Room {
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
-        let endpoint_id = if let Some(member) =
-            self.members.get_member_by_id(member_id)
-        {
-            let play_id = endpoint_id.into();
-            if let Some(endpoint) = member.take_sink(&play_id) {
-                if let Some(peer_id) = endpoint.peer_id() {
-                    let removed_peers =
-                        self.peers.remove_peers(member_id, &hashset![peer_id]);
-                    for (member_id, peers) in removed_peers {
-                        self.member_peers_removed(
-                            peers.into_iter().map(|p| p.id()).collect(),
-                            member_id,
-                            ctx,
-                        )
-                        .map(|_, _, _| ())
-                        .spawn(ctx);
+        let endpoint_id =
+            if let Some(member) = self.members.get_member_by_id(member_id) {
+                let play_id = endpoint_id.into();
+                if let Some(endpoint) = member.take_sink(&play_id) {
+                    if let Some(peer_id) = endpoint.peer_id() {
+                        let removed_peers =
+                            self.peers.remove_peers(member_id, &[peer_id]);
+                        for (member_id, peers) in removed_peers {
+                            self.member_peers_removed(
+                                peers.into_iter().map(|p| p.id()).collect(),
+                                member_id,
+                                ctx,
+                            )
+                            .map(|_, _, _| ())
+                            .spawn(ctx);
+                        }
                     }
                 }
-            }
 
-            let publish_id = String::from(play_id).into();
-            if let Some(endpoint) = member.take_src(&publish_id) {
-                let peer_ids = endpoint.peer_ids();
-                self.remove_peers(member_id, &peer_ids, ctx);
-            }
+                let publish_id = String::from(play_id).into();
+                if let Some(endpoint) = member.take_src(&publish_id) {
+                    let peer_ids = endpoint.peer_ids();
+                    self.remove_peers(member_id, &peer_ids, ctx);
+                }
 
-            publish_id.into()
-        } else {
-            endpoint_id
-        };
+                publish_id.into()
+            } else {
+                endpoint_id
+            };
 
         debug!(
             "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
@@ -661,15 +657,17 @@ impl Room {
         &self,
         command: &CommandMessage,
     ) -> Result<(), CommandValidationError> {
-        use Command::*;
-        use CommandValidationError::*;
+        use Command as C;
+        use CommandValidationError::{
+            PeerBelongsToAnotherMember, PeerNotFound,
+        };
 
         let peer_id = match command.command {
-            MakeSdpOffer { peer_id, .. }
-            | MakeSdpAnswer { peer_id, .. }
-            | SetIceCandidate { peer_id, .. }
-            | AddPeerConnectionMetrics { peer_id, .. }
-            | UpdateTracks { peer_id, .. } => peer_id,
+            C::MakeSdpOffer { peer_id, .. }
+            | C::MakeSdpAnswer { peer_id, .. }
+            | C::SetIceCandidate { peer_id, .. }
+            | C::AddPeerConnectionMetrics { peer_id, .. }
+            | C::UpdateTracks { peer_id, .. } => peer_id,
         };
 
         let peer = self
@@ -1310,18 +1308,6 @@ impl Handler<PeerStopped> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         // TODO: Implement PeerStopped logic.
-    }
-}
-
-impl Handler<FatalPeerFailure> for Room {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        _: FatalPeerFailure,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        // TODO: Implement FatalPeerFailure logic.
     }
 }
 

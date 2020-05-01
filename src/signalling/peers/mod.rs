@@ -7,7 +7,7 @@ mod metrics;
 mod traffic_watcher;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     sync::Arc,
     time::Duration,
@@ -15,8 +15,8 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use futures::{future, future::LocalBoxFuture, Stream};
-use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
+
+use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
@@ -41,8 +41,8 @@ pub use self::{
         PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
     },
     traffic_watcher::{
-        build_peers_traffic_watcher, FatalPeerFailure, FlowMetricSource,
-        PeerStarted, PeerStopped, PeerTrafficWatcher,
+        build_peers_traffic_watcher, FlowMetricSource, PeerStarted,
+        PeerStopped, PeerTrafficWatcher,
     },
 };
 
@@ -161,8 +161,8 @@ impl PeersService {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Creates interconnected [`Peer`]s for provided endpoints and adds them to
-    /// [`PeerService`].
+    /// Creates interconnected [`Peer`]s for provided endpoints and saves them
+    /// in [`PeerService`].
     ///
     /// Returns [`PeerId`]s of the created [`Peer`]s.
     fn create_peers(
@@ -290,14 +290,14 @@ impl PeersService {
     /// __Note:__ this also deletes partner peers.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
-    pub fn remove_peers(
+    pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,
-        peer_ids: &HashSet<PeerId>,
+        peer_ids: Peers,
     ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
-            if let Some(peer) = self.peers.remove(peer_id) {
+            if let Some(peer) = self.peers.remove(&peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
                 if let Some(partner_peer) = self.peers.remove(&partner_peer_id)
@@ -435,7 +435,7 @@ impl PeersService {
                 async move {
                     match res {
                         Ok(_) => {
-                            if endpoint.any_traffic_callback_is_some() {
+                            if endpoint.has_traffic_callback() {
                                 traffic_watcher
                                     .register_peer(
                                         room_id,
@@ -458,120 +458,13 @@ impl PeersService {
         )
     }
 
-    /// Returns [`Endpoint`]s for which provided
-    /// [`Peer`] was created.
-    pub fn get_endpoints_by_peer_id(&self, peer_id: PeerId) -> Vec<Endpoint> {
-        self.peers
-            .get(&peer_id)
-            .map(|peer| {
-                peer.endpoints()
-                    .into_iter()
-                    .filter_map(|e| e.upgrade())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    /// Propagates stats to [`PeersMetricsService`].
-    pub fn add_stats(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
-        self.peer_metrics_service.add_stat(peer_id, stats);
-    }
-
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s from underlying
-    /// [`PeerMetricsService`].
-    pub fn subscribe_to_metrics_events(
-        &mut self,
-    ) -> impl Stream<Item = PeersMetricsEvent> {
-        self.peer_metrics_service.subscribe()
-    }
-
-    /// Runs [`Peer`]s stats validation in the underlying [`PeerMetricsEvent`]s.
-    ///
-    /// This task should be ran every second.
-    pub fn check_peers_validity(&mut self) {
-        self.peer_metrics_service.check_peers_validity();
-    }
-
-    /// Updates [`PeerSpec`] of the [`Peer`] with provided [`PeerId`] in the
-    /// [`PeerMetricsService`].
-    pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
-        self.peer_metrics_service.update_peer_spec(peer_id, spec);
-    }
-
-    /// Unregisters provided [`Peer`] with provided [`PeerId`] and his partner
-    /// [`Peer`] from the [`PeerMetricsService`].
-    pub fn unregister_peer(&mut self, peer_id: PeerId) {
-        if let Some(partner_peer_id) = self
-            .peers
-            .get(&peer_id)
-            .map(PeerStateMachine::partner_peer_id)
-        {
-            self.peer_metrics_service
-                .unregister_peers(hashset![peer_id, partner_peer_id]);
-        } else {
-            self.peer_metrics_service
-                .unregister_peers(hashset![peer_id]);
-        }
-    }
-
-    /// Checks that [`Peer`] with provided [`PeerId`] is registered in the
-    /// [`PeerMetricsService`].
-    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-        self.peer_metrics_service.is_peer_registered(peer_id)
-    }
-
-    /// Reregisters provided [`PeerId`] in the [`PeerMetricsService`] and
-    /// [`PeersTrafficWatcher`].
-    pub fn reregister_peer(
-        &mut self,
-        peer_id: PeerId,
-    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
-        let peer = if let Some(peer) = self.peers.get(&peer_id) {
-            peer
-        } else {
-            return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
-        };
-        let partner_peer = if let Some(partner_peer) =
-            self.peers.get(&peer.partner_peer_id())
-        {
-            partner_peer
-        } else {
-            return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
-        };
-
-        self.peer_metrics_service
-            .register_peer(peer, self.peer_validity_timeout);
-        self.peer_metrics_service
-            .register_peer(partner_peer, self.peer_validity_timeout);
-
-        let is_force_relayed = peer.is_force_relayed();
-        let room_id = self.room_id.clone();
-        let partner_peer_id = partner_peer.id();
-        let partner_peer_is_force_relayed = partner_peer.is_force_relayed();
-        let peers_traffic_watcher = self.peers_traffic_watcher.clone();
-        Box::pin(async move {
-            peers_traffic_watcher
-                .register_peer(room_id.clone(), peer_id, is_force_relayed)
-                .await
-                .map_err(RoomError::PeerTrafficWatcherMailbox)?;
-            peers_traffic_watcher
-                .register_peer(
-                    room_id,
-                    partner_peer_id,
-                    partner_peer_is_force_relayed,
-                )
-                .await
-                .map_err(RoomError::PeerTrafficWatcherMailbox)
-        })
-    }
-
     /// Removes all [`Peer`]s related to given [`Member`].
     /// Note, that this function will also remove all partners [`Peer`]s.
     ///
     /// Returns `HashMap` with all removed [`Peer`]s.
     /// Key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
-    // TODO: this function will be removed in the #91.
+    // TODO: remove in #91.
     pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,

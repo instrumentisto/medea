@@ -3,6 +3,9 @@
 //! This service acts as flow and stop metrics source for the
 //! [`PeerTrafficWatcher`].
 
+// TODO: remove in #91
+#![allow(dead_code)]
+
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -64,7 +67,7 @@ pub struct PeerSpec {
 
 /// Metrics which are available for `MediaTrack` with `Send` direction.
 #[derive(Debug)]
-struct SendDir {
+struct Send {
     /// Count of packets sent by a `MediaTrack` which this [`TrackStat`]
     /// represents.
     packets_sent: u64,
@@ -72,7 +75,7 @@ struct SendDir {
 
 /// Metrics which are available for `MediaTrack` with `Recv` direction.
 #[derive(Debug)]
-struct RecvDir {
+struct Recv {
     /// Count of packets received by a `MediaTrack` which this [`TrackStat`]
     /// represents.
     packets_received: u64,
@@ -101,7 +104,7 @@ impl<T> TrackStat<T> {
     }
 }
 
-impl TrackStat<SendDir> {
+impl TrackStat<Send> {
     /// Updates this [`TrackStat`] with provided [`RtcOutboundRtpStreamStats`].
     ///
     /// [`TrackStat::last_update`] time will be updated.
@@ -111,7 +114,7 @@ impl TrackStat<SendDir> {
     }
 }
 
-impl TrackStat<RecvDir> {
+impl TrackStat<Recv> {
     /// Updates this [`TrackStat`] with provided [`RtcInboundRtpStreamStats`].
     ///
     /// [`TrackStat::last_update`] time will be updated.
@@ -147,10 +150,10 @@ struct PeerStat {
     spec: PeerSpec,
 
     /// All [`TrackStat`]s with [`Send`] direction of this [`PeerStat`].
-    senders: HashMap<StatId, TrackStat<SendDir>>,
+    senders: HashMap<StatId, TrackStat<Send>>,
 
     /// All [`TrackStat`]s with [`Recv`] of this [`PeerStat`].
-    receivers: HashMap<StatId, TrackStat<RecvDir>>,
+    receivers: HashMap<StatId, TrackStat<Recv>>,
 
     /// Current connection state of this [`PeerStat`].
     state: PeerStatState,
@@ -177,7 +180,7 @@ impl PeerStat {
             .entry(stat_id)
             .or_insert_with(|| TrackStat {
                 last_update: Instant::now(),
-                direction: SendDir { packets_sent: 0 },
+                direction: Send { packets_sent: 0 },
                 media_type: TrackMediaType::from(&upd.media_type),
             })
             .update(upd);
@@ -195,7 +198,7 @@ impl PeerStat {
             .entry(stat_id)
             .or_insert_with(|| TrackStat {
                 last_update: Instant::now(),
-                direction: RecvDir {
+                direction: Recv {
                     packets_received: 0,
                 },
                 media_type: TrackMediaType::from(&upd.media_specific_stats),
@@ -482,14 +485,12 @@ impl PeersMetricsService {
                 self.peers_traffic_watcher.traffic_flows(
                     self.room_id.clone(),
                     peer_id,
-                    Instant::now(),
                     FlowMetricSource::Peer,
                 );
                 if let Some(partner_peer_id) = peer_ref.get_partner_peer_id() {
                     self.peers_traffic_watcher.traffic_flows(
                         self.room_id.clone(),
                         partner_peer_id,
-                        Instant::now(),
                         FlowMetricSource::PartnerPeer,
                     );
                 }
@@ -557,3 +558,5 @@ impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
         }
     }
 }
+
+// TODO: unit tests

@@ -143,17 +143,17 @@ impl RoomService {
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
-        let peers_traffic_watcher =
+        let peer_traffic_watcher =
             build_peers_traffic_watcher(&app.config.peer_media_traffic);
         Ok(Self {
             _coturn_metrics: CoturnMetricsService::new(
                 &app.config.turn,
-                peers_traffic_watcher.clone(),
+                peer_traffic_watcher.clone(),
             )?
             .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
-            peer_traffic_watcher: peers_traffic_watcher,
+            peer_traffic_watcher,
             room_repo,
             app,
             graceful_shutdown,

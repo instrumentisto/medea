@@ -190,7 +190,7 @@ impl Handler<Subscribe> for GracefulShutdown {
         if let State::ShuttingDown = self.state {
             return Err(ShuttingDownError);
         }
-        let addrs = self.subs.entry(m.0.priority).or_insert_with(HashSet::new);
+        let addrs = self.subs.entry(m.0.priority).or_default();
         addrs.insert(m.0.addr);
         Ok(())
     }

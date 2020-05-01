@@ -6,6 +6,7 @@ pub mod webrtc;
 
 use derive_more::From;
 use medea_control_api_proto::grpc::api as proto;
+use medea_macro::enum_delegate;
 
 use crate::signalling::elements::endpoints::webrtc::{
     play_endpoint::WeakWebRtcPlayEndpoint,
@@ -15,6 +16,7 @@ use crate::signalling::elements::endpoints::webrtc::{
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
+#[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(webrtc::WebRtcPublishEndpoint),
@@ -22,20 +24,9 @@ pub enum Endpoint {
 }
 
 impl Endpoint {
-    /// Indicates whether only `relay` ICE candidates are allowed for this
-    /// [`Endpoint`].
-    pub fn is_force_relayed(&self) -> bool {
-        match self {
-            Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.is_force_relayed()
-            }
-            Endpoint::WebRtcPlayEndpoint(play) => play.is_force_relayed(),
-        }
-    }
-
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     #[allow(clippy::unused_self)]
-    pub fn any_traffic_callback_is_some(&self) -> bool {
+    pub fn has_traffic_callback(&self) -> bool {
         // TODO: delegate this call to the
         // WebRtcPublishEndpoint/WebRtcPlayEndpoint.
 

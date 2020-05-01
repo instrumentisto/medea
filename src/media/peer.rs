@@ -165,8 +165,7 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
-    /// Weak references to the [`Endpoint`]s for which this [`Peer`]
-    /// is created.
+    /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 }
 

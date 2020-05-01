@@ -53,7 +53,7 @@ impl CoturnMetricsService {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(
@@ -72,7 +72,7 @@ impl CoturnMetricsService {
         Ok(Self {
             client,
             allocations_count: HashMap::new(),
-            peer_traffic_watcher: peers_traffic_watcher,
+            peer_traffic_watcher,
         })
     }
 
@@ -172,7 +172,6 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                     self.peer_traffic_watcher.traffic_flows(
                         event.room_id,
                         event.peer_id,
-                        Instant::now(),
                         FlowMetricSource::Coturn,
                     )
                 }

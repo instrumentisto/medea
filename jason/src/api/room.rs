@@ -20,12 +20,12 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
-use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
+    media::{MediaStream, MediaStreamSettings},
     peer::{
-        MediaConnectionsError, MediaStream, MediaStreamHandle, MuteState,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
+        MediaConnectionsError, MuteState, PeerError, PeerEvent,
+        PeerEventHandler, PeerMediaStream, PeerRepository, RtcStats,
         StableMuteState, TransceiverKind,
     },
     rpc::{
@@ -140,7 +140,7 @@ enum RoomError {
     #[display(fmt = "Remote stream from unknown peer")]
     UnknownRemotePeer,
 
-    /// Returned if [`MediaTrack`] update failed.
+    /// Returned if [`MediaStreamTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
@@ -164,7 +164,10 @@ impl From<TransportError> for RoomError {
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
-        use PeerError::*;
+        use PeerError::{
+            MediaConnections, MediaManager, RtcPeerConnection, StreamRequest,
+        };
+
         match err {
             MediaConnections(ref e) => match e {
                 MediaConnectionsError::InvalidTrackPatch(id) => {
@@ -191,6 +194,7 @@ impl From<MediaConnectionsError> for RoomError {
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
+// TODO: get rid of this RefCell.
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
@@ -199,10 +203,11 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// When:
-    /// - `on_failed_local_stream` callback is not set;
-    /// - `on_connection_loss` callback is not set;
-    /// - fails to connect to media server.
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
+    /// `on_connection_loss` callbacks are not set.
+    ///
+    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
+    /// server.
     pub fn inner_join(
         &self,
         token: String,
@@ -297,16 +302,19 @@ impl RoomHandle {
             .map(|inner| inner.borrow_mut().on_close.set_func(f))
     }
 
-    /// Sets `on_local_stream` callback, which will be invoked once media
-    /// acquisition request will resolve successfully. Only invoked if media
-    /// request was initiated by media server.
+    /// Sets `on_local_stream` callback. This callback is invoked each time
+    /// media acquisition request will resolve successfully. This might
+    /// happen in such cases:
+    /// 1. Media server initiates media request.
+    /// 2. `unmute_audio`/`unmute_video` is called.
+    /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
-    /// media acquisition or media injection failures.
+    /// media acquisition failures.
     pub fn on_failed_local_stream(
         &self,
         f: js_sys::Function,
@@ -331,6 +339,7 @@ impl RoomHandle {
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
     ///   - `on_failed_local_stream` callback is not set
+    ///   - `on_connection_loss` callback is not set
     ///   - unable to connect to media server.
     ///
     /// Effectively returns `Result<(), JasonError>`.
@@ -342,16 +351,29 @@ impl RoomHandle {
         )
     }
 
-    /// Injects local media stream for all created and new [`PeerConnection`]s
-    /// in this [`Room`].
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// configured for some [`Room`], then this [`Room`] can only send
+    /// [`MediaStream`] that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// sending peers, so that might cause new [getUserMedia()][1] request.
+    ///
+    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    pub fn inject_local_stream(
+    /// [1]: https://tinyurl.com/rnxcavf
+    pub fn set_local_media_settings(
         &self,
-        stream: SysMediaStream,
-    ) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().inject_local_stream(stream))
+        settings: &MediaStreamSettings,
+    ) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        let settings = settings.clone();
+        future_to_promise(async move {
+            let inner = inner?;
+            inner.borrow_mut().set_local_media_settings(settings).await;
+            Ok(JsValue::UNDEFINED)
+        })
     }
 
     /// Mutes outbound audio in this [`Room`].
@@ -484,7 +506,7 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
 
     /// Local media stream for injecting into new created [`PeerConnection`]s.
-    local_stream: Option<SysMediaStream>,
+    local_stream_settings: Option<MediaStreamSettings>,
 
     /// [`PeerConnection`] repository.
     peers: Box<dyn PeerRepository>,
@@ -502,10 +524,10 @@ struct InnerRoom {
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
     /// its actual underlying [MediaStream][1] object.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
-    on_local_stream: Callback<MediaStreamHandle>,
+    on_local_stream: Callback<MediaStream>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
@@ -536,7 +558,7 @@ impl InnerRoom {
     ) -> Self {
         Self {
             rpc,
-            local_stream: None,
+            local_stream_settings: None,
             peers,
             peer_event_sender,
             connections: HashMap::new(),
@@ -665,27 +687,37 @@ impl InnerRoom {
             .is_none()
     }
 
-    /// Injects given local stream into all [`PeerConnection`]s of this [`Room`]
-    /// and stores its for injecting into new [`PeerConnection`]s.
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// configured for some [`Room`], then this [`Room`] can only send
+    /// [`MediaStream`] that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
-    /// If injecting fails, then invokes `on_failed_local_stream` callback with
-    /// a failure error.
-    fn inject_local_stream(&mut self, stream: SysMediaStream) {
+    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// callback.
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [1]: https://tinyurl.com/rnxcavf
+    fn set_local_media_settings(
+        &mut self,
+        settings: MediaStreamSettings,
+    ) -> impl Future<Output = ()> + 'static {
         let peers = self.peers.get_all();
-        let injected_stream = Clone::clone(&stream);
+        let settings_clone = settings.clone();
         let error_callback = Rc::clone(&self.on_failed_local_stream);
-        spawn_local(async move {
+        self.local_stream_settings.replace(settings);
+        async move {
             for peer in peers {
                 if let Err(err) = peer
-                    .inject_local_stream(&injected_stream)
+                    .update_local_stream(Some(settings_clone.clone()))
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
                     error_callback.call(JasonError::from(err));
                 }
             }
-        });
-        self.local_stream.replace(stream);
+        }
     }
 }
 
@@ -725,7 +757,7 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
-        let local_stream = self.local_stream.clone();
+        let local_stream_constraints = self.local_stream_settings.clone();
         let rpc = Rc::clone(&self.rpc);
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(
@@ -733,7 +765,7 @@ impl EventHandler for InnerRoom {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
-                            .get_offer(tracks, local_stream.as_ref())
+                            .get_offer(tracks, local_stream_constraints)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         let mids = peer
@@ -747,7 +779,11 @@ impl EventHandler for InnerRoom {
                     }
                     Some(offer) => {
                         let sdp_answer = peer
-                            .process_offer(offer, tracks, local_stream.as_ref())
+                            .process_offer(
+                                offer,
+                                tracks,
+                                local_stream_constraints,
+                            )
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpAnswer {
@@ -871,7 +907,7 @@ impl PeerEventHandler for InnerRoom {
         &mut self,
         _: PeerId,
         sender_id: PeerId,
-        remote_stream: MediaStream,
+        remote_stream: PeerMediaStream,
     ) {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
@@ -884,7 +920,7 @@ impl PeerEventHandler for InnerRoom {
 
     /// Invokes `on_local_stream` [`Room`]'s callback.
     fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
-        self.on_local_stream.call(stream.new_handle());
+        self.on_local_stream.call(stream);
     }
 
     /// Handles [`PeerEvent::IceConnectionStateChanged`] event and sends new
@@ -928,6 +964,27 @@ impl PeerEventHandler for InnerRoom {
             peer_id,
             metrics: PeerMetrics::RtcStats(stats.0),
         });
+    }
+
+    /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
+    /// stream of [`PeerConnection`] that sent request.
+    fn on_new_local_stream_required(&mut self, peer_id: PeerId) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            let constraints_clone = self.local_stream_settings.clone();
+            let error_callback = Rc::clone(&self.on_failed_local_stream);
+            spawn_local(async move {
+                if let Err(err) = peer
+                    .update_local_stream(constraints_clone)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                {
+                    error_callback.call(JasonError::from(err));
+                }
+            });
+        } else {
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
     }
 }
 
