@@ -22,7 +22,7 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    PeerId,
+    MediaType, PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -32,7 +32,7 @@ use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
-pub enum TrackMediaType {
+enum TrackMediaType {
     Audio,
     Video,
 }
@@ -45,7 +45,7 @@ pub enum TrackMediaType {
 pub enum PeersMetricsEvent {
     /// Fatal [`Peer`]'s contradiction of the client metrics with
     /// [`PeerSpec`].
-    FatalPeerFailure { peer_id: PeerId, at: DateTime<Utc> },
+    PeerFailed { peer_id: PeerId, at: DateTime<Utc> },
 }
 
 /// Specification of a [`Peer`].
@@ -53,16 +53,41 @@ pub enum PeersMetricsEvent {
 /// Based on this specification fatal [`Peer`]'s media traffic contradictions
 /// will be determined.
 #[derive(Debug)]
-pub struct PeerSpec {
-    /// All `MediaTrack`s with `Send` direction of [`Peer`].
-    ///
-    /// Value - count of `MediaTrack`s with this [`TrackMediaType`].
-    pub senders: HashMap<TrackMediaType, u64>,
+struct PeerTracks {
+    audio_send: u64,
+    video_send: u64,
+    audio_recv: u64,
+    video_recv: u64,
+}
 
-    /// All `MediaTrack`s with `Recv` direction of [`Peer`].
-    ///
-    /// Value - count of `MediaTrack`s with this [`TrackMediaType`].
-    pub receivers: HashMap<TrackMediaType, u64>,
+impl From<&PeerStateMachine> for PeerTracks {
+    fn from(peer: &PeerStateMachine) -> Self {
+        // TODO: filter muted MediaTracks.
+        let mut audio_send = 0;
+        let mut video_send = 0;
+        let mut audio_recv = 0;
+        let mut video_recv = 0;
+
+        for sender in peer.senders().values() {
+            match sender.media_type {
+                MediaType::Audio(_) => audio_send += 1,
+                MediaType::Video(_) => video_send += 1,
+            }
+        }
+        for receiver in peer.receivers().values() {
+            match receiver.media_type {
+                MediaType::Audio(_) => audio_recv += 1,
+                MediaType::Video(_) => video_recv += 1,
+            }
+        }
+
+        Self {
+            audio_send,
+            video_send,
+            audio_recv,
+            video_recv,
+        }
+    }
 }
 
 /// Metrics which are available for `MediaTrack` with `Send` direction.
@@ -85,7 +110,7 @@ struct Recv {
 #[derive(Debug)]
 struct TrackStat<T> {
     /// Last time when this [`TrackStat`] was updated.
-    last_update: Instant,
+    updated_at: Instant,
 
     /// Media type of the `MediaTrack` which this [`TrackStat`] represents.
     media_type: TrackMediaType,
@@ -99,8 +124,8 @@ struct TrackStat<T> {
 impl<T> TrackStat<T> {
     /// Returns [`Instant`] time on which this [`TrackStat`] was updated last
     /// time.
-    fn last_update(&self) -> &Instant {
-        &self.last_update
+    fn updated_at(&self) -> &Instant {
+        &self.updated_at
     }
 }
 
@@ -109,7 +134,7 @@ impl TrackStat<Send> {
     ///
     /// [`TrackStat::last_update`] time will be updated.
     fn update(&mut self, upd: &RtcOutboundRtpStreamStats) {
-        self.last_update = Instant::now();
+        self.updated_at = Instant::now();
         self.direction.packets_sent = upd.packets_sent;
     }
 }
@@ -119,7 +144,7 @@ impl TrackStat<Recv> {
     ///
     /// [`TrackStat::last_update`] time will be updated.
     fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
-        self.last_update = Instant::now();
+        self.updated_at = Instant::now();
         self.direction.packets_received = upd.packets_received;
     }
 }
@@ -147,7 +172,7 @@ struct PeerStat {
     partner_peer: Weak<RefCell<PeerStat>>,
 
     /// Specification of a [`Peer`] which this [`PeerStat`] represents.
-    spec: PeerSpec,
+    spec: PeerTracks,
 
     /// All [`TrackStat`]s with [`Send`] direction of this [`PeerStat`].
     senders: HashMap<StatId, TrackStat<Send>>,
@@ -179,7 +204,7 @@ impl PeerStat {
         self.senders
             .entry(stat_id)
             .or_insert_with(|| TrackStat {
-                last_update: Instant::now(),
+                updated_at: Instant::now(),
                 direction: Send { packets_sent: 0 },
                 media_type: TrackMediaType::from(&upd.media_type),
             })
@@ -197,7 +222,7 @@ impl PeerStat {
         self.receivers
             .entry(stat_id)
             .or_insert_with(|| TrackStat {
-                last_update: Instant::now(),
+                updated_at: Instant::now(),
                 direction: Recv {
                     packets_received: 0,
                 },
@@ -212,7 +237,7 @@ impl PeerStat {
     /// [`PeerStat::peer_validity_timeout`] or this [`TrackStat`] will be
     /// considered as stopped.
     fn is_track_active<T>(&self, track: &TrackStat<T>) -> bool {
-        track.last_update().elapsed() < self.peer_validity_timeout
+        track.updated_at().elapsed() < self.peer_validity_timeout
     }
 
     /// Checks that this [`PeerStat`] is conforms to [`PeerSpec`].
@@ -223,35 +248,37 @@ impl PeerStat {
     /// Also media type of sender/receiver
     /// and activity taken into account.
     fn is_conforms_spec(&self) -> bool {
-        let mut current_senders = HashMap::new();
-        let mut current_receivers = HashMap::new();
+        let mut audio_send = 0;
+        let mut video_send = 0;
+        let mut audio_recv = 0;
+        let mut video_recv = 0;
 
         self.senders
             .values()
             .filter(|t| self.is_track_active(&t))
-            .for_each(|sender| {
-                *current_senders.entry(sender.media_type).or_insert(0) += 1;
+            .for_each(|sender| match sender.media_type {
+                TrackMediaType::Audio => audio_send += 1,
+                TrackMediaType::Video => video_send += 1,
             });
         self.receivers
             .values()
             .filter(|t| self.is_track_active(&t))
-            .for_each(|receiver| {
-                *current_receivers.entry(receiver.media_type).or_insert(0) += 1;
+            .for_each(|receiver| match receiver.media_type {
+                TrackMediaType::Audio => audio_recv += 1,
+                TrackMediaType::Video => video_recv += 1,
             });
 
-        for (receivers_type, receiver_count) in &self.spec.receivers {
-            if let Some(spec_count) = current_receivers.get(receivers_type) {
-                if spec_count < receiver_count {
-                    return false;
-                }
-            }
+        if audio_send < self.spec.audio_send {
+            return false;
         }
-        for (senders_type, senders_count) in &self.spec.senders {
-            if let Some(spec_count) = current_senders.get(senders_type) {
-                if spec_count < senders_count {
-                    return false;
-                }
-            }
+        if video_send < self.spec.video_send {
+            return false;
+        }
+        if audio_recv < self.spec.audio_recv {
+            return false;
+        }
+        if video_recv < self.spec.video_recv {
+            return false;
         }
 
         true
@@ -278,8 +305,8 @@ impl PeerStat {
     fn get_stop_time(&self) -> Instant {
         self.senders
             .values()
-            .map(|send| send.last_update)
-            .chain(self.receivers.values().map(|recv| recv.last_update))
+            .map(|send| send.updated_at)
+            .chain(self.receivers.values().map(|recv| recv.updated_at))
             .min()
             .unwrap_or_else(Instant::now)
     }
@@ -345,14 +372,11 @@ impl PeersMetricsService {
 
     /// Some fatal error with `PeerConnection`'s metrics happened.
     ///
-    /// [`PeerMetricsEvent::FatalPeerFailure`] will be sent to the subscriber.
-    fn fatal_peer_error(&self, peer_id: PeerId, at: DateTime<Utc>) {
+    /// [`PeerMetricsEvent::PeerFailed`] will be sent to the subscriber.
+    fn peer_failed(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(sender) = &self.peer_metric_events_sender {
-            let _ =
-                sender.unbounded_send(PeersMetricsEvent::FatalPeerFailure {
-                    peer_id,
-                    at,
-                });
+            let _ = sender
+                .unbounded_send(PeersMetricsEvent::PeerFailed { peer_id, at });
         }
     }
 
@@ -370,7 +394,7 @@ impl PeersMetricsService {
     /// Checks that all [`PeerStat`]s is valid accordingly `PeerConnection`
     /// specification. If [`PeerStat`] is considered as invalid accordingly to
     /// `PeerConnection` specification then
-    /// [`PeersMetricsService::fatal_peer_error`] will be called.
+    /// [`PeersMetricsService::peer_failed`] will be called.
     ///
     /// Also checks that all [`PeerStat`]'s senders/receivers is flowing. If all
     /// senders/receivers is stopped then [`TrafficStopped`] will be sent to
@@ -402,7 +426,7 @@ impl PeersMetricsService {
                      because invalid traffic flowing.",
                     peer_ref.peer_id, self.room_id
                 );
-                self.fatal_peer_error(peer_ref.peer_id, Utc::now());
+                self.peer_failed(peer_ref.peer_id, Utc::now());
             }
         }
 
@@ -434,7 +458,7 @@ impl PeersMetricsService {
             senders: HashMap::new(),
             receivers: HashMap::new(),
             state: PeerStatState::Connecting,
-            spec: peer.get_spec(),
+            spec: PeerTracks::from(peer),
             peer_validity_timeout,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
@@ -495,7 +519,7 @@ impl PeersMetricsService {
                     );
                 }
             } else {
-                self.fatal_peer_error(peer_ref.peer_id, peer_ref.last_update);
+                self.peer_failed(peer_ref.peer_id, peer_ref.last_update);
             }
         }
     }
@@ -515,15 +539,9 @@ impl PeersMetricsService {
             .unregister_peers(self.room_id.clone(), peers_ids);
     }
 
-    pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
-        if let Some(peer) = self.peers.get(&peer_id) {
-            let mut peer_ref = peer.borrow_mut();
-            debug!(
-                "Spec of a Peer [id = {}] was updated. Spec before: {:?}. \
-                 Spec after: {:?}.",
-                peer_id, peer_ref.spec, spec
-            );
-            peer_ref.spec = spec;
+    pub fn update_peer_spec(&mut self, peer: &PeerStateMachine) {
+        if let Some(peer_stat) = self.peers.get(&peer.id()) {
+            peer_stat.borrow_mut().spec = PeerTracks::from(peer);
         }
     }
 

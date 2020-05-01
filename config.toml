@@ -212,28 +212,15 @@
 
 
 
-[peer_media_traffic]
-# Duration after which media server will consider `Peer`'s media traffic
-# stats as invalid and will send notification about this by `on_stop`
-# Control API callback.
+[media]
+# Max duration of media-flow lag, after which `on_stop` callback will be fired.
 #
-# Env var: MEDEA_PEER_MEDIA_TRAFFIC__PEER_VALIDITY_TIMEOUT
+# Env var: MEDEA_PEER_MEDIA_TRAFFIC__MAX_LAG
 # Default:
-#   peer_validity_timeout = "10s"
+#   max_lag = "15s"
 
-# Duration after which media server will consider that `Peer`'s media
-# traffic is stopped.
+# Timeout for peer to become active after it was created.
 #
-# Env var: MEDEA_PEER_MEDIA_TRAFFIC__TRAFFIC_FLOWING_TIMEOUT
+# Env var: MEDEA_PEER_MEDIA_TRAFFIC__INIT_TIMEOUT
 # Default:
-#   traffic_flowing_timeout = "10s"
-
-# Duration within which media server should receive signal of `Peer`
-# start from all sources.
-#
-# If media server wouldn't receive this signal, then `on_stop` callback
-# will be sent for a `Endpoint` related to this `Peer`.
-#
-# Env var: MEDEA_PEER_MEDIA_TRAFFIC__PEER_INIT_TIMEOUT
-# Default:
-#   peer_init_timeout = "15s"
+#   init_timeout = "15s"

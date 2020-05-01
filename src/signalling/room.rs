@@ -197,7 +197,7 @@ impl Room {
                 room_spec.id().clone(),
                 context.turn_service.clone(),
                 peers_traffic_watcher,
-                &context.config.peer_media_traffic,
+                &context.config.media,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
@@ -1334,7 +1334,7 @@ mod test {
         Room::new(
             &room_spec,
             &ctx,
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
     }

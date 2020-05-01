@@ -144,7 +144,7 @@ impl RoomService {
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let peer_traffic_watcher =
-            build_peers_traffic_watcher(&app.config.peer_media_traffic);
+            build_peers_traffic_watcher(&app.config.media);
         Ok(Self {
             _coturn_metrics: CoturnMetricsService::new(
                 &app.config.turn,
@@ -753,7 +753,7 @@ mod room_service_specs {
         let room = Room::new(
             &spec,
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -802,7 +802,7 @@ mod room_service_specs {
         let room = Room::new(
             &spec,
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -870,7 +870,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -892,7 +892,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -915,7 +915,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();

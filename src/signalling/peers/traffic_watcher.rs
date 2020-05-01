@@ -44,25 +44,9 @@ use medea_client_api_proto::PeerId;
 
 use crate::{api::control::RoomId, conf, log::prelude::*, signalling::Room};
 
-/// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
-/// events.
-///
-/// [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are
-/// always returned, [`FlowMetricSource::Coturn`] is optional (should be used
-/// only if media is forcibly relayed).
-fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
-    let mut sources =
-        hashset![FlowMetricSource::Peer, FlowMetricSource::PartnerPeer];
-    if should_watch_turn {
-        sources.insert(FlowMetricSource::Coturn);
-    }
-
-    sources
-}
-
 /// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
 pub fn build_peers_traffic_watcher(
-    conf: &conf::PeerMediaTraffic,
+    conf: &conf::Media,
 ) -> Arc<dyn PeerTrafficWatcher> {
     Arc::new(PeersTrafficWatcherImpl::new(conf).start())
 }
@@ -122,6 +106,22 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     /// Notifies [`PeerTrafficWatcher`] that some [`Peer`]'s traffic flowing was
     /// stopped.
     fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant);
+}
+
+/// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
+/// events.
+///
+/// [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are
+/// always returned, [`FlowMetricSource::Coturn`] is optional (should be used
+/// only if media is forcibly relayed).
+fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
+    let mut sources =
+        hashset![FlowMetricSource::Peer, FlowMetricSource::PartnerPeer];
+    if should_watch_turn {
+        sources.insert(FlowMetricSource::Coturn);
+    }
+
+    sources
 }
 
 #[async_trait]
@@ -205,20 +205,20 @@ struct PeersTrafficWatcherImpl {
     /// that traffic is flowing, if some media source wont send new reports for
     /// this timeout, then it is considered that this source is not flowing any
     /// more.
-    traffic_flowing_timeout: Duration,
+    traffic_report_ttl: Duration,
 
     /// Duration after which [`PeersTrafficWatcherImpl`] will check that all
     /// tracked traffic sources have reported that traffic is flowing.
-    peer_init_timeout: Duration,
+    init_timeout: Duration,
 }
 
 impl PeersTrafficWatcherImpl {
     /// Returns new [`PeersTrafficWatcherImpl`].
-    pub fn new(conf: &conf::PeerMediaTraffic) -> Self {
+    pub fn new(conf: &conf::Media) -> Self {
         Self {
             stats: HashMap::new(),
-            traffic_flowing_timeout: conf.traffic_flowing_timeout,
-            peer_init_timeout: conf.peer_init_timeout,
+            traffic_report_ttl: conf.max_lag,
+            init_timeout: conf.init_timeout,
         }
     }
 
@@ -238,7 +238,7 @@ impl PeersTrafficWatcherImpl {
         if let Some(room) = self.stats.get_mut(room_id) {
             if let Some(peer) = room.peers.get_mut(&peer_id) {
                 if peer.state == PeerState::Starting {
-                    if peer.is_all_sources_received() {
+                    if peer.is_flowing() {
                         peer.state = PeerState::Started;
                     } else {
                         peer.stop();
@@ -256,15 +256,14 @@ impl PeersTrafficWatcherImpl {
 impl Actor for PeersTrafficWatcherImpl {
     type Context = actix::Context<Self>;
 
-    /// Starts stats watchdog which will check every second that all traffic
-    /// flowing. If some traffic flowing was stopped then [`TrafficStopped`]
-    /// event will be sent to this [`PeersTrafficWatcherImpl`].
+    /// Checks if [`PeerState::Started`] [`PeerStats`]s traffic is still
+    /// flowing.
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.run_interval(Duration::from_secs(1), |this, ctx| {
             for stat in this.stats.values_mut() {
                 for peer in stat.peers.values_mut() {
-                    peer.remove_outdated_sources(this.traffic_flowing_timeout);
-                    if !peer.is_valid(this.traffic_flowing_timeout) {
+                    if peer.state == PeerState::Started && !peer.is_flowing() {
+                        peer.stop();
                         ctx.notify(TrafficStopped {
                             peer_id: peer.peer_id,
                             room_id: stat.room_id.clone(),
@@ -333,7 +332,6 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
             if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
-                peer.updated_at = Instant::now();
                 peer.received_sources.insert(msg.source, Instant::now());
                 match &mut peer.state {
                     PeerState::New => {
@@ -344,18 +342,12 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                             room_addr.do_send(PeerStarted(peer.peer_id));
                         }
 
-                        ctx.run_later(
-                            self.peer_init_timeout,
-                            move |this, _| {
-                                this.check_is_started(
-                                    &msg.room_id,
-                                    msg.peer_id,
-                                );
-                            },
-                        );
+                        ctx.run_later(self.init_timeout, move |this, _| {
+                            this.check_is_started(&msg.room_id, msg.peer_id);
+                        });
                     }
                     PeerState::Stopped => {
-                        if peer.is_all_sources_received() {
+                        if peer.is_flowing() {
                             peer.state = PeerState::Started;
                             peer.started_at = Some(Utc::now());
                             if let Some(room_addr) = room.room.upgrade() {
@@ -457,8 +449,10 @@ pub enum FlowMetricSource {
 
 /// Current state of [`PeerStat`].
 ///
-/// If [`PeerStat`] goes into [`PeerState::Started`] then all
-/// [`FlowMetricSource`]s should notify [`PeersTrafficWatcher`] about it.
+/// Transitions:
+/// +-------+    +----------+    +-----------+---->+-----------+
+/// |  New  +--->+ Starting +--->+  Started  |     |  Stopped  |
+/// +-------+    +----------+    +-----------+<----+-----------+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum PeerState {
     /// [`Peer`] was just added and have not received any traffic events.
@@ -500,69 +494,41 @@ struct PeerStat {
     /// If `None` then [`PeerStat`] not started.
     started_at: Option<DateTime<Utc>>,
 
-    /// Time of last received [`PeerState`] proof.
-    ///
-    /// If [`PeerStat`] doesn't updates withing
-    /// [`PeerTrafficWatcherImpl::traffic_flowing_timeout`] then this
-    /// [`PeerStat`] will be considered as stopped and will be removed.
-    updated_at: Instant,
-
     /// All [`FlowMetricSource`]s received at this moment with time at which
     /// they are received lastly.
     received_sources: HashMap<FlowMetricSource, Instant>,
+
+    /// Media source traffic report ttl. Media sources must continuously report
+    /// that traffic is flowing, if some media source wont send new reports for
+    /// this timeout, then it is considered that this source is not flowing any
+    /// more.
+    traffic_flowing_timeout: Duration,
 }
 
 impl PeerStat {
     /// Returns `true` if this [`PeerStat`] is considered valid.
     ///
-    /// Checks that all [`FlowMetricSource`]s reported that traffic is flowing
-    /// within `now() - traffic_flowing_timeout`.
-    fn is_valid(&self, traffic_flowing_timeout: Duration) -> bool {
-        if self.state == PeerState::Started {
-            if !self.is_all_sources_received() {
-                return false;
-            }
-
-            if self.updated_at.elapsed() > traffic_flowing_timeout {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    /// Returns `false` if not all tracked [`FlowMetricSource`]s received by
-    /// this [`PeerSpec`].
-    ///
-    /// Returns `true` if all tracked [`FlowMetricSource`]s received by this
-    /// [`PeerSpec`].
-    fn is_all_sources_received(&self) -> bool {
+    /// Checks that all required [`FlowMetricSource`]s reported that traffic is
+    /// flowing within `now() - traffic_flowing_timeout`.
+    fn is_flowing(&self) -> bool {
         for tracked_source in &self.tracked_sources {
-            if !self.received_sources.contains_key(tracked_source) {
+            if let Some(at) = self.received_sources.get(tracked_source) {
+                if at.elapsed() > self.traffic_flowing_timeout {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
 
         true
-    }
-
-    /// Removes all received [`FlowMetricSource`]s which received more than
-    /// `traffic_flowing_timeout` ago.
-    fn remove_outdated_sources(&mut self, traffic_flowing_timeout: Duration) {
-        for src in &self.tracked_sources {
-            if let Some(src_updated_at) = self.received_sources.get(src) {
-                if src_updated_at.elapsed() > traffic_flowing_timeout {
-                    self.received_sources.remove(src);
-                }
-            }
-        }
     }
 
     /// Sets [`PeerStat`] state to the [`PeerState::Stopped`] and resets
     /// [`PeerStat::received_sources`].
     fn stop(&mut self) {
         self.state = PeerState::Stopped;
-        self.received_sources = HashMap::new();
+        self.received_sources.clear();
     }
 }
 
@@ -687,9 +653,9 @@ impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
                     peer_id: msg.peer_id,
                     state: PeerState::New,
                     tracked_sources: msg.flow_metrics_sources,
-                    updated_at: Instant::now(),
                     started_at: None,
                     received_sources: HashMap::new(),
+                    traffic_flowing_timeout: self.traffic_report_ttl,
                 },
             );
         }

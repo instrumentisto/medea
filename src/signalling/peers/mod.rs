@@ -37,9 +37,7 @@ use crate::{
 use self::metrics::PeersMetricsService;
 
 pub use self::{
-    metrics::{
-        PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
-    },
+    metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource, PeerStarted,
         PeerStopped, PeerTrafficWatcher,
@@ -105,7 +103,7 @@ impl PeersService {
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-        peer_media_traffic_conf: &conf::PeerMediaTraffic,
+        media_conf: &conf::Media,
     ) -> Self {
         Self {
             room_id: room_id.clone(),
@@ -118,8 +116,7 @@ impl PeersService {
                 room_id,
                 peers_traffic_watcher,
             ),
-            peer_validity_timeout: peer_media_traffic_conf
-                .peer_validity_timeout,
+            peer_validity_timeout: media_conf.max_lag,
         }
     }
 
