@@ -75,6 +75,7 @@ use crate::{
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
+    signalling::peers::TrackMediaType,
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
     AppContext,
@@ -1257,21 +1258,32 @@ impl PeersMetricsEventHandler for Room {
     type Output = ActFuture<()>;
 
     /// Notifies [`Room`] about fatal [`PeerConnection`] failure.
-    fn on_fatal_peer_failure(
+    fn on_wrong_traffic_flowing(
         &mut self,
         peer_id: PeerId,
         at: DateTime<Utc>,
+        media_type: TrackMediaType,
     ) -> Self::Output {
+        let peer = self.peers.get_peer_by_id(peer_id).unwrap();
         debug!(
-            "Peer [id = {}] from a Room [id = {}] goes into failure state and \
-             will be removed.",
-            peer_id, self.id
+            "Wrong traffic flowing of a Peer [id = {}] from a Room [id = {}] \
+             of the media type {:?}",
+            peer_id, self.id, media_type
         );
-        Box::new(async move { peer_id }.into_actor(self).map(
-            move |peer_id, _, ctx| {
-                ctx.notify(FatalPeerFailure { peer_id, at });
-            },
-        ))
+        for weak_endpoint in peer.endpoints() {
+            if let Some(endpoint) = weak_endpoint.upgrade() {
+                if let Some((url, req)) = endpoint.get_on_stop(
+                    peer_id,
+                    at,
+                    media_type.into(),
+                    OnStopReason::WrongTrafficFlowing,
+                ) {
+                    self.callbacks.send_callback(url, req);
+                }
+            }
+        }
+
+        Box::new(actix::fut::ready(()))
     }
 }
 

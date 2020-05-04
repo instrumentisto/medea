@@ -30,7 +30,10 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
-use crate::{api::control::RoomId, conf, log::prelude::*, signalling::Room};
+use crate::{
+    api::control::RoomId, conf, log::prelude::*, signalling::Room,
+    utils::convert_instant_to_utc,
+};
 
 /// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
 /// events.
@@ -443,9 +446,7 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
                 } else {
                     peer.state = PeerState::Stopped(HashSet::new());
                     if let Some(room_addr) = room.room.upgrade() {
-                        let at = Utc::now()
-                            - chrono::Duration::from_std(msg.at.elapsed())
-                                .unwrap();
+                        let at = convert_instant_to_utc(msg.at);
                         room_addr.do_send(PeerStopped {
                             peer_id: peer.peer_id,
                             at,

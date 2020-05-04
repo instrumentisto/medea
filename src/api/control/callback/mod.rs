@@ -12,7 +12,9 @@ use clients::CallbackClientError;
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::callback as proto;
 
-use crate::api::control::refs::StatefulFid;
+use crate::{
+    api::control::refs::StatefulFid, signalling::peers::TrackMediaType,
+};
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -129,6 +131,15 @@ impl From<&medea_client_api_proto::MediaType> for MediaType {
         match media_type {
             MediaTypeProto::Audio(_) => MediaType::Audio,
             MediaTypeProto::Video(_) => MediaType::Video,
+        }
+    }
+}
+
+impl From<TrackMediaType> for MediaType {
+    fn from(from: TrackMediaType) -> Self {
+        match from {
+            TrackMediaType::Audio => Self::Audio,
+            TrackMediaType::Video => Self::Video,
         }
     }
 }

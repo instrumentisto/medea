@@ -23,7 +23,10 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 
-use crate::{api::control::RoomId, log::prelude::*, media::PeerStateMachine};
+use crate::{
+    api::control::RoomId, log::prelude::*, media::PeerStateMachine,
+    utils::convert_instant_to_utc,
+};
 
 use super::traffic_watcher::{FlowMetricSource, PeerTrafficWatcher};
 
@@ -40,17 +43,18 @@ pub enum TrackMediaType {
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
-    /// Fatal `PeerConnection`'s contradiction of the client metrics with
-    /// [`PeerSpec`].
-    ///
-    /// On this [`PeerMetricsEvent`] [`Peer`] with provided [`PeerId`]
-    /// should be stopped.
-    FatalPeerFailure { peer_id: PeerId, at: DateTime<Utc> },
+    /// Wrong [`Peer`] traffic flowing was detected. Some `MediaTrack`s with
+    /// provided [`TrackMediaType`] doesn't flows.
+    WrongTrafficFlowing {
+        peer_id: PeerId,
+        at: DateTime<Utc>,
+        media_type: TrackMediaType,
+    },
 }
 
 /// Specification of [`Peer`].
 ///
-/// Based on this specification fatal [`Peer`]'s  media traffic contradictions
+/// Based on this specification wrong [`Peer`]'s media traffic flowing
 /// will be determined.
 #[derive(Debug)]
 pub struct PeerSpec {
@@ -215,12 +219,17 @@ impl PeerStat {
 
     /// Checks that this [`PeerStat`] is conforms to [`PeerSpec`].
     ///
+    /// Returns `Some` with [`TrackMediaType`] which was stopped if all
+    /// `MediaTrack`s with this [`TrackMediaType`] was stopped.
+    ///
+    /// Returns `None` if all `MediaTrack`s traffic are normally flows.
+    ///
     /// This is determined by comparing count of senders/receivers from the
     /// [`PeerSpec`].
     ///
     /// Also media type of sender/receiver
     /// and activity taken into account.
-    fn is_conforms_spec(&self) -> bool {
+    fn is_conforms_spec(&self) -> Option<TrackMediaType> {
         let mut current_senders = HashMap::new();
         let mut current_receivers = HashMap::new();
 
@@ -240,19 +249,40 @@ impl PeerStat {
         for (receivers_type, receiver_count) in &self.spec.receivers {
             if let Some(spec_count) = current_receivers.get(receivers_type) {
                 if spec_count < receiver_count {
-                    return false;
+                    return Some(*receivers_type);
                 }
             }
         }
         for (senders_type, senders_count) in &self.spec.senders {
             if let Some(spec_count) = current_senders.get(senders_type) {
                 if spec_count < senders_count {
-                    return false;
+                    return Some(*senders_type);
                 }
             }
         }
 
-        true
+        None
+    }
+
+    /// Returns [`Instant`] at which provided [`TrackMediaType`] was updated
+    /// lastly.
+    #[allow(clippy::filter_map)]
+    fn get_last_update_of_media_type(
+        &self,
+        media_type: TrackMediaType,
+    ) -> Instant {
+        self.senders
+            .values()
+            .filter(|send| send.media_type == media_type)
+            .map(|send| send.last_update)
+            .chain(
+                self.receivers
+                    .values()
+                    .filter(|send| send.media_type == media_type)
+                    .map(|recv| recv.last_update),
+            )
+            .max()
+            .unwrap_or_else(Instant::now)
     }
 
     /// Returns `true` if all senders and receivers is not sending or receiving
@@ -340,15 +370,23 @@ impl PeersMetricsService {
         }
     }
 
-    /// Some fatal error with `PeerConnection`'s metrics happened.
+    /// Some [`Peer`]'s traffic doesn't flows in some `MediaTrack`s which are
+    /// should work.
     ///
-    /// [`PeerMetricsEvent::FatalPeerFailure`] will be sent to the subscriber.
-    fn fatal_peer_error(&self, peer_id: PeerId, at: DateTime<Utc>) {
+    /// [`PeerMetricsEvent::WrongTrafficFlowing`] will be sent to the
+    /// subscriber.
+    fn wrong_traffic_flowing(
+        &self,
+        peer_id: PeerId,
+        at: Instant,
+        media_type: TrackMediaType,
+    ) {
         if let Some(sender) = &self.peer_metric_events_sender {
             let _ =
-                sender.unbounded_send(PeersMetricsEvent::FatalPeerFailure {
+                sender.unbounded_send(PeersMetricsEvent::WrongTrafficFlowing {
                     peer_id,
-                    at,
+                    at: convert_instant_to_utc(at),
+                    media_type,
                 });
         }
     }
@@ -367,7 +405,7 @@ impl PeersMetricsService {
     /// Checks that all [`PeerStat`]s is valid accordingly `PeerConnection`
     /// specification. If [`PeerStat`] is considered as invalid accordingly to
     /// `PeerConnection` specification then
-    /// [`PeersMetrics::fatal_peer_error`] will be called.
+    /// [`PeersMetrics::wrong_traffic_flowing`] will be called.
     ///
     /// Also checks that all [`PeerStat`]'s senders/receivers is flowing. If all
     /// senders/receivers is stopped then [`TrafficStopped`] will be sent to
@@ -393,13 +431,17 @@ impl PeersMetricsService {
                     peer_ref.get_stop_time(),
                 );
                 stopped_peers.push(peer_ref.peer_id);
-            } else if !peer_ref.is_conforms_spec() {
+            } else if let Some(stopped_kind) = peer_ref.is_conforms_spec() {
                 debug!(
                     "Peer [id = {}] from Room [id = {}] traffic stopped \
                      because invalid traffic flowing.",
                     peer_ref.peer_id, self.room_id
                 );
-                self.fatal_peer_error(peer_ref.peer_id, Utc::now());
+                self.wrong_traffic_flowing(
+                    peer_ref.peer_id,
+                    peer_ref.get_last_update_of_media_type(stopped_kind),
+                    stopped_kind,
+                );
             }
         }
 
@@ -450,7 +492,8 @@ impl PeersMetricsService {
     pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
-            let is_conforms_spec_before_upd = peer_ref.is_conforms_spec();
+            let is_conforms_spec_before_upd =
+                peer_ref.is_conforms_spec().is_none();
 
             for stat in stats {
                 match &stat.stats {
@@ -475,7 +518,14 @@ impl PeersMetricsService {
                     peer_ref.peer_id,
                     peer_ref.get_stop_time(),
                 );
-            } else if peer_ref.is_conforms_spec() {
+            } else if let Some(stopped_media_type) = peer_ref.is_conforms_spec()
+            {
+                self.wrong_traffic_flowing(
+                    peer_ref.peer_id,
+                    peer_ref.get_last_update_of_media_type(stopped_media_type),
+                    stopped_media_type,
+                );
+            } else {
                 if !is_conforms_spec_before_upd {
                     peer_ref.connected();
                 }
@@ -493,8 +543,6 @@ impl PeersMetricsService {
                         FlowMetricSource::PartnerPeer,
                     );
                 }
-            } else {
-                self.fatal_peer_error(peer_ref.peer_id, peer_ref.last_update);
             }
         }
     }
