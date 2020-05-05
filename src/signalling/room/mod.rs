@@ -3,28 +3,6 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-// TODO: This mod size is getting out of hand now. We should consider splitting
-//       it to multiple mod's for the sake of readability, e.g.:
-//       1. rpc_server.rs:
-//          1. impl RpcServer for Addr<Room>
-//          2. impl Handler<Authorize>
-//          3. impl Handler<CommandMessage>
-//          4. impl Handler<RpcConnectionEstablished>
-//          5. impl Handler<RpcConnectionClosed>
-//       2. command_handler.rs with impl CommandHandler for Room
-//       3. dynamic_api_impl.rs:
-//          1. impl Handler<SerializeProto> for Room
-//          2. impl Handler<Delete>
-//          3. impl Handler<CreateMember>
-//          4. impl Handler<CreateEndpoint>
-//       4. peer_metrics_events_handler.rs:
-//          1. impl Handler<PeerStopped>
-//          2. impl Handler<PeerFailed>
-//          3. impl Handler<PeerStarted>
-//       Each module could provide its own impl Room, with required methods,
-//       used in that module, and mod's impl Room would contain methods
-//       shared among other mods.
-
 mod command_handler;
 mod dynamic_api;
 mod rpc_server;
