@@ -3,6 +3,7 @@
 //! [`Room`]: crate::signalling::Room
 //! [`Peer`]: crate::media::peer::Peer
 
+mod media_traffic_state;
 mod metrics;
 mod traffic_watcher;
 
