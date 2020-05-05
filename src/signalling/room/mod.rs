@@ -7,10 +7,6 @@ mod command_handler;
 mod dynamic_api;
 mod rpc_server;
 
-pub use dynamic_api::{
-    Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
-};
-
 use std::collections::HashSet;
 
 use actix::{
@@ -42,6 +38,10 @@ use crate::{
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
     AppContext,
+};
+
+pub use dynamic_api::{
+    Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].

@@ -1,4 +1,4 @@
-//! Implementation of the [`RpcServer`] and related commands/functions.
+//! Implementation of the [`RpcServer`] and related [`Command`]s and functions.
 
 use actix::{ActorFuture, Addr, ContextFutureSpawner as _, Handler};
 use derive_more::Display;

@@ -1,5 +1,5 @@
-//! Implementation of the command and functions used for the Dynamic Control
-//! API.
+//! Implementation of the [`Command`]s and functions used for the Dynamic
+//! Control API.
 
 use std::collections::{HashMap, HashSet};
 
