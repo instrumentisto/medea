@@ -21,7 +21,7 @@ use crate::{
 /// 3. When connection will be started, store [`Instant`];
 ///
 /// 4. Wait for connection drop because idle, and verify that diff between
-/// connection open and drop if >3 and <4.
+/// connection open and drop if >3 and <5.
 #[actix_rt::test]
 async fn rpc_settings_from_spec_works() {
     const ROOM_ID: &str = "rpc_settings_from_spec_works";
@@ -59,7 +59,7 @@ async fn rpc_settings_from_spec_works() {
                 let diff = Instant::now() - opened.unwrap();
 
                 assert!(diff > Duration::from_secs(3));
-                assert!(diff < Duration::from_secs(4));
+                assert!(diff < Duration::from_secs(5));
 
                 test_end_tx.take().unwrap().send(()).unwrap();
             }
