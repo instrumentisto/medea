@@ -28,6 +28,7 @@ impl MediaTrafficState {
     /// started.
     #[cfg(test)]
     #[inline]
+    #[cfg(test)]
     pub const fn with_media_type(media_type: MediaType) -> MediaTrafficState {
         Self(media_type as u8)
     }

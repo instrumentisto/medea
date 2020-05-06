@@ -1,7 +1,4 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
-//!
-//! [`Room`]: crate::signalling::Room
-//! [`Peer`]: crate::media::peer::Peer
 
 mod media_traffic_state;
 mod metrics;
@@ -77,9 +74,9 @@ pub struct PeersService {
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetricsService,
 
-    /// Duration after which media server will consider `Peer`'s media traffic
-    /// stats as invalid and will remove this `Peer`.
-    peer_validity_timeout: Duration,
+    /// Duration, after which [`Peer`]s stats will be considered as stale.
+    /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
+    peer_stats_ttl: Duration,
 }
 
 /// Simple ID counter.
@@ -117,7 +114,7 @@ impl PeersService {
                 room_id,
                 peers_traffic_watcher,
             ),
-            peer_validity_timeout: media_conf.max_lag,
+            peer_stats_ttl: media_conf.max_lag,
         }
     }
 
@@ -312,12 +309,14 @@ impl PeersService {
             }
         }
 
-        self.peer_metrics_service.unregister_peers(
-            removed_peers
-                .values()
-                .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
-                .collect(),
-        );
+        let peers_to_unregister: Vec<_> = removed_peers
+            .values()
+            .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
+            .collect();
+        self.peer_metrics_service
+            .unregister_peers(&peers_to_unregister);
+        self.peers_traffic_watcher
+            .unregister_peers(self.room_id.clone(), peers_to_unregister);
 
         removed_peers
     }
@@ -373,9 +372,9 @@ impl PeersService {
             let sink_peer = PeerStateMachine::from(sink_peer);
 
             self.peer_metrics_service
-                .register_peer(&src_peer, self.peer_validity_timeout);
+                .register_peer(&src_peer, self.peer_stats_ttl);
             self.peer_metrics_service
-                .register_peer(&sink_peer, self.peer_validity_timeout);
+                .register_peer(&sink_peer, self.peer_stats_ttl);
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);

@@ -35,7 +35,7 @@ pub type ActFuture<O> =
 /// from Coturn.
 #[derive(Debug)]
 pub struct CoturnMetricsService {
-    /// [`PeersTrafficWatcher`] which will be notified of all traffic events.
+    /// [`PeerTrafficWatcher`] which will be notified of all traffic events.
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates are received.
