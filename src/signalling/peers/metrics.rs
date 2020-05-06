@@ -1,5 +1,10 @@
-//! Service which is responsible for processing [`Peer`]'s [`RtcStat`] metrics.
+//! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 //!
+//! At first you must register Peer via [`PeersMetricsService.register_peer()`].
+//! Use [`PeersMetricsService.subscribe()`] to subscribe to stats processing
+//! results. Then provide Peer metrics to [`PeersMetricsService.add_stat()`].
+//! You should call [`PeersMetricsService.check_peers()`] with
+// reasonable interval (~1-2 sec), this will check for stale metrics.
 //! This service acts as flow and stop metrics source for the
 //! [`PeerTrafficWatcher`].
 
@@ -8,7 +13,7 @@
 
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     rc::{Rc, Weak},
     sync::Arc,
     time::{Duration, Instant},
@@ -32,12 +37,279 @@ use crate::{
         RoomId,
     },
     log::prelude::*,
-    media::PeerStateMachine,
+    media::PeerStateMachine as Peer,
     signalling::peers::FlowMetricSource,
-    utils::convert_instant_to_utc,
+    utils::instant_into_utc,
 };
 
 use super::traffic_watcher::PeerTrafficWatcher;
+
+/// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
+#[derive(Debug)]
+pub struct PeersMetricsService {
+    /// [`RoomId`] of Room to which this [`PeersMetricsService`] belongs
+    /// to.
+    room_id: RoomId,
+
+    /// [`Addr`] of [`PeerTrafficWatcher`] to which traffic updates will be
+    /// sent.
+    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+
+    /// All `PeerConnection` for this [`PeersMetricsService`] will process
+    /// metrics.
+    peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
+
+    /// Sender of [`PeerMetricsEvent`]s.
+    ///
+    /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
+    /// [`PeersMetricsService`] belongs to.
+    events_tx: Option<mpsc::UnboundedSender<PeersMetricsEvent>>,
+}
+
+impl PeersMetricsService {
+    /// Returns new [`PeersMetricsService`] for a provided [`Room`].
+    pub fn new(
+        room_id: RoomId,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+    ) -> Self {
+        Self {
+            room_id,
+            peers_traffic_watcher,
+            peers: HashMap::new(),
+            events_tx: None,
+        }
+    }
+
+    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
+    ///
+    /// Creating new subscription will invalidate previous, so there may be only
+    /// one subscription. Events are not saved or buffered at sending side, so
+    /// you won't receive any events happened before subscription was made.
+    pub fn subscribe(&mut self) -> impl Stream<Item = PeersMetricsEvent> {
+        let (tx, rx) = mpsc::unbounded();
+        self.events_tx = Some(tx);
+
+        rx
+    }
+
+    /// Checks that all tracked [`Peer`]s are valid, meaning that all their
+    /// inbound and outbound tracks are flowing according to the provided
+    /// metrics.
+    ///
+    /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
+    /// some track is not flowing.
+    pub fn check_peers(&mut self) {
+        let mut stopped_peers = Vec::new();
+        for peer in self
+            .peers
+            .values()
+            .filter(|peer| peer.borrow().state == PeerStatState::Connected)
+        {
+            let peer_ref = peer.borrow();
+
+            if peer_ref.is_stopped() {
+                debug!(
+                    "Peer [id = {}] from Room [id = {}] traffic stopped \
+                     because all his traffic not flowing.",
+                    peer_ref.peer_id, self.room_id
+                );
+                self.peers_traffic_watcher.traffic_stopped(
+                    self.room_id.clone(),
+                    peer_ref.peer_id,
+                    peer_ref.get_stop_time(),
+                );
+                stopped_peers.push(peer_ref.peer_id);
+            } else {
+                let stopped_tracks_types = peer_ref.get_stopped_tracks_types();
+                for (direction, media_type) in stopped_tracks_types {
+                    debug!(
+                        "Peer [id = {}] from Room [id = {}] traffic [{:?}, \
+                         {:?}] stopped because wrong traffic flowing.",
+                        peer_ref.peer_id, self.room_id, direction, media_type,
+                    );
+                    let was_flowing_at =
+                        peer_ref.get_tracks_last_update(direction, media_type);
+                    self.send_no_traffic(
+                        peer_ref.peer_id,
+                        instant_into_utc(was_flowing_at),
+                        media_type,
+                        direction,
+                    );
+                }
+            }
+        }
+
+        for stopped_peer_id in stopped_peers {
+            self.peers.remove(&stopped_peer_id);
+        }
+    }
+
+    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
+    /// creation.
+    ///
+    /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
+    pub fn register_peer(&mut self, peer: &Peer, stats_ttl: Duration) {
+        debug!(
+            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
+             = {}].",
+            peer.id(),
+            self.room_id
+        );
+
+        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
+            peer_id: peer.id(),
+            partner_peer: Weak::new(),
+            last_update: Utc::now(),
+            senders: HashMap::new(),
+            receivers: HashMap::new(),
+            state: PeerStatState::Connecting,
+            tracks_spec: PeerTracks::from(peer),
+            stats_ttl,
+        }));
+        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
+        {
+            first_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&partner_peer_stat);
+            partner_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&first_peer_stat);
+        }
+
+        self.peers.insert(peer.id(), first_peer_stat);
+    }
+
+    /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
+    /// [`PeersMetricsService`].
+    pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+        if let Some(peer) = self.peers.get(&peer_id) {
+            let mut peer_ref = peer.borrow_mut();
+            let stopped_tracks_before = peer_ref.get_stopped_tracks_types();
+
+            for stat in stats {
+                match &stat.stats {
+                    RtcStatsType::InboundRtp(inbound) => {
+                        peer_ref.update_receiver(stat.id, inbound);
+                    }
+                    RtcStatsType::OutboundRtp(outbound) => {
+                        peer_ref.update_sender(stat.id, outbound);
+                    }
+                    _ => (),
+                }
+            }
+
+            if peer_ref.is_stopped() {
+                debug!(
+                    "Peer [id = {}] from Room [id = {}] traffic stopped \
+                     because traffic stats doesn't updated too long.",
+                    peer_ref.peer_id, self.room_id
+                );
+                self.peers_traffic_watcher.traffic_stopped(
+                    self.room_id.clone(),
+                    peer_ref.peer_id,
+                    peer_ref.get_stop_time(),
+                );
+            } else {
+                let stopped_tracks_kinds = peer_ref.get_stopped_tracks_types();
+                if stopped_tracks_kinds.is_empty() {
+                    self.peers_traffic_watcher.traffic_flows(
+                        self.room_id.clone(),
+                        peer_id,
+                        FlowMetricSource::Peer,
+                    );
+                    if let Some(partner_peer_id) =
+                        peer_ref.get_partner_peer_id()
+                    {
+                        self.peers_traffic_watcher.traffic_flows(
+                            self.room_id.clone(),
+                            partner_peer_id,
+                            FlowMetricSource::PartnerPeer,
+                        );
+                    }
+                } else {
+                    for (direction, media_type) in &stopped_tracks_kinds {
+                        let stopped_at = peer_ref
+                            .get_tracks_last_update(*direction, *media_type);
+                        self.send_no_traffic(
+                            peer_ref.peer_id,
+                            instant_into_utc(stopped_at),
+                            *media_type,
+                            *direction,
+                        );
+                    }
+
+                    for (direction, media_type_before) in stopped_tracks_before
+                    {
+                        if let Some(started_media_type) = stopped_tracks_kinds
+                            .get(&direction)
+                            .and_then(|k| media_type_before.get_started(*k))
+                        {
+                            self.track_traffic_starts_flowing(
+                                peer_id,
+                                started_media_type,
+                                direction,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Stops tracking provided [`Peer`]s.
+    pub fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
+        debug!(
+            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
+             the PeerMetricsService.",
+            peers_ids, self.room_id
+        );
+
+        for peer_id in peers_ids {
+            self.peers.remove(peer_id);
+        }
+    }
+
+    /// Updates [`Peer`]s internal representation. Must be called each time
+    /// [`Peer`] tracks set changes (some track was added or removed).
+    pub fn update_peer_spec(&mut self, peer: &Peer) {
+        if let Some(peer_stat) = self.peers.get(&peer.id()) {
+            peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
+        }
+    }
+
+    /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
+    fn send_no_traffic(
+        &self,
+        peer_id: PeerId,
+        was_flowing_at: DateTime<Utc>,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) {
+        if let Some(sender) = &self.events_tx {
+            let _ = sender.unbounded_send(PeersMetricsEvent::NoTrafficFlow {
+                peer_id,
+                was_flowing_at,
+                media_type,
+                direction,
+            });
+        }
+    }
+
+    /// Stopped `MediaTrack` with provided [`MediaType`] and [`MediaDirection`]
+    /// was started after stopping.
+    fn track_traffic_starts_flowing(
+        &self,
+        peer_id: PeerId,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) {
+        if let Some(sender) = &self.events_tx {
+            let _ = sender.unbounded_send(PeersMetricsEvent::TrafficFlows {
+                peer_id,
+                media_type,
+                direction,
+            });
+        }
+    }
+}
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
@@ -65,34 +337,33 @@ impl PartialEq<MediaType> for TrackMediaType {
     }
 }
 
-/// Events which [`PeersMetricsService`] can throw to the
-/// [`PeersMetricsService::peer_metric_events_sender`]'s receiver (currently
-/// this is [`Room`] which owns this [`PeersMetricsService`]).
+/// Events which [`PeersMetricsService`] can send to its subscriber.
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
     /// Wrong [`Peer`] traffic flowing was detected. Some `MediaTrack`s with
     /// provided [`TrackMediaType`] doesn't flows.
-    WrongTrafficFlowing {
+    NoTrafficFlow {
         peer_id: PeerId,
-        at: DateTime<Utc>,
+        was_flowing_at: DateTime<Utc>,
         media_type: MediaType,
         direction: MediaDirection,
     },
 
     /// Stopped `MediaTrack` with provided [`MediaType`] and [`MediaDirection`]
     /// was started after stopping.
-    TrackTrafficStarted {
+    TrafficFlows {
         peer_id: PeerId,
         media_type: MediaType,
         direction: MediaDirection,
     },
 }
 
-/// Specification of a [`Peer`].
+/// Specification of a [`Peer`]s tracks. Contains info about how many tracks of
+/// each kind should this [`Peer`] send/receive.
 ///
-/// Based on this specification wrong [`Peer`]'s media traffic flowing
-/// will be determined.
+/// This spec is compared with [`Peer`]s actual stats, to calculate difference
+/// between expected and actual [`Peer`] state.
 #[derive(Debug)]
 struct PeerTracks {
     audio_send: u64,
@@ -101,8 +372,8 @@ struct PeerTracks {
     video_recv: u64,
 }
 
-impl From<&PeerStateMachine> for PeerTracks {
-    fn from(peer: &PeerStateMachine) -> Self {
+impl From<&Peer> for PeerTracks {
+    fn from(peer: &Peer) -> Self {
         // TODO: filter muted MediaTracks.
         let mut audio_send = 0;
         let mut video_send = 0;
@@ -213,7 +484,7 @@ struct PeerStat {
     partner_peer: Weak<RefCell<PeerStat>>,
 
     /// Specification of a [`Peer`] which this [`PeerStat`] represents.
-    spec: PeerTracks,
+    tracks_spec: PeerTracks,
 
     /// All [`TrackStat`]s with [`Send`] direction of this [`PeerStat`].
     senders: HashMap<StatId, TrackStat<Send>>,
@@ -227,10 +498,8 @@ struct PeerStat {
     /// Time of the last metrics update of this [`PeerStat`].
     last_update: DateTime<Utc>,
 
-    /// Duration after which media server will consider [`Peer`]'s media
-    /// traffic stats as invalid and will send notification about this by
-    /// `on_stop` Control API callback.
-    peer_validity_timeout: Duration,
+    /// Duration, after which [`Peers`] stats will be considered as stale.
+    stats_ttl: Duration,
 }
 
 impl PeerStat {
@@ -301,10 +570,10 @@ impl PeerStat {
     /// Checks that media traffic flows through provided [`TrackStat`].
     ///
     /// [`TrackStat`] should be updated within
-    /// [`PeerStat::peer_validity_timeout`] or this [`TrackStat`] will be
+    /// [`PeerStat::stats_ttl`] or this [`TrackStat`] will be
     /// considered as stopped.
     fn is_track_active<T>(&self, track: &TrackStat<T>) -> bool {
-        track.updated_at().elapsed() < self.peer_validity_timeout
+        track.updated_at().elapsed() < self.stats_ttl
     }
 
     /// Returns [`MediaDirection`]s and [`MediaType`]s of the `MediaTrack`s
@@ -337,10 +606,10 @@ impl PeerStat {
             });
 
         let mut stopped = HashMap::new();
-        if audio_send < self.spec.audio_send {
+        if audio_send < self.tracks_spec.audio_send {
             stopped.insert(MediaDirection::Publish, MediaType::Audio);
         }
-        if video_send < self.spec.video_send {
+        if video_send < self.tracks_spec.video_send {
             if let Some(media_type) = stopped.get_mut(&MediaDirection::Publish)
             {
                 *media_type = MediaType::Both;
@@ -348,10 +617,10 @@ impl PeerStat {
                 stopped.insert(MediaDirection::Publish, MediaType::Video);
             }
         }
-        if audio_recv < self.spec.audio_recv {
+        if audio_recv < self.tracks_spec.audio_recv {
             stopped.insert(MediaDirection::Play, MediaType::Audio);
         }
-        if video_recv < self.spec.video_recv {
+        if video_recv < self.tracks_spec.video_recv {
             if let Some(media_type) = stopped.get_mut(&MediaDirection::Play) {
                 *media_type = MediaType::Both;
             } else {
@@ -408,289 +677,6 @@ impl PeerStat {
     /// Sets state of this [`PeerStat`] to [`PeerStatState::Connected`].
     fn connected(&mut self) {
         self.state = PeerStatState::Connected;
-    }
-}
-
-/// Service which responsible for processing [`PeerConnection`]'s metrics
-/// received from a client.
-#[derive(Debug)]
-pub struct PeersMetricsService {
-    /// [`RoomId`] of [`Room`] to which this [`PeersMetricsService`] belongs
-    /// to.
-    room_id: RoomId,
-
-    /// [`Addr`] of [`PeersTrafficWatcher`] to which traffic updates will be
-    /// sent.
-    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-
-    /// All `PeerConnection` for this [`PeersMetricsService`] will process
-    /// metrics.
-    peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
-
-    /// Sender of [`PeerMetricsEvent`]s.
-    ///
-    /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
-    /// [`PeersMetricsService`] belongs to.
-    peer_metric_events_sender: Option<mpsc::UnboundedSender<PeersMetricsEvent>>,
-}
-
-impl PeersMetricsService {
-    /// Returns new [`PeersMetricsService`] for a provided [`Room`].
-    pub fn new(
-        room_id: RoomId,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-    ) -> Self {
-        Self {
-            room_id,
-            peers_traffic_watcher,
-            peers: HashMap::new(),
-            peer_metric_events_sender: None,
-        }
-    }
-
-    /// Some [`Peer`]'s traffic doesn't flows in some `MediaTrack`s which are
-    /// should work.
-    ///
-    /// [`PeerMetricsEvent::WrongTrafficFlowing`] will be sent to the
-    /// subscriber.
-    fn wrong_traffic_flowing(
-        &self,
-        peer_id: PeerId,
-        at: DateTime<Utc>,
-        media_type: MediaType,
-        direction: MediaDirection,
-    ) {
-        if let Some(sender) = &self.peer_metric_events_sender {
-            let _ =
-                sender.unbounded_send(PeersMetricsEvent::WrongTrafficFlowing {
-                    peer_id,
-                    at,
-                    media_type,
-                    direction,
-                });
-        }
-    }
-
-    /// Stopped `MediaTrack` with provided [`MediaType`] and [`MediaDirection`]
-    /// was started after stopping.
-    fn track_traffic_starts_flowing(
-        &self,
-        peer_id: PeerId,
-        media_type: MediaType,
-        direction: MediaDirection,
-    ) {
-        if let Some(sender) = &self.peer_metric_events_sender {
-            let _ =
-                sender.unbounded_send(PeersMetricsEvent::TrackTrafficStarted {
-                    peer_id,
-                    media_type,
-                    direction,
-                });
-        }
-    }
-
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
-    ///
-    /// Currently this method will be called by a [`Room`] to which this
-    /// [`PeersMetricsService`] belongs to.
-    pub fn subscribe(&mut self) -> impl Stream<Item = PeersMetricsEvent> {
-        let (tx, rx) = mpsc::unbounded();
-        self.peer_metric_events_sender = Some(tx);
-
-        rx
-    }
-
-    /// Checks that all [`PeerStat`]s is valid accordingly `PeerConnection`
-    /// specification. If [`PeerStat`] is considered as invalid accordingly to
-    /// `PeerConnection` specification then
-    /// [`PeersMetricsService::wrong_traffic_flowing`] will be called.
-    ///
-    /// Also checks that all [`PeerStat`]'s senders/receivers is flowing. If all
-    /// senders/receivers is stopped then [`TrafficStopped`] will be sent to
-    /// the [`PeersTrafficWatcher`].
-    pub fn check_peers_validity(&mut self) {
-        let mut stopped_peers = Vec::new();
-        for peer in self
-            .peers
-            .values()
-            .filter(|peer| peer.borrow().state == PeerStatState::Connected)
-        {
-            let peer_ref = peer.borrow();
-
-            if peer_ref.is_stopped() {
-                debug!(
-                    "Peer [id = {}] from Room [id = {}] traffic stopped \
-                     because all his traffic not flowing.",
-                    peer_ref.peer_id, self.room_id
-                );
-                self.peers_traffic_watcher.traffic_stopped(
-                    self.room_id.clone(),
-                    peer_ref.peer_id,
-                    peer_ref.get_stop_time(),
-                );
-                stopped_peers.push(peer_ref.peer_id);
-            } else {
-                let stopped_tracks_types = peer_ref.get_stopped_tracks_types();
-                for (direction, media_type) in stopped_tracks_types {
-                    debug!(
-                        "Peer [id = {}] from Room [id = {}] traffic [{:?}, \
-                         {:?}] stopped because wrong traffic flowing.",
-                        peer_ref.peer_id, self.room_id, direction, media_type,
-                    );
-                    let stopped_at =
-                        peer_ref.get_tracks_last_update(direction, media_type);
-                    self.wrong_traffic_flowing(
-                        peer_ref.peer_id,
-                        convert_instant_to_utc(stopped_at),
-                        media_type,
-                        direction,
-                    );
-                }
-            }
-        }
-
-        for stopped_peer_id in stopped_peers {
-            self.peers.remove(&stopped_peer_id);
-        }
-    }
-
-    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
-    /// creation.
-    ///
-    /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
-    pub fn register_peer(
-        &mut self,
-        peer: &PeerStateMachine,
-        peer_validity_timeout: Duration,
-    ) {
-        debug!(
-            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
-             = {}].",
-            peer.id(),
-            self.room_id
-        );
-
-        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: peer.id(),
-            partner_peer: Weak::new(),
-            last_update: Utc::now(),
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-            state: PeerStatState::Connecting,
-            spec: PeerTracks::from(peer),
-            peer_validity_timeout,
-        }));
-        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
-        {
-            first_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&partner_peer_stat);
-            partner_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&first_peer_stat);
-        }
-
-        self.peers.insert(peer.id(), first_peer_stat);
-    }
-
-    /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
-    /// [`PeersMetricsService`].
-    pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
-        if let Some(peer) = self.peers.get(&peer_id) {
-            let mut peer_ref = peer.borrow_mut();
-            let stopped_tracks_before = peer_ref.get_stopped_tracks_types();
-
-            for stat in stats {
-                match &stat.stats {
-                    RtcStatsType::InboundRtp(inbound) => {
-                        peer_ref.update_receiver(stat.id, inbound);
-                    }
-                    RtcStatsType::OutboundRtp(outbound) => {
-                        peer_ref.update_sender(stat.id, outbound);
-                    }
-                    _ => (),
-                }
-            }
-
-            if peer_ref.is_stopped() {
-                debug!(
-                    "Peer [id = {}] from Room [id = {}] traffic stopped \
-                     because traffic stats doesn't updated too long.",
-                    peer_ref.peer_id, self.room_id
-                );
-                self.peers_traffic_watcher.traffic_stopped(
-                    self.room_id.clone(),
-                    peer_ref.peer_id,
-                    peer_ref.get_stop_time(),
-                );
-            } else {
-                let stopped_tracks_kinds = peer_ref.get_stopped_tracks_types();
-                if stopped_tracks_kinds.is_empty() {
-                    self.peers_traffic_watcher.traffic_flows(
-                        self.room_id.clone(),
-                        peer_id,
-                        FlowMetricSource::Peer,
-                    );
-                    if let Some(partner_peer_id) =
-                        peer_ref.get_partner_peer_id()
-                    {
-                        self.peers_traffic_watcher.traffic_flows(
-                            self.room_id.clone(),
-                            partner_peer_id,
-                            FlowMetricSource::PartnerPeer,
-                        );
-                    }
-                } else {
-                    for (direction, media_type) in &stopped_tracks_kinds {
-                        let stopped_at = peer_ref
-                            .get_tracks_last_update(*direction, *media_type);
-                        self.wrong_traffic_flowing(
-                            peer_ref.peer_id,
-                            convert_instant_to_utc(stopped_at),
-                            *media_type,
-                            *direction,
-                        );
-                    }
-
-                    for (direction, media_type_before) in stopped_tracks_before
-                    {
-                        if let Some(started_media_type) = stopped_tracks_kinds
-                            .get(&direction)
-                            .and_then(|k| media_type_before.get_started(*k))
-                        {
-                            self.track_traffic_starts_flowing(
-                                peer_id,
-                                started_media_type,
-                                direction,
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// [`Room`] notifies [`PeersMetricsService`] that some [`Peer`] is removed.
-    pub fn unregister_peers(&mut self, peers_ids: HashSet<PeerId>) {
-        debug!(
-            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
-             the PeerMetricsService.",
-            peers_ids, self.room_id
-        );
-
-        for peer_id in &peers_ids {
-            self.peers.remove(peer_id);
-        }
-        self.peers_traffic_watcher
-            .unregister_peers(self.room_id.clone(), peers_ids);
-    }
-
-    pub fn update_peer_spec(&mut self, peer: &PeerStateMachine) {
-        if let Some(peer_stat) = self.peers.get(&peer.id()) {
-            peer_stat.borrow_mut().spec = PeerTracks::from(peer);
-        }
-    }
-
-    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-        self.peers.contains_key(&peer_id)
     }
 }
 

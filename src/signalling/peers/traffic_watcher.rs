@@ -1,35 +1,32 @@
 //! Provides [`PeerTrafficWatcher`] trait and its impl.
 //!
-//! [`PeerTrafficWatcher`] analyzes [`Peer`] traffic metrics and send messages
+//! [`PeerTrafficWatcher`] analyzes Peer traffic metrics and send messages
 //! ([`PeerStarted`], [`PeerStopped`]) to [`Room`].
 //!
 //! Traffic metrics, consumed by [`PeerTrafficWatcher`] can originate from
 //! different sources:
 //! 1. [`FlowMetricSource::Peer`] - Stats received from member that owns target
-//!    [`Peer`].
+//!    Peer.
 //! 2. [`FlowMetricSource::PartnerPeer`] - Stats received from member,
-//!    that owns [`Peer`], connected to target [`Peer`].
+//!    that owns Peer, connected to target Peer.
 //! 3. [`FlowMetricSource::Coturn`] - Stats reported by Coturn TURN server, this
-//! source is only being tracked if target [`Peer`] traffic is being relayed.
+//! source is only being tracked if target Peer traffic is being relayed.
 //!
 //! At first you should register [`Room`] (`PeerTrafficWatcher.register_room()`)
-//! and [`Peer`] (`PeerTrafficWatcher.register_peer()`). When first source will
+//! and Peer (`PeerTrafficWatcher.register_peer()`). When first source will
 //! report that traffic is flowing (`PeerTrafficWatcher.traffic_flows()`)
 //! [`PeerStarted`] event will be sent to [`Room`].
 //!
 //! After that [`PeerTrafficWatcher`] will wait for other sources to report that
-//! traffic is flowing for `peer_init_timeout`, or [`PeerStopped`] event will be
+//! traffic is flowing for `init_timeout`, or [`PeerStopped`] event will be
 //! sent to [`Room`].
 //!
 //! If some source will report that it observes traffic stopped flowing
 //! (`PeerTrafficWatcher.traffic_stopped()`), then [`PeerStopped`] message will
 //! be sent to [`Room`].
-//!
-//!
-//! [`Peer`]: crate::media::peer::Peer
 
 use std::{
-    collections::{hash_map::RandomState, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::Debug,
     sync::Arc,
     time::{Duration, Instant},
@@ -51,13 +48,13 @@ pub fn build_peers_traffic_watcher(
     Arc::new(PeersTrafficWatcherImpl::new(conf).start())
 }
 
-/// Message which indicates that [`Peer`] with provided [`PeerId`]
+/// Message which indicates that Peer with provided [`PeerId`]
 /// has started.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerStarted(pub PeerId);
 
-/// Message which indicates that [`Peer`] with provided [`PeerId`]
+/// Message which indicates that Peer with provided [`PeerId`]
 /// has stopped.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
@@ -66,24 +63,24 @@ pub struct PeerStopped {
     pub at: DateTime<Utc>,
 }
 
-/// Consumes [`Peer`] traffic metrics for further processing.
+/// Consumes Peer traffic metrics for further processing.
 #[async_trait]
 pub trait PeerTrafficWatcher: Debug + Send + Sync {
-    /// Registers [`Room`] as [`Peer`]'s state messages listener, preparing
-    /// [`PeerTrafficWatcher`] for registering [`Peer`]s from this [`Room`].
+    /// Registers [`Room`] as Peer's state messages listener, preparing
+    /// [`PeerTrafficWatcher`] for registering Peers from this [`Room`].
     async fn register_room(
         &self,
         room_id: RoomId,
         room: WeakAddr<Room>,
     ) -> Result<(), MailboxError>;
 
-    /// Unregisters [`Room`] as [`Peer`]'s state messages listener.
+    /// Unregisters [`Room`] as Peer's state messages listener.
     ///
-    /// All [`Peer`] subscriptions related to this [`Room`] will be removed.
+    /// All Peer subscriptions related to this [`Room`] will be removed.
     fn unregister_room(&self, room_id: RoomId);
 
-    /// Registers [`Peer`], so that [`PeerTrafficWatcher`] will be able to
-    /// process traffic flow events of this [`Peer`].
+    /// Registers Peer, so that [`PeerTrafficWatcher`] will be able to
+    /// process traffic flow events of this Peer.
     async fn register_peer(
         &self,
         room_id: RoomId,
@@ -91,11 +88,11 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
         should_watch_turn: bool,
     ) -> Result<(), MailboxError>;
 
-    /// Unregisters [`Peer`]s, so that [`PeerTrafficWatcher`] will not be able
-    /// to process traffic flow events of this [`Peer`] anymore.
-    fn unregister_peers(&self, room_id: RoomId, peers_ids: HashSet<PeerId>);
+    /// Unregisters Peers, so that [`PeerTrafficWatcher`] will not be able
+    /// to process traffic flow events of this Peer anymore.
+    fn unregister_peers(&self, room_id: RoomId, peers_ids: Vec<PeerId>);
 
-    /// Notifies [`PeerTrafficWatcher`] that some [`Peer`] traffic flowing.
+    /// Notifies [`PeerTrafficWatcher`] that some Peer traffic flowing.
     fn traffic_flows(
         &self,
         room_id: RoomId,
@@ -103,12 +100,12 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
         source: FlowMetricSource,
     );
 
-    /// Notifies [`PeerTrafficWatcher`] that some [`Peer`]'s traffic flowing was
+    /// Notifies [`PeerTrafficWatcher`] that some Peer's traffic flowing was
     /// stopped.
     fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant);
 }
 
-/// Returns [`FlowMetricSources`], which will be used to emit [`Peer`] state
+/// Returns [`FlowMetricSources`], which will be used to emit Peer state
 /// events.
 ///
 /// [`FlowMetricSource::Peer`] and [`FlowMetricSource::PartnerPeer`] are
@@ -158,11 +155,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     }
 
     /// Sends [`UnregisterPeers`] message to [`PeersTrafficWatcherImpl`].
-    fn unregister_peers(
-        &self,
-        room_id: RoomId,
-        peers_ids: HashSet<PeerId, RandomState>,
-    ) {
+    fn unregister_peers(&self, room_id: RoomId, peers_ids: Vec<PeerId>) {
         self.do_send(UnregisterPeers { room_id, peers_ids })
     }
 
@@ -192,10 +185,8 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     }
 }
 
-/// Service which analyzes [`Peer`] traffic metrics and send messages
+/// Service which analyzes Peer traffic metrics and send messages
 /// ([`PeerStarted`], [`PeerStopped`]) to [`Room`].
-///
-/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Default)]
 struct PeersTrafficWatcherImpl {
     /// All `Room`s which exists on the Medea server.
@@ -222,18 +213,16 @@ impl PeersTrafficWatcherImpl {
         }
     }
 
-    /// Checks that all [`FlowMetricSource`] have reported that [`Peer`] traffic
+    /// Checks that all [`FlowMetricSource`] have reported that Peer traffic
     /// is flowing.
     ///
     /// If this check fails, then [`PeerStopped`] message is sent to [`Room`]
-    /// with `at` field set at time, when first source reported that [`Peer`]
+    /// with `at` field set at time, when first source reported that Peer
     /// traffic is flowing.
     ///
-    /// Called for every [`Peer`] after
-    /// `peer_init_timeout` passed since first source reported that [`Peer`]
+    /// Called for every Peer after
+    /// `init_timeout` passed since first source reported that Peer
     /// traffic is flowing.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
     fn check_is_started(&mut self, room_id: &RoomId, peer_id: PeerId) {
         if let Some(room) = self.stats.get_mut(room_id) {
             if let Some(peer) = room.peers.get_mut(&peer_id) {
@@ -277,20 +266,15 @@ impl Actor for PeersTrafficWatcherImpl {
 }
 
 /// Some [`FlowMetricSource`] notifies that it observes that
-/// [`Peer`]s traffic is flowing.
-///
-/// [`Peer`]: crate::media::peer::Peer
+/// Peers traffic is flowing.
+
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 struct TrafficFlows {
-    /// [`RoomId`] of [`Room`] where this [`Peer`] is stored.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// [`RoomId`] of [`Room`] where this Peer is stored.
     room_id: RoomId,
 
-    /// [`PeerId`] of [`Peer`] which flows.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// [`PeerId`] of Peer which flows.
     peer_id: PeerId,
 
     /// Source of this metric.
@@ -301,14 +285,14 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     type Result = ();
 
     /// Saves that provided [`FlowMetricSource`] reported that it observes
-    /// [`Peer`] traffic flowing.
+    /// Peer traffic flowing.
     ///
     /// If [`PeerStat`] is in [`PeerState::NotStarted`] state:
     /// 1. This stat is changed to [`PeerState::Starting`] state in which
-    /// [`Peer`] init
+    /// Peer init
     /// 2. [`PeerStarted`] message is sent to [`Room`].
     /// 3. [`PeersTrafficWatcherImpl::check_is_started`] is scheduled to run
-    /// for this [`PeerStat`] in [`PeersTrafficWatcherImpl::peer_init_timeout`].
+    /// for this [`PeerStat`] in [`PeersTrafficWatcherImpl::init_timeout`].
     ///
     /// If [`PeerStat`] is in [`PeerState::Starting`] state then provided
     /// [`FlowMetricSource`] is saved to list of received
@@ -323,8 +307,7 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     /// [`FlowMetricSource`]s will be received then [`PeerStat`] will be
     /// transferred into [`PeerState::Started`] with [`FlowMetricSource`]s from
     /// the [`PeerStat::Stopped`] state with [`Instant::now`] time.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+
     fn handle(
         &mut self,
         msg: TrafficFlows,
@@ -363,25 +346,18 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
 }
 
 /// Some [`FlowMetricSource`] notifies that it observes that
-/// [`Peer`]s traffic stopped flowing.
-///
-/// [`Peer`]: crate::media::peer::Peer
+/// Peers traffic stopped flowing.
+
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 struct TrafficStopped {
-    /// [`RoomId`] of [`Room`] where this [`Peer`] is stored.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// [`RoomId`] of [`Room`] where this Peer is stored.
     room_id: RoomId,
 
-    /// [`PeerId`] of [`Peer`] which traffic was stopped.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// [`PeerId`] of Peer which traffic was stopped.
     peer_id: PeerId,
 
-    /// Time when proof of [`Peer`]'s traffic stopping was gotten.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// Time when proof of Peer's traffic stopping was gotten.
     at: Instant,
 }
 
@@ -391,7 +367,7 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
     /// Sends [`PeerStopped`] into [`Room`] if [`PeerStat`] isn't in
     /// [`PeerState::Stopped`] state.
     ///
-    /// Transfers [`PeerStat`] of the stopped [`Peer`] into
+    /// Transfers [`PeerStat`] of the stopped Peer into
     /// [`PeerState::Stopped`].
     fn handle(
         &mut self,
@@ -420,30 +396,22 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
 /// All sources of [`TrafficFlows`] message.
 ///
 /// This is needed for checking that all metrics sources have the same opinion
-/// about current [`Peer`]'s traffic state.
+/// about current Peer's traffic state.
 ///
-/// [`PeersTrafficWatcher`] checks that all sources have the same opinion
-/// after [`PeersTrafficWatcherImpl::peer_init_timeout`] from first
+/// [`PeerTrafficWatcher`] checks that all sources have the same opinion
+/// after [`PeersTrafficWatcherImpl::init_timeout`] from first
 /// [`TrafficFlows`] message received for some [`PeerStat`]. If at least one
-/// [`FlowMetricSource`] doesn't sent [`TrafficFlows`] message, then [`Peer`]
+/// [`FlowMetricSource`] doesn't sent [`TrafficFlows`] message, then Peer
 /// will be considered as wrong and it will be stopped.
-///
-/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
-    /// Metrics from the partner [`Peer`].
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// Metrics from the partner Peer.
     PartnerPeer,
 
-    /// Metrics from the [`Peer`].
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// Metrics from the Peer.
     Peer,
 
-    /// Metrics for this [`Peer`] from the Coturn TURN server.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// Metrics for this Peer from the Coturn TURN server.
     Coturn,
 }
 
@@ -455,7 +423,7 @@ pub enum FlowMetricSource {
 /// +-------+    +----------+    +-----------+<----+-----------+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum PeerState {
-    /// [`Peer`] was just added and have not received any traffic events.
+    /// Peer was just added and have not received any traffic events.
     New,
 
     /// Some sources have reported that traffic is flowing, but not all of
@@ -469,17 +437,14 @@ enum PeerState {
     Stopped,
 }
 
-/// Current stats of [`Peer`].
+/// Current stats of Peer.
 ///
-/// Also this structure may be considered as subscription to this [`Peer`] state
+/// Also this structure may be considered as subscription to this Peer state
 /// updates.
-///
-/// [`Peer`]: crate::media::peer::Peer
+
 #[derive(Debug)]
 struct PeerStat {
-    /// [`PeerId`] of [`Peer`] which this [`PeerStat`] represents.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// [`PeerId`] of Peer which this [`PeerStat`] represents.
     peer_id: PeerId,
 
     /// Current state of this [`PeerStat`].
@@ -532,10 +497,9 @@ impl PeerStat {
     }
 }
 
-/// Stores [`PeerStat`]s of [`Peer`]s for which stats updates [`Room`]
+/// Stores [`PeerStat`]s of Peers for which stats updates [`Room`]
 /// is watching.
-///
-/// [`Peer`]: crate::media::peer::Peer
+
 #[derive(Debug)]
 struct RoomStats {
     /// [`RoomId`] of all [`PeerStat`] which stored here.
@@ -672,7 +636,7 @@ struct UnregisterPeers {
     room_id: RoomId,
 
     /// [`PeerId`] of [`PeerStat`] from which unregistration is requested.
-    peers_ids: HashSet<PeerId>,
+    peers_ids: Vec<PeerId>,
 }
 
 impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
