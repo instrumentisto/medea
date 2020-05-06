@@ -808,7 +808,12 @@ impl InnerRoom {
     ) {
         let peer = match self
             .peers
-            .create_peer(peer_state, self.peer_event_sender.clone())
+            .create_peer(
+                peer_state,
+                self.peer_event_sender.clone(),
+                self.rpc.on_connection_loss(),
+                self.rpc.on_state_restored(),
+            )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
             Ok(peer) => peer,

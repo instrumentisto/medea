@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, stream::LocalBoxStream};
 use medea_client_api_proto::PeerId;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -26,6 +26,8 @@ pub trait PeerRepository {
         &self,
         peer_state: &ObservablePeerSnapshot,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
+        on_connection_loss_stream: LocalBoxStream<'static, ()>,
+        on_state_restored_stream: LocalBoxStream<'static, ()>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -98,10 +100,14 @@ impl PeerRepository for Repository {
         &self,
         peer_state: &ObservablePeerSnapshot,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+        on_connection_loss_stream: LocalBoxStream<'static, ()>,
+        on_state_restored_stream: LocalBoxStream<'static, ()>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = PeerConnection::new(
             peer_state,
             peer_events_sender,
+            on_connection_loss_stream,
+            on_state_restored_stream,
             Rc::clone(&self.media_manager),
         )
         .map_err(tracerr::map_from_and_wrap!())?;

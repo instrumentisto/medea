@@ -19,7 +19,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future, StreamExt as _};
+use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState,
     PeerConnectionState, PeerId as Id, PeerId, TrackId,
@@ -233,6 +233,8 @@ impl PeerConnection {
     pub fn new(
         peer_state: &ObservablePeerSnapshot,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+        on_connection_loss_stream: LocalBoxStream<'static, ()>,
+        on_state_restored_stream: LocalBoxStream<'static, ()>,
         media_manager: Rc<MediaManager>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
@@ -345,7 +347,50 @@ impl PeerConnection {
             }
         });
 
+        Self::spawn_on_connection_loss_stream(&peer, on_connection_loss_stream);
+        Self::spawn_on_state_restored_stream(&peer, on_state_restored_stream);
+
         Ok(peer)
+    }
+
+    /// Spawns connection loss event listener.
+    ///
+    /// On every connection loss, [`MediaConnections::freeze_timers`] will be
+    /// called.
+    fn spawn_on_connection_loss_stream(
+        peer: &Rc<Self>,
+        mut on_connection_loss_stream: LocalBoxStream<'static, ()>,
+    ) {
+        let this_weak = Rc::downgrade(&peer);
+        spawn_local(async move {
+            while let Some(_) = on_connection_loss_stream.next().await {
+                if let Some(this) = this_weak.upgrade() {
+                    this.media_connections.freeze_timers();
+                } else {
+                    break;
+                }
+            }
+        });
+    }
+
+    /// Spawns state restoring event listener.
+    ///
+    /// On every state restoring, [`MediaConnections::unfreeze_timers`] will be
+    /// called.
+    fn spawn_on_state_restored_stream(
+        peer: &Rc<Self>,
+        mut on_state_restored_stream: LocalBoxStream<'static, ()>,
+    ) {
+        let this_weak = Rc::downgrade(&peer);
+        spawn_local(async move {
+            while let Some(_) = on_state_restored_stream.next().await {
+                if let Some(this) = this_weak.upgrade() {
+                    this.media_connections.unfreeze_timers();
+                } else {
+                    break;
+                }
+            }
+        });
     }
 
     /// Filters out already sent stats, and send new statss from

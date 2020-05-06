@@ -1,11 +1,12 @@
 #![cfg(target_arch = "wasm32")]
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     rc::Rc,
 };
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, stream, stream::LocalBoxStream};
 use medea_client_api_proto::{
     snapshots::{PeerSnapshotAccessor, RoomSnapshotAccessor},
     Command, Event, PeerId,
@@ -28,7 +29,6 @@ use crate::{
     get_observable_tracks, get_peer, get_test_tracks,
     wait_and_check_test_result, MockNavigator,
 };
-use std::cell::RefCell;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -65,7 +65,9 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     let peer_clone = Rc::clone(&peer);
     repo.expect_create_peer().returning_st(
         move |_: &ObservablePeerSnapshot,
-              _: mpsc::UnboundedSender<PeerEvent>| {
+              _: mpsc::UnboundedSender<PeerEvent>,
+              _: LocalBoxStream<'static, ()>,
+              _: LocalBoxStream<'static, ()>| {
             Ok(peer_clone.clone())
         },
     );
@@ -79,6 +81,10 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     repo.expect_get()
         .returning_st(move |_| Some(Rc::clone(&peer_clone)));
     rpc.expect_unsub().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
     rpc.expect_set_close_reason().return_const(());
     rpc.expect_send_command().returning(move |cmd| match cmd {
         Command::UpdateTracks {
@@ -369,15 +375,21 @@ fn get_test_room_and_new_peer(
     let peer_clone = Rc::clone(&peer);
     repo.expect_create_peer()
         .withf(
-            move |
-                peer_state: &ObservablePeerSnapshot,
-                _events_sender: &mpsc::UnboundedSender<PeerEvent>,
-            | { peer_state.get_id() == PeerId(1) },
+            move |peer_state: &ObservablePeerSnapshot,
+                  _events_sender: &mpsc::UnboundedSender<PeerEvent>,
+                  _: &LocalBoxStream<'static, ()>,
+                  _: &LocalBoxStream<'static, ()>| {
+                peer_state.get_id() == PeerId(1)
+            },
         )
-        .return_once_st(move |_, _| Ok(peer_clone));
+        .return_once_st(move |_, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
 
     let room = Room::new(
         Rc::new(rpc),
@@ -572,6 +584,10 @@ async fn error_join_room_without_on_failed_stream_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(
         Rc::new(rpc),
@@ -612,6 +628,10 @@ async fn error_join_room_without_on_connection_loss_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(
         Rc::new(rpc),
@@ -639,9 +659,9 @@ async fn error_join_room_without_on_connection_loss_callback() {
 
 /// Tests for `RoomHandle.on_close` JS side callback.
 mod on_close_callback {
-    use std::rc::Rc;
+    use std::{cell::RefCell, rc::Rc};
 
-    use futures::channel::mpsc;
+    use futures::{channel::mpsc, stream};
     use medea_client_api_proto::CloseReason as CloseByServerReason;
     use medea_jason::{
         api::Room,
@@ -653,7 +673,6 @@ mod on_close_callback {
     use wasm_bindgen_test::*;
 
     use super::wait_and_check_test_result;
-    use std::cell::RefCell;
 
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
                                 closed.reason(); }")]
@@ -683,6 +702,10 @@ mod on_close_callback {
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
         rpc.expect_set_close_reason().return_const(());
+        rpc.expect_on_state_restored()
+            .returning(|| Box::pin(stream::pending()));
+        rpc.expect_on_connection_loss()
+            .returning(|| Box::pin(stream::pending()));
 
         Room::new(
             Rc::new(rpc),
@@ -793,6 +816,10 @@ mod rpc_close_reason_on_room_drop {
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
+        rpc.expect_on_state_restored()
+            .returning(|| Box::pin(stream::pending()));
+        rpc.expect_on_connection_loss()
+            .returning(|| Box::pin(stream::pending()));
         let (test_tx, test_rx) = oneshot::channel();
         rpc.expect_set_close_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
@@ -946,6 +973,10 @@ mod patches_generation {
         rpc.expect_send_command().returning(move |command| {
             command_tx.unbounded_send(command).unwrap();
         });
+        rpc.expect_on_state_restored()
+            .returning(|| Box::pin(stream::pending()));
+        rpc.expect_on_connection_loss()
+            .returning(|| Box::pin(stream::pending()));
         rpc.expect_subscribe()
             .return_once(move || Box::pin(futures::stream::pending()));
         rpc.expect_unsub().return_once(|| ());

@@ -88,6 +88,7 @@ use std::{
 use futures::{
     channel::{mpsc, oneshot},
     future::{Either, LocalBoxFuture},
+    stream,
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -159,6 +160,8 @@ pub fn get_peer(
         PeerConnection::new(
             &observable_peer,
             peer_events_sender,
+            Box::pin(stream::pending()),
+            Box::pin(stream::pending()),
             media_manager,
         )
         .unwrap(),

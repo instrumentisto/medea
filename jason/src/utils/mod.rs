@@ -5,6 +5,7 @@ mod errors;
 
 mod callback;
 mod event_listener;
+mod frezeable_delay;
 
 use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
@@ -22,6 +23,7 @@ pub use self::{
         console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
     },
     event_listener::{EventListener, EventListenerBindError},
+    frezeable_delay::{freezeable_delay_for, FreezeableDelayHandle},
 };
 
 /// Returns [`Window`] object.
