@@ -4,7 +4,8 @@
 //! Use [`PeersMetricsService.subscribe()`] to subscribe to stats processing
 //! results. Then provide Peer metrics to [`PeersMetricsService.add_stat()`].
 //! You should call [`PeersMetricsService.check_peers()`] with
-// reasonable interval (~1-2 sec), this will check for stale metrics.
+//! reasonable interval (~1-2 sec), this will check for stale metrics.
+//!
 //! This service acts as flow and stop metrics source for the
 //! [`PeerTrafficWatcher`].
 
@@ -40,8 +41,7 @@ use crate::{
     media::PeerStateMachine as Peer,
     signalling::peers::{
         media_traffic_state::{
-            which_media_type_was_started, which_media_type_was_stopped,
-            MediaTrafficState,
+            get_diff_added, get_diff_removed, MediaTrafficState,
         },
         FlowMetricSource,
     },
@@ -133,24 +133,20 @@ impl PeersMetricsService {
                     peer_ref.send_traffic_state;
                 let recv_media_traffic_state_after =
                     peer_ref.recv_traffic_state;
-                if let Some(stopped_send_media_type) =
-                    which_media_type_was_stopped(
-                        send_media_traffic_state_before,
-                        send_media_traffic_state_after,
-                    )
-                {
+                if let Some(stopped_send_media_type) = get_diff_removed(
+                    send_media_traffic_state_before,
+                    send_media_traffic_state_after,
+                ) {
                     self.send_no_traffic(
                         &*peer_ref,
                         stopped_send_media_type,
                         MediaDirection::Publish,
                     );
                 }
-                if let Some(stopped_recv_media_type) =
-                    which_media_type_was_stopped(
-                        recv_media_traffic_state_before,
-                        recv_media_traffic_state_after,
-                    )
-                {
+                if let Some(stopped_recv_media_type) = get_diff_removed(
+                    recv_media_traffic_state_before,
+                    recv_media_traffic_state_after,
+                ) {
                     self.send_no_traffic(
                         &*peer_ref,
                         stopped_recv_media_type,
@@ -212,10 +208,14 @@ impl PeersMetricsService {
     pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
-            let send_media_traffic_state_before = peer_ref.send_traffic_state;
-            let recv_media_traffic_state_before = peer_ref.recv_traffic_state;
+
+            // get state before applying new stats so we can make before-after
+            // diff
+            let send_before = peer_ref.send_traffic_state;
+            let recv_before = peer_ref.recv_traffic_state;
             peer_ref.update_media_traffic_state();
 
+            // apply new stats
             for stat in stats {
                 match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
@@ -253,15 +253,13 @@ impl PeersMetricsService {
                     );
                 }
 
-                let send_media_traffic_state_after =
-                    peer_ref.send_traffic_state;
-                let recv_media_traffic_state_after =
-                    peer_ref.recv_traffic_state;
+                let send_after = peer_ref.send_traffic_state;
+                let recv_after = peer_ref.recv_traffic_state;
 
-                if let Some(started_media_type) = which_media_type_was_started(
-                    send_media_traffic_state_before,
-                    send_media_traffic_state_after,
-                ) {
+                // compare before and after
+                if let Some(started_media_type) =
+                    get_diff_added(send_before, send_after)
+                {
                     self.send_traffic_flows(
                         peer_id,
                         started_media_type,
@@ -269,10 +267,9 @@ impl PeersMetricsService {
                     );
                 }
 
-                if let Some(started_media_type) = which_media_type_was_started(
-                    recv_media_traffic_state_before,
-                    recv_media_traffic_state_after,
-                ) {
+                if let Some(started_media_type) =
+                    get_diff_added(recv_before, recv_after)
+                {
                     self.send_traffic_flows(
                         peer_id,
                         started_media_type,
@@ -280,10 +277,9 @@ impl PeersMetricsService {
                     );
                 }
 
-                if let Some(stopped_media_type) = which_media_type_was_stopped(
-                    send_media_traffic_state_before,
-                    send_media_traffic_state_after,
-                ) {
+                if let Some(stopped_media_type) =
+                    get_diff_removed(send_before, send_after)
+                {
                     self.send_no_traffic(
                         &*peer_ref,
                         stopped_media_type,
@@ -291,10 +287,9 @@ impl PeersMetricsService {
                     );
                 }
 
-                if let Some(stopped_media_type) = which_media_type_was_stopped(
-                    recv_media_traffic_state_before,
-                    recv_media_traffic_state_after,
-                ) {
+                if let Some(stopped_media_type) =
+                    get_diff_removed(recv_before, recv_after)
+                {
                     self.send_no_traffic(
                         &*peer_ref,
                         stopped_media_type,

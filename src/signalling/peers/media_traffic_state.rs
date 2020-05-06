@@ -7,11 +7,7 @@ use crate::api::control::callback::MediaType;
 ///
 /// All [`MediaType`]s can be in started or stopped state.
 ///
-/// If you wanna use this structure than you can just use it's methods without
-/// understanding how it works.
-///
 /// `1` bit in this bitflags structure represents that [`MediaType`] is started.
-///
 /// `0` bit in this bitflags structure represents that [`MediaType`] is stopped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MediaTrafficState(u8);
@@ -28,7 +24,6 @@ impl MediaTrafficState {
     /// started.
     #[cfg(test)]
     #[inline]
-    #[cfg(test)]
     pub const fn with_media_type(media_type: MediaType) -> MediaTrafficState {
         Self(media_type as u8)
     }
@@ -91,10 +86,11 @@ impl MediaTrafficState {
 }
 
 /// Returns [`MediaType`] which was started based on [`MediaTrafficState`]
-/// before and [`MediaTrafficState`] after.
+/// before and [`MediaTrafficState`] after. Returns `Some(MediaType)` if `after`
+/// contains [`MediaType`] that is not present in `before` and `None` otherwise.
 ///
 /// `None` will be returned if none of the [`MediaType`]s was started.
-pub fn which_media_type_was_started(
+pub fn get_diff_added(
     before: MediaTrafficState,
     after: MediaTrafficState,
 ) -> Option<MediaType> {
@@ -102,10 +98,10 @@ pub fn which_media_type_was_started(
 }
 
 /// Returns [`MediaType`] which was stopped based on [`MediaTrafficState`]
-/// before and [`MediaTrafficState`] after.
-///
-/// `None` will be returned if none of the [`MediaType`]s was stopped.
-pub fn which_media_type_was_stopped(
+/// before and [`MediaTrafficState`] after. Returns `Some(MediaType)` if
+/// `before` contains [`MediaType`] that is not present in `after` and `None`
+/// otherwise.
+pub fn get_diff_removed(
     before: MediaTrafficState,
     after: MediaTrafficState,
 ) -> Option<MediaType> {
@@ -213,42 +209,38 @@ mod tracks_state_tests {
         let state_before = MediaTrafficState::with_media_type(MediaType::Audio);
         let state_after = MediaTrafficState::with_media_type(MediaType::Video);
         let started_media_type =
-            which_media_type_was_started(state_before, state_after).unwrap();
+            get_diff_added(state_before, state_after).unwrap();
         assert_eq!(started_media_type, MediaType::Video);
 
         // 0b0 -> 0b1 = 0b1
         let state_before = MediaTrafficState::new();
         let state_after = MediaTrafficState::with_media_type(MediaType::Audio);
         let started_media_type =
-            which_media_type_was_started(state_before, state_after).unwrap();
+            get_diff_added(state_before, state_after).unwrap();
         assert_eq!(started_media_type, MediaType::Audio);
 
         // 0b0 -> 0b11 = 0b11
         let state_before = MediaTrafficState::new();
         let state_after = MediaTrafficState::with_media_type(MediaType::Both);
         let started_media_type =
-            which_media_type_was_started(state_before, state_after).unwrap();
+            get_diff_added(state_before, state_after).unwrap();
         assert_eq!(started_media_type, MediaType::Both);
 
         // 0b11 -> 0b0 = 0b0
         let state_before = MediaTrafficState::with_media_type(MediaType::Both);
         let state_after = MediaTrafficState::new();
-        assert!(
-            which_media_type_was_started(state_before, state_after).is_none()
-        );
+        assert!(get_diff_added(state_before, state_after).is_none());
 
         // 0b11 -> 0b11 = 0b0
         let state_before = MediaTrafficState::with_media_type(MediaType::Both);
         let state_after = MediaTrafficState::with_media_type(MediaType::Both);
-        assert!(
-            which_media_type_was_started(state_before, state_after).is_none()
-        );
+        assert!(get_diff_added(state_before, state_after).is_none());
 
         // 0b10 -> 0b1 = 0b1
         let state_before = MediaTrafficState::with_media_type(MediaType::Video);
         let state_after = MediaTrafficState::with_media_type(MediaType::Audio);
         assert_eq!(
-            which_media_type_was_started(state_before, state_after).unwrap(),
+            get_diff_added(state_before, state_after).unwrap(),
             MediaType::Audio
         );
 
@@ -256,7 +248,7 @@ mod tracks_state_tests {
         let state_before = MediaTrafficState::new();
         let state_after = MediaTrafficState::with_media_type(MediaType::Video);
         assert_eq!(
-            which_media_type_was_started(state_before, state_after).unwrap(),
+            get_diff_added(state_before, state_after).unwrap(),
             MediaType::Video
         );
     }
@@ -265,23 +257,26 @@ mod tracks_state_tests {
     fn diff_stopped() {
         let before = MediaTrafficState::with_media_type(MediaType::Both);
         let after = MediaTrafficState::with_media_type(MediaType::Audio);
-        assert_eq!(
-            which_media_type_was_stopped(before, after).unwrap(),
-            MediaType::Video,
-        );
+        assert_eq!(get_diff_removed(before, after).unwrap(), MediaType::Video,);
 
         let before = MediaTrafficState::with_media_type(MediaType::Audio);
         let after = MediaTrafficState::with_media_type(MediaType::Video);
-        assert_eq!(
-            which_media_type_was_stopped(before, after).unwrap(),
-            MediaType::Audio,
-        );
+        assert_eq!(get_diff_removed(before, after).unwrap(), MediaType::Audio,);
 
         let before = MediaTrafficState::with_media_type(MediaType::Both);
         let after = MediaTrafficState::new();
-        assert_eq!(
-            which_media_type_was_stopped(before, after).unwrap(),
-            MediaType::Both,
-        );
+        assert_eq!(get_diff_removed(before, after).unwrap(), MediaType::Both,);
+
+        let before = MediaTrafficState::with_media_type(MediaType::Both);
+        let after = MediaTrafficState::with_media_type(MediaType::Both);
+        assert!(get_diff_removed(before, after).is_none());
+
+        let before = MediaTrafficState::new();
+        let after = MediaTrafficState::new();
+        assert!(get_diff_removed(before, after).is_none());
+
+        let before = MediaTrafficState::new();
+        let after = MediaTrafficState::with_media_type(MediaType::Both);
+        assert!(get_diff_removed(before, after).is_none());
     }
 }
