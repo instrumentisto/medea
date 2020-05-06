@@ -194,16 +194,18 @@ pub enum PeerConnectionState {
 
 impl From<IceConnectionState> for PeerConnectionState {
     fn from(ice_con_state: IceConnectionState) -> Self {
-        use PeerConnectionState::*;
+        use IceConnectionState as IceState;
+        use PeerConnectionState as PeerState;
+
         match ice_con_state {
-            IceConnectionState::New => New,
-            IceConnectionState::Checking => Connecting,
-            IceConnectionState::Connected | IceConnectionState::Completed => {
-                Connected
+            IceState::New => PeerState::New,
+            IceState::Checking => PeerState::Connecting,
+            IceState::Connected | IceConnectionState::Completed => {
+                PeerState::Connected
             }
-            IceConnectionState::Failed => Failed,
-            IceConnectionState::Disconnected => Disconnected,
-            IceConnectionState::Closed => Closed,
+            IceState::Failed => PeerState::Failed,
+            IceState::Disconnected => PeerState::Disconnected,
+            IceState::Closed => PeerState::Closed,
         }
     }
 }

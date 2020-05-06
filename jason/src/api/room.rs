@@ -765,7 +765,7 @@ impl EventHandler for InnerRoom {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
-                            .get_offer(tracks, local_stream_constraints)
+                            .get_offer(tracks, local_stream_constraints, false)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         let mids = peer

@@ -753,9 +753,8 @@ impl PeerConnection {
         local_constraints: Option<MediaStreamSettings>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
-        let (recv, send): (Vec<_>, Vec<_>) = track_updates
-            .into_iter()
-            .partition(|track| match track.direction {
+        let (recv, send): (Vec<_>, Vec<_>) =
+            tracks.into_iter().partition(|track| match track.direction {
                 Direction::Send { .. } => false,
                 Direction::Recv { .. } => true,
             });

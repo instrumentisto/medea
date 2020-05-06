@@ -667,7 +667,8 @@ impl Room {
         peer_id: PeerId,
         new_state: PeerConnectionState,
     ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
-        use PeerConnectionState::*;
+        use PeerConnectionState as PeerConState;
+
         let peer = match self.peers.get_peer_by_id(peer_id) {
             Ok(peer) => peer,
             Err(err) => return future::err(err).boxed_local(),
@@ -676,7 +677,9 @@ impl Room {
         let old_state: PeerConnectionState = peer.connection_state();
 
         // check whether state really changed
-        if let (Failed, Disconnected) = (old_state, new_state) {
+        if let (PeerConState::Failed, PeerConState::Disconnected) =
+            (old_state, new_state)
+        {
             // Failed => Disconnected is still Failed
             return future::ok(()).boxed_local();
         } else {
@@ -685,8 +688,8 @@ impl Room {
 
         // maybe init ICE restart
         match new_state {
-            Failed => match old_state {
-                Connected | Disconnected => {
+            PeerConState::Failed => match old_state {
+                PeerConState::Connected | PeerConState::Disconnected => {
                     let connected_peer_state: PeerConnectionState =
                         match self.peers.get_peer_by_id(peer.partner_peer_id())
                         {
@@ -694,7 +697,7 @@ impl Room {
                             Err(err) => return future::err(err).boxed_local(),
                         };
 
-                    if let Failed = connected_peer_state {
+                    if let PeerConState::Failed = connected_peer_state {
                         match self.peers.take_inner_peer::<Stable>(peer_id) {
                             Ok(peer) => {
                                 let member_id = peer.member_id();
@@ -899,17 +902,17 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         metrics: PeerMetrics,
     ) -> Self::Output {
-        use PeerMetrics::*;
+        use PeerMetrics as PM;
 
         Ok(Box::new(
             match metrics {
-                IceConnectionState(state) => {
+                PM::IceConnectionState(state) => {
                     self.update_peer_connection_state(peer_id, state.into())
                 }
-                PeerConnectionState(state) => {
+                PM::PeerConnectionState(state) => {
                     self.update_peer_connection_state(peer_id, state)
                 }
-                RtcStats(_) => future::ok(()).boxed_local(),
+                PM::RtcStats(_) => future::ok(()).boxed_local(),
             }
             .into_actor(self),
         ))
