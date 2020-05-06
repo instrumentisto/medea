@@ -7,7 +7,7 @@ use crate::api::control::callback::MediaType;
 ///
 /// All [`MediaType`]s can be in started or stopped state.
 ///
-/// If you wanna use this structure than you can just use it methods without
+/// If you wanna use this structure than you can just use it's methods without
 /// understanding how it works.
 ///
 /// `1` bit in this bitflags structure represents that [`MediaType`] is started.

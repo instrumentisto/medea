@@ -392,8 +392,7 @@ impl PartialEq<MediaType> for TrackMediaType {
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
-    /// Wrong [`Peer`] traffic flowing was detected. Some `MediaTrack`s with
-    /// provided [`TrackMediaType`] doesn't flows.
+    /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
     NoTrafficFlow {
         peer_id: PeerId,
         was_flowing_at: DateTime<Utc>,
@@ -417,15 +416,25 @@ pub enum PeersMetricsEvent {
 /// between expected and actual [`Peer`] state.
 #[derive(Debug)]
 struct PeerTracks {
+    /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
+    /// [`MediaType::Audio`].
     audio_send: u64,
+
+    /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
+    /// [`MediaType::Video`].
     video_send: u64,
+
+    /// Count of the [`MediaTrack`]s with the [`Direction::Play`] and
+    /// [`MediaType::Audio`].
     audio_recv: u64,
+
+    /// Count of the [`MediaTrack`]s with the [`Direction::Play`] and
+    /// [`MediaType::Video`].
     video_recv: u64,
 }
 
 impl From<&Peer> for PeerTracks {
     fn from(peer: &Peer) -> Self {
-        // TODO: filter muted MediaTracks.
         let mut audio_send = 0;
         let mut video_send = 0;
         let mut audio_recv = 0;
@@ -483,7 +492,7 @@ struct TrackStat<T> {
 
     /// Direction state of this [`TrackStat`].
     ///
-    /// Can be [`SendDir`] or [`RecvDir`].
+    /// Can be [`Send`] or [`Recv`].
     direction: T,
 }
 
