@@ -16,11 +16,9 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{
-    self, Either, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{
-    snapshots::RoomSnapshot, CloseDescription, CloseReason, Event,
-};
+use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
 use crate::{
     api::{
@@ -61,14 +59,6 @@ pub enum ParticipantServiceErr {
 
     /// Some error happened in [`Member`].
     MemberError(MemberError),
-
-    /// [`Event::RestoreState`] sending is failed.
-    #[display(fmt = "Event::RestoreState sending is failed.")]
-    MemberSnapshotSending,
-
-    /// [`RpcConnection`] for some [`Member`] not found.
-    #[display(fmt = "RPC connection for some Member not found.")]
-    ConnectionForMemberNotFound,
 }
 
 impl From<MemberError> for ParticipantServiceErr {
@@ -100,12 +90,6 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    /// All [`RoomSnapshot`]s of the [`Room`] for the each [`Member`].
-    ///
-    /// This [`RoomSnapshot`]s will be constructed by received [`Command`]s
-    /// from a Web Client and [`Event`]s sent from the Media Server.
-    snapshots: HashMap<MemberId, RoomSnapshot>,
-
     /// Default values for the RPC connection settings.
     ///
     /// If nothing provided into [`Member`] element spec then this values will
@@ -128,7 +112,6 @@ impl ParticipantService {
             members: parse_members(room_spec, context.config.rpc)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
-            snapshots: HashMap::new(),
             rpc_conf: context.config.rpc,
         })
     }
@@ -206,9 +189,6 @@ impl ParticipantService {
         member_id: MemberId,
         event: Event,
     ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
-        if let Some(snapshot) = self.snapshots.get_mut(&member_id) {
-            event.clone().dispatch_with(snapshot);
-        }
         if let Some(conn) = self.connections.get(&member_id) {
             conn.send_event(event)
                 .map_err(move |_| RoomError::UnableToSendEvent(member_id))
@@ -248,58 +228,15 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
-            self.insert_connection(member_id.clone(), conn);
-            let send_snapshot_fut = self.send_snapshot(&member_id);
-            Box::new(wrap_future(send_snapshot_fut.then(move |res| {
-                if let Err(e) = res {
-                    Either::Left(future::err(e))
-                } else {
-                    Either::Right(
-                        connection
-                            .close(CloseDescription::new(
-                                CloseReason::Reconnected,
-                            ))
-                            .map(move |_| Ok(member)),
-                    )
-                }
-            })))
+            self.insert_connection(member_id, conn);
+            Box::new(wrap_future(
+                connection
+                    .close(CloseDescription::new(CloseReason::Reconnected))
+                    .map(move |_| Ok(member)),
+            ))
         } else {
             self.insert_connection(member_id, conn);
             Box::new(wrap_future(future::ok(member)))
-        }
-    }
-
-    /// Sends [`Event::RestoreState`] to the [`Member`] with provided
-    /// [`MemberId`].
-    ///
-    /// # Errors
-    ///
-    /// [`ParticipantServiceErr::MemberSnapshotSending`] if some connection
-    /// error is happened while sending [`Event::RestoreState`].
-    ///
-    /// [`ParticipantServiceErr::ConnectionForMemberNotFound`] if
-    /// [`RpcConnection`] for the [`Member`] with provided [`MemberId`] is not
-    /// found.
-    fn send_snapshot(
-        &mut self,
-        member_id: &MemberId,
-    ) -> LocalBoxFuture<'static, Result<(), ParticipantServiceErr>> {
-        let snapshot = self.snapshots.get(member_id).cloned();
-        if let Some(snapshot) = snapshot {
-            if let Some(conn) = self.connections.get(member_id) {
-                Box::pin(
-                    conn.send_event(Event::RestoreState { snapshot }).map_err(
-                        |_| ParticipantServiceErr::MemberSnapshotSending,
-                    ),
-                )
-            } else {
-                Box::pin(future::err(
-                    ParticipantServiceErr::ConnectionForMemberNotFound,
-                ))
-            }
-        } else {
-            warn!("Snapshot for Member [id = {}] not found!", member_id);
-            Box::pin(future::ok(()))
         }
     }
 
@@ -309,8 +246,6 @@ impl ParticipantService {
         member_id: MemberId,
         conn: Box<dyn RpcConnection>,
     ) {
-        self.snapshots
-            .insert(member_id.clone(), RoomSnapshot::new());
         self.connections.insert(member_id, conn);
     }
 

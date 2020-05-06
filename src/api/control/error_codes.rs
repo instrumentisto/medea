@@ -299,8 +299,7 @@ pub enum ErrorCode {
 impl From<ParticipantServiceErr> for ErrorResponse {
     fn from(err: ParticipantServiceErr) -> Self {
         use ParticipantServiceErr::{
-            ConnectionForMemberNotFound, EndpointNotFound, MemberError,
-            MemberSnapshotSending, ParticipantNotFound,
+            EndpointNotFound, MemberError, ParticipantNotFound,
         };
 
         match err {
@@ -308,9 +307,7 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            MemberError(_)
-            | ConnectionForMemberNotFound
-            | MemberSnapshotSending => Self::unexpected(&err),
+            MemberError(_) => Self::unexpected(&err),
         }
     }
 }
