@@ -256,7 +256,7 @@ impl MediaConnections {
                     inner.senders.insert(track_id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
-                    let media_type = track.borrow().get_media_type().clone();
+                    let media_type = track.borrow().get_media_type();
                     let recv = Receiver::new(
                         track_id,
                         &(media_type.clone().into()),
@@ -476,8 +476,7 @@ impl Sender {
         mid: Option<String>,
     ) -> Result<Rc<Self>> {
         let track_state_ref = track_state.borrow();
-        let caps =
-            TrackConstraints::from(track_state_ref.get_media_type().clone());
+        let caps = TrackConstraints::from(track_state_ref.get_media_type());
         let kind = TransceiverKind::from(&caps);
         let track_id = track_state_ref.get_id();
         let transceiver = match mid {

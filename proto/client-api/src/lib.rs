@@ -136,7 +136,10 @@ pub enum Command {
         mids: HashMap<TrackId, String>,
     },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
@@ -152,6 +155,10 @@ pub enum Command {
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
+    },
+
+    SynchronizeMe {
+        snapshot: RoomSnapshot,
     },
 }
 
@@ -252,7 +259,10 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -263,7 +273,9 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<PeerId> },
+    PeersRemoved {
+        peer_ids: Vec<PeerId>,
+    },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// Peer.
@@ -275,12 +287,9 @@ pub enum Event {
         tracks_patches: Vec<TrackPatch>,
     },
 
-    /// [`Event`] which server will send if detects that `Member` is
-    /// reconnecting.
-    ///
-    /// On this [`Event`] client should upgrade/downgrade local state to the
-    /// state of the server.
-    RestoreState { snapshot: RoomSnapshot },
+    SnapshotSynchronized {
+        snapshot: RoomSnapshot,
+    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -346,7 +355,7 @@ pub enum Direction {
 /// Type of [`Track`].
 #[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
@@ -354,12 +363,12 @@ pub enum MediaType {
 
 #[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct AudioSettings {}
 
 #[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct VideoSettings {}
 
 #[cfg(feature = "jason")]

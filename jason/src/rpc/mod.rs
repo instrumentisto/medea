@@ -14,15 +14,19 @@ use futures::{
     stream::{LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
-    Event, RpcSettings, ServerMsg,
+    snapshots::RoomSnapshot, ClientMsg, CloseDescription,
+    CloseReason as CloseByServerReason, Command, Event, RpcSettings, ServerMsg,
 };
+use medea_reactive::ObservableCell;
 use serde::Serialize;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, JasonError, JsCaused, JsError};
+use crate::{
+    snapshots::ObservableRoomSnapshot,
+    utils::{console_error, JasonError, JsCaused, JsError},
+};
 
 #[doc(inline)]
 pub use self::{
@@ -316,6 +320,15 @@ pub trait RpcClient {
     ///
     /// If token is `None` then [`RpcClient`] never was connected to a server.
     fn get_token(&self) -> Option<String>;
+
+    /// Restores [`Room`] state after reconnection to the Media Server.
+    ///
+    /// Sends [`Command::SynchronizeMe`] and waits for the
+    /// [`Event::SnapshotSynchronized`].
+    ///
+    /// Returned [`Future`] will be resolved when [`RoomSnapshot`] will be
+    /// updated by the [`Event::SnapshotSynchronized`].
+    fn restore_state(&self) -> LocalBoxFuture<'static, ()>;
 }
 
 /// RPC transport between a client and a server.
@@ -350,6 +363,10 @@ struct Inner {
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
 
+    /// [`ObservableRoomSnapshot`] of the [`Room`] for which this [`RpcClient`]
+    /// was created.
+    room_snapshot: Rc<RefCell<ObservableRoomSnapshot>>,
+
     /// [`oneshot::Sender`] with which [`CloseReason`] will be sent when
     /// WebSocket connection normally closed by server.
     ///
@@ -379,6 +396,11 @@ struct Inner {
 
     /// Current [`State`] of this [`RpcClient`].
     state: State,
+
+    /// State of the [`RpcClient`] reconnection.
+    ///
+    /// `true` if [`RpcClient`] is reconnecting.
+    is_reconnecting: ObservableCell<bool>,
 }
 
 /// Factory closure which creates [`RpcTransport`] for
@@ -393,10 +415,14 @@ type RpcTransportFactory = Box<
 >;
 
 impl Inner {
-    fn new(rpc_transport_factory: RpcTransportFactory) -> Rc<RefCell<Self>> {
+    fn new(
+        rpc_transport_factory: RpcTransportFactory,
+        room_snapshot: Rc<RefCell<ObservableRoomSnapshot>>,
+    ) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
             on_close_subscribers: Vec::new(),
+            room_snapshot,
             subs: vec![],
             heartbeat: None,
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
@@ -405,6 +431,7 @@ impl Inner {
             token: None,
             on_state_change_subs: Vec::new(),
             state: State::Closed(ClosedStateReason::NeverConnected),
+            is_reconnecting: ObservableCell::new(false),
         }))
     }
 
@@ -443,21 +470,23 @@ pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 impl WebSocketRpcClient {
     /// Creates new [`WebSocketRpcClient`] with provided [`RpcTransportFactory`]
     /// closure.
-    pub fn new(rpc_transport_factory: RpcTransportFactory) -> Self {
-        Self(Inner::new(rpc_transport_factory))
+    pub fn new(
+        rpc_transport_factory: RpcTransportFactory,
+        room_snapshot: Rc<RefCell<ObservableRoomSnapshot>>,
+    ) -> Self {
+        Self(Inner::new(rpc_transport_factory, room_snapshot))
     }
 
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
     /// subs about connection loss.
     fn on_connection_loss(&self, closed_state_reason: ClosedStateReason) {
-        self.0
-            .borrow_mut()
-            .update_state(&State::Closed(closed_state_reason));
-        self.0.borrow_mut().heartbeat.take();
-        self.0
-            .borrow_mut()
-            .on_connection_loss_subs
-            .retain(|sub| !sub.is_closed());
+        {
+            let mut this = self.0.borrow_mut();
+            this.update_state(&State::Closed(closed_state_reason));
+            this.heartbeat.take();
+            this.on_connection_loss_subs.retain(|sub| !sub.is_closed());
+            this.is_reconnecting.set(true);
+        }
 
         let inner = self.0.borrow();
         for sub in &inner.on_connection_loss_subs {
@@ -515,11 +544,13 @@ impl WebSocketRpcClient {
     fn on_transport_message(&self, msg: ServerMsg) {
         match msg {
             ServerMsg::Event(event) => {
+                let mut this = self.0.borrow_mut();
+                if let Event::SnapshotSynchronized { .. } = &event {
+                    this.is_reconnecting.set(false);
+                }
                 // TODO: filter messages by session
-                self.0.borrow_mut().subs.retain(|sub| !sub.is_closed());
-                self.0
-                    .borrow()
-                    .subs
+                this.subs.retain(|sub| !sub.is_closed());
+                this.subs
                     .iter()
                     .filter_map(|sub| sub.unbounded_send(event.clone()).err())
                     .for_each(|e| console_error(e.to_string()));
@@ -749,6 +780,18 @@ impl RpcClient for WebSocketRpcClient {
 
     // TODO: proper sub registry
     fn send_command(&self, command: Command) {
+        command
+            .clone()
+            .dispatch_with(&mut *self.0.borrow().room_snapshot.borrow_mut());
+
+        {
+            let this = self.0.borrow();
+            if this.is_reconnecting.get() {
+                this.room_snapshot.borrow_mut().fill_intentions(&command);
+                return;
+            }
+        }
+
         let socket_borrow = &self.0.borrow().sock;
 
         // TODO: no socket? we dont really want this method to return err
@@ -784,6 +827,22 @@ impl RpcClient for WebSocketRpcClient {
 
     fn get_token(&self) -> Option<String> {
         self.0.borrow().token.clone()
+    }
+
+    fn restore_state(&self) -> LocalBoxFuture<'static, ()> {
+        let snapshot;
+        let wait_for_reconnection_finish;
+        {
+            let this = self.0.borrow();
+            wait_for_reconnection_finish = this.is_reconnecting.when_eq(false);
+            snapshot = RoomSnapshot::from(&*this.room_snapshot.borrow());
+        }
+
+        self.send_command(Command::SynchronizeMe { snapshot });
+
+        Box::pin(async move {
+            let _ = wait_for_reconnection_finish.await;
+        })
     }
 }
 

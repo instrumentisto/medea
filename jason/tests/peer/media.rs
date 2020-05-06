@@ -13,7 +13,7 @@ use medea_jason::{
 };
 use wasm_bindgen_test::*;
 
-use crate::{get_observable_tracks, get_test_tracks};
+use crate::get_observable_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

@@ -60,6 +60,7 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
+use medea_client_api_proto::snapshots::RoomSnapshot;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -642,6 +643,10 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
+            C::SynchronizeMe { .. } => {
+                // TODO: validate snapshot
+                return Ok(());
+            }
         };
 
         let peer = self
@@ -872,6 +877,11 @@ impl CommandHandler for Room {
         } else {
             Ok(Box::new(actix::fut::ok(())))
         }
+    }
+
+    /// Does nothing atm.
+    fn on_synchronize_me(&mut self, _: RoomSnapshot) -> Self::Output {
+        Ok(Box::new(actix::fut::ok(())))
     }
 }
 

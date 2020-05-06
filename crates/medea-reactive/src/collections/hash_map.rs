@@ -3,7 +3,10 @@
 
 use std::{
     cell::RefCell,
-    collections::{hash_map::Iter, HashMap},
+    collections::{
+        hash_map::{Iter, Values},
+        HashMap,
+    },
     hash::Hash,
 };
 
@@ -170,6 +173,12 @@ where
     /// iterator element type is `(&'a K, &'a V)`.
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.into_iter()
+    }
+
+    /// An iterator visiting all values in arbitrary order. The iterator element
+    /// type is `&'a V`.
+    pub fn values(&self) -> Values<'_, K, V> {
+        self.store.values()
     }
 }
 

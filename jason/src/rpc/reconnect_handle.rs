@@ -53,6 +53,8 @@ impl ReconnectHandle {
                 .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
+            rpc.restore_state().await;
+
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -98,6 +100,8 @@ impl ReconnectHandle {
             {
                 backoff_delayer.delay().await;
             }
+
+            upgrade_or_detached!(rpc, JsValue)?.restore_state().await;
 
             Ok(JsValue::UNDEFINED)
         })

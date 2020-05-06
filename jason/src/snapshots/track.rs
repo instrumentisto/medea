@@ -3,7 +3,8 @@
 
 use futures::Stream;
 use medea_client_api_proto::{
-    snapshots::track::TrackSnapshotAccessor, Direction, MediaType, TrackId,
+    snapshots::{track::TrackSnapshotAccessor, TrackSnapshot},
+    Direction, MediaType, TrackId,
 };
 use medea_reactive::ObservableCell;
 
@@ -21,6 +22,22 @@ pub struct ObservableTrackSnapshot {
 
     /// Media type of `MediaTrack`.
     pub media_type: MediaType,
+
+    /// `MediaTrack` state change which was requested by a user while RPC
+    /// reconnection.
+    pub intent: TrackIntent,
+}
+
+#[derive(Debug, Default)]
+pub struct TrackIntent {
+    /// `MediaTrack`'s mute state which user intents.
+    pub is_muted: Option<bool>,
+}
+
+impl TrackIntent {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 impl ObservableTrackSnapshot {
@@ -36,8 +53,8 @@ impl ObservableTrackSnapshot {
     }
 
     /// Returns media type of this `MediaTrack`.
-    pub fn get_media_type(&self) -> &MediaType {
-        &self.media_type
+    pub fn get_media_type(&self) -> MediaType {
+        self.media_type
     }
 
     /// Returns mute state of this `MediaTrack`.
@@ -63,10 +80,22 @@ impl TrackSnapshotAccessor for ObservableTrackSnapshot {
             is_muted: ObservableCell::new(is_muted),
             direction,
             media_type,
+            intent: TrackIntent::new(),
         }
     }
 
     fn set_is_muted(&mut self, is_muted: bool) {
         self.is_muted.set(is_muted);
+    }
+}
+
+impl From<&ObservableTrackSnapshot> for TrackSnapshot {
+    fn from(from: &ObservableTrackSnapshot) -> Self {
+        TrackSnapshot {
+            id: from.id,
+            media_type: from.media_type,
+            direction: from.direction.clone(),
+            is_muted: from.is_muted.get(),
+        }
     }
 }

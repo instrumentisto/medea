@@ -430,7 +430,7 @@ impl Room {
     pub fn new(
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
-        snapshot: ObservableRoomSnapshot,
+        snapshot: Rc<RefCell<ObservableRoomSnapshot>>,
     ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
@@ -443,7 +443,8 @@ impl Room {
             Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx, snapshot)));
 
         let inner = Rc::downgrade(&room);
-        let mut on_peer_created = room.borrow().snapshot.on_peer_created();
+        let mut on_peer_created =
+            room.borrow().snapshot.borrow().on_peer_created();
         spawn_local(async move {
             while let Some((new_peer_id, new_peer)) =
                 on_peer_created.next().await
@@ -459,7 +460,8 @@ impl Room {
         });
 
         let inner = Rc::downgrade(&room);
-        let mut on_peer_removed = room.borrow().snapshot.on_peer_removed();
+        let mut on_peer_removed =
+            room.borrow().snapshot.borrow().on_peer_removed();
         spawn_local(async move {
             while let Some((removed_peer_id, _removed_peer)) =
                 on_peer_removed.next().await
@@ -495,7 +497,10 @@ impl Room {
                         match event {
                             RoomEvent::RpcEvent(event) => {
                                 event.dispatch_with(
-                                    &mut inner.borrow_mut().snapshot,
+                                    &mut *inner
+                                        .borrow_mut()
+                                        .snapshot
+                                        .borrow_mut(),
                                 );
                             }
                             RoomEvent::PeerEvent(event) => {
@@ -528,6 +533,7 @@ impl Room {
         self.0
             .borrow_mut()
             .snapshot
+            .borrow()
             .peers
             .get(&peer_id)
             .unwrap()
@@ -615,7 +621,7 @@ struct InnerRoom {
     ///
     /// State synchronization with Media Server also will be done by this
     /// [`ObservableRoomSnapshot`].
-    snapshot: ObservableRoomSnapshot,
+    snapshot: Rc<RefCell<ObservableRoomSnapshot>>,
 }
 
 impl InnerRoom {
@@ -625,7 +631,7 @@ impl InnerRoom {
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-        snapshot: ObservableRoomSnapshot,
+        snapshot: Rc<RefCell<ObservableRoomSnapshot>>,
     ) -> Self {
         Self {
             rpc,

@@ -48,14 +48,19 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = WebSocketRpcClient::new(Box::new(|token| {
-            Box::pin(async move {
-                let ws = WebSocketRpcTransport::new(&token)
-                    .await
-                    .map_err(|e| tracerr::new!(e))?;
-                Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
-            })
-        }));
+        let room_snapshot =
+            Rc::new(RefCell::new(ObservableRoomSnapshot::new()));
+        let rpc = WebSocketRpcClient::new(
+            Box::new(|token| {
+                Box::pin(async move {
+                    let ws = WebSocketRpcTransport::new(&token)
+                        .await
+                        .map_err(|e| tracerr::new!(e))?;
+                    Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
+                })
+            }),
+            room_snapshot.clone(),
+        );
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
@@ -75,11 +80,7 @@ impl Jason {
             inner.borrow_mut().media_manager = Rc::default();
         }));
 
-        let room = Room::new(
-            Rc::new(rpc),
-            peer_repository,
-            ObservableRoomSnapshot::new(),
-        );
+        let room = Room::new(Rc::new(rpc), peer_repository, room_snapshot);
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle

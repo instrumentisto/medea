@@ -23,6 +23,11 @@ pub struct PeerSnapshot {
     /// Snapshots of the all `MediaTrack`s of this `Peer`.
     pub tracks: HashMap<TrackId, TrackSnapshot>,
 
+    /// Negotiated media IDs (mid) which the local and remote peers have agreed
+    /// upon to uniquely identify the stream's pairing of sender and receiver
+    /// for all `MediaTrack`s of this [`ObsevablePeerSnapshot`].
+    pub mids: HashMap<TrackId, String>,
+
     /// All [`IceServer`]s created for this `Peer`.
     pub ice_servers: HashSet<IceServer>,
 
@@ -43,6 +48,7 @@ pub trait PeerSnapshotAccessor {
         ice_servers: HashSet<IceServer>,
         is_force_relayed: bool,
         tracks: HashMap<TrackId, Self::Track>,
+        mids: HashMap<TrackId, String>,
     ) -> Self;
 
     /// Sets SDP answer for this `Peer`.
@@ -98,6 +104,8 @@ pub trait PeerSnapshotAccessor {
             });
         }
     }
+
+    fn extend_mids(&mut self, mids: HashMap<TrackId, String>);
 }
 
 impl PeerSnapshotAccessor for PeerSnapshot {
@@ -109,6 +117,7 @@ impl PeerSnapshotAccessor for PeerSnapshot {
         ice_servers: HashSet<IceServer>,
         is_force_relayed: bool,
         tracks: HashMap<TrackId, Self::Track>,
+        mids: HashMap<TrackId, String>,
     ) -> Self {
         Self {
             id,
@@ -118,6 +127,7 @@ impl PeerSnapshotAccessor for PeerSnapshot {
             tracks,
             sdp_answer: None,
             ice_candidates: HashSet::new(),
+            mids,
         }
     }
 
@@ -150,5 +160,9 @@ impl PeerSnapshotAccessor for PeerSnapshot {
         F: FnOnce(Option<&mut Self::Track>),
     {
         (update_fn)(self.tracks.get_mut(&track_id));
+    }
+
+    fn extend_mids(&mut self, mids: HashMap<TrackId, String>) {
+        self.mids.extend(mids.into_iter());
     }
 }

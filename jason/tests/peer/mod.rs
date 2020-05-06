@@ -12,20 +12,18 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStat, TrackStatKind,
     },
-    AudioSettings, Direction, IceConnectionState, MediaType, PeerId, Track,
-    TrackId, TrackPatch, VideoSettings,
+    AudioSettings, Direction, IceConnectionState, MediaType, PeerId, TrackId,
+    TrackPatch, VideoSettings,
 };
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent, RtcStats},
     snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
-    utils::console_error,
 };
 use wasm_bindgen_test::*;
 
 use crate::{
-    await_with_timeout, get_observable_tracks, get_peer, get_test_tracks,
-    resolve_after,
+    await_with_timeout, get_observable_tracks, get_peer, resolve_after,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);

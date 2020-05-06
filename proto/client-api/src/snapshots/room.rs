@@ -4,7 +4,10 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{EventHandler, IceCandidate, IceServer, PeerId, Track, TrackPatch};
+use crate::{
+    CommandHandler, EventHandler, IceCandidate, IceServer, PeerId, PeerMetrics,
+    Track, TrackId, TrackPatch,
+};
 
 use super::{PeerSnapshot, PeerSnapshotAccessor, TrackSnapshotAccessor};
 
@@ -99,9 +102,18 @@ where
         type Peer<R> = <R as RoomSnapshotAccessor>::Peer;
         type Track<R> = <Peer<R> as PeerSnapshotAccessor>::Track;
 
+        let mut mids = HashMap::new();
         let tracks = tracks
             .into_iter()
             .map(|track| {
+                use crate::Direction;
+                let mid = match &track.direction {
+                    Direction::Recv { mid, .. }
+                    | Direction::Send { mid, .. } => mid.clone(),
+                };
+                if let Some(mid) = mid {
+                    mids.insert(track.id, mid);
+                }
                 (
                     track.id,
                     Track::<R>::new(
@@ -119,6 +131,7 @@ where
             ice_servers,
             is_force_relayed,
             tracks,
+            mids,
         );
         self.insert_peer(peer_id, peer);
     }
@@ -165,7 +178,77 @@ where
     }
 
     /// Updates this [`RoomSnapshot`] with a new one.
-    fn on_restore_state(&mut self, snapshot: RoomSnapshot) {
+    fn on_snapshot_synchronized(&mut self, snapshot: RoomSnapshot) {
         self.update_snapshot(snapshot);
     }
+}
+
+impl<R> CommandHandler for R
+where
+    R: RoomSnapshotAccessor,
+{
+    type Output = ();
+
+    fn on_make_sdp_offer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_offer: String,
+        mids: HashMap<TrackId, String>,
+    ) {
+        self.update_peer(from_peer_id, |peer| {
+            if let Some(peer) = peer {
+                peer.set_sdp_offer(Some(sdp_offer));
+                peer.extend_mids(mids);
+            } else {
+                panic!("Peer not found!");
+            }
+        });
+    }
+
+    /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
+    /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
+    /// be changed to [`Stable`].
+    fn on_make_sdp_answer(&mut self, from_peer_id: PeerId, sdp_answer: String) {
+        self.update_peer(from_peer_id, |peer| {
+            if let Some(peer) = peer {
+                peer.set_sdp_answer(Some(sdp_answer));
+            } else {
+                panic!("Peer not found!");
+            }
+        });
+    }
+
+    /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
+    /// Both [`Peer`]s may have any state except [`New`].
+    fn on_set_ice_candidate(
+        &mut self,
+        from_peer_id: PeerId,
+        candidate: IceCandidate,
+    ) {
+        self.update_peer(from_peer_id, |peer| {
+            if let Some(peer) = peer {
+                peer.add_ice_candidate(candidate);
+            }
+        });
+    }
+
+    /// Does nothing atm.
+    fn on_add_peer_connection_metrics(&mut self, _: PeerId, _: PeerMetrics) {}
+
+    /// Sends [`Event::TracksUpdated`] with data from the received
+    /// [`Command::UpdateTracks`].
+    fn on_update_tracks(
+        &mut self,
+        peer_id: PeerId,
+        tracks_patches: Vec<TrackPatch>,
+    ) -> Self::Output {
+        self.update_peer(peer_id, |peer| {
+            if let Some(peer) = peer {
+                peer.update_tracks_by_patches(tracks_patches);
+            }
+        })
+    }
+
+    fn on_synchronize_me(&mut self, _: RoomSnapshot) -> Self::Output {}
 }

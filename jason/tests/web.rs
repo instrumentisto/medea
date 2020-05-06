@@ -153,6 +153,7 @@ pub fn get_peer(
         ice_servers,
         is_force_relayed,
         HashMap::new(),
+        HashMap::new(),
     );
     (
         PeerConnection::new(

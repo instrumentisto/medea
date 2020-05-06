@@ -9,8 +9,8 @@ use std::{
 
 use futures::{Stream, StreamExt as _};
 use medea_client_api_proto::{
-    snapshots::peer::PeerSnapshotAccessor, IceCandidate, IceServer, PeerId,
-    TrackId,
+    snapshots::{peer::PeerSnapshotAccessor, PeerSnapshot, TrackSnapshot},
+    Command, IceCandidate, IceServer, PeerId, TrackId, TrackPatch,
 };
 use medea_reactive::{collections::ObservableHashSet, Observable};
 
@@ -39,9 +39,36 @@ pub struct ObservablePeerSnapshot {
 
     /// All [`IceCandidate`]s of this `Peer`.
     pub ice_candidates: ObservableHashSet<IceCandidate>,
+
+    /// Negotiated media IDs (mid) which the local and remote peers have agreed
+    /// upon to uniquely identify the stream's pairing of sender and receiver
+    /// for all `MediaTrack`s of this [`ObsevablePeerSnapshot`].
+    pub mids: HashMap<TrackId, String>,
 }
 
 impl ObservablePeerSnapshot {
+    /// Returns intention [`Command`]s which user requested while RPC
+    /// reconnecting.
+    pub fn get_intents(&self) -> Vec<Command> {
+        let mut commands = Vec::new();
+        let mut tracks_patches = Vec::new();
+        for track in self.tracks.values() {
+            let mut track_ref = track.borrow_mut();
+            if let Some(is_muted) = track_ref.intent.is_muted.take() {
+                tracks_patches.push(TrackPatch {
+                    is_muted: Some(is_muted),
+                    id: track_ref.id,
+                });
+            }
+        }
+        commands.push(Command::UpdateTracks {
+            peer_id: self.id,
+            tracks_patches,
+        });
+
+        commands
+    }
+
     /// Returns [`Stream`] to which will be sent SDP answer when it changes.
     pub fn on_sdp_answer_made(&self) -> impl Stream<Item = String> {
         self.sdp_answer.subscribe().filter_map(|new_sdp_answer| {
@@ -94,6 +121,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
         ice_servers: HashSet<IceServer>,
         is_force_relayed: bool,
         tracks: HashMap<TrackId, Self::Track>,
+        mids: HashMap<TrackId, String>,
     ) -> Self {
         ObservablePeerSnapshot {
             id,
@@ -106,6 +134,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
                 .into_iter()
                 .map(|(id, track)| (id, Rc::new(RefCell::new(track))))
                 .collect(),
+            mids,
         }
     }
 
@@ -142,6 +171,29 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
             (update_fn)(Some(&mut track.borrow_mut()));
         } else {
             (update_fn)(None);
+        }
+    }
+
+    fn extend_mids(&mut self, mids: HashMap<TrackId, String>) {
+        self.mids.extend(mids.into_iter());
+    }
+}
+
+impl From<&ObservablePeerSnapshot> for PeerSnapshot {
+    fn from(from: &ObservablePeerSnapshot) -> Self {
+        Self {
+            id: from.id,
+            is_force_relayed: *from.is_force_relayed,
+            sdp_offer: from.sdp_offer.clone(),
+            sdp_answer: from.sdp_answer.clone(),
+            ice_servers: from.ice_servers.iter().cloned().collect(),
+            mids: from.mids.clone(),
+            ice_candidates: from.ice_candidates.iter().cloned().collect(),
+            tracks: from
+                .tracks
+                .iter()
+                .map(|(id, track)| (*id, TrackSnapshot::from(&*track.borrow())))
+                .collect(),
         }
     }
 }

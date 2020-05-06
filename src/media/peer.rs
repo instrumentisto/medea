@@ -207,7 +207,7 @@ impl<T> Peer<T> {
             |mut tracks, (_, track)| {
                 tracks.push(Track {
                     id: track.id,
-                    media_type: track.media_type.clone(),
+                    media_type: track.media_type,
                     direction: Direction::Send {
                         receivers: vec![self.context.partner_peer],
                         mid: track.mid(),
@@ -223,7 +223,7 @@ impl<T> Peer<T> {
             .fold(tracks, |mut tracks, (_, track)| {
                 tracks.push(Track {
                     id: track.id,
-                    media_type: track.media_type.clone(),
+                    media_type: track.media_type,
                     direction: Direction::Recv {
                         sender: self.context.partner_peer,
                         mid: track.mid(),

@@ -4,7 +4,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::Stream;
-use medea_client_api_proto::{snapshots::room::RoomSnapshotAccessor, PeerId};
+use medea_client_api_proto::{
+    snapshots::{room::RoomSnapshotAccessor, PeerSnapshot, RoomSnapshot},
+    Command, PeerId,
+};
 use medea_reactive::collections::ObservableHashMap;
 
 use super::ObservablePeerSnapshot;
@@ -37,6 +40,49 @@ impl ObservableRoomSnapshot {
     ) -> impl Stream<Item = (PeerId, Rc<RefCell<ObservablePeerSnapshot>>)> {
         self.peers.on_remove()
     }
+
+    /// Stores provided intention [`Command`] in the [`RoomSnapshot`].
+    ///
+    /// When RPC will be reconnected and state will be restored then this user
+    /// intentions will be sent.
+    #[allow(clippy::single_match)]
+    pub fn fill_intentions(&mut self, cmd: &Command) {
+        match cmd {
+            Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } => {
+                if let Some(peer) = self.peers.get(peer_id) {
+                    let peer_ref = peer.borrow();
+                    for track_patch in tracks_patches {
+                        if let Some(track) =
+                            peer_ref.tracks.get(&track_patch.id)
+                        {
+                            let mut track_ref = track.borrow_mut();
+                            if let Some(is_muted) = track_patch.is_muted {
+                                if track_ref.is_muted.get() != is_muted {
+                                    track_ref.intent.is_muted = Some(is_muted);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+
+    /// Returns intention [`Command`]s which user requested while RPC
+    /// reconnecting.
+    pub fn get_intents(&self) -> Vec<Command> {
+        let mut commands = Vec::new();
+        for peer in self.peers.values() {
+            let peer_ref = peer.borrow();
+            commands.append(&mut peer_ref.get_intents());
+        }
+
+        commands
+    }
 }
 
 impl Default for ObservableRoomSnapshot {
@@ -67,6 +113,18 @@ impl RoomSnapshotAccessor for ObservableRoomSnapshot {
             (update_fn)(Some(&mut peer.borrow_mut()));
         } else {
             (update_fn)(None);
+        }
+    }
+}
+
+impl From<&ObservableRoomSnapshot> for RoomSnapshot {
+    fn from(from: &ObservableRoomSnapshot) -> Self {
+        Self {
+            peers: from
+                .peers
+                .iter()
+                .map(|(id, peer)| (*id, PeerSnapshot::from(&*peer.borrow())))
+                .collect(),
         }
     }
 }
