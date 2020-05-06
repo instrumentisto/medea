@@ -69,6 +69,8 @@ impl CommandHandler for Room {
     /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
     /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
     /// be changed to [`Stable`].
+    ///
+    /// [`Stable`]: crate::media::peer::Stable
     fn on_make_sdp_answer(
         &mut self,
         from_peer_id: PeerId,
@@ -158,6 +160,8 @@ impl CommandHandler for Room {
 
     /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
+    ///
+    /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,

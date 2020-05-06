@@ -1,5 +1,7 @@
-//! Implementation of the [`Command`]s and functions used for the Dynamic
-//! Control API.
+//! Handlers for messages sent via [Control API], i.e. dynamic [`Room`] pipeline
+//! mutations.
+//!
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::collections::{HashMap, HashSet};
 
@@ -115,7 +117,7 @@ impl Room {
     ///
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
     /// provided [`MemberId`] was not found in [`ParticipantService`].
-    pub fn create_src_endpoint(
+    fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
         publish_id: WebRtcPublishId,
@@ -168,7 +170,7 @@ impl Room {
     ///
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
     /// provided [`MemberId`] doesn't exist.
-    pub fn create_sink_endpoint(
+    fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
@@ -225,6 +227,28 @@ impl Room {
         }
 
         Ok(())
+    }
+
+    /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
+    /// [`Member`].
+    ///
+    /// This will delete [`Peer`]s from [`PeerRepository`] and send
+    /// [`Event::PeersRemoved`] event to [`Member`].
+    fn remove_peers(
+        &mut self,
+        member_id: &MemberId,
+        peer_ids_to_remove: &HashSet<PeerId>,
+        ctx: &mut Context<Self>,
+    ) {
+        debug!("Remove peers.");
+        self.peers
+            .remove_peers(&member_id, &peer_ids_to_remove)
+            .into_iter()
+            .for_each(|(member_id, peers_id)| {
+                self.member_peers_removed(peers_id, member_id, ctx)
+                    .map(|_, _, _| ())
+                    .spawn(ctx);
+            });
     }
 }
 
@@ -337,7 +361,7 @@ impl Handler<Delete> for Room {
     }
 }
 
-/// Signal for creating new [`Member`] in this [`Room`].
+/// Signal for creating new `Member` in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);

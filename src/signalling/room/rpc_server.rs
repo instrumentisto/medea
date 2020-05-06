@@ -28,11 +28,11 @@ use super::{ActFuture, Room};
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
 pub enum CommandValidationError {
-    /// Unable to find expected [`Peer`].
+    /// Unable to find expected `Peer`.
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
 
-    /// Specified [`Peer`] doesn't belong to the [`Member`] which sends
+    /// Specified `Peer` doesn't belong to the `Member` which sends
     /// [`Command`].
     #[display(
         fmt = "Peer [id = {}] that doesn't belong to Member [id = {}]",
@@ -47,7 +47,7 @@ impl Room {
     ///
     /// Two assertions are made:
     /// 1. Specified [`PeerId`] must be known to [`Room`].
-    /// 2. Found [`Peer`] must belong to specified [`Member`]
+    /// 2. Found `Peer` must belong to specified `Member`
     fn validate_command(
         &self,
         command: &CommandMessage,
@@ -202,11 +202,12 @@ impl Handler<CommandMessage> for Room {
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<Result<(), ()>>;
 
-    /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
-    /// establishment between members.
-    /// Creates and interconnects all available [`Member`]'s [`Peer`]s.
+    /// Saves new [`RpcConnection`] in [`ParticipantService`][1], initiates
+    /// media establishment between members.
+    /// Creates and interconnects all available `Member`'s `Peer`s.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
+    /// [1]: crate::signalling::participants::ParticipantService
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -244,15 +245,17 @@ impl Handler<RpcConnectionEstablished> for Room {
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Passes message to [`ParticipantService`] to cleanup stored connections.
+    /// Passes message to [`ParticipantService`][1] to cleanup stored
+    /// connections.
     ///
-    /// Removes all related for disconnected [`Member`] [`Peer`]s.
+    /// Removes all related for disconnected `Member` `Peer`s.
     ///
-    /// Sends [`PeersRemoved`] message to [`Member`].
+    /// Sends [`PeersRemoved`] message to `Member`.
     ///
-    /// Deletes all removed [`PeerId`]s from all [`Member`]'s endpoints.
+    /// Deletes all removed [`PeerId`]s from all `Member`'s endpoints.
     ///
     /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
+    /// [1]: crate::signalling::participants::ParticipantService
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",

@@ -1,13 +1,9 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
-//!
-//! [`Member`]: crate::signalling::elements::member::Member
 
 mod command_handler;
 mod dynamic_api;
 mod rpc_server;
-
-use std::collections::HashSet;
 
 use actix::{
     Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
@@ -116,7 +112,7 @@ pub struct Room {
 
     /// Service for sending [`CallbackEvent`]s.
     ///
-    /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
+    /// [`CallbackEvent`]: crate::api::control::callback::CallbackEvent
     callbacks: CallbackService<CallbackClientFactoryImpl>,
 
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
@@ -156,7 +152,7 @@ impl Room {
     }
 
     /// Returns [`RoomId`] of this [`Room`].
-    pub fn get_id(&self) -> RoomId {
+    fn get_id(&self) -> RoomId {
         self.id.clone()
     }
 
@@ -362,28 +358,6 @@ impl Room {
                 }
             },
         ))
-    }
-
-    /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
-    /// [`Member`].
-    ///
-    /// This will delete [`Peer`]s from [`PeerRepository`] and send
-    /// [`Event::PeersRemoved`] event to [`Member`].
-    fn remove_peers(
-        &mut self,
-        member_id: &MemberId,
-        peer_ids_to_remove: &HashSet<PeerId>,
-        ctx: &mut Context<Self>,
-    ) {
-        debug!("Remove peers.");
-        self.peers
-            .remove_peers(&member_id, &peer_ids_to_remove)
-            .into_iter()
-            .for_each(|(member_id, peers_id)| {
-                self.member_peers_removed(peers_id, member_id, ctx)
-                    .map(|_, _, _| ())
-                    .spawn(ctx);
-            });
     }
 }
 
