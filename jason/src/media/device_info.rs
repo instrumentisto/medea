@@ -1,4 +1,4 @@
-//! [`MediaDeviceInfo`][1] related objects.
+//! [MediaDeviceInfo][1] related objects.
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#device-info
 
@@ -34,9 +34,11 @@ pub struct InputDeviceInfo {
 /// [MediaDeviceKind][1] wrapper, excluding `audiooutput`.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevicekind
+#[derive(Clone, Copy, Eq, PartialEq)]
 enum InputDeviceKind {
     /// `audioinput` device (for example a microphone).
     Audio,
+
     /// `videoinput` device ( for example a webcam).
     Video,
 }

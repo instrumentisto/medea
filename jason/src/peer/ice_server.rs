@@ -1,6 +1,6 @@
 //! Collection of [`RtcIceServer`][1]s.
 //!
-//! [1]: https://www.w3.org/TR/webrtc/#rtciceserver-dictionary
+//! [1]: https://w3.org/TR/webrtc/#rtciceserver-dictionary
 
 use std::ops::Deref;
 
@@ -11,7 +11,7 @@ use web_sys::RtcIceServer;
 
 /// Collection of [`RtcIceServer`]s (see [RTCIceServer][1]).
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#rtciceserver-dictionary
+/// [1]: https://w3.org/TR/webrtc/#rtciceserver-dictionary
 pub struct RtcIceServers(JsArray);
 
 impl<I> From<I> for RtcIceServers

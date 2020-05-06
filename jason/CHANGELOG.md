@@ -14,6 +14,7 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Library API:
+    - Replace `MediaStreamHandle` with `LocalMediaStream` and `RemoteMediaStream` ([#97]);
     - Expose `on_local_stream` callback in `Room` instead of `Jason` ([#54]);
     - Remove error argument from `on_local_stream` callback ([#54]);
     - Room initialization ([#46]):
@@ -25,7 +26,7 @@ All user visible changes to this project will be documented in this file. This p
 
 - Media management:
     - Library API:
-        - Mute/unmute local video/audio ([#40], [#81]):
+        - Mute/unmute local video/audio ([#40], [#81], [#97]):
             - `Room.mute_audio()`;
             - `Room.unmute_audio()`;
             - `Room.mute_video()`;
@@ -35,15 +36,15 @@ All user visible changes to this project will be documented in this file. This p
             - `MediaManager.enumerate_devices()`;
             - `MediaManager.init_local_stream()`.
         - Local media stream constraints:
-            - `MediaStreamConstraints`, `AudioTrackConstraints` classes ([#46]);
+            - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
             - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]).
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`;
-        - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
+        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RtcIceTransportPolicy` configuration ([#79]).
+    - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
@@ -77,6 +78,7 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#87]: /../../pull/87
 [#90]: /../../pull/90
+[#97]: /../../pull/97
 
 
 

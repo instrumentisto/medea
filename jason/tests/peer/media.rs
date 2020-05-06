@@ -1,8 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{convert::TryFrom, rc::Rc};
+use std::{convert::TryFrom, mem, rc::Rc};
 
-use medea_client_api_proto::{TrackId, TrackPatch};
+use futures::channel::mpsc;
+use medea_client_api_proto::{PeerId, TrackId, TrackPatch};
 use medea_jason::{
     media::MediaManager,
     peer::{
@@ -20,9 +21,13 @@ async fn get_test_media_connections(
     enabled_audio: bool,
     enabled_video: bool,
 ) -> (MediaConnections, TrackId, TrackId) {
-    let media_connections = MediaConnections::new(Rc::new(
-        RtcPeerConnection::new(vec![], false).unwrap(),
-    ));
+    let (tx, rx) = mpsc::unbounded();
+    mem::forget(rx);
+    let media_connections = MediaConnections::new(
+        PeerId(0),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        tx,
+    );
     let (audio_track, video_track) =
         get_observable_tracks(!enabled_audio, !enabled_video);
     let audio_track_id = audio_track.borrow().get_id();
@@ -36,7 +41,7 @@ async fn get_test_media_connections(
     let (stream, _) = manager.get_stream(&caps).await.unwrap();
 
     media_connections
-        .insert_local_stream(&caps.parse_stream(&stream).unwrap())
+        .insert_local_stream(&caps.parse_stream(stream).unwrap())
         .await
         .unwrap();
 
@@ -53,20 +58,31 @@ async fn get_test_media_connections(
 }
 
 #[wasm_bindgen_test]
-fn get_stream_request() {
-    let media_connections = MediaConnections::new(Rc::new(
-        RtcPeerConnection::new(vec![], false).unwrap(),
-    ));
+fn get_stream_request1() {
+    let (tx, rx) = mpsc::unbounded();
+    mem::forget(rx);
+    let media_connections = MediaConnections::new(
+        PeerId(0),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        tx,
+    );
     let (audio_track, video_track) = get_observable_tracks(false, false);
     media_connections
         .update_tracks(vec![audio_track, video_track])
         .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_some());
+}
 
-    let media_connections = MediaConnections::new(Rc::new(
-        RtcPeerConnection::new(vec![], false).unwrap(),
-    ));
+#[wasm_bindgen_test]
+fn get_stream_request2() {
+    let (tx, rx) = mpsc::unbounded();
+    mem::forget(rx);
+    let media_connections = MediaConnections::new(
+        PeerId(0),
+        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        tx,
+    );
     media_connections.update_tracks(vec![]).unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());
@@ -91,8 +107,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(!video_track.is_muted());
 
     audio_track.mute_state_transition_to(StableMuteState::Muted);
     media_connections
@@ -101,8 +117,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(true),
         }])
         .unwrap();
-    assert!(audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(audio_track.is_muted());
+    assert!(!video_track.is_muted());
 
     video_track.mute_state_transition_to(StableMuteState::Muted);
     media_connections
@@ -111,8 +127,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(true),
         }])
         .unwrap();
-    assert!(audio_track.is_track_muted());
-    assert!(video_track.is_track_muted());
+    assert!(audio_track.is_muted());
+    assert!(video_track.is_muted());
 
     audio_track.mute_state_transition_to(StableMuteState::NotMuted);
     media_connections
@@ -121,8 +137,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(false),
         }])
         .unwrap();
-    assert!(!audio_track.is_track_muted());
-    assert!(video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(video_track.is_muted());
 
     video_track.mute_state_transition_to(StableMuteState::NotMuted);
     media_connections
@@ -131,8 +147,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted: Some(false),
         }])
         .unwrap();
-    assert!(!audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(!video_track.is_muted());
 }
 
 #[wasm_bindgen_test]
@@ -145,8 +161,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(audio_track.is_track_muted());
-    assert!(!video_track.is_track_muted());
+    assert!(audio_track.is_muted());
+    assert!(!video_track.is_muted());
 }
 
 #[wasm_bindgen_test]
@@ -159,8 +175,8 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_track_muted());
-    assert!(video_track.is_track_muted());
+    assert!(!audio_track.is_muted());
+    assert!(video_track.is_muted());
 }
 
 /// Tests for [`Sender::update`] function.
@@ -189,7 +205,7 @@ mod sender_patch {
             is_muted: Some(true),
         });
 
-        assert!(!sender.is_track_muted());
+        assert!(!sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -200,7 +216,7 @@ mod sender_patch {
             is_muted: Some(true),
         });
 
-        assert!(sender.is_track_muted());
+        assert!(sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -211,7 +227,7 @@ mod sender_patch {
             is_muted: Some(false),
         });
 
-        assert!(!sender.is_track_muted());
+        assert!(!sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -221,14 +237,14 @@ mod sender_patch {
             id: track_id,
             is_muted: Some(true),
         });
-        assert!(sender.is_track_muted());
+        assert!(sender.is_muted());
 
         sender.update(&TrackPatch {
             id: track_id,
             is_muted: Some(true),
         });
 
-        assert!(sender.is_track_muted());
+        assert!(sender.is_muted());
     }
 
     #[wasm_bindgen_test]
@@ -239,6 +255,6 @@ mod sender_patch {
             is_muted: None,
         });
 
-        assert!(!sender.is_track_muted());
+        assert!(!sender.is_muted());
     }
 }

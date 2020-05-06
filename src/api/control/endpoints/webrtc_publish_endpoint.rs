@@ -28,22 +28,24 @@ pub enum P2pMode {
 
 impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     fn from(value: proto::web_rtc_publish_endpoint::P2p) -> Self {
-        use proto::web_rtc_publish_endpoint::P2p::*;
+        use proto::web_rtc_publish_endpoint::P2p;
+
         match value {
-            Always => Self::Always,
-            IfPossible => Self::IfPossible,
-            Never => Self::Never,
+            P2p::Always => Self::Always,
+            P2p::IfPossible => Self::IfPossible,
+            P2p::Never => Self::Never,
         }
     }
 }
 
 impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     fn into(self) -> proto::web_rtc_publish_endpoint::P2p {
-        use proto::web_rtc_publish_endpoint::P2p::*;
+        use proto::web_rtc_publish_endpoint::P2p;
+
         match self {
-            Self::Always => Always,
-            Self::IfPossible => IfPossible,
-            Self::Never => Never,
+            Self::Always => P2p::Always,
+            Self::IfPossible => P2p::IfPossible,
+            Self::Never => P2p::Never,
         }
     }
 }
