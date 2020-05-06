@@ -1,7 +1,4 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
-//!
-//! [`Room`]: crate::signalling::Room
-//! [`Peer`]: crate::media::peer::Peer
 
 mod media_traffic_state;
 mod metrics;
@@ -71,14 +68,14 @@ pub struct PeersService {
     /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
 
-    /// [`PeerTrafficWatcher`] which analyzes Peers traffic metrics.
+    /// [`PeerTrafficWatcher`] which analyzes [`Peer`]s traffic metrics.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetricsService,
 
-    /// Duration, after which Peers stats will be considered as stale. Passed
-    /// to [`PeersMetricsService`] when registering new Peers.
+    /// Duration, after which [`Peer`]s stats will be considered as stale.
+    /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
 }
 

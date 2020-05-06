@@ -24,6 +24,7 @@ impl MediaTrafficState {
     /// Returns new [`MediaTrafficState`] in which provided [`MediaType`] is
     /// started.
     #[inline]
+    #[cfg(test)]
     pub const fn with_media_type(media_type: MediaType) -> MediaTrafficState {
         Self(media_type as u8)
     }
