@@ -1,3 +1,6 @@
+//! Implementation of the [`MediaTrafficState`] which will be used for
+//! the storing started/stopped [`MediaType`]s.
+
 use crate::api::control::callback::MediaType;
 
 /// Traffic state of all [`MediaType`]s for some `Endpoint`.
@@ -23,6 +26,7 @@ impl MediaTrafficState {
 
     /// Returns new [`MediaTrafficState`] in which provided [`MediaType`] is
     /// started.
+    #[cfg(test)]
     #[inline]
     pub const fn with_media_type(media_type: MediaType) -> MediaTrafficState {
         Self(media_type as u8)
@@ -53,6 +57,7 @@ impl MediaTrafficState {
     #[inline]
     pub const fn is_started(self, media_type: MediaType) -> bool {
         let media_type = media_type as u8;
+
         (self.0 & media_type) == media_type
     }
 
@@ -71,7 +76,7 @@ impl MediaTrafficState {
     /// [`MediaTrafficState`].
     ///
     /// Returns `None` if all [`MediaType`]s stopped.
-    pub fn into_media_type(self) -> Option<MediaType> {
+    pub fn get_started_media_type(self) -> Option<MediaType> {
         if self.is_started(MediaType::Both) {
             Some(MediaType::Both)
         } else if self.is_started(MediaType::Audio) {
@@ -84,18 +89,26 @@ impl MediaTrafficState {
     }
 }
 
+/// Returns [`MediaType`] which was started based on [`MediaTrafficState`]
+/// before and [`MediaTrafficState`] after.
+///
+/// `None` will be returned if none of the [`MediaType`]s was started.
 pub fn which_media_type_was_started(
     before: MediaTrafficState,
     after: MediaTrafficState,
 ) -> Option<MediaType> {
-    MediaTrafficState(!before.0 & after.0).into_media_type()
+    MediaTrafficState(!before.0 & after.0).get_started_media_type()
 }
 
+/// Returns [`MediaType`] which was stopped based on [`MediaTrafficState`]
+/// before and [`MediaTrafficState`] after.
+///
+/// `None` will be returned if none of the [`MediaType`]s was stopped.
 pub fn which_media_type_was_stopped(
     before: MediaTrafficState,
     after: MediaTrafficState,
 ) -> Option<MediaType> {
-    MediaTrafficState(before.0 & !after.0).into_media_type()
+    MediaTrafficState(before.0 & !after.0).get_started_media_type()
 }
 
 #[cfg(test)]

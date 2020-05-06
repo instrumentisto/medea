@@ -22,7 +22,7 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    Direction, MediaType as MediaTypeProto, PeerId,
+    MediaType as MediaTypeProto, PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -33,18 +33,17 @@ use crate::{
     },
     log::prelude::*,
     media::PeerStateMachine,
-    signalling::peers::FlowMetricSource,
+    signalling::peers::{
+        media_traffic_state::{
+            which_media_type_was_started, which_media_type_was_stopped,
+            MediaTrafficState,
+        },
+        FlowMetricSource,
+    },
     utils::convert_instant_to_utc,
 };
 
 use super::traffic_watcher::PeerTrafficWatcher;
-use crate::{
-    conf::Media,
-    signalling::peers::media_traffic_state::{
-        which_media_type_was_started, which_media_type_was_stopped,
-        MediaTrafficState,
-    },
-};
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
@@ -225,8 +224,12 @@ struct PeerStat {
     /// All [`TrackStat`]s with [`Send`] direction of this [`PeerStat`].
     senders: HashMap<StatId, TrackStat<Send>>,
 
+    /// State of the traffic flowing with the [`Send`] direction for
+    /// [`MediaType`]s.
     send_traffic_state: MediaTrafficState,
 
+    /// State of the traffic flowing with the [`Recv`] direction for
+    /// [`MediaType`]s.
     recv_traffic_state: MediaTrafficState,
 
     /// All [`TrackStat`]s with [`Recv`] of this [`PeerStat`].
@@ -247,50 +250,46 @@ struct PeerStat {
 impl PeerStat {
     /// Updates [`TrackStat`] with provided [`StatId`] by
     /// [`RtcOutboundRtpStreamStats`].
+    ///
+    /// Updates [`MediaTrafficState`] of the [`Send`] direction.
     fn update_sender(
         &mut self,
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
     ) {
         self.last_update = Utc::now();
-        self.senders
-            .entry(stat_id.clone())
-            .or_insert_with(|| TrackStat {
-                updated_at: Instant::now(),
-                direction: Send { packets_sent: 0 },
-                media_type: TrackMediaType::from(&upd.media_type),
-            })
-            .update(upd);
-        let sender = self.senders.get(&stat_id).unwrap();
-        if self.is_track_active(&sender) {
-            let sender_media_type: MediaType = sender.media_type.into();
-            self.send_traffic_state.started(sender_media_type);
-        }
+
+        let sender = self.senders.entry(stat_id).or_insert_with(|| TrackStat {
+            updated_at: Instant::now(),
+            direction: Send { packets_sent: 0 },
+            media_type: TrackMediaType::from(&upd.media_type),
+        });
+        sender.update(upd);
+
+        self.send_traffic_state.started(sender.media_type.into());
     }
 
     /// Updates [`TrackStat`] with provided [`StatId`] by
     /// [`RtcInboundRtpStreamStats`].
+    ///
+    /// Updates [`MediaTrafficState`] of the [`Recv`] direction.
     fn update_receiver(
         &mut self,
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
     ) {
         self.last_update = Utc::now();
-        self.receivers
-            .entry(stat_id.clone())
-            .or_insert_with(|| TrackStat {
+        let receiver =
+            self.receivers.entry(stat_id).or_insert_with(|| TrackStat {
                 updated_at: Instant::now(),
                 direction: Recv {
                     packets_received: 0,
                 },
                 media_type: TrackMediaType::from(&upd.media_specific_stats),
-            })
-            .update(upd);
-        let receiver = self.receivers.get(&stat_id).unwrap();
-        if self.is_track_active(&receiver) {
-            let receiver_media_type = receiver.media_type.into();
-            self.recv_traffic_state.started(receiver_media_type);
-        }
+            });
+        receiver.update(upd);
+
+        self.recv_traffic_state.started(receiver.media_type.into());
     }
 
     /// Returns last update time of the tracks with provided [`MediaDirection`]
@@ -384,19 +383,6 @@ impl PeerStat {
     fn is_stopped(&self) -> bool {
         self.recv_traffic_state.is_stopped(MediaType::Both)
             && self.send_traffic_state.is_stopped(MediaType::Both)
-
-        // let active_senders_count = self
-        //     .senders
-        //     .values()
-        //     .filter(|sender| self.is_track_active(&sender))
-        //     .count();
-        // let active_receivers_count = self
-        //     .receivers
-        //     .values()
-        //     .filter(|recv| self.is_track_active(&recv))
-        //     .count();
-        //
-        // active_receivers_count + active_senders_count == 0
     }
 
     /// Returns [`Instant`] time of [`TrackStat`] which haven't updated longest.
@@ -640,6 +626,13 @@ impl PeersMetricsService {
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
     /// [`PeersMetricsService`].
+    ///
+    /// Notifies [`PeerTrafficWatcher`] about traffic flowing/stopping.
+    ///
+    /// Also, from this function can be sent
+    /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
+    /// TrackTrafficStarted`] to the [`Room`] if some
+    /// [`MediaType`]/[`Direction`] was stopped.
     pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
@@ -761,12 +754,16 @@ impl PeersMetricsService {
             .unregister_peers(self.room_id.clone(), peers_ids);
     }
 
-    pub fn update_peer_spec(&mut self, peer: &PeerStateMachine) {
+    /// Updates [`PeerTracks`] of this [`PeerSpec`] from the provided
+    /// [`PeerStateMachine`].
+    pub fn update_peer_tracks(&mut self, peer: &PeerStateMachine) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().spec = PeerTracks::from(peer);
         }
     }
 
+    /// Returns `true` is `Peer` with provided [`PeerId`] is registered in this
+    /// [`PeerMetricsService`].
     pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
         self.peers.contains_key(&peer_id)
     }
