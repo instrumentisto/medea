@@ -1,3 +1,6 @@
+//! [`Observable`] implementation of the [`PeerSnapshotAccessor`] which will be
+//! used in the Jason for the `Peer`'s real state updating.
+
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -130,6 +133,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
         self.ice_candidates.insert(ice_candidate);
     }
 
+    /// Does nothing if [`TrackSnapshot`] with a provided [`TrackId`] not found.
     fn update_track<F>(&mut self, track_id: TrackId, update_fn: F)
     where
         F: FnOnce(Option<&mut Self::Track>),

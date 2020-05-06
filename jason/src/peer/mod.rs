@@ -30,7 +30,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    media::{MediaManager, MediaManagerError},
+    media::{MediaManager, MediaManagerError, MediaStream},
     snapshots::{ObservablePeerSnapshot, ObservableTrackSnapshot},
     utils::{console_error, JasonError, JsCaused, JsError},
     MediaStreamSettings,
@@ -54,7 +54,6 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
-use crate::media::MediaStream;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///

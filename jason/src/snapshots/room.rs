@@ -1,3 +1,6 @@
+//! [`Observable`] implementation of the [`RoomSnapshotAccessor`] which will be
+//! used in the Jason for the `Room`'s real state updating.
+
 use std::{cell::RefCell, rc::Rc};
 
 use futures::Stream;
@@ -55,6 +58,7 @@ impl RoomSnapshotAccessor for ObservableRoomSnapshot {
         self.peers.remove(&peer_id);
     }
 
+    /// Does nothing if [`PeerSnapshot`] with a provided [`PeerId`] not found.
     fn update_peer<F>(&mut self, peer_id: PeerId, update_fn: F)
     where
         F: FnOnce(Option<&mut Self::Peer>),

@@ -1,11 +1,10 @@
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, collections::HashSet, rc::Rc};
 
 use actix::{AsyncContext as _, Context, System};
 use actix_http::ws::CloseCode;
 use medea_client_api_proto::{Direction, Event, PeerId};
 
 use crate::signalling::{CloseSocket, TestMember};
-use std::collections::HashSet;
 
 #[test]
 #[allow(clippy::too_many_lines)]

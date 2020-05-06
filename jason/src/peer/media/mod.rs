@@ -20,6 +20,7 @@ use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::PeerEvent,
+    snapshots::ObservableTrackSnapshot,
     utils::{delay_for, JsCaused, JsError},
 };
 
@@ -30,7 +31,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use crate::snapshots::ObservableTrackSnapshot;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]

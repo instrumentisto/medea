@@ -72,8 +72,13 @@ where
     K: Hash + Eq + Clone,
     V: Clone,
 {
+    /// Data stored by this [`ObservableHashMap`].
     store: HashMap<K, V>,
+
+    /// Subscribers of the [`ObservableHashMap::on_insert`] method.
     on_insert_subs: RefCell<Vec<mpsc::UnboundedSender<(K, V)>>>,
+
+    /// Subscribers of the [`ObservableHashMap::on_remove`] method.
     on_remove_subs: RefCell<Vec<mpsc::UnboundedSender<(K, V)>>>,
 }
 
@@ -208,6 +213,8 @@ impl<'a, K: Hash + Eq + Clone, V: Clone> IntoIterator
 }
 
 impl<K: Hash + Eq + Clone, V: Clone> Drop for ObservableHashMap<K, V> {
+    /// Sends all key-values of a dropped [`ObservableHashMap`] to the
+    /// [`ObservableHashMap::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;

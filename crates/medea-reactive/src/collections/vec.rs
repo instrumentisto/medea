@@ -60,8 +60,13 @@ use futures::{channel::mpsc, Stream};
 /// ```
 #[derive(Debug)]
 pub struct ObservableVec<T: Clone> {
+    /// Data stored by this [`ObservableVec`].
     store: Vec<T>,
+
+    /// Subscribers of the [`ObservableVec::on_push`] method.
     on_push_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
+
+    /// Subscribers of the [`ObservableVec::on_remove`] method.
     on_remove_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
 }
 
@@ -173,6 +178,8 @@ impl<T> Drop for ObservableVec<T>
 where
     T: Clone,
 {
+    /// Sends all items of a dropped [`ObservableVec`] to the
+    /// [`ObservableVec::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;

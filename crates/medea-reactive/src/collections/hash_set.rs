@@ -83,8 +83,13 @@ use futures::{channel::mpsc, Stream};
 /// ```
 #[derive(Debug)]
 pub struct ObservableHashSet<T: Clone + Hash + Eq> {
+    /// Data stored by this [`ObservableHashSet`].
     store: HashSet<T>,
+
+    /// Subscribers of the [`ObservableHashSet::on_insert`] method.
     on_insert_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
+
+    /// Subscribers of the [`ObservableHashSet::on_remove`] method.
     on_remove_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
 }
 
@@ -224,6 +229,8 @@ impl<T> Drop for ObservableHashSet<T>
 where
     T: Clone + Hash + Eq,
 {
+    /// Sends all values of a dropped [`ObservableHashSet`] to the
+    /// [`ObservableHashSet::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;

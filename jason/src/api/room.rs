@@ -515,7 +515,9 @@ impl Room {
     /// Inserts provided [`ObservableTrackSnapshot`] to this [`Room`]'s
     /// [`ObservableRoomSnapshot`].
     ///
-    /// __Used for testing purposes.__
+    /// __Used for the testing purposes.__
+    ///
+    /// This function can PANIC, so use it ONLY in the tests.
     #[cfg(feature = "mockable")]
     pub fn insert_track_snapshot(
         &self,
@@ -607,6 +609,12 @@ struct InnerRoom {
     close_reason: CloseReason,
 
     /// Snapshot of this [`Room`].
+    ///
+    /// By this [`ObservableRoomSnapshot`] real state of this [`Room`] will be
+    /// updated.
+    ///
+    /// State synchronization with Media Server also will be done by this
+    /// [`ObservableRoomSnapshot`].
     snapshot: ObservableRoomSnapshot,
 }
 

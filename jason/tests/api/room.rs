@@ -6,7 +6,10 @@ use std::{
 };
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{Command, Event, IceServer, PeerId};
+use medea_client_api_proto::{
+    snapshots::{PeerSnapshotAccessor, RoomSnapshot, RoomSnapshotAccessor},
+    Command, Event, IceServer, PeerId,
+};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
@@ -15,7 +18,8 @@ use medea_jason::{
         TransceiverKind,
     },
     rpc::MockRpcClient,
-    utils::JasonError,
+    snapshots::{ObservablePeerSnapshot, ObservableRoomSnapshot},
+    utils::{console_error, JasonError, JsError},
 };
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -24,16 +28,10 @@ use crate::{
     get_observable_tracks, get_peer, get_test_tracks,
     wait_and_check_test_result, MockNavigator,
 };
-use medea_client_api_proto::snapshots::{
-    PeerSnapshotAccessor, RoomSnapshot, RoomSnapshotAccessor,
-};
-use medea_jason::{
-    snapshots::{ObservablePeerSnapshot, ObservableRoomSnapshot},
-    utils::{console_error, JsError},
-};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+/// Returns [`ObservableRoomSnapshot`] used for tests.
 fn get_test_room_snapshot() -> ObservableRoomSnapshot {
     let mut room = ObservableRoomSnapshot::new();
     let peer = ObservablePeerSnapshot::new(
@@ -49,6 +47,7 @@ fn get_test_room_snapshot() -> ObservableRoomSnapshot {
     room
 }
 
+/// Returns [`Room`] and [`PeerConnection`]s for tests.
 fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());

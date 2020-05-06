@@ -1,3 +1,5 @@
+//! Snapshot for the `Room` object.
+
 use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
@@ -84,6 +86,8 @@ where
 {
     type Output = ();
 
+    /// Creates [`PeerSnapshot`] from the provided data and inserts
+    /// [`PeerSnapshot`] into this [`RoomSnapshot`].
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,
@@ -119,6 +123,7 @@ where
         self.insert_peer(peer_id, peer);
     }
 
+    /// Sets SDP answer of the [`PeerSnapshot`] with the provided [`PeerId`].
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         self.update_peer(peer_id, move |peer| {
             if let Some(peer) = peer {
@@ -127,6 +132,8 @@ where
         });
     }
 
+    /// Adds provided [`IceCandidate`] into [`PeerSnapshot`] with the provided
+    /// [`PeerId`].
     fn on_ice_candidate_discovered(
         &mut self,
         peer_id: PeerId,
@@ -139,12 +146,16 @@ where
         });
     }
 
+    /// Removes [`PeerSnapshot`] with the provided [`PeerId`]s from this
+    /// [`RoomSnapshot`].
     fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
         for peer_id in peer_ids {
             self.remove_peer(peer_id);
         }
     }
 
+    /// Updates [`TrackSnapshot`]s from the [`PeerSnapshot`] with the provided
+    /// [`PeerId`] by provided [`TrackPatch`]s.
     fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
         self.update_peer(peer_id, move |peer| {
             if let Some(peer) = peer {
@@ -153,6 +164,7 @@ where
         });
     }
 
+    /// Updates this [`RoomSnapshot`] with a new one.
     fn on_restore_state(&mut self, snapshot: RoomSnapshot) {
         self.update_snapshot(snapshot);
     }

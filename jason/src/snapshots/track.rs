@@ -1,3 +1,6 @@
+//! [`Observable`] implementation of the [`TrackSnapshotAccessor`] which will be
+//! used in the Jason for the `Track`'s real state updating.
+
 use futures::Stream;
 use medea_client_api_proto::{
     snapshots::track::TrackSnapshotAccessor, Direction, MediaType, TrackId,

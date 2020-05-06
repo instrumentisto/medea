@@ -100,6 +100,10 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
+    /// All [`RoomSnapshot`]s of the [`Room`] for the each [`Member`].
+    ///
+    /// This [`RoomSnapshot`]s will be constructed by received [`Command`]s
+    /// from a Web Client and [`Event`]s sent from the Media Server.
     snapshots: HashMap<MemberId, RoomSnapshot>,
 
     /// Default values for the RPC connection settings.

@@ -1,3 +1,5 @@
+//! Snapshot of the `Peer` object.
+
 use std::collections::{hash_map::RandomState, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};

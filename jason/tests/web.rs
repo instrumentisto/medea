@@ -138,6 +138,8 @@ extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
 
+/// Returns [`PeerConnection`] with his [`ObservablePeerSnapshot`] based
+/// on provided data.
 pub fn get_peer(
     peer_id: PeerId,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -163,6 +165,8 @@ pub fn get_peer(
     )
 }
 
+/// Returns [`ObservableTrackSnapshot`]s used for tests based on provided audio
+/// and video muting state.
 pub fn get_observable_tracks(
     is_audio_muted: bool,
     is_video_muted: bool,
