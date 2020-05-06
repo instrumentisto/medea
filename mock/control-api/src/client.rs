@@ -94,16 +94,16 @@ impl ControlClient {
         fid: Fid,
         element: Element,
     ) -> Result<proto::CreateResponse, Status> {
-        use proto::create_request::El::*;
+        use proto::create_request::El;
 
         let el = match element {
-            Element::Room(room) => Room(room.into_proto(id)),
-            Element::Member(member) => Member(member.into_proto(id)),
+            Element::Room(room) => El::Room(room.into_proto(id)),
+            Element::Member(member) => El::Member(member.into_proto(id)),
             Element::WebRtcPlayEndpoint(webrtc_play) => {
-                WebrtcPlay(webrtc_play.into_proto(id))
+                El::WebrtcPlay(webrtc_play.into_proto(id))
             }
             Element::WebRtcPublishEndpoint(webrtc_pub) => {
-                WebrtcPub(webrtc_pub.into_proto(id))
+                El::WebrtcPub(webrtc_pub.into_proto(id))
             }
         };
         let req = proto::CreateRequest {

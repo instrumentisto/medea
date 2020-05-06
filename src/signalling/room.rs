@@ -631,15 +631,17 @@ impl Room {
         &self,
         command: &CommandMessage,
     ) -> Result<(), CommandValidationError> {
-        use Command::*;
-        use CommandValidationError::*;
+        use Command as C;
+        use CommandValidationError::{
+            PeerBelongsToAnotherMember, PeerNotFound,
+        };
 
         let peer_id = match command.command {
-            MakeSdpOffer { peer_id, .. }
-            | MakeSdpAnswer { peer_id, .. }
-            | SetIceCandidate { peer_id, .. }
-            | AddPeerConnectionMetrics { peer_id, .. }
-            | UpdateTracks { peer_id, .. } => peer_id,
+            C::MakeSdpOffer { peer_id, .. }
+            | C::MakeSdpAnswer { peer_id, .. }
+            | C::SetIceCandidate { peer_id, .. }
+            | C::AddPeerConnectionMetrics { peer_id, .. }
+            | C::UpdateTracks { peer_id, .. } => peer_id,
         };
 
         let peer = self

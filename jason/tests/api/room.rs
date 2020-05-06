@@ -6,7 +6,7 @@ use futures::channel::mpsc;
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
-    media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
+    media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{
         MockPeerRepository, PeerConnection, PeerEvent, StableMuteState,
         TransceiverKind,
@@ -392,16 +392,14 @@ fn get_test_room_and_new_peer(
 //    assert!(!peer.is_send_video_enabled());
 //}
 
-// Tests Room::inject_local_stream for create new PeerConnection.
-// Setup:
-//     1. Create Room.
-//     2. Set `on_failed_local_stream` callback.
-//     3. Acquire audio track.
-//     4. Acquire local media stream without video track.
-//     5. Inject local stream to Room.
-//     6. Try create PeerConnection with injected stream.
-// Assertions:
-//     1. Invoking `on_failed_local_stream` callback.
+/// Tests RoomHandle::set_local_media_settings before creating PeerConnection.
+/// Setup:
+///     1. Create Room.
+///     2. Set `on_failed_local_stream` callback.
+///     3. Invoke `room_handle.set_local_media_settings` with one track.
+///     4. Send `PeerCreated` to room wth two tracks
+/// Assertions:
+///     1. `on_failed_local_stream` callback was invoked.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
@@ -420,13 +418,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 
     let (audio_track, video_track) = get_test_tracks(false, false);
 
-    let media_manager = MediaManager::default();
-    let mut constraints = MediaStreamConstraints::new();
-    let audio_constraints = AudioTrackConstraints::new();
-    constraints.audio(audio_constraints);
-    let (stream, _) = media_manager.get_stream(constraints).await.unwrap();
+    let mut constraints = MediaStreamSettings::new();
+    constraints.audio(AudioTrackConstraints::new());
 
-    room_handle.inject_local_stream(stream).unwrap();
+    JsFuture::from(room_handle.set_local_media_settings(&constraints))
+        .await
+        .unwrap();
 
     event_tx
         .unbounded_send(Event::PeerCreated {
@@ -441,15 +438,14 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     wait_and_check_test_result(test_result, || {}).await;
 }
 
-// Tests Room::inject_local_stream for existing PeerConnection.
-// Setup:
-//     1. Create Room.
-//     2. Set `on_failed_local_stream` callback.
-//     3. Acquire audio track.
-//     4. Acquire local media stream without video track.
-//     5. Inject local stream to Room and try change stream into existing peer.
-// Assertions:
-//     1. Invoking `on_failed_local_stream` callback.
+/// Tests RoomHandle::set_local_media_settings for existing PeerConnection.
+/// Setup:
+///     1. Create Room.
+///     2. Set `on_failed_local_stream` callback.
+///     3. Invoke `peer.get_offer` with two tracks.
+///     4. Invoke `room_handle.set_local_media_settings` with only one track.
+/// Assertions:
+///     1. `on_failed_local_stream` was invoked.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (cb, test_result) = js_callback!(|err: JasonError| {
@@ -466,14 +462,13 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         .await
         .unwrap();
 
-    let media_manager = MediaManager::default();
-    let mut constraints = MediaStreamConstraints::new();
-    let audio_constraints = AudioTrackConstraints::new();
-    constraints.audio(audio_constraints);
-    let (stream, _) = media_manager.get_stream(constraints).await.unwrap();
+    let mut constraints = MediaStreamSettings::new();
+    constraints.audio(AudioTrackConstraints::new());
     let room_handle = room.new_handle();
     room_handle.on_failed_local_stream(cb.into()).unwrap();
-    room_handle.inject_local_stream(stream).unwrap();
+    JsFuture::from(room_handle.set_local_media_settings(&constraints))
+        .await
+        .unwrap();
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -515,13 +510,13 @@ async fn error_get_local_stream_on_new_peer() {
         .await;
 }
 
-// Tests Room::join without set `on_failed_local_stream` callback.
-// Setup:
-//     1. Create Room.
-//     2. DO NOT set `on_failed_local_stream` callback.
-//     3. Try join to Room.
-// Assertions:
-//     1. Room::join returns error.
+/// Tests `Room::join` if `on_failed_local_stream` callback was not set.
+/// Setup:
+///     1. Create Room.
+///     2. DO NOT set `on_failed_local_stream` callback.
+///     3. Try join to Room.
+/// Assertions:
+///     1. Room::join returns error.
 #[wasm_bindgen_test]
 async fn error_join_room_without_on_failed_stream_callback() {
     let (_, event_rx) = mpsc::unbounded();
@@ -551,13 +546,13 @@ async fn error_join_room_without_on_failed_stream_callback() {
     }
 }
 
-// Tests Room::join without set `on_connection_loss` callback.
-// Setup:
-//     1. Create Room.
-//     2. DO NOT set `on_connection_loss` callback.
-//     3. Try join to Room.
-// Assertions:
-//     1. Room::join returns error.
+/// Tests `Room::join` if `on_connection_loss` callback was not set.
+/// Setup:
+///     1. Create Room.
+///     2. DO NOT set `on_connection_loss` callback.
+///     3. Try join to Room.
+/// Assertions:
+///     1. Room::join returns error.
 #[wasm_bindgen_test]
 async fn error_join_room_without_on_connection_loss_callback() {
     let (_, event_rx) = mpsc::unbounded();
