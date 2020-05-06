@@ -81,6 +81,8 @@ use futures::{channel::mpsc, Stream};
 /// assert!(set.contains(&"foo-4".to_string()));
 /// # });
 /// ```
+
+// TODO: HashSet's are usually implemented on top of HashMap<T,()>
 #[derive(Debug)]
 pub struct ObservableHashSet<T: Clone + Hash + Eq> {
     /// Data stored by this [`ObservableHashSet`].

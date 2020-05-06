@@ -1,6 +1,6 @@
 //! Snapshot of the `Peer` object.
 
-use std::collections::{hash_map::RandomState, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -129,10 +129,7 @@ impl PeerSnapshotAccessor for PeerSnapshot {
         self.sdp_offer = sdp_offer
     }
 
-    fn set_ice_servers(
-        &mut self,
-        ice_servers: HashSet<IceServer, RandomState>,
-    ) {
+    fn set_ice_servers(&mut self, ice_servers: HashSet<IceServer>) {
         self.ice_servers = ice_servers;
     }
 
@@ -140,10 +137,7 @@ impl PeerSnapshotAccessor for PeerSnapshot {
         self.is_force_relayed = is_force_relayed;
     }
 
-    fn set_ice_candidates(
-        &mut self,
-        ice_candidates: HashSet<IceCandidate, RandomState>,
-    ) {
+    fn set_ice_candidates(&mut self, ice_candidates: HashSet<IceCandidate>) {
         self.ice_candidates = ice_candidates;
     }
 

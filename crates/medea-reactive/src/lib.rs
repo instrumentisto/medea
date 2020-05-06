@@ -1,3 +1,5 @@
+// TODO: i think ObservableCell/Field should be moved from lib.rs now.
+
 //! Reactive mutable data containers.
 //!
 //! # Basic iteraction with an `ObservableField`
