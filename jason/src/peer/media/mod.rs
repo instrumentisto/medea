@@ -21,7 +21,7 @@ use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::PeerEvent,
     snapshots::ObservableTrackSnapshot,
-    utils::{JsCaused, JsError},
+    utils::{freezeable_delay_for, FreezeableDelayHandle, JsCaused, JsError},
 };
 
 use super::{
@@ -31,7 +31,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use crate::utils::{freezeable_delay_for, FreezeableDelayHandle};
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]

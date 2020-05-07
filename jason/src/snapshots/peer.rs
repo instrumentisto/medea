@@ -174,6 +174,7 @@ impl PeerSnapshotAccessor for ObservablePeerSnapshot {
         }
     }
 
+    /// Extends `mid`s of this [`PeerSnapshot`] with the provided `mids`s.
     fn extend_mids(&mut self, mids: HashMap<TrackId, String>) {
         self.mids.extend(mids.into_iter());
     }
