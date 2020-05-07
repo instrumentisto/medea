@@ -317,8 +317,11 @@ impl PeerConnection {
                 } else {
                     break;
                 };
-                if let Err(err) = this.set_remote_answer(sdp_answer).await {
-                    JasonError::from(err).print()
+                let is_has_remote_description = *this.has_remote_description.borrow();
+                if !is_has_remote_description {
+                    if let Err(err) = this.set_remote_answer(sdp_answer).await {
+                        JasonError::from(err).print()
+                    }
                 }
             }
         });
