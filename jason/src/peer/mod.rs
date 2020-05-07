@@ -309,7 +309,7 @@ impl PeerConnection {
         let peer = Rc::new(peer);
 
         let this_weak = Rc::downgrade(&peer);
-        let mut on_sdp_answer_made = peer_state.on_sdp_answer_made();
+        let mut on_sdp_answer_made = peer_state.on_sdp_answer_made().skip(1);
         spawn_local(async move {
             while let Some(sdp_answer) = on_sdp_answer_made.next().await {
                 let this = if let Some(this) = this_weak.upgrade() {
