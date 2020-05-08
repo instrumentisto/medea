@@ -313,8 +313,9 @@ pub struct Track {
 }
 
 /// Path to existing [`Track`] and field which can be updated.
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Copy, Clone)]
 pub struct TrackPatch {
     pub id: TrackId,
     pub is_muted: Option<bool>,
