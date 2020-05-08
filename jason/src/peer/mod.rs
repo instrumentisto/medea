@@ -308,24 +308,10 @@ impl PeerConnection {
 
         let peer = Rc::new(peer);
 
-        let this_weak = Rc::downgrade(&peer);
-        let mut on_sdp_answer_made = peer_state.on_sdp_answer_made();
-        spawn_local(async move {
-            while let Some(sdp_answer) = on_sdp_answer_made.next().await {
-                let this = if let Some(this) = this_weak.upgrade() {
-                    this
-                } else {
-                    break;
-                };
-                let is_has_remote_description =
-                    *this.has_remote_description.borrow();
-                if !is_has_remote_description {
-                    if let Err(err) = this.set_remote_answer(sdp_answer).await {
-                        JasonError::from(err).print()
-                    }
-                }
-            }
-        });
+        Self::spawn_on_sdp_answer_made_stream(
+            &peer,
+            Box::pin(peer_state.on_sdp_answer_made()),
+        );
 
         let this_weak = Rc::downgrade(&peer);
         let mut on_ice_candidate_discovered =
@@ -372,6 +358,33 @@ impl PeerConnection {
                     this.media_connections.freeze_timers();
                 } else {
                     break;
+                }
+            }
+        });
+    }
+
+    /// Spawns SDP answer made listener.
+    ///
+    /// [`Peer::set_remote_answer`] will be called when `sdp_answer`] will be
+    /// received.
+    fn spawn_on_sdp_answer_made_stream(
+        peer: &Rc<Self>,
+        mut on_sdp_answer_made: LocalBoxStream<'static, String>,
+    ) {
+        let this_weak = Rc::downgrade(&peer);
+        spawn_local(async move {
+            while let Some(sdp_answer) = on_sdp_answer_made.next().await {
+                let this = if let Some(this) = this_weak.upgrade() {
+                    this
+                } else {
+                    break;
+                };
+                let is_has_remote_description =
+                    *this.has_remote_description.borrow();
+                if !is_has_remote_description {
+                    if let Err(err) = this.set_remote_answer(sdp_answer).await {
+                        JasonError::from(err).print()
+                    }
                 }
             }
         });

@@ -31,8 +31,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use std::fmt::Debug;
-use wasm_bindgen::__rt::core::fmt::Formatter;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
