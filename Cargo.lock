@@ -1476,7 +1476,6 @@ version = "0.2.0-dev"
 dependencies = [
  "derive_more",
  "medea-macro",
- "medea-reactive",
  "serde 1.0.106",
  "serde_json",
  "serde_with",

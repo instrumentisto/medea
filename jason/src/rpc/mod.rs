@@ -847,6 +847,10 @@ impl RpcClient for WebSocketRpcClient {
         self.0.borrow().token.clone()
     }
 
+    /// Starts restoring of the [`Room`] after reconnection.
+    ///
+    /// Sends [`Command::SynchronizeMe`] and waits for the
+    /// [`Event::SnapshotSynchronized`].
     fn restore_state(&self) -> LocalBoxFuture<'static, ()> {
         let snapshot;
         let wait_for_reconnection_finish;

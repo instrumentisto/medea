@@ -1,3 +1,5 @@
+//! Snapshot for the `Track` object.
+
 use serde::{Deserialize, Serialize};
 
 use crate::{Direction, MediaType, TrackId, TrackPatch};
@@ -18,6 +20,12 @@ pub struct TrackSnapshot {
     pub media_type: MediaType,
 }
 
+/// Accessor to the `Track` snapshot objects.
+///
+/// For this trait is implemented `CommandHandler` and
+/// `EventHandler` which will be used on the Web Client side and on the Media
+/// Server side. But real snapshot objects are different on the Web Client and
+/// on the Media Server, so this abstraction is needed.
 pub trait TrackSnapshotAccessor {
     /// Returns new `MediaTrack` with provided data.
     fn new(

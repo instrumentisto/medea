@@ -59,7 +59,7 @@ impl Jason {
                     Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
                 })
             }),
-            room_snapshot.clone(),
+            Rc::clone(&room_snapshot),
         );
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,

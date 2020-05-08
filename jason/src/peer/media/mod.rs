@@ -233,12 +233,10 @@ impl MediaConnections {
     /// exist.
     // TODO: Doesnt really updates anything, but only generates new senders
     //       and receivers atm.
-    pub fn update_tracks<
+    pub fn update_tracks<I>(&self, tracks: I) -> Result<()>
+    where
         I: IntoIterator<Item = Rc<RefCell<ObservableTrackSnapshot>>>,
-    >(
-        &self,
-        tracks: I,
-    ) -> Result<()> {
+    {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
             let track_id = track.borrow().get_id();
@@ -453,6 +451,8 @@ impl MediaConnections {
     }
 
     /// Freezes all [`Sender`]s mute/unmute timeouts.
+    ///
+    /// Countdown of this timeouts will be started from the beginning.
     pub fn freeze_timers(&self) {
         self.0
             .borrow()
@@ -462,6 +462,8 @@ impl MediaConnections {
     }
 
     /// Unfreezes all [`Sender`]s mute/unmute timeouts.
+    ///
+    /// Countdown of this timeouts will start from the beginning.
     pub fn unfreeze_timers(&self) {
         self.0
             .borrow()
@@ -532,7 +534,6 @@ impl Sender {
             }
         });
 
-        // TODO: remove when refactor muting to dropping tracks.
         let weak_this = Rc::downgrade(&this);
         spawn_local(async move {
             while let Some(mute_state) = mute_state_changes.next().await {

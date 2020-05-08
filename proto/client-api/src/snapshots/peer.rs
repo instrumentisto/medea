@@ -25,7 +25,7 @@ pub struct PeerSnapshot {
 
     /// Negotiated media IDs (mid) which the local and remote peers have agreed
     /// upon to uniquely identify the stream's pairing of sender and receiver
-    /// for all `MediaTrack`s of this [`ObsevablePeerSnapshot`].
+    /// for all `MediaTrack`s of this [`PeerSnapshot`].
     pub mids: HashMap<TrackId, String>,
 
     /// All [`IceServer`]s created for this `Peer`.
@@ -38,6 +38,12 @@ pub struct PeerSnapshot {
     pub ice_candidates: HashSet<IceCandidate>,
 }
 
+/// Accessor to the `Peer` snapshot objects.
+///
+/// For this trait is implemented `CommandHandler` and
+/// `EventHandler` which will be used on the Web Client side and on the Media
+/// Server side. But real snapshot objects are different on the Web Client and
+/// on the Media Server, so this abstraction is needed.
 pub trait PeerSnapshotAccessor {
     type Track: TrackSnapshotAccessor;
 

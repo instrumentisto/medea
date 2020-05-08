@@ -517,31 +517,6 @@ impl Room {
         Self(room)
     }
 
-    /// Inserts provided [`ObservableTrackSnapshot`] to this [`Room`]'s
-    /// [`ObservableRoomSnapshot`].
-    ///
-    /// __Used for the testing purposes.__
-    ///
-    /// This function can PANIC, so use it ONLY in the tests.
-    #[cfg(feature = "mockable")]
-    pub fn insert_track_snapshot(
-        &self,
-        peer_id: PeerId,
-        track_snapshot: Rc<RefCell<ObservableTrackSnapshot>>,
-    ) {
-        let track_id = track_snapshot.borrow().id;
-        self.0
-            .borrow_mut()
-            .snapshot
-            .borrow()
-            .peers
-            .get(&peer_id)
-            .unwrap()
-            .borrow_mut()
-            .tracks
-            .insert(track_id, track_snapshot);
-    }
-
     /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
     ///
     /// Supposed that this function will trigger [`Drop`] implementation of
@@ -801,6 +776,11 @@ impl InnerRoom {
         }
     }
 
+    /// Creates [`PeerConnection`] with a provided ID and all the
+    /// [`Connection`]s basing on provided [`Track`]s.
+    ///
+    /// If `sdp_offer` is `Some`, then offer is applied to a created
+    /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
     pub fn on_peer_created(
         &mut self,
         peer_id: PeerId,
@@ -881,6 +861,7 @@ impl InnerRoom {
         );
     }
 
+    /// Disposes specified [`PeerConnection`]s.
     pub fn on_peer_removed(&mut self, peer_id: PeerId) {
         self.peers.remove(peer_id);
     }

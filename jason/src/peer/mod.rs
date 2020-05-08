@@ -221,8 +221,6 @@ impl PeerConnection {
     /// Provided `peer_events_sender` will be used to emit [`PeerEvent`]s from
     /// this peer.
     ///
-    /// Provided `ice_servers` will be used by created [`RtcPeerConnection`].
-    ///
     /// # Errors
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if [`RtcPeerConnection`]
@@ -312,10 +310,28 @@ impl PeerConnection {
             &peer,
             Box::pin(peer_state.on_sdp_answer_made()),
         );
+        Self::spawn_on_ice_candidate_discovered_stream(
+            &peer,
+            Box::pin(peer_state.on_ice_candidate_discovered()),
+        );
+        Self::spawn_on_connection_loss_stream(&peer, on_connection_loss_stream);
+        Self::spawn_on_state_restored_stream(&peer, on_state_restored_stream);
 
+        Ok(peer)
+    }
+
+    /// Spawns connection loss event listener.
+    ///
+    /// On every received [`IceCandidate`] [`Peer::add_ice_candidate`] will be
+    /// called.
+    fn spawn_on_ice_candidate_discovered_stream(
+        peer: &Rc<Self>,
+        mut on_ice_candidate_discovered: LocalBoxStream<
+            'static,
+            medea_client_api_proto::IceCandidate,
+        >,
+    ) {
         let this_weak = Rc::downgrade(&peer);
-        let mut on_ice_candidate_discovered =
-            peer_state.on_ice_candidate_discovered();
         spawn_local(async move {
             while let Some(candidate) = on_ice_candidate_discovered.next().await
             {
@@ -336,11 +352,6 @@ impl PeerConnection {
                 }
             }
         });
-
-        Self::spawn_on_connection_loss_stream(&peer, on_connection_loss_stream);
-        Self::spawn_on_state_restored_stream(&peer, on_state_restored_stream);
-
-        Ok(peer)
     }
 
     /// Spawns connection loss event listener.
@@ -646,13 +657,13 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Rc<RefCell<ObservableTrackSnapshot>>>,
-        local_constraints: Option<MediaStreamSettings>,
+        local_stream: Option<MediaStreamSettings>,
     ) -> Result<String> {
         self.media_connections
             .update_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream(local_constraints)
+        self.update_local_stream(local_stream)
             .await
             .map_err(tracerr::wrap!())?;
 
