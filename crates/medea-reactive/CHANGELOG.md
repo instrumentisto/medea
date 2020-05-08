@@ -3,7 +3,7 @@
 
 All user visible changes to this project will be documented in this file. This project uses [Semantic Versioning 2.0.0].
 
-<!-- TODO: changelog? -->
+
 
 
 ## TBD [0.1.0] · 2020-??-??
@@ -13,9 +13,14 @@ All user visible changes to this project will be documented in this file. This p
 
 - `ObservableField` and `ObservableCell` containers ([#81]);
 - `Observable` type alias ([#81]);
-- `OnObservableFieldModification`, `Subscribable` and `Whenable` traits ([#81]).
+- `OnObservableFieldModification`, `Subscribable` and `Whenable` traits ([#81]);
+- Observable collections ([#100]):
+  - `ObservableVec`;
+  - `ObservableHashMap`;
+  - `ObservableHashSet`.
 
 [#81]: /../../pull/81
+[#100]: /../../pull/100
 
 
 

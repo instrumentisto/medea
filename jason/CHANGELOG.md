@@ -51,12 +51,14 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]).
 - RPC messaging:
     - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
-    - `RpcClient` and `RpcTransport` reconnection ([#75]).
+    - `RpcClient` and `RpcTransport` reconnection ([#75]);
+    - Jason state synchronization with the Media Server state after `RpcClient` reconnection ([#100]).
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
         - `ApplyTracks` for muting/unmuting ([#81]);
-        - `AddPeerConnectionStats` with `RtcStats` ([#90]).
+        - `AddPeerConnectionStats` with `RtcStats` ([#90]);
+        - `SynchronizeMe` after `RpcClient` reconnection ([#100]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -79,6 +81,7 @@ All user visible changes to this project will be documented in this file. This p
 [#87]: /../../pull/87
 [#90]: /../../pull/90
 [#97]: /../../pull/97
+[#100]: /../../pull/100
 
 
 

@@ -8,8 +8,6 @@
 //! [`Serialize`] implementation for [`Event`]s.
 //! - `extended-stats`: Enables unused RTC Stats DTOs.
 
-// TODO: add final changes
-
 pub mod snapshots;
 pub mod stats;
 

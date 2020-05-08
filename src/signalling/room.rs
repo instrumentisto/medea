@@ -13,8 +13,8 @@ use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    snapshots::RoomSnapshot, Command, CommandHandler, Event, IceCandidate,
+    PeerId, PeerMetrics, TrackId, TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -60,7 +60,6 @@ use crate::{
     utils::ResponseActAnyFuture,
     AppContext,
 };
-use medea_client_api_proto::snapshots::RoomSnapshot;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;

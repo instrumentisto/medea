@@ -48,6 +48,16 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcIceCandidateStats`;
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
+- State snapshots ([#100]):
+  - `RoomSnapshot`,
+  - `PeerSnapshot`,
+  - `TrackSnapshot`.
+- State snapshots accessors ([#100]):
+  - `RoomSnapshotAccessor`,
+  - `PeerSnapshotAccessor`,
+  - `TrackSnapshotAccessor`.
+- `SynchronizeMe` command and `SnapshotSynchronized` event ([#100]).
+- `CommandHandler` and `EventHandler` implementations for the `RoomSnapshotAccessor` ([#100]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -57,6 +67,7 @@ All user visible changes to this project will be documented in this file. This p
 [#81]: /../../pull/81
 [#87]: /../../pull/87
 [#90]: /../../pull/90
+[#100]: /../../pull/100
 
 
 
