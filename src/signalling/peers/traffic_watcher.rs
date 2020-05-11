@@ -32,14 +32,30 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix::{
-    Actor, Addr, AsyncContext, Handler, MailboxError, Message, WeakAddr,
-};
+use actix::{Actor, Addr, AsyncContext, Handler, MailboxError, Message};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
+use std::fmt;
 
-use crate::{api::control::RoomId, conf, log::prelude::*, signalling::Room};
+use crate::{
+    api::control::RoomId, conf, log::prelude::*, utils::instant_into_utc,
+};
+use failure::_core::fmt::Formatter;
+
+#[cfg_attr(test, mockall::automock)]
+pub trait PeerTrafficWatcherSubscriber: Send + Debug {
+    fn peer_started(&self, peer_id: PeerId);
+
+    fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>);
+}
+
+#[cfg(test)]
+impl Debug for MockPeerTrafficWatcherSubscriber {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("MockPeerTrafficWatcherSubscriber").finish()
+    }
+}
 
 /// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
 pub fn build_peers_traffic_watcher(
@@ -71,7 +87,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     async fn register_room(
         &self,
         room_id: RoomId,
-        room: WeakAddr<Room>,
+        room: Box<dyn PeerTrafficWatcherSubscriber>,
     ) -> Result<(), MailboxError>;
 
     /// Unregisters [`Room`] as `Peer`s state messages listener.
@@ -128,7 +144,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     async fn register_room(
         &self,
         room_id: RoomId,
-        room: WeakAddr<Room>,
+        room: Box<dyn PeerTrafficWatcherSubscriber>,
     ) -> Result<(), MailboxError> {
         self.send(RegisterRoom { room_id, room }).await
     }
@@ -232,9 +248,7 @@ impl PeersTrafficWatcherImpl {
                     } else {
                         peer.stop();
                         let at = peer.started_at.unwrap_or_else(Utc::now);
-                        if let Some(room) = room.room.upgrade() {
-                            room.do_send(PeerStopped { peer_id, at });
-                        }
+                        room.subscriber.peer_stopped(peer_id, at);
                     }
                 };
             }
@@ -307,7 +321,6 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     /// [`FlowMetricSource`]s will be received then [`PeerStat`] will be
     /// transferred into [`PeerState::Started`] with [`FlowMetricSource`]s from
     /// the [`PeerStat::Stopped`] state with [`Instant::now`] time.
-
     fn handle(
         &mut self,
         msg: TrafficFlows,
@@ -321,9 +334,7 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                         peer.state = PeerState::Starting;
                         peer.started_at = Some(Utc::now());
 
-                        if let Some(room_addr) = room.room.upgrade() {
-                            room_addr.do_send(PeerStarted(peer.peer_id));
-                        }
+                        room.subscriber.peer_started(peer.peer_id);
 
                         ctx.run_later(self.init_timeout, move |this, _| {
                             this.check_is_started(&msg.room_id, msg.peer_id);
@@ -333,9 +344,7 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                         if peer.is_flowing() {
                             peer.state = PeerState::Started;
                             peer.started_at = Some(Utc::now());
-                            if let Some(room_addr) = room.room.upgrade() {
-                                room_addr.do_send(PeerStarted(peer.peer_id));
-                            }
+                            room.subscriber.peer_started(peer.peer_id);
                         }
                     }
                     _ => (),
@@ -378,15 +387,8 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
             if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
                 if peer.state != PeerState::Stopped {
                     peer.stop();
-                    if let Some(room_addr) = room.room.upgrade() {
-                        let at = Utc::now()
-                            - chrono::Duration::from_std(msg.at.elapsed())
-                                .unwrap();
-                        room_addr.do_send(PeerStopped {
-                            peer_id: peer.peer_id,
-                            at,
-                        });
-                    }
+                    let at = instant_into_utc(msg.at);
+                    room.subscriber.peer_stopped(peer.peer_id, at);
                 }
             }
         }
@@ -418,9 +420,9 @@ pub enum FlowMetricSource {
 /// Current state of [`PeerStat`].
 ///
 /// Transitions:
-/// +-------+    +----------+    +-----------+---->+-----------+
-/// |  New  +--->+ Starting +--->+  Started  |     |  Stopped  |
-/// +-------+    +----------+    +-----------+<----+-----------+
+/// +-------+    +----------+    +-----------+     +-----------+
+/// |  New  +--->+ Starting +--->+  Started  +<--->+  Stopped  |
+/// +-------+    +----------+    +-----------+     +-----------+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum PeerState {
     /// `Peer` was just added and have not received any traffic events.
@@ -506,7 +508,7 @@ struct RoomStats {
     room_id: RoomId,
 
     /// [`Addr`] of [`Room`] which is watching for this [`PeerStat`]s.
-    room: WeakAddr<Room>,
+    subscriber: Box<dyn PeerTrafficWatcherSubscriber>,
 
     /// [`PeerStat`] for which [`Room`] is watching.
     peers: HashMap<PeerId, PeerStat>,
@@ -528,7 +530,7 @@ struct RegisterRoom {
 
     /// [`Addr`] of [`Room`] which requested to register in the
     /// [`PeersTrafficWatcherImpl`].
-    room: WeakAddr<Room>,
+    room: Box<dyn PeerTrafficWatcherSubscriber>,
 }
 
 impl Handler<RegisterRoom> for PeersTrafficWatcherImpl {
@@ -547,7 +549,7 @@ impl Handler<RegisterRoom> for PeersTrafficWatcherImpl {
             msg.room_id.clone(),
             RoomStats {
                 room_id: msg.room_id,
-                room: msg.room,
+                subscriber: msg.room,
                 peers: HashMap::new(),
             },
         );
@@ -662,4 +664,184 @@ impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
     }
 }
 
-// TODO: unit tests
+#[cfg(test)]
+mod tests {
+    use futures::{
+        channel::{mpsc, oneshot},
+        future::Either,
+        stream::LocalBoxStream,
+        Future, StreamExt,
+    };
+    use tokio::time::delay_for;
+
+    use super::*;
+
+    use crate::turn::allocation_event::CoturnAllocationEvent::Traffic;
+
+    struct TrafficWatcherTestHelper {
+        peer_stopped_rx: LocalBoxStream<'static, PeerStopped>,
+        peer_started_rx: LocalBoxStream<'static, PeerStarted>,
+        traffic_watcher: Addr<PeersTrafficWatcherImpl>,
+    }
+
+    impl TrafficWatcherTestHelper {
+        pub async fn new(cfg: &conf::Media) -> Self {
+            let watcher = PeersTrafficWatcherImpl::new(cfg).start();
+            let mut subscriber = MockPeerTrafficWatcherSubscriber::new();
+            let (peer_stopped_tx, peer_stopped_rx) = mpsc::unbounded();
+            let (peer_started_tx, peer_started_rx) = mpsc::unbounded();
+            subscriber
+                .expect_peer_stopped()
+                .returning(move |peer_id, at| {
+                    peer_stopped_tx
+                        .unbounded_send(PeerStopped { peer_id, at })
+                        .unwrap();
+                });
+            subscriber.expect_peer_started().returning(move |peer_id| {
+                peer_started_tx
+                    .unbounded_send(PeerStarted(peer_id))
+                    .unwrap();
+            });
+            watcher
+                .register_room(Self::room_id(), Box::new(subscriber))
+                .await;
+
+            Self {
+                traffic_watcher: watcher,
+                peer_started_rx: Box::pin(peer_started_rx),
+                peer_stopped_rx: Box::pin(peer_stopped_rx),
+            }
+        }
+
+        fn room_id() -> RoomId {
+            "test-room".to_string().into()
+        }
+
+        pub fn watcher(&self) -> Addr<PeersTrafficWatcherImpl> {
+            self.traffic_watcher.clone()
+        }
+
+        pub async fn next_peer_stopped(&mut self) -> PeerStopped {
+            self.try_next_peer_stoppped().await.unwrap()
+        }
+
+        pub async fn next_peer_started(&mut self) -> PeerStarted {
+            self.try_next_peer_started().await.unwrap()
+        }
+
+        pub async fn try_next_peer_stoppped(&mut self) -> Option<PeerStopped> {
+            self.peer_stopped_rx.next().await
+        }
+
+        pub async fn try_next_peer_started(&mut self) -> Option<PeerStarted> {
+            self.peer_started_rx.next().await
+        }
+    }
+
+    async fn wait_or_fail<T>(
+        fut: impl Future<Output = T>,
+        dur: Duration,
+    ) -> Result<T, ()> {
+        let result =
+            futures::future::select(Box::pin(fut), Box::pin(delay_for(dur)))
+                .await;
+        match result {
+            Either::Left((res, _)) => Ok(res),
+            Either::Right(_) => Err(()),
+        }
+    }
+
+    #[actix_rt::test]
+    async fn two_sources_works() {
+        let mut helper = TrafficWatcherTestHelper::new(&conf::Media {
+            init_timeout: Duration::from_millis(150),
+            max_lag: Duration::from_millis(300),
+        })
+        .await;
+        helper
+            .watcher()
+            .register_peer(
+                TrafficWatcherTestHelper::room_id(),
+                PeerId(1),
+                false,
+            )
+            .await;
+        helper.watcher().traffic_flows(
+            TrafficWatcherTestHelper::room_id(),
+            PeerId(1),
+            FlowMetricSource::Peer,
+        );
+        assert_eq!(helper.next_peer_started().await.0, PeerId(1));
+        helper.watcher().traffic_flows(
+            TrafficWatcherTestHelper::room_id(),
+            PeerId(1),
+            FlowMetricSource::PartnerPeer,
+        );
+        wait_or_fail(helper.next_peer_stopped(), Duration::from_millis(150))
+            .await
+            .unwrap_err();
+    }
+
+    #[actix_rt::test]
+    async fn at_in_stop_on_start_checking_is_valid() {
+        let mut helper = TrafficWatcherTestHelper::new(&conf::Media {
+            init_timeout: Duration::from_millis(100),
+            ..Default::default()
+        })
+        .await;
+        helper
+            .watcher()
+            .register_peer(
+                TrafficWatcherTestHelper::room_id(),
+                PeerId(1),
+                false,
+            )
+            .await;
+        helper.watcher().traffic_flows(
+            TrafficWatcherTestHelper::room_id(),
+            PeerId(1),
+            FlowMetricSource::Peer,
+        );
+        assert_eq!(helper.next_peer_started().await.0, PeerId(1));
+        let start_time = Utc::now();
+        assert_eq!(
+            helper.next_peer_stopped().await.at.timestamp() / 10,
+            start_time.timestamp() / 10
+        );
+    }
+
+    #[actix_rt::test]
+    async fn stop_on_max_lag() {
+        let mut helper = TrafficWatcherTestHelper::new(&conf::Media {
+            init_timeout: Duration::from_millis(30),
+            max_lag: Duration::from_millis(30),
+            ..Default::default()
+        })
+        .await;
+        helper
+            .watcher()
+            .register_peer(
+                TrafficWatcherTestHelper::room_id(),
+                PeerId(1),
+                false,
+            )
+            .await;
+        helper.watcher().traffic_flows(
+            TrafficWatcherTestHelper::room_id(),
+            PeerId(1),
+            FlowMetricSource::Peer,
+        );
+        helper.watcher().traffic_flows(
+            TrafficWatcherTestHelper::room_id(),
+            PeerId(1),
+            FlowMetricSource::PartnerPeer,
+        );
+
+        wait_or_fail(
+            helper.next_peer_stopped(),
+            Duration::from_secs(1) + Duration::from_millis(10),
+        )
+        .await
+        .unwrap();
+    }
+}

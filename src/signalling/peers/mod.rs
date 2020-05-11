@@ -2,7 +2,9 @@
 
 mod media_traffic_state;
 mod metrics;
-mod traffic_watcher;
+// TODO: try normally re-export TrafficWatcher trait and make this module
+// private.
+pub mod traffic_watcher;
 
 use std::{
     collections::HashMap,
