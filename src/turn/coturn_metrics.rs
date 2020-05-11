@@ -149,9 +149,9 @@ impl Actor for CoturnMetricsService {
 impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
     fn handle(&mut self, msg: redis_pub_sub::Msg, _: &mut Self::Context) {
         let event = match CoturnEvent::parse(&msg) {
-            Ok(event) => event,
-            Err(err) => {
-                error!("Error parsing CoturnEvent: {}", err);
+            Ok(ev) => ev,
+            Err(e) => {
+                error!("Error parsing CoturnEvent: {}", e);
                 return;
             }
         };

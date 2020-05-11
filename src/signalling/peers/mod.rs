@@ -13,7 +13,6 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -458,8 +457,8 @@ impl PeersService {
     /// Removes all [`Peer`]s related to given [`Member`].
     /// Note, that this function will also remove all partners [`Peer`]s.
     ///
-    /// Returns `HashMap` with all removed [`Peer`]s.
-    /// Key - [`Peer`]'s owner [`MemberId`],
+    /// Returns [`HashMap`] with all removed [`Peer`]s:
+    /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     // TODO: remove in #91.
     pub fn remove_peers_related_to_member(
@@ -490,8 +489,8 @@ impl PeersService {
         peers_to_remove
             .values()
             .flat_map(|peer_ids| peer_ids.iter())
-            .for_each(|peer_id| {
-                self.peers.remove(peer_id);
+            .for_each(|id| {
+                self.peers.remove(id);
             });
 
         peers_to_remove

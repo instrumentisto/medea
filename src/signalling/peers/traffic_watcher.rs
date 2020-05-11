@@ -48,14 +48,12 @@ pub fn build_peers_traffic_watcher(
     Arc::new(PeersTrafficWatcherImpl::new(conf).start())
 }
 
-/// Message which indicates that `Peer` with provided [`PeerId`]
-/// has started.
+/// Message which indicates that `Peer` with provided [`PeerId`] has started.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerStarted(pub PeerId);
 
-/// Message which indicates that `Peer` with provided [`PeerId`]
-/// has stopped.
+/// Message which indicates that `Peer` with provided [`PeerId`] has stopped.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct PeerStopped {
@@ -307,7 +305,6 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
     /// [`FlowMetricSource`]s will be received then [`PeerStat`] will be
     /// transferred into [`PeerState::Started`] with [`FlowMetricSource`]s from
     /// the [`PeerStat::Stopped`] state with [`Instant::now`] time.
-
     fn handle(
         &mut self,
         msg: TrafficFlows,

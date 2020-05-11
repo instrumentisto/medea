@@ -278,12 +278,12 @@ impl<T> Peer<T> {
         self.context.endpoints.push(endpoint.downgrade());
     }
 
-    /// Returns all receiving tracks of this peer.
+    /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
         self.context.receivers.clone()
     }
 
-    /// Returns all sending tracks of this peer.
+    /// Returns all sending [`MediaTrack`]s of this [`Peer`].
     pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
         self.context.senders.clone()
     }
