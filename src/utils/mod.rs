@@ -1,11 +1,12 @@
 //! Helper utils used in project.
 
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, time::Instant};
 
 use actix::prelude::dev::{
     Actor, ActorFuture, Arbiter, AsyncContext, ContextFutureSpawner as _,
     Message, MessageResponse, ResponseChannel, WrapFuture as _,
 };
+use chrono::{DateTime, Utc};
 use futures::future;
 
 /// Creates new [`HashMap`] from a list of key-value pairs.
@@ -42,6 +43,36 @@ macro_rules! hashmap {
     };
 }
 
+/// Creates new [`HashSet`] from a list of values.
+///
+/// # Example
+///
+/// ```rust
+/// # use medea::hashset;
+/// let map = hashset![1, 1, 2];
+/// assert!(map.contains(&1));
+/// assert!(map.contains(&2));
+/// ```
+///
+/// [`HashSet`]: std::collections::HashSet
+#[macro_export]
+macro_rules! hashset {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
+
+    ($($value:expr,)+) => { hashset!($($value),+) };
+    ($($value:expr),*) => {
+        {
+            let _cap = hashset!(@count $($value),*);
+            let mut _map = ::std::collections::HashSet::with_capacity(_cap);
+            $(
+                let _ = _map.insert($value);
+            )*
+            _map
+        }
+    };
+}
+
 /// Generates [`Debug`] implementation for a provided structure with name of
 /// this structure.
 ///
@@ -51,6 +82,7 @@ macro_rules! hashmap {
 /// # Example
 ///
 /// ```
+/// # use medea::impl_debug_by_struct_name;
 /// struct Foo;
 ///
 /// impl_debug_by_struct_name!(Foo);
@@ -123,4 +155,10 @@ where
             })
             .spawn(ctx);
     }
+}
+
+/// Converts provided [`Instant`] into [`chrono::DateTime`].
+pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
+    chrono::Duration::from_std(instant.elapsed())
+        .map_or_else(|_| Utc::now(), |dur| Utc::now() - dur)
 }

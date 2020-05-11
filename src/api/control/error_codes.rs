@@ -430,6 +430,7 @@ impl From<RoomError> for ErrorResponse {
             | E::UnableToSendEvent(_)
             | E::PeerError(_)
             | E::BadRoomSpec(_)
+            | E::PeerTrafficWatcherMailbox(_)
             | E::TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
