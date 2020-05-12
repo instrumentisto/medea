@@ -84,7 +84,7 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> Result<TokenStream> {
 
     let enum_output = quote! {
         #(#enum_name_iter::#variants(inner) => {
-            inner.#function_ident(#(#function_args)*)
+            inner.#function_ident(#(#function_args,)*)
         },)*
     };
 

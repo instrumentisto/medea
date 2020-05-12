@@ -67,8 +67,7 @@ impl CoturnTelnetClient {
     /// With [`CoturnCliError::PoolError`] if could not get or establish new
     /// connection in pool.
     ///
-    /// With [`CoturnCliError::CoturnTelnetError`] in case of unexpected
-    /// protocol error.
+    /// With [`CoturnCliError::CliError`] in case of unexpected protocol error.
     pub async fn delete_sessions(
         &self,
         users: &[&IceUser],
