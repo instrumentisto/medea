@@ -27,16 +27,13 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
     fmt::Debug,
-    future::Future,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use actix::{Actor, Addr, AsyncContext, Handler, MailboxError, Message};
 use chrono::{DateTime, Utc};
-use failure::_core::fmt::Formatter;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::PeerId;
 
@@ -53,7 +50,7 @@ pub trait PeerTrafficWatcherSubscriber: Send + Debug {
 
 #[cfg(test)]
 impl Debug for MockPeerTrafficWatcherSubscriber {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("MockPeerTrafficWatcherSubscriber").finish()
     }
 }
@@ -124,7 +121,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 
 #[cfg(test)]
 impl Debug for MockPeerTrafficWatcher {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("PeerTrafficWatcherMock").finish()
     }
 }
@@ -672,25 +669,28 @@ impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
 
 #[cfg(test)]
 mod tests {
-    use futures::{
-        channel::{mpsc, oneshot},
-        future::Either,
-        stream::LocalBoxStream,
-        Future, StreamExt,
-    };
-    use tokio::time::delay_for;
+    use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt};
 
     use super::*;
 
-    use crate::utils::test::wait_or_fail;
+    use crate::utils::test::future_with_timeout;
 
-    struct TrafficWatcherTestHelper {
+    /// Helper for the all [`traffic_watcher`] unit tests.
+    struct Helper {
+        /// Stream which will receive all sent by [`PeersTrafficWatcher`]
+        /// [`PeerStopped`] messages.
         peer_stopped_rx: LocalBoxStream<'static, PeerStopped>,
+
+        /// Stream which will receive all sent by [`PeersTrafficWatcher`]
+        /// [`PeerStarted`] messages.
         peer_started_rx: LocalBoxStream<'static, PeerStarted>,
+
+        /// [`PeerTrafficWatcherImpl`] [`Actor`].
         traffic_watcher: Addr<PeersTrafficWatcherImpl>,
     }
 
-    impl TrafficWatcherTestHelper {
+    impl Helper {
+        /// Returns new [`Helper`] with empty [`PeersTrafficWatcher`].
         pub async fn new(cfg: &conf::Media) -> Self {
             let watcher = PeersTrafficWatcherImpl::new(cfg).start();
             let mut subscriber = MockPeerTrafficWatcherSubscriber::new();
@@ -710,7 +710,8 @@ mod tests {
             });
             watcher
                 .register_room(Self::room_id(), Box::new(subscriber))
-                .await;
+                .await
+                .unwrap();
 
             Self {
                 traffic_watcher: watcher,
@@ -719,79 +720,79 @@ mod tests {
             }
         }
 
+        /// Returns [`RoomId`] used for the [`traffic_watcher`] unit tests.
         fn room_id() -> RoomId {
             "test-room".to_string().into()
         }
 
+        /// Returns [`Addr`] to the underlying [`PeersTrafficWatcherImpl`].
         pub fn watcher(&self) -> Addr<PeersTrafficWatcherImpl> {
             self.traffic_watcher.clone()
         }
 
+        /// Waits for the [`PeerStopped`] event which
+        /// [`PeersTrafficWatcherImpl`] sends to the [`Room`].
         pub async fn next_peer_stopped(&mut self) -> PeerStopped {
-            self.try_next_peer_stoppped().await.unwrap()
+            self.peer_stopped_rx.next().await.unwrap()
         }
 
+        /// Waits for the [`PeerStarted`] event which
+        /// [`PeersTrafficWatcherImpl`] sends to the [`Room`].
         pub async fn next_peer_started(&mut self) -> PeerStarted {
-            self.try_next_peer_started().await.unwrap()
-        }
-
-        pub async fn try_next_peer_stoppped(&mut self) -> Option<PeerStopped> {
-            self.peer_stopped_rx.next().await
-        }
-
-        pub async fn try_next_peer_started(&mut self) -> Option<PeerStarted> {
-            self.peer_started_rx.next().await
+            self.peer_started_rx.next().await.unwrap()
         }
     }
 
+    /// Checks that [`PeerTrafficWatcherImpl`] normally sends [`PeerStarted`]
+    /// and [`PeerStopped`] messages to the [`Room`] on normal traffic
+    /// flowing cycle.
     #[actix_rt::test]
     async fn two_sources_works() {
-        let mut helper = TrafficWatcherTestHelper::new(&conf::Media {
+        let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(150),
             max_lag: Duration::from_millis(300),
         })
         .await;
         helper
             .watcher()
-            .register_peer(
-                TrafficWatcherTestHelper::room_id(),
-                PeerId(1),
-                false,
-            )
-            .await;
+            .register_peer(Helper::room_id(), PeerId(1), false)
+            .await
+            .unwrap();
         helper.watcher().traffic_flows(
-            TrafficWatcherTestHelper::room_id(),
+            Helper::room_id(),
             PeerId(1),
             FlowMetricSource::Peer,
         );
         assert_eq!(helper.next_peer_started().await.0, PeerId(1));
         helper.watcher().traffic_flows(
-            TrafficWatcherTestHelper::room_id(),
+            Helper::room_id(),
             PeerId(1),
             FlowMetricSource::PartnerPeer,
         );
-        wait_or_fail(helper.next_peer_stopped(), Duration::from_millis(150))
-            .await
-            .unwrap_err();
+        future_with_timeout(
+            helper.next_peer_stopped(),
+            Duration::from_millis(150),
+        )
+        .await
+        .unwrap_err();
     }
 
+    /// Checks that in [`PeerStopped`] message correct stop time will be
+    /// provided.
     #[actix_rt::test]
     async fn at_in_stop_on_start_checking_is_valid() {
-        let mut helper = TrafficWatcherTestHelper::new(&conf::Media {
+        let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(100),
             ..Default::default()
         })
         .await;
         helper
             .watcher()
-            .register_peer(
-                TrafficWatcherTestHelper::room_id(),
-                PeerId(1),
-                false,
-            )
-            .await;
+            .register_peer(Helper::room_id(), PeerId(1), false)
+            .await
+            .unwrap();
         helper.watcher().traffic_flows(
-            TrafficWatcherTestHelper::room_id(),
+            Helper::room_id(),
             PeerId(1),
             FlowMetricSource::Peer,
         );
@@ -803,9 +804,11 @@ mod tests {
         );
     }
 
+    /// Checks that [`TrafficStopped`] will be sent if no [`TrafficFlows`] will
+    /// be received within `max_lag` timeout.
     #[actix_rt::test]
     async fn stop_on_max_lag() {
-        let mut helper = TrafficWatcherTestHelper::new(&conf::Media {
+        let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(30),
             max_lag: Duration::from_millis(30),
             ..Default::default()
@@ -813,24 +816,21 @@ mod tests {
         .await;
         helper
             .watcher()
-            .register_peer(
-                TrafficWatcherTestHelper::room_id(),
-                PeerId(1),
-                false,
-            )
-            .await;
+            .register_peer(Helper::room_id(), PeerId(1), false)
+            .await
+            .unwrap();
         helper.watcher().traffic_flows(
-            TrafficWatcherTestHelper::room_id(),
+            Helper::room_id(),
             PeerId(1),
             FlowMetricSource::Peer,
         );
         helper.watcher().traffic_flows(
-            TrafficWatcherTestHelper::room_id(),
+            Helper::room_id(),
             PeerId(1),
             FlowMetricSource::PartnerPeer,
         );
 
-        wait_or_fail(
+        future_with_timeout(
             helper.next_peer_stopped(),
             Duration::from_secs(1) + Duration::from_millis(10),
         )

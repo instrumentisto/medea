@@ -1,9 +1,20 @@
+//! Utils which can be used for the unit testing purposes.
+//!
+//! This module is available only in the unit tests.
+
+use std::time::Duration;
+
 use futures::{future, future::Either, Future};
-use medea_client_api_proto::stats::HighResTimeStamp;
-use std::time::{Duration, SystemTime};
 use tokio::time::delay_for;
 
-pub async fn wait_or_fail<T>(
+/// Starts provided [`Future`] and waits provided [`Duration`] for the
+/// [`Future`] result.
+///
+/// Returns `Ok` with a [`Result`] of the [`Future`] if it finished within
+/// [`Duration`] period.
+///
+/// Returns `Err` if [`Future`] doesn't finished within [`Duration`] period.
+pub async fn future_with_timeout<T>(
     fut: impl Future<Output = T>,
     dur: Duration,
 ) -> Result<T, ()> {
@@ -12,13 +23,4 @@ pub async fn wait_or_fail<T>(
         Either::Left((res, _)) => Ok(res),
         Either::Right(_) => Err(()),
     }
-}
-
-pub fn timestamp(time: SystemTime) -> HighResTimeStamp {
-    HighResTimeStamp(
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as f64,
-    )
 }

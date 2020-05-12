@@ -1480,6 +1480,18 @@ impl From<HighResTimeStamp> for SystemTime {
     }
 }
 
+impl From<SystemTime> for HighResTimeStamp {
+    #[allow(clippy::cast_precision_loss)]
+    #[inline]
+    fn from(time: SystemTime) -> Self {
+        HighResTimeStamp(
+            time.duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as f64,
+        )
+    }
+}
+
 /// Hashing string representation.
 ///
 /// Some people believe that such behavior is incorrect (but in some programming

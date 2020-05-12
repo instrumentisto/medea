@@ -775,17 +775,17 @@ impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
+        collections::HashSet,
         sync::Arc,
-        time::{Duration, Instant, SystemTime},
+        time::{Duration, SystemTime},
     };
 
     use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt as _};
     use medea_client_api_proto::{
         stats::{
-            HighResTimeStamp, MediaSourceKind, RtcInboundRtpStreamMediaType,
-            RtcInboundRtpStreamStats, RtcOutboundRtpStreamMediaType,
-            RtcOutboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
+            RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
+            RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
+            RtcStatsType, StatId,
         },
         PeerId,
     };
@@ -793,18 +793,18 @@ mod tests {
 
     use crate::{
         api::control::callback::{MediaDirection, MediaType},
-        media::peer::{
-            tests::test_peer_from_peer_tracks, Context, Peer, Stable,
-        },
+        media::peer::tests::test_peer_from_peer_tracks,
         signalling::peers::{
             traffic_watcher::MockPeerTrafficWatcher, PeersMetricsEvent,
         },
-        utils::test::{timestamp, wait_or_fail},
+        utils::test::future_with_timeout,
     };
 
-    use super::{PeerTracks, PeersMetricsService};
-    use std::collections::HashSet;
+    use super::PeersMetricsService;
 
+    /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
+    /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
+    /// `is_audio`.
     fn outbound_traffic(
         packets_sent: u64,
         is_audio: bool,
@@ -831,6 +831,9 @@ mod tests {
         }
     }
 
+    /// Returns [`RtcInboundRtpStreamStats`] with a provided number of
+    /// `packets_received` and [`RtcInboundRtpStreamMediaType`] based on
+    /// `is_audio`.
     fn inbound_traffic(
         packets_received: u64,
         is_audio: bool,
@@ -874,14 +877,27 @@ mod tests {
         }
     }
 
+    /// Helper for the all [`metrics`] unit tests.
     struct Helper {
+        /// Stream to which will be sent `()` on every [`TrafficFlows`] message
+        /// received from the [`PeersMetricsService`]
         traffic_flows_stream: LocalBoxStream<'static, ()>,
+
+        /// Stream to which will be sent `()` on every [`TrafficStopped`]
+        /// message received from the [`PeersMetricsService`]
         traffic_stopped_stream: LocalBoxStream<'static, ()>,
+
+        /// Stream to which will [`PeerMetricsService`] will send all his
+        /// [`PeerMetricsEvent`]s.
         peer_events_stream: LocalBoxStream<'static, PeersMetricsEvent>,
+
+        /// Actual [`PeerMetricsService`].
         metrics: PeersMetricsService,
     }
 
     impl Helper {
+        /// Returns new [`Helper`] with [`PeerMetricsService`] in which [`Room`]
+        /// with `test` ID was registered.
         pub fn new() -> Self {
             let mut watcher = MockPeerTrafficWatcher::new();
             watcher
@@ -893,12 +909,12 @@ mod tests {
                 .returning(|_, _, _| Box::pin(async { Ok(()) }));
             watcher.expect_unregister_peers().return_const(());
             let (traffic_flows_tx, traffic_flows_rx) = mpsc::unbounded();
-            let mut traffic_flows_stream = Box::pin(traffic_flows_rx);
+            let traffic_flows_stream = Box::pin(traffic_flows_rx);
             watcher.expect_traffic_flows().returning(move |_, _, _| {
                 traffic_flows_tx.unbounded_send(()).unwrap();
             });
             let (traffic_stopped_tx, traffic_stopped_rx) = mpsc::unbounded();
-            let mut traffic_stopped_stream = Box::pin(traffic_stopped_rx);
+            let traffic_stopped_stream = Box::pin(traffic_stopped_rx);
             watcher.expect_traffic_stopped().returning(move |_, _, _| {
                 traffic_stopped_tx.unbounded_send(()).unwrap();
             });
@@ -916,6 +932,8 @@ mod tests {
             }
         }
 
+        /// Registers [`Peer`] with `PeerId(1)` and provided [`MediaTrack`]s
+        /// count.
         pub fn register_peer(
             &mut self,
             send_audio: u32,
@@ -931,7 +949,9 @@ mod tests {
             );
         }
 
-        pub fn start_traffic_flowing(
+        /// Sends [`RtcStats`] in which provided count of [`MediaTrack`]s will
+        /// flow with provided count of packets.
+        pub fn traffic_flows(
             &mut self,
             send_audio: u32,
             send_video: u32,
@@ -943,7 +963,7 @@ mod tests {
             for i in 0..send_audio {
                 stats.push(RtcStat {
                     id: StatId(format!("{}-send-audio", i)),
-                    timestamp: timestamp(SystemTime::now()),
+                    timestamp: SystemTime::now().into(),
                     stats: RtcStatsType::OutboundRtp(Box::new(
                         outbound_traffic(packets, true),
                     )),
@@ -953,7 +973,7 @@ mod tests {
             for i in 0..send_video {
                 stats.push(RtcStat {
                     id: StatId(format!("{}-send-video", i)),
-                    timestamp: timestamp(SystemTime::now()),
+                    timestamp: SystemTime::now().into(),
                     stats: RtcStatsType::OutboundRtp(Box::new(
                         outbound_traffic(packets, false),
                     )),
@@ -963,7 +983,7 @@ mod tests {
             for i in 0..recv_audio {
                 stats.push(RtcStat {
                     id: StatId(format!("{}-recv-audio", i)),
-                    timestamp: timestamp(SystemTime::now()),
+                    timestamp: SystemTime::now().into(),
                     stats: RtcStatsType::InboundRtp(Box::new(inbound_traffic(
                         packets, true,
                     ))),
@@ -973,7 +993,7 @@ mod tests {
             for i in 0..recv_video {
                 stats.push(RtcStat {
                     id: StatId(format!("{}-recv-video", i)),
-                    timestamp: timestamp(SystemTime::now()),
+                    timestamp: SystemTime::now().into(),
                     stats: RtcStatsType::InboundRtp(Box::new(inbound_traffic(
                         packets, false,
                     ))),
@@ -983,49 +1003,69 @@ mod tests {
             self.metrics.add_stat(PeerId(1), stats);
         }
 
-        pub async fn next_traffic_flows(&mut self) {
+        /// Waits for the [`TrafficFlows`] which should receive
+        /// [`TrafficWatcherService`].
+        #[inline]
+        pub async fn wait_traffic_flow(&mut self) {
             self.traffic_flows_stream.next().await;
         }
 
-        pub async fn next_traffic_stopped(&mut self) {
+        /// Waits for the [`TrafficStopped`] which should receive
+        /// [`TrafficWatcherService`].
+        ///
+        /// This function will call [`PeerMetricsService::check_peers`] before
+        /// waiting for the [`TrafficStopped`].
+        pub async fn wait_traffic_stopped(&mut self) {
             self.metrics.check_peers();
             self.traffic_stopped_stream.next().await;
         }
 
+        /// Returns next [`PeerMetricsEvent`] which [`PeerMetricsService`] wants
+        /// send to the [`Room`].
+        #[inline]
         pub async fn next_event(&mut self) -> PeersMetricsEvent {
             self.peer_events_stream.next().await.unwrap()
         }
 
+        /// Calls [`PeerMetricsService::check_peers`].
+        #[inline]
         pub fn check_peers(&mut self) {
             self.metrics.check_peers();
         }
 
+        /// Calls [`PeerMetricsService::unregister_peers`] with provided
+        /// [`PeerId`] as argument.
         pub fn unregister_peer(&mut self, peer_id: PeerId) {
             self.metrics.unregister_peers(&[peer_id]);
         }
     }
 
+    /// Checks that [`TrafficFlows`] and [`TrafficStopped`] is sending to the
+    /// [`TrafficWatcher`] on all traffic flowing starting and stopping.
     #[actix_rt::test]
-    async fn traffic_flows_and_stopped_works() {
+    async fn full_traffic_stopping_works() {
         let mut helper = Helper::new();
         helper.register_peer(1, 1, 1, 1);
-        helper.start_traffic_flowing(1, 1, 1, 1, 100);
-        helper.next_traffic_flows().await;
+        helper.traffic_flows(1, 1, 1, 1, 100);
+        helper.wait_traffic_flow().await;
 
         delay_for(Duration::from_millis(50)).await;
 
-        helper.next_traffic_stopped().await;
+        helper.wait_traffic_stopped().await;
     }
 
+    /// Checks that [`PeerMetricsEvent::NoTrafficFlow`] and
+    /// [`PeerMetricsEvent::TrafficFlows`] is sending on partial traffic
+    /// flowing stopping and starting.
     #[actix_rt::test]
-    async fn no_traffic_event_works() {
+    async fn partial_stopping_works() {
         let mut helper = Helper::new();
         helper.register_peer(1, 1, 1, 1);
-        helper.start_traffic_flowing(1, 1, 1, 1, 100);
+        helper.traffic_flows(1, 1, 1, 1, 100);
         let _ = helper.next_event().await;
         let _ = helper.next_event().await;
         delay_for(Duration::from_millis(40)).await;
-        helper.start_traffic_flowing(1, 1, 0, 0, 200);
+        helper.traffic_flows(1, 1, 0, 0, 200);
         delay_for(Duration::from_millis(15)).await;
         helper.check_peers();
 
@@ -1047,7 +1087,7 @@ mod tests {
             }
         }
 
-        helper.start_traffic_flowing(1, 1, 1, 1, 300);
+        helper.traffic_flows(1, 1, 1, 1, 300);
         let event = helper.next_event().await;
         match event {
             PeersMetricsEvent::TrafficFlows {
@@ -1063,11 +1103,13 @@ mod tests {
         }
     }
 
+    /// Checks that [`PeerMetricsService::unregister_peer`] doesn't triggers
+    /// anything ([`TrafficStopped`], [`PeerEventsEvent::NoTrafficFlow`] e.g.).
     #[actix_rt::test]
     async fn peer_unregistering_doesnt_trigger_anything() {
         let mut helper = Helper::new();
         helper.register_peer(1, 1, 1, 1);
-        helper.start_traffic_flowing(1, 1, 1, 1, 100);
+        helper.traffic_flows(1, 1, 1, 1, 100);
 
         let mut directions = HashSet::new();
         loop {
@@ -1090,11 +1132,14 @@ mod tests {
         }
 
         helper.unregister_peer(PeerId(1));
-        wait_or_fail(helper.next_event(), Duration::from_millis(10))
+        future_with_timeout(helper.next_event(), Duration::from_millis(10))
             .await
             .unwrap_err();
-        wait_or_fail(helper.next_traffic_stopped(), Duration::from_millis(10))
-            .await
-            .unwrap_err();
+        future_with_timeout(
+            helper.wait_traffic_stopped(),
+            Duration::from_millis(10),
+        )
+        .await
+        .unwrap_err();
     }
 }
