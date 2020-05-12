@@ -1,5 +1,8 @@
 //! Helper utils used in project.
 
+#[cfg(test)]
+pub mod test;
+
 use std::{future::Future, pin::Pin, time::Instant};
 
 use actix::prelude::dev::{

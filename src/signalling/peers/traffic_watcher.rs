@@ -27,21 +27,22 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     fmt::Debug,
+    future::Future,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use actix::{Actor, Addr, AsyncContext, Handler, MailboxError, Message};
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use failure::_core::fmt::Formatter;
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::PeerId;
-use std::fmt;
 
 use crate::{
     api::control::RoomId, conf, log::prelude::*, utils::instant_into_utc,
 };
-use failure::_core::fmt::Formatter;
 
 #[cfg_attr(test, mockall::automock)]
 pub trait PeerTrafficWatcherSubscriber: Send + Debug {
@@ -80,15 +81,15 @@ pub struct PeerStopped {
 }
 
 /// Consumes `Peer` traffic metrics for further processing.
-#[async_trait]
+#[cfg_attr(test, mockall::automock)]
 pub trait PeerTrafficWatcher: Debug + Send + Sync {
     /// Registers [`Room`] as `Peer`s state messages listener, preparing
     /// [`PeerTrafficWatcher`] for registering `Peer`s from this [`Room`].
-    async fn register_room(
+    fn register_room(
         &self,
         room_id: RoomId,
         room: Box<dyn PeerTrafficWatcherSubscriber>,
-    ) -> Result<(), MailboxError>;
+    ) -> LocalBoxFuture<'static, Result<(), MailboxError>>;
 
     /// Unregisters [`Room`] as `Peer`s state messages listener.
     ///
@@ -97,12 +98,12 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 
     /// Registers `Peer`, so that [`PeerTrafficWatcher`] will be able to
     /// process traffic flow events of this `Peer`.
-    async fn register_peer(
+    fn register_peer(
         &self,
         room_id: RoomId,
         peer_id: PeerId,
         should_watch_turn: bool,
-    ) -> Result<(), MailboxError>;
+    ) -> LocalBoxFuture<'static, Result<(), MailboxError>>;
 
     /// Unregisters `Peer`s, so that [`PeerTrafficWatcher`] will not be able
     /// to process traffic flow events of this `Peer` anymore.
@@ -121,6 +122,13 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant);
 }
 
+#[cfg(test)]
+impl Debug for MockPeerTrafficWatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PeerTrafficWatcherMock").finish()
+    }
+}
+
 /// Returns [`FlowMetricSources`], which will be used to emit `Peer` state
 /// events.
 ///
@@ -137,16 +145,15 @@ fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
     sources
 }
 
-#[async_trait]
 impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     /// Sends [`RegisterRoom`] message to the [`PeersTrafficWatcherImpl`]
     /// returning send result.
-    async fn register_room(
+    fn register_room(
         &self,
         room_id: RoomId,
         room: Box<dyn PeerTrafficWatcherSubscriber>,
-    ) -> Result<(), MailboxError> {
-        self.send(RegisterRoom { room_id, room }).await
+    ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
+        Box::pin(self.send(RegisterRoom { room_id, room }))
     }
 
     /// Sends [`UnregisterRoom`] message to [`PeersTrafficWatcherImpl`].
@@ -156,18 +163,17 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
 
     /// Sends [`RegisterPeer`] message to [`PeersTrafficWatcherImpl`] returning
     /// send result.
-    async fn register_peer(
+    fn register_peer(
         &self,
         room_id: RoomId,
         peer_id: PeerId,
         should_watch_turn: bool,
-    ) -> Result<(), MailboxError> {
-        self.send(RegisterPeer {
+    ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
+        Box::pin(self.send(RegisterPeer {
             room_id,
             peer_id,
             flow_metrics_sources: build_flow_sources(should_watch_turn),
-        })
-        .await
+        }))
     }
 
     /// Sends [`UnregisterPeers`] message to [`PeersTrafficWatcherImpl`].
@@ -676,7 +682,7 @@ mod tests {
 
     use super::*;
 
-    use crate::turn::allocation_event::CoturnAllocationEvent::Traffic;
+    use crate::utils::test::wait_or_fail;
 
     struct TrafficWatcherTestHelper {
         peer_stopped_rx: LocalBoxStream<'static, PeerStopped>,
@@ -735,19 +741,6 @@ mod tests {
 
         pub async fn try_next_peer_started(&mut self) -> Option<PeerStarted> {
             self.peer_started_rx.next().await
-        }
-    }
-
-    async fn wait_or_fail<T>(
-        fut: impl Future<Output = T>,
-        dur: Duration,
-    ) -> Result<T, ()> {
-        let result =
-            futures::future::select(Box::pin(fut), Box::pin(delay_for(dur)))
-                .await;
-        match result {
-            Either::Left((res, _)) => Ok(res),
-            Either::Right(_) => Err(()),
         }
     }
 

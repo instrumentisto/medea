@@ -106,11 +106,7 @@ impl PeersMetricsService {
     /// some track is not flowing.
     pub fn check_peers(&mut self) {
         let mut stopped_peers = Vec::new();
-        for peer in self
-            .peers
-            .values()
-            .filter(|peer| peer.borrow().state == PeerStatState::Connected)
-        {
+        for peer in self.peers.values() {
             let mut peer_ref = peer.borrow_mut();
             let send_media_traffic_state_before = peer_ref.send_traffic_state;
             let recv_media_traffic_state_before = peer_ref.recv_traffic_state;
@@ -150,7 +146,7 @@ impl PeersMetricsService {
                     self.send_no_traffic(
                         &*peer_ref,
                         stopped_recv_media_type,
-                        MediaDirection::Publish,
+                        MediaDirection::Play,
                     );
                 }
             }
@@ -776,4 +772,329 @@ impl From<&medea_client_api_proto::MediaType> for TrackMediaType {
     }
 }
 
-// TODO: unit tests
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        sync::Arc,
+        time::{Duration, Instant, SystemTime},
+    };
+
+    use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt as _};
+    use medea_client_api_proto::{
+        stats::{
+            HighResTimeStamp, MediaSourceKind, RtcInboundRtpStreamMediaType,
+            RtcInboundRtpStreamStats, RtcOutboundRtpStreamMediaType,
+            RtcOutboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
+        },
+        PeerId,
+    };
+    use tokio::time::delay_for;
+
+    use crate::{
+        api::control::callback::{MediaDirection, MediaType},
+        media::peer::{
+            tests::test_peer_from_peer_tracks, Context, Peer, Stable,
+        },
+        signalling::peers::{
+            traffic_watcher::MockPeerTrafficWatcher, PeersMetricsEvent,
+        },
+        utils::test::{timestamp, wait_or_fail},
+    };
+
+    use super::{PeerTracks, PeersMetricsService};
+    use std::collections::HashSet;
+
+    fn outbound_traffic(
+        packets_sent: u64,
+        is_audio: bool,
+    ) -> RtcOutboundRtpStreamStats {
+        let media_type = if is_audio {
+            RtcOutboundRtpStreamMediaType::Audio {
+                total_samples_sent: None,
+                voice_activity_flag: None,
+            }
+        } else {
+            RtcOutboundRtpStreamMediaType::Video {
+                frame_width: None,
+                frame_height: None,
+                frames_per_second: None,
+            }
+        };
+
+        RtcOutboundRtpStreamStats {
+            track_id: None,
+            media_type,
+            packets_sent,
+            bytes_sent: 0,
+            media_source_id: None,
+        }
+    }
+
+    fn inbound_traffic(
+        packets_received: u64,
+        is_audio: bool,
+    ) -> RtcInboundRtpStreamStats {
+        let media_type = if is_audio {
+            RtcInboundRtpStreamMediaType::Audio {
+                voice_activity_flag: None,
+                total_samples_received: None,
+                concealed_samples: None,
+                silent_concealed_samples: None,
+                audio_level: None,
+                total_audio_energy: None,
+                total_samples_duration: None,
+            }
+        } else {
+            RtcInboundRtpStreamMediaType::Video {
+                frames_decoded: None,
+                key_frames_decoded: None,
+                frame_width: None,
+                frame_height: None,
+                total_inter_frame_delay: None,
+                frames_per_second: None,
+                frame_bit_depth: None,
+                fir_count: None,
+                pli_count: None,
+                sli_count: None,
+                concealment_events: None,
+                frames_received: None,
+            }
+        };
+
+        RtcInboundRtpStreamStats {
+            packets_received,
+            track_id: None,
+            media_specific_stats: media_type,
+            bytes_received: 0,
+            packets_lost: None,
+            jitter: None,
+            total_decode_time: None,
+            jitter_buffer_emitted_count: None,
+        }
+    }
+
+    struct Helper {
+        traffic_flows_stream: LocalBoxStream<'static, ()>,
+        traffic_stopped_stream: LocalBoxStream<'static, ()>,
+        peer_events_stream: LocalBoxStream<'static, PeersMetricsEvent>,
+        metrics: PeersMetricsService,
+    }
+
+    impl Helper {
+        pub fn new() -> Self {
+            let mut watcher = MockPeerTrafficWatcher::new();
+            watcher
+                .expect_register_room()
+                .returning(|_, _| Box::pin(async { Ok(()) }));
+            watcher.expect_unregister_room().return_const(());
+            watcher
+                .expect_register_peer()
+                .returning(|_, _, _| Box::pin(async { Ok(()) }));
+            watcher.expect_unregister_peers().return_const(());
+            let (traffic_flows_tx, traffic_flows_rx) = mpsc::unbounded();
+            let mut traffic_flows_stream = Box::pin(traffic_flows_rx);
+            watcher.expect_traffic_flows().returning(move |_, _, _| {
+                traffic_flows_tx.unbounded_send(()).unwrap();
+            });
+            let (traffic_stopped_tx, traffic_stopped_rx) = mpsc::unbounded();
+            let mut traffic_stopped_stream = Box::pin(traffic_stopped_rx);
+            watcher.expect_traffic_stopped().returning(move |_, _, _| {
+                traffic_stopped_tx.unbounded_send(()).unwrap();
+            });
+
+            let mut metrics = PeersMetricsService::new(
+                "test".to_string().into(),
+                Arc::new(watcher),
+            );
+
+            Self {
+                traffic_flows_stream,
+                traffic_stopped_stream,
+                peer_events_stream: Box::pin(metrics.subscribe()),
+                metrics,
+            }
+        }
+
+        pub fn register_peer(
+            &mut self,
+            send_audio: u32,
+            send_video: u32,
+            recv_audio: u32,
+            recv_video: u32,
+        ) {
+            self.metrics.register_peer(
+                &test_peer_from_peer_tracks(
+                    send_audio, send_video, recv_audio, recv_video,
+                ),
+                Duration::from_millis(50),
+            );
+        }
+
+        pub fn start_traffic_flowing(
+            &mut self,
+            send_audio: u32,
+            send_video: u32,
+            recv_audio: u32,
+            recv_video: u32,
+            packets: u64,
+        ) {
+            let mut stats = Vec::new();
+            for i in 0..send_audio {
+                stats.push(RtcStat {
+                    id: StatId(format!("{}-send-audio", i)),
+                    timestamp: timestamp(SystemTime::now()),
+                    stats: RtcStatsType::OutboundRtp(Box::new(
+                        outbound_traffic(packets, true),
+                    )),
+                });
+            }
+
+            for i in 0..send_video {
+                stats.push(RtcStat {
+                    id: StatId(format!("{}-send-video", i)),
+                    timestamp: timestamp(SystemTime::now()),
+                    stats: RtcStatsType::OutboundRtp(Box::new(
+                        outbound_traffic(packets, false),
+                    )),
+                })
+            }
+
+            for i in 0..recv_audio {
+                stats.push(RtcStat {
+                    id: StatId(format!("{}-recv-audio", i)),
+                    timestamp: timestamp(SystemTime::now()),
+                    stats: RtcStatsType::InboundRtp(Box::new(inbound_traffic(
+                        packets, true,
+                    ))),
+                })
+            }
+
+            for i in 0..recv_video {
+                stats.push(RtcStat {
+                    id: StatId(format!("{}-recv-video", i)),
+                    timestamp: timestamp(SystemTime::now()),
+                    stats: RtcStatsType::InboundRtp(Box::new(inbound_traffic(
+                        packets, false,
+                    ))),
+                })
+            }
+
+            self.metrics.add_stat(PeerId(1), stats);
+        }
+
+        pub async fn next_traffic_flows(&mut self) {
+            self.traffic_flows_stream.next().await;
+        }
+
+        pub async fn next_traffic_stopped(&mut self) {
+            self.metrics.check_peers();
+            self.traffic_stopped_stream.next().await;
+        }
+
+        pub async fn next_event(&mut self) -> PeersMetricsEvent {
+            self.peer_events_stream.next().await.unwrap()
+        }
+
+        pub fn check_peers(&mut self) {
+            self.metrics.check_peers();
+        }
+
+        pub fn unregister_peer(&mut self, peer_id: PeerId) {
+            self.metrics.unregister_peers(&[peer_id]);
+        }
+    }
+
+    #[actix_rt::test]
+    async fn traffic_flows_and_stopped_works() {
+        let mut helper = Helper::new();
+        helper.register_peer(1, 1, 1, 1);
+        helper.start_traffic_flowing(1, 1, 1, 1, 100);
+        helper.next_traffic_flows().await;
+
+        delay_for(Duration::from_millis(50)).await;
+
+        helper.next_traffic_stopped().await;
+    }
+
+    #[actix_rt::test]
+    async fn no_traffic_event_works() {
+        let mut helper = Helper::new();
+        helper.register_peer(1, 1, 1, 1);
+        helper.start_traffic_flowing(1, 1, 1, 1, 100);
+        let _ = helper.next_event().await;
+        let _ = helper.next_event().await;
+        delay_for(Duration::from_millis(40)).await;
+        helper.start_traffic_flowing(1, 1, 0, 0, 200);
+        delay_for(Duration::from_millis(15)).await;
+        helper.check_peers();
+
+        loop {
+            let event = helper.next_event().await;
+            match event {
+                PeersMetricsEvent::NoTrafficFlow {
+                    peer_id,
+                    direction,
+                    media_type,
+                    ..
+                } => {
+                    assert_eq!(peer_id, PeerId(1));
+                    assert_eq!(direction, MediaDirection::Play);
+                    assert_eq!(media_type, MediaType::Both);
+                    break;
+                }
+                _ => panic!("Unexpected event received: {:?}.", event),
+            }
+        }
+
+        helper.start_traffic_flowing(1, 1, 1, 1, 300);
+        let event = helper.next_event().await;
+        match event {
+            PeersMetricsEvent::TrafficFlows {
+                peer_id,
+                direction,
+                media_type,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(direction, MediaDirection::Play);
+                assert_eq!(media_type, MediaType::Both);
+            }
+            _ => panic!("Unexpected event received: {:?}.", event),
+        }
+    }
+
+    #[actix_rt::test]
+    async fn peer_unregistering_doesnt_trigger_anything() {
+        let mut helper = Helper::new();
+        helper.register_peer(1, 1, 1, 1);
+        helper.start_traffic_flowing(1, 1, 1, 1, 100);
+
+        let mut directions = HashSet::new();
+        loop {
+            let event = helper.next_event().await;
+            match event {
+                PeersMetricsEvent::TrafficFlows {
+                    peer_id,
+                    media_type,
+                    direction,
+                } => {
+                    assert_eq!(peer_id, PeerId(1));
+                    assert_eq!(media_type, MediaType::Both);
+                    directions.insert(direction);
+                    if directions.len() == 2 {
+                        break;
+                    }
+                }
+                _ => panic!("Unknown event received: {:?}", event),
+            }
+        }
+
+        helper.unregister_peer(PeerId(1));
+        wait_or_fail(helper.next_event(), Duration::from_millis(10))
+            .await
+            .unwrap_err();
+        wait_or_fail(helper.next_traffic_stopped(), Duration::from_millis(10))
+            .await
+            .unwrap_err();
+    }
+}
