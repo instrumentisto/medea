@@ -1,4 +1,5 @@
-//! Handlers for [`PeerStarted`] and [`PeerStopped`] messages emitted by [`PeerTrafficWatcher`].
+//! Handlers for [`PeerStarted`] and [`PeerStopped`] messages emitted by
+//! [`PeerTrafficWatcher`].
 //!
 //! [`PeerTrafficWatcher`]: crate::signalling::peers::PeerTrafficWatcher
 
