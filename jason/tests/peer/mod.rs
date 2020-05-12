@@ -576,6 +576,8 @@ async fn get_traffic_stats() {
                 "Second Peer shouldn't have any OutboundRtp stats."
             ),
             RtcStatsType::CandidatePair(candidate_pair) => {
+                // TODO: fix test race where this assertion might fail cause
+                //       left = Unknown("cancelled").
                 assert_eq!(
                     candidate_pair.state,
                     NonExhaustive::Known(KnownIceCandidatePairState::Succeeded)
