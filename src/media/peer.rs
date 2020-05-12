@@ -278,12 +278,12 @@ impl<T> Peer<T> {
         self.context.endpoints.push(endpoint.downgrade());
     }
 
-    /// Returns all receiving tracks of this peer.
+    /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
         self.context.receivers.clone()
     }
 
-    /// Returns all sending tracks of this peer.
+    /// Returns all sending [`MediaTrack`]s of this [`Peer`].
     pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
         self.context.senders.clone()
     }
@@ -461,68 +461,5 @@ impl Peer<Stable> {
             );
         }
         Ok(mids)
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-
-    /// Returns [`PeerStateMachine`] with provided count of the `MediaTrack`s
-    /// media types.
-    pub fn test_peer_from_peer_tracks(
-        send_audio: u32,
-        send_video: u32,
-        recv_audio: u32,
-        recv_video: u32,
-    ) -> PeerStateMachine {
-        let mut peer = Peer {
-            state: Stable {},
-            context: Context {
-                id: Id(1),
-                sdp_offer: None,
-                sdp_answer: None,
-                senders: HashMap::new(),
-                receivers: HashMap::new(),
-                member_id: "test-member".to_string().into(),
-                is_force_relayed: false,
-                partner_peer: Id(2),
-                ice_user: None,
-                endpoints: Vec::new(),
-                partner_member: "partner-member".to_string().into(),
-            },
-        };
-
-        let mut track_id_counter = Counter::default();
-
-        for _ in 0..send_audio {
-            let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
-            peer.context.senders.insert(track_id, Rc::new(track));
-        }
-
-        for _ in 0..send_video {
-            let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
-            peer.context.senders.insert(track_id, Rc::new(track));
-        }
-
-        for _ in 0..recv_audio {
-            let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
-            peer.context.receivers.insert(track_id, Rc::new(track));
-        }
-
-        for _ in 0..recv_video {
-            let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
-            peer.context.receivers.insert(track_id, Rc::new(track));
-        }
-
-        peer.into()
     }
 }

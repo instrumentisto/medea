@@ -90,8 +90,8 @@ impl Into<proto::request::Event> for CallbackEvent {
 
 /// Media type of the traffic which starts/stops flowing in some `Endpoint`.
 ///
-/// This enum is used in the [`MuteState`] of the `Endpoint`s. Because of it,
-/// this structure is bitflag enum.
+/// This enum is used in [`MuteState`] of `Endpoint`s. That's why it represents
+/// a bitflag enum.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 pub enum MediaType {
     /// Started/stopped audio traffic.
@@ -112,7 +112,7 @@ impl MediaType {
     /// [`MediaType`]s.
     ///
     /// This [`MediaType`] should be what was before `RTCStat` update and
-    /// as argument is [`MediaType`] which was getted after `RTCStat` update.
+    /// as argument is [`MediaType`] which was got after `RTCStat` update.
     pub fn get_started(self, after: Self) -> Option<Self> {
         match self {
             MediaType::Audio => match after {

@@ -213,14 +213,14 @@
 
 
 [media]
-# Max duration of media-flow lag, after which `on_stop` callback will be fired.
+# Max duration of media-flow lag, after which `on_stop` callback is fired.
 #
-# Env var: MEDEA_PEER_MEDIA_TRAFFIC__MAX_LAG
+# Env var: MEDEA_MEDIA__MAX_LAG
 # Default:
 #   max_lag = "15s"
 
-# Timeout for peer to become active after it was created.
+# Timeout for peer to become active after it has been created.
 #
-# Env var: MEDEA_PEER_MEDIA_TRAFFIC__INIT_TIMEOUT
+# Env var: MEDEA_MEDIA__INIT_TIMEOUT
 # Default:
 #   init_timeout = "15s"

@@ -37,7 +37,7 @@ mod spec {
             "MEDEA_MEDIA__INIT_TIMEOUT" => "503ms",
         );
 
-        assert_ne!(default_conf.media.max_lag, env_conf.media.max_lag,);
+        assert_ne!(default_conf.media.max_lag, env_conf.media.max_lag);
         assert_eq!(env_conf.media.max_lag, Duration::from_millis(502));
 
         assert_ne!(

@@ -10,7 +10,7 @@ use std::{
 
 use actix::{
     Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, Message, WeakAddr, WrapFuture as _,
+    MailboxError, Message, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -121,11 +121,11 @@ pub enum RoomError {
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 
-    /// [`MailboxError`] return on sending message to the
-    /// [`PeerTrafficWatcher`] service.
+    /// [`MailboxError`] returned on sending message to [`PeerTrafficWatcher`]
+    /// service.
     #[display(
-        fmt = "Mailbox error while sending message to the \
-               'PeerTrafficWatcher' service. {:?}",
+        fmt = "Mailbox error while sending message to PeerTrafficWatcher \
+               service: {}",
         _0
     )]
     #[from(ignore)]

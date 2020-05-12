@@ -26,9 +26,10 @@ pub enum Endpoint {
 impl Endpoint {
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     #[allow(clippy::unused_self)]
+    #[inline]
     pub fn has_traffic_callback(&self) -> bool {
-        // TODO: delegate this call to the
-        // WebRtcPublishEndpoint/WebRtcPlayEndpoint.
+        // TODO: Delegate this call to
+        //       `WebRtcPublishEndpoint`/`WebRtcPlayEndpoint`.
 
         false
     }
@@ -51,9 +52,9 @@ impl Into<proto::Element> for Endpoint {
     }
 }
 
-/// Weak pointer to a [`Endpoint`].
+/// Weak pointer to an [`Endpoint`].
 ///
-/// Can be upgraded to the [`Endpoint`] by calling [`WeakEndpoint::upgrade`].
+/// Can be upgraded to an [`Endpoint`] by calling [`WeakEndpoint::upgrade`].
 #[derive(Clone, Debug, From)]
 pub enum WeakEndpoint {
     /// [`Weak`] pointer to the [`WebRtcPublishEndpoint`].
@@ -67,11 +68,11 @@ impl WeakEndpoint {
     /// Upgrades this weak pointer to a strong [`Endpoint`] pointer.
     pub fn upgrade(&self) -> Option<Endpoint> {
         match self {
-            WeakEndpoint::WebRtcPublishEndpoint(publish_endpoint) => {
-                publish_endpoint.safe_upgrade().map(|e| e.into())
+            WeakEndpoint::WebRtcPublishEndpoint(ep) => {
+                ep.safe_upgrade().map(Into::into)
             }
-            WeakEndpoint::WebRtcPlayEndpoint(play_endpoint) => {
-                play_endpoint.safe_upgrade().map(|e| e.into())
+            WeakEndpoint::WebRtcPlayEndpoint(ep) => {
+                ep.safe_upgrade().map(Into::into)
             }
         }
     }

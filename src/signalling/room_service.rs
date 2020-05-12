@@ -122,8 +122,7 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
-    /// [`PeerTrafficWatcher`] for all [`Room`]s from this
-    /// [`RoomService`].
+    /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which is responsible for processing [`PeerConnection`]'s
