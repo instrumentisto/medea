@@ -37,7 +37,7 @@ pub use self::{
     metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource, PeerStarted,
-        PeerStopped, PeerTrafficWatcher,
+        PeerStopped, PeerTrafficWatcher, PeerTrafficWatcherSubscriber,
     },
 };
 

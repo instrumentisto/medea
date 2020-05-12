@@ -41,10 +41,13 @@ use crate::{
     api::control::RoomId, conf, log::prelude::*, utils::instant_into_utc,
 };
 
+/// Receiver of the [`PeerTrafficWatcher`] decisions about traffic flowing.
 #[cfg_attr(test, mockall::automock)]
 pub trait PeerTrafficWatcherSubscriber: Send + Debug {
+    /// [`PeerTrafficWatcher`] believes that traffic was started.
     fn peer_started(&self, peer_id: PeerId);
 
+    /// [`PeerTrafficWatcher`] believes that traffic was stopped.
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>);
 }
 
@@ -669,9 +672,9 @@ impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
 mod tests {
     use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt};
 
-    use super::*;
-
     use crate::utils::test::future_with_timeout;
+
+    use super::*;
 
     /// Helper for the all [`traffic_watcher`] unit tests.
     struct Helper {

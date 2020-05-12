@@ -10,8 +10,9 @@ use std::{
 
 use actix::{
     Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, Message, WrapFuture as _,
+    MailboxError, Message, WeakAddr, WrapFuture as _,
 };
+use chrono::{DateTime, Utc};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
@@ -58,15 +59,14 @@ use crate::{
         },
         participants::{ParticipantService, ParticipantServiceErr},
         peers::{
-            PeerTrafficWatcherSubscriber, PeerStarted,
-            PeerStopped, PeerTrafficWatcher, PeersService,
+            PeerStarted, PeerStopped, PeerTrafficWatcher,
+            PeerTrafficWatcherSubscriber, PeersService,
         },
     },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
     AppContext,
 };
-use chrono::{DateTime, Utc};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -1316,12 +1316,16 @@ impl Handler<PeerStopped> for Room {
 }
 
 impl PeerTrafficWatcherSubscriber for WeakAddr<Room> {
+    /// Updgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStarted`]
+    /// message.
     fn peer_started(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStarted(peer_id));
         }
     }
 
+    /// Updgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStopped`]
+    /// message.
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
