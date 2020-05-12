@@ -58,7 +58,7 @@ use crate::{
         },
         participants::{ParticipantService, ParticipantServiceErr},
         peers::{
-            traffic_watcher::PeerTrafficWatcherSubscriber, PeerStarted,
+            PeerTrafficWatcherSubscriber, PeerStarted,
             PeerStopped, PeerTrafficWatcher, PeersService,
         },
     },

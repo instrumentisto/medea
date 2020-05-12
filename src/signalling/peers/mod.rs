@@ -2,9 +2,7 @@
 
 mod media_traffic_state;
 mod metrics;
-// TODO: try normally re-export TrafficWatcher trait and make this module
-// private.
-pub mod traffic_watcher;
+mod traffic_watcher;
 
 use std::{
     collections::HashMap,
@@ -40,7 +38,7 @@ pub use self::{
     metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource, PeerStarted,
-        PeerStopped, PeerTrafficWatcher,
+        PeerStopped, PeerTrafficWatcher, PeerTrafficWatcherSubscriber,
     },
 };
 
