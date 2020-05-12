@@ -71,32 +71,35 @@ impl Room {
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
-        let endpoint_id = if let Some(member) =
-            self.members.get_member_by_id(member_id)
-        {
-            let play_id = endpoint_id.into();
-            if let Some(endpoint) = member.take_sink(&play_id) {
-                if let Some(peer_id) = endpoint.peer_id() {
-                    let removed_peers =
-                        self.peers.remove_peer(member_id, peer_id);
-                    for (member_id, peers_ids) in removed_peers {
-                        self.member_peers_removed(peers_ids, member_id, ctx)
+        let endpoint_id =
+            if let Some(member) = self.members.get_member_by_id(member_id) {
+                let play_id = endpoint_id.into();
+                if let Some(endpoint) = member.take_sink(&play_id) {
+                    if let Some(peer_id) = endpoint.peer_id() {
+                        let removed_peers =
+                            self.peers.remove_peers(member_id, &[peer_id]);
+                        for (member_id, peers) in removed_peers {
+                            self.member_peers_removed(
+                                peers.into_iter().map(|p| p.id()).collect(),
+                                member_id,
+                                ctx,
+                            )
                             .map(|_, _, _| ())
                             .spawn(ctx);
+                        }
                     }
                 }
-            }
 
-            let publish_id = String::from(play_id).into();
-            if let Some(endpoint) = member.take_src(&publish_id) {
-                let peer_ids = endpoint.peer_ids();
-                self.remove_peers(member_id, &peer_ids, ctx);
-            }
+                let publish_id = String::from(play_id).into();
+                if let Some(endpoint) = member.take_src(&publish_id) {
+                    let peer_ids = endpoint.peer_ids();
+                    self.remove_peers(member_id, &peer_ids, ctx);
+                }
 
-            publish_id.into()
-        } else {
-            endpoint_id
-        };
+                publish_id.into()
+            } else {
+                endpoint_id
+            };
 
         debug!(
             "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
@@ -234,20 +237,24 @@ impl Room {
     ///
     /// This will delete [`Peer`]s from [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] event to [`Member`].
-    fn remove_peers(
+    fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,
-        peer_ids_to_remove: &HashSet<PeerId>,
+        peer_ids_to_remove: Peers,
         ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
         self.peers
-            .remove_peers(&member_id, &peer_ids_to_remove)
+            .remove_peers(&member_id, peer_ids_to_remove)
             .into_iter()
-            .for_each(|(member_id, peers_id)| {
-                self.member_peers_removed(peers_id, member_id, ctx)
-                    .map(|_, _, _| ())
-                    .spawn(ctx);
+            .for_each(|(member_id, peers)| {
+                self.member_peers_removed(
+                    peers.into_iter().map(|p| p.id()).collect(),
+                    member_id,
+                    ctx,
+                )
+                .map(|_, _, _| ())
+                .spawn(ctx);
             });
     }
 }
@@ -261,7 +268,7 @@ impl Into<proto::Room> for &Room {
             .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
         proto::Room {
-            id: self.get_id().to_string(),
+            id: self.id().to_string(),
             pipeline,
         }
     }

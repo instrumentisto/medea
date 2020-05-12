@@ -3,11 +3,14 @@
 
 mod command_handler;
 mod dynamic_api;
+mod peer_events_handler;
 mod rpc_server;
+
+use std::sync::Arc;
 
 use actix::{
     Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
-    WrapFuture as _,
+    MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -29,7 +32,7 @@ use crate::{
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::PeerRepository,
+        peers::{PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
@@ -92,6 +95,16 @@ pub enum RoomError {
     /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
+
+    /// [`MailboxError`] returned on sending message to [`PeerTrafficWatcher`]
+    /// service.
+    #[display(
+        fmt = "Mailbox error while sending message to PeerTrafficWatcher \
+               service: {}",
+        _0
+    )]
+    #[from(ignore)]
+    PeerTrafficWatcherMailbox(MailboxError),
 }
 
 /// Possible states of [`Room`].
@@ -122,7 +135,7 @@ pub struct Room {
     pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeerRepository,
+    pub peers: PeersService,
 
     /// Current state of this [`Room`].
     state: State,
@@ -138,12 +151,15 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
-            peers: PeerRepository::new(
+            peers: PeersService::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
+                peers_traffic_watcher,
+                &context.config.media,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
@@ -152,8 +168,8 @@ impl Room {
     }
 
     /// Returns [`RoomId`] of this [`Room`].
-    fn get_id(&self) -> RoomId {
-        self.id.clone()
+    pub fn id(&self) -> &RoomId {
+        &self.id
     }
 
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
@@ -244,7 +260,8 @@ impl Room {
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
                     connect_endpoints_tasks.push(
-                        self.peers.connect_endpoints(publisher, &receiver),
+                        self.peers
+                            .connect_endpoints(publisher.clone(), receiver),
                     );
                 }
             }
@@ -256,8 +273,10 @@ impl Room {
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
-                connect_endpoints_tasks
-                    .push(self.peers.connect_endpoints(&publisher, receiver))
+                connect_endpoints_tasks.push(
+                    self.peers
+                        .connect_endpoints(publisher.clone(), receiver.clone()),
+                )
             }
         }
 

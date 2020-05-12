@@ -310,19 +310,16 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::collections::HashMap;
 
-    use medea_client_api_proto::{Command, IceCandidate, PeerId};
+    use super::*;
 
     use crate::{
-        api::{
-            client::rpc_connection::CommandMessage,
-            control::{
-                pipeline::Pipeline, MemberId, MemberSpec, RoomId, RoomSpec,
-            },
-        },
-        conf::Conf,
-        signalling::room::{rpc_server::CommandValidationError, Room},
+        api::control::{pipeline::Pipeline, MemberSpec, RoomId, RoomSpec},
+        conf::{self, Conf},
+        signalling::peers::build_peers_traffic_watcher,
         AppContext,
     };
+
+    use medea_client_api_proto::IceCandidate;
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
@@ -334,11 +331,16 @@ mod test {
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(&room_spec, &ctx).unwrap()
+        Room::new(
+            &room_spec,
+            &ctx,
+            build_peers_traffic_watcher(&conf::Media::default()),
+        )
+        .unwrap()
     }
 
-    #[test]
-    fn command_validation_peer_not_found() {
+    #[actix_rt::test]
+    async fn command_validation_peer_not_found() {
         let mut room = empty_room();
 
         let member1 = MemberSpec::new(
@@ -375,8 +377,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn command_validation_peer_does_not_belong_to_member() {
+    #[actix_rt::test]
+    async fn command_validation_peer_does_not_belong_to_member() {
         let mut room = empty_room();
 
         let member1 = MemberSpec::new(
