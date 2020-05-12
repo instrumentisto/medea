@@ -57,7 +57,7 @@ pub struct PeersMetricsService {
     /// to.
     room_id: RoomId,
 
-    /// [`Addr`] of [`PeerTrafficWatcher`] to which traffic updates will be
+    /// [`PeerTrafficWatcher`] to which traffic updates will be
     /// sent.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
@@ -177,7 +177,6 @@ impl PeersMetricsService {
             receivers: HashMap::new(),
             send_traffic_state: MediaTrafficState::new(),
             recv_traffic_state: MediaTrafficState::new(),
-            state: PeerStatState::Connecting,
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
         }));
@@ -528,18 +527,6 @@ impl<T> TrackStat<T> {
     }
 }
 
-/// Current state of a [`PeerStat`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PeerStatState {
-    /// [`Peer`] which this [`PeerStat`] represents is considered as
-    /// connected.
-    Connected,
-
-    /// [`Peer`] which this [`PeerStat`] represents waiting for
-    /// connection.
-    Connecting,
-}
-
 /// Current stats of some [`Peer`].
 #[derive(Debug)]
 struct PeerStat {
@@ -566,9 +553,6 @@ struct PeerStat {
 
     /// All [`TrackStat`]s with [`Recv`] of this [`PeerStat`].
     receivers: HashMap<StatId, TrackStat<Recv>>,
-
-    /// Current connection state of this [`PeerStat`].
-    state: PeerStatState,
 
     /// Time of the last metrics update of this [`PeerStat`].
     last_update: DateTime<Utc>,
@@ -737,11 +721,6 @@ impl PeerStat {
     /// represents.
     fn get_peer_id(&self) -> PeerId {
         self.peer_id
-    }
-
-    /// Sets state of this [`PeerStat`] to [`PeerStatState::Connected`].
-    fn connected(&mut self) {
-        self.state = PeerStatState::Connected;
     }
 }
 

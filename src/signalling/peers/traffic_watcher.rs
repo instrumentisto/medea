@@ -391,8 +391,8 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
             if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
                 if peer.state != PeerState::Stopped {
                     peer.stop();
-                    let at = instant_into_utc(msg.at);
-                    room.subscriber.peer_stopped(peer.peer_id, at);
+                    room.subscriber
+                        .peer_stopped(peer.peer_id, instant_into_utc(msg.at));
                 }
             }
         }
@@ -511,7 +511,7 @@ struct RoomStats {
     /// [`RoomId`] of all [`PeerStat`] which stored here.
     room_id: RoomId,
 
-    /// [`Addr`] of [`Room`] which is watching for this [`PeerStat`]s.
+    /// Receiver of the [`PeerStat`] events.
     subscriber: Box<dyn PeerTrafficWatcherSubscriber>,
 
     /// [`PeerStat`] for which [`Room`] is watching.
@@ -532,8 +532,7 @@ struct RegisterRoom {
     /// [`PeersTrafficWatcherImpl`].
     room_id: RoomId,
 
-    /// [`Addr`] of [`Room`] which requested to register in the
-    /// [`PeersTrafficWatcherImpl`].
+    /// Receiver of the [`PeerStat`] events.
     room: Box<dyn PeerTrafficWatcherSubscriber>,
 }
 
