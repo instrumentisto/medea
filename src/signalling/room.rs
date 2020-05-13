@@ -27,6 +27,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    iter,
     sync::Arc,
     time::Duration,
 };
@@ -55,8 +56,8 @@ use crate::{
         control::{
             callback::{
                 clients::CallbackClientFactoryImpl, service::CallbackService,
-                CallbackRequest, MediaType, OnJoinEvent, OnLeaveEvent,
-                OnLeaveReason, OnStopReason,
+                CallbackRequest, MediaDirection, MediaType, OnJoinEvent,
+                OnLeaveEvent, OnLeaveReason,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -95,7 +96,6 @@ use super::{
         PeersMetricsEventHandler, PeersService,
     },
 };
-use crate::api::control::callback::MediaDirection;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -760,82 +760,6 @@ impl Room {
         }
         Ok(())
     }
-
-    /// Sends needed `on_stop` Control API callbacks of the provided
-    /// [`WebRtcPublishEndpoint`] and sinks of this
-    /// [`WebRtcPublishEndpoint`].
-    ///
-    /// Callbacks will be sent only for `Endpoint`s which was considered as
-    /// stopped.
-    ///
-    /// This function will be called if provided [`WebRtcPublishEndpoint`] was
-    /// muted.
-    fn send_stop_callback_on_mute(
-        &self,
-        peer_id: PeerId,
-        publish: &WebRtcPublishEndpoint,
-        media_type: MediaType,
-    ) {
-        debug!(
-            "Endpoint [fid = {}] with {} kind is muted.",
-            publish.owner().get_fid_to_endpoint(publish.id().into()),
-            media_type
-        );
-
-        let callbacks_at = Utc::now();
-        if let Some((url, req)) = publish.get_on_stop(
-            peer_id,
-            callbacks_at,
-            media_type,
-            OnStopReason::Muted,
-        ) {
-            self.callbacks.send_callback(url, req);
-        }
-
-        for sink in publish.sinks() {
-            if let Some((url, req)) = sink.get_on_stop(
-                callbacks_at,
-                media_type,
-                OnStopReason::SrcMuted,
-            ) {
-                self.callbacks.send_callback(url, req);
-            }
-        }
-    }
-
-    /// Sends needed `on_start` Control API callbacks of the provided
-    /// [`WebRtcPublishEndpoint`] and sinks of this
-    /// [`WebRtcPublishEndpoint`].
-    ///
-    /// Callbacks will be sent only for `Endpoint`s which was considered as
-    /// started.
-    ///
-    /// This function will be called if provided [`WebRtcPublishEndpoint`] was
-    /// unmuted.
-    fn send_start_callback_on_unmute(
-        &self,
-        publish: &WebRtcPublishEndpoint,
-        media_type: MediaType,
-    ) {
-        debug!(
-            "Endpoint [fid = {}] with {} kind is unmuted.",
-            publish.owner().get_fid_to_endpoint(publish.id().into()),
-            media_type
-        );
-
-        publish.set_on_start_media_traffic_state(media_type);
-        let callback_at = Utc::now();
-        if let Some((url, req)) = publish.get_on_start(callback_at) {
-            self.callbacks.send_callback(url, req);
-        }
-
-        for sink in publish.sinks() {
-            sink.set_on_start_media_traffic_state(media_type);
-            if let Some((url, req)) = sink.get_on_start(callback_at) {
-                self.callbacks.send_callback(url, req);
-            }
-        }
-    }
 }
 
 impl RpcServer for Addr<Room> {
@@ -1058,96 +982,46 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        let member_id;
-        let peer_senders;
-        let peer_receivers;
-
+        debug!("Updating Peer [id = {}] tracks.", peer_id);
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            let is_peer_video_muted_before =
-                peer.is_senders_muted(MediaType::Video);
-            let is_peer_audio_muted_before =
-                peer.is_senders_muted(MediaType::Audio);
             tracks_patches
                 .iter()
                 .for_each(|patch| peer.update_track(patch));
+            let member_id = peer.member_id();
 
             for weak_endpoint in peer.endpoints() {
-                if let Some(Endpoint::WebRtcPublishEndpoint(publish)) =
-                    weak_endpoint.upgrade()
-                {
-                    let is_peer_video_currently_muted =
-                        peer.is_senders_muted(MediaType::Video);
-                    let is_peer_audio_currently_muted =
-                        peer.is_senders_muted(MediaType::Audio);
-
-                    if !is_peer_audio_currently_muted
-                        && is_peer_audio_muted_before
-                    {
-                        self.send_start_callback_on_unmute(
-                            &publish,
-                            MediaType::Audio,
-                        );
-                    } else if is_peer_audio_currently_muted
-                        && !is_peer_audio_muted_before
-                    {
-                        self.send_stop_callback_on_mute(
-                            peer.id(),
-                            &publish,
-                            MediaType::Audio,
-                        );
-                    }
-
-                    if !is_peer_video_currently_muted
-                        && is_peer_video_muted_before
-                    {
-                        self.send_start_callback_on_unmute(
-                            &publish,
-                            MediaType::Video,
-                        );
-                    } else if is_peer_video_currently_muted
-                        && !is_peer_video_muted_before
-                    {
-                        self.send_stop_callback_on_mute(
-                            peer.id(),
-                            &publish,
-                            MediaType::Video,
-                        );
+                if let Some(endpoint) = weak_endpoint.upgrade() {
+                    if let Endpoint::WebRtcPublishEndpoint(publish) = endpoint {
+                        if peer.is_senders_muted(MediaType::Audio) {
+                            publish.mute_audio();
+                        } else {
+                            publish.unmute_audio();
+                        }
+                        if peer.is_senders_muted(MediaType::Video) {
+                            publish.mute_video();
+                        } else {
+                            publish.unmute_video();
+                        }
                     }
                 }
             }
 
-            peer_senders = peer.senders();
-            peer_receivers = peer.receivers();
-            member_id = peer.member_id();
-        } else {
-            return Ok(Box::new(actix::fut::ok(())));
-        }
-
-        let send_event_fut = self.members.send_event_to_member(
-            member_id,
-            Event::TracksUpdated {
-                peer_id,
-                tracks_patches,
-            },
-        );
-
-        if peer_senders.is_empty() && peer_receivers.is_empty() {
-            self.peers.unregister_peer(peer_id);
-        } else if self.peers.is_peer_registered(peer_id) {
             self.peers.update_peer_tracks(peer_id);
+
+            Ok(Box::new(
+                self.members
+                    .send_event_to_member(
+                        member_id,
+                        Event::TracksUpdated {
+                            peer_id,
+                            tracks_patches,
+                        },
+                    )
+                    .into_actor(self),
+            ))
         } else {
-            let reregister_fut = self.peers.reregister_peer(peer_id);
-
-            return Ok(Box::new(
-                async move {
-                    reregister_fut.await?;
-                    send_event_fut.await
-                }
-                .into_actor(self),
-            ));
+            Ok(Box::new(actix::fut::ok(())))
         }
-
-        Ok(Box::new(send_event_fut.into_actor(self)))
     }
 }
 
@@ -1173,14 +1047,16 @@ impl Handler<PeerStarted> for Room {
                     publish.set_peer_status(peer_id, true);
                     if publish.publishing_peers_count() == 1 {
                         if let Some((url, req)) =
-                            publish.get_on_start(Utc::now())
+                            publish.get_on_start(Utc::now(), MediaType::Both)
                         {
                             self.callbacks.send_callback(url, req);
                         }
                     }
                 }
                 Endpoint::WebRtcPlayEndpoint(play) => {
-                    if let Some((url, req)) = play.get_on_start(Utc::now()) {
+                    if let Some((url, req)) =
+                        play.get_on_start(Utc::now(), MediaType::Both)
+                    {
                         self.callbacks.send_callback(url, req);
                     }
                 }
@@ -1204,6 +1080,8 @@ impl Handler<PeerStopped> for Room {
     ) -> Self::Result {
         let peer_id = msg.peer_id;
         let at = msg.at;
+        debug!("Peer [id = {}] was stopped at {}", peer_id, at);
+
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
             peer.endpoints()
                 .into_iter()
@@ -1259,43 +1137,74 @@ impl StreamHandler<PeersMetricsEvent> for Room {
 impl PeersMetricsEventHandler for Room {
     type Output = ActFuture<()>;
 
-    /// Notifies [`Room`] about fatal [`PeerConnection`] failure.
+    /// Notifies [`Room`] about [`PeerConnection`]'s partial media traffic
+    /// stopping.
+    #[allow(clippy::filter_map)]
     fn on_no_traffic_flow(
         &mut self,
         peer_id: PeerId,
         was_flowing_at: DateTime<Utc>,
         media_type: MediaType,
-        direction: MediaDirection,
+        _: MediaDirection,
     ) -> Self::Output {
+        debug!("NoTrafficFlow for Peer [id = {}].", peer_id);
         let peer = self.peers.get_peer_by_id(peer_id).unwrap();
-        debug!(
-            "Wrong traffic flowing of a Peer [id = {}] from a Room [id = {}] \
-             of the media type {:?}",
-            peer_id, self.id, media_type
-        );
-        for weak_endpoint in peer.endpoints() {
-            if let Some(endpoint) = weak_endpoint.upgrade() {
-                if let Some((url, req)) = endpoint.get_on_stop(
-                    peer_id,
-                    was_flowing_at,
-                    media_type.into(),
-                    OnStopReason::WrongTrafficFlowing,
-                ) {
-                    self.callbacks.send_callback(url, req);
-                }
-            }
-        }
+
+        peer.endpoints()
+            .into_iter()
+            .filter_map(|e| e.upgrade())
+            .filter_map(|e| match e {
+                Endpoint::WebRtcPublishEndpoint(publish) => Some(publish),
+                _ => None,
+            })
+            .flat_map(|e: WebRtcPublishEndpoint| {
+                iter::once(e.get_on_stop(peer_id, was_flowing_at, media_type))
+                    .chain(
+                        e.sinks()
+                            .into_iter()
+                            .map(|e| e.get_on_stop(was_flowing_at, media_type)),
+                    )
+                    .filter_map(|e| e)
+            })
+            .for_each(|(url, req)| {
+                self.callbacks.send_callback(url, req);
+            });
 
         Box::new(actix::fut::ready(()))
     }
 
+    /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
+    #[allow(clippy::filter_map)]
     fn on_traffic_flows(
         &mut self,
         peer_id: PeerId,
         media_type: MediaType,
-        direction: MediaDirection,
+        _: MediaDirection,
     ) -> Self::Output {
-        todo!()
+        debug!("TrafficFlows for Peer [id = {}].", peer_id);
+        let peer = self.peers.get_peer_by_id(peer_id).unwrap();
+
+        peer.endpoints()
+            .into_iter()
+            .filter_map(|e| e.upgrade())
+            .filter_map(|e| match e {
+                Endpoint::WebRtcPublishEndpoint(publish) => Some(publish),
+                _ => None,
+            })
+            .flat_map(|e: WebRtcPublishEndpoint| {
+                iter::once(e.get_on_start(Utc::now(), media_type))
+                    .chain(
+                        e.sinks()
+                            .into_iter()
+                            .map(|e| e.get_on_start(Utc::now(), media_type)),
+                    )
+                    .filter_map(|e| e)
+            })
+            .for_each(|(url, req)| {
+                self.callbacks.send_callback(url, req);
+            });
+
+        Box::new(actix::fut::ready(()))
     }
 }
 
@@ -1711,7 +1620,7 @@ mod test {
         Room::new(
             &room_spec,
             &ctx,
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
     }

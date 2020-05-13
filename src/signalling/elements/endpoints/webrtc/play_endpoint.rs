@@ -18,12 +18,14 @@ use crate::{
         endpoints::webrtc_play_endpoint::WebRtcPlayId as Id,
         refs::SrcUri,
     },
-    signalling::elements::{
-        endpoints::webrtc::{
-            publish_endpoint::WeakWebRtcPublishEndpoint, MediaTrafficState,
+    signalling::{
+        elements::{
+            endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
+            member::WeakMember, Member,
         },
-        member::WeakMember,
-        Member,
+        peers::media_traffic_state::{
+            get_diff_added, get_diff_removed, MediaTrafficState,
+        },
     },
 };
 
@@ -67,10 +69,8 @@ struct WebRtcPlayEndpointInner {
     /// Current [`MediaTrafficState`] of this [`WebRtcPlayEndpoint`].
     media_traffic_state: MediaTrafficState,
 
-    /// [`MediaTrafficState`] which should be set as current after
-    /// [`WebRtcPlayEndpoint`] will be started by calling
-    /// [`WebRtcPlayEndpoint::get_on_start`].
-    on_start_media_traffic_state: Option<MediaTrafficState>,
+    /// Mute state of the [`MediaType`]s of this [`WebRtcPlayEndpoint`].
+    mute_state: MediaTrafficState,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -141,9 +141,7 @@ impl WebRtcPlayEndpoint {
             on_start,
             on_stop,
             media_traffic_state: MediaTrafficState::new(),
-            on_start_media_traffic_state: Some(
-                MediaTrafficState::with_media_type(MediaType::Both),
-            ),
+            mute_state: MediaTrafficState::new(),
         })))
     }
 
@@ -212,29 +210,34 @@ impl WebRtcPlayEndpoint {
     pub fn get_on_start(
         &self,
         at: DateTime<Utc>,
+        media_type: MediaType,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if let Some(awaits_on_start) = inner.on_start_media_traffic_state {
-            if inner.media_traffic_state == awaits_on_start {
-                return None;
-            }
-            inner.media_traffic_state = awaits_on_start;
-            inner.on_start_media_traffic_state = None;
-            let fid =
-                inner.owner().get_fid_to_endpoint(inner.id.clone().into());
 
-            if let Some(on_start) = inner.on_start.clone() {
-                return Some((
-                    on_start,
-                    CallbackRequest::new(
-                        fid,
-                        OnStartEvent {
-                            direction: Self::DIRECTION,
-                            media_type: awaits_on_start.into_media_type()?,
-                        },
-                        at,
-                    ),
-                ));
+        let old_media_traffic_state = inner.media_traffic_state;
+        let mut new_media_traffic_state = inner.media_traffic_state;
+        new_media_traffic_state.started(media_type);
+        if let Some(started_media_type) =
+            get_diff_added(old_media_traffic_state, new_media_traffic_state)
+        {
+            if inner.mute_state.is_stopped(started_media_type) {
+                inner.media_traffic_state = new_media_traffic_state;
+                let fid =
+                    inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+
+                if let Some(on_start) = inner.on_start.clone() {
+                    return Some((
+                        on_start,
+                        CallbackRequest::new(
+                            fid,
+                            OnStartEvent {
+                                direction: Self::DIRECTION,
+                                media_type: started_media_type,
+                            },
+                            at,
+                        ),
+                    ));
+                }
             }
         }
 
@@ -245,6 +248,30 @@ impl WebRtcPlayEndpoint {
     pub fn has_traffic_callback(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
+    }
+
+    /// Mutes [`MediaType::Audio`] of this [`WebRtcPlayEndpoint`].
+    pub fn mute_audio(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.started(MediaType::Audio)
+    }
+
+    /// Unmutes [`MediaType::Audio`] of this [`WebRtcPlayEndpoint`].
+    pub fn unmute_audio(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.stopped(MediaType::Audio)
+    }
+
+    /// Mutes [`MediaType::Video`] of this [`WebRtcPlayEndpoint`].
+    pub fn mute_video(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.started(MediaType::Video);
+    }
+
+    /// Unmutes [`MediaType::Video`] of this [`WebRtcPlayEndpoint`].
+    pub fn unmute_video(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.stopped(MediaType::Video);
     }
 
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
@@ -259,48 +286,53 @@ impl WebRtcPlayEndpoint {
         &self,
         at: DateTime<Utc>,
         media_type: MediaType,
-        reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
         if !inner.media_traffic_state.is_stopped(media_type) {
+            let media_traffic_state_before = inner.media_traffic_state;
             inner.media_traffic_state.stopped(media_type);
-
-            let fid =
-                inner.owner().get_fid_to_endpoint(inner.id.clone().into());
-            if let Some(url) = inner.on_stop.clone() {
-                return Some((
-                    url,
-                    CallbackRequest::new(
-                        fid,
-                        OnStopEvent {
-                            reason,
-                            media_type,
-                            media_direction: Self::DIRECTION,
-                        },
-                        at,
-                    ),
-                ));
+            let stopped_media_type = get_diff_removed(
+                media_traffic_state_before,
+                inner.media_traffic_state,
+            )?;
+            if inner.mute_state.is_started(media_type) {
+                let fid =
+                    inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+                if let Some(url) = inner.on_stop.clone() {
+                    return Some((
+                        url,
+                        CallbackRequest::new(
+                            fid,
+                            OnStopEvent {
+                                reason: OnStopReason::SrcMuted,
+                                media_type: stopped_media_type,
+                                media_direction: Self::DIRECTION,
+                            },
+                            at,
+                        ),
+                    ));
+                }
+            } else {
+                let fid =
+                    inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+                if let Some(url) = inner.on_stop.clone() {
+                    return Some((
+                        url,
+                        CallbackRequest::new(
+                            fid,
+                            OnStopEvent {
+                                reason: OnStopReason::WrongTrafficFlowing,
+                                media_type: stopped_media_type,
+                                media_direction: Self::DIRECTION,
+                            },
+                            at,
+                        ),
+                    ));
+                }
             }
         }
 
         None
-    }
-
-    /// Sets [`WebRtcPlayEndpoint::on_start_media_traffic_state`] to the
-    /// [`MediaTrafficState`] in which provided [`MediaType`] will be
-    /// started.
-    ///
-    /// When [`WebRtcPlayEndpoint::get_on_start`] will be called then
-    /// [`WebRtcPlayEndpoint::media_traffic_state`] will be set to the
-    /// [`WebRtcPlayEndpoint::on_start_media_traffic_state`].
-    pub fn set_on_start_media_traffic_state(&self, media_type: MediaType) {
-        let mut inner = self.0.borrow_mut();
-        if let Some(s) = inner.on_start_media_traffic_state.as_mut() {
-            s.started(media_type);
-        } else {
-            inner.on_start_media_traffic_state =
-                Some(MediaTrafficState::with_media_type(media_type));
-        }
     }
 
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak

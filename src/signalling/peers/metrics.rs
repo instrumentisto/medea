@@ -9,12 +9,10 @@
 //! This service acts as flow and stop metrics source for the
 //! [`PeerTrafficWatcher`].
 
-// TODO: remove in #91
-#![allow(dead_code)]
-
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
     sync::Arc,
     time::{Duration, Instant},
@@ -49,7 +47,7 @@ use crate::{
 };
 
 use super::traffic_watcher::PeerTrafficWatcher;
-use std::collections::HashSet;
+use crate::conf::Media;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
@@ -106,7 +104,6 @@ impl PeersMetricsService {
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
     pub fn check_peers(&mut self) {
-        let mut stopped_peers = Vec::new();
         for peer in self
             .peers
             .values()
@@ -128,7 +125,6 @@ impl PeersMetricsService {
                     peer_ref.peer_id,
                     peer_ref.get_stop_time(),
                 );
-                stopped_peers.push(peer_ref.peer_id);
             } else {
                 let send_media_traffic_state_after =
                     peer_ref.send_traffic_state;
@@ -151,14 +147,11 @@ impl PeersMetricsService {
                     self.send_no_traffic(
                         &*peer_ref,
                         stopped_recv_media_type,
-                        MediaDirection::Publish,
+                        MediaDirection::Play,
                     );
                 }
             }
-        }
-
-        for stopped_peer_id in stopped_peers {
-            self.peers.remove(&stopped_peer_id);
+            peer_ref.remove_stopped_stats();
         }
     }
 
@@ -184,6 +177,7 @@ impl PeersMetricsService {
             recv_traffic_state: MediaTrafficState::new(),
             state: PeerStatState::Connecting,
             tracks_spec: PeerTracks::from(peer),
+            blacklisted_stats: HashSet::new(),
             stats_ttl,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
@@ -241,6 +235,7 @@ impl PeersMetricsService {
                     peer_ref.get_stop_time(),
                 );
             } else {
+                peer_ref.state = PeerStatState::Connected;
                 self.peers_traffic_watcher.traffic_flows(
                     self.room_id.clone(),
                     peer_id,
@@ -298,6 +293,8 @@ impl PeersMetricsService {
                     );
                 }
             }
+
+            peer_ref.remove_stopped_stats();
         }
     }
 
@@ -318,12 +315,103 @@ impl PeersMetricsService {
     /// [`Peer`] tracks set changes (some track was added or removed).
     pub fn update_peer_tracks(&mut self, peer: &Peer) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
-            peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
-        }
-    }
+            debug!("Updating PeerTracks of a Peer [id = {}].", peer.id());
+            let mut peer_stat_ref = peer_stat.borrow_mut();
+            debug!("Peer tracks before: {:?}", peer_stat_ref.tracks_spec);
+            let updated_peer_tracks = PeerTracks::from(peer);
+            debug!("Peer tracks after: {:?}", updated_peer_tracks);
+            let send_traffic_state_before = peer_stat_ref.send_traffic_state;
+            let recv_traffic_state_before = peer_stat_ref.recv_traffic_state;
+            // let mut send_traffic_state_after =
+            // peer_stat_ref.send_traffic_state;
+            // let mut recv_traffic_state_after =
+            // peer_stat_ref.recv_traffic_state;
+            {
+                let current_peer_tracks = peer_stat_ref.tracks_spec;
 
-    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-        self.peers.contains_key(&peer_id)
+                if updated_peer_tracks.audio_send
+                    < current_peer_tracks.audio_send
+                {
+                    peer_stat_ref.send_traffic_state.stopped(MediaType::Audio);
+                }
+                if updated_peer_tracks.video_send
+                    < current_peer_tracks.video_send
+                {
+                    peer_stat_ref.send_traffic_state.stopped(MediaType::Video);
+                }
+
+                if updated_peer_tracks.audio_recv
+                    < current_peer_tracks.audio_recv
+                {
+                    peer_stat_ref.recv_traffic_state.stopped(MediaType::Audio);
+                }
+                if updated_peer_tracks.video_recv
+                    < current_peer_tracks.video_recv
+                {
+                    peer_stat_ref.recv_traffic_state.stopped(MediaType::Video);
+                }
+            }
+
+            let send_stopped_media_type = get_diff_removed(
+                send_traffic_state_before,
+                peer_stat_ref.send_traffic_state,
+            );
+            if let Some(send_stopped_media_type) = send_stopped_media_type {
+                let senders_to_remove: HashSet<_> = peer_stat_ref
+                    .senders
+                    .iter()
+                    .filter_map(|(id, sender)| {
+                        if sender.media_type == send_stopped_media_type {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                senders_to_remove.into_iter().for_each(|id| {
+                    peer_stat_ref.remove_sender(id);
+                });
+                peer_stat_ref
+                    .send_traffic_state
+                    .stopped(send_stopped_media_type);
+                self.send_no_traffic(
+                    &peer_stat_ref,
+                    send_stopped_media_type,
+                    MediaDirection::Publish,
+                );
+            }
+
+            let recv_stopped_media_type = get_diff_removed(
+                recv_traffic_state_before,
+                peer_stat_ref.recv_traffic_state,
+            );
+            if let Some(recv_stopped_media_type) = recv_stopped_media_type {
+                let receivers_to_remove: HashSet<_> = peer_stat_ref
+                    .receivers
+                    .iter()
+                    .filter_map(|(id, receiver)| {
+                        if receiver.media_type == recv_stopped_media_type {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                receivers_to_remove.into_iter().for_each(|id| {
+                    peer_stat_ref.remove_receiver(id);
+                });
+                peer_stat_ref
+                    .recv_traffic_state
+                    .stopped(recv_stopped_media_type);
+                self.send_no_traffic(
+                    &peer_stat_ref,
+                    recv_stopped_media_type,
+                    MediaDirection::Play,
+                );
+            }
+
+            peer_stat_ref.tracks_spec = updated_peer_tracks;
+        }
     }
 
     /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
@@ -334,6 +422,10 @@ impl PeersMetricsService {
         direction: MediaDirection,
     ) {
         if let Some(sender) = &self.events_tx {
+            debug!(
+                "Sending NoTraffic event for a Peer [id = {}].",
+                peer.peer_id
+            );
             let was_flowing_at =
                 peer.get_tracks_last_update(direction, media_type);
             let _ = sender.unbounded_send(PeersMetricsEvent::NoTrafficFlow {
@@ -353,6 +445,7 @@ impl PeersMetricsService {
         direction: MediaDirection,
     ) {
         if let Some(sender) = &self.events_tx {
+            debug!("Sending TrafficFlows event for a Peer [id = {}].", peer_id);
             let _ = sender.unbounded_send(PeersMetricsEvent::TrafficFlows {
                 peer_id,
                 media_type,
@@ -381,8 +474,8 @@ impl From<TrackMediaType> for MediaType {
 impl PartialEq<MediaType> for TrackMediaType {
     fn eq(&self, other: &MediaType) -> bool {
         match other {
-            MediaType::Video => *self == MediaType::Video,
-            MediaType::Audio => *self == MediaType::Audio,
+            MediaType::Video => *self == TrackMediaType::Video,
+            MediaType::Audio => *self == TrackMediaType::Audio,
             MediaType::Both => true,
         }
     }
@@ -414,7 +507,7 @@ pub enum PeersMetricsEvent {
 ///
 /// This spec is compared with [`Peer`]s actual stats, to calculate difference
 /// between expected and actual [`Peer`] state.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct PeerTracks {
     /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
     /// [`MediaType::Audio`].
@@ -440,13 +533,19 @@ impl From<&Peer> for PeerTracks {
         let mut audio_recv = 0;
         let mut video_recv = 0;
 
-        for sender in peer.senders().values() {
+        for sender in
+            peer.senders().values().filter(|sender| !sender.is_muted())
+        {
             match sender.media_type {
                 MediaTypeProto::Audio(_) => audio_send += 1,
                 MediaTypeProto::Video(_) => video_send += 1,
             }
         }
-        for receiver in peer.receivers().values() {
+        for receiver in peer
+            .receivers()
+            .values()
+            .filter(|receiver| !receiver.is_muted())
+        {
             match receiver.media_type {
                 MediaTypeProto::Audio(_) => audio_recv += 1,
                 MediaTypeProto::Video(_) => video_recv += 1,
@@ -584,6 +683,8 @@ struct PeerStat {
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
+
+    blacklisted_stats: HashSet<StatId>,
 }
 
 impl PeerStat {
@@ -596,13 +697,18 @@ impl PeerStat {
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
     ) {
+        let track_media_type = TrackMediaType::from(&upd.media_type);
+        if self.is_sender_stopped_in_spec(track_media_type) {
+            return;
+        }
+
         self.last_update = Utc::now();
         let ttl = self.stats_ttl;
         let sender = self.senders.entry(stat_id).or_insert_with(|| TrackStat {
             updated_at: Instant::now(),
             ttl,
             direction: Send { packets_sent: 0 },
-            media_type: TrackMediaType::from(&upd.media_type),
+            media_type: track_media_type,
         });
         sender.update(upd);
         if sender.is_flowing() {
@@ -620,6 +726,11 @@ impl PeerStat {
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
     ) {
+        let track_media_type = TrackMediaType::from(&upd.media_specific_stats);
+        if self.is_receiver_stopped_in_spec(track_media_type) {
+            return;
+        }
+
         self.last_update = Utc::now();
         let ttl = self.stats_ttl;
         let receiver =
@@ -629,13 +740,39 @@ impl PeerStat {
                 direction: Recv {
                     packets_received: 0,
                 },
-                media_type: TrackMediaType::from(&upd.media_specific_stats),
+                media_type: track_media_type,
             });
         receiver.update(upd);
         if receiver.is_flowing() {
             let receiver_media_type = receiver.media_type.into();
             self.recv_traffic_state.started(receiver_media_type);
         }
+    }
+
+    fn is_sender_stopped_in_spec(&self, media_type: TrackMediaType) -> bool {
+        match media_type {
+            TrackMediaType::Audio => self.tracks_spec.audio_send == 0,
+            TrackMediaType::Video => self.tracks_spec.video_send == 0,
+        }
+    }
+
+    fn is_receiver_stopped_in_spec(&self, media_type: TrackMediaType) -> bool {
+        match media_type {
+            TrackMediaType::Audio => self.tracks_spec.audio_recv == 0,
+            TrackMediaType::Video => self.tracks_spec.video_recv == 0,
+        }
+    }
+
+    fn remove_sender(&mut self, sender_id: StatId) {
+        debug!("Sender [id = {:?}] was removed.", sender_id);
+        self.senders.remove(&sender_id);
+        self.blacklisted_stats.insert(sender_id);
+    }
+
+    fn remove_receiver(&mut self, receiver_id: StatId) {
+        debug!("Receiver [id = {:?}] was removed.", receiver_id);
+        self.receivers.remove(&receiver_id);
+        self.blacklisted_stats.insert(receiver_id);
     }
 
     /// Returns last update time of the tracks with provided [`MediaDirection`]
@@ -662,6 +799,40 @@ impl PeerStat {
                 .max()
                 .unwrap_or_else(Instant::now),
         }
+    }
+
+    /// Removes [`TrackStat`]s which was considered as stopped.
+    #[allow(clippy::if_not_else)]
+    fn remove_stopped_stats(&mut self) {
+        let remove_senders: HashSet<_> = self
+            .senders
+            .iter()
+            .filter_map(|(sender_id, sender)| {
+                if !sender.is_flowing() {
+                    Some(sender_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let remove_receivers: HashSet<_> = self
+            .receivers
+            .iter()
+            .filter_map(|(receiver_id, receiver)| {
+                if !receiver.is_flowing() {
+                    Some(receiver_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        remove_senders.into_iter().for_each(|sender_id| {
+            self.remove_sender(sender_id);
+        });
+        remove_receivers.into_iter().for_each(|receiver_id| {
+            self.remove_receiver(receiver_id);
+        });
     }
 
     /// Returns [`MediaDirection`]s and [`MediaType`]s of the `MediaTrack`s
@@ -693,25 +864,41 @@ impl PeerStat {
                 TrackMediaType::Video => video_recv += 1,
             });
 
-        if audio_send < self.tracks_spec.audio_send {
-            self.send_traffic_state.stopped(MediaType::Audio);
-        } else {
-            self.send_traffic_state.started(MediaType::Audio);
+        match audio_send.cmp(&self.tracks_spec.audio_send) {
+            Ordering::Less => self.send_traffic_state.stopped(MediaType::Audio),
+            Ordering::Equal => {
+                if self.tracks_spec.audio_send > 0 {
+                    self.send_traffic_state.started(MediaType::Audio)
+                }
+            }
+            _ => (),
         }
-        if video_send < self.tracks_spec.video_send {
-            self.send_traffic_state.stopped(MediaType::Video);
-        } else {
-            self.send_traffic_state.started(MediaType::Video);
+        match video_send.cmp(&self.tracks_spec.video_send) {
+            Ordering::Less => self.send_traffic_state.stopped(MediaType::Video),
+            Ordering::Equal => {
+                if self.tracks_spec.video_send > 0 {
+                    self.send_traffic_state.started(MediaType::Video)
+                }
+            }
+            _ => (),
         }
-        if audio_recv < self.tracks_spec.audio_recv {
-            self.recv_traffic_state.stopped(MediaType::Audio);
-        } else {
-            self.recv_traffic_state.started(MediaType::Audio);
+        match audio_recv.cmp(&self.tracks_spec.audio_recv) {
+            Ordering::Less => self.recv_traffic_state.stopped(MediaType::Audio),
+            Ordering::Equal => {
+                if self.tracks_spec.audio_recv > 0 {
+                    self.recv_traffic_state.started(MediaType::Audio)
+                }
+            }
+            _ => (),
         }
-        if video_recv < self.tracks_spec.video_recv {
-            self.recv_traffic_state.stopped(MediaType::Video);
-        } else {
-            self.recv_traffic_state.started(MediaType::Video);
+        match video_recv.cmp(&self.tracks_spec.video_recv) {
+            Ordering::Less => self.recv_traffic_state.stopped(MediaType::Video),
+            Ordering::Equal => {
+                if self.tracks_spec.video_recv > 0 {
+                    self.recv_traffic_state.started(MediaType::Video)
+                }
+            }
+            _ => (),
         }
     }
 
@@ -746,11 +933,6 @@ impl PeerStat {
     /// represents.
     fn get_peer_id(&self) -> PeerId {
         self.peer_id
-    }
-
-    /// Sets state of this [`PeerStat`] to [`PeerStatState::Connected`].
-    fn connected(&mut self) {
-        self.state = PeerStatState::Connected;
     }
 }
 

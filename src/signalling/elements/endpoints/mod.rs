@@ -11,7 +11,7 @@ use medea_control_api_proto::grpc::api as proto;
 use medea_macro::enum_delegate;
 
 use crate::api::control::callback::{
-    url::CallbackUrl, CallbackRequest, MediaType, OnStopReason,
+    url::CallbackUrl, CallbackRequest, MediaDirection, MediaType,
 };
 
 use self::webrtc::{
@@ -25,9 +25,10 @@ use self::webrtc::{
 /// [Medea]: https://github.com/instrumentisto/medea
 #[enum_delegate(pub fn has_traffic_callback(&self) -> bool)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(
-    pub fn set_on_start_media_traffic_state(&self, media_type: MediaType)
-)]
+#[enum_delegate(pub fn mute_audio(&self))]
+#[enum_delegate(pub fn unmute_audio(&self))]
+#[enum_delegate(pub fn mute_video(&self))]
+#[enum_delegate(pub fn unmute_video(&self))]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),
@@ -47,15 +48,24 @@ impl Endpoint {
         peer_id: PeerId,
         at: DateTime<Utc>,
         media_type: MediaType,
-        reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         match self {
             Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.get_on_stop(peer_id, at, media_type, reason)
+                publish.get_on_stop(peer_id, at, media_type)
             }
             Endpoint::WebRtcPlayEndpoint(play) => {
-                play.get_on_stop(at, media_type, reason)
+                play.get_on_stop(at, media_type)
             }
+        }
+    }
+
+    /// Returns [`MediaDirection`] of this [`Endpoint`].
+    pub fn direction(&self) -> MediaDirection {
+        match self {
+            Endpoint::WebRtcPublishEndpoint(_) => {
+                WebRtcPublishEndpoint::DIRECTION
+            }
+            Endpoint::WebRtcPlayEndpoint(_) => WebRtcPlayEndpoint::DIRECTION,
         }
     }
 
@@ -101,7 +111,7 @@ impl WeakEndpoint {
         peer_id: PeerId,
         at: DateTime<Utc>,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
-        self.get_both_on_stop(peer_id, OnStopReason::TrafficNotFlowing, at)
+        self.get_both_on_stop(peer_id, at)
     }
 
     /// Returns [`CallbackUrl`] and [`CallbackRequest`] for this
@@ -112,14 +122,10 @@ impl WeakEndpoint {
     pub fn get_both_on_stop(
         &self,
         peer_id: PeerId,
-        reason: OnStopReason,
         at: DateTime<Utc>,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.upgrade()
-            .map(|e| {
-                e.set_on_start_media_traffic_state(MediaType::Both);
-                e.get_on_stop(peer_id, at, MediaType::Both, reason)
-            })
+            .map(|e| e.get_on_stop(peer_id, at, MediaType::Both))
             .flatten()
     }
 

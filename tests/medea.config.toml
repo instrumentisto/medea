@@ -3,7 +3,6 @@ idle_timeout = "1s"
 ping_interval = "500ms"
 reconnect_timeout = "0ms"
 
-[peer_media_traffic]
-peer_validity_timeout = "3s"
-traffic_flowing_timeout = "3s"
-peer_init_timeout = "6s"
+[media]
+max_lag = "5s"
+init_timeout = "5s"

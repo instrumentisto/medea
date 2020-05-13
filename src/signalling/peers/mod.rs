@@ -1,11 +1,11 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
-mod media_traffic_state;
+pub mod media_traffic_state;
 mod metrics;
 mod traffic_watcher;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
     sync::Arc,
     time::Duration,
@@ -30,6 +30,8 @@ use crate::{
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
+use futures::{future, future::LocalBoxFuture, Stream};
+use medea_client_api_proto::stats::RtcStat;
 
 use self::metrics::PeersMetricsService;
 
@@ -40,9 +42,6 @@ pub use self::{
         PeerStopped, PeerTrafficWatcher,
     },
 };
-use futures::{future, future::LocalBoxFuture, Stream};
-use medea_client_api_proto::stats::RtcStat;
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -494,31 +493,9 @@ impl PeersService {
     /// Updates [`PeerSpec`] of the [`Peer`] with provided [`PeerId`] in the
     /// [`PeerMetricsService`].
     pub fn update_peer_tracks(&mut self, peer_id: PeerId) {
-        // TODO: remove unwrap
-        let peer = self.peers.get(&peer_id).unwrap();
-        self.peer_metrics_service.update_peer_tracks(peer);
-    }
-
-    /// Unregisters provided [`Peer`] with provided [`PeerId`] and his partner
-    /// [`Peer`] from the [`PeerMetricsService`].
-    pub fn unregister_peer(&mut self, peer_id: PeerId) {
-        if let Some(partner_peer_id) = self
-            .peers
-            .get(&peer_id)
-            .map(PeerStateMachine::partner_peer_id)
-        {
-            self.peer_metrics_service
-                .unregister_peers(&hashset![peer_id, partner_peer_id]);
-        } else {
-            self.peer_metrics_service
-                .unregister_peers(&hashset![peer_id]);
+        if let Some(peer) = self.peers.get(&peer_id) {
+            self.peer_metrics_service.update_peer_tracks(peer);
         }
-    }
-
-    /// Checks that [`Peer`] with provided [`PeerId`] is registered in the
-    /// [`PeerMetricsService`].
-    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-        self.peer_metrics_service.is_peer_registered(peer_id)
     }
 
     /// Reregisters provided [`PeerId`] in the [`PeerMetricsService`] and

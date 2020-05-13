@@ -110,11 +110,11 @@ enum MediaType {
 
 impl From<proto::MediaType> for MediaType {
     fn from(proto: proto::MediaType) -> Self {
-        use proto::MediaType::*;
+        use proto::MediaType as MT;
         match proto {
-            Audio => Self::Audio,
-            Video => Self::Video,
-            Both => Self::Both,
+            MT::Audio => Self::Audio,
+            MT::Video => Self::Video,
+            MT::Both => Self::Both,
         }
     }
 }
@@ -174,12 +174,12 @@ mod on_stop {
 
     impl From<proto::on_stop::Reason> for OnStopReason {
         fn from(proto: proto::on_stop::Reason) -> Self {
-            use proto::on_stop::Reason::*;
+            use proto::on_stop::Reason as R;
             match proto {
-                TrafficNotFlowing => Self::TrafficNotFlowing,
-                Muted => Self::Muted,
-                SrcMuted => Self::SrcMuted,
-                WrongTrafficFlowing => Self::WrongTrafficFlowing,
+                R::TrafficNotFlowing => Self::TrafficNotFlowing,
+                R::Muted => Self::Muted,
+                R::SrcMuted => Self::SrcMuted,
+                R::WrongTrafficFlowing => Self::WrongTrafficFlowing,
             }
         }
     }

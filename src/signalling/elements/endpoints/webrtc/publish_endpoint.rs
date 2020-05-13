@@ -18,12 +18,14 @@ use crate::{
         },
         endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
     },
-    signalling::elements::{
-        endpoints::webrtc::{
-            play_endpoint::WeakWebRtcPlayEndpoint, MediaTrafficState,
+    signalling::{
+        elements::{
+            endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
+            member::WeakMember, Member,
         },
-        member::WeakMember,
-        Member,
+        peers::media_traffic_state::{
+            get_diff_added, get_diff_removed, MediaTrafficState,
+        },
     },
 };
 
@@ -67,10 +69,8 @@ struct WebRtcPublishEndpointInner {
     /// Current [`MediaTrafficState`] of this [`WebRtcPublishEndpoint`].
     media_traffic_state: MediaTrafficState,
 
-    /// [`MediaTrafficState`] which should be set as current after
-    /// [`WebRtcPublishEndpoint`] will be started by calling
-    /// [`WebRtcPublishEndpoint::get_on_start`].
-    on_start_media_traffic_state: Option<MediaTrafficState>,
+    /// Mute state of this [`MediaTrafficState`].
+    mute_state: MediaTrafficState,
 }
 
 impl Drop for WebRtcPublishEndpointInner {
@@ -127,6 +127,7 @@ impl WebRtcPublishEndpointInner {
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
+    /// [`MediaDirection`] of the [`WebRtcPublishEndpoint`].
     pub const DIRECTION: MediaDirection = MediaDirection::Publish;
 
     /// Creates new [`WebRtcPublishEndpoint`].
@@ -147,10 +148,8 @@ impl WebRtcPublishEndpoint {
             peers_publishing_statuses: HashMap::new(),
             on_start,
             on_stop,
+            mute_state: MediaTrafficState::new(),
             media_traffic_state: MediaTrafficState::new(),
-            on_start_media_traffic_state: Some(
-                MediaTrafficState::with_media_type(MediaType::Both),
-            ),
         })))
     }
 
@@ -267,59 +266,97 @@ impl WebRtcPublishEndpoint {
     pub fn get_on_start(
         &self,
         at: DateTime<Utc>,
+        media_type: MediaType,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if let Some(awaits_on_start) = inner.on_start_media_traffic_state {
-            if inner.media_traffic_state == awaits_on_start {
-                inner.on_start_media_traffic_state = None;
-                return None;
-            }
-            inner.media_traffic_state = awaits_on_start;
-            inner.on_start_media_traffic_state = None;
-            let fid =
-                inner.owner().get_fid_to_endpoint(inner.id.clone().into());
 
-            if let Some(on_start) = inner.on_start.clone() {
-                return Some((
-                    on_start,
-                    CallbackRequest::new(
-                        fid,
-                        OnStartEvent {
-                            direction: Self::DIRECTION,
-                            media_type: awaits_on_start.into_media_type()?,
-                        },
-                        at,
-                    ),
-                ));
+        let old_media_traffic_state = inner.media_traffic_state;
+        let mut new_media_traffic_state = inner.media_traffic_state;
+        new_media_traffic_state.started(media_type);
+
+        if let Some(started_media_type) =
+            get_diff_added(old_media_traffic_state, new_media_traffic_state)
+        {
+            if inner.mute_state.is_stopped(started_media_type) {
+                inner.media_traffic_state = new_media_traffic_state;
+                let fid =
+                    inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+
+                if let Some(on_start) = inner.on_start.clone() {
+                    return Some((
+                        on_start,
+                        CallbackRequest::new(
+                            fid,
+                            OnStartEvent {
+                                direction: Self::DIRECTION,
+                                media_type: started_media_type,
+                            },
+                            at,
+                        ),
+                    ));
+                }
             }
         }
 
         None
     }
 
-    /// Sets [`WebRtcPublishEndpoint::on_start_media_traffic_state`] to the
-    /// [`MediaTrafficState`] in which provided [`MediaType`] will be
-    /// started.
-    ///
-    /// When [`WebRtcPublishEndpoint::get_on_start`] will be called then
-    /// [`WebRtcPublishEndpoint::media_traffic_state`] will be set to the
-    /// [`WebRtcPublishEndpoint::on_start_media_traffic_state`].
-    pub fn set_on_start_media_traffic_state(&self, media_type: MediaType) {
-        let mut inner = self.0.borrow_mut();
-        if let Some(awaits_start_state) =
-            inner.on_start_media_traffic_state.as_mut()
-        {
-            awaits_start_state.started(media_type);
-        } else {
-            let state = MediaTrafficState::with_media_type(media_type);
-            inner.on_start_media_traffic_state = Some(state);
-        }
-    }
-
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     pub fn has_traffic_callback(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
+    }
+
+    /// Mutes [`MediaType::Audio`] of this [`WebRtcPublishEndpoint`].
+    ///
+    /// Also this function will call [`WebRtcPlayEndpoint::mute_video`] on all
+    /// sinks.
+    pub fn mute_audio(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.started(MediaType::Audio);
+        inner
+            .sinks()
+            .iter()
+            .for_each(WebRtcPlayEndpoint::mute_audio);
+    }
+
+    /// Unmutes [`MediaType::Audio`] of this [`WebRtcPublishEndpoint`].
+    ///
+    /// Also this function will call [`WebRtcPlayEndpoint::unmute_video`] on all
+    /// sinks.
+    pub fn unmute_audio(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.stopped(MediaType::Audio);
+        inner
+            .sinks()
+            .iter()
+            .for_each(WebRtcPlayEndpoint::unmute_audio);
+    }
+
+    /// Mutes [`MediaType::Video`] of this [`WebRtcPublishEndpoint`].
+    ///
+    /// Also this function will call [`WebRtcPlayEndpoint::mute_audio`] on all
+    /// sinks.
+    pub fn mute_video(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.started(MediaType::Video);
+        inner
+            .sinks()
+            .iter()
+            .for_each(WebRtcPlayEndpoint::mute_video);
+    }
+
+    /// Unmutes [`MediaType::Video`] of this [`WebRtcPublishEndpoint`].
+    ///
+    /// Also this function will call [`WebRtcPlayEndpoint::unmute_audio`] on all
+    /// sinks.
+    pub fn unmute_video(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.mute_state.stopped(MediaType::Video);
+        inner
+            .sinks()
+            .iter()
+            .for_each(WebRtcPlayEndpoint::unmute_video);
     }
 
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
@@ -337,29 +374,51 @@ impl WebRtcPublishEndpoint {
         peer_id: PeerId,
         at: DateTime<Utc>,
         media_type: MediaType,
-        reason: OnStopReason,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         self.set_peer_status(peer_id, false);
+
         let mut inner = self.0.borrow_mut();
-
         if !inner.media_traffic_state.is_stopped(media_type) {
+            let media_traffic_state_before = inner.media_traffic_state;
             inner.media_traffic_state.stopped(media_type);
-
-            let fid =
-                inner.owner().get_fid_to_endpoint(inner.id.clone().into());
-            if let Some(url) = inner.on_stop.clone() {
-                return Some((
-                    url,
-                    CallbackRequest::new(
-                        fid,
-                        OnStopEvent {
-                            reason,
-                            media_type,
-                            media_direction: Self::DIRECTION,
-                        },
-                        at,
-                    ),
-                ));
+            let stopped_media_type = get_diff_removed(
+                media_traffic_state_before,
+                inner.media_traffic_state,
+            )?;
+            if inner.mute_state.is_started(media_type) {
+                let fid =
+                    inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+                if let Some(url) = inner.on_stop.clone() {
+                    return Some((
+                        url,
+                        CallbackRequest::new(
+                            fid,
+                            OnStopEvent {
+                                reason: OnStopReason::Muted,
+                                media_type: stopped_media_type,
+                                media_direction: Self::DIRECTION,
+                            },
+                            at,
+                        ),
+                    ));
+                }
+            } else {
+                let fid =
+                    inner.owner().get_fid_to_endpoint(inner.id.clone().into());
+                if let Some(url) = inner.on_stop.clone() {
+                    return Some((
+                        url,
+                        CallbackRequest::new(
+                            fid,
+                            OnStopEvent {
+                                reason: OnStopReason::WrongTrafficFlowing,
+                                media_type: stopped_media_type,
+                                media_direction: Self::DIRECTION,
+                            },
+                            at,
+                        ),
+                    ));
+                }
             }
         }
 

@@ -64,10 +64,10 @@ pub struct WebRtcPublishEndpoint {
     #[serde(default)]
     pub force_relay: bool,
 
-    /// `OnStart` Control API callback URL.
+    /// `on_start` Control API callback URL.
     pub on_start: Option<CallbackUrl>,
 
-    /// `OnStop` Control API callback URL.
+    /// `on_stop` Control API callback URL.
     pub on_stop: Option<CallbackUrl>,
 }
 

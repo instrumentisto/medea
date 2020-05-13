@@ -783,7 +783,7 @@ mod room_service_specs {
         let room = Room::new(
             &spec,
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -832,7 +832,7 @@ mod room_service_specs {
         let room = Room::new(
             &spec,
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -900,7 +900,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -922,7 +922,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
@@ -945,7 +945,7 @@ mod room_service_specs {
         let room = Room::new(
             &room_spec(),
             &app_ctx(),
-            build_peers_traffic_watcher(&conf::PeerMediaTraffic::default()),
+            build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap()
         .start();
