@@ -1291,16 +1291,16 @@ impl Handler<CreateEndpoint> for Room {
 }
 
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
-    /// Updgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStarted`]
-    /// message.
+    /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStarted`]
+    /// message to this [`Addr`].
     fn peer_started(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStarted(peer_id));
         }
     }
 
-    /// Upgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStopped`]
-    /// message.
+    /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStopped`]
+    /// message to this [`Addr`].
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
@@ -1317,7 +1317,10 @@ struct PeerStarted(pub PeerId);
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 struct PeerStopped {
+    /// [`PeerId`] of the `Peer` which traffic was stopped.
     peer_id: PeerId,
+
+    /// [`DateTime`] at which this `Peer` was stopped.
     at: DateTime<Utc>,
 }
 
