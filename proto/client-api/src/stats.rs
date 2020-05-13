@@ -889,6 +889,8 @@ pub enum KnownIceCandidatePairState {
     /// unfreeze and move into the [`KnownIceCandidatePairState::Waiting`]
     /// state.
     Frozen,
+
+    Cancelled,
 }
 
 /// Non-exhaustive version of [`KnownIceCandidatePairState`].
