@@ -890,6 +890,11 @@ pub enum KnownIceCandidatePairState {
     /// state.
     Frozen,
 
+    /// This state indicates that ICE candidate was cancelled and doesn't
+    /// needed anymore.
+    ///
+    /// Actually, we don't know what it is because this state doesn't
+    /// documented anywhere, so not recommended to use this.
     Cancelled,
 }
 
