@@ -484,12 +484,12 @@ pub mod tests {
                 sdp_answer: None,
                 senders: HashMap::new(),
                 receivers: HashMap::new(),
-                member_id: "test-member".to_string().into(),
+                member_id: MemberId::from("test-member"),
                 is_force_relayed: false,
                 partner_peer: Id(2),
                 ice_user: None,
                 endpoints: Vec::new(),
-                partner_member: "partner-member".to_string().into(),
+                partner_member: MemberId::from("partner-member"),
             },
         };
 

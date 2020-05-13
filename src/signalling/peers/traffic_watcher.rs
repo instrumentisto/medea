@@ -41,9 +41,9 @@ use crate::{
     api::control::RoomId, conf, log::prelude::*, utils::instant_into_utc,
 };
 
-/// Receiver of the [`PeerTrafficWatcher`] decisions about traffic flowing.
+/// Receiver of the [`PeerTrafficWatcher`] conclusions about traffic flowing.
 #[cfg_attr(test, mockall::automock)]
-pub trait PeerTrafficWatcherSubscriber: Send + Debug {
+pub trait PeerConnectionStateEventsHandler: Send + Debug {
     /// [`PeerTrafficWatcher`] believes that traffic was started.
     fn peer_started(&self, peer_id: PeerId);
 
@@ -52,9 +52,10 @@ pub trait PeerTrafficWatcherSubscriber: Send + Debug {
 }
 
 #[cfg(test)]
-impl Debug for MockPeerTrafficWatcherSubscriber {
+impl Debug for MockPeerConnectionStateEventsHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("MockPeerTrafficWatcherSubscriber").finish()
+        f.debug_struct("MockPeerConnectionStateEventsHandler")
+            .finish()
     }
 }
 
@@ -65,19 +66,6 @@ pub fn build_peers_traffic_watcher(
     Arc::new(PeersTrafficWatcherImpl::new(conf).start())
 }
 
-/// Message which indicates that `Peer` with provided [`PeerId`] has started.
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct PeerStarted(pub PeerId);
-
-/// Message which indicates that `Peer` with provided [`PeerId`] has stopped.
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct PeerStopped {
-    pub peer_id: PeerId,
-    pub at: DateTime<Utc>,
-}
-
 /// Consumes `Peer` traffic metrics for further processing.
 #[cfg_attr(test, mockall::automock)]
 pub trait PeerTrafficWatcher: Debug + Send + Sync {
@@ -86,7 +74,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     fn register_room(
         &self,
         room_id: RoomId,
-        room: Box<dyn PeerTrafficWatcherSubscriber>,
+        room: Box<dyn PeerConnectionStateEventsHandler>,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>>;
 
     /// Unregisters [`Room`] as `Peer`s state messages listener.
@@ -149,7 +137,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     fn register_room(
         &self,
         room_id: RoomId,
-        room: Box<dyn PeerTrafficWatcherSubscriber>,
+        room: Box<dyn PeerConnectionStateEventsHandler>,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         Box::pin(self.send(RegisterRoom { room_id, room }))
     }
@@ -512,7 +500,7 @@ struct RoomStats {
     room_id: RoomId,
 
     /// Receiver of the [`PeerStat`] events.
-    subscriber: Box<dyn PeerTrafficWatcherSubscriber>,
+    subscriber: Box<dyn PeerConnectionStateEventsHandler>,
 
     /// [`PeerStat`] for which [`Room`] is watching.
     peers: HashMap<PeerId, PeerStat>,
@@ -533,7 +521,7 @@ struct RegisterRoom {
     room_id: RoomId,
 
     /// Receiver of the [`PeerStat`] events.
-    room: Box<dyn PeerTrafficWatcherSubscriber>,
+    room: Box<dyn PeerConnectionStateEventsHandler>,
 }
 
 impl Handler<RegisterRoom> for PeersTrafficWatcherImpl {
@@ -671,7 +659,7 @@ impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {
 mod tests {
     use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt};
 
-    use crate::utils::test::future_with_timeout;
+    use tokio::time::timeout;
 
     use super::*;
 
@@ -679,11 +667,11 @@ mod tests {
     struct Helper {
         /// Stream which will receive all sent by [`PeersTrafficWatcher`]
         /// [`PeerStopped`] messages.
-        peer_stopped_rx: LocalBoxStream<'static, PeerStopped>,
+        peer_stopped_rx: LocalBoxStream<'static, (PeerId, DateTime<Utc>)>,
 
         /// Stream which will receive all sent by [`PeersTrafficWatcher`]
         /// [`PeerStarted`] messages.
-        peer_started_rx: LocalBoxStream<'static, PeerStarted>,
+        peer_started_rx: LocalBoxStream<'static, PeerId>,
 
         /// [`PeerTrafficWatcherImpl`] [`Actor`].
         traffic_watcher: Addr<PeersTrafficWatcherImpl>,
@@ -693,20 +681,16 @@ mod tests {
         /// Returns new [`Helper`] with empty [`PeersTrafficWatcher`].
         pub async fn new(cfg: &conf::Media) -> Self {
             let watcher = PeersTrafficWatcherImpl::new(cfg).start();
-            let mut subscriber = MockPeerTrafficWatcherSubscriber::new();
+            let mut subscriber = MockPeerConnectionStateEventsHandler::new();
             let (peer_stopped_tx, peer_stopped_rx) = mpsc::unbounded();
             let (peer_started_tx, peer_started_rx) = mpsc::unbounded();
             subscriber
                 .expect_peer_stopped()
                 .returning(move |peer_id, at| {
-                    peer_stopped_tx
-                        .unbounded_send(PeerStopped { peer_id, at })
-                        .unwrap();
+                    peer_stopped_tx.unbounded_send((peer_id, at)).unwrap();
                 });
             subscriber.expect_peer_started().returning(move |peer_id| {
-                peer_started_tx
-                    .unbounded_send(PeerStarted(peer_id))
-                    .unwrap();
+                peer_started_tx.unbounded_send(peer_id).unwrap();
             });
             watcher
                 .register_room(Self::room_id(), Box::new(subscriber))
@@ -722,7 +706,7 @@ mod tests {
 
         /// Returns [`RoomId`] used for the [`traffic_watcher`] unit tests.
         fn room_id() -> RoomId {
-            "test-room".to_string().into()
+            RoomId::from("test-room")
         }
 
         /// Returns [`Addr`] to the underlying [`PeersTrafficWatcherImpl`].
@@ -732,13 +716,13 @@ mod tests {
 
         /// Waits for the [`PeerStopped`] event which
         /// [`PeersTrafficWatcherImpl`] sends to the [`Room`].
-        pub async fn next_peer_stopped(&mut self) -> PeerStopped {
+        pub async fn next_peer_stopped(&mut self) -> (PeerId, DateTime<Utc>) {
             self.peer_stopped_rx.next().await.unwrap()
         }
 
         /// Waits for the [`PeerStarted`] event which
         /// [`PeersTrafficWatcherImpl`] sends to the [`Room`].
-        pub async fn next_peer_started(&mut self) -> PeerStarted {
+        pub async fn next_peer_started(&mut self) -> PeerId {
             self.peer_started_rx.next().await.unwrap()
         }
     }
@@ -763,18 +747,15 @@ mod tests {
             PeerId(1),
             FlowMetricSource::Peer,
         );
-        assert_eq!(helper.next_peer_started().await.0, PeerId(1));
+        assert_eq!(helper.next_peer_started().await, PeerId(1));
         helper.watcher().traffic_flows(
             Helper::room_id(),
             PeerId(1),
             FlowMetricSource::PartnerPeer,
         );
-        future_with_timeout(
-            helper.next_peer_stopped(),
-            Duration::from_millis(150),
-        )
-        .await
-        .unwrap_err();
+        timeout(Duration::from_millis(150), helper.next_peer_stopped())
+            .await
+            .unwrap_err();
     }
 
     /// Checks that in [`PeerStopped`] message correct stop time will be
@@ -796,12 +777,10 @@ mod tests {
             PeerId(1),
             FlowMetricSource::Peer,
         );
-        assert_eq!(helper.next_peer_started().await.0, PeerId(1));
+        assert_eq!(helper.next_peer_started().await, PeerId(1));
         let start_time = Utc::now();
-        assert_eq!(
-            helper.next_peer_stopped().await.at.timestamp() / 10,
-            start_time.timestamp() / 10
-        );
+        let (_, at) = helper.next_peer_stopped().await;
+        assert_eq!(at.timestamp() / 10, start_time.timestamp() / 10);
     }
 
     /// Checks that [`TrafficStopped`] will be sent if no [`TrafficFlows`] will
@@ -830,9 +809,9 @@ mod tests {
             FlowMetricSource::PartnerPeer,
         );
 
-        future_with_timeout(
-            helper.next_peer_stopped(),
+        timeout(
             Duration::from_secs(1) + Duration::from_millis(10),
+            helper.next_peer_stopped(),
         )
         .await
         .unwrap();

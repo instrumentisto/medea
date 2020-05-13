@@ -768,7 +768,7 @@ mod tests {
         },
         PeerId,
     };
-    use tokio::time::delay_for;
+    use tokio::time::{delay_for, timeout};
 
     use crate::{
         api::control::callback::{MediaDirection, MediaType},
@@ -776,7 +776,6 @@ mod tests {
         signalling::peers::{
             traffic_watcher::MockPeerTrafficWatcher, PeersMetricsEvent,
         },
-        utils::test::future_with_timeout,
     };
 
     use super::PeersMetricsService;
@@ -784,7 +783,7 @@ mod tests {
     /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
     /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
     /// `is_audio`.
-    fn outbound_traffic(
+    fn build_outbound_stream_stat(
         packets_sent: u64,
         is_audio: bool,
     ) -> RtcOutboundRtpStreamStats {
@@ -813,7 +812,7 @@ mod tests {
     /// Returns [`RtcInboundRtpStreamStats`] with a provided number of
     /// `packets_received` and [`RtcInboundRtpStreamMediaType`] based on
     /// `is_audio`.
-    fn inbound_traffic(
+    fn build_inbound_stream_stat(
         packets_received: u64,
         is_audio: bool,
     ) -> RtcInboundRtpStreamStats {
@@ -944,7 +943,7 @@ mod tests {
                     id: StatId(format!("{}-send-audio", i)),
                     timestamp: SystemTime::now().into(),
                     stats: RtcStatsType::OutboundRtp(Box::new(
-                        outbound_traffic(packets, true),
+                        build_outbound_stream_stat(packets, true),
                     )),
                 });
             }
@@ -954,7 +953,7 @@ mod tests {
                     id: StatId(format!("{}-send-video", i)),
                     timestamp: SystemTime::now().into(),
                     stats: RtcStatsType::OutboundRtp(Box::new(
-                        outbound_traffic(packets, false),
+                        build_outbound_stream_stat(packets, false),
                     )),
                 })
             }
@@ -963,9 +962,9 @@ mod tests {
                 stats.push(RtcStat {
                     id: StatId(format!("{}-recv-audio", i)),
                     timestamp: SystemTime::now().into(),
-                    stats: RtcStatsType::InboundRtp(Box::new(inbound_traffic(
-                        packets, true,
-                    ))),
+                    stats: RtcStatsType::InboundRtp(Box::new(
+                        build_inbound_stream_stat(packets, true),
+                    )),
                 })
             }
 
@@ -973,9 +972,9 @@ mod tests {
                 stats.push(RtcStat {
                     id: StatId(format!("{}-recv-video", i)),
                     timestamp: SystemTime::now().into(),
-                    stats: RtcStatsType::InboundRtp(Box::new(inbound_traffic(
-                        packets, false,
-                    ))),
+                    stats: RtcStatsType::InboundRtp(Box::new(
+                        build_inbound_stream_stat(packets, false),
+                    )),
                 })
             }
 
@@ -1083,7 +1082,7 @@ mod tests {
     }
 
     /// Checks that [`PeerMetricsService::unregister_peer`] doesn't triggers
-    /// anything ([`TrafficStopped`], [`PeerEventsEvent::NoTrafficFlow`] e.g.).
+    /// anything ([`TrafficStopped`], [`PeerEventsEvent::NoTrafficFlow`] etc.).
     #[actix_rt::test]
     async fn peer_unregistering_doesnt_trigger_anything() {
         let mut helper = Helper::new();
@@ -1111,14 +1110,11 @@ mod tests {
         }
 
         helper.unregister_peer(PeerId(1));
-        future_with_timeout(helper.next_event(), Duration::from_millis(10))
+        timeout(Duration::from_millis(10), helper.next_event())
             .await
             .unwrap_err();
-        future_with_timeout(
-            helper.wait_traffic_stopped(),
-            Duration::from_millis(10),
-        )
-        .await
-        .unwrap_err();
+        timeout(Duration::from_millis(10), helper.wait_traffic_stopped())
+            .await
+            .unwrap_err();
     }
 }

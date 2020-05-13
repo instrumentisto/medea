@@ -59,8 +59,7 @@ use crate::{
         },
         participants::{ParticipantService, ParticipantServiceErr},
         peers::{
-            PeerStarted, PeerStopped, PeerTrafficWatcher,
-            PeerTrafficWatcherSubscriber, PeersService,
+            PeerConnectionStateEventsHandler, PeerTrafficWatcher, PeersService,
         },
     },
     turn::TurnServiceErr,
@@ -1291,6 +1290,37 @@ impl Handler<CreateEndpoint> for Room {
     }
 }
 
+impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
+    /// Updgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStarted`]
+    /// message.
+    fn peer_started(&self, peer_id: PeerId) {
+        if let Some(addr) = self.upgrade() {
+            addr.do_send(PeerStarted(peer_id));
+        }
+    }
+
+    /// Upgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStopped`]
+    /// message.
+    fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
+        if let Some(addr) = self.upgrade() {
+            addr.do_send(PeerStopped { peer_id, at })
+        }
+    }
+}
+
+/// Message which indicates that `Peer` with provided [`PeerId`] has started.
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+struct PeerStarted(pub PeerId);
+
+/// Message which indicates that `Peer` with provided [`PeerId`] has stopped.
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+struct PeerStopped {
+    peer_id: PeerId,
+    at: DateTime<Utc>,
+}
+
 impl Handler<PeerStarted> for Room {
     type Result = ();
 
@@ -1312,24 +1342,6 @@ impl Handler<PeerStopped> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         // TODO: Implement PeerStopped logic.
-    }
-}
-
-impl PeerTrafficWatcherSubscriber for WeakAddr<Room> {
-    /// Updgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStarted`]
-    /// message.
-    fn peer_started(&self, peer_id: PeerId) {
-        if let Some(addr) = self.upgrade() {
-            addr.do_send(PeerStarted(peer_id));
-        }
-    }
-
-    /// Updgrades [`WeakAddr`] to the [`Room`] and sends [`PeerStopped`]
-    /// message.
-    fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
-        if let Some(addr) = self.upgrade() {
-            addr.do_send(PeerStopped { peer_id, at })
-        }
     }
 }
 

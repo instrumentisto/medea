@@ -36,8 +36,8 @@ use self::metrics::PeersMetricsService;
 pub use self::{
     metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     traffic_watcher::{
-        build_peers_traffic_watcher, FlowMetricSource, PeerStarted,
-        PeerStopped, PeerTrafficWatcher, PeerTrafficWatcherSubscriber,
+        build_peers_traffic_watcher, FlowMetricSource,
+        PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
 
