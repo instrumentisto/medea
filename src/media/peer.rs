@@ -19,7 +19,7 @@ use crate::{
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{Endpoint, WeakEndpoint},
-        peers::{Counter, PeerSpec, TrackMediaType},
+        peers::Counter,
     },
 };
 
@@ -77,7 +77,6 @@ impl PeerError {
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn get_spec(&self) -> PeerSpec)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
@@ -86,6 +85,10 @@ impl PeerError {
 #[enum_delegate(
     pub fn is_senders_muted(&self, kind: CallbackMediaType) -> bool
 )]
+#[enum_delegate(
+    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
+)]
+#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -169,8 +172,7 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
-    /// Weak references to the [`Endpoint`]s for which this [`Peer`]
-    /// is created.
+    /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 }
 
@@ -252,31 +254,6 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    /// Returns [`PeerSpec`] of this [`PeerConnection`].
-    ///
-    /// This [`PeerSpec`] will be used in the [`PeerTrafficWatcher`] for
-    /// checking that [`Peer`]'s media traffic is flows same as expected in
-    /// [`PeerSpec`].
-    pub fn get_spec(&self) -> PeerSpec {
-        let mut senders = HashMap::new();
-        let mut receivers = HashMap::new();
-
-        for sender in self.context.senders.values() {
-            if !sender.is_muted() {
-                let media_type = TrackMediaType::from(&sender.media_type);
-                *senders.entry(media_type).or_insert(0) += 1;
-            }
-        }
-        for receiver in self.context.receivers.values() {
-            if !receiver.is_muted() {
-                let media_type = TrackMediaType::from(&receiver.media_type);
-                *receivers.entry(media_type).or_insert(0) += 1;
-            }
-        }
-
-        PeerSpec { senders, receivers }
-    }
-
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
     pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
         self.context.ice_user.as_ref().map(IceUser::servers_list)
@@ -325,6 +302,16 @@ impl<T> Peer<T> {
             CallbackMediaType::from(&track.media_type) == kind
                 && track.is_muted()
         })
+    }
+
+    /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
+    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
+        self.context.receivers.clone()
+    }
+
+    /// Returns all sending [`MediaTrack`]s of this [`Peer`].
+    pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
+        self.context.senders.clone()
     }
 }
 

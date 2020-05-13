@@ -242,7 +242,7 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.
-    pub fn any_traffic_callback_is_some(&self) -> bool {
+    pub fn has_traffic_callback(&self) -> bool {
         let inner = self.0.borrow();
         inner.on_stop.is_some() || inner.on_start.is_some()
     }

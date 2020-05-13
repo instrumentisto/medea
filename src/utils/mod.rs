@@ -1,6 +1,6 @@
 //! Helper utils used in project.
 
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, time::Instant};
 
 use actix::prelude::dev::{
     Actor, ActorFuture, Arbiter, AsyncContext, ContextFutureSpawner as _,
@@ -8,7 +8,6 @@ use actix::prelude::dev::{
 };
 use chrono::{DateTime, Utc};
 use futures::future;
-use std::time::Instant;
 
 /// Creates new [`HashMap`] from a list of key-value pairs.
 ///
@@ -61,7 +60,7 @@ macro_rules! hashset {
     (@single $($x:tt)*) => (());
     (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
 
-    ($($value:expr,)+) => { hashset!($($key => $value),+) };
+    ($($value:expr,)+) => { hashset!($($value),+) };
     ($($value:expr),*) => {
         {
             let _cap = hashset!(@count $($value),*);
@@ -159,7 +158,7 @@ where
 }
 
 /// Converts provided [`Instant`] into [`chrono::DateTime`].
-pub fn convert_instant_to_utc(instant: Instant) -> DateTime<Utc> {
+pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
     chrono::Duration::from_std(instant.elapsed())
         .map_or_else(|_| Utc::now(), |dur| Utc::now() - dur)
 }

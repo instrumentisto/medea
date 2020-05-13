@@ -143,7 +143,7 @@ pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value, clippy::wildcard_imports)]
 mod delete {
-    use super::*;
+    use super::{error, Context, Data, HttpResponse, Response};
 
     gen_request_macro!(delete, Response);
 
@@ -157,7 +157,7 @@ mod delete {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value, clippy::wildcard_imports)]
 mod get {
-    use super::*;
+    use super::{error, Context, Data, HttpResponse, SingleGetResponse};
 
     gen_request_macro!(get, SingleGetResponse);
 
@@ -347,14 +347,15 @@ impl Element {
 
 impl From<proto::Element> for Element {
     fn from(proto: proto::Element) -> Self {
-        use proto::element::El::*;
+        use proto::element::El;
+
         match proto.el.unwrap() {
-            Room(room) => Self::Room(room.into()),
-            Member(member) => Self::Member(member.into()),
-            WebrtcPub(webrtc_pub) => {
+            El::Room(room) => Self::Room(room.into()),
+            El::Member(member) => Self::Member(member.into()),
+            El::WebrtcPub(webrtc_pub) => {
                 Self::WebRtcPublishEndpoint(webrtc_pub.into())
             }
-            WebrtcPlay(webrtc_play) => {
+            El::WebrtcPlay(webrtc_play) => {
                 Self::WebRtcPlayEndpoint(webrtc_play.into())
             }
         }

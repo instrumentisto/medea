@@ -25,9 +25,9 @@ pub use self::service::test::new_turn_auth_service_mock;
 #[derive(Clone, Debug, Display, Eq, Hash, PartialEq)]
 #[display(fmt = "{}_{}", room_id, peer_id)]
 pub struct CoturnUsername {
-    /// [`RoomId`] of the [`Room`] this Coturn user is created for.
-    room_id: RoomId,
+    /// [`RoomId`] of the Room this Coturn user is created for.
+    pub room_id: RoomId,
 
-    /// [`PeerId`] of the [`PeerConnection`] this Coturn user is created for.
-    peer_id: PeerId,
+    /// [`PeerId`] of the Peer this Coturn user is created for.
+    pub peer_id: PeerId,
 }

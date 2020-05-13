@@ -298,7 +298,9 @@ pub enum ErrorCode {
 
 impl From<ParticipantServiceErr> for ErrorResponse {
     fn from(err: ParticipantServiceErr) -> Self {
-        use ParticipantServiceErr::*;
+        use ParticipantServiceErr::{
+            EndpointNotFound, MemberError, ParticipantNotFound,
+        };
 
         match err {
             EndpointNotFound(id) => Self::new(ErrorCode::EndpointNotFound, &id),
@@ -312,12 +314,12 @@ impl From<ParticipantServiceErr> for ErrorResponse {
 
 impl From<TryFromProtobufError> for ErrorResponse {
     fn from(err: TryFromProtobufError) -> Self {
-        use TryFromProtobufError::*;
+        use TryFromProtobufError as E;
 
         match err {
-            SrcUriError(e) => e.into(),
-            CallbackUrlParseErr(e) => e.into(),
-            NotMemberElementInRoomElement(id) => Self::with_explanation(
+            E::SrcUriError(e) => e.into(),
+            E::CallbackUrlParseErr(e) => e.into(),
+            E::NotMemberElementInRoomElement(id) => Self::with_explanation(
                 ErrorCode::UnimplementedCall,
                 String::from(
                     "Not Member elements in Room element currently is \
@@ -325,12 +327,12 @@ impl From<TryFromProtobufError> for ErrorResponse {
                 ),
                 Some(id),
             ),
-            UnimplementedEndpoint(id) => Self::with_explanation(
+            E::UnimplementedEndpoint(id) => Self::with_explanation(
                 ErrorCode::UnimplementedCall,
                 String::from("Endpoint is not implemented."),
                 Some(id),
             ),
-            ExpectedOtherElement(element, id) => Self::with_explanation(
+            E::ExpectedOtherElement(element, id) => Self::with_explanation(
                 ErrorCode::ElementIdMismatch,
                 format!(
                     "Provided fid can not point to element of type [{}]",
@@ -338,12 +340,12 @@ impl From<TryFromProtobufError> for ErrorResponse {
                 ),
                 Some(id),
             ),
-            EmptyElement(id) => Self::with_explanation(
+            E::EmptyElement(id) => Self::with_explanation(
                 ErrorCode::NoElement,
                 String::from("No element was provided"),
                 Some(id),
             ),
-            NegativeDuration(id, field) => Self::with_explanation(
+            E::NegativeDuration(id, field) => Self::with_explanation(
                 ErrorCode::NegativeDuration,
                 format!(
                     "Element [id = {}] contains negative duration field `{}`",
@@ -357,25 +359,29 @@ impl From<TryFromProtobufError> for ErrorResponse {
 
 impl From<LocalUriParseError> for ErrorResponse {
     fn from(err: LocalUriParseError) -> Self {
-        use LocalUriParseError::*;
+        use LocalUriParseError as E;
 
         match err {
-            NotLocal(text) => Self::new(ErrorCode::ElementIdIsNotLocal, &text),
-            TooManyPaths(text) => {
+            E::NotLocal(text) => {
+                Self::new(ErrorCode::ElementIdIsNotLocal, &text)
+            }
+            E::TooManyPaths(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
-            Empty => Self::without_id(ErrorCode::EmptyElementId),
-            MissingPaths(text) => {
+            E::Empty => Self::without_id(ErrorCode::EmptyElementId),
+            E::MissingPaths(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
-            UrlParseErr(id, _) => Self::new(ErrorCode::InvalidSrcUri, &id),
+            E::UrlParseErr(id, _) => Self::new(ErrorCode::InvalidSrcUri, &id),
         }
     }
 }
 
 impl From<CallbackUrlParseError> for ErrorResponse {
     fn from(err: CallbackUrlParseError) -> Self {
-        use CallbackUrlParseError::*;
+        use CallbackUrlParseError::{
+            MissingHost, UnsupportedScheme, UrlParseErr,
+        };
 
         match err {
             MissingHost => {
@@ -391,7 +397,7 @@ impl From<CallbackUrlParseError> for ErrorResponse {
 
 impl From<ParseFidError> for ErrorResponse {
     fn from(err: ParseFidError) -> Self {
-        use ParseFidError::*;
+        use ParseFidError::{Empty, MissingPath, TooManyPaths};
 
         match err {
             TooManyPaths(text) => {
@@ -405,43 +411,42 @@ impl From<ParseFidError> for ErrorResponse {
 
 impl From<RoomError> for ErrorResponse {
     fn from(err: RoomError) -> Self {
-        use RoomError::*;
+        use RoomError as E;
 
         match err {
-            MemberError(e) => e.into(),
-            MembersLoadError(e) => e.into(),
-            ParticipantServiceErr(e) => e.into(),
-            MemberAlreadyExists(id) => {
+            E::MemberError(e) => e.into(),
+            E::MembersLoadError(e) => e.into(),
+            E::ParticipantServiceErr(e) => e.into(),
+            E::MemberAlreadyExists(id) => {
                 Self::new(ErrorCode::MemberAlreadyExists, &id)
             }
-            EndpointAlreadyExists(id) => {
+            E::EndpointAlreadyExists(id) => {
                 Self::new(ErrorCode::EndpointAlreadyExists, &id)
             }
-            WrongRoomId(_, _)
-            | PeerNotFound(_)
-            | NoTurnCredentials(_)
-            | ConnectionNotExists(_)
-            | UnableToSendEvent(_)
-            | PeerError(_)
-            | BadRoomSpec(_)
-            | PeerTrafficWatcherMailbox(_)
-            | TurnServiceErr(_) => Self::unexpected(&err),
+            E::WrongRoomId(_, _)
+            | E::PeerNotFound(_)
+            | E::NoTurnCredentials(_)
+            | E::ConnectionNotExists(_)
+            | E::UnableToSendEvent(_)
+            | E::PeerError(_)
+            | E::BadRoomSpec(_)
+            | E::PeerTrafficWatcherMailbox(_)
+            | E::TurnServiceErr(_) => Self::unexpected(&err),
         }
     }
 }
 
 impl From<MembersLoadError> for ErrorResponse {
     fn from(err: MembersLoadError) -> Self {
-        use MembersLoadError::*;
+        use MembersLoadError::{
+            EndpointNotFound, MemberNotFound, TryFromError,
+        };
+        use TryFromElementError::{NotMember, NotRoom};
 
         match err {
             TryFromError(e, id) => match e {
-                TryFromElementError::NotMember => {
-                    Self::new(ErrorCode::NotMemberInSpec, &id)
-                }
-                TryFromElementError::NotRoom => {
-                    Self::new(ErrorCode::NotRoomInSpec, &id)
-                }
+                NotMember => Self::new(ErrorCode::NotMemberInSpec, &id),
+                NotRoom => Self::new(ErrorCode::NotRoomInSpec, &id),
             },
             MemberNotFound(id) => Self::new(ErrorCode::MemberNotFound, &id),
             EndpointNotFound(id) => Self::new(ErrorCode::EndpointNotFound, &id),
@@ -461,7 +466,7 @@ impl From<MemberError> for ErrorResponse {
 
 impl From<SrcParseError> for ErrorResponse {
     fn from(err: SrcParseError) -> Self {
-        use SrcParseError::*;
+        use SrcParseError::{LocalUriParseError, NotSrcUri};
 
         match err {
             NotSrcUri(text) => Self::new(ErrorCode::NotSourceUri, &text),
@@ -472,16 +477,16 @@ impl From<SrcParseError> for ErrorResponse {
 
 impl From<RoomServiceError> for ErrorResponse {
     fn from(err: RoomServiceError) -> Self {
-        use RoomServiceError::*;
+        use RoomServiceError as E;
 
         match err {
-            RoomNotFound(id) => Self::new(ErrorCode::RoomNotFound, &id),
-            RoomAlreadyExists(id) => {
+            E::RoomNotFound(id) => Self::new(ErrorCode::RoomNotFound, &id),
+            E::RoomAlreadyExists(id) => {
                 Self::new(ErrorCode::RoomAlreadyExists, &id)
             }
-            RoomError(e) => e.into(),
-            EmptyUrisList => Self::without_id(ErrorCode::EmptyElementsList),
-            NotSameRoomIds(id1, id2) => Self::with_explanation(
+            E::RoomError(e) => e.into(),
+            E::EmptyUrisList => Self::without_id(ErrorCode::EmptyElementsList),
+            E::NotSameRoomIds(id1, id2) => Self::with_explanation(
                 ErrorCode::ProvidedNotSameRoomIds,
                 format!(
                     "All FID's must have equal room_id. Provided Id's are \
@@ -490,23 +495,23 @@ impl From<RoomServiceError> for ErrorResponse {
                 ),
                 None,
             ),
-            RoomMailboxErr(_)
-            | FailedToLoadStaticSpecs(_)
-            | TryFromElement(_)
-            | TrafficWatcherMailbox(_) => Self::unexpected(&err),
+            E::RoomMailboxErr(_)
+            | E::FailedToLoadStaticSpecs(_)
+            | E::TryFromElement(_)
+            | E::TrafficWatcherMailbox(_) => Self::unexpected(&err),
         }
     }
 }
 
 impl From<GrpcControlApiError> for ErrorResponse {
     fn from(err: GrpcControlApiError) -> Self {
-        use GrpcControlApiError::*;
+        use GrpcControlApiError as E;
 
         match err {
-            Fid(e) => e.into(),
-            TryFromProtobuf(e) => e.into(),
-            RoomServiceError(e) => e.into(),
-            RoomServiceMailboxError(_) => Self::unexpected(&err),
+            E::Fid(e) => e.into(),
+            E::TryFromProtobuf(e) => e.into(),
+            E::RoomServiceError(e) => e.into(),
+            E::RoomServiceMailboxError(_) => Self::unexpected(&err),
         }
     }
 }

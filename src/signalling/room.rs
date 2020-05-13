@@ -75,7 +75,6 @@ use crate::{
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
-    signalling::peers::TrackMediaType,
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
     AppContext,
@@ -92,10 +91,11 @@ use super::{
     },
     participants::{ParticipantService, ParticipantServiceErr},
     peers::{
-        FatalPeerFailure, PeerStarted, PeerStopped, PeerTrafficWatcher,
-        PeersMetricsEvent, PeersMetricsEventHandler, PeersService,
+        PeerStarted, PeerStopped, PeerTrafficWatcher, PeersMetricsEvent,
+        PeersMetricsEventHandler, PeersService,
     },
 };
+use crate::api::control::callback::MediaDirection;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -230,7 +230,7 @@ impl Room {
                 room_spec.id().clone(),
                 context.turn_service.clone(),
                 peers_traffic_watcher,
-                &context.config.peer_media_traffic,
+                &context.config.media,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
@@ -471,7 +471,7 @@ impl Room {
             peer_ids_to_remove, self.id
         );
         let removed_peers =
-            self.peers.remove_peers(&member_id, &peer_ids_to_remove);
+            self.peers.remove_peers(&member_id, peer_ids_to_remove);
 
         removed_peers
             .iter()
@@ -1059,7 +1059,8 @@ impl CommandHandler for Room {
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
         let member_id;
-        let peer_spec;
+        let peer_senders;
+        let peer_receivers;
 
         if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
             let is_peer_video_muted_before =
@@ -1115,7 +1116,8 @@ impl CommandHandler for Room {
                 }
             }
 
-            peer_spec = peer.get_spec();
+            peer_senders = peer.senders();
+            peer_receivers = peer.receivers();
             member_id = peer.member_id();
         } else {
             return Ok(Box::new(actix::fut::ok(())));
@@ -1129,10 +1131,10 @@ impl CommandHandler for Room {
             },
         );
 
-        if peer_spec.senders.is_empty() && peer_spec.receivers.is_empty() {
+        if peer_senders.is_empty() && peer_receivers.is_empty() {
             self.peers.unregister_peer(peer_id);
         } else if self.peers.is_peer_registered(peer_id) {
-            self.peers.update_peer_spec(peer_id, peer_spec);
+            self.peers.update_peer_tracks(peer_id);
         } else {
             let reregister_fut = self.peers.reregister_peer(peer_id);
 
@@ -1241,7 +1243,7 @@ impl Actor for Room {
         debug!("Room [id = {}] started.", self.id);
 
         ctx.run_interval(Duration::from_secs(1), |this, _| {
-            this.peers.check_peers_validity();
+            this.peers.check_peers();
         });
 
         ctx.add_stream(self.peers.subscribe_to_metrics_events());
@@ -1258,11 +1260,12 @@ impl PeersMetricsEventHandler for Room {
     type Output = ActFuture<()>;
 
     /// Notifies [`Room`] about fatal [`PeerConnection`] failure.
-    fn on_wrong_traffic_flowing(
+    fn on_no_traffic_flow(
         &mut self,
         peer_id: PeerId,
-        at: DateTime<Utc>,
-        media_type: TrackMediaType,
+        was_flowing_at: DateTime<Utc>,
+        media_type: MediaType,
+        direction: MediaDirection,
     ) -> Self::Output {
         let peer = self.peers.get_peer_by_id(peer_id).unwrap();
         debug!(
@@ -1274,7 +1277,7 @@ impl PeersMetricsEventHandler for Room {
             if let Some(endpoint) = weak_endpoint.upgrade() {
                 if let Some((url, req)) = endpoint.get_on_stop(
                     peer_id,
-                    at,
+                    was_flowing_at,
                     media_type.into(),
                     OnStopReason::WrongTrafficFlowing,
                 ) {
@@ -1285,53 +1288,14 @@ impl PeersMetricsEventHandler for Room {
 
         Box::new(actix::fut::ready(()))
     }
-}
 
-impl Handler<FatalPeerFailure> for Room {
-    type Result = ();
-
-    /// Removes failured [`Peer`], and sends `on_stop` callbacks for all related
-    /// to this [`Peer`] endpoints which considered as stopped.
-    fn handle(
+    fn on_traffic_flows(
         &mut self,
-        msg: FatalPeerFailure,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        warn!(
-            "Traffic of the Peer [id = {}] from Room [id = {}] is flowing \
-             wrongly!",
-            msg.peer_id, self.id
-        );
-
-        let peer_id = msg.peer_id;
-        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
-            peer.endpoints()
-                .into_iter()
-                .filter_map(|e| {
-                    e.get_both_on_stop(
-                        peer.id(),
-                        OnStopReason::WrongTrafficFlowing,
-                        msg.at,
-                    )
-                })
-                .chain(
-                    self.peers
-                        .get_peer_by_id(peer.partner_peer_id())
-                        .map(PeerStateMachine::endpoints)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|e| {
-                            e.get_both_on_stop(
-                                peer.partner_peer_id(),
-                                OnStopReason::WrongTrafficFlowing,
-                                msg.at,
-                            )
-                        }),
-                )
-                .for_each(|(url, req)| {
-                    self.callbacks.send_callback(url, req);
-                });
-        }
+        peer_id: PeerId,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) -> Self::Output {
+        todo!()
     }
 }
 

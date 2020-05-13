@@ -35,8 +35,8 @@ pub type ActFuture<O> =
 /// from Coturn.
 #[derive(Debug)]
 pub struct CoturnMetricsService {
-    /// [`PeersTrafficWatcher`] which will be notified of all traffic events.
-    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+    /// [`PeerTrafficWatcher`] which will be notified of all traffic events.
+    peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates are received.
     client: redis_pub_sub::Client,
@@ -53,7 +53,7 @@ impl CoturnMetricsService {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     pub fn new(
         cf: &crate::conf::turn::Turn,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
         let connection_info = ConnectionInfo {
             addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(
@@ -72,7 +72,7 @@ impl CoturnMetricsService {
         Ok(Self {
             client,
             allocations_count: HashMap::new(),
-            peers_traffic_watcher,
+            peer_traffic_watcher,
         })
     }
 
@@ -149,9 +149,9 @@ impl Actor for CoturnMetricsService {
 impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
     fn handle(&mut self, msg: redis_pub_sub::Msg, _: &mut Self::Context) {
         let event = match CoturnEvent::parse(&msg) {
-            Ok(event) => event,
-            Err(err) => {
-                error!("Error parsing CoturnEvent: {}", err);
+            Ok(ev) => ev,
+            Err(e) => {
+                error!("Error parsing CoturnEvent: {}", e);
                 return;
             }
         };
@@ -168,10 +168,9 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                 let is_traffic_really_going =
                     traffic.sent_packets + traffic.received_packets > 10;
                 if is_traffic_really_going {
-                    self.peers_traffic_watcher.traffic_flows(
+                    self.peer_traffic_watcher.traffic_flows(
                         event.room_id,
                         event.peer_id,
-                        Instant::now(),
                         FlowMetricSource::Coturn,
                     )
                 }
@@ -184,7 +183,7 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                          because his allocations was removed in the Coturn.",
                         event.peer_id, event.room_id
                     );
-                    self.peers_traffic_watcher.traffic_stopped(
+                    self.peer_traffic_watcher.traffic_stopped(
                         event.room_id,
                         event.peer_id,
                         Instant::now(),

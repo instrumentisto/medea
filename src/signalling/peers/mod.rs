@@ -1,13 +1,11 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
-//!
-//! [`Room`]: crate::signalling::Room
-//! [`Peer`]: crate::media::peer::Peer
 
+mod media_traffic_state;
 mod metrics;
 mod traffic_watcher;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     sync::Arc,
     time::Duration,
@@ -15,8 +13,7 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use futures::{future, future::LocalBoxFuture, Stream};
-use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
+use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
@@ -37,14 +34,15 @@ use crate::{
 use self::metrics::PeersMetricsService;
 
 pub use self::{
-    metrics::{
-        PeerSpec, PeersMetricsEvent, PeersMetricsEventHandler, TrackMediaType,
-    },
+    metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     traffic_watcher::{
-        build_peers_traffic_watcher, FatalPeerFailure, FlowMetricSource,
-        PeerStarted, PeerStopped, PeerTrafficWatcher,
+        build_peers_traffic_watcher, FlowMetricSource, PeerStarted,
+        PeerStopped, PeerTrafficWatcher,
     },
 };
+use futures::{future, future::LocalBoxFuture, Stream};
+use medea_client_api_proto::stats::RtcStat;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -78,9 +76,9 @@ pub struct PeersService {
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: PeersMetricsService,
 
-    /// Duration after which media server will consider `Peer`'s media traffic
-    /// stats as invalid and will remove this `Peer`.
-    peer_validity_timeout: Duration,
+    /// Duration, after which [`Peer`]s stats will be considered as stale.
+    /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
+    peer_stats_ttl: Duration,
 }
 
 /// Simple ID counter.
@@ -105,7 +103,7 @@ impl PeersService {
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-        peer_media_traffic_conf: &conf::PeerMediaTraffic,
+        media_conf: &conf::Media,
     ) -> Self {
         Self {
             room_id: room_id.clone(),
@@ -118,8 +116,7 @@ impl PeersService {
                 room_id,
                 peers_traffic_watcher,
             ),
-            peer_validity_timeout: peer_media_traffic_conf
-                .peer_validity_timeout,
+            peer_stats_ttl: media_conf.max_lag,
         }
     }
 
@@ -161,8 +158,8 @@ impl PeersService {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Creates interconnected [`Peer`]s for provided endpoints and adds them to
-    /// [`PeerService`].
+    /// Creates interconnected [`Peer`]s for provided endpoints and saves them
+    /// in [`PeerService`].
     ///
     /// Returns [`PeerId`]s of the created [`Peer`]s.
     fn create_peers(
@@ -290,14 +287,14 @@ impl PeersService {
     /// __Note:__ this also deletes partner peers.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
-    pub fn remove_peers(
+    pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,
-        peer_ids: &HashSet<PeerId>,
+        peer_ids: Peers,
     ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
-            if let Some(peer) = self.peers.remove(peer_id) {
+            if let Some(peer) = self.peers.remove(&peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
                 if let Some(partner_peer) = self.peers.remove(&partner_peer_id)
@@ -314,12 +311,14 @@ impl PeersService {
             }
         }
 
-        self.peer_metrics_service.unregister_peers(
-            removed_peers
-                .values()
-                .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
-                .collect(),
-        );
+        let peers_to_unregister: HashSet<_> = removed_peers
+            .values()
+            .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
+            .collect();
+        self.peer_metrics_service
+            .unregister_peers(&peers_to_unregister);
+        self.peers_traffic_watcher
+            .unregister_peers(self.room_id.clone(), peers_to_unregister);
 
         removed_peers
     }
@@ -375,9 +374,9 @@ impl PeersService {
             let sink_peer = PeerStateMachine::from(sink_peer);
 
             self.peer_metrics_service
-                .register_peer(&src_peer, self.peer_validity_timeout);
+                .register_peer(&src_peer, self.peer_stats_ttl);
             self.peer_metrics_service
-                .register_peer(&sink_peer, self.peer_validity_timeout);
+                .register_peer(&sink_peer, self.peer_stats_ttl);
 
             self.add_peer(src_peer);
             self.add_peer(sink_peer);
@@ -435,7 +434,7 @@ impl PeersService {
                 async move {
                     match res {
                         Ok(_) => {
-                            if endpoint.any_traffic_callback_is_some() {
+                            if endpoint.has_traffic_callback() {
                                 traffic_watcher
                                     .register_peer(
                                         room_id,
@@ -488,14 +487,16 @@ impl PeersService {
     /// Runs [`Peer`]s stats validation in the underlying [`PeerMetricsEvent`]s.
     ///
     /// This task should be ran every second.
-    pub fn check_peers_validity(&mut self) {
-        self.peer_metrics_service.check_peers_validity();
+    pub fn check_peers(&mut self) {
+        self.peer_metrics_service.check_peers();
     }
 
     /// Updates [`PeerSpec`] of the [`Peer`] with provided [`PeerId`] in the
     /// [`PeerMetricsService`].
-    pub fn update_peer_spec(&mut self, peer_id: PeerId, spec: PeerSpec) {
-        self.peer_metrics_service.update_peer_spec(peer_id, spec);
+    pub fn update_peer_tracks(&mut self, peer_id: PeerId) {
+        // TODO: remove unwrap
+        let peer = self.peers.get(&peer_id).unwrap();
+        self.peer_metrics_service.update_peer_tracks(peer);
     }
 
     /// Unregisters provided [`Peer`] with provided [`PeerId`] and his partner
@@ -507,10 +508,10 @@ impl PeersService {
             .map(PeerStateMachine::partner_peer_id)
         {
             self.peer_metrics_service
-                .unregister_peers(hashset![peer_id, partner_peer_id]);
+                .unregister_peers(&hashset![peer_id, partner_peer_id]);
         } else {
             self.peer_metrics_service
-                .unregister_peers(hashset![peer_id]);
+                .unregister_peers(&hashset![peer_id]);
         }
     }
 
@@ -540,9 +541,9 @@ impl PeersService {
         };
 
         self.peer_metrics_service
-            .register_peer(peer, self.peer_validity_timeout);
+            .register_peer(peer, self.peer_stats_ttl);
         self.peer_metrics_service
-            .register_peer(partner_peer, self.peer_validity_timeout);
+            .register_peer(partner_peer, self.peer_stats_ttl);
 
         let is_force_relayed = peer.is_force_relayed();
         let room_id = self.room_id.clone();

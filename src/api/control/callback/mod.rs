@@ -12,9 +12,7 @@ use clients::CallbackClientError;
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::callback as proto;
 
-use crate::{
-    api::control::refs::StatefulFid, signalling::peers::TrackMediaType,
-};
+use crate::api::control::refs::StatefulFid;
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -95,25 +93,6 @@ impl Into<proto::OnStart> for OnStartEvent {
     }
 }
 
-/// Media type of the traffic which starts/stops flowing in some `Endpoint`.
-///
-/// This enum is used in the [`MuteState`] of the `Endpoint`s. Because of it,
-/// this structure is bitflag enum.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
-pub enum MediaType {
-    /// Started/stopped audio traffic.
-    Audio = 0b1,
-
-    /// Started/stopped video traffic.
-    Video = 0b10,
-
-    /// Started/stopped audio and video traffic.
-    ///
-    /// In bitflag representation this variant will be equal to
-    /// [`MediaType::Audio`] + [`MediaType::Video`].
-    Both = 0b11,
-}
-
 impl Into<proto::MediaType> for MediaType {
     fn into(self) -> proto::MediaType {
         match self {
@@ -131,35 +110,6 @@ impl From<&medea_client_api_proto::MediaType> for MediaType {
         match media_type {
             MediaTypeProto::Audio(_) => MediaType::Audio,
             MediaTypeProto::Video(_) => MediaType::Video,
-        }
-    }
-}
-
-impl From<TrackMediaType> for MediaType {
-    fn from(from: TrackMediaType) -> Self {
-        match from {
-            TrackMediaType::Audio => Self::Audio,
-            TrackMediaType::Video => Self::Video,
-        }
-    }
-}
-
-/// Media direction of the `Endpoint` for which `on_start` or `on_stop` Control
-/// API callback was received.
-#[derive(Clone, Copy, Debug)]
-pub enum MediaDirection {
-    /// `Endpoint` is a publisher.
-    Publish,
-
-    /// `Endpoint` is a player.
-    Play,
-}
-
-impl Into<proto::MediaDirection> for MediaDirection {
-    fn into(self) -> proto::MediaDirection {
-        match self {
-            MediaDirection::Play => proto::MediaDirection::Play,
-            MediaDirection::Publish => proto::MediaDirection::Publish,
         }
     }
 }
@@ -249,6 +199,70 @@ impl Into<proto::request::Event> for CallbackEvent {
             Self::Stop(on_stop) => {
                 proto::request::Event::OnStop(on_stop.into())
             }
+        }
+    }
+}
+
+/// Media type of the traffic which starts/stops flowing in some `Endpoint`.
+///
+/// This enum is used in [`MuteState`] of `Endpoint`s. That's why it represents
+/// a bitflag enum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
+pub enum MediaType {
+    /// Started/stopped audio traffic.
+    Audio = 0b1,
+
+    /// Started/stopped video traffic.
+    Video = 0b10,
+
+    /// Started/stopped audio and video traffic.
+    ///
+    /// In bitflag representation this variant will be equal to
+    /// [`MediaType::Audio`] + [`MediaType::Video`].
+    Both = 0b11,
+}
+
+impl MediaType {
+    /// Returns [`MediaType`] which was started based on the provided
+    /// [`MediaType`]s.
+    ///
+    /// This [`MediaType`] should be what was before `RTCStat` update and
+    /// as argument is [`MediaType`] which was got after `RTCStat` update.
+    pub fn get_started(self, after: Self) -> Option<Self> {
+        match self {
+            MediaType::Audio => match after {
+                MediaType::Video => Some(MediaType::Audio),
+                _ => None,
+            },
+            MediaType::Video => match after {
+                MediaType::Audio => Some(MediaType::Video),
+                _ => None,
+            },
+            MediaType::Both => match after {
+                MediaType::Audio => Some(MediaType::Video),
+                MediaType::Video => Some(MediaType::Audio),
+                _ => None,
+            },
+        }
+    }
+}
+
+/// Media direction of the `Endpoint` for which `on_start` or `on_stop` Control
+/// API callback was received.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum MediaDirection {
+    /// `Endpoint` is a publisher.
+    Publish,
+
+    /// `Endpoint` is a player.
+    Play,
+}
+
+impl Into<proto::MediaDirection> for MediaDirection {
+    fn into(self) -> proto::MediaDirection {
+        match self {
+            MediaDirection::Play => proto::MediaDirection::Play,
+            MediaDirection::Publish => proto::MediaDirection::Publish,
         }
     }
 }

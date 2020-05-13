@@ -23,7 +23,7 @@ use self::webrtc::{
 /// Enum which can store all kinds of [Medea] endpoints.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-#[enum_delegate(pub fn any_traffic_callback_is_some(&self) -> bool)]
+#[enum_delegate(pub fn has_traffic_callback(&self) -> bool)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(
     pub fn set_on_start_media_traffic_state(&self, media_type: MediaType)

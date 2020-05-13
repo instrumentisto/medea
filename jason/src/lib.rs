@@ -36,7 +36,7 @@ pub use self::{
     api::{ConnectionHandle, Jason, RoomHandle},
     media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
-        DisplayVideoTrackConstraints, MediaStreamConstraints,
+        DisplayVideoTrackConstraints, MediaStreamSettings,
     },
 };
 

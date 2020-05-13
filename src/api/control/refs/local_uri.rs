@@ -35,9 +35,9 @@ use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 /// # use medea::api::control::refs::{LocalUri, ToEndpoint};
 /// # use medea::api::control::{RoomId, MemberId, EndpointId};
 /// #
-/// let orig_room_id = RoomId::from("room".to_string());
-/// let orig_member_id = MemberId::from("member".to_string());
-/// let orig_endpoint_id = EndpointId::from("endpoint".to_string());
+/// let orig_room_id = RoomId::from("room");
+/// let orig_member_id = MemberId::from("member");
+/// let orig_endpoint_id = EndpointId::from("endpoint");
 ///
 /// // Create new LocalUri for endpoint.
 /// let local_uri = LocalUri::<ToEndpoint>::new(

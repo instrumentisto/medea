@@ -324,8 +324,8 @@ window.onload = async function() {
     video_select.append(option);
   }
 
-  async function getStream(audio_select, video_select) {
-    let constraints = new rust.MediaStreamConstraints();
+  async function build_constraints(audio_select, video_select) {
+    let constraints = new rust.MediaStreamSettings();
     let audio = new rust.AudioTrackConstraints();
     let audioSource = audio_select.options[audio_select.selectedIndex];
     if (audioSource) {
@@ -347,10 +347,14 @@ window.onload = async function() {
       constraints.device_video(new rust.DeviceVideoTrackConstraints());
     }
 
-    return await jason.media_manager().init_local_stream(constraints);
+    return constraints;
   }
 
   let room = newRoom();
+  let isCallStarted = false;
+  let localStream = null;
+  let isAudioMuted = false;
+  let isVideoMuted = false;
   let connectBtnsDiv = document.getElementsByClassName('connect')[0];
   let controlBtns = document.getElementsByClassName('control')[0];
   let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
@@ -358,7 +362,7 @@ window.onload = async function() {
   let localVideo = document.querySelector('.local-video > video');
 
   const updateLocalVideo = async (stream) => {
-    localVideo.srcObject = stream;
+    localVideo.srcObject = stream.get_media_stream();
     await localVideo.play();
   };
 
@@ -367,15 +371,17 @@ window.onload = async function() {
     room = await jason.init_room();
 
     try {
-      const stream = await getStream(audioSelect, videoSelect);
-      await updateLocalVideo(stream);
-      await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
-      room.inject_local_stream(stream);
+      const constraints = await build_constraints(audioSelect, videoSelect);
+      localStream = await jason.media_manager().init_local_stream(constraints)
+      await updateLocalVideo(localStream);
+      await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+      await room.set_local_media_settings(constraints);
     } catch (e) {
       console.error("Init local video failed: " + e.message());
     }
 
     room.on_new_connection( (connection) => {
+      isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
@@ -389,8 +395,13 @@ window.onload = async function() {
       });
     });
 
+    room.on_local_stream((stream) => {
+      updateLocalVideo(stream);
+      stream.free();
+    });
+
     room.on_failed_local_stream((error) => {
-      console.error(error);
+      console.error(error.message());
     });
 
     room.on_connection_loss( async (reconnectHandle) => {
@@ -444,9 +455,15 @@ window.onload = async function() {
 
     audioSelect.addEventListener('change', async () => {
       try {
-        const stream = await getStream(audioSelect, videoSelect);
-        await updateLocalVideo(stream);
-        room.inject_local_stream(stream);
+        const constraints = await build_constraints(audioSelect, videoSelect);
+        if (localStream && localStream.ptr > 0 ){
+          localStream.free();
+        }
+        if (!isAudioMuted) {
+          localStream = await jason.media_manager().init_local_stream(constraints)
+          await updateLocalVideo(localStream);
+        }
+        await room.set_local_media_settings(constraints);
       } catch (e) {
         console.error("Changing audio source failed: " + e);
       }
@@ -454,9 +471,15 @@ window.onload = async function() {
 
     videoSelect.addEventListener('change', async () => {
       try {
-        const stream = await getStream(audioSelect, videoSelect);
-        await updateLocalVideo(stream);
-        room.inject_local_stream(stream);
+        const constraints = await build_constraints(audioSelect, videoSelect);
+        if (localStream && localStream.ptr > 0 ){
+          localStream.free();
+        }
+        if (!isVideoMuted) {
+          localStream = await jason.media_manager().init_local_stream(constraints)
+          await updateLocalVideo(localStream);
+        }
+        await room.set_local_media_settings(constraints);
       } catch (e) {
         console.error("Changing video source failed: " + e);
       }
@@ -465,17 +488,22 @@ window.onload = async function() {
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
     let muteVideo = document.getElementsByClassName('control__mute_video')[0];
     let closeApp = document.getElementsByClassName('control__close_app')[0];
-    let isAudioMuted = false;
-    let isVideoMuted = false;
 
     muteAudio.addEventListener('click', async () => {
       try {
         if (isAudioMuted) {
-          await room.unmute_audio();
+          if (isCallStarted) {
+            await room.unmute_audio();
+          }
           isAudioMuted = false;
           muteAudio.textContent = "Mute audio";
         } else {
-          await room.mute_audio();
+          if (isCallStarted) {
+            await room.mute_audio();
+            if (localStream && localStream.ptr > 0 ){
+              localStream.free_audio();
+            }
+          }
           isAudioMuted = true;
           muteAudio.textContent = "Unmute audio";
         }
@@ -486,11 +514,19 @@ window.onload = async function() {
     muteVideo.addEventListener('click', async () => {
       try {
         if (isVideoMuted) {
+          if (!isCallStarted) {
+            const constraints = await build_constraints(audioSelect, videoSelect);
+            localStream = await jason.media_manager().init_local_stream(constraints)
+            await updateLocalVideo(localStream);
+          }
           await room.unmute_video();
           isVideoMuted = false;
           muteVideo.textContent = "Mute video";
         } else {
           await room.mute_video();
+          if (localStream && localStream.ptr > 0 ){
+            localStream.free_video();
+          }
           isVideoMuted = true;
           muteVideo.textContent = "Unmute video";
         }

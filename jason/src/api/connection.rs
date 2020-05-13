@@ -8,7 +8,7 @@ use std::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    peer::MediaStreamHandle,
+    peer::RemoteMediaStream,
     utils::{Callback, HandlerDetachedError},
 };
 
@@ -17,7 +17,7 @@ use crate::{
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    on_remote_stream: Callback<MediaStreamHandle>,
+    on_remote_stream: Callback<RemoteMediaStream>,
 }
 
 /// Connection with a specific remote `Member`, that is used on JS side.
@@ -62,7 +62,7 @@ impl Connection {
     /// Invoke `on_remote_stream` [`Connection`]'s callback
     /// for a given [`MediaStream`] received from a related remote [`Member`].
     #[inline]
-    pub(crate) fn on_remote_stream(&self, stream: MediaStreamHandle) {
+    pub(crate) fn on_remote_stream(&self, stream: RemoteMediaStream) {
         self.0.borrow().on_remote_stream.call(stream);
     }
 }
