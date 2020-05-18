@@ -1,3 +1,4 @@
 [rpc]
 idle_timeout = "1s"
+ping_interval = "500ms"
 reconnect_timeout = "0ms"

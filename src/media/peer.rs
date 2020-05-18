@@ -22,7 +22,10 @@ use medea_macro::enum_delegate;
 use crate::{
     api::control::MemberId,
     media::{IceUser, MediaTrack},
-    signalling::peers::Counter,
+    signalling::{
+        elements::endpoints::{Endpoint, WeakEndpoint},
+        peers::Counter,
+    },
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -81,6 +84,12 @@ impl PeerError {
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<HashSet<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
+#[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
+#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(
+    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
+)]
+#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -164,6 +173,8 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
+    /// Weak references to the [`Endpoint`]s related to this [`Peer`].
+    endpoints: Vec<WeakEndpoint>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -253,6 +264,34 @@ impl<T> Peer<T> {
     pub fn set_ice_user(&mut self, ice_user: IceUser) {
         self.context.ice_user.replace(ice_user);
     }
+
+    /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
+    pub fn endpoints(&self) -> Vec<WeakEndpoint> {
+        self.context.endpoints.clone()
+    }
+
+    /// Adds [`Endpoint`] for which this [`Peer`] was created.
+    pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
+        match endpoint {
+            Endpoint::WebRtcPlayEndpoint(play) => {
+                play.set_peer_id(self.id());
+            }
+            Endpoint::WebRtcPublishEndpoint(publish) => {
+                publish.add_peer_id(self.id());
+            }
+        }
+        self.context.endpoints.push(endpoint.downgrade());
+    }
+
+    /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
+    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
+        self.context.receivers.clone()
+    }
+
+    /// Returns all sending [`MediaTrack`]s of this [`Peer`].
+    pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
+        self.context.senders.clone()
+    }
 }
 
 impl Peer<New> {
@@ -277,6 +316,7 @@ impl Peer<New> {
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
+            endpoints: Vec::new(),
         };
         Self {
             context,

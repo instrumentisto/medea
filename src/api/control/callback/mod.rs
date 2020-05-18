@@ -7,7 +7,7 @@ pub mod url;
 use actix::Message;
 use chrono::{DateTime, Utc};
 use clients::CallbackClientError;
-use derive_more::From;
+use derive_more::{Display, From};
 use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
@@ -86,6 +86,72 @@ impl Into<proto::request::Event> for CallbackEvent {
             }
         }
     }
+}
+
+/// Media type of the traffic which starts/stops flowing in some `Endpoint`.
+///
+/// This enum is used in [`MuteState`] of `Endpoint`s. That's why it represents
+/// a bitflag enum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
+pub enum MediaType {
+    /// Started/stopped audio traffic.
+    Audio = 0b1,
+
+    /// Started/stopped video traffic.
+    Video = 0b10,
+
+    /// Started/stopped audio and video traffic.
+    ///
+    /// In bitflag representation this variant will be equal to
+    /// [`MediaType::Audio`] + [`MediaType::Video`].
+    Both = 0b11,
+}
+
+impl MediaType {
+    /// Returns [`MediaType`] which was started based on the provided
+    /// [`MediaType`]s.
+    ///
+    /// This [`MediaType`] should be what was before `RTCStat` update and
+    /// as argument is [`MediaType`] which was got after `RTCStat` update.
+    pub fn get_started(self, after: Self) -> Option<Self> {
+        match self {
+            MediaType::Audio => match after {
+                MediaType::Video => Some(MediaType::Audio),
+                _ => None,
+            },
+            MediaType::Video => match after {
+                MediaType::Audio => Some(MediaType::Video),
+                _ => None,
+            },
+            MediaType::Both => match after {
+                MediaType::Audio => Some(MediaType::Video),
+                MediaType::Video => Some(MediaType::Audio),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl From<&medea_client_api_proto::MediaType> for MediaType {
+    fn from(media_type: &medea_client_api_proto::MediaType) -> Self {
+        use medea_client_api_proto::MediaType as MediaTypeProto;
+
+        match media_type {
+            MediaTypeProto::Audio(_) => MediaType::Audio,
+            MediaTypeProto::Video(_) => MediaType::Video,
+        }
+    }
+}
+
+/// Media direction of the `Endpoint` for which `on_start` or `on_stop` Control
+/// API callback was received.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum MediaDirection {
+    /// `Endpoint` is a publisher.
+    Publish,
+
+    /// `Endpoint` is a player.
+    Play,
 }
 
 /// Control API callback.

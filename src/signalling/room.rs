@@ -3,11 +3,14 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use actix::{
     Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _,
+    MailboxError, Message, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -54,7 +57,7 @@ use crate::{
             Member, MembersLoadError,
         },
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::PeerRepository,
+        peers::{PeerStarted, PeerStopped, PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
@@ -113,6 +116,16 @@ pub enum RoomError {
     /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
+
+    /// [`MailboxError`] returned on sending message to [`PeerTrafficWatcher`]
+    /// service.
+    #[display(
+        fmt = "Mailbox error while sending message to PeerTrafficWatcher \
+               service: {}",
+        _0
+    )]
+    #[from(ignore)]
+    PeerTrafficWatcherMailbox(MailboxError),
 }
 
 /// Error of validating received [`Command`].
@@ -160,7 +173,7 @@ pub struct Room {
     pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeerRepository,
+    pub peers: PeersService,
 
     /// Current state of this [`Room`].
     state: State,
@@ -176,12 +189,15 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
-            peers: PeerRepository::new(
+            peers: PeersService::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
+                peers_traffic_watcher,
+                &context.config.media,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
@@ -287,7 +303,8 @@ impl Room {
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
                     connect_endpoints_tasks.push(
-                        self.peers.connect_endpoints(publisher, &receiver),
+                        self.peers
+                            .connect_endpoints(publisher.clone(), receiver),
                     );
                 }
             }
@@ -299,8 +316,10 @@ impl Room {
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
-                connect_endpoints_tasks
-                    .push(self.peers.connect_endpoints(&publisher, receiver))
+                connect_endpoints_tasks.push(
+                    self.peers
+                        .connect_endpoints(publisher.clone(), receiver.clone()),
+                )
             }
         }
 
@@ -408,20 +427,24 @@ impl Room {
     ///
     /// This will delete [`Peer`]s from [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] event to [`Member`].
-    fn remove_peers(
+    fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,
-        peer_ids_to_remove: &HashSet<PeerId>,
+        peer_ids_to_remove: Peers,
         ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
         self.peers
-            .remove_peers(&member_id, &peer_ids_to_remove)
+            .remove_peers(&member_id, peer_ids_to_remove)
             .into_iter()
-            .for_each(|(member_id, peers_id)| {
-                self.member_peers_removed(peers_id, member_id, ctx)
-                    .map(|_, _, _| ())
-                    .spawn(ctx);
+            .for_each(|(member_id, peers)| {
+                self.member_peers_removed(
+                    peers.into_iter().map(|p| p.id()).collect(),
+                    member_id,
+                    ctx,
+                )
+                .map(|_, _, _| ())
+                .spawn(ctx);
             });
     }
 
@@ -464,32 +487,35 @@ impl Room {
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
-        let endpoint_id = if let Some(member) =
-            self.members.get_member_by_id(member_id)
-        {
-            let play_id = endpoint_id.into();
-            if let Some(endpoint) = member.take_sink(&play_id) {
-                if let Some(peer_id) = endpoint.peer_id() {
-                    let removed_peers =
-                        self.peers.remove_peer(member_id, peer_id);
-                    for (member_id, peers_ids) in removed_peers {
-                        self.member_peers_removed(peers_ids, member_id, ctx)
+        let endpoint_id =
+            if let Some(member) = self.members.get_member_by_id(member_id) {
+                let play_id = endpoint_id.into();
+                if let Some(endpoint) = member.take_sink(&play_id) {
+                    if let Some(peer_id) = endpoint.peer_id() {
+                        let removed_peers =
+                            self.peers.remove_peers(member_id, &[peer_id]);
+                        for (member_id, peers) in removed_peers {
+                            self.member_peers_removed(
+                                peers.into_iter().map(|p| p.id()).collect(),
+                                member_id,
+                                ctx,
+                            )
                             .map(|_, _, _| ())
                             .spawn(ctx);
+                        }
                     }
                 }
-            }
 
-            let publish_id = String::from(play_id).into();
-            if let Some(endpoint) = member.take_src(&publish_id) {
-                let peer_ids = endpoint.peer_ids();
-                self.remove_peers(member_id, &peer_ids, ctx);
-            }
+                let publish_id = String::from(play_id).into();
+                if let Some(endpoint) = member.take_src(&publish_id) {
+                    let peer_ids = endpoint.peer_ids();
+                    self.remove_peers(member_id, &peer_ids, ctx);
+                }
 
-            publish_id.into()
-        } else {
-            endpoint_id
-        };
+                publish_id.into()
+            } else {
+                endpoint_id
+            };
 
         debug!(
             "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
@@ -1270,11 +1296,39 @@ impl Handler<CreateEndpoint> for Room {
     }
 }
 
+impl Handler<PeerStarted> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        _: PeerStarted,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        // TODO: Implement PeerStarted logic.
+    }
+}
+
+impl Handler<PeerStopped> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        _: PeerStopped,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        // TODO: Implement PeerStopped logic.
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+    use crate::{
+        api::control::pipeline::Pipeline,
+        conf::{self, Conf},
+        signalling::peers::build_peers_traffic_watcher,
+    };
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
@@ -1286,11 +1340,16 @@ mod test {
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(&room_spec, &ctx).unwrap()
+        Room::new(
+            &room_spec,
+            &ctx,
+            build_peers_traffic_watcher(&conf::Media::default()),
+        )
+        .unwrap()
     }
 
-    #[test]
-    fn command_validation_peer_not_found() {
+    #[actix_rt::test]
+    async fn command_validation_peer_not_found() {
         let mut room = empty_room();
 
         let member1 = MemberSpec::new(
@@ -1327,8 +1386,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn command_validation_peer_does_not_belong_to_member() {
+    #[actix_rt::test]
+    async fn command_validation_peer_does_not_belong_to_member() {
         let mut room = empty_room();
 
         let member1 = MemberSpec::new(
