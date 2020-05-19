@@ -406,12 +406,23 @@ impl WebRtcPublishEndpoint {
                 let fid =
                     inner.owner().get_fid_to_endpoint(inner.id.clone().into());
                 if let Some(url) = inner.on_stop.clone() {
+                    let reason = if inner
+                        .sinks
+                        .iter()
+                        .filter_map(WeakWebRtcPlayEndpoint::safe_upgrade)
+                        .count()
+                        == 0
+                    {
+                        OnStopReason::EndpointRemoved
+                    } else {
+                        OnStopReason::WrongTrafficFlowing
+                    };
                     return Some((
                         url,
                         CallbackRequest::new(
                             fid,
                             OnStopEvent {
-                                reason: OnStopReason::WrongTrafficFlowing,
+                                reason,
                                 media_type: stopped_media_type,
                                 media_direction: Self::DIRECTION,
                             },

@@ -68,6 +68,8 @@ pub mod on_stop {
         SrcMuted = 2,
         /// Some traffic flows within Endpoint, but incorrectly.
         WrongTrafficFlowing = 3,
+        /// Traffic stopped because Endpoint was removed.
+        EndpointRemoved = 4,
     }
 }
 /// Event that fires when Member joins a Room.

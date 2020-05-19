@@ -966,18 +966,15 @@ impl CommandHandler for Room {
         Ok(Box::new(actix::fut::ok(())))
     }
 
-    // TODO: correct docs
     /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
-    /// Updates [`MediaTrack`], sends `on_start`/`on_stop` callbacks on
-    /// mute/unmute of the `MediaTrack`s.
+    /// Updates [`Peer`]'s [`MediaTrack`]s with provided [`TrackPatch`]s.
     ///
-    /// Unregisters [`Peer`]s which was stopped after [`MediaTrack`]s updates
-    /// from the [`PeersTrafficWatcher`] and [`PeerMetricsService`].
+    /// Updates [`Endpoint`]s mute state accordingly to updated [`Peer`].
     ///
-    /// Reregisters [`Peer`]s which was stopped after [`MediaTrack`]s updates in
-    /// the [`PeersTrafficWatcher`] and [`PeerMetricsService`].
+    /// Updates [`PeerTracks`] of the [`PeerMetricsService`] by updated
+    /// [`Peer`].
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,

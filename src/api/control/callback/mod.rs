@@ -129,6 +129,9 @@ pub enum OnStopReason {
 
     /// Some traffic flows within `Endpoint`, but incorrectly.
     WrongTrafficFlowing,
+
+    /// Traffic stopped because Endpoint was removed.
+    EndpointRemoved,
 }
 
 impl Into<proto::on_stop::Reason> for OnStopReason {
@@ -136,6 +139,9 @@ impl Into<proto::on_stop::Reason> for OnStopReason {
         match self {
             OnStopReason::TrafficNotFlowing => {
                 proto::on_stop::Reason::TrafficNotFlowing
+            }
+            OnStopReason::EndpointRemoved => {
+                proto::on_stop::Reason::EndpointRemoved
             }
             OnStopReason::Muted => proto::on_stop::Reason::Muted,
             OnStopReason::SrcMuted => proto::on_stop::Reason::SrcMuted,

@@ -212,6 +212,11 @@ impl WebRtcPlayEndpoint {
         at: DateTime<Utc>,
         media_type: MediaType,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
+        use crate::log::prelude::*;
+        debug!(
+            "PlayEndpoint strong refs count on_start: {}",
+            Rc::strong_count(&self.0)
+        );
         let mut inner = self.0.borrow_mut();
 
         let old_media_traffic_state = inner.media_traffic_state;
@@ -287,6 +292,11 @@ impl WebRtcPlayEndpoint {
         at: DateTime<Utc>,
         media_type: MediaType,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
+        use crate::log::prelude::*;
+        debug!(
+            "PlayEndpoint strong refs count: {}",
+            Rc::strong_count(&self.0)
+        );
         let mut inner = self.0.borrow_mut();
         if !inner.media_traffic_state.is_disabled(media_type) {
             let media_traffic_state_before = inner.media_traffic_state;
@@ -316,12 +326,17 @@ impl WebRtcPlayEndpoint {
                 let fid =
                     inner.owner().get_fid_to_endpoint(inner.id.clone().into());
                 if let Some(url) = inner.on_stop.clone() {
+                    let reason = if inner.src.safe_upgrade().is_some() {
+                        OnStopReason::EndpointRemoved
+                    } else {
+                        OnStopReason::WrongTrafficFlowing
+                    };
                     return Some((
                         url,
                         CallbackRequest::new(
                             fid,
                             OnStopEvent {
-                                reason: OnStopReason::WrongTrafficFlowing,
+                                reason,
                                 media_type: stopped_media_type,
                                 media_direction: Self::DIRECTION,
                             },

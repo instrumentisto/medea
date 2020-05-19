@@ -311,13 +311,14 @@ impl PeersMetricsService {
 
     /// Updates [`Peer`]s internal representation. Must be called each time
     /// [`Peer`] tracks set changes (some track was added or removed).
+    ///
+    /// Updates [`MediaTrafficState`] if this [`PeerStat`], sends
+    /// [`PeerMetricsEvent::NoTrafficFlow`] removes unneeded [`TrackStat`]s
+    /// accordingly to the new [`PeerTracks`] spec.
     pub fn update_peer_tracks(&mut self, peer: &Peer) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
-            debug!("Updating PeerTracks of a Peer [id = {}].", peer.id());
             let mut peer_stat_ref = peer_stat.borrow_mut();
-            debug!("Peer tracks before: {:?}", peer_stat_ref.tracks_spec);
             let updated_peer_tracks = PeerTracks::from(peer);
-            debug!("Peer tracks after: {:?}", updated_peer_tracks);
             let send_traffic_state_before = peer_stat_ref.send_traffic_state;
             let recv_traffic_state_before = peer_stat_ref.recv_traffic_state;
             {
@@ -479,19 +480,31 @@ impl PartialEq<MediaType> for TrackMediaType {
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
-    /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
+    /// Media traffic of a some `MediaTrack` was partially stopped.
     NoTrafficFlow {
+        /// [`PeerId`] of a `Peer` whose media traffic was partially stopped.
         peer_id: PeerId,
+
+        /// [`DateTime`] at which media traffic flowing was partially stopped.
         was_flowing_at: DateTime<Utc>,
+
+        /// [`MediaType`] of a media traffic which stopped flowing.
         media_type: MediaType,
+
+        /// [`MediaDirection`] of a media traffic which stopped flowing.
         direction: MediaDirection,
     },
 
     /// Stopped `MediaTrack` with provided [`MediaType`] and [`MediaDirection`]
     /// was started after stopping.
     TrafficFlows {
+        /// [`PeerId`] of a `Peer` whose media traffic was partially started.
         peer_id: PeerId,
+
+        /// [`MediaType`] of a media traffic which was started flowing.
         media_type: MediaType,
+
+        /// [`MediaDirection`] of a media traffic which was started flowing.
         direction: MediaDirection,
     },
 }
@@ -684,6 +697,10 @@ impl PeerStat {
     /// [`RtcOutboundRtpStreamStats`].
     ///
     /// Updates [`MediaTrafficState`] of the [`Send`] direction.
+    ///
+    /// [`TrackStat`] wouldn't be updated if a provided [`MediaType`] and
+    /// [`MediaDirection`] of a provided `RTCStat` was stopped accordingly
+    /// to the [`PeerTracks`] spec of this [`PeerStat`].
     fn update_sender(
         &mut self,
         stat_id: StatId,
@@ -713,6 +730,10 @@ impl PeerStat {
     /// [`RtcInboundRtpStreamStats`].
     ///
     /// Updates [`MediaTrafficState`] of the [`Recv`] direction.
+    ///
+    /// [`TrackStat`] wouldn't be updated if a provided [`MediaType`] and
+    /// [`MediaDirection`] of a provided `RTCStat` was stopped accordingly
+    /// to the [`PeerTracks`] spec of this [`PeerStat`].
     fn update_receiver(
         &mut self,
         stat_id: StatId,
@@ -843,8 +864,7 @@ impl PeerStat {
     /// This is determined by comparing count of senders/receivers from the
     /// [`PeerSpec`].
     ///
-    /// Also media type of sender/receiver
-    /// and activity taken into account.
+    /// Also media type of sender/receiver and activity taken into account.
     fn update_media_traffic_state(&mut self) {
         let mut audio_send = 0;
         let mut video_send = 0;

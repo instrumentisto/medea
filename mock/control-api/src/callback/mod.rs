@@ -170,6 +170,9 @@ mod on_stop {
 
         /// Some traffic flows within `Endpoint`, but incorrectly.
         WrongTrafficFlowing,
+
+        /// Traffic stopped because Endpoint was removed.
+        EndpointRemoved,
     }
 
     impl From<proto::on_stop::Reason> for OnStopReason {
@@ -180,6 +183,7 @@ mod on_stop {
                 R::Muted => Self::Muted,
                 R::SrcMuted => Self::SrcMuted,
                 R::WrongTrafficFlowing => Self::WrongTrafficFlowing,
+                R::EndpointRemoved => Self::EndpointRemoved,
             }
         }
     }

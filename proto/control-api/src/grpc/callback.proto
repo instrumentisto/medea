@@ -85,6 +85,9 @@ message OnStop {
 
     // Some traffic flows within Endpoint, but incorrectly.
     WRONG_TRAFFIC_FLOWING = 3;
+
+    // Traffic stopped because Endpoint was removed.
+    ENDPOINT_REMOVED = 4;
   }
 }
 
