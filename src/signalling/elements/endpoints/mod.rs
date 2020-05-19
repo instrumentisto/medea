@@ -25,10 +25,6 @@ use self::webrtc::{
 /// [Medea]: https://github.com/instrumentisto/medea
 #[enum_delegate(pub fn has_traffic_callback(&self) -> bool)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn mute_audio(&self))]
-#[enum_delegate(pub fn unmute_audio(&self))]
-#[enum_delegate(pub fn mute_video(&self))]
-#[enum_delegate(pub fn unmute_video(&self))]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),

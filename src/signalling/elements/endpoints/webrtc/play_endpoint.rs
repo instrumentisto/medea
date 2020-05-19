@@ -24,7 +24,7 @@ use crate::{
             member::WeakMember, Member,
         },
         peers::media_traffic_state::{
-            get_diff_added, get_diff_removed, MediaTrafficState,
+            get_diff_disabled, get_diff_enabled, MediaTrafficState,
         },
     },
 };
@@ -218,9 +218,9 @@ impl WebRtcPlayEndpoint {
         let mut new_media_traffic_state = inner.media_traffic_state;
         new_media_traffic_state.started(media_type);
         if let Some(started_media_type) =
-            get_diff_added(old_media_traffic_state, new_media_traffic_state)
+            get_diff_enabled(old_media_traffic_state, new_media_traffic_state)
         {
-            if inner.mute_state.is_stopped(started_media_type) {
+            if inner.mute_state.is_disabled(started_media_type) {
                 inner.media_traffic_state = new_media_traffic_state;
                 let fid =
                     inner.owner().get_fid_to_endpoint(inner.id.clone().into());
@@ -259,7 +259,7 @@ impl WebRtcPlayEndpoint {
     /// Unmutes [`MediaType::Audio`] of this [`WebRtcPlayEndpoint`].
     pub fn unmute_audio(&self) {
         let mut inner = self.0.borrow_mut();
-        inner.mute_state.stopped(MediaType::Audio)
+        inner.mute_state.disable(MediaType::Audio)
     }
 
     /// Mutes [`MediaType::Video`] of this [`WebRtcPlayEndpoint`].
@@ -271,7 +271,7 @@ impl WebRtcPlayEndpoint {
     /// Unmutes [`MediaType::Video`] of this [`WebRtcPlayEndpoint`].
     pub fn unmute_video(&self) {
         let mut inner = self.0.borrow_mut();
-        inner.mute_state.stopped(MediaType::Video);
+        inner.mute_state.disable(MediaType::Video);
     }
 
     /// Returns [`CallbackUrl`] and [`Fid`] for the `on_stop` Control API
@@ -288,14 +288,14 @@ impl WebRtcPlayEndpoint {
         media_type: MediaType,
     ) -> Option<(CallbackUrl, CallbackRequest)> {
         let mut inner = self.0.borrow_mut();
-        if !inner.media_traffic_state.is_stopped(media_type) {
+        if !inner.media_traffic_state.is_disabled(media_type) {
             let media_traffic_state_before = inner.media_traffic_state;
-            inner.media_traffic_state.stopped(media_type);
-            let stopped_media_type = get_diff_removed(
+            inner.media_traffic_state.disable(media_type);
+            let stopped_media_type = get_diff_disabled(
                 media_traffic_state_before,
                 inner.media_traffic_state,
             )?;
-            if inner.mute_state.is_started(media_type) {
+            if inner.mute_state.is_enabled(media_type) {
                 let fid =
                     inner.owner().get_fid_to_endpoint(inner.id.clone().into());
                 if let Some(url) = inner.on_stop.clone() {

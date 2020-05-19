@@ -39,7 +39,7 @@ use crate::{
     media::PeerStateMachine as Peer,
     signalling::peers::{
         media_traffic_state::{
-            get_diff_added, get_diff_removed, MediaTrafficState,
+            get_diff_disabled, get_diff_enabled, MediaTrafficState,
         },
         FlowMetricSource,
     },
@@ -47,7 +47,6 @@ use crate::{
 };
 
 use super::traffic_watcher::PeerTrafficWatcher;
-use crate::conf::Media;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
@@ -130,7 +129,7 @@ impl PeersMetricsService {
                     peer_ref.send_traffic_state;
                 let recv_media_traffic_state_after =
                     peer_ref.recv_traffic_state;
-                if let Some(stopped_send_media_type) = get_diff_removed(
+                if let Some(stopped_send_media_type) = get_diff_disabled(
                     send_media_traffic_state_before,
                     send_media_traffic_state_after,
                 ) {
@@ -140,7 +139,7 @@ impl PeersMetricsService {
                         MediaDirection::Publish,
                     );
                 }
-                if let Some(stopped_recv_media_type) = get_diff_removed(
+                if let Some(stopped_recv_media_type) = get_diff_disabled(
                     recv_media_traffic_state_before,
                     recv_media_traffic_state_after,
                 ) {
@@ -177,7 +176,6 @@ impl PeersMetricsService {
             recv_traffic_state: MediaTrafficState::new(),
             state: PeerStatState::Connecting,
             tracks_spec: PeerTracks::from(peer),
-            blacklisted_stats: HashSet::new(),
             stats_ttl,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
@@ -254,7 +252,7 @@ impl PeersMetricsService {
 
                 // compare before and after
                 if let Some(started_media_type) =
-                    get_diff_added(send_before, send_after)
+                    get_diff_enabled(send_before, send_after)
                 {
                     self.send_traffic_flows(
                         peer_id,
@@ -264,7 +262,7 @@ impl PeersMetricsService {
                 }
 
                 if let Some(started_media_type) =
-                    get_diff_added(recv_before, recv_after)
+                    get_diff_enabled(recv_before, recv_after)
                 {
                     self.send_traffic_flows(
                         peer_id,
@@ -274,7 +272,7 @@ impl PeersMetricsService {
                 }
 
                 if let Some(stopped_media_type) =
-                    get_diff_removed(send_before, send_after)
+                    get_diff_disabled(send_before, send_after)
                 {
                     self.send_no_traffic(
                         &*peer_ref,
@@ -284,7 +282,7 @@ impl PeersMetricsService {
                 }
 
                 if let Some(stopped_media_type) =
-                    get_diff_removed(recv_before, recv_after)
+                    get_diff_disabled(recv_before, recv_after)
                 {
                     self.send_no_traffic(
                         &*peer_ref,
@@ -322,37 +320,33 @@ impl PeersMetricsService {
             debug!("Peer tracks after: {:?}", updated_peer_tracks);
             let send_traffic_state_before = peer_stat_ref.send_traffic_state;
             let recv_traffic_state_before = peer_stat_ref.recv_traffic_state;
-            // let mut send_traffic_state_after =
-            // peer_stat_ref.send_traffic_state;
-            // let mut recv_traffic_state_after =
-            // peer_stat_ref.recv_traffic_state;
             {
                 let current_peer_tracks = peer_stat_ref.tracks_spec;
 
                 if updated_peer_tracks.audio_send
                     < current_peer_tracks.audio_send
                 {
-                    peer_stat_ref.send_traffic_state.stopped(MediaType::Audio);
+                    peer_stat_ref.send_traffic_state.disable(MediaType::Audio);
                 }
                 if updated_peer_tracks.video_send
                     < current_peer_tracks.video_send
                 {
-                    peer_stat_ref.send_traffic_state.stopped(MediaType::Video);
+                    peer_stat_ref.send_traffic_state.disable(MediaType::Video);
                 }
 
                 if updated_peer_tracks.audio_recv
                     < current_peer_tracks.audio_recv
                 {
-                    peer_stat_ref.recv_traffic_state.stopped(MediaType::Audio);
+                    peer_stat_ref.recv_traffic_state.disable(MediaType::Audio);
                 }
                 if updated_peer_tracks.video_recv
                     < current_peer_tracks.video_recv
                 {
-                    peer_stat_ref.recv_traffic_state.stopped(MediaType::Video);
+                    peer_stat_ref.recv_traffic_state.disable(MediaType::Video);
                 }
             }
 
-            let send_stopped_media_type = get_diff_removed(
+            let send_stopped_media_type = get_diff_disabled(
                 send_traffic_state_before,
                 peer_stat_ref.send_traffic_state,
             );
@@ -368,12 +362,12 @@ impl PeersMetricsService {
                         }
                     })
                     .collect();
-                senders_to_remove.into_iter().for_each(|id| {
+                senders_to_remove.iter().for_each(|id| {
                     peer_stat_ref.remove_sender(id);
                 });
                 peer_stat_ref
                     .send_traffic_state
-                    .stopped(send_stopped_media_type);
+                    .disable(send_stopped_media_type);
                 self.send_no_traffic(
                     &peer_stat_ref,
                     send_stopped_media_type,
@@ -381,7 +375,7 @@ impl PeersMetricsService {
                 );
             }
 
-            let recv_stopped_media_type = get_diff_removed(
+            let recv_stopped_media_type = get_diff_disabled(
                 recv_traffic_state_before,
                 peer_stat_ref.recv_traffic_state,
             );
@@ -397,12 +391,12 @@ impl PeersMetricsService {
                         }
                     })
                     .collect();
-                receivers_to_remove.into_iter().for_each(|id| {
+                receivers_to_remove.iter().for_each(|id| {
                     peer_stat_ref.remove_receiver(id);
                 });
                 peer_stat_ref
                     .recv_traffic_state
-                    .stopped(recv_stopped_media_type);
+                    .disable(recv_stopped_media_type);
                 self.send_no_traffic(
                     &peer_stat_ref,
                     recv_stopped_media_type,
@@ -457,7 +451,7 @@ impl PeersMetricsService {
 
 /// Media type of a [`MediaTrack`].
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
-pub enum TrackMediaType {
+enum TrackMediaType {
     Audio,
     Video,
 }
@@ -683,8 +677,6 @@ struct PeerStat {
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
-
-    blacklisted_stats: HashSet<StatId>,
 }
 
 impl PeerStat {
@@ -749,6 +741,8 @@ impl PeerStat {
         }
     }
 
+    /// Returns `true` if tracks with [`Direction::Send`] and provided
+    /// [`TrackMediaType`] is fully stopped.
     fn is_sender_stopped_in_spec(&self, media_type: TrackMediaType) -> bool {
         match media_type {
             TrackMediaType::Audio => self.tracks_spec.audio_send == 0,
@@ -756,6 +750,8 @@ impl PeerStat {
         }
     }
 
+    /// Returns `true` if tracks with [`Direction::Recv`] and provided
+    /// [`TrackMediaType`] is fully stopped.
     fn is_receiver_stopped_in_spec(&self, media_type: TrackMediaType) -> bool {
         match media_type {
             TrackMediaType::Audio => self.tracks_spec.audio_recv == 0,
@@ -763,16 +759,22 @@ impl PeerStat {
         }
     }
 
-    fn remove_sender(&mut self, sender_id: StatId) {
-        debug!("Sender [id = {:?}] was removed.", sender_id);
-        self.senders.remove(&sender_id);
-        self.blacklisted_stats.insert(sender_id);
+    /// Removes [`TrackStat`] with [`Direction::Send`].
+    fn remove_sender(&mut self, sender_id: &StatId) {
+        debug!(
+            "Sender TrackStat [id = {:?}, peer_id = {}] was removed.",
+            sender_id, self.peer_id
+        );
+        self.senders.remove(sender_id);
     }
 
-    fn remove_receiver(&mut self, receiver_id: StatId) {
-        debug!("Receiver [id = {:?}] was removed.", receiver_id);
-        self.receivers.remove(&receiver_id);
-        self.blacklisted_stats.insert(receiver_id);
+    /// Removes [`TrackStat`] with [`Direction::Recv`].
+    fn remove_receiver(&mut self, receiver_id: &StatId) {
+        debug!(
+            "Receiver TrackStat [id = {:?}, peer_id = {}] was removed.",
+            receiver_id, self.peer_id
+        );
+        self.receivers.remove(receiver_id);
     }
 
     /// Returns last update time of the tracks with provided [`MediaDirection`]
@@ -827,10 +829,10 @@ impl PeerStat {
             })
             .collect();
 
-        remove_senders.into_iter().for_each(|sender_id| {
+        remove_senders.iter().for_each(|sender_id| {
             self.remove_sender(sender_id);
         });
-        remove_receivers.into_iter().for_each(|receiver_id| {
+        remove_receivers.iter().for_each(|receiver_id| {
             self.remove_receiver(receiver_id);
         });
     }
@@ -865,7 +867,7 @@ impl PeerStat {
             });
 
         match audio_send.cmp(&self.tracks_spec.audio_send) {
-            Ordering::Less => self.send_traffic_state.stopped(MediaType::Audio),
+            Ordering::Less => self.send_traffic_state.disable(MediaType::Audio),
             Ordering::Equal => {
                 if self.tracks_spec.audio_send > 0 {
                     self.send_traffic_state.started(MediaType::Audio)
@@ -874,7 +876,7 @@ impl PeerStat {
             _ => (),
         }
         match video_send.cmp(&self.tracks_spec.video_send) {
-            Ordering::Less => self.send_traffic_state.stopped(MediaType::Video),
+            Ordering::Less => self.send_traffic_state.disable(MediaType::Video),
             Ordering::Equal => {
                 if self.tracks_spec.video_send > 0 {
                     self.send_traffic_state.started(MediaType::Video)
@@ -883,7 +885,7 @@ impl PeerStat {
             _ => (),
         }
         match audio_recv.cmp(&self.tracks_spec.audio_recv) {
-            Ordering::Less => self.recv_traffic_state.stopped(MediaType::Audio),
+            Ordering::Less => self.recv_traffic_state.disable(MediaType::Audio),
             Ordering::Equal => {
                 if self.tracks_spec.audio_recv > 0 {
                     self.recv_traffic_state.started(MediaType::Audio)
@@ -892,7 +894,7 @@ impl PeerStat {
             _ => (),
         }
         match video_recv.cmp(&self.tracks_spec.video_recv) {
-            Ordering::Less => self.recv_traffic_state.stopped(MediaType::Video),
+            Ordering::Less => self.recv_traffic_state.disable(MediaType::Video),
             Ordering::Equal => {
                 if self.tracks_spec.video_recv > 0 {
                     self.recv_traffic_state.started(MediaType::Video)
@@ -905,8 +907,8 @@ impl PeerStat {
     /// Returns `true` if all senders and receivers is not sending or receiving
     /// anything.
     fn is_stopped(&self) -> bool {
-        self.recv_traffic_state.is_stopped(MediaType::Both)
-            && self.send_traffic_state.is_stopped(MediaType::Both)
+        self.recv_traffic_state.is_disabled(MediaType::Both)
+            && self.send_traffic_state.is_disabled(MediaType::Both)
     }
 
     /// Returns [`Instant`] time of [`TrackStat`] which haven't updated longest.

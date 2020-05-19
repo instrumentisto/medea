@@ -740,15 +740,17 @@ impl Room {
         &self,
         command: &CommandMessage,
     ) -> Result<(), CommandValidationError> {
-        use Command::*;
-        use CommandValidationError::*;
+        use Command as C;
+        use CommandValidationError::{
+            PeerBelongsToAnotherMember, PeerNotFound,
+        };
 
         let peer_id = match command.command {
-            MakeSdpOffer { peer_id, .. }
-            | MakeSdpAnswer { peer_id, .. }
-            | SetIceCandidate { peer_id, .. }
-            | AddPeerConnectionMetrics { peer_id, .. }
-            | UpdateTracks { peer_id, .. } => peer_id,
+            C::MakeSdpOffer { peer_id, .. }
+            | C::MakeSdpAnswer { peer_id, .. }
+            | C::SetIceCandidate { peer_id, .. }
+            | C::AddPeerConnectionMetrics { peer_id, .. }
+            | C::UpdateTracks { peer_id, .. } => peer_id,
         };
 
         let peer = self
@@ -774,17 +776,17 @@ impl RpcServer for Addr<Room> {
             member_id,
             connection,
         })
-            .map(|res| match res {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    error!(
-                        "Failed to send RpcConnectionEstablished cause {:?}",
-                        e,
-                    );
-                    Err(())
-                }
-            })
-            .boxed_local()
+        .map(|res| match res {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                error!(
+                    "Failed to send RpcConnectionEstablished cause {:?}",
+                    e,
+                );
+                Err(())
+            }
+        })
+        .boxed_local()
     }
 
     /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
@@ -947,9 +949,7 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// Provides received [`PeerMetrics::RtcStats`] into [`PeerTrafficWatcher`].
-    ///
-    /// On other [`PeerMetrics`] does nothing atm.
+    /// Provides received [`PeerMetrics::RtcStats`] into [`PeerMetricsService`].
     #[allow(clippy::single_match)]
     fn on_add_peer_connection_metrics(
         &mut self,
@@ -966,6 +966,7 @@ impl CommandHandler for Room {
         Ok(Box::new(actix::fut::ok(())))
     }
 
+    // TODO: correct docs
     /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
     ///

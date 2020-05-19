@@ -13,7 +13,8 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use futures::Stream;
+use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
@@ -30,8 +31,6 @@ use crate::{
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
-use futures::{future, future::LocalBoxFuture, Stream};
-use medea_client_api_proto::stats::RtcStat;
 
 use self::metrics::PeersMetricsService;
 
@@ -496,50 +495,5 @@ impl PeersService {
         if let Some(peer) = self.peers.get(&peer_id) {
             self.peer_metrics_service.update_peer_tracks(peer);
         }
-    }
-
-    /// Reregisters provided [`PeerId`] in the [`PeerMetricsService`] and
-    /// [`PeersTrafficWatcher`].
-    pub fn reregister_peer(
-        &mut self,
-        peer_id: PeerId,
-    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
-        let peer = if let Some(peer) = self.peers.get(&peer_id) {
-            peer
-        } else {
-            return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
-        };
-        let partner_peer = if let Some(partner_peer) =
-            self.peers.get(&peer.partner_peer_id())
-        {
-            partner_peer
-        } else {
-            return Box::pin(future::err(RoomError::PeerNotFound(peer_id)));
-        };
-
-        self.peer_metrics_service
-            .register_peer(peer, self.peer_stats_ttl);
-        self.peer_metrics_service
-            .register_peer(partner_peer, self.peer_stats_ttl);
-
-        let is_force_relayed = peer.is_force_relayed();
-        let room_id = self.room_id.clone();
-        let partner_peer_id = partner_peer.id();
-        let partner_peer_is_force_relayed = partner_peer.is_force_relayed();
-        let peers_traffic_watcher = self.peers_traffic_watcher.clone();
-        Box::pin(async move {
-            peers_traffic_watcher
-                .register_peer(room_id.clone(), peer_id, is_force_relayed)
-                .await
-                .map_err(RoomError::PeerTrafficWatcherMailbox)?;
-            peers_traffic_watcher
-                .register_peer(
-                    room_id,
-                    partner_peer_id,
-                    partner_peer_is_force_relayed,
-                )
-                .await
-                .map_err(RoomError::PeerTrafficWatcherMailbox)
-        })
     }
 }
