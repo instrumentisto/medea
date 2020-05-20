@@ -66,7 +66,6 @@ use futures::{channel::mpsc, Stream};
 /// # });
 /// ```
 
-// TODO: HashSet's are usually implemented on top of HashMap<T,()>
 #[derive(Debug)]
 pub struct ObservableHashSet<T: Clone + Hash + Eq> {
     /// Data stored by this [`ObservableHashSet`].
