@@ -1,5 +1,5 @@
-//! Implementation of the [`CommandHandler`] for the [`Room`] and related to
-//! this functional functions.
+//! Implementation of the [`CommandHandler`] for the [`Room`] and related
+//! definitions.
 
 use std::collections::HashMap;
 
