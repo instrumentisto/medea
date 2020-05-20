@@ -63,6 +63,10 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
+            C::SynchronizeMe { .. } => {
+                // TODO: validate snapshot
+                return Ok(());
+            }
         };
 
         let peer = self

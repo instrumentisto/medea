@@ -2,7 +2,7 @@
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 
-use std::{collections::HashSet, iter};
+use std::collections::HashSet;
 
 use derive_more::{AsRef, Display, From, Into};
 use medea_client_api_proto::{IceServer, PeerId};
@@ -78,7 +78,7 @@ impl IceUser {
             credential: Some(self.pass.clone()),
         };
 
-        iter::once(stun).chain(iter::once(turn)).collect()
+        hashset![stun, turn]
     }
 
     pub fn address(&self) -> &str {

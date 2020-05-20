@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    snapshots::RoomSnapshot, CommandHandler, Event, IceCandidate, PeerId,
+    PeerMetrics, TrackId, TrackPatch,
 };
 
 use crate::{
@@ -183,5 +183,10 @@ impl CommandHandler for Room {
         } else {
             Ok(Box::new(actix::fut::ok(())))
         }
+    }
+
+    /// Does nothing atm.
+    fn on_synchronize_me(&mut self, _: RoomSnapshot) -> Self::Output {
+        Ok(Box::new(actix::fut::ok(())))
     }
 }

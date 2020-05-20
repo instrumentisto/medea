@@ -380,8 +380,8 @@ impl Room {
     }
 }
 
-/// [`Actor`] implementation that provides an ergonomic way
-/// to interact with [`Room`].
+/// [`Actor`] implementation that provides an ergonomic way to interact with
+/// [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
 
