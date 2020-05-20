@@ -6,6 +6,8 @@ pub mod hash_map;
 pub mod hash_set;
 pub mod vec;
 
-pub use hash_map::ObservableHashMap;
-pub use hash_set::ObservableHashSet;
-pub use vec::ObservableVec;
+#[doc(inline)]
+pub use {
+    hash_map::ObservableHashMap, hash_set::ObservableHashSet,
+    vec::ObservableVec,
+};

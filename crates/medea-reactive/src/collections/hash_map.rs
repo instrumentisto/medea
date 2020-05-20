@@ -1,5 +1,4 @@
-//! Implementation of the reactive [`HashMap`] data structure based on
-//! [`std::collections`].
+//! Reactive hash map based on [`HashMap`].
 
 use std::{
     cell::RefCell,
@@ -12,24 +11,9 @@ use std::{
 
 use futures::{channel::mpsc, Stream};
 
-/// Reactive [`HashMap`] data structure based on [`std::collections`].
+/// Reactive hash map based on [`HashMap`].
 ///
-/// # Basic usage
-///
-/// ```rust
-/// use medea_reactive::collections::ObservableHashMap;
-///
-/// let mut map = ObservableHashMap::new();
-///
-/// // You can just insert items as well as with standard HashMap.
-/// map.insert("foo".to_string(), "bar".to_string());
-/// // ...or get.
-/// assert_eq!(map.get(&"foo".to_string()).unwrap(), &"bar".to_string());
-/// // ...and finally remove them.
-/// map.remove(&"foo".to_string());
-/// ```
-///
-/// # Subscriptions to the changes
+/// # Usage
 ///
 /// ```rust
 /// # use std::collections::HashMap;
@@ -40,33 +24,33 @@ use futures::{channel::mpsc, Stream};
 /// let mut map = ObservableHashMap::new();
 ///
 /// // You can subscribe on insert action:
-/// let mut map_insert_subscription = map.on_insert();
-/// map.insert("foo".to_string(), "bar".to_string());
-/// let (inserted_item_id, inserted_item) = map_insert_subscription.next()
+/// let mut inserts = map.on_insert();
+/// map.insert("foo", "bar");
+/// let (key, val) = inserts.next()
 ///     .await
 ///     .unwrap();
-/// assert_eq!(inserted_item_id, "foo".to_string());
-/// assert_eq!(inserted_item, "bar".to_string());
+/// assert_eq!(key, "foo");
+/// assert_eq!(val, "bar");
 ///
 /// // Also you can subscribe on remove action:
-/// let mut map_remove_subscription = map.on_remove();
-/// map.remove(&"foo".to_string());
-/// let (removed_item_id, removed_item) = map_remove_subscription.next()
+/// let mut removals = map.on_remove();
+/// map.remove(&"foo");
+/// let (key, val) = removals.next()
 ///     .await
 ///     .unwrap();
-/// assert_eq!(removed_item_id, "foo".to_string());
-/// assert_eq!(removed_item, "bar".to_string());
+/// assert_eq!(key, "foo");
+/// assert_eq!(val, "bar");
 ///
-/// // Remove subscription will also receive all items of the
-/// // HashMap when it will be dropped:
-/// map.insert("foo-1".to_string(), "bar-1".to_string());
-/// map.insert("foo-2".to_string(), "bar-2".to_string());
+/// // Remove subscription will also receive all items of the HashMap when it
+/// // will be dropped:
+/// map.insert("foo-1", "bar-1");
+/// map.insert("foo-2", "bar-2");
 /// drop(map);
-/// let removed_items: HashMap<String, String> = map_remove_subscription.take(2)
+/// let removed_items: HashMap<_, _> = removals.take(2)
 ///     .collect()
 ///     .await;
-/// assert_eq!(removed_items["foo-1"], "bar-1".to_string());
-/// assert_eq!(removed_items["foo-2"], "bar-2".to_string());
+/// assert_eq!(removed_items["foo-1"], "bar-1");
+/// assert_eq!(removed_items["foo-2"], "bar-2");
 /// # });
 /// ```
 #[derive(Debug, Clone)]
@@ -108,8 +92,8 @@ where
         self.store.insert(key, value)
     }
 
-    /// Removes a key from the [`ObservableHashMap`], returning the value at the
-    /// key if the key was previously in the [`ObservableHashMap`].
+    /// Removes a key from the [`ObservableHashMap`], returning the value at
+    /// the key if the key was previously in the [`ObservableHashMap`].
     ///
     /// This action will produce [`ObservableHashMap::on_remove`] event.
     pub fn remove(&mut self, key: &K) -> Option<V> {

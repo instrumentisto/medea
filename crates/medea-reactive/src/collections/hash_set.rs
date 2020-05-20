@@ -1,5 +1,4 @@
-//! Implementation of the reactive [`HashSet`] data structure based on
-//! [`std::collections`].
+//! Reactive hash set based on [`HashSet`].
 
 use std::{
     cell::RefCell,
@@ -9,24 +8,9 @@ use std::{
 
 use futures::{channel::mpsc, Stream};
 
-/// Reactive [`HashSet`] data structure based on [`std::collections`].
+/// Reactive hash set based on [`HashSet`].
 ///
-/// # Basic usage
-///
-/// ```rust
-/// use medea_reactive::collections::ObservableHashSet;
-///
-/// let mut set = ObservableHashSet::new();
-///
-/// // You can just insert items as well as with standard HashMap.
-/// set.insert("foo".to_string());
-/// // ...or iterate over items.
-/// assert_eq!(set.iter().next().unwrap(), &"foo".to_string());
-/// // ...and finally remove them.
-/// set.remove(&"foo".to_string());
-/// ```
-///
-/// # Subscriptions to the changes
+/// # Usage
 ///
 /// ```rust
 /// # use futures::{executor, StreamExt as _, Stream};
@@ -37,48 +21,48 @@ use futures::{channel::mpsc, Stream};
 /// let mut set = ObservableHashSet::new();
 ///
 /// // You can subscribe on insert action:
-/// let mut set_insert_subscription = set.on_insert();
+/// let mut inserts = set.on_insert();
 ///
-/// set.insert("foo".to_string());
+/// set.insert("foo");
 ///
-/// let inserted_item = set_insert_subscription.next()
+/// let item = inserts.next()
 ///     .await
 ///     .unwrap();
-/// assert_eq!(inserted_item, "foo".to_string());
+/// assert_eq!(item, "foo");
 ///
 /// // Also you can subscribe on remove action:
-/// let mut set_remove_subscription = set.on_remove();
+/// let mut removals = set.on_remove();
 ///
-/// set.remove(&"foo".to_string());
+/// set.remove(&"foo");
 ///
-/// let removed_item = set_remove_subscription.next()
+/// let removed_item = removals.next()
 ///     .await
 ///     .unwrap();
-/// assert_eq!(removed_item, "foo".to_string());
+/// assert_eq!(removed_item, "foo");
 ///
-/// // When you update ObservableHashSet by another HashSet all events
-/// // will work fine:
-/// set.insert("foo-1".to_string());
-/// set.insert("foo-2".to_string());
-/// set.insert("foo-3".to_string());
+/// // When you update ObservableHashSet by another HashSet all events will
+/// // work fine:
+/// set.insert("foo-1");
+/// set.insert("foo-2");
+/// set.insert("foo-3");
 ///
 /// let mut set_for_update = HashSet::new();
-/// set_for_update.insert("foo-1".to_string());
-/// set_for_update.insert("foo-4".to_string());
+/// set_for_update.insert("foo-1");
+/// set_for_update.insert("foo-4");
 /// set.update(set_for_update);
 ///
-/// let removed_items: HashSet<String> = set_remove_subscription.take(2)
+/// let removed_items: HashSet<_> = removals.take(2)
 ///     .collect()
 ///     .await;
-/// let inserted_item = set_insert_subscription.skip(3)
+/// let inserted_item = inserts.skip(3)
 ///     .next()
 ///     .await
 ///     .unwrap();
-/// assert!(removed_items.contains(&"foo-2".to_string()));
-/// assert!(removed_items.contains(&"foo-3".to_string()));
-/// assert_eq!(inserted_item, "foo-4".to_string());
-/// assert!(set.contains(&"foo-1".to_string()));
-/// assert!(set.contains(&"foo-4".to_string()));
+/// assert!(removed_items.contains("foo-2"));
+/// assert!(removed_items.contains("foo-3"));
+/// assert_eq!(inserted_item, "foo-4");
+/// assert!(set.contains(&"foo-1"));
+/// assert!(set.contains(&"foo-4"));
 /// # });
 /// ```
 
@@ -159,8 +143,7 @@ where
         rx
     }
 
-    /// Returns the [`Stream`] to which the removed values will be
-    /// sent.
+    /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableHashSet`] on drop.

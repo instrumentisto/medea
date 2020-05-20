@@ -1,28 +1,12 @@
-//! Implementation of the reactive [`Vec`] data structure based on
-//! [`std`].
+//! Reactive vector based on [`Vec`].
 
 use std::{cell::RefCell, slice::Iter};
 
 use futures::{channel::mpsc, Stream};
 
-/// Reactive [`Vec`] data structure based on [`std`].
+/// Reactive vector based on [`Vec`].
 ///
-/// # Basic usage
-///
-/// ```rust
-/// use medea_reactive::collections::ObservableVec;
-///
-/// let mut set = ObservableVec::new();
-///
-/// // You can just insert items as well as with standard HashMap.
-/// set.push("foo".to_string());
-/// // ...or iterate over items.
-/// assert_eq!(set.iter().next().unwrap(), &"foo".to_string());
-/// // ...and finally remove them.
-/// set.remove(0);
-/// ```
-///
-/// # Subscriptions to the changes
+/// # Usage
 ///
 /// ```rust
 /// # use futures::{executor, StreamExt as _, Stream};
@@ -32,30 +16,30 @@ use futures::{channel::mpsc, Stream};
 /// let mut vec = ObservableVec::new();
 ///
 /// // You can subscribe on push event:
-/// let mut vec_push_subscription = vec.on_push();
+/// let mut pushes = vec.on_push();
 ///
-/// vec.push("foo".to_string());
+/// vec.push("foo");
 ///
-/// let pushed_item = vec_push_subscription.next().await.unwrap();
-/// assert_eq!(pushed_item, "foo".to_string());
+/// let pushed_item = pushes.next().await.unwrap();
+/// assert_eq!(pushed_item, "foo");
 ///
 /// // Also you can subscribe on remove event:
-/// let mut vec_remove_subscription = vec.on_remove();
+/// let mut removals = vec.on_remove();
 ///
 /// vec.remove(0);
 ///
-/// let removed_item = vec_remove_subscription.next().await.unwrap();
-/// assert_eq!(removed_item, "foo".to_string());
+/// let removed_item = removals.next().await.unwrap();
+/// assert_eq!(removed_item, "foo");
 ///
 /// // On Vec structure drop, all items will be sent to the on_remove stream:
-/// vec.push("foo-1".to_string());
-/// vec.push("foo-2".to_string());
+/// vec.push("foo-1");
+/// vec.push("foo-2");
 /// drop(vec);
-/// let removed_items: Vec<String> = vec_remove_subscription.take(2)
+/// let removed_items: Vec<_> = removals.take(2)
 ///     .collect()
 ///     .await;
-/// assert_eq!(removed_items[0], "foo-1".to_string());
-/// assert_eq!(removed_items[1], "foo-2".to_string());
+/// assert_eq!(removed_items[0], "foo-1");
+/// assert_eq!(removed_items[1], "foo-2");
 /// # });
 /// ```
 #[derive(Debug)]
@@ -111,8 +95,7 @@ where
         self.into_iter()
     }
 
-    /// Returns the [`Stream`] to which the pushed values will be
-    /// sent.
+    /// Returns the [`Stream`] to which the pushed values will be sent.
     ///
     /// Also to this [`Stream`] will be sent all already pushed values
     /// of this [`ObservableVec`].
@@ -128,8 +111,7 @@ where
         rx
     }
 
-    /// Returns the [`Stream`] to which the removed values will be
-    /// sent.
+    /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableVec`] on drop.

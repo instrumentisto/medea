@@ -49,8 +49,7 @@ async fn mute_unmute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_observable_tracks(false, false);
-    let (peer, _snapshot) =
-        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+    let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
     peer.get_offer(vec![audio_track, video_track], None)
         .await
@@ -75,8 +74,7 @@ async fn mute_unmute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_observable_tracks(false, false);
-    let (peer, _snapshot) =
-        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+    let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -100,8 +98,7 @@ async fn new_with_mute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_observable_tracks(true, false);
-    let (peer, _snapshot) =
-        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+    let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
     peer.get_offer(vec![audio_track, video_track], None)
         .await
@@ -116,8 +113,7 @@ async fn new_with_mute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_observable_tracks(false, true);
-    let (peer, _snapshot) =
-        get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+    let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -132,11 +128,10 @@ async fn add_candidates_to_answerer_before_offer() {
     let (tx2, _) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let (pc1, _snapshot1) =
+    let (pc1, _) =
         get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
 
-    let (pc2, _snapshot2) =
-        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (pc2, _) = get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
     let (audio_track, video_track) = get_observable_tracks(false, false);
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None)
@@ -159,10 +154,9 @@ async fn add_candidates_to_offerer_before_answer() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let (pc1, _snapshot1) =
+    let (pc1, _) =
         get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
-    let (pc2, _snapshot2) =
-        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (pc2, _) = get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
 
     let (audio_track, video_track) = get_observable_tracks(false, false);
     let offer = pc1
@@ -186,10 +180,9 @@ async fn normal_exchange_of_candidates() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let (peer1, _snapshot1) =
+    let (peer1, _) =
         get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
-    let (peer2, _snapshot2) =
-        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (peer2, _) = get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
     let (audio_track, video_track) = get_observable_tracks(false, false);
 
     let offer = peer1
@@ -244,7 +237,7 @@ async fn send_event_on_new_local_stream() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_observable_tracks(false, true);
     let id = PeerId(1);
-    let (peer, _snapshot) = get_peer(id, tx, HashSet::new(), manager, false);
+    let (peer, _) = get_peer(id, tx, HashSet::new(), manager, false);
     peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
@@ -269,10 +262,9 @@ async fn ice_connection_state_changed_is_emitted() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let (peer1, _snapshot1) =
+    let (peer1, _) =
         get_peer(PeerId(1), tx1, HashSet::new(), Rc::clone(&manager), false);
-    let (peer2, _snapshot2) =
-        get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
+    let (peer2, _) = get_peer(PeerId(2), tx2, HashSet::new(), manager, false);
     let (audio_track, video_track) = get_observable_tracks(false, false);
 
     let offer = peer1
@@ -629,8 +621,7 @@ mod peer_stats_caching {
     async fn works() {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
-        let (peer, _snapshot) =
-            get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+        let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
         let stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
@@ -670,8 +661,7 @@ mod peer_stats_caching {
     async fn takes_into_account_stat_id() {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
-        let (peer, _snapshot) =
-            get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+        let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
         let mut stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
@@ -711,8 +701,7 @@ mod peer_stats_caching {
     async fn sends_updated_stats() {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
-        let (peer, _snapshot) =
-            get_peer(PeerId(1), tx, HashSet::new(), manager, false);
+        let (peer, _) = get_peer(PeerId(1), tx, HashSet::new(), manager, false);
 
         let mut track_stat = Box::new(TrackStat {
             track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"

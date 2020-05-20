@@ -2,6 +2,9 @@
 //!
 //! Subscription to changes works the same way as [`ObservableField`],
 //! but working with underlying data of [`ObservableCell`] is different.
+//!
+//! [`Cell`]: std::cell::Cell
+//! [`ObservableField`]: crate::ObservableField
 
 #![allow(clippy::module_name_repetitions)]
 
@@ -12,7 +15,7 @@ use std::{
 
 use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 
-use crate::{
+use super::{
     DefaultSubscribers, DroppedError, MutObservableFieldGuard, Observable,
 };
 
@@ -77,6 +80,7 @@ use crate::{
 /// ```
 ///
 /// [`Cell`]: std::cell::Cell
+/// [`ObservableField`]: crate::ObservableField
 #[derive(Debug)]
 pub struct ObservableCell<D>(RefCell<Observable<D>>);
 
@@ -189,5 +193,154 @@ where
         F: FnOnce(MutObservableFieldGuard<'_, D, DefaultSubscribers<D>>),
     {
         (f)(self.0.borrow_mut().borrow_mut());
+    }
+}
+
+#[cfg(test)]
+mod observable_cell {
+    use std::time::Duration;
+
+    use futures::StreamExt as _;
+    use tokio::time::timeout;
+
+    use crate::ObservableCell;
+
+    #[tokio::test]
+    async fn subscription() {
+        let field = ObservableCell::new(0);
+        let subscription = field.subscribe();
+
+        field.set(100);
+        assert_eq!(subscription.skip(1).next().await.unwrap(), 100);
+    }
+
+    #[tokio::test]
+    async fn when() {
+        let field = ObservableCell::new(0);
+        let when_will_be_greater_than_5 = field.when(|upd| upd > &5);
+
+        field.set(6);
+        timeout(
+            Duration::from_millis(50),
+            Box::pin(when_will_be_greater_than_5),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn when_eq() {
+        let field = ObservableCell::new(0);
+        let when_will_be_5 = field.when_eq(5);
+
+        field.set(5);
+        timeout(Duration::from_millis(50), Box::pin(when_will_be_5))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn only_initial_update_emitted() {
+        let field = ObservableCell::new(0);
+        let mut subscription = field.subscribe();
+        assert_eq!(subscription.next().await.unwrap(), 0);
+
+        let _ =
+            timeout(Duration::from_millis(10), Box::pin(subscription.next()))
+                .await
+                .unwrap_err();
+    }
+
+    #[tokio::test]
+    async fn when_eq_never_resolves() {
+        let field = ObservableCell::new(0);
+        let when_will_be_5 = field.when_eq(5);
+
+        let _ = timeout(Duration::from_millis(10), Box::pin(when_will_be_5))
+            .await
+            .unwrap_err();
+    }
+
+    #[tokio::test]
+    async fn data_mutates() {
+        let field = ObservableCell::new(0);
+        assert_eq!(*field.borrow(), 0);
+        field.set(100_500);
+        assert_eq!(*field.borrow(), 100_500);
+    }
+
+    #[tokio::test]
+    async fn updates_emitted_on_replace() {
+        let field = ObservableCell::new(0);
+        let mut subscription = field.subscribe().skip(1);
+
+        assert_eq!(field.replace(100), 0);
+        assert_eq!(*field.borrow(), 100);
+
+        assert_eq!(subscription.next().await.unwrap(), 100);
+    }
+
+    #[tokio::test]
+    async fn when_on_replace() {
+        let field = ObservableCell::new(0);
+        let when_will_be_greater_than_5 = field.when(|upd| upd > &5);
+
+        assert_eq!(field.replace(6), 0);
+
+        timeout(
+            Duration::from_millis(50),
+            Box::pin(when_will_be_greater_than_5),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn when_eq_on_replace() {
+        let field = ObservableCell::new(0);
+        let when_will_be_5 = field.when_eq(5);
+
+        assert_eq!(field.replace(5), 0);
+
+        timeout(Duration::from_millis(50), Box::pin(when_will_be_5))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn get() {
+        let field = ObservableCell::new(0);
+        assert_eq!(field.get(), 0);
+
+        field.set(5);
+        assert_eq!(field.get(), 5);
+
+        assert_eq!(field.replace(10), 5);
+        assert_eq!(field.get(), 10);
+    }
+
+    #[tokio::test]
+    async fn emits_changes_on_mutate() {
+        let field = ObservableCell::new(0);
+        let mut subscription = field.subscribe().skip(1);
+
+        field.mutate(|mut data| *data = 100);
+        assert_eq!(subscription.next().await.unwrap(), 100);
+    }
+
+    #[tokio::test]
+    async fn when_with_mutate() {
+        let field = ObservableCell::new(0);
+        let when_will_be_5 = field.when_eq(5);
+
+        field.mutate(|mut data| *data = 5);
+        timeout(Duration::from_millis(50), Box::pin(when_will_be_5))
+            .await
+            .unwrap()
+            .unwrap();
     }
 }
