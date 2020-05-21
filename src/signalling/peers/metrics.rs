@@ -318,7 +318,6 @@ impl PeersMetricsService {
     pub fn update_peer_tracks(&mut self, peer: &Peer) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
-            peer_stat.borrow_mut().state = PeerStatState::Connecting;
         }
     }
 
@@ -1272,7 +1271,6 @@ mod tests {
             );
             delay_for(Duration::from_millis(15)).await;
             helper.add_stats(stats.0, stats.1, stats.2, stats.3, 200);
-            helper.check_peers();
 
             let traffic_flow = timeout(
                 Duration::from_millis(10),
