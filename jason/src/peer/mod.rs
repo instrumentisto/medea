@@ -559,6 +559,14 @@ impl PeerConnection {
         Ok(offer)
     }
 
+    pub async fn create_new_offer(&self) -> Result<String> {
+        Ok(self
+            .peer
+            .create_and_set_offer()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?)
+    }
+
     /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
     /// Requests local stream from [`MediaManager`] if no stream was provided.
@@ -766,6 +774,21 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(answer)
+    }
+
+    pub async fn proccess_new_remote_offer(
+        &self,
+        offer: String,
+    ) -> Result<String> {
+        self.set_remote_offer(offer)
+            .await
+            .map_err(tracerr::wrap!())?;
+
+        Ok(self
+            .peer
+            .create_and_set_answer()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?)
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.

@@ -877,9 +877,34 @@ impl EventHandler for InnerRoom {
         }
     }
 
-    fn on_renegotiation_started(&mut self, peer_id: PeerId) {}
+    fn on_renegotiation_started(&mut self, peer_id: PeerId) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            let rpc = self.rpc.clone();
+            spawn_local(async move {
+                let sdp_offer = peer.create_new_offer().await.unwrap();
+                let mids = peer.get_mids().unwrap();
+                rpc.send_command(Command::MakeSdpOffer {
+                    peer_id,
+                    sdp_offer,
+                    mids,
+                });
+            });
+        }
+    }
 
-    fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {}
+    fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            let rpc = self.rpc.clone();
+            spawn_local(async move {
+                let sdp_answer =
+                    peer.proccess_new_remote_offer(sdp_offer).await.unwrap();
+                rpc.send_command(Command::MakeSdpAnswer {
+                    peer_id,
+                    sdp_answer,
+                })
+            })
+        }
+    }
 }
 
 /// [`PeerEvent`]s handling.
