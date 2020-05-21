@@ -560,7 +560,7 @@ async fn get_traffic_stats() {
     let second_peer_stats = peers.second_peer.get_stats().await.unwrap();
     let mut second_peer_video_inbound_stats_count = 0;
     let mut second_peer_audio_inbound_stats_count = 0;
-    let mut succeeded_candidate_pairs_count = 0;
+    let mut has_succeeded_pair = false;
     for stat in second_peer_stats.0 {
         match stat.stats {
             RtcStatsType::InboundRtp(inbound) => {
@@ -581,13 +581,13 @@ async fn get_traffic_stats() {
                     KnownIceCandidatePairState::Succeeded,
                 ) = candidate_pair.state
                 {
-                    succeeded_candidate_pairs_count += 1;
+                    has_succeeded_pair = true;
                 }
             }
             _ => (),
         }
     }
-    assert!(succeeded_candidate_pairs_count > 0);
+    assert!(has_succeeded_pair);
     assert_eq!(second_peer_video_inbound_stats_count, 1);
     assert_eq!(second_peer_audio_inbound_stats_count, 1);
 }
