@@ -15,9 +15,9 @@ All user visible changes to this project will be documented in this file. This p
 - `Observable` type alias ([#81]);
 - `OnObservableFieldModification`, `Subscribable` and `Whenable` traits ([#81]);
 - Observable collections ([#103]):
-  - `ObservableVec`;
-  - `ObservableHashMap`;
-  - `ObservableHashSet`.
+    - `ObservableVec`;
+    - `ObservableHashMap`;
+    - `ObservableHashSet`.
 
 [#81]: /../../pull/81
 [#103]: /../../pull/103
