@@ -4,13 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerConnectionState,
-    PeerId as Id, Track, TrackId, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
+    TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -82,13 +82,6 @@ impl PeerError {
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
-#[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
-#[enum_delegate(
-    pub fn set_connection_state(
-        &self,
-        state: PeerConnectionState
-    )
-)]
 #[enum_delegate(pub fn is_offerer(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -173,7 +166,6 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
-    connection_state: RefCell<PeerConnectionState>,
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
     is_offerer: bool,
@@ -255,16 +247,6 @@ impl<T> Peer<T> {
     /// Indicates whether all media is forcibly relayed through a TURN server.
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
-    }
-
-    /// Changes [`Peer`]'s connection state.
-    pub fn set_connection_state(&self, state: PeerConnectionState) {
-        self.context.connection_state.replace(state);
-    }
-
-    /// Returns [`Peer`] current connection state.
-    pub fn connection_state(&self) -> PeerConnectionState {
-        *self.context.connection_state.borrow()
     }
 
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
@@ -402,7 +384,6 @@ impl Peer<Stable> {
             senders: HashMap::new(),
             is_force_relayed,
             endpoints: Vec::new(),
-            connection_state: RefCell::new(PeerConnectionState::New),
             is_offerer,
         };
         Self {

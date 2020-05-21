@@ -10,16 +10,15 @@ use std::{
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, MailboxError, Message, WrapFuture as _, WrapFuture,
+    Handler, MailboxError, Message, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::{future::LocalBoxFuture, FutureExt};
 use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerConnectionState, PeerId,
-    PeerMetrics, TrackId, TrackPatch,
+    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
+    TrackPatch,
 };
-use futures::FutureExt;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -47,8 +46,8 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        Peer, PeerError, PeerStateMachine, Stable, WaitLocalHaveRemote,
-        WaitLocalSdp, WaitRemoteSdp,
+        Peer, PeerError, Stable, WaitLocalHaveRemote, WaitLocalSdp,
+        WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
     signalling::{
@@ -781,18 +780,12 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = match from_peer.connection_state() {
-            PeerConnectionState::Failed => Event::SdpOfferMade {
-                peer_id: to_peer.id(),
-                sdp_offer,
-            },
-            _ => Event::PeerCreated {
-                peer_id: to_peer.id(),
-                sdp_offer: Some(sdp_offer),
-                tracks: to_peer.tracks(),
-                ice_servers,
-                force_relay: to_peer.is_force_relayed(),
-            },
+        let event = Event::PeerCreated {
+            peer_id: to_peer.id(),
+            sdp_offer: Some(sdp_offer),
+            tracks: to_peer.tracks(),
+            ice_servers,
+            force_relay: to_peer.is_force_relayed(),
         };
 
         self.peers.add_peer(from_peer);
@@ -979,7 +972,7 @@ impl Handler<SerializeProto> for Room {
                     let fut = self.renegotiate_peer(PeerId(1)).unwrap();
                     ctx.spawn(
                         async move {
-                            fut.await;
+                            fut.await.unwrap();
                         }
                         .into_actor(self),
                     );
