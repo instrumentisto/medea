@@ -9,8 +9,8 @@ use std::{
 };
 
 use actix::{
-    Actor, ActorFuture, Addr, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, Message, WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext, Context, ContextFutureSpawner as _,
+    Handler, MailboxError, Message, WrapFuture as _, WrapFuture,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -19,6 +19,7 @@ use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerConnectionState, PeerId,
     PeerMetrics, TrackId, TrackPatch,
 };
+use futures::FutureExt;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -683,19 +684,15 @@ impl Room {
     fn renegotiate_peer(
         &mut self,
         peer_id: PeerId,
-    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
+    ) -> Result<LocalBoxFuture<'static, Result<(), RoomError>>, RoomError> {
         let renegotiation_peer = self.peers.start_renegotiation(peer_id)?;
         let member_id = renegotiation_peer.member_id();
         let peer_id = renegotiation_peer.id();
 
-        Ok(Box::new(
-            self.members
-                .send_event_to_member(
-                    member_id,
-                    Event::RenegotiationStarted { peer_id },
-                )
-                .into_actor(self),
-        ))
+        Ok(Box::pin(self.members.send_event_to_member(
+            member_id,
+            Event::RenegotiationStarted { peer_id },
+        )))
     }
 }
 
@@ -856,28 +853,9 @@ impl CommandHandler for Room {
             return Ok(Box::new(actix::fut::ok(())));
         }
 
-        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
-        if let PeerStateMachine::Stable(_) = from_peer {
-            return Err(PeerError::WrongState(
-                from_peer_id,
-                "Not Stable",
-                format!("{}", from_peer),
-            )
-            .into());
-        }
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
-        if let PeerStateMachine::Stable(_) = to_peer {
-            return Err(PeerError::WrongState(
-                to_peer_id,
-                "Not Stable",
-                format!("{}", to_peer),
-            )
-            .into());
-        }
-
-        let to_member_id = to_peer.member_id();
+        let to_peer_id =
+            self.peers.get_peer_by_id(from_peer_id)?.partner_peer_id();
+        let to_member_id = self.peers.get_peer_by_id(to_peer_id)?.member_id();
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,
@@ -975,7 +953,7 @@ impl Handler<SerializeProto> for Room {
     fn handle(
         &mut self,
         msg: SerializeProto,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         let mut serialized: HashMap<StatefulFid, proto::Element> =
             HashMap::new();
@@ -998,6 +976,13 @@ impl Handler<SerializeProto> for Room {
                     serialized.insert(fid, member.into());
                 }
                 StatefulFid::Endpoint(endpoint_fid) => {
+                    let fut = self.renegotiate_peer(PeerId(1)).unwrap();
+                    ctx.spawn(
+                        async move {
+                            fut.await;
+                        }
+                        .into_actor(self),
+                    );
                     let member =
                         self.members.get_member(endpoint_fid.member_id())?;
                     let endpoint = member.get_endpoint_by_id(

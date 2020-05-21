@@ -877,7 +877,12 @@ impl EventHandler for InnerRoom {
         }
     }
 
+    /// Starts SDP renegotiation. Only [ICE restart][1] renegotiation is
+    /// supported atm.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcofferoptions-icerestart
     fn on_renegotiation_started(&mut self, peer_id: PeerId) {
+        let rpc = Rc::clone(&self.rpc);
         if let Some(peer) = self.peers.get(peer_id) {
             let rpc = self.rpc.clone();
             spawn_local(async move {
@@ -892,6 +897,8 @@ impl EventHandler for InnerRoom {
         }
     }
 
+    /// Sets received SDP offer as found peer's remote description and creates
+    /// and sends SDP answer based on offer received.
     fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {
         if let Some(peer) = self.peers.get(peer_id) {
             let rpc = self.rpc.clone();

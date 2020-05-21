@@ -8,7 +8,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
-    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
@@ -587,11 +587,16 @@ impl RtcPeerConnection {
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(peer.create_offer())
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateOfferFailed)
-            .map_err(tracerr::wrap!())?;
+        let mut offer_options = RtcOfferOptions::new();
+        offer_options.ice_restart(false);
+
+        let create_offer = JsFuture::from(
+            peer.create_offer_with_rtc_offer_options(&offer_options),
+        )
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::CreateOfferFailed)
+        .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
@@ -621,12 +626,14 @@ impl RtcPeerConnection {
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         let description = match sdp {
             SdpType::Offer(offer) => {
+                console_error(&offer);
                 let mut desc =
                     RtcSessionDescriptionInit::new(RtcSdpType::Offer);
                 desc.sdp(&offer);
                 desc
             }
             SdpType::Answer(answer) => {
+                console_error(&answer);
                 let mut desc =
                     RtcSessionDescriptionInit::new(RtcSdpType::Answer);
                 desc.sdp(&answer);

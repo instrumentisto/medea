@@ -67,7 +67,7 @@ wee_alloc = { version = "0.4", optional = true }
         "RtcSessionDescription", "RtcSessionDescriptionInit",
         "RtcStats",
         "RtcTrackEvent",
-        "WebSocket", "Window",
+        "WebSocket", "Window", "RtcOfferOptions",
     ]
 
 [dev-dependencies]
