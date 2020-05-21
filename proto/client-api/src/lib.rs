@@ -130,18 +130,22 @@ pub enum Command {
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
     },
+
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
+
     /// Web Client sends Peer Connection metrics.
     AddPeerConnectionMetrics {
         peer_id: PeerId,
         metrics: PeerMetrics,
     },
+
     /// Web Client asks permission to update [`Track`]s in specified Peer.
     /// Media Server gives permission by sending [`Event::TracksUpdated`].
     UpdateTracks {
@@ -269,6 +273,14 @@ pub enum Event {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     },
+
+    /// Media Server notifies Web Client about necessity to start
+    /// renegotiation, creating new SDP Offer.
+    RenegotiationStarted { peer_id: PeerId },
+
+    /// Media Server notifies Web Client about necessity to apply specified SDP
+    /// Offer to Web Client's RTCPeerConnection.
+    SdpOfferMade { peer_id: PeerId, sdp_offer: String },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

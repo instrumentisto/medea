@@ -16,8 +16,8 @@ use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    Command, CommandHandler, Event, IceCandidate, PeerConnectionState, PeerId,
+    PeerMetrics, TrackId, TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 
@@ -46,7 +46,7 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
+        Peer, PeerError, PeerStateMachine, Stable, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
@@ -218,15 +218,15 @@ impl Room {
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
     /// which of them has any outbound tracks. That [`Peer`] state will be
     /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
-    /// [`New`] state. At least one of provided peers must have outbound
+    /// [`Stable`] state. At least one of provided peers must have outbound
     /// tracks.
     fn send_peer_created(
         &mut self,
         peer1_id: PeerId,
         peer2_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
+        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
+        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
 
         // decide which peer is sender
         let (sender, receiver) = if peer1.is_sender() {
@@ -679,6 +679,24 @@ impl Room {
         }
         Ok(())
     }
+
+    fn renegotiate_peer(
+        &mut self,
+        peer_id: PeerId,
+    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
+        let renegotiation_peer = self.peers.start_renegotiation(peer_id)?;
+        let member_id = renegotiation_peer.member_id();
+        let peer_id = renegotiation_peer.id();
+
+        Ok(Box::new(
+            self.members
+                .send_event_to_member(
+                    member_id,
+                    Event::RenegotiationStarted { peer_id },
+                )
+                .into_actor(self),
+        ))
+    }
 }
 
 impl RpcServer for Addr<Room> {
@@ -743,8 +761,8 @@ impl CommandHandler for Room {
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
-    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
-    /// changed to [`WaitLocalHaveRemote`].
+    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`Stable`] and will
+    /// be changed to [`WaitLocalHaveRemote`].
     fn on_make_sdp_offer(
         &mut self,
         from_peer_id: PeerId,
@@ -756,7 +774,7 @@ impl CommandHandler for Room {
         from_peer.set_mids(mids)?;
 
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
+        let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
@@ -766,12 +784,18 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = Event::PeerCreated {
-            peer_id: to_peer.id(),
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-            ice_servers,
-            force_relay: to_peer.is_force_relayed(),
+        let event = match from_peer.connection_state() {
+            PeerConnectionState::Failed => Event::SdpOfferMade {
+                peer_id: to_peer.id(),
+                sdp_offer,
+            },
+            _ => Event::PeerCreated {
+                peer_id: to_peer.id(),
+                sdp_offer: Some(sdp_offer),
+                tracks: to_peer.tracks(),
+                ice_servers,
+                force_relay: to_peer.is_force_relayed(),
+            },
         };
 
         self.peers.add_peer(from_peer);
@@ -820,7 +844,7 @@ impl CommandHandler for Room {
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
-    /// Both [`Peer`]s may have any state except [`New`].
+    /// Both [`Peer`]s may have any state except [`Stable`].
     fn on_set_ice_candidate(
         &mut self,
         from_peer_id: PeerId,
@@ -833,10 +857,10 @@ impl CommandHandler for Room {
         }
 
         let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
-        if let PeerStateMachine::New(_) = from_peer {
+        if let PeerStateMachine::Stable(_) = from_peer {
             return Err(PeerError::WrongState(
                 from_peer_id,
-                "Not New",
+                "Not Stable",
                 format!("{}", from_peer),
             )
             .into());
@@ -844,10 +868,10 @@ impl CommandHandler for Room {
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
-        if let PeerStateMachine::New(_) = to_peer {
+        if let PeerStateMachine::Stable(_) = to_peer {
             return Err(PeerError::WrongState(
                 to_peer_id,
-                "Not New",
+                "Not Stable",
                 format!("{}", to_peer),
             )
             .into());

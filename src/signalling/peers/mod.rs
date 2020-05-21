@@ -19,7 +19,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{IceUser, New, Peer, PeerStateMachine},
+    media::{IceUser, Peer, PeerError, PeerStateMachine, Stable, WaitLocalSdp},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -180,6 +180,7 @@ impl PeersService {
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
+            true,
         );
         src_peer.add_endpoint(&src.clone().into());
 
@@ -189,6 +190,7 @@ impl PeersService {
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
+            false,
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
@@ -264,16 +266,27 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
+    ///
+    /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
+    /// requested state.
     pub fn take_inner_peer<S>(
         &mut self,
         peer_id: PeerId,
     ) -> Result<Peer<S>, RoomError>
     where
         Peer<S>: TryFrom<PeerStateMachine>,
-        <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
+        <Peer<S> as TryFrom<PeerStateMachine>>::Error:
+            Into<(PeerError, PeerStateMachine)>,
     {
         match self.peers.remove(&peer_id) {
-            Some(peer) => peer.try_into().map_err(Into::into),
+            Some(peer) => match peer.try_into() {
+                Ok(peer) => Ok(peer),
+                Err(err) => {
+                    let (err, peer) = err.into();
+                    self.peers.insert(peer_id, peer);
+                    Err(RoomError::from(err))
+                }
+            },
             None => Err(RoomError::PeerNotFound(peer_id)),
         }
     }
@@ -357,9 +370,9 @@ impl PeersService {
             //       [`Peer<New>`] state.
             //       Also, don't forget to update `PeerSpec` in the
             //       [`PeerMetricsService`].
-            let mut src_peer: Peer<New> =
+            let mut src_peer: Peer<Stable> =
                 self.take_inner_peer(src_peer_id).unwrap();
-            let mut sink_peer: Peer<New> =
+            let mut sink_peer: Peer<Stable> =
                 self.take_inner_peer(sink_peer_id).unwrap();
 
             src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
@@ -494,5 +507,42 @@ impl PeersService {
             });
 
         peers_to_remove
+    }
+
+    pub fn start_renegotiation(
+        &mut self,
+        peer_id: PeerId,
+    ) -> Result<&Peer<WaitLocalSdp>, RoomError> {
+        let peer: Peer<Stable> = self.take_inner_peer(peer_id)?;
+        if peer.is_offerer() {
+            let renegotiating_peer = peer.start_renegotiation();
+            self.peers.insert(peer_id, renegotiating_peer.into());
+            match self.get_peer_by_id(peer_id).unwrap() {
+                PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
+                _ => {
+                    // TODO: normal message
+                    unreachable!()
+                }
+            }
+        } else {
+            let partner_peer = self.take_inner_peer(peer.partner_peer_id())?;
+            if partner_peer.is_offerer() {
+                let renegotiating_peer = partner_peer.start_renegotiation();
+                let renegotiating_peer_id = renegotiating_peer.id();
+                self.peers
+                    .insert(renegotiating_peer_id, renegotiating_peer.into());
+                self.peers.insert(peer_id, peer.into());
+                match self.get_peer_by_id(renegotiating_peer_id).unwrap() {
+                    PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
+                    _ => {
+                        // TODO: normal message
+                        unreachable!()
+                    }
+                }
+            } else {
+                // TODO: normal unerachable message
+                unreachable!()
+            }
+        }
     }
 }

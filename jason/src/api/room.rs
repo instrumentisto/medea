@@ -876,6 +876,10 @@ impl EventHandler for InnerRoom {
                 .print();
         }
     }
+
+    fn on_renegotiation_started(&mut self, peer_id: PeerId) {}
+
+    fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {}
 }
 
 /// [`PeerEvent`]s handling.

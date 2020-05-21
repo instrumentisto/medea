@@ -4,13 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerConnectionState,
+    PeerId as Id, Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -22,10 +22,6 @@ use crate::{
         peers::Counter,
     },
 };
-
-/// Newly initialized [`Peer`] ready to signalling.
-#[derive(Debug, PartialEq)]
-pub struct New {}
 
 /// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
 #[derive(Debug, PartialEq)]
@@ -39,7 +35,8 @@ pub struct WaitLocalHaveRemote {}
 #[derive(Debug, PartialEq)]
 pub struct WaitRemoteSdp {}
 
-/// SDP exchange ended.
+/// There is no negotiation happening atm. It may have ended or haven't started
+/// yet.
 #[derive(Debug, PartialEq)]
 pub struct Stable {}
 
@@ -85,9 +82,16 @@ impl PeerError {
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
+#[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
+#[enum_delegate(
+    pub fn set_connection_state(
+        &self,
+        state: PeerConnectionState
+    )
+)]
+#[enum_delegate(pub fn is_offerer(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
-    New(Peer<New>),
     WaitLocalSdp(Peer<WaitLocalSdp>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
@@ -98,7 +102,6 @@ impl fmt::Display for PeerStateMachine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
-            PeerStateMachine::New(_) => write!(f, "New"),
             PeerStateMachine::WaitLocalSdp(_) => write!(f, "WaitLocalSdp"),
             PeerStateMachine::WaitLocalHaveRemote(_) => {
                 write!(f, "WaitLocalHaveRemote")
@@ -128,15 +131,18 @@ macro_rules! impl_peer_converts {
         }
 
         impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
-            type Error = PeerError;
+            type Error = (PeerError, PeerStateMachine);
 
             fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerError::WrongState(
-                        peer.id(),
-                        stringify!($peer_type),
-                        format!("{}", peer),
+                    _ => Err((
+                        PeerError::WrongState(
+                            peer.id(),
+                            stringify!($peer_type),
+                            format!("{}", peer),
+                        ),
+                        peer,
                     )),
                 }
             }
@@ -150,7 +156,6 @@ macro_rules! impl_peer_converts {
     };
 }
 
-impl_peer_converts!(New);
 impl_peer_converts!(WaitLocalSdp);
 impl_peer_converts!(WaitLocalHaveRemote);
 impl_peer_converts!(WaitRemoteSdp);
@@ -168,8 +173,10 @@ pub struct Context {
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
+    connection_state: RefCell<PeerConnectionState>,
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
+    is_offerer: bool,
 }
 
 /// [RTCPeerConnection] representation.
@@ -250,6 +257,16 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
+    /// Changes [`Peer`]'s connection state.
+    pub fn set_connection_state(&self, state: PeerConnectionState) {
+        self.context.connection_state.replace(state);
+    }
+
+    /// Returns [`Peer`] current connection state.
+    pub fn connection_state(&self) -> PeerConnectionState {
+        *self.context.connection_state.borrow()
+    }
+
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
     pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
         self.context.ice_user.as_ref().map(IceUser::servers_list)
@@ -287,9 +304,81 @@ impl<T> Peer<T> {
     pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
         self.context.senders.clone()
     }
+
+    /// Returns `true` if this [`Peer`] is offerer and will start renegotiation
+    /// when it will be needed.
+    pub fn is_offerer(&self) -> bool {
+        self.context.is_offerer
+    }
 }
 
-impl Peer<New> {
+impl Peer<WaitLocalSdp> {
+    /// Sets local description and transition [`Peer`]
+    /// to [`WaitRemoteSdp`] state.
+    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
+        let mut context = self.context;
+        context.sdp_offer = Some(sdp_offer);
+        Peer {
+            context,
+            state: WaitRemoteSdp {},
+        }
+    }
+
+    /// Sets tracks [mid]s.
+    ///
+    /// Provided [mid]s must have entries for all [`Peer`]s tracks.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
+    /// [`MediaTrack`] without providing its [mid].
+    ///
+    /// [mid]:
+    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
+    pub fn set_mids(
+        &mut self,
+        mut mids: HashMap<TrackId, String>,
+    ) -> Result<(), PeerError> {
+        for (id, track) in self
+            .context
+            .senders
+            .iter_mut()
+            .chain(self.context.receivers.iter_mut())
+        {
+            let mid = mids
+                .remove(&id)
+                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
+            track.set_mid(mid)
+        }
+        Ok(())
+    }
+}
+
+impl Peer<WaitRemoteSdp> {
+    /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
+    pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
+        let mut context = self.context;
+        context.sdp_answer = Some(sdp_answer.to_string());
+        Peer {
+            context,
+            state: Stable {},
+        }
+    }
+}
+
+impl Peer<WaitLocalHaveRemote> {
+    /// Sets local description and transitions [`Peer`] to [`Stable`] state.
+    pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
+        let mut context = self.context;
+        context.sdp_answer = Some(sdp_answer);
+        Peer {
+            context,
+            state: Stable {},
+        }
+    }
+}
+
+impl Peer<Stable> {
     /// Creates new [`Peer`] for [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
@@ -299,6 +388,7 @@ impl Peer<New> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
+        is_offerer: bool,
     ) -> Self {
         let context = Context {
             id,
@@ -312,10 +402,12 @@ impl Peer<New> {
             senders: HashMap::new(),
             is_force_relayed,
             endpoints: Vec::new(),
+            connection_state: RefCell::new(PeerConnectionState::New),
+            is_offerer,
         };
         Self {
             context,
-            state: New {},
+            state: Stable {},
         }
     }
 
@@ -323,7 +415,7 @@ impl Peer<New> {
     /// to `partner_peer`.
     pub fn add_publisher(
         &mut self,
-        partner_peer: &mut Peer<New>,
+        partner_peer: &mut Peer<Stable>,
         tracks_count: &mut Counter<TrackId>,
     ) {
         let track_audio = Rc::new(MediaTrack::new(
@@ -372,75 +464,7 @@ impl Peer<New> {
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.context.receivers.insert(track.id, track);
     }
-}
 
-impl Peer<WaitLocalSdp> {
-    /// Sets local description and transition [`Peer`]
-    /// to [`WaitRemoteSdp`] state.
-    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
-        let mut context = self.context;
-        context.sdp_offer = Some(sdp_offer);
-        Peer {
-            context,
-            state: WaitRemoteSdp {},
-        }
-    }
-
-    /// Sets tracks [mid]s.
-    ///
-    /// Provided [mid]s must have entries for all [`Peer`]s tracks.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
-    /// [`MediaTrack`] without providing its [mid].
-    ///
-    /// [mid]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    pub fn set_mids(
-        &mut self,
-        mut mids: HashMap<TrackId, String>,
-    ) -> Result<(), PeerError> {
-        for (id, track) in self
-            .context
-            .senders
-            .iter_mut()
-            .chain(self.context.receivers.iter_mut())
-        {
-            let mid = mids
-                .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
-            track.set_mid(mid)
-        }
-        Ok(())
-    }
-}
-
-impl Peer<WaitRemoteSdp> {
-    /// Sets remote description and transition [`Peer`] to [`Stable`] state.
-    pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
-        let mut context = self.context;
-        context.sdp_answer = Some(sdp_answer.to_string());
-        Peer {
-            context,
-            state: Stable {},
-        }
-    }
-}
-
-impl Peer<WaitLocalHaveRemote> {
-    /// Sets local description and transition [`Peer`] to [`Stable`] state.
-    pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
-        let mut context = self.context;
-        context.sdp_answer = Some(sdp_answer);
-        Peer {
-            context,
-            state: Stable {},
-        }
-    }
-}
-
-impl Peer<Stable> {
     /// Returns [mid]s of this [`Peer`].
     ///
     /// # Errors
@@ -461,5 +485,20 @@ impl Peer<Stable> {
             );
         }
         Ok(mids)
+    }
+
+    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
+    /// SDP Offer and Answer.
+    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
+        if !self.context.is_offerer {
+            // TODO: print error! message about it.
+        }
+        let mut context = self.context;
+        context.sdp_answer = None;
+        context.sdp_offer = None;
+        Peer {
+            context,
+            state: WaitLocalSdp {},
+        }
     }
 }
