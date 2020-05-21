@@ -105,8 +105,11 @@ impl PeersMetricsService {
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
     pub fn check_peers(&mut self) {
-        let mut stopped_peers = Vec::new();
-        for peer in self.peers.values() {
+        for peer in self
+            .peers
+            .values()
+            .filter(|peer| peer.borrow().state == PeerStatState::Connected)
+        {
             let mut peer_ref = peer.borrow_mut();
 
             // get state before applying new stats so we can make before-after
@@ -126,7 +129,6 @@ impl PeersMetricsService {
                     peer_ref.peer_id,
                     peer_ref.get_stop_time(),
                 );
-                stopped_peers.push(peer_ref.peer_id);
             } else {
                 let send_media_traffic_state_after =
                     peer_ref.send_traffic_state;
@@ -154,10 +156,6 @@ impl PeersMetricsService {
                 }
             }
         }
-
-        for stopped_peer_id in stopped_peers {
-            self.peers.remove(&stopped_peer_id);
-        }
     }
 
     /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
@@ -180,6 +178,7 @@ impl PeersMetricsService {
             receivers: HashMap::new(),
             send_traffic_state: MediaTrafficState::new(),
             recv_traffic_state: MediaTrafficState::new(),
+            state: PeerStatState::Connecting,
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
         }));
@@ -240,6 +239,7 @@ impl PeersMetricsService {
                     peer_ref.get_stop_time(),
                 );
             } else {
+                peer_ref.state = PeerStatState::Connected;
                 self.peers_traffic_watcher.traffic_flows(
                     self.room_id.clone(),
                     peer_id,
@@ -318,6 +318,7 @@ impl PeersMetricsService {
     pub fn update_peer_tracks(&mut self, peer: &Peer) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
+            peer_stat.borrow_mut().state = PeerStatState::Connecting;
         }
     }
 
@@ -549,6 +550,18 @@ impl<T> TrackStat<T> {
     }
 }
 
+/// Current state of a [`PeerStat`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PeerStatState {
+    /// [`Peer`] which this [`PeerStat`] represents is considered as
+    /// connected.
+    Connected,
+
+    /// [`Peer`] which this [`PeerStat`] represents waiting for
+    /// connection.
+    Connecting,
+}
+
 /// Current stats of some [`Peer`].
 #[derive(Debug)]
 struct PeerStat {
@@ -575,6 +588,9 @@ struct PeerStat {
 
     /// All [`TrackStat`]s with [`Recv`] of this [`PeerStat`].
     receivers: HashMap<StatId, TrackStat<Recv>>,
+
+    /// Current connection state of this [`PeerStat`].
+    state: PeerStatState,
 
     /// Time of the last metrics update of this [`PeerStat`].
     last_update: DateTime<Utc>,
@@ -639,10 +655,11 @@ impl PeerStat {
                 .filter(|rx| rx.media_type == *track_media_type)
                 .filter(|rx| rx.is_flowing())
                 .count();
-            if cnt_flowing
-                >= self
-                    .tracks_spec
-                    .get_by_kind(*track_media_type, MediaDirection::Play)
+            if cnt_flowing != 0
+                && cnt_flowing
+                    >= self
+                        .tracks_spec
+                        .get_by_kind(*track_media_type, MediaDirection::Play)
             {
                 self.recv_traffic_state.started(media_type);
             } else {
@@ -663,10 +680,11 @@ impl PeerStat {
                 .filter(|rx| rx.media_type == *track_media_type)
                 .filter(|rx| rx.is_flowing())
                 .count();
-            if cnt_flowing
-                >= self
-                    .tracks_spec
-                    .get_by_kind(*track_media_type, MediaDirection::Publish)
+            if cnt_flowing != 0
+                && cnt_flowing
+                    >= self
+                        .tracks_spec
+                        .get_by_kind(*track_media_type, MediaDirection::Publish)
             {
                 self.send_traffic_state.started(media_type);
             } else {
@@ -1254,6 +1272,7 @@ mod tests {
             );
             delay_for(Duration::from_millis(15)).await;
             helper.add_stats(stats.0, stats.1, stats.2, stats.3, 200);
+            helper.check_peers();
 
             let traffic_flow = timeout(
                 Duration::from_millis(10),
@@ -1355,8 +1374,7 @@ mod tests {
     }
 
     /// Calling `check_peers` after adding new tracks via `update_peer_tracks`
-    /// emits [`PeersMetricsEvent::NoTrafficFlow`].
-    // TODO: change in #91?
+    /// doesn't emits [`PeersMetricsEvent::NoTrafficFlow`].
     #[actix_rt::test]
     async fn update_peer_tracks_and_check_peers() {
         let (state, mut helper) =
@@ -1365,8 +1383,8 @@ mod tests {
         assert_eq!(
             state,
             MergedFlowState {
-                audio_send: true,
-                video_send: true,
+                audio_send: false,
+                video_send: false,
                 audio_recv: true,
                 video_recv: true
             }
@@ -1378,15 +1396,14 @@ mod tests {
         helper.check_peers();
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
-            .unwrap();
+            .unwrap_err();
         timeout(Duration::from_millis(10), helper.next_traffic_event())
             .await
             .unwrap_err();
     }
 
-    /// Calling `add_stats` after adding new tracks via `update_peer_tracks` may
-    /// emit [`PeersMetricsEvent::NoTrafficFlow`].
-    // TODO: change in #91?
+    /// Calling `add_stats` after adding new tracks via `update_peer_tracks`
+    /// doesn't emit [`PeersMetricsEvent::NoTrafficFlow`].
     #[actix_rt::test]
     async fn update_peer_tracks_and_add_stats() {
         let (state, mut helper) =
@@ -1395,8 +1412,8 @@ mod tests {
         assert_eq!(
             state,
             MergedFlowState {
-                audio_send: true,
-                video_send: true,
+                audio_send: false,
+                video_send: false,
                 audio_recv: true,
                 video_recv: true
             }
@@ -1408,7 +1425,7 @@ mod tests {
         helper.add_stats(0, 0, 1, 1, 300);
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
-            .unwrap();
+            .unwrap_err();
         timeout(Duration::from_millis(10), helper.next_traffic_event())
             .await
             .unwrap_err();
