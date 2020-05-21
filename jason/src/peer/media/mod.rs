@@ -1,5 +1,6 @@
 //! [`crate::peer::PeerConnection`] media management.
 
+// TODO: Move Sender and Receiver to separate mods.
 mod mute_state;
 
 use std::{
