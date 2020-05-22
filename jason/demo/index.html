@@ -10,7 +10,10 @@
   <script type="module">
     import init, {
       Jason,
-      MediaStreamConstraints, AudioTrackConstraints, DeviceVideoTrackConstraints, DisplayVideoTrackConstraints
+      MediaStreamSettings,
+      AudioTrackConstraints,
+      DeviceVideoTrackConstraints,
+      DisplayVideoTrackConstraints,
     } from './js/medea_jason.js';
 
     let inited = false;
@@ -99,7 +102,7 @@
       inited = true;
       const jason = new Jason();
 
-      async function getDevices(audio_select, video_select, current_stream) {
+      async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
         const current_audio = current_stream.getAudioTracks().pop().label
           || "disable";
         const current_video = current_stream.getVideoTracks().pop().label
@@ -129,10 +132,8 @@
         video_select.append(option);
       }
 
-      async function getStream(audio_select, video_select) {
-
-        let constraints = new MediaStreamConstraints();
-
+      async function build_constraints(audio_select, video_select) {
+        let constraints = new MediaStreamSettings();
         let audio = new AudioTrackConstraints();
         let audioSource = audio_select.options[audio_select.selectedIndex];
         if (audioSource) {
@@ -154,9 +155,13 @@
           constraints.device_video(new DeviceVideoTrackConstraints());
         }
 
-        return await jason.media_manager().init_local_stream(constraints);
+        return constraints;
       }
 
+      let isCallStarted = false;
+      let localStream = null;
+      let isAudioMuted = false;
+      let isVideoMuted = false;
       let chooseRoomDiv = document.getElementById('choose-room');
       let videoCallDiv = document.getElementById('video-call');
       let chooseRoomButton = document.getElementById('choose-room__join');
@@ -177,28 +182,40 @@
 
       let room = await jason.init_room();
 
-      const updateLocalVideo = async function (stream) {
-        localVideo.srcObject = stream;
+      const updateLocalVideo = async (stream) => {
+        localVideo.srcObject = stream.get_media_stream();
         await localVideo.play();
       };
 
       audioSelect.addEventListener('change', async () => {
         try {
-          const stream = await getStream(audioSelect, videoSelect);
-          await updateLocalVideo(stream);
-          room.inject_local_stream(stream);
+          const constraints = await build_constraints(audioSelect, videoSelect);
+          if (localStream && localStream.ptr > 0 ){
+            localStream.free();
+          }
+          if (!isAudioMuted) {
+            localStream = await jason.media_manager().init_local_stream(constraints)
+            await updateLocalVideo(localStream);
+          }
+          await room.set_local_media_settings(constraints);
         } catch (e) {
-          logError("Changing audio source failed", e);
+          console.error("Changing audio source failed: " + e);
         }
       });
 
       videoSelect.addEventListener('change', async () => {
         try {
-          const stream = await getStream(audioSelect, videoSelect);
-          await updateLocalVideo(stream);
-          room.inject_local_stream(stream);
+          const constraints = await build_constraints(audioSelect, videoSelect);
+          if (localStream && localStream.ptr > 0 ){
+            localStream.free();
+          }
+          if (!isVideoMuted) {
+            localStream = await jason.media_manager().init_local_stream(constraints)
+            await updateLocalVideo(localStream);
+          }
+          await room.set_local_media_settings(constraints);
         } catch (e) {
-          logError("Changing video source failed", e);
+          console.error("Changing video source failed: " + e);
         }
       });
 
@@ -207,6 +224,7 @@
       });
 
       room.on_new_connection((connection) => {
+        isCallStarted = true;
         connection.on_remote_stream(async (stream) => {
           let videoDiv = document.getElementById("remote-videos");
           let video = document.createElement("video");
@@ -221,6 +239,11 @@
 
           await video.play();
         });
+      });
+
+      room.on_local_stream((stream) => {
+        updateLocalVideo(stream);
+        stream.free();
       });
 
       let connectionState = document.getElementById('connection-state__state');
@@ -250,29 +273,50 @@
 
       let muteAudio = document.getElementById('control__mute_audio');
       let muteVideo = document.getElementById('control__mute_video');
-      let isAudioMuted = false;
-      let isVideoMuted = false;
 
       muteAudio.addEventListener('click', async () => {
-        if(isAudioMuted) {
-          await room.unmute_audio();
-          isAudioMuted = false;
-          muteAudio.textContent = "Mute audio";
-        } else {
-          await room.mute_audio();
-          isAudioMuted = true;
-          muteAudio.textContent = "Unmute audio";
+        try {
+          if (isAudioMuted) {
+            if (isCallStarted) {
+              await room.unmute_audio();
+            }
+            isAudioMuted = false;
+            muteAudio.textContent = "Mute audio";
+          } else {
+            if (isCallStarted) {
+              await room.mute_audio();
+              if (localStream && localStream.ptr > 0 ){
+                localStream.free_audio();
+              }
+            }
+            isAudioMuted = true;
+            muteAudio.textContent = "Unmute audio";
+          }
+        } catch (e) {
+          console.error(e.message());
         }
       });
       muteVideo.addEventListener('click', async () => {
-        if(isVideoMuted) {
-          await room.unmute_video();
-          isVideoMuted = false;
-          muteVideo.textContent = "Mute video";
-        } else {
-          await room.mute_video();
-          isVideoMuted = true;
-          muteVideo.textContent = "Unmute video";
+        try {
+          if (isVideoMuted) {
+            if (!isCallStarted) {
+              const constraints = await build_constraints(audioSelect, videoSelect);
+              localStream = await jason.media_manager().init_local_stream(constraints)
+              await updateLocalVideo(localStream);
+            }
+            await room.unmute_video();
+            isVideoMuted = false;
+            muteVideo.textContent = "Mute video";
+          } else {
+            await room.mute_video();
+            if (localStream && localStream.ptr > 0 ){
+              localStream.free_video();
+            }
+            isVideoMuted = true;
+            muteVideo.textContent = "Unmute video";
+          }
+        } catch (e) {
+          console.error(e.message());
         }
       });
 
@@ -320,12 +364,13 @@
         videoCallDiv.style.display = "";
 
         try {
-          const stream = await getStream(audioSelect, videoSelect);
-          await updateLocalVideo(stream);
-          await getDevices(audioSelect, videoSelect, stream);
-          room.inject_local_stream(stream);
+          const constraints = await build_constraints(audioSelect, videoSelect);
+          localStream = await jason.media_manager().init_local_stream(constraints)
+          await updateLocalVideo(localStream);
+          await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+          await room.set_local_media_settings(constraints);
         } catch (e) {
-          logError("Init local video failed", e);
+          console.error("Init local video failed: " + e.message());
         }
 
       } else {
@@ -336,12 +381,13 @@
           bindJoinButtons(roomId);
 
           try {
-            const stream = await getStream(audioSelect, videoSelect);
-            await updateLocalVideo(stream);
-            await getDevices(audioSelect, videoSelect, stream);
-            room.inject_local_stream(stream);
+            const constraints = await build_constraints(audioSelect, videoSelect);
+            localStream = await jason.media_manager().init_local_stream(constraints)
+            await updateLocalVideo(localStream);
+            await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+            await room.set_local_media_settings(constraints);
           } catch (e) {
-            logError("Init local video failed", e);
+            console.error("Init local video failed: " + e.message());
           }
 
           chooseRoomDiv.style.display = "none";

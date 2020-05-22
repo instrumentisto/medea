@@ -46,6 +46,9 @@ All user visible changes to this project will be documented in this file. This p
     - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
     - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
+    - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
+        - `max_lag`;
+        - `init_timeout`.
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -66,6 +69,7 @@ All user visible changes to this project will be documented in this file. This p
 [#86]: /../../pull/86
 [#94]: /../../pull/94
 [#95]: /../../pull/95
+[#98]: /../../pull/98
 
 
 
