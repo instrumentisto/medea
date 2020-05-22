@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, stream, stream::LocalBoxStream};
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -27,16 +27,16 @@ fn get_test_room_and_exist_peer(
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
     let (tx, _rx) = mpsc::unbounded();
-    let peer = Rc::new(
-        PeerConnection::new(
-            PeerId(1),
-            tx,
-            vec![],
-            Rc::new(MediaManager::default()),
-            false,
-        )
-        .unwrap(),
-    );
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        vec![],
+        Box::pin(stream::pending()),
+        Box::pin(stream::pending()),
+        Rc::new(MediaManager::default()),
+        false,
+    )
+    .unwrap();
 
     let (event_tx, event_rx) = mpsc::unbounded();
     let peer_clone = Rc::clone(&peer);
@@ -313,28 +313,34 @@ fn get_test_room_and_new_peer(
         .return_once(move || Box::pin(event_rx));
     repo.expect_get_all().returning(|| vec![]);
     let (tx, _rx) = mpsc::unbounded();
-    let peer = Rc::new(
-        PeerConnection::new(
-            PeerId(1),
-            tx,
-            vec![],
-            Rc::new(MediaManager::default()),
-            false,
-        )
-        .unwrap(),
-    );
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        vec![],
+        Box::pin(stream::pending()),
+        Box::pin(stream::pending()),
+        Rc::new(MediaManager::default()),
+        false,
+    )
+    .unwrap();
     let peer_clone = Rc::clone(&peer);
     repo.expect_create_peer()
         .withf(
             move |id: &PeerId,
                   _ice_servers: &Vec<IceServer>,
                   _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
+                  _on_connection_loss_stream: &LocalBoxStream<'static, ()>,
+                  _on_state_restored_stream: &LocalBoxStream<'static, ()>,
                   _is_force_relay: &bool| { *id == PeerId(1) },
         )
-        .return_once_st(move |_, _, _, _| Ok(peer_clone));
+        .return_once_st(move |_, _, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -525,6 +531,10 @@ async fn error_join_room_without_on_failed_stream_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -561,6 +571,10 @@ async fn error_join_room_without_on_connection_loss_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_state_restored()
+        .returning(|| Box::pin(stream::pending()));
+    rpc.expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -586,7 +600,7 @@ async fn error_join_room_without_on_connection_loss_callback() {
 mod on_close_callback {
     use std::rc::Rc;
 
-    use futures::channel::mpsc;
+    use futures::{channel::mpsc, stream};
     use medea_client_api_proto::CloseReason as CloseByServerReason;
     use medea_jason::{
         api::Room,
@@ -626,6 +640,10 @@ mod on_close_callback {
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
         rpc.expect_set_close_reason().return_const(());
+        rpc.expect_on_state_restored()
+            .returning(|| Box::pin(stream::pending()));
+        rpc.expect_on_connection_loss()
+            .returning(|| Box::pin(stream::pending()));
 
         Room::new(Rc::new(rpc), repo)
     }
@@ -732,6 +750,10 @@ mod rpc_close_reason_on_room_drop {
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
+        rpc.expect_on_state_restored()
+            .returning(|| Box::pin(stream::pending()));
+        rpc.expect_on_connection_loss()
+            .returning(|| Box::pin(stream::pending()));
         let (test_tx, test_rx) = oneshot::channel();
         rpc.expect_set_close_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
@@ -850,16 +872,16 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let peer = Rc::new(
-                PeerConnection::new(
-                    peer_id,
-                    tx,
-                    vec![],
-                    Rc::new(MediaManager::default()),
-                    false,
-                )
-                .unwrap(),
-            );
+            let peer = PeerConnection::new(
+                peer_id,
+                tx,
+                vec![],
+                Box::pin(stream::pending()),
+                Box::pin(stream::pending()),
+                Rc::new(MediaManager::default()),
+                false,
+            )
+            .unwrap();
 
             peer.get_offer(tracks, None).await.unwrap();
 
@@ -878,6 +900,10 @@ mod patches_generation {
         rpc.expect_send_command().returning(move |command| {
             command_tx.unbounded_send(command).unwrap();
         });
+        rpc.expect_on_state_restored()
+            .returning(|| Box::pin(stream::pending()));
+        rpc.expect_on_connection_loss()
+            .returning(|| Box::pin(stream::pending()));
         rpc.expect_subscribe()
             .return_once(move || Box::pin(futures::stream::pending()));
         rpc.expect_unsub().return_once(|| ());
