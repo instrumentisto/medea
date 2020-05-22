@@ -402,7 +402,8 @@ ifeq ($(up),yes)
 	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
-	                     TAG=$(TAG) registry=$(registry)
+	                     TAG=$(TAG) registry=$(registry) \
+	                     logfile=$(logfile)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -711,8 +712,12 @@ ifeq ($(log),yes)
 endif
 endif
 else
+ifeq ($(logfile),yes)
+	rm -f /tmp/medea.log
+endif
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
+		$(if $(call eq,$(logfile),yes),> /tmp/medea.log,) \
 		$(if $(call eq,$(background),yes),&,)
 endif
 

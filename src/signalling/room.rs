@@ -52,7 +52,10 @@ use crate::{
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{
-            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            endpoints::{
+                webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+                Endpoint,
+            },
             member::MemberError,
             Member, MembersLoadError,
         },
@@ -688,7 +691,7 @@ impl Room {
         let member_id = renegotiation_peer.member_id();
         let peer_id = renegotiation_peer.id();
 
-        println!("\n\nOfferer: {:?}\n\n", member_id);
+        debug!("Offerer MemberId: {}", member_id);
 
         Ok(Box::pin(self.members.send_event_to_member(
             member_id,
@@ -971,18 +974,26 @@ impl Handler<SerializeProto> for Room {
                     serialized.insert(fid, member.into());
                 }
                 StatefulFid::Endpoint(endpoint_fid) => {
-                    let fut = self.renegotiate_peer(PeerId(1)).unwrap();
-                    ctx.spawn(
-                        async move {
-                            fut.await.unwrap();
-                        }
-                        .into_actor(self),
-                    );
                     let member =
                         self.members.get_member(endpoint_fid.member_id())?;
                     let endpoint = member.get_endpoint_by_id(
                         endpoint_fid.endpoint_id().to_string(),
                     )?;
+                    let peer_id = match &endpoint {
+                        Endpoint::WebRtcPublishEndpoint(publish) => {
+                            publish.peer_ids().iter().next().map(|id| *id)
+                        }
+                        Endpoint::WebRtcPlayEndpoint(play) => play.peer_id(),
+                    };
+                    if let Some(peer_id) = peer_id {
+                        let fut = self.renegotiate_peer(peer_id).unwrap();
+                        ctx.spawn(
+                            async move {
+                                fut.await.unwrap();
+                            }
+                            .into_actor(self),
+                        );
+                    }
                     serialized.insert(fid, endpoint.into());
                 }
             }
