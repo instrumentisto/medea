@@ -33,12 +33,13 @@ use crate::{
     utils::{console_error, JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
+use futures::stream::LocalBoxStream;
+use wasm_bindgen_futures::spawn_local;
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
-pub use self::repo::{PeerRepository, Repository};
 pub use self::{
     conn::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
@@ -48,12 +49,11 @@ pub use self::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, Sender, StableMuteState,
     },
+    repo::{PeerRepository, Repository},
     stats::RtcStats,
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
-use futures::stream::LocalBoxStream;
-use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
