@@ -19,7 +19,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, StreamExt};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
@@ -52,6 +52,8 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
+use futures::stream::LocalBoxStream;
+use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -232,9 +234,11 @@ impl PeerConnection {
         id: Id,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
+        on_connection_loss_stream: LocalBoxStream<'static, ()>,
+        on_state_restored_stream: LocalBoxStream<'static, ()>,
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
-    ) -> Result<Self> {
+    ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
                 .map_err(tracerr::map_from_and_wrap!())?,
@@ -301,7 +305,52 @@ impl PeerConnection {
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
+        let peer = Rc::new(peer);
+
+        Self::spawn_on_connection_loss_stream(&peer, on_connection_loss_stream);
+        Self::spawn_on_state_restored_stream(&peer, on_state_restored_stream);
+
         Ok(peer)
+    }
+
+    /// Spawns state restoring event listener.
+    ///
+    /// On every state restoring, [`MediaConnections::unfreeze_timers`] will be
+    /// called.
+    fn spawn_on_state_restored_stream(
+        peer: &Rc<Self>,
+        mut on_state_restored_stream: LocalBoxStream<'static, ()>,
+    ) {
+        let this_weak = Rc::downgrade(&peer);
+        spawn_local(async move {
+            while let Some(_) = on_state_restored_stream.next().await {
+                if let Some(this) = this_weak.upgrade() {
+                    this.media_connections.unfreeze_timers();
+                } else {
+                    break;
+                }
+            }
+        });
+    }
+
+    /// Spawns connection loss event listener.
+    ///
+    /// On every connection loss, [`MediaConnections::freeze_timers`] will be
+    /// called.
+    fn spawn_on_connection_loss_stream(
+        peer: &Rc<Self>,
+        mut on_connection_loss_stream: LocalBoxStream<'static, ()>,
+    ) {
+        let this_weak = Rc::downgrade(&peer);
+        spawn_local(async move {
+            while let Some(_) = on_connection_loss_stream.next().await {
+                if let Some(this) = this_weak.upgrade() {
+                    this.media_connections.freeze_timers();
+                } else {
+                    break;
+                }
+            }
+        });
     }
 
     /// Filters out already sent stats, and send new statss from

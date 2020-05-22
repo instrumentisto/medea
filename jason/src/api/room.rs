@@ -744,6 +744,8 @@ impl EventHandler for InnerRoom {
                 peer_id,
                 ice_servers,
                 self.peer_event_sender.clone(),
+                self.rpc.on_connection_loss(),
+                self.rpc.on_state_restored(),
                 is_force_relayed,
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))

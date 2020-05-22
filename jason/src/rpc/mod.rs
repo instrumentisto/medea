@@ -312,6 +312,13 @@ pub trait RpcClient {
     /// [`Stream`]: futures::Stream
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
+    /// Returns [`Stream`] to which will be send `()` on every [`RoomSnapshot`]
+    /// restore.
+    ///
+    /// [`RoomSnapshot`] restoring occurs after all reconnections of this
+    /// [`RpcClient`].
+    fn on_state_restored(&self) -> LocalBoxStream<'static, ()>;
+
     /// Returns current token with which this [`RpcClient`] was connected.
     ///
     /// If token is `None` then [`RpcClient`] never was connected to a server.
@@ -365,6 +372,9 @@ struct Inner {
     /// Senders for [`RpcClient::on_connection_loss`] subscribers.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
+    /// Senders for [`RpcClient::on_state_restored`] subscribers.
+    on_state_restored_subs: Vec<mpsc::UnboundedSender<()>>,
+
     /// Closure which will create new [`RpcTransport`]s for this [`RpcClient`]
     /// on every [`WebSocketRpcClient::establish_connection`] call.
     rpc_transport_factory: RpcTransportFactory,
@@ -401,6 +411,7 @@ impl Inner {
             heartbeat: None,
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             on_connection_loss_subs: Vec::new(),
+            on_state_restored_subs: Vec::new(),
             rpc_transport_factory,
             token: None,
             on_state_change_subs: Vec::new(),
@@ -647,6 +658,15 @@ impl WebSocketRpcClient {
         });
 
         self.0.borrow_mut().sock.replace(transport);
+
+        self.0
+            .borrow_mut()
+            .on_state_restored_subs
+            .iter()
+            .for_each(|sub| {
+                let _ = sub.unbounded_send(());
+            });
+
         Ok(())
     }
 
@@ -778,6 +798,13 @@ impl RpcClient for WebSocketRpcClient {
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_subs.push(tx);
+
+        Box::pin(rx)
+    }
+
+    fn on_state_restored(&self) -> LocalBoxStream<'static, ()> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_state_restored_subs.push(tx);
 
         Box::pin(rx)
     }

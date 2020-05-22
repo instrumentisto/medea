@@ -19,7 +19,7 @@ use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::PeerEvent,
-    utils::{delay_for, JsCaused, JsError},
+    utils::{freezeable_delay_for, FreezeableDelayHandle, JsCaused, JsError},
 };
 
 use super::{
@@ -446,6 +446,28 @@ impl MediaConnections {
                 inner.receivers.get(&id).and_then(|recv| recv.track.clone())
             })
     }
+
+    /// Freezes all [`Sender`]s mute/unmute timeouts.
+    ///
+    /// Countdown of this timeouts will be started from the beginning.
+    pub fn freeze_timers(&self) {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .for_each(|sender| sender.freeze_timeout());
+    }
+
+    /// Unfreezes all [`Sender`]s mute/unmute timeouts.
+    ///
+    /// Countdown of this timeouts will start from the beginning.
+    pub fn unfreeze_timers(&self) {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .for_each(|sender| sender.unfreeze_timeout());
+    }
 }
 
 /// Representation of a local [`MediaStreamTrack`] that is being sent to some
@@ -456,6 +478,7 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
+    mute_timeout_handle: RefCell<Option<FreezeableDelayHandle>>,
 }
 
 impl Sender {
@@ -490,6 +513,7 @@ impl Sender {
             track: RefCell::new(None),
             transceiver,
             mute_state,
+            mute_timeout_handle: RefCell::new(None),
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -523,12 +547,15 @@ impl Sender {
                             spawn_local(async move {
                                 let mut transitions =
                                     this.mute_state.subscribe().skip(1);
-                                let timeout = Box::pin(delay_for(
-                                    Duration::from_secs(10).into(),
-                                ));
+                                let (timeout, timeout_handle) =
+                                    freezeable_delay_for(Duration::from_secs(
+                                        10,
+                                    ));
+                                *this.mute_timeout_handle.borrow_mut() =
+                                    Some(timeout_handle);
                                 match future::select(
                                     transitions.next(),
-                                    timeout,
+                                    Box::pin(timeout),
                                 )
                                 .await
                                 {
@@ -554,6 +581,22 @@ impl Sender {
         });
 
         Ok(this)
+    }
+
+    /// Freezes mute/unmute timeout of this [`Sender`].
+    pub fn freeze_timeout(&self) {
+        if let Some(resetable_timer) = &*self.mute_timeout_handle.borrow() {
+            resetable_timer.freeze();
+        }
+    }
+
+    /// Freezes mute/unmute timeout of this [`Sender`].
+    ///
+    /// Countdown of the mute/unmute timeout will be started from beginning.
+    pub fn unfreeze_timeout(&self) {
+        if let Some(resetable_timer) = &*self.mute_timeout_handle.borrow() {
+            resetable_timer.unfreeze();
+        }
     }
 
     /// Returns [`TrackId`] of this [`Sender`].
