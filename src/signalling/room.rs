@@ -688,6 +688,8 @@ impl Room {
         let member_id = renegotiation_peer.member_id();
         let peer_id = renegotiation_peer.id();
 
+        println!("\n\nOfferer: {:?}\n\n", member_id);
+
         Ok(Box::pin(self.members.send_event_to_member(
             member_id,
             Event::RenegotiationStarted { peer_id },
