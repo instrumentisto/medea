@@ -587,13 +587,11 @@ impl RtcPeerConnection {
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(
-            peer.create_offer(),
-        )
-        .await
-        .map_err(Into::into)
-        .map_err(RTCPeerConnectionError::CreateOfferFailed)
-        .map_err(tracerr::wrap!())?;
+        let create_offer = JsFuture::from(peer.create_offer())
+            .await
+            .map_err(Into::into)
+            .map_err(RTCPeerConnectionError::CreateOfferFailed)
+            .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);

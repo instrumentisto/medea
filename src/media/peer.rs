@@ -4,14 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings, PeerConnectionState,
+    AudioSettings, Direction, IceServer, MediaType, PeerConnectionState,
+    PeerId as Id, Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
