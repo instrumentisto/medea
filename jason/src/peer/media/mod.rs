@@ -482,6 +482,11 @@ pub struct Sender {
 }
 
 impl Sender {
+    #[cfg(not(feature = "mockable"))]
+    const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
+    #[cfg(feature = "mockable")]
+    const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
+
     /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`,
     /// otherwise retrieves existing [`RtcRtpTransceiver`] via provided `mid`
     /// from a provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`]
@@ -548,9 +553,9 @@ impl Sender {
                                 let mut transitions =
                                     this.mute_state.subscribe().skip(1);
                                 let (timeout, timeout_handle) =
-                                    freezeable_delay_for(Duration::from_secs(
-                                        10,
-                                    ));
+                                    freezeable_delay_for(
+                                        Self::MUTE_TRANSITION_TIMEOUT,
+                                    );
                                 *this.mute_timeout_handle.borrow_mut() =
                                     Some(timeout_handle);
                                 match future::select(

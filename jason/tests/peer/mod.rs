@@ -855,3 +855,103 @@ mod peer_stats_caching {
         assert_eq!(first_rtc_stats.0[0], stat);
     }
 }
+
+/// Tests which checks that all timeouts for the mute/unmute mechanism
+/// will be freezed on connection loss and started again after reconnection.
+mod mute_unmute_freezing_on_connection_loss {
+    use std::time::Duration;
+
+    use futures::future;
+    use medea_jason::{
+        peer::{StableMuteState, TransceiverKind},
+        utils::delay_for,
+    };
+
+    use super::*;
+
+    /// Checks that when all [`Sender`]s are muting and connection was lost,
+    /// timeouts of a mute state rollback will be freezed.
+    #[wasm_bindgen_test]
+    async fn connection_loss() {
+        let (tx, _) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+        let (audio_track, video_track) = get_test_tracks(false, false);
+        let id = PeerId(1);
+        let (connection_loss, connection_loss_stream) = mpsc::unbounded();
+        let peer = PeerConnection::new(
+            id,
+            tx,
+            vec![],
+            Box::pin(connection_loss_stream),
+            Box::pin(stream::pending()),
+            manager,
+            false,
+        )
+        .unwrap();
+        peer.get_offer(vec![audio_track, video_track], None)
+            .await
+            .unwrap();
+
+        let all_unmuted = future::join_all(
+            peer.get_senders(TransceiverKind::Audio)
+                .into_iter()
+                .chain(peer.get_senders(TransceiverKind::Video).into_iter())
+                .map(|s| {
+                    s.mute_state_transition_to(StableMuteState::Muted);
+
+                    s.when_mute_state_stable(StableMuteState::NotMuted)
+                }),
+        );
+
+        delay_for(Duration::from_millis(400).into()).await;
+        connection_loss.unbounded_send(()).unwrap();
+        await_with_timeout(Box::pin(all_unmuted), 600)
+            .await
+            .unwrap_err();
+    }
+
+    /// Checks that timeouts of a [`Sender`] when it waiting for mute will be
+    /// unfreezed after RPC connection reconnection.
+    #[wasm_bindgen_test]
+    async fn connection_restore() {
+        let (tx, _) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+        let (audio_track, video_track) = get_test_tracks(false, false);
+        let id = PeerId(1);
+        let (connection_loss, connection_loss_stream) = mpsc::unbounded();
+        let (state_restored, state_restored_stream) = mpsc::unbounded();
+        let peer = PeerConnection::new(
+            id,
+            tx,
+            vec![],
+            Box::pin(connection_loss_stream),
+            Box::pin(state_restored_stream),
+            manager,
+            false,
+        )
+        .unwrap();
+        peer.get_offer(vec![audio_track, video_track], None)
+            .await
+            .unwrap();
+
+        let futs = peer
+            .get_senders(TransceiverKind::Audio)
+            .into_iter()
+            .chain(peer.get_senders(TransceiverKind::Video).into_iter())
+            .map(|s| {
+                s.mute_state_transition_to(StableMuteState::Muted);
+
+                s.when_mute_state_stable(StableMuteState::NotMuted)
+            })
+            .collect::<Vec<_>>();
+        let all_unmuted = future::join_all(futs);
+
+        connection_loss.unbounded_send(()).unwrap();
+        delay_for(Duration::from_millis(30).into()).await;
+        state_restored.unbounded_send(()).unwrap();
+
+        await_with_timeout(Box::pin(all_unmuted), 600)
+            .await
+            .unwrap();
+    }
+}
