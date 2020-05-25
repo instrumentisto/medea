@@ -14,11 +14,8 @@ use actix::{
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::{future::LocalBoxFuture, FutureExt};
-use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
-};
+use futures::{future::LocalBoxFuture, FutureExt, future};
+use medea_client_api_proto::{Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId, TrackPatch, PeerConnectionState};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -698,6 +695,71 @@ impl Room {
             Event::RenegotiationStarted { peer_id },
         )))
     }
+
+    /// Updates specified [`Peer`] connection state.
+    ///
+    /// Initiates ICE restart if new connection state is
+    /// [`PeerConnectionState::Failed`], previous connection state is
+    /// [`PeerConnectionState::Connected`] or
+    /// [`PeerConnectionState::Disconnected`] and connected [`Peer`] connection
+    /// state is [`PeerConnectionState::Connected`] or
+    /// [`PeerConnectionState::Disconnected`].
+    fn update_peer_connection_state(
+        &mut self,
+        peer_id: PeerId,
+        new_state: PeerConnectionState,
+    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+        use PeerConnectionState::*;
+        let peer = match self.peers.get_peer_by_id(peer_id) {
+            Ok(peer) => peer,
+            Err(err) => return future::err(err).boxed_local(),
+        };
+
+        let old_state: PeerConnectionState = peer.connection_state();
+
+        // check whether state really changed
+        if let (Failed, Disconnected) = (old_state, new_state) {
+            // Failed => Disconnected is still Failed
+            return future::ok(()).boxed_local();
+        } else {
+            peer.set_connection_state(new_state);
+        }
+
+        // maybe init ICE restart
+        match new_state {
+            Failed => match old_state {
+                Connected | Disconnected => {
+                    let connected_peer_state: PeerConnectionState =
+                        match self.peers.get_peer_by_id(peer.partner_peer_id())
+                        {
+                            Ok(peer) => peer.connection_state(),
+                            Err(err) => return future::err(err).boxed_local(),
+                        };
+
+                    if let Failed = connected_peer_state {
+                        match self.peers.take_inner_peer::<Stable>(peer_id) {
+                            Ok(peer) => {
+                                let member_id = peer.member_id();
+                                self.peers.add_peer(peer.start_renegotiation());
+
+                                self.members.send_event_to_member(
+                                    member_id,
+                                    Event::RenegotiationStarted {
+                                        peer_id,
+                                    },
+                                )
+                            }
+                            Err(err) => future::err(err).boxed_local(),
+                        }
+                    } else {
+                        future::ok(()).boxed_local()
+                    }
+                }
+                _ => future::ok(()).boxed_local(),
+            },
+            _ => future::ok(()).boxed_local(),
+        }
+    }
 }
 
 impl RpcServer for Addr<Room> {
@@ -785,12 +847,18 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = Event::PeerCreated {
-            peer_id: to_peer.id(),
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-            ice_servers,
-            force_relay: to_peer.is_force_relayed(),
+        let event = match from_peer.connection_state() {
+            PeerConnectionState::Failed | PeerConnectionState::Connected => Event::SdpOfferMade {
+                peer_id: to_peer.id(),
+                sdp_offer,
+            },
+            _ => Event::PeerCreated {
+                peer_id: to_peer.id(),
+                sdp_offer: Some(sdp_offer),
+                tracks: to_peer.tracks(),
+                ice_servers,
+                force_relay: to_peer.is_force_relayed(),
+            },
         };
 
         self.peers.add_peer(from_peer);
@@ -869,10 +937,23 @@ impl CommandHandler for Room {
     /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        _: PeerId,
-        _: PeerMetrics,
+        peer_id: PeerId,
+        metrics: PeerMetrics,
     ) -> Self::Output {
-        Ok(Box::new(actix::fut::ok(())))
+        use PeerMetrics::*;
+
+        Ok(Box::new(
+            match metrics {
+                IceConnectionState(state) => {
+                    self.update_peer_connection_state(peer_id, state.into())
+                }
+                PeerConnectionState(state) => {
+                    self.update_peer_connection_state(peer_id, state)
+                }
+                RtcStats(_) => future::ok(()).boxed_local(),
+            }
+            .into_actor(self),
+        ))
     }
 
     /// Sends [`Event::TracksUpdated`] with data from the received

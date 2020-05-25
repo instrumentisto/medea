@@ -5,12 +5,13 @@
 #![allow(clippy::use_self)]
 
 use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::cell::RefCell;
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings,
+    TrackId, VideoSettings, PeerConnectionState,
 };
 use medea_macro::enum_delegate;
 
@@ -83,6 +84,13 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(pub fn is_offerer(&self) -> bool)]
+#[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
+#[enum_delegate(
+    pub fn set_connection_state(
+        &self,
+        state: PeerConnectionState
+    )
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -169,6 +177,8 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
     is_offerer: bool,
+    connection_state: RefCell<PeerConnectionState>,
+    is_renegotiates: bool,
 }
 
 /// [RTCPeerConnection] representation.
@@ -257,6 +267,16 @@ impl<T> Peer<T> {
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s
     pub fn set_ice_user(&mut self, ice_user: IceUser) {
         self.context.ice_user.replace(ice_user);
+    }
+
+    /// Changes [`Peer`]'s connection state.
+    pub fn set_connection_state(&self, state: PeerConnectionState) {
+        self.context.connection_state.replace(state);
+    }
+
+    /// Returns [`Peer`] current connection state.
+    pub fn connection_state(&self) -> PeerConnectionState {
+        *self.context.connection_state.borrow()
     }
 
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
@@ -385,6 +405,8 @@ impl Peer<Stable> {
             is_force_relayed,
             endpoints: Vec::new(),
             is_offerer,
+            connection_state: RefCell::new(PeerConnectionState::New),
+            is_renegotiates: false,
         };
         Self {
             context,
