@@ -8,7 +8,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
-    RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
+    RtcIceConnectionState, RtcIceTransportPolicy,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,

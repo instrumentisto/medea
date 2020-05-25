@@ -559,6 +559,22 @@ impl PeerConnection {
         Ok(offer)
     }
 
+    /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
+    /// [`RtcPeerConnection`] and sets it as local description.
+    ///
+    /// Should be called after local tracks changes, which require
+    /// renegotiation.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
+    /// [RtcPeerConnection.createOffer()][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn create_new_offer(&self) -> Result<String> {
         Ok(self
             .peer
@@ -776,6 +792,26 @@ impl PeerConnection {
         Ok(answer)
     }
 
+    /// Sets provided offer as remote offer.
+    ///
+    /// Creates answer and sets it as local description.
+    ///
+    /// Returns created answer.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// [RTCPeerConnection.setRemoteDescription()][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
+    /// [RtcPeerConnection.createAnswer()][2] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][3] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
+    /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn proccess_new_remote_offer(
         &self,
         offer: String,

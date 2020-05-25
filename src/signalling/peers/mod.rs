@@ -509,6 +509,28 @@ impl PeersService {
         peers_to_remove
     }
 
+    /// Starts renegotiation for a [`Peer`] with a provided [`PeerId`].
+    ///
+    /// Renegotiation process will be started on a offerer [`Peer`].
+    /// If you will provided non-offerer [`PeerId`] then offerer [`Peer`]
+    /// will be found and renegotiation will be started with the found offerer
+    /// [`Peer`]. So you should send [`Event::RenegotiationStarted`] not for
+    /// a [`Peer`] which you provided, but with [`Peer`] which was returned
+    /// from this function.
+    ///
+    /// # Panics
+    ///
+    /// If `Peer` with provided [`PeerId`] and it's partner both not offerer.
+    ///
+    /// If inserted `Peer` in [`WaitLocalSdp`] state isn't in this state.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    ///
+    /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
+    /// requested state.
     pub fn start_renegotiation(
         &mut self,
         peer_id: PeerId,
@@ -519,10 +541,10 @@ impl PeersService {
             self.peers.insert(peer_id, renegotiating_peer.into());
             match self.get_peer_by_id(peer_id).unwrap() {
                 PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
-                _ => {
-                    // TODO: normal message
-                    unreachable!()
-                }
+                _ => unreachable!(
+                    "Peer with WaitLocalSdp state was inserted into the \
+                     PeerService store, but different state was gotten."
+                ),
             }
         } else {
             let partner_peer = self.take_inner_peer(peer.partner_peer_id())?;
@@ -534,14 +556,16 @@ impl PeersService {
                 self.peers.insert(peer_id, peer.into());
                 match self.get_peer_by_id(renegotiating_peer_id).unwrap() {
                     PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
-                    _ => {
-                        // TODO: normal message
-                        unreachable!()
-                    }
+                    _ => unreachable!(
+                        "Peer with WaitLocalSdp state was inserted into the \
+                         PeerService store, but different state was gotten."
+                    ),
                 }
             } else {
-                // TODO: normal unerachable message
-                unreachable!()
+                unreachable!(
+                    "Offerer Peer not found in the Peer pair which is should \
+                     be unreal."
+                )
             }
         }
     }

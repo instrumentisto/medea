@@ -23,22 +23,28 @@ use crate::{
     },
 };
 
-/// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
+/// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
+///
+/// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
-pub struct WaitLocalSdp {}
+pub struct WaitLocalSdp;
 
-/// [`Peer`] has remote SDP and is waiting for local SDP.
+/// [`Peer`] has remote [SDP] and is waiting for local [SDP].
+///
+/// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
-pub struct WaitLocalHaveRemote {}
+pub struct WaitLocalHaveRemote;
 
-/// [`Peer`] has local SDP and is waiting for remote SDP.
+/// [`Peer`] has local [SDP] and is waiting for remote [SDP].
+///
+/// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
-pub struct WaitRemoteSdp {}
+pub struct WaitRemoteSdp;
 
 /// There is no negotiation happening atm. It may have ended or haven't started
 /// yet.
 #[derive(Debug, PartialEq)]
-pub struct Stable {}
+pub struct Stable;
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
 #[derive(Debug, Display, Fail)]
@@ -163,21 +169,50 @@ impl_peer_converts!(Stable);
 
 #[derive(Debug)]
 pub struct Context {
+    /// [`PeerId`] of this [`Peer`].
     id: Id,
+
+    /// [`MemberId`] of a [`Member`] which owns this [`Peer`].
     member_id: MemberId,
+
+    /// [`PeerId`] of a partner [`Peer`].
     partner_peer: Id,
+
+    /// [`MemberId`] of a partner [`Peer`]'s owner.
     partner_member: MemberId,
+
+    /// [`IceUser`] created for this [`Peer`].
     ice_user: Option<IceUser>,
+
+    /// [SDP] offer of this [`Peer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
     sdp_offer: Option<String>,
+
+    /// [SDP] answer of this [`Peer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
     sdp_answer: Option<String>,
+
+    /// All [`MediaTrack`]s with a `Recv` direction`.
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
+
+    /// All [`MediaTrack`]s with a `Send` direction.
     senders: HashMap<TrackId, Rc<MediaTrack>>,
+
+    /// If `true` then this [`Peer`] must be forcibly connected through TURN.
     is_force_relayed: bool,
+
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
+
+    /// Flag which indicates that this [`Peer`] is offerer.
+    ///
+    /// If `true` then this [`Peer`] should start renegotiation when it needed.
     is_offerer: bool,
+
+    /// Current [`PeerConnectionState`] of this [`Peer`]
     connection_state: RefCell<PeerConnectionState>,
-    is_renegotiates: bool,
 }
 
 /// [RTCPeerConnection] representation.
@@ -405,7 +440,6 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_offerer,
             connection_state: RefCell::new(PeerConnectionState::New),
-            is_renegotiates: false,
         };
         Self {
             context,
@@ -490,11 +524,17 @@ impl Peer<Stable> {
     }
 
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
-    /// SDP Offer and Answer.
+    /// [SDP] Offer and Answer.
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
     pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
         if !self.context.is_offerer {
-            // TODO: print error! message about it.
+            panic!(
+                "You're tried to start renegotiation of the Peer which isn't \
+                 offerer."
+            )
         }
+
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;

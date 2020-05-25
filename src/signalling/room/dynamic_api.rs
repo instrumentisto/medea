@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    ActorFuture as _, AsyncContext, Context, ContextFutureSpawner as _,
-    Handler, Message, WrapFuture as _,
+    ActorFuture as _, Context, ContextFutureSpawner as _, Handler, Message,
+    WrapFuture as _,
 };
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
@@ -24,10 +24,7 @@ use crate::{
     },
     log::prelude::*,
     signalling::elements::{
-        endpoints::{
-            webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            Endpoint,
-        },
+        endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         member::MemberError,
     },
 };
@@ -302,7 +299,7 @@ impl Handler<SerializeProto> for Room {
     fn handle(
         &mut self,
         msg: SerializeProto,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let mut serialized: HashMap<StatefulFid, proto::Element> =
             HashMap::new();
@@ -330,21 +327,6 @@ impl Handler<SerializeProto> for Room {
                     let endpoint = member.get_endpoint_by_id(
                         endpoint_fid.endpoint_id().to_string(),
                     )?;
-                    let peer_id = match &endpoint {
-                        Endpoint::WebRtcPublishEndpoint(publish) => {
-                            publish.peer_ids().iter().next().map(|id| *id)
-                        }
-                        Endpoint::WebRtcPlayEndpoint(play) => play.peer_id(),
-                    };
-                    if let Some(peer_id) = peer_id {
-                        let fut = self.renegotiate_peer(peer_id).unwrap();
-                        ctx.spawn(
-                            async move {
-                                fut.await.unwrap();
-                            }
-                            .into_actor(self),
-                        );
-                    }
                     serialized.insert(fid, endpoint.into());
                 }
             }
