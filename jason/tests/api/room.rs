@@ -932,7 +932,7 @@ mod patches_generation {
         let room_handle = room.new_handle();
 
         spawn_local(async move {
-            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
         });
 
         assert_eq!(
@@ -967,7 +967,7 @@ mod patches_generation {
         let room_handle = room.new_handle();
 
         spawn_local(async move {
-            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
         });
 
         let mut commands = HashMap::new();
@@ -1047,7 +1047,7 @@ mod patches_generation {
         let room_handle = room.new_handle();
 
         spawn_local(async move {
-            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
         });
 
         assert_eq!(
