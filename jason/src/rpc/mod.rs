@@ -657,15 +657,18 @@ impl WebSocketRpcClient {
             }
         });
 
-        self.0.borrow_mut().sock.replace(transport);
+        let is_reconnection =
+            self.0.borrow_mut().sock.replace(transport).is_some();
 
-        self.0
-            .borrow_mut()
-            .on_state_restored_subs
-            .iter()
-            .for_each(|sub| {
-                let _ = sub.unbounded_send(());
-            });
+        if is_reconnection {
+            self.0
+                .borrow_mut()
+                .on_state_restored_subs
+                .iter()
+                .for_each(|sub| {
+                    let _ = sub.unbounded_send(());
+                });
+        }
 
         Ok(())
     }

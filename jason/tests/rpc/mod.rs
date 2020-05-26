@@ -560,3 +560,97 @@ mod connect {
             .unwrap();
     }
 }
+
+/// Tests for the [`RpcClient::on_state_restored`] function.
+mod on_state_restored {
+    use crate::utils::{release_async_runtime, StreamMock};
+
+    use super::*;
+
+    /// Checks that [`RpcClient::on_state_restored`] doesn't fires on
+    /// first [`RpcClient`] connection.
+    #[wasm_bindgen_test]
+    async fn doesnt_fires_on_first_connection() {
+        let on_message_mock = StreamMock::new(Rc::new(|| {
+            Some(ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 5_000,
+                ping_interval_ms: 2_000,
+            }))
+        }));
+        let on_message_mock_clone = on_message_mock.clone();
+        let ws = WebSocketRpcClient::new(Box::new(move |_| {
+            let on_message_mock = on_message_mock_clone.clone();
+            Box::pin(async move {
+                let mut transport = MockRpcTransport::new();
+                transport.expect_on_message().times(3).returning_st(
+                    move || Box::pin(on_message_mock.get_stream()),
+                );
+                transport.expect_send().return_once(|_| Ok(()));
+                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_on_state_change().return_once(|| {
+                    stream::once(async { State::Open }).boxed()
+                });
+
+                Ok(Rc::new(transport) as Rc<dyn RpcTransport>)
+            })
+        }));
+
+        let mut on_state_restored_stream = ws.on_state_restored();
+        ws.connect(String::new()).await.unwrap();
+        await_with_timeout(Box::pin(on_state_restored_stream.next()), 10)
+            .await
+            .unwrap_err();
+    }
+
+    /// Checks that [`RpcClient::on_state_restored`] will fire on real
+    /// connection restore.
+    #[wasm_bindgen_test]
+    async fn fires_on_reconnection() {
+        let on_message_mock = StreamMock::new(Rc::new(|| {
+            Some(ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 5_000,
+                ping_interval_ms: 2_000,
+            }))
+        }));
+        let on_state_change_mock: StreamMock<State> =
+            StreamMock::new(Rc::new(|| Some(State::Open)));
+        let on_close_mock_clone = on_state_change_mock.clone();
+        let on_message_mock_clone = on_message_mock.clone();
+
+        let ws = WebSocketRpcClient::new(Box::new(move |_| {
+            let messages_mock = on_message_mock_clone.clone();
+            let on_close_mock = on_close_mock_clone.clone();
+            let on_close_stream = on_close_mock.get_stream();
+            Box::pin(async move {
+                let mut transport = MockRpcTransport::new();
+                transport
+                    .expect_on_message()
+                    .times(3)
+                    .returning_st(move || Box::pin(messages_mock.get_stream()));
+                transport.expect_send().return_once(|_| Ok(()));
+                transport.expect_set_close_reason().return_once(|_| ());
+                transport
+                    .expect_on_state_change()
+                    .return_once_st(move || Box::pin(on_close_stream));
+                let transport = Rc::new(transport);
+                Ok(transport as Rc<dyn RpcTransport>)
+            })
+        }));
+
+        let mut on_state_restored_stream = ws.on_state_restored();
+        ws.connect(String::new()).await.unwrap();
+
+        on_state_change_mock.send(State::Closed(ClosedStateReason::Idle));
+        // Release async runtime so State::Closed can be processed.
+        release_async_runtime().await;
+
+        on_state_change_mock.send(State::Open);
+        on_message_mock.send(ServerMsg::RpcSettings(RpcSettings {
+            idle_timeout_ms: 5_000,
+            ping_interval_ms: 2_000,
+        }));
+
+        ws.connect(String::new()).await.unwrap();
+        assert!(on_state_restored_stream.next().await.is_some());
+    }
+}
