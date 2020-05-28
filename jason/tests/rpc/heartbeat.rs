@@ -4,15 +4,16 @@ use std::{rc::Rc, time::Duration};
 
 use futures::{
     channel::{mpsc, oneshot},
-    stream, FutureExt, StreamExt,
+    stream, StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use medea_jason::rpc::{
-    Heartbeat, IdleTimeout, MockRpcTransport, PingInterval, RpcTransport,
+    websocket::MockRpcTransport, Heartbeat, IdleTimeout, PingInterval,
+    RpcTransport,
 };
 use wasm_bindgen_test::*;
 
-use crate::{await_with_timeout, resolve_after};
+use crate::{delay_for, timeout};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -45,17 +46,14 @@ async fn sends_pong_on_received_ping() {
     );
 
     on_message_tx.unbounded_send(ServerMsg::Ping(2)).unwrap();
-    await_with_timeout(
-        Box::pin(async move {
-            match test_rx.await.unwrap() {
-                ClientMsg::Pong(_) => (),
-                ClientMsg::Command(cmd) => {
-                    panic!("Received not pong message! Command: {:?}", cmd)
-                }
+    timeout(100, async move {
+        match test_rx.await.unwrap() {
+            ClientMsg::Pong(_) => (),
+            ClientMsg::Command(cmd) => {
+                panic!("Received not pong message! Command: {:?}", cmd)
             }
-        }),
-        100,
-    )
+        }
+    })
     .await
     .unwrap();
 }
@@ -81,10 +79,7 @@ async fn on_idle_works() {
         IdleTimeout(Duration::from_millis(100).into()),
     );
 
-    await_with_timeout(Box::pin(hb.on_idle().next()), 120)
-        .await
-        .unwrap()
-        .unwrap();
+    timeout(120, hb.on_idle().next()).await.unwrap().unwrap();
 }
 
 /// Tests that [`Heartbeat`] will try send [`ClientMsg::Pong`] if
@@ -116,11 +111,7 @@ async fn pre_sends_pong() {
         IdleTimeout(Duration::from_millis(100).into()),
     );
 
-    match await_with_timeout(on_message_rx.next().boxed(), 25)
-        .await
-        .unwrap()
-        .unwrap()
-    {
+    match timeout(25, on_message_rx.next()).await.unwrap().unwrap() {
         ClientMsg::Pong(n) => {
             assert_eq!(n, 1);
         }
@@ -147,6 +138,6 @@ async fn transport_is_dropped_when_hearbeater_is_dropped() {
     );
     assert!(Rc::strong_count(&transport) > 1);
     drop(hb);
-    resolve_after(100).await.unwrap();
+    delay_for(100).await;
     assert_eq!(Rc::strong_count(&transport), 1);
 }

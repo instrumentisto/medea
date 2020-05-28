@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use futures::{channel::mpsc, future, stream::LocalBoxStream};
+use futures::{channel::mpsc, future};
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -26,8 +26,6 @@ pub trait PeerRepository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
-        on_connection_loss_stream: LocalBoxStream<'static, ()>,
-        on_state_restored_stream: LocalBoxStream<'static, ()>,
         is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
@@ -102,16 +100,12 @@ impl PeerRepository for Repository {
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        on_connection_loss_stream: LocalBoxStream<'static, ()>,
-        on_state_restored_stream: LocalBoxStream<'static, ()>,
         is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = PeerConnection::new(
             id,
             peer_events_sender,
             ice_servers,
-            on_connection_loss_stream,
-            on_state_restored_stream,
             Rc::clone(&self.media_manager),
             is_force_relayed,
         )

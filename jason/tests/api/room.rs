@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use futures::{channel::mpsc, stream, stream::LocalBoxStream};
+use futures::{
+    channel::mpsc,
+    stream::{self, StreamExt as _},
+};
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -30,9 +33,7 @@ fn get_test_room_and_exist_peer(
     let peer = PeerConnection::new(
         PeerId(1),
         tx,
-        vec![],
-        Box::pin(stream::pending()),
-        Box::pin(stream::pending()),
+        Vec::new(),
         Rc::new(MediaManager::default()),
         false,
     )
@@ -49,6 +50,10 @@ fn get_test_room_and_exist_peer(
     repo.expect_get()
         .returning_st(move |_| Some(Rc::clone(&peer_clone)));
     rpc.expect_unsub().return_const(());
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
     rpc.expect_set_close_reason().return_const(());
     rpc.expect_send_command().returning(move |cmd| match cmd {
         Command::UpdateTracks {
@@ -311,14 +316,12 @@ fn get_test_room_and_new_peer(
 
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
-    repo.expect_get_all().returning(|| vec![]);
+    repo.expect_get_all().returning(|| Vec::new());
     let (tx, _rx) = mpsc::unbounded();
     let peer = PeerConnection::new(
         PeerId(1),
         tx,
-        vec![],
-        Box::pin(stream::pending()),
-        Box::pin(stream::pending()),
+        Vec::new(),
         Rc::new(MediaManager::default()),
         false,
     )
@@ -329,18 +332,16 @@ fn get_test_room_and_new_peer(
             move |id: &PeerId,
                   _ice_servers: &Vec<IceServer>,
                   _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
-                  _on_connection_loss_stream: &LocalBoxStream<'static, ()>,
-                  _on_state_restored_stream: &LocalBoxStream<'static, ()>,
                   _is_force_relay: &bool| { *id == PeerId(1) },
         )
-        .return_once_st(move |_, _, _, _, _, _| Ok(peer_clone));
+        .return_once_st(move |_, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
-    rpc.expect_on_state_restored()
-        .returning(|| Box::pin(stream::pending()));
     rpc.expect_on_connection_loss()
-        .returning(|| Box::pin(stream::pending()));
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -362,7 +363,7 @@ fn get_test_room_and_new_peer(
 //            peer_id: PeerId(1),
 //            sdp_offer: None,
 //            tracks: vec![audio_track, video_track],
-//            ice_servers: vec![],
+//            ice_servers: Vec::new(),
 //            force_relay: false,
 //        })
 //        .unwrap();
@@ -387,7 +388,7 @@ fn get_test_room_and_new_peer(
 //            peer_id: PeerId(1),
 //            sdp_offer: None,
 //            tracks: vec![audio_track, video_track],
-//            ice_servers: vec![],
+//            ice_servers: Vec::new(),
 //            force_relay: false,
 //        })
 //        .unwrap();
@@ -436,7 +437,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
             peer_id: PeerId(1),
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
-            ice_servers: vec![],
+            ice_servers: Vec::new(),
             force_relay: false,
         })
         .unwrap();
@@ -507,7 +508,7 @@ async fn error_get_local_stream_on_new_peer() {
             peer_id: PeerId(1),
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
-            ice_servers: vec![],
+            ice_servers: Vec::new(),
             force_relay: false,
         })
         .unwrap();
@@ -531,10 +532,10 @@ async fn error_join_room_without_on_failed_stream_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
-    rpc.expect_on_state_restored()
-        .returning(|| Box::pin(stream::pending()));
     rpc.expect_on_connection_loss()
-        .returning(|| Box::pin(stream::pending()));
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -571,10 +572,10 @@ async fn error_join_room_without_on_connection_loss_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
-    rpc.expect_on_state_restored()
-        .returning(|| Box::pin(stream::pending()));
     rpc.expect_on_connection_loss()
-        .returning(|| Box::pin(stream::pending()));
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -600,7 +601,7 @@ async fn error_join_room_without_on_connection_loss_callback() {
 mod on_close_callback {
     use std::rc::Rc;
 
-    use futures::{channel::mpsc, stream};
+    use futures::channel::mpsc;
     use medea_client_api_proto::CloseReason as CloseByServerReason;
     use medea_jason::{
         api::Room,
@@ -610,7 +611,7 @@ mod on_close_callback {
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_test::*;
 
-    use super::wait_and_check_test_result;
+    use super::*;
 
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
                                 closed.reason(); }")]
@@ -640,10 +641,10 @@ mod on_close_callback {
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
         rpc.expect_set_close_reason().return_const(());
-        rpc.expect_on_state_restored()
-            .returning(|| Box::pin(stream::pending()));
         rpc.expect_on_connection_loss()
-            .returning(|| Box::pin(stream::pending()));
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
 
         Room::new(Rc::new(rpc), repo)
     }
@@ -750,10 +751,10 @@ mod rpc_close_reason_on_room_drop {
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
-        rpc.expect_on_state_restored()
-            .returning(|| Box::pin(stream::pending()));
         rpc.expect_on_connection_loss()
-            .returning(|| Box::pin(stream::pending()));
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
         let (test_tx, test_rx) = oneshot::channel();
         rpc.expect_set_close_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
@@ -830,7 +831,7 @@ mod patches_generation {
     };
     use wasm_bindgen_futures::spawn_local;
 
-    use crate::await_with_timeout;
+    use crate::timeout;
 
     use super::*;
 
@@ -875,9 +876,7 @@ mod patches_generation {
             let peer = PeerConnection::new(
                 peer_id,
                 tx,
-                vec![],
-                Box::pin(stream::pending()),
-                Box::pin(stream::pending()),
+                Vec::new(),
                 Rc::new(MediaManager::default()),
                 false,
             )
@@ -900,14 +899,14 @@ mod patches_generation {
         rpc.expect_send_command().returning(move |command| {
             command_tx.unbounded_send(command).unwrap();
         });
-        rpc.expect_on_state_restored()
-            .returning(|| Box::pin(stream::pending()));
-        rpc.expect_on_connection_loss()
-            .returning(|| Box::pin(stream::pending()));
         rpc.expect_subscribe()
             .return_once(move || Box::pin(futures::stream::pending()));
         rpc.expect_unsub().return_once(|| ());
         rpc.expect_set_close_reason().return_once(|_| ());
+        rpc.expect_on_connection_loss()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
 
         (Room::new(Rc::new(rpc), repo), command_rx)
     }
@@ -1023,9 +1022,7 @@ mod patches_generation {
             JsFuture::from(room_handle.unmute_audio()).await.unwrap();
         });
 
-        assert!(await_with_timeout(Box::pin(command_rx.next()), 5)
-            .await
-            .is_err());
+        assert!(timeout(5, command_rx.next()).await.is_err());
     }
 
     /// Tests that [`Room`] will generate [`Command::UpdateTracks`] only for

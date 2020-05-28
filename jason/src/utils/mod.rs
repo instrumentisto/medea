@@ -5,7 +5,7 @@ mod errors;
 
 mod callback;
 mod event_listener;
-mod frezeable_delay;
+mod resettable_delay;
 
 use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
@@ -21,9 +21,10 @@ pub use self::{
     callback::{Callback, Callback2},
     errors::{
         console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
+        JsonParseError,
     },
     event_listener::{EventListener, EventListenerBindError},
-    frezeable_delay::{freezeable_delay_for, FreezeableDelayHandle},
+    resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
 
 /// Returns [`Window`] object.

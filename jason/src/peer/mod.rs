@@ -19,7 +19,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future, StreamExt};
+use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
@@ -33,8 +33,6 @@ use crate::{
     utils::{console_error, JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
-use futures::stream::LocalBoxStream;
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -234,8 +232,6 @@ impl PeerConnection {
         id: Id,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
-        on_connection_loss_stream: LocalBoxStream<'static, ()>,
-        on_state_restored_stream: LocalBoxStream<'static, ()>,
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
     ) -> Result<Rc<Self>> {
@@ -257,7 +253,7 @@ impl PeerConnection {
             peer_events_sender,
             sent_stats_cache: RefCell::new(HashMap::new()),
             has_remote_description: RefCell::new(false),
-            ice_candidates_buffer: RefCell::new(vec![]),
+            ice_candidates_buffer: RefCell::new(Vec::new()),
         };
 
         // Bind to `icecandidate` event.
@@ -305,52 +301,35 @@ impl PeerConnection {
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        let peer = Rc::new(peer);
-
-        Self::spawn_on_connection_loss_stream(&peer, on_connection_loss_stream);
-        Self::spawn_on_state_restored_stream(&peer, on_state_restored_stream);
-
-        Ok(peer)
+        Ok(Rc::new(peer))
     }
 
-    /// Spawns state restoring event listener.
+    /// Stops inner state transitions expiry timers.
     ///
-    /// On every state restoring, [`MediaConnections::unfreeze_timers`] will be
-    /// called.
-    fn spawn_on_state_restored_stream(
-        peer: &Rc<Self>,
-        mut on_state_restored_stream: LocalBoxStream<'static, ()>,
-    ) {
-        let this_weak = Rc::downgrade(&peer);
-        spawn_local(async move {
-            while let Some(_) = on_state_restored_stream.next().await {
-                if let Some(this) = this_weak.upgrade() {
-                    this.media_connections.unfreeze_timers();
-                } else {
-                    break;
-                }
-            }
-        });
+    /// Inner state transitions initiated via external APIs that can not be
+    /// performed immediately (must wait for Medea notification/approval) have
+    /// TTL, after which they are cancelled.
+    ///
+    /// In some cases you might want to stop expiry timers, e.g. when
+    /// connection to Medea is temporary lost.
+    ///
+    /// This currently affects only [`Senders`] mute/unmute transitions.
+    pub fn stop_state_transitions_timers(&self) {
+        self.media_connections.stop_state_transitions_timers()
     }
 
-    /// Spawns connection loss event listener.
+    /// Resets inner state transitions expiry timers.
     ///
-    /// On every connection loss, [`MediaConnections::freeze_timers`] will be
-    /// called.
-    fn spawn_on_connection_loss_stream(
-        peer: &Rc<Self>,
-        mut on_connection_loss_stream: LocalBoxStream<'static, ()>,
-    ) {
-        let this_weak = Rc::downgrade(&peer);
-        spawn_local(async move {
-            while let Some(_) = on_connection_loss_stream.next().await {
-                if let Some(this) = this_weak.upgrade() {
-                    this.media_connections.freeze_timers();
-                } else {
-                    break;
-                }
-            }
-        });
+    /// Inner state transitions initiated via external APIs that can not be
+    /// performed immediately (must wait for Medea notification/approval) have
+    /// TTL, after which they are cancelled.
+    ///
+    /// In some cases you might want to stop expiry timers, e.g. when
+    /// connection to Medea is temporary lost.
+    ///
+    /// This currently affects only [`Senders`] mute/unmute transitions.
+    pub fn reset_state_transitions_timers(&self) {
+        self.media_connections.reset_state_transitions_timers();
     }
 
     /// Filters out already sent stats, and send new statss from

@@ -19,7 +19,7 @@ use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::PeerEvent,
-    utils::{freezeable_delay_for, FreezeableDelayHandle, JsCaused, JsError},
+    utils::{resettable_delay_for, JsCaused, JsError, ResettableDelayHandle},
 };
 
 use super::{
@@ -447,26 +447,22 @@ impl MediaConnections {
             })
     }
 
-    /// Freezes all [`Sender`]s mute/unmute timeouts.
-    ///
-    /// Countdown of this timeouts will be started from the beginning.
-    pub fn freeze_timers(&self) {
+    /// Stops all [`Sender`]s state transitions expiry timers.
+    pub fn stop_state_transitions_timers(&self) {
         self.0
             .borrow()
             .senders
             .values()
-            .for_each(|sender| sender.freeze_timeout());
+            .for_each(|sender| sender.stop_mute_state_transition_timeout());
     }
 
-    /// Unfreezes all [`Sender`]s mute/unmute timeouts.
-    ///
-    /// Countdown of this timeouts will start from the beginning.
-    pub fn unfreeze_timers(&self) {
+    /// Resets all [`Sender`]s state transitions expiry timers.
+    pub fn reset_state_transitions_timers(&self) {
         self.0
             .borrow()
             .senders
             .values()
-            .for_each(|sender| sender.unfreeze_timeout());
+            .for_each(|sender| sender.reset_mute_state_transition_timeout());
     }
 }
 
@@ -478,7 +474,7 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
-    mute_timeout_handle: RefCell<Option<FreezeableDelayHandle>>,
+    mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
 }
 
 impl Sender {
@@ -553,11 +549,12 @@ impl Sender {
                                 let mut transitions =
                                     this.mute_state.subscribe().skip(1);
                                 let (timeout, timeout_handle) =
-                                    freezeable_delay_for(
+                                    resettable_delay_for(
                                         Self::MUTE_TRANSITION_TIMEOUT,
                                     );
-                                *this.mute_timeout_handle.borrow_mut() =
-                                    Some(timeout_handle);
+                                this.mute_timeout_handle
+                                    .borrow_mut()
+                                    .replace(timeout_handle);
                                 match future::select(
                                     transitions.next(),
                                     Box::pin(timeout),
@@ -588,19 +585,17 @@ impl Sender {
         Ok(this)
     }
 
-    /// Freezes mute/unmute timeout of this [`Sender`].
-    pub fn freeze_timeout(&self) {
-        if let Some(resetable_timer) = &*self.mute_timeout_handle.borrow() {
-            resetable_timer.freeze();
+    /// Stops mute/unmute timeout of this [`Sender`].
+    pub fn stop_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.stop();
         }
     }
 
-    /// Freezes mute/unmute timeout of this [`Sender`].
-    ///
-    /// Countdown of the mute/unmute timeout will be started from beginning.
-    pub fn unfreeze_timeout(&self) {
-        if let Some(resetable_timer) = &*self.mute_timeout_handle.borrow() {
-            resetable_timer.unfreeze();
+    /// Resets mute/unmute timeout of this [`Sender`].
+    pub fn reset_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.reset();
         }
     }
 
