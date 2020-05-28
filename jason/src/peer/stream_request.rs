@@ -144,7 +144,8 @@ impl SimpleStreamRequest {
                     return Err(tracerr::new!(InvalidAudioTrack));
                 }
             } else {
-                return Err(tracerr::new!(ExpectedAudioTracks));
+                // TODO: Maybe we should do something??
+                // return Err(tracerr::new!(ExpectedAudioTracks));
             }
         }
 
@@ -157,7 +158,8 @@ impl SimpleStreamRequest {
                     return Err(tracerr::new!(InvalidVideoTrack));
                 }
             } else {
-                return Err(tracerr::new!(ExpectedVideoTracks));
+                // TODO: Maybe we should do something??
+                // return Err(tracerr::new!(ExpectedVideoTracks));
             }
         }
 

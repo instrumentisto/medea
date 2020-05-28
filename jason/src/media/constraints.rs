@@ -122,18 +122,23 @@ pub enum MultiSourceMediaStreamConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    Device(SysMediaStreamConstraints),
+    Device(MediaConstrains),
 
     /// Only [getDisplayMedia()][1] request is required.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    Display(SysMediaStreamConstraints),
+    Display(MediaConstrains),
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
+    DeviceAndDisplay(MediaConstrains),
+}
+
+pub struct MediaConstrains {
+    pub audio: Option<SysMediaStreamConstraints>,
+    pub video: Option<SysMediaStreamConstraints>,
 }
 
 /// TL;DR:
@@ -149,49 +154,129 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
     fn from(constraints: MediaStreamSettings) -> Self {
         use MultiSourceMediaStreamConstraints as C;
 
-        let mut sys_constraints = SysMediaStreamConstraints::new();
+        let mut video_constraints = SysMediaStreamConstraints::new();
         let video = match constraints.video {
             Some(video) => match video.0 {
                 Some(StreamSource::Device(device)) => {
-                    sys_constraints
-                        .video(&SysMediaTrackConstraints::from(device).into());
-                    Some(StreamSource::Device(sys_constraints))
+                    video_constraints.video(&SysMediaTrackConstraints::from(device).into());
+                    Some(StreamSource::Device(video_constraints))
                 }
                 Some(StreamSource::Display(display)) => {
-                    sys_constraints
-                        .video(&SysMediaTrackConstraints::from(display).into());
-                    Some(StreamSource::Display(sys_constraints))
+                    video_constraints.video(&SysMediaTrackConstraints::from(display).into());
+                    Some(StreamSource::Display(video_constraints))
                 }
                 None => {
-                    // defaults to device video
-                    sys_constraints
-                        .video(&SysMediaTrackConstraints::new().into());
-                    Some(StreamSource::Device(sys_constraints))
+                    video_constraints.video(&SysMediaTrackConstraints::new().into());
+                    Some(StreamSource::Device(video_constraints))
                 }
-            },
+            }
             None => None,
         };
 
+        let mut audio_constraints = SysMediaStreamConstraints::new();
         match (constraints.audio, video) {
-            (Some(audio), Some(StreamSource::Device(mut caps))) => {
-                caps.audio(&SysMediaTrackConstraints::from(audio).into());
-                Some(C::Device(caps))
+            (Some(audio), Some(StreamSource::Device(video_constraints))) => {
+                audio_constraints.audio(&SysMediaTrackConstraints::from(audio).into());
+                Some(C::Device(MediaConstrains {
+                    audio: Some(audio_constraints),
+                    video: Some(video_constraints),
+                }))
             }
             (Some(audio), Some(StreamSource::Display(caps))) => {
                 let mut audio_caps = SysMediaStreamConstraints::new();
                 audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
 
-                Some(C::DeviceAndDisplay(audio_caps, caps))
+                Some(C::DeviceAndDisplay(MediaConstrains {
+                    audio: Some(audio_caps),
+                    video: Some(caps),
+                }))
             }
-            (None, Some(StreamSource::Device(caps))) => Some(C::Device(caps)),
-            (None, Some(StreamSource::Display(caps))) => Some(C::Display(caps)),
+            (None, Some(StreamSource::Device(caps))) => Some(C::Device(MediaConstrains {
+                audio: None,
+                video: Some(caps),
+            })),
+            (None, Some(StreamSource::Display(caps))) => Some(C::Display(MediaConstrains {
+                audio: None,
+                video: Some(caps),
+            })),
             (Some(audio), None) => {
                 let mut audio_caps = SysMediaStreamConstraints::new();
                 audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
-                Some(C::Device(audio_caps))
+                Some(C::Device(MediaConstrains {
+                    audio: Some(audio_caps),
+                    video: None,
+                }))
             }
             (None, None) => None,
         }
+
+        // //////// DELETE ME TOO
+        // match (constraints.audio, video) {
+        //     (Some(audio), Some(StreamSource::Device(mut caps))) => {
+        //         caps.audio(&SysMediaTrackConstraints::from(audio).into());
+        //         Some(C::Device(caps))
+        //     }
+        //     (Some(audio), Some(StreamSource::Display(caps))) => {
+        //         let mut audio_caps = SysMediaStreamConstraints::new();
+        //         audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
+        //
+        //         Some(C::DeviceAndDisplay(audio_caps, caps))
+        //     }
+        //     (None, Some(StreamSource::Device(caps))) => Some(C::Device(caps)),
+        //     (None, Some(StreamSource::Display(caps))) => Some(C::Display(caps)),
+        //     (Some(audio), None) => {
+        //         let mut audio_caps = SysMediaStreamConstraints::new();
+        //         audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
+        //         Some(C::Device(audio_caps))
+        //     }
+        //     (None, None) => None,
+        // }
+        //
+        //
+        // //////// DELETE ME
+        // let mut sys_constraints = SysMediaStreamConstraints::new();
+        // let video = match constraints.video {
+        //     Some(video) => match video.0 {
+        //         Some(StreamSource::Device(device)) => {
+        //             sys_constraints
+        //                 .video(&SysMediaTrackConstraints::from(device).into());
+        //             Some(StreamSource::Device(sys_constraints))
+        //         }
+        //         Some(StreamSource::Display(display)) => {
+        //             sys_constraints
+        //                 .video(&SysMediaTrackConstraints::from(display).into());
+        //             Some(StreamSource::Display(sys_constraints))
+        //         }
+        //         None => {
+        //             // defaults to device video
+        //             sys_constraints
+        //                 .video(&SysMediaTrackConstraints::new().into());
+        //             Some(StreamSource::Device(sys_constraints))
+        //         }
+        //     },
+        //     None => None,
+        // };
+        //
+        // match (constraints.audio, video) {
+        //     (Some(audio), Some(StreamSource::Device(mut caps))) => {
+        //         caps.audio(&SysMediaTrackConstraints::from(audio).into());
+        //         Some(C::Device(caps))
+        //     }
+        //     (Some(audio), Some(StreamSource::Display(caps))) => {
+        //         let mut audio_caps = SysMediaStreamConstraints::new();
+        //         audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
+        //
+        //         Some(C::DeviceAndDisplay(audio_caps, caps))
+        //     }
+        //     (None, Some(StreamSource::Device(caps))) => Some(C::Device(caps)),
+        //     (None, Some(StreamSource::Display(caps))) => Some(C::Display(caps)),
+        //     (Some(audio), None) => {
+        //         let mut audio_caps = SysMediaStreamConstraints::new();
+        //         audio_caps.audio(&SysMediaTrackConstraints::from(audio).into());
+        //         Some(C::Device(audio_caps))
+        //     }
+        //     (None, None) => None,
+        // }
     }
 }
 

@@ -289,7 +289,7 @@ window.onload = async function() {
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
     const current_audio = current_stream.getAudioTracks().pop().label || "disable";
-    const current_video = current_stream.getVideoTracks().pop().label || "disable";
+    const current_video = "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -364,7 +364,7 @@ window.onload = async function() {
       await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
       await room.set_local_media_settings(constraints);
     } catch (e) {
-      console.error("Init local video failed: " + e.message());
+      console.error("Init local video failed: " + e);
     }
 
     room.on_new_connection( (connection) => {

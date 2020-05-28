@@ -29,6 +29,8 @@ use crate::{
 };
 
 use super::InputDeviceInfo;
+use crate::utils::console_error;
+use futures::future::LocalBoxFuture;
 
 // TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
@@ -152,58 +154,105 @@ impl InnerMediaManager {
     fn get_stream(
         &self,
         mut caps: MediaStreamSettings,
-    ) -> impl Future<Output = Result<(MediaStream, bool)>> {
+    ) -> LocalBoxFuture<'static, Result<(MediaStream, bool)>> {
         let original_caps = caps.clone();
 
+        use web_sys::MediaTrackConstraints as SysMediaTrackConstraints;
         let mut result = self.get_from_storage(&mut caps);
-        let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
-        match caps {
-            None => {
-                future::ok((MediaStream::new(result, original_caps), false))
-                    .left_future()
-                    .left_future()
-            }
-            Some(MultiSourceMediaStreamConstraints::Display(caps)) => self
-                .get_display_media(caps)
-                .map_ok(|mut tracks| {
-                    result.append(&mut tracks);
-                    result
-                })
-                .map_ok(|result| {
-                    (MediaStream::new(result, original_caps), true)
-                })
-                .left_future()
-                .right_future(),
-            Some(MultiSourceMediaStreamConstraints::Device(caps)) => self
-                .get_user_media(caps)
-                .map_ok(|mut tracks| {
-                    result.append(&mut tracks);
-                    result
-                })
-                .map_ok(|result| {
-                    (MediaStream::new(result, original_caps), true)
-                })
-                .right_future()
-                .left_future(),
-            Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
-                device_caps,
-                display_caps,
-            )) => {
-                let get_user_media = self.get_user_media(device_caps);
-                let get_display_media = self.get_display_media(display_caps);
-
-                async move {
-                    let mut get_user_media = get_user_media.await?;
-                    let mut get_display_media = get_display_media.await?;
-                    result.append(&mut get_user_media);
-                    result.append(&mut get_display_media);
-
-                    Ok((MediaStream::new(result, original_caps), true))
+        let mut futs: Vec<LocalBoxFuture<_>> = Vec::new();
+        if let Some(audio_caps) = caps.get_audio() {
+            let mut audio_sys_constraints = SysMediaStreamConstraints::new();
+            audio_sys_constraints.audio(&SysMediaTrackConstraints::from(audio_caps.clone()).into());
+            futs.push(Box::pin(self.get_user_media(audio_sys_constraints)));
+        }
+        if let Some(video_caps) = caps.get_video() {
+            let mut caps = MediaStreamSettings::new();
+            caps.video(video_caps.clone());
+            let caps: Option<MultiSourceMediaStreamConstraints> = caps.clone().into();
+            let caps = caps.unwrap();
+            match caps {
+                MultiSourceMediaStreamConstraints::Display(display_caps) => {
+                    if let Some(audio_caps) = display_caps.audio {
+                        futs.push(Box::pin(self.get_display_media(audio_caps)));
+                    }
+                    if let Some(video_caps) = display_caps.video {
+                        futs.push(Box::pin(self.get_display_media(video_caps)));
+                    }
                 }
-                .right_future()
-                .right_future()
+                MultiSourceMediaStreamConstraints::Device(device_caps) => {
+                    if let Some(audio_caps) = device_caps.audio {
+                        futs.push(Box::pin(self.get_user_media(audio_caps)));
+                    }
+                    if let Some(video_caps) = device_caps.video {
+                        futs.push(Box::pin(self.get_user_media(video_caps)));
+                    }
+                }
+                MultiSourceMediaStreamConstraints::DeviceAndDisplay(caps) => {
+                    if let Some(audio_caps) = caps.audio {
+                        futs.push(Box::pin(self.get_user_media(audio_caps)));
+                    }
+                    if let Some(video_caps) = caps.video {
+                        futs.push(Box::pin(self.get_user_media(video_caps)));
+                    }
+                }
             }
         }
+
+        Box::pin(async move {
+            for fut in futs {
+                if let Ok(mut tracks) = fut.await {
+                    result.append(&mut tracks);
+                }
+            }
+
+            Ok((MediaStream::new(result, original_caps), true))
+        })
+
+
+
+        //
+        // let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
+        // match caps {
+        //     None => {
+        //         Box::pin(future::ok((MediaStream::new(result, original_caps), false)))
+        //     }
+        //     Some(MultiSourceMediaStreamConstraints::Display(caps)) => Box::pin(self
+        //         .get_display_media(caps)
+        //         .map_ok(|mut tracks| {
+        //             result.append(&mut tracks);
+        //             result
+        //         })
+        //         .map_ok(|result| {
+        //             (MediaStream::new(result, original_caps), true)
+        //         })),
+        //     Some(MultiSourceMediaStreamConstraints::Device(caps)) => {
+        //         Box::pin(self
+        //             .get_user_media(caps)
+        //             .map_ok(|mut tracks| {
+        //                 result.append(&mut tracks);
+        //                 result
+        //             })
+        //             .map_ok(|result| {
+        //                 (MediaStream::new(result, original_caps), true)
+        //             }))
+        //     },
+        //     Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
+        //         device_caps,
+        //         display_caps,
+        //     )) => {
+        //         let get_user_media = self.get_user_media(device_caps);
+        //         let get_display_media = self.get_display_media(display_caps);
+        //
+        //         Box::pin(async move {
+        //             let mut get_user_media = get_user_media.await?;
+        //             let mut get_display_media = get_display_media.await?;
+        //             result.append(&mut get_user_media);
+        //             result.append(&mut get_display_media);
+        //
+        //             Ok((MediaStream::new(result, original_caps), true))
+        //         })
+        //     }
+        // }
     }
 
     /// Tries to find [`MediaStreamTrack`]s that satisfies
@@ -372,7 +421,10 @@ impl MediaManager {
         &self,
         caps: I,
     ) -> Result<(MediaStream, bool)> {
-        self.0.get_stream(caps.into()).await
+        self.0.get_stream(caps.into()).await.map_err(|e| {
+            console_error(&format!("{:?}", e));
+            e
+        })
     }
 
     /// Instantiates new [`MediaManagerHandle`] for use on JS side.

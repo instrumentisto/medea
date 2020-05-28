@@ -38,6 +38,8 @@ spec:
               p2p: Always
               audio_settings:
                 publishing_mode: IfPossible
+              video_settings:
+                publishing_mode: IfPossible
           play-member-1:
             kind: WebRtcPlayEndpoint
             spec:

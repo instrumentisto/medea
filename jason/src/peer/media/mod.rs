@@ -346,9 +346,10 @@ impl MediaConnections {
                     ));
                 }
             } else {
-                return Err(tracerr::new!(
-                    MediaConnectionsError::InvalidMediaStream
-                ));
+                // TODO: Error if sender shouldn't be invalid
+                // return Err(tracerr::new!(
+                //     MediaConnectionsError::InvalidMediaStream
+                // ));
             }
         }
 
