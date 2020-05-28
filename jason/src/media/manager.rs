@@ -19,6 +19,7 @@ use web_sys::{
     MediaDevices, MediaStream as SysMediaStream,
     MediaStreamConstraints as SysMediaStreamConstraints,
 };
+use futures::future::LocalBoxFuture;
 
 use crate::{
     media::{
@@ -27,10 +28,9 @@ use crate::{
     },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
+use crate::utils::console_error;
 
 use super::InputDeviceInfo;
-use crate::utils::console_error;
-use futures::future::LocalBoxFuture;
 
 // TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
@@ -162,13 +162,16 @@ impl InnerMediaManager {
         let mut futs: Vec<LocalBoxFuture<_>> = Vec::new();
         if let Some(audio_caps) = caps.get_audio() {
             let mut audio_sys_constraints = SysMediaStreamConstraints::new();
-            audio_sys_constraints.audio(&SysMediaTrackConstraints::from(audio_caps.clone()).into());
+            audio_sys_constraints.audio(
+                &SysMediaTrackConstraints::from(audio_caps.clone()).into(),
+            );
             futs.push(Box::pin(self.get_user_media(audio_sys_constraints)));
         }
         if let Some(video_caps) = caps.get_video() {
             let mut caps = MediaStreamSettings::new();
             caps.video(video_caps.clone());
-            let caps: Option<MultiSourceMediaStreamConstraints> = caps.clone().into();
+            let caps: Option<MultiSourceMediaStreamConstraints> =
+                caps.clone().into();
             let caps = caps.unwrap();
             match caps {
                 MultiSourceMediaStreamConstraints::Display(display_caps) => {
@@ -207,52 +210,6 @@ impl InnerMediaManager {
 
             Ok((MediaStream::new(result, original_caps), true))
         })
-
-
-
-        //
-        // let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
-        // match caps {
-        //     None => {
-        //         Box::pin(future::ok((MediaStream::new(result, original_caps), false)))
-        //     }
-        //     Some(MultiSourceMediaStreamConstraints::Display(caps)) => Box::pin(self
-        //         .get_display_media(caps)
-        //         .map_ok(|mut tracks| {
-        //             result.append(&mut tracks);
-        //             result
-        //         })
-        //         .map_ok(|result| {
-        //             (MediaStream::new(result, original_caps), true)
-        //         })),
-        //     Some(MultiSourceMediaStreamConstraints::Device(caps)) => {
-        //         Box::pin(self
-        //             .get_user_media(caps)
-        //             .map_ok(|mut tracks| {
-        //                 result.append(&mut tracks);
-        //                 result
-        //             })
-        //             .map_ok(|result| {
-        //                 (MediaStream::new(result, original_caps), true)
-        //             }))
-        //     },
-        //     Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
-        //         device_caps,
-        //         display_caps,
-        //     )) => {
-        //         let get_user_media = self.get_user_media(device_caps);
-        //         let get_display_media = self.get_display_media(display_caps);
-        //
-        //         Box::pin(async move {
-        //             let mut get_user_media = get_user_media.await?;
-        //             let mut get_display_media = get_display_media.await?;
-        //             result.append(&mut get_user_media);
-        //             result.append(&mut get_display_media);
-        //
-        //             Ok((MediaStream::new(result, original_caps), true))
-        //         })
-        //     }
-        // }
     }
 
     /// Tries to find [`MediaStreamTrack`]s that satisfies

@@ -247,6 +247,7 @@ impl MediaConnections {
                         inner.peer_events_sender.clone(),
                         mid,
                         track.is_muted.into(),
+                        track.is_important,
                     )
                     .map_err(tracerr::wrap!())?;
                     inner.senders.insert(track.id, sndr);
@@ -346,10 +347,11 @@ impl MediaConnections {
                     ));
                 }
             } else {
-                // TODO: Error if sender shouldn't be invalid
-                // return Err(tracerr::new!(
-                //     MediaConnectionsError::InvalidMediaStream
-                // ));
+                if sender.is_important() {
+                    return Err(tracerr::new!(
+                        MediaConnectionsError::InvalidMediaStream
+                    ));
+                }
             }
         }
 
@@ -457,6 +459,7 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
+    is_important: bool,
 }
 
 impl Sender {
@@ -472,6 +475,7 @@ impl Sender {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         mid: Option<String>,
         mute_state: StableMuteState,
+        is_important: bool,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -491,6 +495,7 @@ impl Sender {
             track: RefCell::new(None),
             transceiver,
             mute_state,
+            is_important,
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -555,6 +560,10 @@ impl Sender {
         });
 
         Ok(this)
+    }
+
+    pub fn is_important(&self) -> bool {
+        self.is_important
     }
 
     /// Returns [`TrackId`] of this [`Sender`].

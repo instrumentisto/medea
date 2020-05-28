@@ -2,11 +2,12 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+use std::convert::From;
+
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
 use medea_control_api_proto::grpc::api as proto;
-use std::convert::From;
 
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(
@@ -71,6 +72,15 @@ pub struct WebRtcPublishEndpoint {
 pub enum PublishingMode {
     IfPossible,
     On,
+}
+
+impl PublishingMode {
+    pub fn is_important(&self) -> bool {
+        match self {
+            PublishingMode::IfPossible => false,
+            PublishingMode::On => true,
+        }
+    }
 }
 
 impl From<proto::web_rtc_publish_endpoint::PublishingMode> for PublishingMode {

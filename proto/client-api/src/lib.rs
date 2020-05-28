@@ -289,6 +289,7 @@ pub struct Track {
     pub direction: Direction,
     pub media_type: MediaType,
     pub is_muted: bool,
+    pub is_important: bool,
 }
 
 /// Path to existing [`Track`] and field which can be updated.

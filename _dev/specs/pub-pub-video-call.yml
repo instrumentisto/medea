@@ -23,7 +23,7 @@ spec:
               audio_settings:
                 publishing_mode: IfPossible
               video_settings:
-                publishing_mode: IfPossible
+                publishing_mode: On
           # Media element which is able to play media data for client
           # via WebRTC.
           play-responder:
@@ -47,7 +47,7 @@ spec:
               audio_settings:
                 publishing_mode: IfPossible
               video_settings:
-                publishing_mode: IfPossible
+                publishing_mode: On
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
