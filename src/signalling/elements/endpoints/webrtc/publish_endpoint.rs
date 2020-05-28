@@ -20,6 +20,9 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
+use crate::api::control::endpoints::webrtc_publish_endpoint::{
+    AudioSettings, VideoSettings,
+};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -38,6 +41,10 @@ struct WebRtcPublishEndpointInner {
 
     /// Owner [`Member`] of this [`WebRtcPublishEndpoint`].
     owner: WeakMember,
+
+    audio_settings: Option<AudioSettings>,
+
+    video_settings: Option<VideoSettings>,
 
     /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
     ///
@@ -115,6 +122,8 @@ impl WebRtcPublishEndpoint {
         p2p: P2pMode,
         owner: WeakMember,
         is_force_relayed: bool,
+        audio_settings: Option<AudioSettings>,
+        video_settings: Option<VideoSettings>,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
@@ -122,6 +131,8 @@ impl WebRtcPublishEndpoint {
             is_force_relayed,
             sinks: Vec::new(),
             owner,
+            audio_settings,
+            video_settings,
             peer_ids: HashSet::new(),
         })))
     }
@@ -203,6 +214,14 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    pub fn audio_settings(&self) -> Option<AudioSettings> {
+        self.0.borrow().audio_settings
+    }
+
+    pub fn video_settings(&self) -> Option<VideoSettings> {
+        self.0.borrow().video_settings
+    }
+
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
@@ -246,6 +265,8 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             p2p: p2p as i32,
             id: self.id().to_string(),
             force_relay: self.is_force_relayed(),
+            audio_settings: self.audio_settings().map(|s| s.into()),
+            video_settings: self.video_settings().map(|s| s.into()),
             on_stop: String::new(),
             on_start: String::new(),
         }

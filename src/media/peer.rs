@@ -18,7 +18,9 @@ use crate::{
     api::control::MemberId,
     media::{IceUser, MediaTrack},
     signalling::{
-        elements::endpoints::{Endpoint, WeakEndpoint},
+        elements::endpoints::{
+            webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
+        },
         peers::Counter,
     },
 };
@@ -325,21 +327,24 @@ impl Peer<New> {
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter<TrackId>,
+        src: &WebRtcPublishEndpoint,
     ) {
-        let track_audio = Rc::new(MediaTrack::new(
-            tracks_count.next_id(),
-            MediaType::Audio(AudioSettings {}),
-        ));
-        let track_video = Rc::new(MediaTrack::new(
-            tracks_count.next_id(),
-            MediaType::Video(VideoSettings {}),
-        ));
-
-        self.add_sender(Rc::clone(&track_video));
-        self.add_sender(Rc::clone(&track_audio));
-
-        partner_peer.add_receiver(track_video);
-        partner_peer.add_receiver(track_audio);
+        if src.audio_settings().is_some() {
+            let track_audio = Rc::new(MediaTrack::new(
+                tracks_count.next_id(),
+                MediaType::Audio(AudioSettings {}),
+            ));
+            self.add_sender(Rc::clone(&track_audio));
+            partner_peer.add_receiver(track_audio);
+        }
+        if src.video_settings().is_some() {
+            let track_video = Rc::new(MediaTrack::new(
+                tracks_count.next_id(),
+                MediaType::Video(VideoSettings {}),
+            ));
+            self.add_sender(Rc::clone(&track_video));
+            partner_peer.add_receiver(track_video);
+        }
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.

@@ -64,6 +64,9 @@ impl WebRtcPublishEndpoint {
             force_relay: self.force_relay,
             on_start: String::new(),
             on_stop: String::new(),
+            // TODO
+            audio_settings: None,
+            video_settings: None,
         }
     }
 }

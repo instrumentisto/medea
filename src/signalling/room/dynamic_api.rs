@@ -146,6 +146,8 @@ impl Room {
             spec.p2p,
             member.downgrade(),
             spec.force_relay,
+            spec.audio_settings,
+            spec.video_settings,
         );
 
         debug!(

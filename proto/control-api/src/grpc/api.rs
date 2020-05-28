@@ -213,8 +213,28 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[prost(bool, tag="5")]
     pub force_relay: bool,
+    #[prost(message, optional, tag="6")]
+    pub audio_settings: ::std::option::Option<web_rtc_publish_endpoint::AudioSettings>,
+    #[prost(message, optional, tag="7")]
+    pub video_settings: ::std::option::Option<web_rtc_publish_endpoint::VideoSettings>,
 }
 pub mod web_rtc_publish_endpoint {
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct VideoSettings {
+        #[prost(enumeration="PublishingMode", tag="1")]
+        pub publishing_mode: i32,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct AudioSettings {
+        #[prost(enumeration="PublishingMode", tag="1")]
+        pub publishing_mode: i32,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum PublishingMode {
+        IfPossible = 0,
+        On = 1,
+    }
     /// P2P mode of WebRTC interaction.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
