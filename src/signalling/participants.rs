@@ -306,7 +306,7 @@ impl ParticipantService {
         // closing all RpcConnection's
         let close_rpc_connections =
             future::join_all(self.connections.drain().fold(
-                vec![],
+                Vec::new(),
                 |mut futs, (_, mut connection)| {
                     futs.push(
                         connection.close(CloseDescription::new(

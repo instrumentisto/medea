@@ -213,7 +213,7 @@ impl<T> Peer<T> {
     /// Returns [`Track`]s of this [`Peer`].
     pub fn tracks(&self) -> Vec<Track> {
         let tracks = self.context.senders.iter().fold(
-            vec![],
+            Vec::new(),
             |mut tracks, (_, track)| {
                 tracks.push(Track {
                     id: track.id,
