@@ -289,11 +289,11 @@ impl WebSocketRpcTransport {
             .next()
             .await;
 
-        let this = Self(socket);
-        this.set_on_close_listener()?;
-        this.set_on_message_listener()?;
-
         if let Some(TransportState::Open) = state {
+            let this = Self(socket);
+            this.set_on_close_listener()?;
+            this.set_on_message_listener()?;
+
             Ok(this)
         } else {
             Err(tracerr::new!(TransportError::InitSocket))
