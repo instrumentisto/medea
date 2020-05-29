@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use actix::Context;
-use futures::{channel::mpsc::*, StreamExt as _};
+use futures::{channel::mpsc::unbounded, StreamExt as _};
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId};
 use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
 
