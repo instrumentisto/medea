@@ -4,7 +4,11 @@ mod media;
 
 use std::{pin::Pin, rc::Rc};
 
-use futures::{channel::mpsc, Stream, StreamExt as _};
+use futures::{
+    channel::mpsc,
+    future::{self, FutureExt as _},
+    Stream, StreamExt as _,
+};
 use medea_client_api_proto::{
     stats::{
         HighResTimeStamp, KnownIceCandidatePairState, NonExhaustive,
@@ -16,11 +20,13 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     media::MediaManager,
-    peer::{PeerConnection, PeerEvent, RtcStats},
+    peer::{
+        PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
+    },
 };
 use wasm_bindgen_test::*;
 
-use crate::{await_with_timeout, get_test_tracks, resolve_after};
+use crate::{delay_for, get_test_tracks, timeout};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -46,7 +52,7 @@ async fn mute_unmute_audio() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks(false, false);
     let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
 
     peer.get_offer(vec![audio_track, video_track], None, false)
         .await
@@ -72,7 +78,7 @@ async fn mute_unmute_video() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks(false, false);
     let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
@@ -97,7 +103,7 @@ async fn new_with_mute_audio() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks(true, false);
     let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
 
     peer.get_offer(vec![audio_track, video_track], None, false)
         .await
@@ -113,7 +119,7 @@ async fn new_with_mute_video() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks(false, true);
     let peer =
-        PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+        PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
@@ -128,12 +134,17 @@ async fn add_candidates_to_answerer_before_offer() {
     let (tx2, _) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let pc1 =
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap();
+    let pc1 = PeerConnection::new(
+        PeerId(1),
+        tx1,
+        Vec::new(),
+        Rc::clone(&manager),
+        false,
+    )
+    .unwrap();
 
-    let pc2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
+    let pc2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
+        .unwrap();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None, false)
@@ -144,7 +155,7 @@ async fn add_candidates_to_answerer_before_offer() {
     // assert that pc2 has buffered candidates
     assert!(pc2.candidates_buffer_len() > 0);
     // then set its remote description
-    pc2.process_offer(offer, vec![], None).await.unwrap();
+    pc2.process_offer(offer, Vec::new(), None).await.unwrap();
 
     // and assert that buffer was flushed
     assert_eq!(pc2.candidates_buffer_len(), 0);
@@ -157,11 +168,18 @@ async fn add_candidates_to_offerer_before_answer() {
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap(),
+        PeerConnection::new(
+            PeerId(1),
+            tx1,
+            Vec::new(),
+            Rc::clone(&manager),
+            false,
+        )
+        .unwrap(),
     );
     let pc2 = Rc::new(
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap(),
+        PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
+            .unwrap(),
     );
 
     let (audio_track, video_track) = get_test_tracks(false, false);
@@ -169,7 +187,7 @@ async fn add_candidates_to_offerer_before_answer() {
         .get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
-    let answer = pc2.process_offer(offer, vec![], None).await.unwrap();
+    let answer = pc2.process_offer(offer, Vec::new(), None).await.unwrap();
 
     handle_ice_candidates(rx2, &pc1, 1).await;
 
@@ -186,11 +204,16 @@ async fn normal_exchange_of_candidates() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let peer1 =
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap();
-    let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
+    let peer1 = PeerConnection::new(
+        PeerId(1),
+        tx1,
+        Vec::new(),
+        Rc::clone(&manager),
+        false,
+    )
+    .unwrap();
+    let peer2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
+        .unwrap();
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     let offer = peer1
@@ -203,7 +226,7 @@ async fn normal_exchange_of_candidates() {
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
 
-    resolve_after(500).await.unwrap();
+    delay_for(500).await;
 
     handle_ice_candidates(rx1, &peer2, 1).await;
     handle_ice_candidates(rx2, &peer1, 1).await;
@@ -245,7 +268,7 @@ async fn send_event_on_new_local_stream() {
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks(false, true);
     let id = PeerId(1);
-    let peer = PeerConnection::new(id, tx, vec![], manager, false).unwrap();
+    let peer = PeerConnection::new(id, tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
@@ -270,11 +293,16 @@ async fn ice_connection_state_changed_is_emitted() {
     let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
-    let peer1 =
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager), false)
-            .unwrap();
-    let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, false).unwrap();
+    let peer1 = PeerConnection::new(
+        PeerId(1),
+        tx1,
+        Vec::new(),
+        Rc::clone(&manager),
+        false,
+    )
+    .unwrap();
+    let peer2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
+        .unwrap();
     let (audio_track, video_track) = get_test_tracks(false, false);
 
     let offer = peer1
@@ -287,7 +315,7 @@ async fn ice_connection_state_changed_is_emitted() {
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
 
-    resolve_after(500).await.unwrap();
+    delay_for(500).await;
 
     let mut events = futures::stream::select(rx1, rx2);
 
@@ -444,11 +472,11 @@ async fn ice_connection_state_changed_is_emitted() {
 struct InterconnectedPeers {
     /// This [`PeerConnection`] will have one `video` track with `send`
     /// direction and one `audio` track with `send` direction.
-    pub first_peer: PeerConnection,
+    pub first_peer: Rc<PeerConnection>,
 
     /// This [`PeerConnection`] will have one `video` track with `recv`
     /// direction and one `audio` track with `recv` direction.
-    pub second_peer: PeerConnection,
+    pub second_peer: Rc<PeerConnection>,
 
     /// All [`PeerEvent`]s of this two interconnected [`PeerConnection`]s.
     pub peer_events_recv: Pin<Box<dyn Stream<Item = PeerEvent>>>,
@@ -464,13 +492,14 @@ impl InterconnectedPeers {
         let peer1 = PeerConnection::new(
             PeerId(1),
             tx1,
-            vec![],
+            Vec::new(),
             Rc::clone(&manager),
             false,
         )
         .unwrap();
-        let peer2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, false)
-            .unwrap();
+        let peer2 =
+            PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
+                .unwrap();
 
         let offer = peer1
             .get_offer(Self::get_peer1_tracks(), None, false)
@@ -482,7 +511,7 @@ impl InterconnectedPeers {
             .unwrap();
         peer1.set_remote_answer(answer).await.unwrap();
 
-        resolve_after(1000).await.unwrap();
+        delay_for(1000).await;
 
         let events =
             futures::stream::select(peer_events_stream1, peer_events_stream2);
@@ -653,6 +682,7 @@ async fn get_traffic_stats() {
     let second_peer_stats = peers.second_peer.get_stats().await.unwrap();
     let mut second_peer_video_inbound_stats_count = 0;
     let mut second_peer_audio_inbound_stats_count = 0;
+    let mut has_succeeded_pair = false;
     for stat in second_peer_stats.0 {
         match stat.stats {
             RtcStatsType::InboundRtp(inbound) => {
@@ -669,14 +699,17 @@ async fn get_traffic_stats() {
                 "Second Peer shouldn't have any OutboundRtp stats."
             ),
             RtcStatsType::CandidatePair(candidate_pair) => {
-                assert_eq!(
-                    candidate_pair.state,
-                    NonExhaustive::Known(KnownIceCandidatePairState::Succeeded)
-                );
+                if let NonExhaustive::Known(
+                    KnownIceCandidatePairState::Succeeded,
+                ) = candidate_pair.state
+                {
+                    has_succeeded_pair = true;
+                }
             }
             _ => (),
         }
     }
+    assert!(has_succeeded_pair);
     assert_eq!(second_peer_video_inbound_stats_count, 1);
     assert_eq!(second_peer_audio_inbound_stats_count, 1);
 }
@@ -692,7 +725,8 @@ mod peer_stats_caching {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
         let peer =
-            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+            PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false)
+                .unwrap();
 
         let stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
@@ -720,9 +754,7 @@ mod peer_stats_caching {
         assert_eq!(first_rtc_stats.0[0], stat);
 
         peer.send_peer_stats(RtcStats(vec![stat]));
-        await_with_timeout(Box::pin(peer_events_stream.next()), 100)
-            .await
-            .unwrap_err();
+        timeout(100, peer_events_stream.next()).await.unwrap_err();
     }
 
     /// Tests that [`PeerConnection::send_peer_stats`] will send two
@@ -733,7 +765,8 @@ mod peer_stats_caching {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
         let peer =
-            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+            PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false)
+                .unwrap();
 
         let mut stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
@@ -774,7 +807,8 @@ mod peer_stats_caching {
         let (tx, peer_events_stream) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
         let peer =
-            PeerConnection::new(PeerId(1), tx, vec![], manager, false).unwrap();
+            PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false)
+                .unwrap();
 
         let mut track_stat = Box::new(TrackStat {
             track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
@@ -808,4 +842,39 @@ mod peer_stats_caching {
         let first_rtc_stats = peer_events_stream.next().await.unwrap();
         assert_eq!(first_rtc_stats.0[0], stat);
     }
+}
+
+#[wasm_bindgen_test]
+async fn reset_transition_timers() {
+    let (tx, _) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let peer =
+        PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    let all_unmuted = future::join_all(
+        peer.get_senders(TransceiverKind::Audio)
+            .into_iter()
+            .chain(peer.get_senders(TransceiverKind::Video).into_iter())
+            .map(|s| {
+                s.mute_state_transition_to(StableMuteState::Muted);
+
+                s.when_mute_state_stable(StableMuteState::NotMuted)
+            }),
+    )
+    .map(|_| ())
+    .shared();
+
+    delay_for(400).await;
+    peer.stop_state_transitions_timers();
+    timeout(600, all_unmuted.clone()).await.unwrap_err();
+
+    peer.stop_state_transitions_timers();
+    delay_for(30).await;
+    peer.reset_state_transitions_timers();
+
+    timeout(600, all_unmuted).await.unwrap();
 }

@@ -117,7 +117,7 @@ impl TryFrom<String> for StatefulFid {
                 member_id
             }
         } else {
-            return Ok(Fid::<ToRoom>::new(room_id.to_string().into()).into());
+            return Ok(Fid::<ToRoom>::new(room_id.into()).into());
         };
 
         let endpoint_id = if let Some(endpoint_id) = splitted.next() {

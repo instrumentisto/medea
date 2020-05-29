@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use futures::channel::mpsc;
+use futures::{
+    channel::mpsc,
+    stream::{self, StreamExt as _},
+};
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -27,16 +30,14 @@ fn get_test_room_and_exist_peer(
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
     let (tx, _rx) = mpsc::unbounded();
-    let peer = Rc::new(
-        PeerConnection::new(
-            PeerId(1),
-            tx,
-            vec![],
-            Rc::new(MediaManager::default()),
-            false,
-        )
-        .unwrap(),
-    );
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        Vec::new(),
+        Rc::new(MediaManager::default()),
+        false,
+    )
+    .unwrap();
 
     let (event_tx, event_rx) = mpsc::unbounded();
     let peer_clone = Rc::clone(&peer);
@@ -49,6 +50,10 @@ fn get_test_room_and_exist_peer(
     repo.expect_get()
         .returning_st(move |_| Some(Rc::clone(&peer_clone)));
     rpc.expect_unsub().return_const(());
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
     rpc.expect_set_close_reason().return_const(());
     rpc.expect_send_command().returning(move |cmd| match cmd {
         Command::UpdateTracks {
@@ -311,18 +316,16 @@ fn get_test_room_and_new_peer(
 
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
-    repo.expect_get_all().returning(|| vec![]);
+    repo.expect_get_all().returning(|| Vec::new());
     let (tx, _rx) = mpsc::unbounded();
-    let peer = Rc::new(
-        PeerConnection::new(
-            PeerId(1),
-            tx,
-            vec![],
-            Rc::new(MediaManager::default()),
-            false,
-        )
-        .unwrap(),
-    );
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        Vec::new(),
+        Rc::new(MediaManager::default()),
+        false,
+    )
+    .unwrap();
     let peer_clone = Rc::clone(&peer);
     repo.expect_create_peer()
         .withf(
@@ -335,6 +338,10 @@ fn get_test_room_and_new_peer(
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -356,7 +363,7 @@ fn get_test_room_and_new_peer(
 //            peer_id: PeerId(1),
 //            sdp_offer: None,
 //            tracks: vec![audio_track, video_track],
-//            ice_servers: vec![],
+//            ice_servers: Vec::new(),
 //            force_relay: false,
 //        })
 //        .unwrap();
@@ -381,7 +388,7 @@ fn get_test_room_and_new_peer(
 //            peer_id: PeerId(1),
 //            sdp_offer: None,
 //            tracks: vec![audio_track, video_track],
-//            ice_servers: vec![],
+//            ice_servers: Vec::new(),
 //            force_relay: false,
 //        })
 //        .unwrap();
@@ -430,7 +437,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
             peer_id: PeerId(1),
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
-            ice_servers: vec![],
+            ice_servers: Vec::new(),
             force_relay: false,
         })
         .unwrap();
@@ -501,7 +508,7 @@ async fn error_get_local_stream_on_new_peer() {
             peer_id: PeerId(1),
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
-            ice_servers: vec![],
+            ice_servers: Vec::new(),
             force_relay: false,
         })
         .unwrap();
@@ -525,6 +532,10 @@ async fn error_join_room_without_on_failed_stream_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -561,6 +572,10 @@ async fn error_join_room_without_on_connection_loss_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -596,7 +611,7 @@ mod on_close_callback {
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_test::*;
 
-    use super::wait_and_check_test_result;
+    use super::*;
 
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
                                 closed.reason(); }")]
@@ -626,6 +641,10 @@ mod on_close_callback {
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
         rpc.expect_set_close_reason().return_const(());
+        rpc.expect_on_connection_loss()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
 
         Room::new(Rc::new(rpc), repo)
     }
@@ -732,6 +751,10 @@ mod rpc_close_reason_on_room_drop {
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
+        rpc.expect_on_connection_loss()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
         let (test_tx, test_rx) = oneshot::channel();
         rpc.expect_set_close_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
@@ -808,7 +831,7 @@ mod patches_generation {
     };
     use wasm_bindgen_futures::spawn_local;
 
-    use crate::await_with_timeout;
+    use crate::timeout;
 
     use super::*;
 
@@ -850,16 +873,14 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let peer = Rc::new(
-                PeerConnection::new(
-                    peer_id,
-                    tx,
-                    vec![],
-                    Rc::new(MediaManager::default()),
-                    false,
-                )
-                .unwrap(),
-            );
+            let peer = PeerConnection::new(
+                peer_id,
+                tx,
+                Vec::new(),
+                Rc::new(MediaManager::default()),
+                false,
+            )
+            .unwrap();
 
             peer.get_offer(tracks, None, false).await.unwrap();
 
@@ -882,6 +903,10 @@ mod patches_generation {
             .return_once(move || Box::pin(futures::stream::pending()));
         rpc.expect_unsub().return_once(|| ());
         rpc.expect_set_close_reason().return_once(|_| ());
+        rpc.expect_on_connection_loss()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
 
         (Room::new(Rc::new(rpc), repo), command_rx)
     }
@@ -906,7 +931,7 @@ mod patches_generation {
         let room_handle = room.new_handle();
 
         spawn_local(async move {
-            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
         });
 
         assert_eq!(
@@ -941,7 +966,7 @@ mod patches_generation {
         let room_handle = room.new_handle();
 
         spawn_local(async move {
-            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
         });
 
         let mut commands = HashMap::new();
@@ -997,9 +1022,7 @@ mod patches_generation {
             JsFuture::from(room_handle.unmute_audio()).await.unwrap();
         });
 
-        assert!(await_with_timeout(Box::pin(command_rx.next()), 5)
-            .await
-            .is_err());
+        assert!(timeout(5, command_rx.next()).await.is_err());
     }
 
     /// Tests that [`Room`] will generate [`Command::UpdateTracks`] only for
@@ -1021,7 +1044,7 @@ mod patches_generation {
         let room_handle = room.new_handle();
 
         spawn_local(async move {
-            JsFuture::from(room_handle.mute_audio()).await.unwrap();
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
         });
 
         assert_eq!(

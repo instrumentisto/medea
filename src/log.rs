@@ -9,7 +9,16 @@ use slog::{
 use slog_async::Async;
 use slog_json::Json;
 
-pub mod prelude;
+/// Re-exports common definitions for logging.
+///
+/// Use this module as following:
+/// ```rust
+/// use medea::log::prelude::*;
+/// ```
+pub mod prelude {
+    pub use slog::{slog_debug, slog_error, slog_info, slog_trace, slog_warn};
+    pub use slog_scope::{debug, error, info, trace, warn};
+}
 
 /// Builds JSON [`Logger`] which prints all its log records to `w_out` writer,
 /// but WARN level (and higher) to `w_err` writer. Logger will use [`Async`]

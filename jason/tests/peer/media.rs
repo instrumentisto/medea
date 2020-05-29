@@ -25,7 +25,7 @@ async fn get_test_media_connections(
     mem::forget(rx);
     let media_connections = MediaConnections::new(
         PeerId(0),
-        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
     let (audio_track, video_track) =
@@ -63,7 +63,7 @@ fn get_stream_request1() {
     mem::forget(rx);
     let media_connections = MediaConnections::new(
         PeerId(0),
-        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
     let (audio_track, video_track) = get_test_tracks(false, false);
@@ -80,10 +80,10 @@ fn get_stream_request2() {
     mem::forget(rx);
     let media_connections = MediaConnections::new(
         PeerId(0),
-        Rc::new(RtcPeerConnection::new(vec![], false).unwrap()),
+        Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
-    media_connections.update_tracks(vec![]).unwrap();
+    media_connections.update_tracks(Vec::new()).unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());
 }

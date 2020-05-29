@@ -104,7 +104,7 @@ impl TestMember {
             Self {
                 sink,
                 events: Vec::new(),
-                known_peers: vec![],
+                known_peers: Vec::new(),
                 deadline,
                 on_message,
                 on_connection_event,

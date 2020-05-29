@@ -8,9 +8,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{
-    channel::mpsc, future, stream, Future, FutureExt as _, StreamExt as _,
-};
+use futures::{channel::mpsc, future, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
@@ -425,34 +423,47 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
+    #[allow(clippy::mut_mut)]
     pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
             PeerEvent(PeerEvent),
+            RpcClientLostConnection,
+            RpcClientReconnected,
         }
 
         let (tx, peer_events_rx) = mpsc::unbounded();
-        let events_stream = rpc.subscribe();
+
+        let mut rpc_events_stream =
+            rpc.subscribe().map(RoomEvent::RpcEvent).fuse();
+        let mut peer_events_stream =
+            peer_events_rx.map(RoomEvent::PeerEvent).fuse();
+        let mut rpc_connection_lost = rpc
+            .on_connection_loss()
+            .map(|_| RoomEvent::RpcClientLostConnection)
+            .fuse();
+        let mut rpc_client_reconnected = rpc
+            .on_reconnected()
+            .map(|_| RoomEvent::RpcClientReconnected)
+            .fuse();
+
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
-
-        let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
-        let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
-
-        let mut events = stream::select(rpc_events_stream, peer_events_stream);
-
         let inner = Rc::downgrade(&room);
-        // Spawns `Promise` in JS, does not provide any handles, so the current
-        // way to stop this stream is to drop all connected `Sender`s.
+
         spawn_local(async move {
-            while let Some(event) = events.next().await {
+            loop {
+                let event: RoomEvent = futures::select! {
+                    event = rpc_events_stream.select_next_some() => event,
+                    event = peer_events_stream.select_next_some() => event,
+                    event = rpc_connection_lost.select_next_some() => event,
+                    event = rpc_client_reconnected.select_next_some() => event,
+                    complete => break,
+                };
+
                 match inner.upgrade() {
                     None => {
-                        // `InnerSession` is gone, which means that `Room` has
-                        // been dropped. Not supposed to
-                        // happen, actually, since
-                        // `InnerSession` should drop its `tx` by unsub from
-                        // `RpcClient`.
-                        console_error("Inner Room dropped unexpectedly")
+                        console_error("Inner Room dropped unexpectedly");
+                        break;
                     }
                     Some(inner) => {
                         match event {
@@ -465,6 +476,14 @@ impl Room {
                                 event.dispatch_with(
                                     inner.borrow_mut().deref_mut(),
                                 );
+                            }
+                            RoomEvent::RpcClientLostConnection => {
+                                inner.borrow().handle_rpc_connection_lost();
+                            }
+                            RoomEvent::RpcClientReconnected => {
+                                inner
+                                    .borrow()
+                                    .handle_rpc_connection_recovered();
                             }
                         };
                     }
@@ -717,6 +736,22 @@ impl InnerRoom {
                     error_callback.call(JasonError::from(err));
                 }
             }
+        }
+    }
+
+    /// Stops state transition timers in all [`PeerConnection`]'s in this
+    /// [`Room`].
+    fn handle_rpc_connection_lost(&self) {
+        for peer in self.peers.get_all() {
+            peer.stop_state_transitions_timers();
+        }
+    }
+
+    /// Resets state transition timers in all [`PeerConnection`]'s in this
+    /// [`Room`].
+    fn handle_rpc_connection_recovered(&self) {
+        for peer in self.peers.get_all() {
+            peer.reset_state_transitions_timers();
         }
     }
 }

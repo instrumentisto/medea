@@ -208,3 +208,19 @@
 # Env var: MEDEA_SHUTDOWN__TIMEOUT
 # Default:
 #   timeout = "5s"
+
+
+
+
+[media]
+# Max duration of media-flow lag, after which `on_stop` callback is fired.
+#
+# Env var: MEDEA_MEDIA__MAX_LAG
+# Default:
+#   max_lag = "15s"
+
+# Timeout for peer to become active after it has been created.
+#
+# Env var: MEDEA_MEDIA__INIT_TIMEOUT
+# Default:
+#   init_timeout = "15s"

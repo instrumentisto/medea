@@ -17,7 +17,10 @@ use medea_macro::enum_delegate;
 use crate::{
     api::control::MemberId,
     media::{IceUser, MediaTrack},
-    signalling::peers::Counter,
+    signalling::{
+        elements::endpoints::{Endpoint, WeakEndpoint},
+        peers::Counter,
+    },
 };
 
 /// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
@@ -74,11 +77,17 @@ impl PeerError {
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
+#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
+#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
     pub fn set_connection_state(
         &self,
         state: PeerConnectionState
     )
+)]
+#[enum_delegate(
+pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -164,6 +173,8 @@ pub struct Context {
     senders: HashMap<TrackId, Rc<MediaTrack>>,
     is_force_relayed: bool,
     connection_state: RefCell<PeerConnectionState>,
+    /// Weak references to the [`Endpoint`]s related to this [`Peer`].
+    endpoints: Vec<WeakEndpoint>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -203,7 +214,7 @@ impl<T> Peer<T> {
     /// Returns [`Track`]s of this [`Peer`].
     pub fn tracks(&self) -> Vec<Track> {
         let tracks = self.context.senders.iter().fold(
-            vec![],
+            Vec::new(),
             |mut tracks, (_, track)| {
                 tracks.push(Track {
                     id: track.id,
@@ -262,6 +273,34 @@ impl<T> Peer<T> {
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s
     pub fn set_ice_user(&mut self, ice_user: IceUser) {
         self.context.ice_user.replace(ice_user);
+    }
+
+    /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
+    pub fn endpoints(&self) -> Vec<WeakEndpoint> {
+        self.context.endpoints.clone()
+    }
+
+    /// Adds [`Endpoint`] for which this [`Peer`] was created.
+    pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
+        match endpoint {
+            Endpoint::WebRtcPlayEndpoint(play) => {
+                play.set_peer_id(self.id());
+            }
+            Endpoint::WebRtcPublishEndpoint(publish) => {
+                publish.add_peer_id(self.id());
+            }
+        }
+        self.context.endpoints.push(endpoint.downgrade());
+    }
+
+    /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
+    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
+        self.context.receivers.clone()
+    }
+
+    /// Returns all sending [`MediaTrack`]s of this [`Peer`].
+    pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
+        self.context.senders.clone()
     }
 }
 
@@ -354,6 +393,7 @@ impl Peer<Stable> {
             senders: HashMap::new(),
             is_force_relayed,
             connection_state: RefCell::new(PeerConnectionState::New),
+            endpoints: Vec::new(),
         };
         Self {
             context,
@@ -447,5 +487,68 @@ impl Peer<Stable> {
             context,
             state: WaitLocalSdp {},
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    /// Returns [`PeerStateMachine`] with provided count of the `MediaTrack`s
+    /// media types.
+    pub fn test_peer_from_peer_tracks(
+        send_audio: u32,
+        send_video: u32,
+        recv_audio: u32,
+        recv_video: u32,
+    ) -> PeerStateMachine {
+        let mut peer = Peer {
+            state: Stable {},
+            context: Context {
+                id: Id(1),
+                sdp_offer: None,
+                sdp_answer: None,
+                senders: HashMap::new(),
+                receivers: HashMap::new(),
+                member_id: MemberId::from("test-member"),
+                is_force_relayed: false,
+                partner_peer: Id(2),
+                ice_user: None,
+                endpoints: Vec::new(),
+                partner_member: MemberId::from("partner-member"),
+            },
+        };
+
+        let mut track_id_counter = Counter::default();
+
+        for _ in 0..send_audio {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            peer.context.senders.insert(track_id, Rc::new(track));
+        }
+
+        for _ in 0..send_video {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            peer.context.senders.insert(track_id, Rc::new(track));
+        }
+
+        for _ in 0..recv_audio {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            peer.context.receivers.insert(track_id, Rc::new(track));
+        }
+
+        for _ in 0..recv_video {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            peer.context.receivers.insert(track_id, Rc::new(track));
+        }
+
+        peer.into()
     }
 }

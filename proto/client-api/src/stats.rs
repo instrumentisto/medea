@@ -889,6 +889,12 @@ pub enum KnownIceCandidatePairState {
     /// unfreeze and move into the [`KnownIceCandidatePairState::Waiting`]
     /// state.
     Frozen,
+
+    /// Other Candidate pair was nominated.
+    ///
+    /// This state is **obsolete and not spec compliant**, however, it still
+    /// may be emitted by some implementations.
+    Cancelled,
 }
 
 /// Non-exhaustive version of [`KnownIceCandidatePairState`].
@@ -1477,6 +1483,18 @@ impl From<HighResTimeStamp> for SystemTime {
     #[inline]
     fn from(timestamp: HighResTimeStamp) -> Self {
         SystemTime::UNIX_EPOCH + Duration::from_millis(timestamp.0 as u64)
+    }
+}
+
+impl From<SystemTime> for HighResTimeStamp {
+    #[allow(clippy::cast_precision_loss)]
+    #[inline]
+    fn from(time: SystemTime) -> Self {
+        HighResTimeStamp(
+            time.duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as f64,
+        )
     }
 }
 

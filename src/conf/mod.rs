@@ -2,6 +2,7 @@
 
 pub mod control;
 pub mod log;
+pub mod media;
 pub mod rpc;
 pub mod server;
 pub mod shutdown;
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 pub use self::{
     control::ControlApi,
     log::Log,
+    media::Media,
     rpc::Rpc,
     server::Server,
     shutdown::Shutdown,
@@ -53,6 +55,9 @@ pub struct Conf {
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
     pub control: ControlApi,
+
+    /// [`Peer`] media traffic watcher configuration.
+    pub media: Media,
 }
 
 impl Conf {
@@ -139,7 +144,7 @@ pub(crate) mod spec {
     #[serial]
     fn get_conf_file_name_spec_none_if_nothing_is_set() {
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
-        assert_eq!(get_conf_file_name(vec![]), None);
+        assert_eq!(get_conf_file_name(Vec::new()), None);
     }
 
     #[test]
@@ -160,7 +165,7 @@ pub(crate) mod spec {
     #[serial]
     fn get_conf_file_name_spec_env_if_set() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
-        assert_eq!(get_conf_file_name(vec![]), Some("env_path".to_owned()));
+        assert_eq!(get_conf_file_name(Vec::new()), Some("env_path".to_owned()));
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
 
