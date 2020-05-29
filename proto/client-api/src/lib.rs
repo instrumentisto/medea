@@ -66,8 +66,7 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(Eq, PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `ping` message that `Media Server` is expected to send to `Client`
@@ -84,8 +83,7 @@ pub enum ServerMsg {
 }
 
 /// RPC settings of `Client` received from `Media Server`.
-#[cfg_attr(test, derive(Eq, PartialEq))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcSettings {
     /// Timeout of considering `Client` as lost by `Media Server` when it
     /// doesn't receive [`ClientMsg::Pong`].
@@ -130,18 +128,22 @@ pub enum Command {
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
     },
+
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
+
     /// Web Client sends Peer Connection metrics.
     AddPeerConnectionMetrics {
         peer_id: PeerId,
         metrics: PeerMetrics,
     },
+
     /// Web Client asks permission to update [`Track`]s in specified Peer.
     /// Media Server gives permission by sending [`Event::TracksUpdated`].
     UpdateTracks {
@@ -168,14 +170,46 @@ pub enum PeerMetrics {
 /// Peer Connection's ICE connection state.
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IceConnectionState {
+    /// The ICE agent is gathering addresses or is waiting to be given remote
+    /// candidates.
     New,
+
+    /// The ICE agent has been given one or more remote candidates and is
+    /// checking pairs of local and remote candidates against one another to
+    /// try to find a compatible match, but has not yet found a pair which will
+    /// allow the peer connection to be made. It's possible that gathering of
+    /// candidates is also still underway.
     Checking,
+
+    /// A usable pairing of local and remote candidates has been found for all
+    /// components of the connection, and the connection has been established.
+    /// It's possible that gathering is still underway, and it's also possible
+    /// that the ICE agent is still checking candidates against one another
+    /// looking for a better connection to use.
     Connected,
+
+    /// The ICE agent has finished gathering candidates, has checked all pairs
+    /// against one another, and has found a connection for all components.
     Completed,
+
+    /// The ICE candidate has checked all candidates pairs against one another
+    /// and has failed to find compatible matches for all components of the
+    /// connection. It is, however, possible that the ICE agent did find
+    /// compatible connections for some components.
     Failed,
+
+    /// Checks to ensure that components are still connected failed for at
+    /// least one component of the `PeerConnection`. This is a less stringent
+    /// test than [`IceConnectionState::Failed`] and may trigger intermittently
+    /// and resolve just as spontaneously on less reliable networks, or during
+    /// temporary disconnections. When the problem resolves, the connection may
+    /// return to the [`IceConnectionState::Connected`] state.
     Disconnected,
+
+    /// The ICE agent for this `PeerConnection` has shut down and is no longer
+    /// handling requests.
     Closed,
 }
 
@@ -184,28 +218,54 @@ pub enum IceConnectionState {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PeerConnectionState {
+    /// At least one of the connection's ICE transports are in the
+    /// [`IceConnectionState::New`] state, and none of them are in one
+    /// of the following states: [`IceConnectionState::Connecting`],
+    /// [`IceConnectionState::Checking`], [`IceConnectionState::Failed`], or
+    /// [`IceConnectionState::Disconnected`], or all of the connection's
+    /// transports are in the [`IceConnectionState::Closed`] state.
     New,
+
+    /// One or more of the ICE transports are currently in the process of
+    /// establishing a connection; that is, their [`IceConnectionState`] is
+    /// either [`IceConnectionState::Checking`] or
+    /// [`IceConnectionState::Connected`], and no transports are in the
+    /// [`IceConnectionState::Failed`] state.
     Connecting,
+
+    /// Every ICE transport used by the connection is either in use (state
+    /// [`IceConnectionState::Connected`] or [`IceConnectionState::Completed`])
+    /// or is closed ([`IceConnectionState::Closed`]); in addition,
+    /// at least one transport is either [`IceConnectionState::Connected`] or
+    /// [`IceConnectionState::Completed`].
     Connected,
+
+    /// At least one of the ICE transports for the connection is in the
+    /// [`IceConnectionState::Disconnected`] state and none of the other
+    /// transports are in the state [`IceConnectionState::Failed`],
+    /// [`IceConnectionState::Connecting`], or
+    /// [`IceConnectionState::Checking`].
     Disconnected,
+
+    /// One or more of the ICE transports on the connection is in the
+    /// [`IceConnectionState::Failed`] state.
     Failed,
+
+    /// The `PeerConnection` is closed.
     Closed,
 }
 
 impl From<IceConnectionState> for PeerConnectionState {
     fn from(ice_con_state: IceConnectionState) -> Self {
         use IceConnectionState as IceState;
-        use PeerConnectionState as PeerState;
 
         match ice_con_state {
-            IceState::New => PeerState::New,
-            IceState::Checking => PeerState::Connecting,
-            IceState::Connected | IceConnectionState::Completed => {
-                PeerState::Connected
-            }
-            IceState::Failed => PeerState::Failed,
-            IceState::Disconnected => PeerState::Disconnected,
-            IceState::Closed => PeerState::Closed,
+            IceState::New => Self::New,
+            IceState::Checking => Self::Connecting,
+            IceState::Connected | From::Completed => Self::Connected,
+            IceState::Failed => Self::Failed,
+            IceState::Disconnected => Self::Disconnected,
+            IceState::Closed => Self::Closed,
         }
     }
 }
@@ -264,10 +324,6 @@ pub enum Event {
     },
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
-    /// Offer to Web Client's RTCPeerConnection.
-    SdpOfferMade { peer_id: PeerId, sdp_offer: String },
-
-    /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
@@ -294,7 +350,11 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to start
     /// renegotiation, creating new SDP Offer.
-    RenegotiationStarted { peer_id: PeerId, ice_restart: bool },
+    RenegotiationStarted { peer_id: PeerId },
+
+    /// Media Server notifies Web Client about necessity to apply specified SDP
+    /// Offer to Web Client's RTCPeerConnection.
+    SdpOfferMade { peer_id: PeerId, sdp_offer: String },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
