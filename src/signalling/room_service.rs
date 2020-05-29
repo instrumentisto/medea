@@ -797,7 +797,7 @@ mod room_service_specs {
         endpoint_spec.p2p = P2pMode::Never;
         let endpoint_spec = endpoint_spec.into();
 
-        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_id: RoomId = "pub-sub-video-call".into();
         let room = Room::new(
             &spec,
             &app_ctx(),
