@@ -127,9 +127,8 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
-    /// [`PeerTrafficWatcher`] for all [`Room`]s from this
-    /// [`RoomService`].
-    peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+    /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
+    peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which is responsible for processing [`PeerConnection`]'s
     /// metrics received from the Coturn.
@@ -148,17 +147,17 @@ impl RoomService {
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Result<Self, redis_pub_sub::RedisError> {
-        let peers_traffic_watcher =
+        let peer_traffic_watcher =
             build_peers_traffic_watcher(&app.config.media);
         Ok(Self {
             _coturn_metrics: CoturnMetricsService::new(
                 &app.config.turn,
-                peers_traffic_watcher.clone(),
+                peer_traffic_watcher.clone(),
             )?
             .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
-            peers_traffic_watcher,
+            peer_traffic_watcher,
             room_repo,
             app,
             graceful_shutdown,
