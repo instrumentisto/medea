@@ -744,11 +744,11 @@ mod room_service_specs {
         let member_spec = spec
             .members()
             .unwrap()
-            .get(&"caller".into())
+            .get(&"caller".to_string().into())
             .unwrap()
             .clone();
 
-        let room_id = RoomId::from("pub-sub-video-call");
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
         let room = Room::new(
             &spec,
             &app_ctx(),
@@ -761,7 +761,7 @@ mod room_service_specs {
         )));
 
         let member_parent_fid = Fid::<ToRoom>::new(room_id);
-        let member_id = MemberId::from("test-member");
+        let member_id: MemberId = "test-member".to_string().into();
         let member_full_id: StatefulFid = member_parent_fid
             .clone()
             .push_member_id(member_id.clone())
@@ -789,7 +789,7 @@ mod room_service_specs {
         let mut endpoint_spec = spec
             .members()
             .unwrap()
-            .get(&"caller".into())
+            .get(&"caller".to_string().into())
             .unwrap()
             .get_publish_endpoint_by_id("publish".to_string().into())
             .unwrap()
@@ -810,7 +810,7 @@ mod room_service_specs {
         )));
 
         let endpoint_parent_fid =
-            Fid::<ToMember>::new(room_id, "caller".into());
+            Fid::<ToMember>::new(room_id, "caller".to_string().into());
         let endpoint_id: EndpointId = "test-publish".to_string().into();
         let endpoint_full_id: StatefulFid = endpoint_parent_fid
             .clone()
@@ -862,7 +862,7 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn delete_and_get_room() {
-        let room_id: RoomId = "pub-sub-video-call".into();
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
@@ -882,10 +882,10 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn delete_and_get_member() {
-        let room_id: RoomId = "pub-sub-video-call".into();
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
         let member_fid = StatefulFid::from(Fid::<ToMember>::new(
             room_id.clone(),
-            "caller".into(),
+            "caller".to_string().into(),
         ));
 
         let room = Room::new(
@@ -904,10 +904,10 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn delete_and_get_endpoint() {
-        let room_id = RoomId::from("pub-sub-video-call");
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
         let endpoint_fid = StatefulFid::from(Fid::<ToEndpoint>::new(
             room_id.clone(),
-            MemberId::from("caller"),
+            "caller".to_string().into(),
             "publish".to_string().into(),
         ));
 

@@ -127,17 +127,19 @@ impl TryFrom<String> for StatefulFid {
                 endpoint_id
             }
         } else {
-            return Ok(
-                Fid::<ToMember>::new(room_id.into(), member_id.into()).into()
-            );
+            return Ok(Fid::<ToMember>::new(
+                room_id.to_string().into(),
+                member_id.to_string().into(),
+            )
+            .into());
         };
 
         if splitted.next().is_some() {
             Err(ParseFidError::TooManyPaths(value))
         } else {
             Ok(Fid::<ToEndpoint>::new(
-                room_id.into(),
-                member_id.into(),
+                room_id.to_string().into(),
+                member_id.to_string().into(),
                 endpoint_id.to_string().into(),
             )
             .into())
@@ -188,7 +190,7 @@ mod specs {
 
     #[test]
     fn successful_parse_to_room() {
-        let room_id = RoomId::from("room_id");
+        let room_id: RoomId = "room_id".to_string().into();
         let fid = StatefulFid::try_from(format!("{}", room_id)).unwrap();
         match fid {
             StatefulFid::Room(room_fid) => {
@@ -200,8 +202,8 @@ mod specs {
 
     #[test]
     fn successful_parse_to_member() {
-        let room_id = RoomId::from("room_id");
-        let member_id = MemberId::from("member_id");
+        let room_id: RoomId = "room_id".to_string().into();
+        let member_id: MemberId = "member_id".to_string().into();
         let fid = StatefulFid::try_from(format!("{}/{}", room_id, member_id))
             .unwrap();
 
@@ -216,8 +218,8 @@ mod specs {
 
     #[test]
     fn successful_parse_to_endpoint() {
-        let room_id = RoomId::from("room_id");
-        let member_id = MemberId::from("member_id");
+        let room_id: RoomId = "room_id".to_string().into();
+        let member_id: MemberId = "member_id".to_string().into();
         let endpoint_id: EndpointId = "endpoint_id".to_string().into();
         let fid = StatefulFid::try_from(format!(
             "{}/{}/{}",
