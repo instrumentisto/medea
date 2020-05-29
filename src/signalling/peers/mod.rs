@@ -5,7 +5,7 @@ mod metrics;
 mod traffic_watcher;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     sync::Arc,
     time::Duration,
@@ -310,7 +310,7 @@ impl PeersService {
             }
         }
 
-        let peers_to_unregister: HashSet<_> = removed_peers
+        let peers_to_unregister: Vec<_> = removed_peers
             .values()
             .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
             .collect();

@@ -96,7 +96,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 
     /// Unregisters `Peer`s, so that [`PeerTrafficWatcher`] will not be able
     /// to process traffic flow events of this `Peer` anymore.
-    fn unregister_peers(&self, room_id: RoomId, peers_ids: HashSet<PeerId>);
+    fn unregister_peers(&self, room_id: RoomId, peers_ids: Vec<PeerId>);
 
     /// Notifies [`PeerTrafficWatcher`] that some `Peer` traffic flowing.
     fn traffic_flows(
@@ -166,7 +166,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     }
 
     /// Sends [`UnregisterPeers`] message to [`PeersTrafficWatcherImpl`].
-    fn unregister_peers(&self, room_id: RoomId, peers_ids: HashSet<PeerId>) {
+    fn unregister_peers(&self, room_id: RoomId, peers_ids: Vec<PeerId>) {
         self.do_send(UnregisterPeers { room_id, peers_ids })
     }
 
@@ -648,7 +648,7 @@ struct UnregisterPeers {
     room_id: RoomId,
 
     /// [`PeerId`] of [`PeerStat`] from which unregistration is requested.
-    peers_ids: HashSet<PeerId>,
+    peers_ids: Vec<PeerId>,
 }
 
 impl Handler<UnregisterPeers> for PeersTrafficWatcherImpl {

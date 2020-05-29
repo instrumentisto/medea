@@ -5,7 +5,7 @@
 
 use std::iter;
 
-use actix::{AsyncContext, Handler, Message, WeakAddr, StreamHandler};
+use actix::{AsyncContext, Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::PeerId;
 
@@ -16,14 +16,12 @@ use crate::{
     signalling::{
         elements::endpoints::{webrtc::WebRtcPublishEndpoint, Endpoint},
         peers::{
-            PeerConnectionStateEventsHandler,
-            PeersMetricsEvent,
+            PeerConnectionStateEventsHandler, PeersMetricsEvent,
             PeersMetricsEventHandler,
         },
         room::{ActFuture, Room},
     },
 };
-
 
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
     /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStarted`]

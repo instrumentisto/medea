@@ -256,14 +256,14 @@ mod tests {
         let state_before = MediaTrafficState::with_media_type(MediaType::Audio);
         let state_after = MediaTrafficState::with_media_type(MediaType::Both);
         assert_eq!(
-            get_diff_added(state_before, state_after).unwrap(),
+            get_diff_enabled(state_before, state_after).unwrap(),
             MediaType::Video,
         );
 
         let state_before = MediaTrafficState::with_media_type(MediaType::Video);
         let state_after = MediaTrafficState::with_media_type(MediaType::Both);
         assert_eq!(
-            get_diff_added(state_before, state_after).unwrap(),
+            get_diff_enabled(state_before, state_after).unwrap(),
             MediaType::Audio,
         );
     }
@@ -296,10 +296,10 @@ mod tests {
 
         let before = MediaTrafficState::with_media_type(MediaType::Both);
         let after = MediaTrafficState::with_media_type(MediaType::Audio);
-        assert_eq!(get_diff_removed(before, after).unwrap(), MediaType::Video);
+        assert_eq!(get_diff_disabled(before, after).unwrap(), MediaType::Video);
 
         let before = MediaTrafficState::with_media_type(MediaType::Both);
         let after = MediaTrafficState::with_media_type(MediaType::Video);
-        assert_eq!(get_diff_removed(before, after).unwrap(), MediaType::Audio);
+        assert_eq!(get_diff_disabled(before, after).unwrap(), MediaType::Audio);
     }
 }

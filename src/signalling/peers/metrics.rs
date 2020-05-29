@@ -796,7 +796,7 @@ impl PeerStat {
             {
                 self.recv_traffic_state.started(media_type);
             } else {
-                self.recv_traffic_state.stopped(media_type);
+                self.recv_traffic_state.disable(media_type);
             }
         }
     }
@@ -821,7 +821,7 @@ impl PeerStat {
             {
                 self.send_traffic_state.started(media_type);
             } else {
-                self.send_traffic_state.stopped(media_type);
+                self.send_traffic_state.disable(media_type);
             }
         }
     }
@@ -1276,7 +1276,7 @@ mod tests {
                 })
             }
 
-            self.metrics.add_stats(PeerId(1), stats);
+            self.metrics.add_stat(PeerId(1), stats);
         }
 
         /// Waits for `traffic_flows()` invocation on inner

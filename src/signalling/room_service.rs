@@ -172,7 +172,7 @@ impl RoomService {
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
-            self.peers_traffic_watcher.unregister_room(id.clone());
+            self.peer_traffic_watcher.unregister_room(id.clone());
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -214,7 +214,7 @@ impl RoomService {
         let room = match Room::new(
             &spec,
             &self.app,
-            self.peers_traffic_watcher.clone(),
+            self.peer_traffic_watcher.clone(),
         ) {
             Ok(room) => room.start(),
             Err(err) => {
@@ -224,11 +224,11 @@ impl RoomService {
         };
 
         let graceful_shutdown = self.graceful_shutdown.clone();
-        let peers_traffic_watcher = self.peers_traffic_watcher.clone();
+        let peer_traffic_watcher = self.peer_traffic_watcher.clone();
         let room_repo = self.room_repo.clone();
         async move {
-            peers_traffic_watcher
-                .register_room(spec.id().clone(), room.downgrade())
+            peer_traffic_watcher
+                .register_room(spec.id().clone(), Box::new(room.downgrade()))
                 .await
                 .map_err(RoomServiceError::TrafficWatcherMailbox)?;
             shutdown::subscribe(
