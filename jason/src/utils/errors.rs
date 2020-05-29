@@ -1,9 +1,10 @@
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
+    rc::Rc,
 };
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
@@ -33,7 +34,7 @@ pub trait JsCaused {
 }
 
 /// Wrapper for JS value which returned from JS side as error.
-#[derive(Clone, Debug, Display)]
+#[derive(Clone, Debug, Display, PartialEq)]
 #[display(fmt = "{}: {}", name, message)]
 pub struct JsError {
     /// Name of JS error.
@@ -144,3 +145,17 @@ where
 #[derive(Debug, Display, JsCaused)]
 #[display(fmt = "Handler is in detached state.")]
 pub struct HandlerDetachedError;
+
+/// Wrapper for [`serde_json::error::Error`] that provides [`Clone`], [`Debug`],
+/// [`Display`] implementations.
+#[derive(Clone, Debug, Display, From)]
+#[from(forward)]
+pub struct JsonParseError(Rc<serde_json::error::Error>);
+
+impl PartialEq for JsonParseError {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.line() == other.0.line()
+            && self.0.column() == other.0.column()
+            && self.0.classify() == other.0.classify()
+    }
+}

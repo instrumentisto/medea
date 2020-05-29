@@ -10,7 +10,7 @@ use crate::utils::{console_error, errors::JsCaused, JsError};
 /// Failed to bind to [`EventTarget`][1] event.
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
-#[derive(Clone, Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
 pub struct EventListenerBindError(JsError);
 
 /// Wrapper for closure that handles some [`EventTarget`] event.

@@ -66,8 +66,7 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(Eq, PartialEq))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `ping` message that `Media Server` is expected to send to `Client`
@@ -84,8 +83,7 @@ pub enum ServerMsg {
 }
 
 /// RPC settings of `Client` received from `Media Server`.
-#[cfg_attr(test, derive(Eq, PartialEq))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RpcSettings {
     /// Timeout of considering `Client` as lost by `Media Server` when it
     /// doesn't receive [`ClientMsg::Pong`].

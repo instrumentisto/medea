@@ -38,7 +38,6 @@ use crate::{
 #[doc(inline)]
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
-pub use self::repo::{PeerRepository, Repository};
 pub use self::{
     conn::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
@@ -48,6 +47,7 @@ pub use self::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, Sender, StableMuteState,
     },
+    repo::{PeerRepository, Repository},
     stats::RtcStats,
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
@@ -234,7 +234,7 @@ impl PeerConnection {
         ice_servers: I,
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
-    ) -> Result<Self> {
+    ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
                 .map_err(tracerr::map_from_and_wrap!())?,
@@ -253,7 +253,7 @@ impl PeerConnection {
             peer_events_sender,
             sent_stats_cache: RefCell::new(HashMap::new()),
             has_remote_description: RefCell::new(false),
-            ice_candidates_buffer: RefCell::new(vec![]),
+            ice_candidates_buffer: RefCell::new(Vec::new()),
         };
 
         // Bind to `icecandidate` event.
@@ -301,7 +301,35 @@ impl PeerConnection {
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        Ok(peer)
+        Ok(Rc::new(peer))
+    }
+
+    /// Stops inner state transitions expiry timers.
+    ///
+    /// Inner state transitions initiated via external APIs that can not be
+    /// performed immediately (must wait for Medea notification/approval) have
+    /// TTL, after which they are cancelled.
+    ///
+    /// In some cases you might want to stop expiry timers, e.g. when
+    /// connection to Medea is temporary lost.
+    ///
+    /// This currently affects only [`Senders`] mute/unmute transitions.
+    pub fn stop_state_transitions_timers(&self) {
+        self.media_connections.stop_state_transitions_timers()
+    }
+
+    /// Resets inner state transitions expiry timers.
+    ///
+    /// Inner state transitions initiated via external APIs that can not be
+    /// performed immediately (must wait for Medea notification/approval) have
+    /// TTL, after which they are cancelled.
+    ///
+    /// In some cases you might want to stop expiry timers, e.g. when
+    /// connection to Medea is temporary lost.
+    ///
+    /// This currently affects only [`Senders`] mute/unmute transitions.
+    pub fn reset_state_transitions_timers(&self) {
+        self.media_connections.reset_state_transitions_timers();
     }
 
     /// Filters out already sent stats, and send new statss from

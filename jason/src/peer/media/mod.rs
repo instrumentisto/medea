@@ -19,7 +19,7 @@ use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::PeerEvent,
-    utils::{delay_for, JsCaused, JsError},
+    utils::{resettable_delay_for, JsCaused, JsError, ResettableDelayHandle},
 };
 
 use super::{
@@ -446,6 +446,24 @@ impl MediaConnections {
                 inner.receivers.get(&id).and_then(|recv| recv.track.clone())
             })
     }
+
+    /// Stops all [`Sender`]s state transitions expiry timers.
+    pub fn stop_state_transitions_timers(&self) {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .for_each(|sender| sender.stop_mute_state_transition_timeout());
+    }
+
+    /// Resets all [`Sender`]s state transitions expiry timers.
+    pub fn reset_state_transitions_timers(&self) {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .for_each(|sender| sender.reset_mute_state_transition_timeout());
+    }
 }
 
 /// Representation of a local [`MediaStreamTrack`] that is being sent to some
@@ -456,9 +474,15 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
+    mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
 }
 
 impl Sender {
+    #[cfg(not(feature = "mockable"))]
+    const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
+    #[cfg(feature = "mockable")]
+    const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
+
     /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`,
     /// otherwise retrieves existing [`RtcRtpTransceiver`] via provided `mid`
     /// from a provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`]
@@ -490,6 +514,7 @@ impl Sender {
             track: RefCell::new(None),
             transceiver,
             mute_state,
+            mute_timeout_handle: RefCell::new(None),
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -523,12 +548,16 @@ impl Sender {
                             spawn_local(async move {
                                 let mut transitions =
                                     this.mute_state.subscribe().skip(1);
-                                let timeout = Box::pin(delay_for(
-                                    Duration::from_secs(10).into(),
-                                ));
+                                let (timeout, timeout_handle) =
+                                    resettable_delay_for(
+                                        Self::MUTE_TRANSITION_TIMEOUT,
+                                    );
+                                this.mute_timeout_handle
+                                    .borrow_mut()
+                                    .replace(timeout_handle);
                                 match future::select(
                                     transitions.next(),
-                                    timeout,
+                                    Box::pin(timeout),
                                 )
                                 .await
                                 {
@@ -554,6 +583,20 @@ impl Sender {
         });
 
         Ok(this)
+    }
+
+    /// Stops mute/unmute timeout of this [`Sender`].
+    pub fn stop_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.stop();
+        }
+    }
+
+    /// Resets mute/unmute timeout of this [`Sender`].
+    pub fn reset_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.reset();
+        }
     }
 
     /// Returns [`TrackId`] of this [`Sender`].
