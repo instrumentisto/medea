@@ -889,6 +889,12 @@ pub enum KnownIceCandidatePairState {
     /// unfreeze and move into the [`KnownIceCandidatePairState::Waiting`]
     /// state.
     Frozen,
+
+    /// Other Candidate pair was nominated.
+    ///
+    /// This state is **obsolete and not spec compliant**, however, it still
+    /// may be emitted by some implementations.
+    Cancelled,
 }
 
 /// Non-exhaustive version of [`KnownIceCandidatePairState`].
