@@ -129,10 +129,10 @@ impl WeakEndpoint {
     pub fn upgrade(&self) -> Option<Endpoint> {
         match self {
             WeakEndpoint::WebRtcPublishEndpoint(publish_endpoint) => {
-                publish_endpoint.safe_upgrade().map(|e| e.into())
+                publish_endpoint.safe_upgrade().map(Into::into)
             }
             WeakEndpoint::WebRtcPlayEndpoint(play_endpoint) => {
-                play_endpoint.safe_upgrade().map(|e| e.into())
+                play_endpoint.safe_upgrade().map(Into::into)
             }
         }
     }

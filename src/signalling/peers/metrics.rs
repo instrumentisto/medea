@@ -195,8 +195,8 @@ impl PeersMetricsService {
     /// Notifies [`PeerTrafficWatcher`] about traffic flowing/stopping.
     ///
     /// Also, from this function can be sent
-    /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
-    /// TrackTrafficStarted`] to the [`Room`] if some
+    /// [`PeersMetricsEvent::WrongTrafficFlowing`] or
+    /// [`PeersMetricsEvent::TrackTrafficStarted`] to the [`Room`] if some
     /// [`MediaType`]/[`Direction`] was stopped.
     pub fn add_stat(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
@@ -706,8 +706,8 @@ impl PeerStat {
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
     ) {
-        let track_media_type = TrackMediaType::from(&upd.media_type);
-        if self.is_sender_stopped_in_spec(track_media_type) {
+        let media_type = TrackMediaType::from(&upd.media_type);
+        if self.is_sender_stopped_in_spec(media_type) {
             return;
         }
 
@@ -717,7 +717,7 @@ impl PeerStat {
             updated_at: Instant::now(),
             ttl,
             direction: Send { packets_sent: 0 },
-            media_type: track_media_type,
+            media_type,
         });
         sender.update(upd);
         if sender.is_flowing() {
@@ -739,8 +739,8 @@ impl PeerStat {
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
     ) {
-        let track_media_type = TrackMediaType::from(&upd.media_specific_stats);
-        if self.is_receiver_stopped_in_spec(track_media_type) {
+        let media_type = TrackMediaType::from(&upd.media_specific_stats);
+        if self.is_receiver_stopped_in_spec(media_type) {
             return;
         }
 
@@ -753,7 +753,7 @@ impl PeerStat {
                 direction: Recv {
                     packets_received: 0,
                 },
-                media_type: track_media_type,
+                media_type,
             });
         receiver.update(upd);
         if receiver.is_flowing() {

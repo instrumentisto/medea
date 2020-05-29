@@ -14,7 +14,9 @@ use crate::{
             RpcConnectionSettings,
         },
         control::{
-            callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
+            callback::{
+                CallbackRequest, OnJoinEvent, OnLeaveEvent, OnLeaveReason,
+            },
             MemberId,
         },
         RpcServer,
@@ -25,7 +27,6 @@ use crate::{
 };
 
 use super::{ActFuture, Room};
-use crate::api::control::callback::CallbackRequest;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]

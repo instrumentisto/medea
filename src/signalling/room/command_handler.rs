@@ -10,18 +10,16 @@ use medea_client_api_proto::{
 };
 
 use crate::{
+    api::control::callback::MediaType,
     log::prelude::*,
     media::{
         New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
+    signalling::elements::endpoints::Endpoint,
 };
 
 use super::{ActFuture, Room, RoomError};
-use crate::{
-    api::control::callback::MediaType,
-    signalling::elements::endpoints::Endpoint,
-};
 
 impl CommandHandler for Room {
     type Output = Result<ActFuture<Result<(), RoomError>>, RoomError>;

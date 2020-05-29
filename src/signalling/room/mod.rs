@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use actix::{
     Actor, ActorFuture, AsyncContext, Context, ContextFutureSpawner as _,
@@ -20,7 +20,7 @@ use crate::{
     api::control::{
         callback::{
             clients::CallbackClientFactoryImpl, service::CallbackService,
-            OnLeaveEvent, OnLeaveReason,
+            CallbackRequest, OnLeaveEvent, OnLeaveReason,
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
         room::RoomSpec,
@@ -39,11 +39,9 @@ use crate::{
     AppContext,
 };
 
-use crate::api::control::callback::CallbackRequest;
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
-use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;

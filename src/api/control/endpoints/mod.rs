@@ -7,7 +7,7 @@ pub mod webrtc_publish_endpoint;
 
 use std::convert::TryFrom;
 
-use derive_more::{Display, From, Into};
+use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -19,29 +19,22 @@ pub use webrtc_play_endpoint::{WebRtcPlayEndpoint, WebRtcPlayId};
 pub use webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId};
 
 /// ID of `Endpoint`.
-#[derive(
-    Clone, Debug, Deserialize, Display, Eq, From, Hash, Into, PartialEq,
-)]
-pub struct Id(pub String);
+#[derive(Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq)]
+#[from(forward)]
+pub struct Id(String);
 
-macro_rules! impl_from_into {
+macro_rules! impl_from {
     ($id:ty) => {
         impl std::convert::From<Id> for $id {
             fn from(id: Id) -> Self {
-                String::from(id).into()
-            }
-        }
-
-        impl std::convert::From<$id> for Id {
-            fn from(id: $id) -> Self {
-                String::from(id).into()
+                <$id>::from(id.0)
             }
         }
     };
 }
 
-impl_from_into!(WebRtcPublishId);
-impl_from_into!(WebRtcPlayId);
+impl_from!(WebRtcPublishId);
+impl_from!(WebRtcPlayId);
 
 /// Media element that one or more media data streams flow through.
 #[derive(Debug, From)]

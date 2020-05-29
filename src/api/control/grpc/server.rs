@@ -290,7 +290,6 @@ impl ControlApi for ControlApiService {
                     error: Some(err.into()),
                 },
             };
-
         Ok(tonic::Response::new(create_response))
     }
 
@@ -305,7 +304,6 @@ impl ControlApi for ControlApiService {
                 error: Some(e.into()),
             },
         };
-
         Ok(tonic::Response::new(response))
     }
 
@@ -324,7 +322,6 @@ impl ControlApi for ControlApiService {
                 error: Some(e.into()),
             },
         };
-
         Ok(tonic::Response::new(response))
     }
 }

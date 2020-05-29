@@ -4,17 +4,24 @@
 
 use std::convert::TryFrom;
 
-use derive_more::{Display, From, Into};
+use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{callback::url::CallbackUrl, TryFromProtobufError};
 
+use super::Id as EndpointId;
+
 /// ID of [`WebRtcPublishEndpoint`].
-#[derive(
-    Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From, Into,
-)]
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
+#[from(forward)]
 pub struct WebRtcPublishId(String);
+
+impl std::convert::From<WebRtcPublishId> for EndpointId {
+    fn from(id: WebRtcPublishId) -> Self {
+        EndpointId::from(id.0)
+    }
+}
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Deserialize, Debug)]

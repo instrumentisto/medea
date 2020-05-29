@@ -7,26 +7,23 @@ use std::iter;
 
 use actix::{AsyncContext, Handler, StreamHandler};
 use chrono::{DateTime, Utc};
+use medea_client_api_proto::PeerId;
 
 use crate::{
-    api::control::callback::MediaType,
+    api::control::callback::{MediaDirection, MediaType},
     log::prelude::*,
     media::PeerStateMachine,
     signalling::{
-        elements::endpoints::Endpoint,
-        peers::{PeerStarted, PeerStopped, PeersMetricsEventHandler},
+        elements::endpoints::{webrtc::WebRtcPublishEndpoint, Endpoint},
+        peers::{
+            PeerStarted, PeerStopped, PeersMetricsEvent,
+            PeersMetricsEventHandler,
+        },
+        room::ActFuture,
     },
 };
 
 use super::Room;
-use crate::{
-    api::control::callback::MediaDirection,
-    signalling::{
-        elements::endpoints::webrtc::WebRtcPublishEndpoint,
-        peers::PeersMetricsEvent, room::ActFuture,
-    },
-};
-use medea_client_api_proto::PeerId;
 
 impl Handler<PeerStarted> for Room {
     type Result = ();

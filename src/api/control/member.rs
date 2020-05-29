@@ -223,8 +223,10 @@ impl TryFrom<proto::Member> for MemberSpec {
         let mut pipeline = HashMap::new();
         for (id, member_element) in member.pipeline {
             if let Some(elem) = member_element.el {
-                let endpoint =
-                    EndpointSpec::try_from((EndpointId(id.clone()), elem))?;
+                let endpoint = EndpointSpec::try_from((
+                    EndpointId::from(id.clone()),
+                    elem,
+                ))?;
                 pipeline.insert(id.into(), endpoint.into());
             } else {
                 return Err(TryFromProtobufError::EmptyElement(id));
@@ -271,7 +273,6 @@ macro_rules! impl_try_from_proto_for_member {
                 (id, proto): (Id, $proto),
             ) -> Result<Self, Self::Error> {
                 use $proto as proto_el;
-
                 match proto {
                     proto_el::Member(member) => Self::try_from(member),
                     _ => Err(TryFromProtobufError::ExpectedOtherElement(

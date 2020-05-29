@@ -416,7 +416,7 @@ impl Member {
             return Ok(Endpoint::WebRtcPublishEndpoint(publish_endpoint));
         }
 
-        let webrtc_play_id = String::from(webrtc_publish_id).into();
+        let webrtc_play_id = EndpointId::from(webrtc_publish_id).into();
         if let Some(play_endpoint) = self.get_sink_by_id(&webrtc_play_id) {
             return Ok(Endpoint::WebRtcPlayEndpoint(play_endpoint));
         }

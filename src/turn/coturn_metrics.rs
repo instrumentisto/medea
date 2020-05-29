@@ -155,6 +155,7 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
                 return;
             }
         };
+
         let username = CoturnUsername {
             room_id: event.room_id.clone(),
             peer_id: event.peer_id,

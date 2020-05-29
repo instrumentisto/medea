@@ -117,7 +117,7 @@ impl Room {
                     ));
                 }
             } else {
-                let publish_id = String::from(play_id).into();
+                let publish_id = EndpointId::from(play_id).into();
                 if let Some(endpoint) = member.take_src(&publish_id) {
                     let peer_ids = endpoint.peer_ids();
                     removed_peers =
@@ -170,7 +170,7 @@ impl Room {
         let is_member_have_this_src_id =
             member.get_src_by_id(&publish_id).is_some();
 
-        let play_id = String::from(publish_id).into();
+        let play_id = EndpointId::from(publish_id).into();
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&play_id).is_some();
 
@@ -181,7 +181,7 @@ impl Room {
         }
 
         let endpoint = WebRtcPublishEndpoint::new(
-            String::from(play_id).into(),
+            EndpointId::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
             spec.force_relay,
@@ -226,7 +226,7 @@ impl Room {
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&endpoint_id).is_some();
 
-        let publish_id = String::from(endpoint_id).into();
+        let publish_id = EndpointId::from(endpoint_id).into();
         let is_member_have_this_src_id =
             member.get_src_by_id(&publish_id).is_some();
         if is_member_have_this_sink_id || is_member_have_this_src_id {
@@ -247,7 +247,7 @@ impl Room {
             })?;
 
         let sink = WebRtcPlayEndpoint::new(
-            String::from(publish_id).into(),
+            EndpointId::from(publish_id).into(),
             spec.src,
             src.downgrade(),
             member.downgrade(),
