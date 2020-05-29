@@ -102,16 +102,14 @@ impl PeerRepository for Repository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         is_force_relayed: bool,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
-        let peer = Rc::new(
-            PeerConnection::new(
-                id,
-                peer_events_sender,
-                ice_servers,
-                Rc::clone(&self.media_manager),
-                is_force_relayed,
-            )
-            .map_err(tracerr::map_from_and_wrap!())?,
-        );
+        let peer = PeerConnection::new(
+            id,
+            peer_events_sender,
+            ice_servers,
+            Rc::clone(&self.media_manager),
+            is_force_relayed,
+        )
+        .map_err(tracerr::map_from_and_wrap!())?;
         self.peers.borrow_mut().insert(id, Rc::clone(&peer));
         Ok(peer)
     }

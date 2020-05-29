@@ -5,7 +5,7 @@ use std::time::Duration;
 use medea_jason::rpc::BackoffDelayer;
 use wasm_bindgen_test::*;
 
-use crate::await_with_timeout;
+use crate::timeout;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -19,15 +19,9 @@ async fn multiplier_works() {
         1.5,
         Duration::from_millis(100).into(),
     );
-    await_with_timeout(Box::pin(delayer.delay()), 13)
-        .await
-        .unwrap();
-    await_with_timeout(Box::pin(delayer.delay()), 18)
-        .await
-        .unwrap();
-    await_with_timeout(Box::pin(delayer.delay()), 25)
-        .await
-        .unwrap();
+    timeout(13, delayer.delay()).await.unwrap();
+    timeout(18, delayer.delay()).await.unwrap();
+    timeout(25, delayer.delay()).await.unwrap();
 }
 
 /// Tests that `delay` wouldn't be greater than provided `max_delay`.
@@ -38,15 +32,9 @@ async fn max_delay_works() {
         2.0,
         Duration::from_millis(100).into(),
     );
-    await_with_timeout(Box::pin(delayer.delay()), 53)
-        .await
-        .unwrap();
-    await_with_timeout(Box::pin(delayer.delay()), 103)
-        .await
-        .unwrap();
-    await_with_timeout(Box::pin(delayer.delay()), 103)
-        .await
-        .unwrap();
+    timeout(53, delayer.delay()).await.unwrap();
+    timeout(103, delayer.delay()).await.unwrap();
+    timeout(103, delayer.delay()).await.unwrap();
 }
 
 /// Tests that multiplication of [`JsDuration`] by negative `multiplier`
@@ -59,13 +47,7 @@ async fn negative_multiplier() {
         -2.0,
         Duration::from_millis(100).into(),
     );
-    await_with_timeout(Box::pin(delayer.delay()), 13)
-        .await
-        .unwrap();
-    await_with_timeout(Box::pin(delayer.delay()), 3)
-        .await
-        .unwrap();
-    await_with_timeout(Box::pin(delayer.delay()), 3)
-        .await
-        .unwrap();
+    timeout(13, delayer.delay()).await.unwrap();
+    timeout(3, delayer.delay()).await.unwrap();
+    timeout(3, delayer.delay()).await.unwrap();
 }
