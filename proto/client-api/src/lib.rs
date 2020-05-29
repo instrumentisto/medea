@@ -262,7 +262,7 @@ impl From<IceConnectionState> for PeerConnectionState {
         match ice_con_state {
             IceState::New => Self::New,
             IceState::Checking => Self::Connecting,
-            IceState::Connected | From::Completed => Self::Connected,
+            IceState::Connected | IceState::Completed => Self::Connected,
             IceState::Failed => Self::Failed,
             IceState::Disconnected => Self::Disconnected,
             IceState::Closed => Self::Closed,
@@ -350,7 +350,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to start
     /// renegotiation, creating new SDP Offer.
-    RenegotiationStarted { peer_id: PeerId },
+    RenegotiationStarted { peer_id: PeerId, ice_restart: bool },
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Offer to Web Client's RTCPeerConnection.

@@ -851,7 +851,7 @@ async fn reset_transition_timers() {
     let (audio_track, video_track) = get_test_tracks(false, false);
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
+    peer.get_offer(vec![audio_track, video_track], None, false)
         .await
         .unwrap();
 

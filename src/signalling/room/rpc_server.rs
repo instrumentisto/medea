@@ -315,11 +315,12 @@ mod test {
     use crate::{
         api::control::{pipeline::Pipeline, MemberSpec, RoomId, RoomSpec},
         conf::{self, Conf},
+        media::Peer,
         signalling::peers::build_peers_traffic_watcher,
         AppContext,
     };
 
-    use medea_client_api_proto::IceCandidate;
+    use medea_client_api_proto::{IceCandidate, PeerConnectionState};
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
@@ -381,22 +382,24 @@ mod test {
     async fn command_validation_peer_does_not_belong_to_member() {
         let mut room = empty_room();
 
-        let member1 = MemberSpec::new(
-            Pipeline::new(HashMap::new()),
-            String::from("w/e"),
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        room.peers.add_peer(Peer::new(
+            PeerId(0),
+            MemberId::from("member_1"),
+            PeerId(1),
+            MemberId::from("member_2"),
+            false,
+        ));
 
-        room.members
-            .create_member(MemberId(String::from("member1")), &member1)
-            .unwrap();
+        room.peers.add_peer(Peer::new(
+            PeerId(1),
+            MemberId::from("member_2"),
+            PeerId(0),
+            MemberId::from("member_1"),
+            false,
+        ));
 
         let no_such_peer = CommandMessage::new(
-            MemberId(String::from("member1")),
+            MemberId::from("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -411,7 +414,52 @@ mod test {
 
         assert_eq!(
             validation,
-            Err(CommandValidationError::PeerNotFound(PeerId(1)))
+            Err(CommandValidationError::PeerBelongsToAnotherMember(
+                PeerId(1),
+                MemberId(String::from("member_2"))
+            ))
+        );
+    }
+
+    #[actix_rt::test]
+    async fn simple_update_peer_connection_state() {
+        let mut room: Room = empty_room();
+        let peer_id = PeerId(0);
+
+        room.peers.add_peer(Peer::new(
+            peer_id,
+            MemberId::from("member_1"),
+            PeerId(1),
+            MemberId::from("member_2"),
+            false,
+        ));
+
+        room.update_peer_connection_state(
+            peer_id,
+            PeerConnectionState::Connecting,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            room.peers
+                .get_peer_by_id(peer_id)
+                .unwrap()
+                .connection_state(),
+            PeerConnectionState::Connecting
+        );
+
+        room.update_peer_connection_state(
+            peer_id,
+            PeerConnectionState::Connected,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            room.peers
+                .get_peer_by_id(peer_id)
+                .unwrap()
+                .connection_state(),
+            PeerConnectionState::Connected
         );
     }
 }

@@ -19,7 +19,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{peer::Stable, Peer, PeerError, PeerStateMachine, IceUser},
+    media::{peer::Stable, IceUser, Peer, PeerError, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -515,7 +515,11 @@ mod test {
 
     use super::*;
 
-    use crate::{media::WaitRemoteSdp, turn::new_turn_auth_service_mock};
+    use crate::{
+        media::WaitRemoteSdp,
+        signalling::peers::traffic_watcher::MockPeerTrafficWatcher,
+        turn::new_turn_auth_service_mock,
+    };
 
     #[test]
     fn take_inner_peer() {
@@ -530,12 +534,20 @@ mod test {
         let mut peers = HashMap::new();
         peers.insert(peer.id(), peer.into());
 
-        let mut repo = PeerRepository {
+        let watcher: Arc<dyn PeerTrafficWatcher> =
+            Arc::new(MockPeerTrafficWatcher::new());
+        let mut repo = PeersService {
             room_id: RoomId::from("w/e"),
             turn_service: new_turn_auth_service_mock(),
             peers,
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
+            peers_traffic_watcher: Arc::clone(&watcher),
+            peer_metrics_service: PeersMetricsService::new(
+                RoomId::from("w/e"),
+                Arc::clone(&watcher),
+            ),
+            peer_stats_ttl: Default::default(),
         };
 
         // bad id

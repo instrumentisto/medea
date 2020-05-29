@@ -516,6 +516,7 @@ pub mod tests {
                 ice_user: None,
                 endpoints: Vec::new(),
                 partner_member: MemberId::from("partner-member"),
+                connection_state: RefCell::new(PeerConnectionState::New),
             },
         };
 

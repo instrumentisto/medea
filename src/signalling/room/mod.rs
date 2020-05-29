@@ -27,7 +27,7 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{New, Peer, PeerError},
+    media::{peer::Stable, Peer, PeerError},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
@@ -175,15 +175,15 @@ impl Room {
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
     /// which of them has any outbound tracks. That [`Peer`] state will be
     /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
-    /// [`New`] state. At least one of provided peers must have outbound
+    /// [`Stable`] state. At least one of provided peers must have outbound
     /// tracks.
     fn send_peer_created(
         &mut self,
         peer1_id: PeerId,
         peer2_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
+        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
+        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
 
         // decide which peer is sender
         let (sender, receiver) = if peer1.is_sender() {
