@@ -256,14 +256,14 @@ mod tracks_state_tests {
         let state_after = MediaTrafficState::with_media_type(MediaType::Both);
         assert_eq!(
             get_diff_added(state_before, state_after).unwrap(),
-            MediaType::Video
+            MediaType::Video,
         );
 
         let state_before = MediaTrafficState::with_media_type(MediaType::Video);
         let state_after = MediaTrafficState::with_media_type(MediaType::Both);
         assert_eq!(
             get_diff_added(state_before, state_after).unwrap(),
-            MediaType::Audio
+            MediaType::Audio,
         );
     }
 

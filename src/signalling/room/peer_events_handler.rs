@@ -33,10 +33,10 @@ struct PeerStarted(pub PeerId);
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 struct PeerStopped {
-    /// [`PeerId`] of the `Peer` which traffic was stopped.
+    /// ID of the `Peer` which traffic was stopped.
     peer_id: PeerId,
 
-    /// [`DateTime`] at which this `Peer` was stopped.
+    /// [`DateTime`] when this `Peer` was stopped.
     at: DateTime<Utc>,
 }
 
