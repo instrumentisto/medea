@@ -211,7 +211,7 @@ impl<T> Peer<T> {
     /// Returns [`Track`]s of this [`Peer`].
     pub fn tracks(&self) -> Vec<Track> {
         let tracks = self.context.senders.iter().fold(
-            vec![],
+            Vec::new(),
             |mut tracks, (_, track)| {
                 tracks.push(Track {
                     id: track.id,
@@ -470,5 +470,68 @@ impl Peer<Stable> {
             );
         }
         Ok(mids)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    /// Returns [`PeerStateMachine`] with provided count of the `MediaTrack`s
+    /// media types.
+    pub fn test_peer_from_peer_tracks(
+        send_audio: u32,
+        send_video: u32,
+        recv_audio: u32,
+        recv_video: u32,
+    ) -> PeerStateMachine {
+        let mut peer = Peer {
+            state: Stable {},
+            context: Context {
+                id: Id(1),
+                sdp_offer: None,
+                sdp_answer: None,
+                senders: HashMap::new(),
+                receivers: HashMap::new(),
+                member_id: MemberId::from("test-member"),
+                is_force_relayed: false,
+                partner_peer: Id(2),
+                ice_user: None,
+                endpoints: Vec::new(),
+                partner_member: MemberId::from("partner-member"),
+            },
+        };
+
+        let mut track_id_counter = Counter::default();
+
+        for _ in 0..send_audio {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            peer.context.senders.insert(track_id, Rc::new(track));
+        }
+
+        for _ in 0..send_video {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            peer.context.senders.insert(track_id, Rc::new(track));
+        }
+
+        for _ in 0..recv_audio {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            peer.context.receivers.insert(track_id, Rc::new(track));
+        }
+
+        for _ in 0..recv_video {
+            let track_id = track_id_counter.next_id();
+            let track =
+                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            peer.context.receivers.insert(track_id, Rc::new(track));
+        }
+
+        peer.into()
     }
 }

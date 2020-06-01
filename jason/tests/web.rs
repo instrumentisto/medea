@@ -78,11 +78,9 @@ mod api;
 mod media;
 mod peer;
 mod rpc;
+mod utils;
 
-use futures::{
-    channel::oneshot,
-    future::{Either, LocalBoxFuture},
-};
+use futures::{channel::oneshot, future::Either, Future};
 use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
@@ -152,7 +150,7 @@ pub fn get_test_tracks(
 }
 
 /// Resolves after provided number of milliseconds.
-pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
+pub async fn delay_for(delay_ms: i32) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
             .set_timeout_with_callback_and_timeout_and_arguments_0(
@@ -160,8 +158,8 @@ pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
             )
             .unwrap();
     }))
-    .await?;
-    Ok(())
+    .await
+    .unwrap();
 }
 
 /// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
@@ -173,8 +171,7 @@ async fn wait_and_check_test_result(
     finally: impl FnOnce(),
 ) {
     let result =
-        futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
-            .await;
+        futures::future::select(Box::pin(rx), Box::pin(delay_for(500))).await;
     finally();
     match result {
         Either::Left((oneshot_fut_result, _)) => {
@@ -191,14 +188,24 @@ async fn wait_and_check_test_result(
 /// provided `timeout` time this [`LocalBoxFuture`] won'tbe resolved, then
 /// `Err(String)` will be returned, otherwise a result of the provided
 /// [`LocalBoxFuture`] will be returned.
-async fn await_with_timeout<T>(
-    f: LocalBoxFuture<'_, T>,
-    timeout: i32,
-) -> Result<T, String> {
-    match futures::future::select(f, Box::pin(resolve_after(timeout))).await {
+async fn timeout<T>(timeout: i32, future: T) -> Result<T::Output, String>
+where
+    T: Future,
+{
+    match futures::future::select(
+        Box::pin(future),
+        Box::pin(delay_for(timeout)),
+    )
+    .await
+    {
         Either::Left((res, _)) => Ok(res),
         Either::Right((_, _)) => Err("Future timed out.".to_string()),
     }
+}
+
+/// Async [`std::thread::yield_now`].
+pub async fn yield_now() {
+    delay_for(0).await;
 }
 
 // TODO: Might be extended to proc macro at some point.

@@ -5,6 +5,7 @@ mod errors;
 
 mod callback;
 mod event_listener;
+mod resettable_delay;
 
 use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
@@ -20,8 +21,10 @@ pub use self::{
     callback::{Callback, Callback2},
     errors::{
         console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
+        JsonParseError,
     },
     event_listener::{EventListener, EventListenerBindError},
+    resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
 
 /// Returns [`Window`] object.
