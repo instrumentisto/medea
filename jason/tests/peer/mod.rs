@@ -483,7 +483,9 @@ impl InterconnectedPeers {
                     receivers: vec![PeerId(2)],
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {}),
+                media_type: MediaType::Audio(AudioSettings {
+                    is_important: true,
+                }),
                 is_muted: false,
             },
             Track {
@@ -492,7 +494,9 @@ impl InterconnectedPeers {
                     receivers: vec![PeerId(2)],
                     mid: None,
                 },
-                media_type: MediaType::Video(VideoSettings {}),
+                media_type: MediaType::Video(VideoSettings {
+                    is_important: true,
+                }),
                 is_muted: false,
             },
         ]
@@ -507,7 +511,9 @@ impl InterconnectedPeers {
                     sender: PeerId(1),
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {}),
+                media_type: MediaType::Audio(AudioSettings {
+                    is_important: true,
+                }),
                 is_muted: false,
             },
             Track {
@@ -516,7 +522,9 @@ impl InterconnectedPeers {
                     sender: PeerId(2),
                     mid: None,
                 },
-                media_type: MediaType::Video(VideoSettings {}),
+                media_type: MediaType::Video(VideoSettings {
+                    is_important: true,
+                }),
                 is_muted: false,
             },
         ]

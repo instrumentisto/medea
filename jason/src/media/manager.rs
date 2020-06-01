@@ -91,7 +91,6 @@ impl GetUserMediaError {
 pub enum GetUserMediaType {
     Audio,
     Video,
-    Both,
 }
 use crate::utils::console_error;
 use std::fmt;
@@ -101,7 +100,6 @@ impl fmt::Display for GetUserMediaType {
         let to_write = match self {
             Self::Audio => "audio",
             Self::Video => "video",
-            Self::Both => "both",
         };
         write!(f, "{}", to_write)
     }
@@ -120,7 +118,7 @@ impl TryFrom<&MediaManagerError> for GetUserMediaError {
                 } else if e.message.contains("video") {
                     GetUserMediaType::Video
                 } else {
-                    GetUserMediaType::Both
+                    return Err(());
                 };
 
                 Ok(Self { media_type })
@@ -490,16 +488,12 @@ impl MediaManagerHandle {
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
                     .map_err(|e| {
-                        let out = if let Ok(err) =
-                            GetUserMediaError::try_from(e.as_ref())
+                        if let Ok(err) = GetUserMediaError::try_from(e.as_ref())
                         {
-                            JasonError::from(e).print();
                             err.into()
                         } else {
                             JasonError::from(e).into()
-                        };
-
-                        out
+                        }
                     })
             }),
             Err(err) => future_to_promise(future::err(err)),

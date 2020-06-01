@@ -18,6 +18,7 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, wait_and_check_test_result, MockNavigator};
+use medea_jason::peer::{PeerError::StreamRequest, StreamRequestError};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -410,8 +411,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
             err.message(),
-            "Invalid local stream: provided MediaStream was expected to have \
-             single video track"
+            "Invalid local stream: Provided stream does not have all \
+             necessary Tracks"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -452,8 +453,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local stream: provided MediaStream was expected to have \
-             single video track"
+            "Invalid local stream: Provided stream does not have all \
+             necessary Tracks"
         );
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
@@ -832,7 +833,9 @@ mod patches_generation {
             let audio_track = Track {
                 id: audio_track_id,
                 is_muted: (audio_track_muted_state_fn)(i),
-                media_type: MediaType::Audio(AudioSettings {}),
+                media_type: MediaType::Audio(AudioSettings {
+                    is_important: true,
+                }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
                     mid: None,
@@ -841,7 +844,9 @@ mod patches_generation {
             let video_track = Track {
                 id: video_track_id,
                 is_muted: false,
-                media_type: MediaType::Video(VideoSettings {}),
+                media_type: MediaType::Video(VideoSettings {
+                    is_important: true,
+                }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
                     mid: None,
