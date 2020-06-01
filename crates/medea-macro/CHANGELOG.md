@@ -26,10 +26,6 @@ All user visible changes to this project will be documented in this file. This p
 [#68]: /../../pull/68
 [#91]: /../../pull/91
 
-### Fixed
-
-- `#[enum_delegate]` macro now works fine with functions with multiple arguments ([#91](/../../pull/91).
-
 
 
 

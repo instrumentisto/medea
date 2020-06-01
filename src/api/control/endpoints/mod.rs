@@ -21,20 +21,26 @@ pub use webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId};
 /// ID of `Endpoint`.
 #[derive(Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq)]
 #[from(forward)]
-pub struct Id(String);
+pub struct Id(pub String);
 
-macro_rules! impl_from {
+macro_rules! impl_from_into {
     ($id:ty) => {
         impl std::convert::From<Id> for $id {
             fn from(id: Id) -> Self {
                 <$id>::from(id.0)
             }
         }
+
+        impl std::convert::From<$id> for Id {
+            fn from(id: $id) -> Self {
+                Id::from(id.0)
+            }
+        }
     };
 }
 
-impl_from!(WebRtcPublishId);
-impl_from!(WebRtcPlayId);
+impl_from_into!(WebRtcPublishId);
+impl_from_into!(WebRtcPlayId);
 
 /// Media element that one or more media data streams flow through.
 #[derive(Debug, From)]

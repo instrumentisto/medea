@@ -10,18 +10,10 @@ use serde::Deserialize;
 
 use crate::api::control::{callback::url::CallbackUrl, TryFromProtobufError};
 
-use super::Id as EndpointId;
-
 /// ID of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
 #[from(forward)]
-pub struct WebRtcPublishId(String);
-
-impl std::convert::From<WebRtcPublishId> for EndpointId {
-    fn from(id: WebRtcPublishId) -> Self {
-        EndpointId::from(id.0)
-    }
-}
+pub struct WebRtcPublishId(pub String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Deserialize, Debug)]

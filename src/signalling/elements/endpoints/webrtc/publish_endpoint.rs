@@ -476,8 +476,8 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     fn into(self) -> proto::WebRtcPublishEndpoint {
         let p2p: proto::web_rtc_publish_endpoint::P2p = self.p2p().into();
         proto::WebRtcPublishEndpoint {
+            id: self.id().0,
             p2p: p2p as i32,
-            id: self.id().to_string(),
             force_relay: self.is_force_relayed(),
             on_stop: self.0.borrow().on_stop.as_ref().map(ToString::to_string),
             on_start: self

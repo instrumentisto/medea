@@ -12,18 +12,10 @@ use crate::api::control::{
     callback::url::CallbackUrl, refs::SrcUri, TryFromProtobufError,
 };
 
-use super::Id as EndpointId;
-
 /// ID of [`WebRtcPlayEndpoint`].
 #[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
 #[from(forward)]
-pub struct WebRtcPlayId(String);
-
-impl std::convert::From<WebRtcPlayId> for EndpointId {
-    fn from(id: WebRtcPlayId) -> Self {
-        EndpointId::from(id.0)
-    }
-}
+pub struct WebRtcPlayId(pub String);
 
 /// Media element which is able to play media data for client via WebRTC.
 #[derive(Clone, Deserialize, Debug)]

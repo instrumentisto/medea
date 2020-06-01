@@ -86,7 +86,7 @@ enum MediaDirection {
 
 impl From<proto::MediaDirection> for MediaDirection {
     fn from(proto: proto::MediaDirection) -> Self {
-        use proto::MediaDirection::*;
+        use proto::MediaDirection::{Play, Publish};
 
         match proto {
             Publish => Self::Publish,

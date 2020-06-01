@@ -141,7 +141,7 @@ pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
 /// Implementation of `Delete` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::needless_pass_by_value, clippy::wildcard_imports)]
+#[allow(clippy::needless_pass_by_value)]
 mod delete {
     use super::{error, Context, Data, HttpResponse, Response};
 
@@ -155,7 +155,7 @@ mod delete {
 /// Implementation of `Get` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::needless_pass_by_value, clippy::wildcard_imports)]
+#[allow(clippy::needless_pass_by_value)]
 mod get {
     use super::{error, Context, Data, HttpResponse, SingleGetResponse};
 
