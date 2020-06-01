@@ -35,6 +35,90 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub enum PublishingMode {
+    Required,
+    IfPossible,
+}
+
+impl From<proto::web_rtc_publish_endpoint::PublishingMode> for PublishingMode {
+    fn from(proto: proto::web_rtc_publish_endpoint::PublishingMode) -> Self {
+        use proto::web_rtc_publish_endpoint::PublishingMode;
+
+        match proto {
+            PublishingMode::Required => Self::Required,
+            PublishingMode::IfPossible => Self::IfPossible,
+        }
+    }
+}
+
+impl From<PublishingMode> for proto::web_rtc_publish_endpoint::PublishingMode {
+    fn from(from: PublishingMode) -> Self {
+        match from {
+            PublishingMode::IfPossible => Self::IfPossible,
+            PublishingMode::Required => Self::Required,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AudioSettings {
+    publishing_mode: PublishingMode,
+}
+
+impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
+    fn from(proto: proto::web_rtc_publish_endpoint::AudioSettings) -> Self {
+        Self {
+            publishing_mode:
+                proto::web_rtc_publish_endpoint::PublishingMode::from_i32(
+                    proto.publishing_mode,
+                )
+                .unwrap_or_default()
+                .into(),
+        }
+    }
+}
+
+impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
+    fn from(from: AudioSettings) -> Self {
+        Self {
+            publishing_mode:
+                proto::web_rtc_publish_endpoint::PublishingMode::from(
+                    from.publishing_mode,
+                ) as i32,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VideoSettings {
+    publishing_mode: PublishingMode,
+}
+
+impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
+    fn from(from: VideoSettings) -> Self {
+        Self {
+            publishing_mode:
+                proto::web_rtc_publish_endpoint::PublishingMode::from(
+                    from.publishing_mode,
+                ) as i32,
+        }
+    }
+}
+
+impl From<proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
+    fn from(proto: proto::web_rtc_publish_endpoint::VideoSettings) -> Self {
+        Self {
+            publishing_mode:
+                proto::web_rtc_publish_endpoint::PublishingMode::from_i32(
+                    proto.publishing_mode,
+                )
+                .unwrap_or_default()
+                .into(),
+        }
+    }
+}
+
 /// [Control API]'s `WebRtcPublishEndpoint` representation.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
@@ -50,6 +134,10 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
     force_relay: bool,
+
+    audio_settings: Option<AudioSettings>,
+
+    video_settings: Option<VideoSettings>,
 }
 
 impl WebRtcPublishEndpoint {
@@ -64,9 +152,8 @@ impl WebRtcPublishEndpoint {
             force_relay: self.force_relay,
             on_start: String::new(),
             on_stop: String::new(),
-            // TODO
-            audio_settings: None,
-            video_settings: None,
+            audio_settings: self.audio_settings.map(|s| s.into()),
+            video_settings: self.video_settings.map(|s| s.into()),
         }
     }
 }
@@ -79,6 +166,8 @@ impl From<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
                 .unwrap_or_default()
                 .into(),
             force_relay: proto.force_relay,
+            audio_settings: proto.audio_settings.map(|s| s.into()),
+            video_settings: proto.video_settings.map(|s| s.into()),
         }
     }
 }
