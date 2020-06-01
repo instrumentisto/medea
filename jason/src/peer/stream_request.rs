@@ -120,10 +120,7 @@ impl SimpleStreamRequest {
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
     /// [`MediaStream`] doesn't have expected video track.
     pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
-        use StreamRequestError::{
-            ExpectedAudioTracks, ExpectedVideoTracks, InvalidAudioTrack,
-            InvalidVideoTrack,
-        };
+        use StreamRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let result_stream = PeerMediaStream::new();
 

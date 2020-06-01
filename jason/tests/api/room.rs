@@ -18,7 +18,6 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, wait_and_check_test_result, MockNavigator};
-use medea_jason::peer::{PeerError::StreamRequest, StreamRequestError};
 
 wasm_bindgen_test_configure!(run_in_browser);
 

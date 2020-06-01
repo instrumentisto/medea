@@ -52,7 +52,6 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
-use crate::media::{GetUserMediaError, GetUserMediaType};
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -597,7 +596,7 @@ impl PeerConnection {
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            let mut used_caps: MediaStreamSettings = match local_constraints {
+            let used_caps: MediaStreamSettings = match local_constraints {
                 None => (&required_caps).into(),
                 Some(local_constraints) => {
                     required_caps
@@ -606,7 +605,6 @@ impl PeerConnection {
                     (&required_caps).into()
                 }
             };
-
             let (media_stream, is_new_stream) = self
                 .media_manager
                 .get_stream(used_caps)

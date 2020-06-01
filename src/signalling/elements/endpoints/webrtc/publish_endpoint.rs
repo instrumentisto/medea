@@ -11,7 +11,7 @@ use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::{
-        P2pMode, WebRtcPublishId as Id,
+        AudioSettings, P2pMode, VideoSettings, WebRtcPublishId as Id,
     },
     signalling::elements::{
         endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
@@ -20,9 +20,6 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-use crate::api::control::endpoints::webrtc_publish_endpoint::{
-    AudioSettings, VideoSettings,
-};
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {

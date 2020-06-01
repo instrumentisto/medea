@@ -5,6 +5,7 @@
 use std::{
     cell::RefCell,
     convert::TryFrom,
+    fmt,
     future::Future,
     rc::{Rc, Weak},
 };
@@ -92,8 +93,6 @@ pub enum GetUserMediaType {
     Audio,
     Video,
 }
-use crate::utils::console_error;
-use std::fmt;
 
 impl fmt::Display for GetUserMediaType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

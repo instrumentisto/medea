@@ -162,8 +162,6 @@ message Member {
   }
 }
 
-
-
 // Media element which is able to receive media data from a client via WebRTC
 // (allows to publish media data).
 message WebRtcPublishEndpoint {

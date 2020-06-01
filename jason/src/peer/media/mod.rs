@@ -391,6 +391,7 @@ impl MediaConnections {
 
     /// Returns [`MediaStreamTrack`]s being received from a specified sender,
     /// but only if all receiving [`MediaStreamTrack`]s are present already.
+    // TODO: maybe this is incorrect impl
     pub fn get_stream_by_sender(
         &self,
         sender_id: PeerId,
@@ -717,7 +718,6 @@ pub struct Receiver {
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
-    is_important: bool,
 }
 
 impl Receiver {
@@ -736,7 +736,6 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
-        let is_important = caps.is_important();
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
             None => {
@@ -750,12 +749,7 @@ impl Receiver {
             transceiver,
             mid,
             track: None,
-            is_important,
         }
-    }
-
-    pub fn is_important(&self) -> bool {
-        self.is_important
     }
 
     /// Returns associated [`MediaStreamTrack`] with this [`Receiver`], if any.
