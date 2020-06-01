@@ -181,6 +181,8 @@ impl SimpleStreamRequest {
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
     /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
     /// [`MediaStreamSettings`] doesn't.
+    // TODO: correct docs, because this is not evident merge.
+    //       Also, may be rename this function.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
@@ -221,28 +223,6 @@ impl SimpleStreamRequest {
             }
         }
 
-        // if let Some((_, audio)) = self.audio.as_mut() {
-        // if let Some(other_audio) = other.take_audio() {
-        // audio.merge(other_audio)
-        // } else {
-        // if audio.is_important() {
-        // return Err(tracerr::new!(
-        // StreamRequestError::ExpectedAudioTracks
-        // ));
-        // }
-        // }
-        // };
-        // if let Some((_, video)) = self.video.as_mut() {
-        // if let Some(other_video) = other.take_video() {
-        // video.merge(other_video)
-        // } else {
-        // if video.is_important() {
-        // return Err(tracerr::new!(
-        // StreamRequestError::ExpectedVideoTracks
-        // ));
-        // }
-        // }
-        // };
         Ok(())
     }
 }
