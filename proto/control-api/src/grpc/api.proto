@@ -180,9 +180,10 @@ message WebRtcPublishEndpoint {
   AudioSettings audio_settings = 6;
   VideoSettings video_settings = 7;
 
+  // TODO: rename to publishing_policy
   enum PublishingMode {
     IfPossible = 0;
-    On = 1;
+    Required = 1;
   }
 
   message VideoSettings {

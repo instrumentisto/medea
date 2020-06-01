@@ -52,6 +52,7 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
+use crate::media::{GetUserMediaError, GetUserMediaType};
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -596,7 +597,7 @@ impl PeerConnection {
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            let used_caps: MediaStreamSettings = match local_constraints {
+            let mut used_caps: MediaStreamSettings = match local_constraints {
                 None => (&required_caps).into(),
                 Some(local_constraints) => {
                     required_caps
@@ -605,11 +606,48 @@ impl PeerConnection {
                     (&required_caps).into()
                 }
             };
-            let (media_stream, is_new_stream) = self
-                .media_manager
-                .get_stream(used_caps)
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?;
+            let (media_stream, is_new_stream) =
+                match self.media_manager.get_stream(used_caps.clone()).await {
+                    Ok((media_stream, is_new_stream)) => {
+                        console_error("OK");
+                        (media_stream, is_new_stream)
+                    }
+                    Err(e) => match GetUserMediaError::try_from(e.as_ref()) {
+                        Ok(error) => {
+                            match error.media_type {
+                                GetUserMediaType::Audio => {
+                                    used_caps.take_audio();
+                                }
+                                GetUserMediaType::Video => {
+                                    used_caps.take_video();
+                                }
+                                GetUserMediaType::Both => {
+                                    used_caps.take_audio();
+                                    used_caps.take_video();
+                                }
+                            }
+                            console_error(&format!(
+                                "is_audio: {}; is_video: {}",
+                                used_caps.get_audio().is_some(),
+                                used_caps.get_video().is_some()
+                            ));
+                            self.media_manager
+                                .get_stream(used_caps)
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?
+                        }
+                        Err(_) => {
+                            return Err(e)
+                                .map_err(tracerr::map_from_and_wrap!());
+                        }
+                    },
+                };
+
+            // let (media_stream, is_new_stream) = self
+            //     .media_manager
+            //     .get_stream(used_caps)
+            //     .await
+            //     .map_err(tracerr::map_from_and_wrap!())?;
             let peer_stream = required_caps
                 .parse_stream(media_stream.clone())
                 .map_err(tracerr::map_from_and_wrap!())?;

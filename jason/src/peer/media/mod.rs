@@ -247,7 +247,6 @@ impl MediaConnections {
                         inner.peer_events_sender.clone(),
                         mid,
                         track.is_muted.into(),
-                        track.is_important,
                     )
                     .map_err(tracerr::wrap!())?;
                     inner.senders.insert(track.id, sndr);
@@ -401,14 +400,22 @@ impl MediaConnections {
         for rcv in inner.receivers.values() {
             if rcv.sender_id == sender_id {
                 match rcv.track() {
-                    None => return None,
-                    Some(ref track) => {
-                        stream.add_track(rcv.track_id, track.clone());
+                    None => {
+                        // if rcv.is_important() {
+                        //     return None;
+                        // }
+                    }
+                    Some(track) => {
+                        stream.add_track(rcv.track_id, track);
                     }
                 }
             }
         }
-        Some(stream)
+        if stream.is_empty() {
+            None
+        } else {
+            Some(stream)
+        }
     }
 
     /// Returns [`MediaStreamTrack`] by its [`TrackId`] and
@@ -459,7 +466,6 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
-    is_important: bool,
 }
 
 impl Sender {
@@ -475,7 +481,6 @@ impl Sender {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         mid: Option<String>,
         mute_state: StableMuteState,
-        is_important: bool,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -495,7 +500,6 @@ impl Sender {
             track: RefCell::new(None),
             transceiver,
             mute_state,
-            is_important,
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -563,7 +567,7 @@ impl Sender {
     }
 
     pub fn is_important(&self) -> bool {
-        self.is_important
+        self.caps.is_important()
     }
 
     /// Returns [`TrackId`] of this [`Sender`].
@@ -713,6 +717,7 @@ pub struct Receiver {
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
+    is_important: bool,
 }
 
 impl Receiver {
@@ -731,6 +736,7 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
+        let is_important = caps.is_important();
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
             None => {
@@ -744,7 +750,12 @@ impl Receiver {
             transceiver,
             mid,
             track: None,
+            is_important,
         }
+    }
+
+    pub fn is_important(&self) -> bool {
+        self.is_important
     }
 
     /// Returns associated [`MediaStreamTrack`] with this [`Receiver`], if any.

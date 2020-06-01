@@ -115,6 +115,11 @@ impl PeerMediaStream {
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.borrow().stream)
     }
+
+    pub fn is_empty(&self) -> bool {
+        let inner = self.0.borrow();
+        inner.audio_tracks.is_empty() && inner.video_tracks.is_empty()
+    }
 }
 
 /// JS side handle to [`PeerMediaStream`].

@@ -221,7 +221,6 @@ impl<T> Peer<T> {
                         mid: track.mid(),
                     },
                     is_muted: false,
-                    is_important: track.is_important(),
                 });
                 tracks
             },
@@ -238,7 +237,6 @@ impl<T> Peer<T> {
                         mid: track.mid(),
                     },
                     is_muted: false,
-                    is_important: track.is_important(),
                 });
                 tracks
             })
@@ -334,8 +332,9 @@ impl Peer<New> {
         if let Some(audio_settings) = src.audio_settings() {
             let track_audio = Rc::new(MediaTrack::new(
                 tracks_count.next_id(),
-                MediaType::Audio(AudioSettings {}),
-                audio_settings.publishing_mode.is_important(),
+                MediaType::Audio(AudioSettings {
+                    is_important: audio_settings.publishing_mode.is_important(),
+                }),
             ));
             self.add_sender(Rc::clone(&track_audio));
             partner_peer.add_receiver(track_audio);
@@ -343,8 +342,9 @@ impl Peer<New> {
         if let Some(video_settings) = src.video_settings() {
             let track_video = Rc::new(MediaTrack::new(
                 tracks_count.next_id(),
-                MediaType::Video(VideoSettings {}),
-                video_settings.publishing_mode.is_important(),
+                MediaType::Video(VideoSettings {
+                    is_important: video_settings.publishing_mode.is_important(),
+                }),
             ));
             self.add_sender(Rc::clone(&track_video));
             partner_peer.add_receiver(track_video);

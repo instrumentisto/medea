@@ -16,6 +16,9 @@ pub use self::{
         VideoTrackConstraints,
     },
     device_info::InputDeviceInfo,
-    manager::{MediaManager, MediaManagerError, MediaManagerHandle},
+    manager::{
+        GetUserMediaError, GetUserMediaType, MediaManager, MediaManagerError,
+        MediaManagerHandle,
+    },
     stream::{MediaStream, MediaStreamTrack, TrackKind},
 };

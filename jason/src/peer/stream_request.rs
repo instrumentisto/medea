@@ -187,24 +187,62 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
-        if let Some((_, audio)) = self.audio.as_mut() {
-            if let Some(other_audio) = other.take_audio() {
-                audio.merge(other_audio)
-            } else {
-                return Err(tracerr::new!(
-                    StreamRequestError::ExpectedAudioTracks
-                ));
+        if self.video.is_some() {
+            if other.get_video().is_none() {
+                self.video.take();
             }
-        };
-        if let Some((_, video)) = self.video.as_mut() {
-            if let Some(other_video) = other.take_video() {
-                video.merge(other_video)
-            } else {
-                return Err(tracerr::new!(
-                    StreamRequestError::ExpectedVideoTracks
-                ));
+        }
+        if self.audio.is_some() {
+            if other.get_audio().is_none() {
+                self.audio.take();
             }
-        };
+        }
+
+        if let Some(other_audio) = other.take_audio() {
+            if let Some((_, audio)) = self.audio.as_mut() {
+                audio.merge(other_audio);
+            } else {
+                if other_audio.is_important() {
+                    return Err(tracerr::new!(
+                        StreamRequestError::ExpectedAudioTracks
+                    ));
+                }
+            }
+        }
+        if let Some(other_video) = other.take_video() {
+            if let Some((_, video)) = self.video.as_mut() {
+                video.merge(other_video);
+            } else {
+                if other_video.is_important() {
+                    return Err(tracerr::new!(
+                        StreamRequestError::ExpectedVideoTracks
+                    ));
+                }
+            }
+        }
+
+        // if let Some((_, audio)) = self.audio.as_mut() {
+        // if let Some(other_audio) = other.take_audio() {
+        // audio.merge(other_audio)
+        // } else {
+        // if audio.is_important() {
+        // return Err(tracerr::new!(
+        // StreamRequestError::ExpectedAudioTracks
+        // ));
+        // }
+        // }
+        // };
+        // if let Some((_, video)) = self.video.as_mut() {
+        // if let Some(other_video) = other.take_video() {
+        // video.merge(other_video)
+        // } else {
+        // if video.is_important() {
+        // return Err(tracerr::new!(
+        // StreamRequestError::ExpectedVideoTracks
+        // ));
+        // }
+        // }
+        // };
         Ok(())
     }
 }

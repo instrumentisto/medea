@@ -233,7 +233,7 @@ pub mod web_rtc_publish_endpoint {
     #[repr(i32)]
     pub enum PublishingMode {
         IfPossible = 0,
-        On = 1,
+        Required = 1,
     }
     /// P2P mode of WebRTC interaction.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]

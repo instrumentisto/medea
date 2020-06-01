@@ -71,14 +71,14 @@ pub struct WebRtcPublishEndpoint {
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub enum PublishingMode {
     IfPossible,
-    On,
+    Required,
 }
 
 impl PublishingMode {
     pub fn is_important(&self) -> bool {
         match self {
             PublishingMode::IfPossible => false,
-            PublishingMode::On => true,
+            PublishingMode::Required => true,
         }
     }
 }
@@ -89,7 +89,7 @@ impl From<proto::web_rtc_publish_endpoint::PublishingMode> for PublishingMode {
 
         match from {
             PM::IfPossible => Self::IfPossible,
-            PM::On => Self::On,
+            PM::Required => Self::Required,
         }
     }
 }
@@ -97,8 +97,8 @@ impl From<proto::web_rtc_publish_endpoint::PublishingMode> for PublishingMode {
 impl From<PublishingMode> for proto::web_rtc_publish_endpoint::PublishingMode {
     fn from(from: PublishingMode) -> Self {
         match from {
-            PublishingMode::On => Self::On,
             PublishingMode::IfPossible => Self::IfPossible,
+            PublishingMode::Required => Self::Required,
         }
     }
 }

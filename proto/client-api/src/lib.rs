@@ -289,7 +289,6 @@ pub struct Track {
     pub direction: Direction,
     pub media_type: MediaType,
     pub is_muted: bool,
-    pub is_important: bool,
 }
 
 /// Path to existing [`Track`] and field which can be updated.
@@ -341,11 +340,15 @@ pub enum MediaType {
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct AudioSettings {}
+pub struct AudioSettings {
+    pub is_important: bool,
+}
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct VideoSettings {}
+pub struct VideoSettings {
+    pub is_important: bool,
+}
 
 #[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
