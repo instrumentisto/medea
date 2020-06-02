@@ -417,8 +417,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
             err.message(),
-            "Invalid local stream: Provided stream does not have all \
-             necessary Tracks"
+            "Invalid local stream: provided MediaStream was expected to have \
+             single video track"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -459,8 +459,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local stream: Provided stream does not have all \
-             necessary Tracks"
+            "Invalid local stream: provided MediaStream was expected to have \
+             single video track"
         );
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
