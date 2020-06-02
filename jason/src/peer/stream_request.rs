@@ -13,7 +13,7 @@ use crate::{
         AudioTrackConstraints, MediaStream, MediaStreamSettings,
         TrackConstraints, TrackKind, VideoTrackConstraints,
     },
-    utils::{JsCaused, JsError},
+    utils::{console_error, JsCaused, JsError},
 };
 
 use super::PeerMediaStream;
@@ -186,37 +186,37 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
-        if self.video.is_some() {
+        if let Some((_, video_caps)) = &self.video {
             if other.get_video().is_none() {
-                self.video.take();
+                if video_caps.is_important() {
+                    return Err(tracerr::new!(
+                        StreamRequestError::ExpectedAudioTracks
+                    ));
+                } else {
+                    self.video.take();
+                }
             }
         }
-        if self.audio.is_some() {
+        if let Some((_, audio_caps)) = &self.audio {
             if other.get_audio().is_none() {
-                self.audio.take();
+                if audio_caps.is_important() {
+                    return Err(tracerr::new!(
+                        StreamRequestError::ExpectedVideoTracks
+                    ));
+                } else {
+                    self.audio.take();
+                }
             }
         }
 
         if let Some(other_audio) = other.take_audio() {
             if let Some((_, audio)) = self.audio.as_mut() {
                 audio.merge(other_audio);
-            } else {
-                if other_audio.is_important() {
-                    return Err(tracerr::new!(
-                        StreamRequestError::ExpectedAudioTracks
-                    ));
-                }
             }
         }
         if let Some(other_video) = other.take_video() {
             if let Some((_, video)) = self.video.as_mut() {
                 video.merge(other_video);
-            } else {
-                if other_video.is_important() {
-                    return Err(tracerr::new!(
-                        StreamRequestError::ExpectedVideoTracks
-                    ));
-                }
             }
         }
 

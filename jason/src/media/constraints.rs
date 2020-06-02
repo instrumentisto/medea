@@ -10,7 +10,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::utils::get_property_by_name;
+use crate::utils::{console_error, get_property_by_name};
 
 /// Helper to distinguish objects related to media captured from device and
 /// media captured from display.

@@ -29,6 +29,7 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
+use crate::{media::TrackKind, utils::console_error};
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -402,9 +403,9 @@ impl MediaConnections {
             if rcv.sender_id == sender_id {
                 match rcv.track() {
                     None => {
-                        // if rcv.is_important() {
-                        //     return None;
-                        // }
+                        if rcv.is_important() {
+                            return None;
+                        }
                     }
                     Some(track) => {
                         stream.add_track(rcv.track_id, track);
@@ -412,30 +413,11 @@ impl MediaConnections {
                 }
             }
         }
+
         if stream.is_empty() {
             None
         } else {
             Some(stream)
-        }
-    }
-
-    /// Returns [`MediaStreamTrack`] by its [`TrackId`] and
-    /// [`TransceiverDirection`].
-    pub fn get_track_by_id_and_direction(
-        &self,
-        id: TrackId,
-        direction: TransceiverDirection,
-    ) -> Option<MediaStreamTrack> {
-        let inner = self.0.borrow();
-        match direction {
-            TransceiverDirection::Sendonly => inner
-                .senders
-                .get(&id)
-                .and_then(|sndr| sndr.track.borrow().clone()),
-            TransceiverDirection::Recvonly => inner
-                .receivers
-                .get(&id)
-                .and_then(|recvr| recvr.track.clone()),
         }
     }
 
@@ -509,7 +491,7 @@ impl Sender {
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
-            None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
+            None => peer.add_transceiver(kind, TransceiverDirection::Inactive),
             Some(mid) => peer
                 .get_transceiver_by_mid(&mid)
                 .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
@@ -638,6 +620,14 @@ impl Sender {
         sender: Rc<Self>,
         new_track: MediaStreamTrack,
     ) -> Result<()> {
+        match &sender.caps {
+            TrackConstraints::Video(_) => {
+                console_error("Inserted MediaTrack into video Sender");
+            }
+            TrackConstraints::Audio(_) => {
+                console_error("Inserted MediaTrack into audio Sender");
+            }
+        }
         // no-op if we try to insert same track
         if let Some(current_track) = sender.track.borrow().as_ref() {
             if new_track.id() == current_track.id() {
@@ -761,6 +751,7 @@ pub struct Receiver {
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
+    is_important: bool,
 }
 
 impl Receiver {
@@ -779,6 +770,7 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
+        let is_important = caps.is_important();
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
             None => {
@@ -792,7 +784,12 @@ impl Receiver {
             transceiver,
             mid,
             track: None,
+            is_important,
         }
+    }
+
+    pub fn is_important(&self) -> bool {
+        self.is_important
     }
 
     /// Returns associated [`MediaStreamTrack`] with this [`Receiver`], if any.

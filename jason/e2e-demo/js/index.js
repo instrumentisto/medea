@@ -404,13 +404,15 @@ window.onload = async function() {
 
         let alreadyCreatedVideo = videoDiv.getElementsByClassName("real-video")[0];
         if (alreadyCreatedVideo) {
-          let mediaStream = stream.get_media_stream();
-          for (const track of mediaStream.getTracks()) {
-            let alreadyInsertedTrack = alreadyCreatedVideo.srcObject.getTrackById(track.id);
-            if (!alreadyInsertedTrack) {
-              alreadyCreatedVideo.srcObject.addTrack(track);
-            }
-          }
+          // let mediaStream = stream.get_media_stream();
+          alreadyCreatedVideo.srcObject = stream.get_media_stream();
+          // for (const track of mediaStream.getTracks()) {
+          //   let alreadyInsertedTrack = alreadyCreatedVideo.srcObject.getTrackById(track.id);
+          //   if (!alreadyInsertedTrack) {
+          //     alreadyCreatedVideo.srcObject.addTrack(track);
+          //   }
+          // }
+
           await alreadyCreatedVideo.play();
         } else {
           let video = document.createElement("video");
