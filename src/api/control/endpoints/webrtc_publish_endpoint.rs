@@ -94,7 +94,7 @@ impl PublishingPolicy {
     /// published.
     ///
     /// If `false` then media can be not published.
-    pub fn is_important(&self) -> bool {
+    pub fn is_important(self) -> bool {
         match self {
             PublishingPolicy::IfPossible => false,
             PublishingPolicy::Required => true,
@@ -202,11 +202,11 @@ impl From<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             audio_settings: value
                 .audio_settings
                 .as_ref()
-                .map(|s| AudioSettings::from(s)),
+                .map(AudioSettings::from),
             video_settings: value
                 .video_settings
                 .as_ref()
-                .map(|s| VideoSettings::from(s)),
+                .map(VideoSettings::from),
             force_relay: value.force_relay,
         }
     }

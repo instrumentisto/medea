@@ -345,12 +345,10 @@ impl MediaConnections {
                         MediaConnectionsError::InvalidMediaTrack
                     ));
                 }
-            } else {
-                if sender.is_important() {
-                    return Err(tracerr::new!(
-                        MediaConnectionsError::InvalidMediaStream
-                    ));
-                }
+            } else if sender.is_important() {
+                return Err(tracerr::new!(
+                    MediaConnectionsError::InvalidMediaStream
+                ));
             }
         }
 

@@ -508,8 +508,10 @@ impl MediaManagerHandle {
                     .map_err(tracerr::wrap!(=> MediaManagerError))
                     .map_err(|e| {
                         MediaTypeUnavailableError::try_from(e.as_ref())
-                            .map(|e| e.into())
-                            .unwrap_or_else(move |_| JasonError::from(e).into())
+                            .map_or_else(
+                                move |_| JasonError::from(e).into(),
+                                |e| e.into(),
+                            )
                     })
             }),
             Err(err) => future_to_promise(future::err(err)),
