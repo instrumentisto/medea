@@ -8,7 +8,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::TrackId;
+use medea_client_api_proto::{PeerId, TrackId};
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
@@ -22,6 +22,8 @@ use crate::{
 /// Shared between JS side ([`RemoteMediaStream`]) and Rust side
 /// ([`PeerMediaStream`]).
 struct InnerStream {
+    sender_peer_id: Option<PeerId>,
+
     /// Actual underlying [MediaStream][1] object.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
@@ -36,8 +38,18 @@ struct InnerStream {
 
 impl InnerStream {
     /// Instantiates new [`InnerStream`].
-    fn new() -> Self {
+    fn new(sender_peer_id: PeerId) -> Self {
         Self {
+            sender_peer_id: Some(sender_peer_id),
+            stream: SysMediaStream::new().unwrap(),
+            audio_tracks: HashMap::new(),
+            video_tracks: HashMap::new(),
+        }
+    }
+
+    fn new_local() -> Self {
+        Self {
+            sender_peer_id: None,
             stream: SysMediaStream::new().unwrap(),
             audio_tracks: HashMap::new(),
             video_tracks: HashMap::new(),
@@ -72,8 +84,12 @@ pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
 #[allow(clippy::new_without_default)]
 impl PeerMediaStream {
     /// Creates empty [`PeerMediaStream`].
-    pub fn new() -> Self {
-        Self(Rc::new(RefCell::new(InnerStream::new())))
+    pub fn new(sender_peer_id: PeerId) -> Self {
+        Self(Rc::new(RefCell::new(InnerStream::new(sender_peer_id))))
+    }
+
+    pub fn new_local() -> Self {
+        Self(Rc::new(RefCell::new(InnerStream::new_local())))
     }
 
     /// Adds provided [`MediaStreamTrack`] to a stream.
@@ -137,5 +153,10 @@ impl RemoteMediaStream {
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| Clone::clone(&inner.borrow().stream))
+    }
+
+    pub fn sender_peer_id(&self) -> Result<Option<u64>, JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.borrow().sender_peer_id.map(|id| id.0))
     }
 }

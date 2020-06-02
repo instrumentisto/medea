@@ -321,6 +321,7 @@ window.onload = async function() {
   let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
   let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
   let localVideo = document.querySelector('.local-video > video');
+  let remoteVideos = new Map();
 
   async function initLocalStream() {
       let constraints = await build_constraints(audioSelect, videoSelect);
@@ -423,25 +424,46 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
-        console.log("on_remote_stream");
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-
-        let alreadyCreatedVideo = videoDiv.getElementsByClassName("real-video")[0];
+        let alreadyCreatedVideo = remoteVideos.get(stream.sender_peer_id());
         if (alreadyCreatedVideo) {
           alreadyCreatedVideo.srcObject = stream.get_media_stream();
-
-          await alreadyCreatedVideo.play();
         } else {
+          let videoDiv = document.getElementsByClassName("remote-videos")[0];
           let video = document.createElement("video");
+          let sender_peer_id = stream.sender_peer_id();
           video.srcObject = stream.get_media_stream();
-          video.className = "real-video"
           let innerVideoDiv = document.createElement("div");
           innerVideoDiv.className = "video";
           innerVideoDiv.appendChild(video);
           videoDiv.appendChild(innerVideoDiv);
 
-          await video.play();
+          remoteVideos.set(sender_peer_id, video);
+          video.oncanplay = async () => {
+            await video.play();
+          };
         }
+
+
+
+
+        // let videoDiv = document.getElementsByClassName("remote-videos")[0];
+
+        // let alreadyCreatedVideo = videoDiv.getElementsByClassName("real-video")[0];
+        // if (alreadyCreatedVideo) {
+        //   alreadyCreatedVideo.srcObject = stream.get_media_stream();
+
+        //   await alreadyCreatedVideo.play();
+        // } else {
+        //   let video = document.createElement("video");
+        //   video.srcObject = stream.get_media_stream();
+        //   video.className = "real-video"
+        //   let innerVideoDiv = document.createElement("div");
+        //   innerVideoDiv.className = "video";
+        //   innerVideoDiv.appendChild(video);
+        //   videoDiv.appendChild(innerVideoDiv);
+
+        //   await video.play();
+        // }
       });
     });
 

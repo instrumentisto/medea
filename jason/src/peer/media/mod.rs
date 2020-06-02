@@ -398,7 +398,7 @@ impl MediaConnections {
         sender_id: PeerId,
     ) -> Option<PeerMediaStream> {
         let inner = self.0.borrow();
-        let stream = PeerMediaStream::new();
+        let stream = PeerMediaStream::new(sender_id);
         for rcv in inner.receivers.values() {
             if rcv.sender_id == sender_id {
                 match rcv.track() {
@@ -620,14 +620,6 @@ impl Sender {
         sender: Rc<Self>,
         new_track: MediaStreamTrack,
     ) -> Result<()> {
-        match &sender.caps {
-            TrackConstraints::Video(_) => {
-                console_error("Inserted MediaTrack into video Sender");
-            }
-            TrackConstraints::Audio(_) => {
-                console_error("Inserted MediaTrack into audio Sender");
-            }
-        }
         // no-op if we try to insert same track
         if let Some(current_track) = sender.track.borrow().as_ref() {
             if new_track.id() == current_track.id() {
