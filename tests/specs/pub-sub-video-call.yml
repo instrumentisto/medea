@@ -13,9 +13,9 @@ spec:
               p2p: Always
               force_relay: true
               audio_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
               video_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
     responder:
       kind: Member
       credentials: test

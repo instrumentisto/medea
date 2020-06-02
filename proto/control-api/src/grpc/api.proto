@@ -178,18 +178,17 @@ message WebRtcPublishEndpoint {
   AudioSettings audio_settings = 6;
   VideoSettings video_settings = 7;
 
-  // TODO: rename to publishing_policy
-  enum PublishingMode {
+  enum PublishingPolicy {
     IfPossible = 0;
     Required = 1;
   }
 
   message VideoSettings {
-    PublishingMode publishing_mode = 1;
+    PublishingPolicy publishing_policy = 1;
   }
 
   message AudioSettings {
-    PublishingMode publishing_mode = 1;
+    PublishingPolicy publishing_policy = 1;
   }
 
   // P2P mode of WebRTC interaction.

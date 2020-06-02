@@ -221,17 +221,17 @@ pub struct WebRtcPublishEndpoint {
 pub mod web_rtc_publish_endpoint {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct VideoSettings {
-        #[prost(enumeration="PublishingMode", tag="1")]
-        pub publishing_mode: i32,
+        #[prost(enumeration="PublishingPolicy", tag="1")]
+        pub publishing_policy: i32,
     }
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AudioSettings {
-        #[prost(enumeration="PublishingMode", tag="1")]
-        pub publishing_mode: i32,
+        #[prost(enumeration="PublishingPolicy", tag="1")]
+        pub publishing_policy: i32,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
-    pub enum PublishingMode {
+    pub enum PublishingPolicy {
         IfPossible = 0,
         Required = 1,
     }

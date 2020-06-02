@@ -76,12 +76,12 @@ pub enum MediaManagerError {
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
-pub struct GetUserMediaError {
-    pub media_type: GetUserMediaType,
+pub struct MediaTypeUnavailableError {
+    pub media_type: UnavailableMediaType,
 }
 
 #[wasm_bindgen]
-impl GetUserMediaError {
+impl MediaTypeUnavailableError {
     pub fn media_type(&self) -> String {
         self.media_type.to_string()
     }
@@ -89,13 +89,13 @@ impl GetUserMediaError {
 
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
-pub enum GetUserMediaType {
+pub enum UnavailableMediaType {
     Audio,
     Video,
 }
 
-impl fmt::Display for GetUserMediaType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for UnavailableMediaType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let to_write = match self {
             Self::Audio => "audio",
             Self::Video => "video",
@@ -104,7 +104,7 @@ impl fmt::Display for GetUserMediaType {
     }
 }
 
-impl TryFrom<&MediaManagerError> for GetUserMediaError {
+impl TryFrom<&MediaManagerError> for MediaTypeUnavailableError {
     type Error = ();
 
     fn try_from(
@@ -112,15 +112,11 @@ impl TryFrom<&MediaManagerError> for GetUserMediaError {
     ) -> std::result::Result<Self, Self::Error> {
         match value {
             MediaManagerError::GetUserMediaFailed(e) => {
-                let media_type = if e.message.contains("audio") {
-                    GetUserMediaType::Audio
-                } else if e.message.contains("video") {
-                    GetUserMediaType::Video
-                } else {
-                    return Err(());
-                };
-
-                Ok(Self { media_type })
+                [UnavailableMediaType::Audio, UnavailableMediaType::Video]
+                    .iter()
+                    .find(|t| e.message.contains(&t.to_string()))
+                    .ok_or(())
+                    .map(|t| Self { media_type: *t })
             }
             _ => Err(()),
         }
@@ -487,12 +483,9 @@ impl MediaManagerHandle {
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
                     .map_err(|e| {
-                        if let Ok(err) = GetUserMediaError::try_from(e.as_ref())
-                        {
-                            err.into()
-                        } else {
-                            JasonError::from(e).into()
-                        }
+                        MediaTypeUnavailableError::try_from(e.as_ref())
+                            .map(|e| e.into())
+                            .unwrap_or_else(move |_| JasonError::from(e).into())
                     })
             }),
             Err(err) => future_to_promise(future::err(err)),

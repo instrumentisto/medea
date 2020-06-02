@@ -20,10 +20,10 @@ async function createRoom(roomId, memberId) {
               p2p: 'Always',
               force_relay: false,
               audio_settings: {
-                publishing_mode: "IfPossible"
+                publishing_policy: "IfPossible"
               },
               video_settings: {
-                publishing_mode: "IfPossible"
+                publishing_policy: "IfPossible"
               }
             },
           },
@@ -46,10 +46,10 @@ async function createMember(roomId, memberId) {
       p2p: 'Always',
       force_relay: false,
       audio_settings: {
-        publishing_mode: "IfPossible",
+        publishing_policy: "IfPossible",
       },
       video_settings: {
-        publishing_mode: "IfPossible",
+        publishing_policy: "IfPossible",
       }
     }
   };
@@ -158,10 +158,10 @@ const controlDebugWindows = {
             p2p: p2pMode,
             force_relay: isForceRelay,
             audio_settings: {
-              publishing_mode: "IfPossible",
+              publishing_policy: "IfPossible",
             },
             video_settings: {
-              publishing_mode: "IfPossible",
+              publishing_policy: "IfPossible",
             },
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
@@ -172,10 +172,10 @@ const controlDebugWindows = {
             src: source,
             force_relay: isForceRelay,
             audio_settings: {
-              publishing_mode: "IfPossible",
+              publishing_policy: "IfPossible",
             },
             video_settings: {
-              publishing_mode: "IfPossible",
+              publishing_policy: "IfPossible",
             }
           });
       }
@@ -351,8 +351,8 @@ window.onload = async function() {
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    const current_audio = current_stream.getAudioTracks().pop().label || "disable";
-    const current_video = "disable";
+    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label;
+    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label;
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -442,28 +442,6 @@ window.onload = async function() {
             await video.play();
           };
         }
-
-
-
-
-        // let videoDiv = document.getElementsByClassName("remote-videos")[0];
-
-        // let alreadyCreatedVideo = videoDiv.getElementsByClassName("real-video")[0];
-        // if (alreadyCreatedVideo) {
-        //   alreadyCreatedVideo.srcObject = stream.get_media_stream();
-
-        //   await alreadyCreatedVideo.play();
-        // } else {
-        //   let video = document.createElement("video");
-        //   video.srcObject = stream.get_media_stream();
-        //   video.className = "real-video"
-        //   let innerVideoDiv = document.createElement("div");
-        //   innerVideoDiv.className = "video";
-        //   innerVideoDiv.appendChild(video);
-        //   videoDiv.appendChild(innerVideoDiv);
-
-        //   await video.play();
-        // }
       });
     });
 

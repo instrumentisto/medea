@@ -17,9 +17,12 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
+    media::{MediaStreamTrack, TrackConstraints, TrackKind},
     peer::PeerEvent,
-    utils::{resettable_delay_for, JsCaused, JsError, ResettableDelayHandle},
+    utils::{
+        console_error, resettable_delay_for, JsCaused, JsError,
+        ResettableDelayHandle,
+    },
 };
 
 use super::{
@@ -29,7 +32,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use crate::{media::TrackKind, utils::console_error};
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -392,7 +394,6 @@ impl MediaConnections {
 
     /// Returns [`MediaStreamTrack`]s being received from a specified sender,
     /// but only if all receiving [`MediaStreamTrack`]s are present already.
-    // TODO: maybe this is incorrect impl
     pub fn get_stream_by_sender(
         &self,
         sender_id: PeerId,

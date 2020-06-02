@@ -133,30 +133,22 @@ impl SimpleStreamRequest {
             });
 
         if let Some((id, audio)) = &self.audio {
-            if audio_tracks.len() == 1 {
-                let track = audio_tracks.into_iter().next().unwrap();
+            if let Some(track) = audio_tracks.into_iter().next() {
                 if audio.satisfies(track.as_ref()) {
                     result_stream.add_track(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
                 }
-            } else {
-                // TODO: Maybe we should do something??
-                // return Err(tracerr::new!(ExpectedAudioTracks));
             }
         }
 
         if let Some((id, video)) = &self.video {
-            if video_tracks.len() == 1 {
-                let track = video_tracks.into_iter().next().unwrap();
+            if let Some(track) = video_tracks.into_iter().next() {
                 if video.satisfies(track.as_ref()) {
                     result_stream.add_track(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
                 }
-            } else {
-                // TODO: Maybe we should do something??
-                // return Err(tracerr::new!(ExpectedVideoTracks));
             }
         }
 

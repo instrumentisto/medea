@@ -12,9 +12,9 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
               video_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
           play-member-2:
             kind: WebRtcPlayEndpoint
             spec:
@@ -33,9 +33,9 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
               video_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
           play-member-1:
             kind: WebRtcPlayEndpoint
             spec:
@@ -54,9 +54,9 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
               video_settings:
-                publishing_mode: IfPossible
+                publishing_policy: IfPossible
           play-member-2:
             kind: WebRtcPlayEndpoint
             spec:

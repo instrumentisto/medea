@@ -69,51 +69,57 @@ pub struct WebRtcPublishEndpoint {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
-pub enum PublishingMode {
+pub enum PublishingPolicy {
     IfPossible,
     Required,
 }
 
-impl PublishingMode {
+impl PublishingPolicy {
     pub fn is_important(&self) -> bool {
         match self {
-            PublishingMode::IfPossible => false,
-            PublishingMode::Required => true,
+            PublishingPolicy::IfPossible => false,
+            PublishingPolicy::Required => true,
         }
     }
 }
 
-impl From<proto::web_rtc_publish_endpoint::PublishingMode> for PublishingMode {
-    fn from(from: proto::web_rtc_publish_endpoint::PublishingMode) -> Self {
-        use proto::web_rtc_publish_endpoint::PublishingMode as PM;
+impl From<proto::web_rtc_publish_endpoint::PublishingPolicy>
+    for PublishingPolicy
+{
+    fn from(from: proto::web_rtc_publish_endpoint::PublishingPolicy) -> Self {
+        use proto::web_rtc_publish_endpoint::PublishingPolicy::{
+            IfPossible, Required,
+        };
 
         match from {
-            PM::IfPossible => Self::IfPossible,
-            PM::Required => Self::Required,
+            IfPossible => Self::IfPossible,
+            Required => Self::Required,
         }
     }
 }
 
-impl From<PublishingMode> for proto::web_rtc_publish_endpoint::PublishingMode {
-    fn from(from: PublishingMode) -> Self {
+impl From<PublishingPolicy>
+    for proto::web_rtc_publish_endpoint::PublishingPolicy
+{
+    fn from(from: PublishingPolicy) -> Self {
         match from {
-            PublishingMode::IfPossible => Self::IfPossible,
-            PublishingMode::Required => Self::Required,
+            PublishingPolicy::IfPossible => Self::IfPossible,
+            PublishingPolicy::Required => Self::Required,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct AudioSettings {
-    pub publishing_mode: PublishingMode,
+    pub publishing_policy: PublishingPolicy,
 }
 
 impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
     fn from(from: &proto::web_rtc_publish_endpoint::AudioSettings) -> Self {
         Self {
-            publishing_mode:
-                proto::web_rtc_publish_endpoint::PublishingMode::from_i32(
-                    from.publishing_mode,
+            publishing_policy:
+                proto::web_rtc_publish_endpoint::PublishingPolicy::from_i32(
+                    from.publishing_policy,
                 )
                 .unwrap_or_default()
                 .into(),
@@ -124,9 +130,9 @@ impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
 impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     fn from(from: AudioSettings) -> Self {
         Self {
-            publishing_mode:
-                proto::web_rtc_publish_endpoint::PublishingMode::from(
-                    from.publishing_mode,
+            publishing_policy:
+                proto::web_rtc_publish_endpoint::PublishingPolicy::from(
+                    from.publishing_policy,
                 ) as i32,
         }
     }
@@ -134,15 +140,15 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct VideoSettings {
-    pub publishing_mode: PublishingMode,
+    pub publishing_policy: PublishingPolicy,
 }
 
 impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
     fn from(from: &proto::web_rtc_publish_endpoint::VideoSettings) -> Self {
         Self {
-            publishing_mode:
-                proto::web_rtc_publish_endpoint::PublishingMode::from_i32(
-                    from.publishing_mode,
+            publishing_policy:
+                proto::web_rtc_publish_endpoint::PublishingPolicy::from_i32(
+                    from.publishing_policy,
                 )
                 .unwrap_or_default()
                 .into(),
@@ -153,9 +159,9 @@ impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
     fn from(from: VideoSettings) -> Self {
         Self {
-            publishing_mode:
-                proto::web_rtc_publish_endpoint::PublishingMode::from(
-                    from.publishing_mode,
+            publishing_policy:
+                proto::web_rtc_publish_endpoint::PublishingPolicy::from(
+                    from.publishing_policy,
                 ) as i32,
         }
     }
