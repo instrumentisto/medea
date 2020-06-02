@@ -180,6 +180,7 @@
       let videoSelect = document.getElementById('connect__select-device_video');
       let localVideo = document.getElementById('local-video__video');
       let isForceRelayCheckbox = document.getElementById("is_force_relay");
+      let remoteVideos = new Map();
 
       let joinCallerButton = document.getElementById('join__join');
       let usernameInput = document.getElementById('join__username');
@@ -260,18 +261,28 @@
       room.on_new_connection((connection) => {
         isCallStarted = true;
         connection.on_remote_stream(async (stream) => {
-          let videoDiv = document.getElementById("remote-videos");
-          let video = document.createElement("video");
-          video.srcObject = stream.get_media_stream();
-          video.controls = "true";
-          video.style.maxWidth = "100%";
+          let alreadyCreatedVideo = remoteVideos.get(stream.sender_peer_id());
+          if (alreadyCreatedVideo) {
+            alreadyCreatedVideo.srcObject = stream.get_media_stream();
+          } else {
+            let sender_peer_id = stream.sender_peer_id();
+            let videoDiv = document.getElementById("remote-videos");
+            let video = document.createElement("video");
+            video.srcObject = stream.get_media_stream();
+            video.controls = "true";
+            video.style.maxWidth = "100%";
 
-          let innerVideoDiv = document.createElement("div");
-          innerVideoDiv.className = "col-md-3";
-          innerVideoDiv.appendChild(video);
-          videoDiv.appendChild(innerVideoDiv);
+            let innerVideoDiv = document.createElement("div");
+            innerVideoDiv.className = "col-md-3";
+            innerVideoDiv.appendChild(video);
+            videoDiv.appendChild(innerVideoDiv);
 
-          await video.play();
+            video.oncanplay = async () => {
+              await video.play();
+            };
+
+            remoteVideos.set(sender_peer_id, video);
+          }
         });
       });
 
