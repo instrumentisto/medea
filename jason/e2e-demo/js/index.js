@@ -18,7 +18,13 @@ async function createRoom(roomId, memberId) {
             publish: {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always',
-              force_relay: false
+              force_relay: false,
+              audio_settings: {
+                publishing_mode: "IfPossible"
+              },
+              video_settings: {
+                publishing_mode: "IfPossible"
+              }
             },
           },
           on_join: "grpc://127.0.0.1:9099",
@@ -38,7 +44,13 @@ async function createMember(roomId, memberId) {
     publish: {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
-      force_relay: false
+      force_relay: false,
+      audio_settings: {
+        publishing_mode: "IfPossible",
+      },
+      video_settings: {
+        publishing_mode: "IfPossible",
+      }
     }
   };
 
@@ -145,6 +157,12 @@ const controlDebugWindows = {
             kind: endpointType,
             p2p: p2pMode,
             force_relay: isForceRelay,
+            audio_settings: {
+              publishing_mode: "IfPossible",
+            },
+            video_settings: {
+              publishing_mode: "IfPossible",
+            },
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
           let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
@@ -153,6 +171,12 @@ const controlDebugWindows = {
             kind: endpointType,
             src: source,
             force_relay: isForceRelay,
+            audio_settings: {
+              publishing_mode: "IfPossible",
+            },
+            video_settings: {
+              publishing_mode: "IfPossible",
+            }
           });
       }
     })
@@ -404,14 +428,7 @@ window.onload = async function() {
 
         let alreadyCreatedVideo = videoDiv.getElementsByClassName("real-video")[0];
         if (alreadyCreatedVideo) {
-          // let mediaStream = stream.get_media_stream();
           alreadyCreatedVideo.srcObject = stream.get_media_stream();
-          // for (const track of mediaStream.getTracks()) {
-          //   let alreadyInsertedTrack = alreadyCreatedVideo.srcObject.getTrackById(track.id);
-          //   if (!alreadyInsertedTrack) {
-          //     alreadyCreatedVideo.srcObject.addTrack(track);
-          //   }
-          // }
 
           await alreadyCreatedVideo.play();
         } else {
