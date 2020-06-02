@@ -339,12 +339,18 @@ pub enum MediaType {
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct AudioSettings {
+    /// Importance of the audio media type.
+    ///
+    /// If `false` then audio can be not published.
     pub is_important: bool,
 }
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct VideoSettings {
+    /// Importance of the vidoe media type.
+    ///
+    /// If `false` then video can be not published.
     pub is_important: bool,
 }
 

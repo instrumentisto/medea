@@ -35,9 +35,18 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     }
 }
 
+/// Publishing policy of the video or audio media type in the
+/// [`WebRtcPublishEndpoint`].
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PublishingPolicy {
+    /// Audio or video media type __should__ be published.
+    ///
+    /// If this media type can't be gotten then a client application should go
+    /// to the failure state.
     Required,
+
+    /// If this media type can't be got, then a client application can continue
+    /// working without this media type.
     IfPossible,
 }
 
@@ -67,8 +76,11 @@ impl From<PublishingPolicy>
     }
 }
 
+/// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AudioSettings {
+    /// Publishing policy of the audio media type in the
+    /// [`WebRtcPublishEndpoint`].
     publishing_policy: PublishingPolicy,
 }
 
@@ -96,8 +108,11 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     }
 }
 
+/// Settings for the video media type of the [`WebRtcPublishEndpoint`].
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VideoSettings {
+    /// Publishing policy of the video media type in the
+    /// [`WebRtcPublishEndpoint`].
     publishing_policy: PublishingPolicy,
 }
 
@@ -141,8 +156,14 @@ pub struct WebRtcPublishEndpoint {
     #[serde(default)]
     force_relay: bool,
 
+    /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
+    ///
+    /// If `None` then audio shouldn't be published.
     audio_settings: Option<AudioSettings>,
 
+    /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
+    ///
+    /// If `None` then video shouldn't be published.
     video_settings: Option<VideoSettings>,
 }
 

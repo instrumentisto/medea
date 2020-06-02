@@ -13,7 +13,7 @@ use crate::{
         AudioTrackConstraints, MediaStream, MediaStreamSettings,
         TrackConstraints, TrackKind, VideoTrackConstraints,
     },
-    utils::{console_error, JsCaused, JsError},
+    utils::{JsCaused, JsError},
 };
 
 use super::PeerMediaStream;
@@ -170,8 +170,6 @@ impl SimpleStreamRequest {
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
     /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
     /// [`MediaStreamSettings`] doesn't.
-    // TODO: correct docs, because this is not evident merge.
-    //       Also, may be rename this function.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,

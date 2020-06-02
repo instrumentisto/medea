@@ -63,18 +63,37 @@ pub struct WebRtcPublishEndpoint {
     #[serde(default)]
     pub force_relay: bool,
 
+    /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
+    ///
+    /// If `None` then audio shouldn't be published.
     pub audio_settings: Option<AudioSettings>,
 
+    /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
+    ///
+    /// If `None` then video shouldn't be published.
     pub video_settings: Option<VideoSettings>,
 }
 
+/// Publishing policy of the video or audio media type in the
+/// [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub enum PublishingPolicy {
+    /// If this media type can't be got, then a client application can continue
+    /// working without this media type.
     IfPossible,
+
+    /// Audio or video media type __should__ be published.
+    ///
+    /// If this media type can't be gotten then a client application should go
+    /// to the failure state.
     Required,
 }
 
 impl PublishingPolicy {
+    /// Returns `true` if publishing policy prescribes that media __should__ be
+    /// published.
+    ///
+    /// If `false` then media can be not published.
     pub fn is_important(&self) -> bool {
         match self {
             PublishingPolicy::IfPossible => false,
@@ -109,8 +128,11 @@ impl From<PublishingPolicy>
     }
 }
 
+/// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct AudioSettings {
+    /// Publishing policy of the audio media type in the
+    /// [`WebRtcPublishEndpoint`].
     pub publishing_policy: PublishingPolicy,
 }
 
@@ -138,8 +160,11 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     }
 }
 
+/// Settings for the video media type of the [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct VideoSettings {
+    /// Publishing policy of the video media type in the
+    /// [`WebRtcPublishEndpoint`].
     pub publishing_policy: PublishingPolicy,
 }
 

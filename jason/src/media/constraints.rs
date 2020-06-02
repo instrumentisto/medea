@@ -10,7 +10,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::utils::{console_error, get_property_by_name};
+use crate::utils::get_property_by_name;
 
 /// Helper to distinguish objects related to media captured from device and
 /// media captured from display.
@@ -151,7 +151,7 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
 
         let mut sys_constraints = SysMediaStreamConstraints::new();
         let video = match constraints.video {
-            Some(video) => match video.caps {
+            Some(video) => match video.constraints {
                 Some(StreamSource::Device(device)) => {
                     sys_constraints
                         .video(&SysMediaTrackConstraints::from(device).into());
@@ -238,6 +238,10 @@ impl TrackConstraints {
         }
     }
 
+    /// Returns importance of this [`TrackConstraints`].
+    ///
+    /// If this [`TrackConstraints`] is important then without this
+    /// [`TrackConstraints`] call can't be performed.
     pub fn is_important(&self) -> bool {
         match self {
             TrackConstraints::Video(video) => video.is_important,
@@ -319,6 +323,10 @@ impl AudioTrackConstraints {
         }
     }
 
+    /// Returns importance of this [`AudioTrackConstraints`].
+    ///
+    /// If this [`AudioTrackConstraints`] is important then without this
+    /// [`AudioTrackConstraints`] call can't be performed.
     pub fn is_important(&self) -> bool {
         self.is_important
     }
@@ -351,9 +359,15 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
 /// Constraints applicable to video tracks.
 #[derive(Clone)]
 pub struct VideoTrackConstraints {
-    caps: Option<
+    /// Constraints applicable to video tracks.
+    constraints: Option<
         StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints>,
     >,
+
+    /// Importance of this [`VideoTrackConstraints`]
+    ///
+    /// If `true` then without this [`VideoTrackConstraints`] call can't be
+    /// performed.
     is_important: bool,
 }
 
@@ -365,6 +379,11 @@ pub struct DeviceVideoTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
     device_id: Option<String>,
+
+    /// Importance of this [`DeviceVideoTrackConstraints`]
+    ///
+    /// If `true` then without this [`DeviceVideoTrackConstraints`] call can't
+    /// be performed.
     is_important: bool,
 }
 
@@ -381,6 +400,10 @@ impl DeviceVideoTrackConstraints {
         }
     }
 
+    /// Returns importance of this [`DeviceVideoTrackConstraints`].
+    ///
+    /// If this [`DeviceVideoTrackConstraints`] is important then without this
+    /// [`DeviceVideoTrackConstraints`] call can't be performed.
     pub fn is_important(&self) -> bool {
         self.is_important
     }
@@ -444,7 +467,7 @@ impl VideoTrackConstraints {
             return false;
         }
 
-        match &self.caps {
+        match &self.constraints {
             None => true,
             Some(StreamSource::Device(constraints)) => {
                 satisfies_by_device_id(&constraints.device_id, track)
@@ -483,9 +506,9 @@ impl VideoTrackConstraints {
     /// if some constraint is not set on this one, then it will be applied from
     /// `another`.
     pub fn merge(&mut self, another: VideoTrackConstraints) {
-        match (self.caps.as_mut(), another.caps) {
+        match (self.constraints.as_mut(), another.constraints) {
             (None, Some(another)) => {
-                self.caps.replace(another);
+                self.constraints.replace(another);
             }
             (Some(this), Some(another)) => {
                 this.merge(another);
@@ -494,6 +517,10 @@ impl VideoTrackConstraints {
         };
     }
 
+    /// Returns importance of this [`VideoTrackConstraints`].
+    ///
+    /// If this [`VideoTrackConstraints`] is important then without this
+    /// [`VideoTrackConstraints`] call can't be performed.
     pub fn is_important(&self) -> bool {
         self.is_important
     }
@@ -502,7 +529,7 @@ impl VideoTrackConstraints {
 impl From<ProtoVideoConstraints> for VideoTrackConstraints {
     fn from(caps: ProtoVideoConstraints) -> Self {
         Self {
-            caps: None,
+            constraints: None,
             is_important: caps.is_important,
         }
     }
@@ -532,7 +559,7 @@ impl From<DeviceVideoTrackConstraints> for VideoTrackConstraints {
     fn from(constraints: DeviceVideoTrackConstraints) -> Self {
         Self {
             is_important: constraints.is_important,
-            caps: Some(StreamSource::Device(constraints)),
+            constraints: Some(StreamSource::Device(constraints)),
         }
     }
 }
@@ -541,7 +568,7 @@ impl From<DisplayVideoTrackConstraints> for VideoTrackConstraints {
     fn from(constraints: DisplayVideoTrackConstraints) -> Self {
         Self {
             is_important: true,
-            caps: Some(StreamSource::Display(constraints)),
+            constraints: Some(StreamSource::Display(constraints)),
         }
     }
 }

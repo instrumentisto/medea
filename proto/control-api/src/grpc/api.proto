@@ -175,19 +175,39 @@ message WebRtcPublishEndpoint {
   string on_stop = 4;
   // Option to relay all media through a TURN server forcibly.
   bool force_relay = 5;
+  // Settings for the audio media type of the 'WebRtcPublishEndpoint'.
+  //
+  // If empty then audio shouldn't be published.
   AudioSettings audio_settings = 6;
+  // Settings for the video media type of the 'WebRtcPublishEndpoint'.
+  //
+  // If empty then video shouldn't be published.
   VideoSettings video_settings = 7;
 
+  // Publishing policy of the video or audio media type in the
+  // 'WebRtcPublishEndpoint'.
   enum PublishingPolicy {
+    // Audio or video media type __should__ be published.
+    //
+    // If this media type can't be gotten then a client application should go
+    // to the failure state.
     IfPossible = 0;
+    // If this media type can't be got, then a client application can continue
+    // working without this media type.
     Required = 1;
   }
 
+  // Settings for the video media type of the 'WebRtcPublishEndpoint'.
   message VideoSettings {
+    // Publishing policy of the video media type in the
+    // 'WebRtcPublishEndpoint'.
     PublishingPolicy publishing_policy = 1;
   }
 
+  // Settings for the audio media type of the 'WebRtcPublishEndpoint'.
   message AudioSettings {
+    // Publishing policy of the audio media type in the
+    // 'WebRtcPublishEndpoint'.
     PublishingPolicy publishing_policy = 1;
   }
 

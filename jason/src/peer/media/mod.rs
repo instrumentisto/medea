@@ -17,12 +17,9 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints, TrackKind},
+    media::{MediaStreamTrack, TrackConstraints},
     peer::PeerEvent,
-    utils::{
-        console_error, resettable_delay_for, JsCaused, JsError,
-        ResettableDelayHandle,
-    },
+    utils::{resettable_delay_for, JsCaused, JsError, ResettableDelayHandle},
 };
 
 use super::{
@@ -393,7 +390,8 @@ impl MediaConnections {
     }
 
     /// Returns [`MediaStreamTrack`]s being received from a specified sender,
-    /// but only if all receiving [`MediaStreamTrack`]s are present already.
+    /// but only if all important receiving [`MediaStreamTrack`]s are present
+    /// already.
     pub fn get_stream_by_sender(
         &self,
         sender_id: PeerId,
@@ -579,6 +577,8 @@ impl Sender {
         Ok(this)
     }
 
+    /// Returns `true` if this [`Sender`] is important and without it call
+    /// session can't be started.
     pub fn is_important(&self) -> bool {
         self.caps.is_important()
     }
@@ -781,6 +781,8 @@ impl Receiver {
         }
     }
 
+    /// Returns `true` if this [`Sender`] is important and without it call
+    /// session can't be started.
     pub fn is_important(&self) -> bool {
         self.is_important
     }

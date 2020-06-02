@@ -74,23 +74,42 @@ pub enum MediaManagerError {
     EnumerateDevicesFailed(JsError),
 }
 
+/// Error which indicates that some media type from the requsted constraints
+/// can't be gotten.
+///
+/// Should be returned to the JS side, so JS side can create new request without
+/// errored media type.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct MediaTypeUnavailableError {
+    /// Media type which can't be gotten.
     pub media_type: UnavailableMediaType,
 }
 
 #[wasm_bindgen]
 impl MediaTypeUnavailableError {
+    /// Returns [`String`] with [`UnavailableMediaType`].
     pub fn media_type(&self) -> String {
         self.media_type.to_string()
     }
 }
 
+/// Media types which can be requested in the constraints.
+///
+/// Will be stored in the [`MediaTypeUnavailableError`].
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub enum UnavailableMediaType {
+    /// Audio media type can't be gotten.
+    ///
+    /// `audio` string will be returned to the JS side on
+    /// [`MediaTypeUnavailableError::media_type`] call.
     Audio,
+
+    /// Video media type can't be gotten.
+    ///
+    /// `video` string will be returned to the JS side on
+    /// [`MediaTypeUnavailableError::media_type`] call.
     Video,
 }
 
@@ -107,6 +126,8 @@ impl fmt::Display for UnavailableMediaType {
 impl TryFrom<&MediaManagerError> for MediaTypeUnavailableError {
     type Error = ();
 
+    /// Tries to get failed to got media type from the
+    /// [`MediaManagerError::GetUserMediaFailed`] error.
     fn try_from(
         value: &MediaManagerError,
     ) -> std::result::Result<Self, Self::Error> {
@@ -473,6 +494,9 @@ impl MediaManagerHandle {
 
     /// Returns [`MediaStream`](LocalMediaStream) object, built from provided
     /// [`MediaStreamSettings`].
+    ///
+    /// If some media type can't be gotten then exception with
+    /// [MediaTypeUnavailableError`] will be throwed.
     pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {
         match upgrade_or_detached!(self.0)
             .map(|inner| inner.get_stream(caps.clone()))

@@ -97,6 +97,10 @@ pub enum TransceiverDirection {
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-recvonly
     Recvonly,
 
+    /// [`inactive` direction][1] of transceiver.
+    ///
+    /// [1]:
+    /// https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-inactive
     Inactive,
 }
 
