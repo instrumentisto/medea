@@ -496,7 +496,7 @@ impl MediaManagerHandle {
     /// [`MediaStreamSettings`].
     ///
     /// If some media type can't be gotten then exception with
-    /// [MediaTypeUnavailableError`] will be throwed.
+    /// [`MediaTypeUnavailableError`] will be throwed.
     pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {
         match upgrade_or_detached!(self.0)
             .map(|inner| inner.get_stream(caps.clone()))

@@ -241,7 +241,7 @@ impl TrackConstraints {
     /// Returns importance of this [`TrackConstraints`].
     ///
     /// If this [`TrackConstraints`] is important then without this
-    /// [`TrackConstraints`] call can't be performed.
+    /// [`TrackConstraints`] call session can't be started.
     pub fn is_important(&self) -> bool {
         match self {
             TrackConstraints::Video(video) => video.is_important,
@@ -273,6 +273,11 @@ pub struct AudioTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
     device_id: Option<String>,
+
+    /// Importance of this [`AudioTrackConstraints`]
+    ///
+    /// If `true` then without this [`AudioTrackConstraints`] call session
+    /// can't be started.
     is_important: bool,
 }
 
@@ -326,7 +331,7 @@ impl AudioTrackConstraints {
     /// Returns importance of this [`AudioTrackConstraints`].
     ///
     /// If this [`AudioTrackConstraints`] is important then without this
-    /// [`AudioTrackConstraints`] call can't be performed.
+    /// [`AudioTrackConstraints`] call session can't be started.
     pub fn is_important(&self) -> bool {
         self.is_important
     }
@@ -366,8 +371,8 @@ pub struct VideoTrackConstraints {
 
     /// Importance of this [`VideoTrackConstraints`]
     ///
-    /// If `true` then without this [`VideoTrackConstraints`] call can't be
-    /// performed.
+    /// If `true` then without this [`VideoTrackConstraints`] call session
+    /// can't be started.
     is_important: bool,
 }
 
@@ -382,8 +387,8 @@ pub struct DeviceVideoTrackConstraints {
 
     /// Importance of this [`DeviceVideoTrackConstraints`]
     ///
-    /// If `true` then without this [`DeviceVideoTrackConstraints`] call can't
-    /// be performed.
+    /// If `true` then without this [`DeviceVideoTrackConstraints`] call
+    /// session can't be started.
     is_important: bool,
 }
 
@@ -403,7 +408,7 @@ impl DeviceVideoTrackConstraints {
     /// Returns importance of this [`DeviceVideoTrackConstraints`].
     ///
     /// If this [`DeviceVideoTrackConstraints`] is important then without this
-    /// [`DeviceVideoTrackConstraints`] call can't be performed.
+    /// [`DeviceVideoTrackConstraints`] call session can't be started.
     pub fn is_important(&self) -> bool {
         self.is_important
     }
@@ -506,6 +511,9 @@ impl VideoTrackConstraints {
     /// if some constraint is not set on this one, then it will be applied from
     /// `another`.
     pub fn merge(&mut self, another: VideoTrackConstraints) {
+        if !self.is_important && another.is_important {
+            self.is_important = another.is_important;
+        }
         match (self.constraints.as_mut(), another.constraints) {
             (None, Some(another)) => {
                 self.constraints.replace(another);
@@ -520,7 +528,7 @@ impl VideoTrackConstraints {
     /// Returns importance of this [`VideoTrackConstraints`].
     ///
     /// If this [`VideoTrackConstraints`] is important then without this
-    /// [`VideoTrackConstraints`] call can't be performed.
+    /// [`VideoTrackConstraints`] call session can't be started.
     pub fn is_important(&self) -> bool {
         self.is_important
     }

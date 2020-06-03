@@ -337,9 +337,7 @@ window.onload = async function() {
             constraints = await build_constraints(audioSelect, null);
             localStream = await jason.media_manager().init_local_stream(constraints);
           } else {
-            console.error("All sourcers are unavailable.");
-            constraints = await build_constraints(null, null);
-            localStream = await jason.media_manager().init_local_stream(constraints);
+            console.error(e);
           }
         } else {
           console.error(e);
@@ -351,8 +349,8 @@ window.onload = async function() {
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label;
-    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label;
+    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
+    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -446,7 +444,6 @@ window.onload = async function() {
     });
 
     room.on_local_stream((stream) => {
-      console.log("on_local_stream");
       updateLocalVideo(stream);
       stream.free();
     });

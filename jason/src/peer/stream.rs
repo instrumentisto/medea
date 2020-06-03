@@ -152,7 +152,6 @@ impl PeerMediaStream {
 ///
 /// For using [`RemoteMediaStream`] on Rust side, consider the
 /// [`PeerMediaStream`].
-// TODO: This structure named remote, but used as local. Maybe rename it????
 #[wasm_bindgen]
 pub struct RemoteMediaStream(Weak<RefCell<InnerStream>>);
 

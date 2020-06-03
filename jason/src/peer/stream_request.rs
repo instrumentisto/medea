@@ -161,15 +161,22 @@ impl SimpleStreamRequest {
     /// [`SimpleStreamRequest`] does not have some constraint, then it will be
     /// applied from [`MediaStreamSettings`].
     ///
+    /// If some caps are exists in the [`SimpleStreamRequest`] but doesn't
+    /// exists in the [`MediaStreamSettings`] and this caps doesn't
+    /// important then they will be remoted from the
+    /// [`SimpleStreamRequest`].
+    ///
     /// # Errors
     ///
     /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if
     /// [`SimpleStreamRequest`] contains [`AudioTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] doesn't.
+    /// [`MediaStreamSettings`] doesn't and this [`AudioTrackConstraints`] are
+    /// important.
     ///
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
     /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] doesn't.
+    /// [`MediaStreamSettings`] doesn't and this [`VideoTrackConstraints`] are
+    /// important.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,

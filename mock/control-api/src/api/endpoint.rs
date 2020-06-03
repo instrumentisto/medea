@@ -45,8 +45,8 @@ pub enum PublishingPolicy {
     /// to the failure state.
     Required,
 
-    /// If this media type can't be got, then a client application can continue
-    /// working without this media type.
+    /// If this media type can't be gotten, then a client application can
+    /// continue working without publishing this media type.
     IfPossible,
 }
 

@@ -78,8 +78,8 @@ pub struct WebRtcPublishEndpoint {
 /// [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub enum PublishingPolicy {
-    /// If this media type can't be got, then a client application can continue
-    /// working without this media type.
+    /// If this media type can't be gotten, then a client application can
+    /// continue working without this media type.
     IfPossible,
 
     /// Audio or video media type __should__ be published.

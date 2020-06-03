@@ -213,26 +213,46 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[prost(bool, tag="5")]
     pub force_relay: bool,
+    /// Settings for the audio media type of the 'WebRtcPublishEndpoint'.
+    ///
+    /// If empty then audio shouldn't be published.
     #[prost(message, optional, tag="6")]
     pub audio_settings: ::std::option::Option<web_rtc_publish_endpoint::AudioSettings>,
+    /// Settings for the video media type of the 'WebRtcPublishEndpoint'.
+    ///
+    /// If empty then video shouldn't be published.
     #[prost(message, optional, tag="7")]
     pub video_settings: ::std::option::Option<web_rtc_publish_endpoint::VideoSettings>,
 }
 pub mod web_rtc_publish_endpoint {
+    /// Settings for the video media type of the 'WebRtcPublishEndpoint'.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct VideoSettings {
+        /// Publishing policy of the video media type in the
+        /// 'WebRtcPublishEndpoint'.
         #[prost(enumeration="PublishingPolicy", tag="1")]
         pub publishing_policy: i32,
     }
+    /// Settings for the audio media type of the 'WebRtcPublishEndpoint'.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AudioSettings {
+        /// Publishing policy of the audio media type in the
+        /// 'WebRtcPublishEndpoint'.
         #[prost(enumeration="PublishingPolicy", tag="1")]
         pub publishing_policy: i32,
     }
+    /// Publishing policy of the video or audio media type in the
+    /// 'WebRtcPublishEndpoint'.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum PublishingPolicy {
+        /// Audio or video media type __should__ be published.
+        ///
+        /// If this media type can't be gotten then a client application should go
+        /// to the failure state.
         IfPossible = 0,
+        /// If this media type can't be got, then a client application can continue
+        /// working without this media type.
         Required = 1,
     }
     /// P2P mode of WebRTC interaction.

@@ -17,6 +17,10 @@ spec:
             spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
+              audio_settings:
+                publishing_policy: IfPossible
+              video_settings:
+                publishing_policy: IfPossible
     subscriber:
       kind: Member
       credentials: test

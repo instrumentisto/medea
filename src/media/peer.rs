@@ -323,6 +323,10 @@ impl Peer<New> {
 
     /// Adds `send` tracks to `self` and add `recv` for this `send`
     /// to `partner_peer`.
+    ///
+    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
+    /// and [`WebRtcPublishEndpoint::video_settings`], so if `None` will be
+    /// returned then track for this media type wouldn't be created.
     pub fn add_publisher(
         &mut self,
         partner_peer: &mut Peer<New>,
