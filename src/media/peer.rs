@@ -510,29 +510,37 @@ pub mod tests {
 
         for _ in 0..send_audio {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Audio(AudioSettings { is_important: true }),
+            );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
 
         for _ in 0..send_video {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Video(VideoSettings { is_important: true }),
+            );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
 
         for _ in 0..recv_audio {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Audio(AudioSettings { is_important: true }),
+            );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
 
         for _ in 0..recv_video {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Video(VideoSettings { is_important: true }),
+            );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
 
