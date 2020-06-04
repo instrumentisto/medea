@@ -9,12 +9,11 @@ mod rpc_server;
 use std::sync::Arc;
 
 use actix::{
-    Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, WrapFuture as _,
+    fut, Actor, ActorFuture, AsyncContext, Context, ContextFutureSpawner as _,
+    Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Event, PeerId};
 
 use crate::{
@@ -28,7 +27,7 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{Peer, PeerError, Stable},
+    media::{peer::RenegotiationReason, Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
@@ -173,53 +172,84 @@ impl Room {
         &self.id
     }
 
-    /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
-    /// which of them has any outbound tracks. That [`Peer`] state will be
-    /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
-    /// [`New`] state. At least one of provided peers must have outbound
-    /// tracks.
+    /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
+    /// will be changed to [`WaitLocalSdp`] state.
     fn send_peer_created(
         &mut self,
-        peer1_id: PeerId,
-        peer2_id: PeerId,
+        peer_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
+        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
 
-        // decide which peer is sender
-        let (sender, receiver) = if peer1.is_sender() {
-            (peer1, peer2)
-        } else if peer2.is_sender() {
-            (peer2, peer1)
-        } else {
-            self.peers.add_peer(peer1);
-            self.peers.add_peer(peer2);
-            return Err(RoomError::BadRoomSpec(format!(
-                "Error while trying to connect Peer [id = {}] and Peer [id = \
-                 {}] cause neither of peers are senders",
-                peer1_id, peer2_id
-            )));
-        };
-        self.peers.add_peer(receiver);
-
-        let sender = sender.start();
-        let member_id = sender.member_id();
-        let ice_servers = sender
+        let peer = peer.start();
+        let member_id = peer.member_id();
+        let ice_servers = peer
             .ice_servers_list()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
-            peer_id: sender.id(),
+            peer_id: peer.id(),
             sdp_offer: None,
-            tracks: sender.tracks(),
+            tracks: peer.tracks(),
             ice_servers,
-            force_relay: sender.is_force_relayed(),
+            force_relay: peer.is_force_relayed(),
         };
-        self.peers.add_peer(sender);
+        self.peers.add_peer(peer);
         Ok(Box::new(
             self.members
                 .send_event_to_member(member_id, peer_created)
                 .into_actor(self),
         ))
+    }
+
+    fn start_renegotiation(
+        &mut self,
+        peer_id: PeerId,
+    ) -> ActFuture<Result<(), RoomError>> {
+        unimplemented!()
+    }
+
+    fn send_tracks_added(
+        &mut self,
+        peer_id: PeerId,
+    ) -> ActFuture<Result<(), RoomError>> {
+        use medea_client_api_proto::{
+            AudioSettings, Direction, MediaType, Track, TrackId, VideoSettings,
+        };
+
+        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id).unwrap();
+
+        let mut tracks = Vec::new();
+        tracks.push(Track {
+            id: TrackId(2),
+            media_type: MediaType::Audio(AudioSettings {}),
+            direction: Direction::Send {
+                receivers: vec![peer.partner_peer_id()],
+                mid: None,
+            },
+            is_muted: false,
+        });
+        tracks.push(Track {
+            id: TrackId(3),
+            media_type: MediaType::Video(VideoSettings {}),
+            direction: Direction::Send {
+                receivers: vec![peer.partner_peer_id()],
+                mid: None,
+            },
+            is_muted: false,
+        });
+
+        let peer = peer.start_renegotiation(RenegotiationReason::TracksAdded);
+        let member_id = peer.member_id();
+        let peer_created = Event::TracksAdded {
+            peer_id: peer.id(),
+            tracks,
+            sdp_offer: None,
+        };
+        self.peers.add_peer(peer);
+        Box::new(
+            self.members
+                .send_event_to_member(member_id, peer_created)
+                .into_actor(self),
+        )
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
@@ -241,7 +271,8 @@ impl Room {
     }
 
     /// Creates and interconnects all [`Peer`]s between connected [`Member`]
-    /// and all available at this moment other [`Member`]s.
+    /// and all available at this moment other [`Member`]s. Expects that
+    /// provided [`Member`] have active [`RpcConnection`].
     ///
     /// Availability is determined by checking [`RpcConnection`] of all
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
@@ -251,7 +282,7 @@ impl Room {
         member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
-        let mut connect_endpoints_tasks = Vec::new();
+        let mut connect_tasks = Vec::new();
 
         for publisher in member.srcs().values() {
             for receiver in publisher.sinks() {
@@ -260,7 +291,7 @@ impl Room {
                 if receiver.peer_id().is_none()
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
-                    connect_endpoints_tasks.push(
+                    connect_tasks.push(
                         self.peers
                             .connect_endpoints(publisher.clone(), receiver),
                     );
@@ -274,32 +305,57 @@ impl Room {
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
-                connect_endpoints_tasks.push(
+                connect_tasks.push(
                     self.peers
                         .connect_endpoints(publisher.clone(), receiver.clone()),
                 )
             }
         }
 
-        for connect_endpoints_task in connect_endpoints_tasks {
-            connect_endpoints_task
-                .then(|result, this, _| match result {
-                    Ok(Some((peer1, peer2))) => {
-                        match this.send_peer_created(peer1, peer2) {
-                            Ok(fut) => fut,
-                            Err(err) => Box::new(actix::fut::err(err)),
-                        }
-                    }
-                    Err(err) => Box::new(actix::fut::err(err)),
-                    _ => Box::new(actix::fut::ok(())),
-                })
-                .map(|res, _, _| {
-                    if let Err(err) = res {
-                        error!("Failed connect peers, because {}.", err);
-                    }
-                })
-                .spawn(ctx);
+        if connect_tasks.is_empty() {
+            return;
         }
+
+        let endpoints_connected = if connect_tasks.len() == 1 {
+            Box::new(
+                connect_tasks
+                    .pop()
+                    .unwrap()
+                    .map(|res, _, _| res.map(|ok| vec![ok])),
+            )
+        } else {
+            let mut connect_tasks = connect_tasks.into_iter();
+            let mut acc = Vec::new();
+            let mut chained: ActFuture<_> = Box::new(
+                connect_tasks.nth(0).unwrap().map(move |res, _, _| {
+                    res.map(|ok| {
+                        acc.push(ok);
+                        acc
+                    })
+                }),
+            );
+
+            for item in connect_tasks {
+                chained = Box::new(chained.then(|mut res, _, _| match res {
+                    Ok(mut acc) => fut::Either::Left(item.map(|res, _, _| {
+                        res.map(|val| {
+                            acc.push(val);
+                            acc
+                        })
+                    })),
+                    Err(err) => fut::Either::Right(fut::err(err)),
+                }));
+            }
+
+            chained
+        };
+
+        // TODO: propagate error upwards
+        ctx.spawn(endpoints_connected.map(|res, room, ctx| {
+            println!("1111111111 {:?}", res.unwrap());
+            // let (id1, id2) = res.unwrap().pop().unwrap();
+            // room.send_peer_created(id1).unwrap().map(|_, _, _| ())
+        }));
     }
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving
@@ -378,29 +434,6 @@ impl Room {
                 }
             },
         ))
-    }
-
-    /// Starts renegotiation of the `Peer` with provided [`PeerId`] and his
-    /// partner `Peer`.
-    ///
-    /// You can provided any [`PeerId`], but renegotiation will be started on
-    /// the offerer `Peer` in this pair. So [`Event::RenegotiationStarted`]
-    /// should be sent for [`Peer`] which will be returned from
-    /// [`PeerService::start_renegotiation`] (not just for provided
-    /// [`PeerId`]).
-    #[allow(dead_code)]
-    fn renegotiate_peer(
-        &mut self,
-        peer_id: PeerId,
-    ) -> Result<LocalBoxFuture<'static, Result<(), RoomError>>, RoomError> {
-        let renegotiation_peer = self.peers.start_renegotiation(peer_id)?;
-        let member_id = renegotiation_peer.member_id();
-        let peer_id = renegotiation_peer.id();
-
-        Ok(Box::pin(self.members.send_event_to_member(
-            member_id,
-            Event::RenegotiationStarted { peer_id },
-        )))
     }
 }
 

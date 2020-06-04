@@ -247,7 +247,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                         }
                         Event::PeersRemoved { .. }
                         | Event::RenegotiationStarted { .. }
-                        | Event::SdpOfferMade { .. } => {}
+                        | Event::SdpOfferMade { .. }
+                        | Event::TracksAdded { .. } => {}
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);

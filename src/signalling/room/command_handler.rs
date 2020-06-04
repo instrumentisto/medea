@@ -4,89 +4,20 @@
 use std::collections::HashMap;
 
 use actix::WrapFuture as _;
-use futures::{future, future::LocalBoxFuture, FutureExt};
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, PeerConnectionState, PeerId,
-    PeerMetrics, TrackId, TrackPatch,
+    AudioSettings, CommandHandler, Direction, Event, IceCandidate, MediaType,
+    PeerId, PeerMetrics, Track, TrackId, TrackPatch, VideoSettings,
 };
 
 use crate::{
     log::prelude::*,
-    media::{Peer, Stable, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp},
+    media::{
+        peer::RenegotiationReason, Peer, Stable, WaitLocalHaveRemote,
+        WaitLocalSdp, WaitRemoteSdp,
+    },
 };
 
 use super::{ActFuture, Room, RoomError};
-
-impl Room {
-    /// Updates specified [`Peer`] connection state.
-    ///
-    /// Initiates ICE restart if new connection state is
-    /// [`PeerConnectionState::Failed`], previous connection state is
-    /// [`PeerConnectionState::Connected`] or
-    /// [`PeerConnectionState::Disconnected`] and connected [`Peer`] connection
-    /// state is [`PeerConnectionState::Connected`] or
-    /// [`PeerConnectionState::Disconnected`].
-    fn update_peer_connection_state<S>(
-        &mut self,
-        peer_id: PeerId,
-        new_state: S,
-    ) -> LocalBoxFuture<'static, Result<(), RoomError>>
-    where
-        S: Into<PeerConnectionState>,
-    {
-        use PeerConnectionState as State;
-
-        let new_state: State = new_state.into();
-
-        let peer = match self.peers.get_peer_by_id(peer_id) {
-            Ok(peer) => peer,
-            Err(err) => return future::err(err).boxed_local(),
-        };
-
-        let old_state: State = peer.connection_state();
-
-        // check whether state really changed
-        if let (State::Failed, State::Disconnected) = (old_state, new_state) {
-            // Failed => Disconnected is still Failed
-            return future::ok(()).boxed_local();
-        } else {
-            peer.set_connection_state(new_state);
-        }
-
-        // maybe init ICE restart
-        match new_state {
-            State::Failed => match old_state {
-                State::Connected | State::Disconnected => {
-                    let connected_peer_state: State =
-                        match self.peers.get_peer_by_id(peer.partner_peer_id())
-                        {
-                            Ok(peer) => peer.connection_state(),
-                            Err(err) => return future::err(err).boxed_local(),
-                        };
-
-                    if let State::Failed = connected_peer_state {
-                        match self.peers.take_inner_peer::<Stable>(peer_id) {
-                            Ok(peer) => {
-                                let member_id = peer.member_id();
-                                self.peers.add_peer(peer.start_renegotiation());
-
-                                self.members.send_event_to_member(
-                                    member_id,
-                                    Event::RenegotiationStarted { peer_id },
-                                )
-                            }
-                            Err(err) => future::err(err).boxed_local(),
-                        }
-                    } else {
-                        future::ok(()).boxed_local()
-                    }
-                }
-                _ => future::ok(()).boxed_local(),
-            },
-            _ => future::ok(()).boxed_local(),
-        }
-    }
-}
 
 impl CommandHandler for Room {
     type Output = Result<ActFuture<Result<(), RoomError>>, RoomError>;
@@ -116,17 +47,42 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = match from_peer.connection_state() {
-            PeerConnectionState::New => Event::PeerCreated {
+        let event = match from_peer.renegotiation_reason() {
+            None => Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
                 tracks: to_peer.tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
             },
-            _ => Event::SdpOfferMade {
-                peer_id: to_peer.id(),
-                sdp_offer,
+            Some(reason) => match &reason {
+                RenegotiationReason::TracksAdded => {
+                    let mut tracks = Vec::new();
+                    tracks.push(Track {
+                        id: TrackId(2),
+                        media_type: MediaType::Audio(AudioSettings {}),
+                        direction: Direction::Recv {
+                            sender: from_peer_id,
+                            mid: Some(String::from("2")),
+                        },
+                        is_muted: false,
+                    });
+                    tracks.push(Track {
+                        id: TrackId(3),
+                        media_type: MediaType::Video(VideoSettings {}),
+                        direction: Direction::Recv {
+                            sender: from_peer_id,
+                            mid: Some(String::from("3")),
+                        },
+                        is_muted: false,
+                    });
+
+                    Event::TracksAdded {
+                        peer_id: to_peer_id,
+                        tracks,
+                        sdp_offer: Some(sdp_offer),
+                    }
+                }
             },
         };
 
@@ -203,27 +159,13 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// Updates [`PeerConnectionState`] on [`PeerMetrics::IceConnectionState`]
-    /// and [`PeerMetrics::PeerConnectionState`].
+    /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        peer_id: PeerId,
-        metrics: PeerMetrics,
+        _: PeerId,
+        _: PeerMetrics,
     ) -> Self::Output {
-        use PeerMetrics as PM;
-
-        Ok(Box::new(
-            match metrics {
-                PM::IceConnectionState(state) => {
-                    self.update_peer_connection_state(peer_id, state)
-                }
-                PM::PeerConnectionState(state) => {
-                    self.update_peer_connection_state(peer_id, state)
-                }
-                PM::RtcStats(_) => future::ok(()).boxed_local(),
-            }
-            .into_actor(self),
-        ))
+        Ok(Box::new(actix::fut::ok(())))
     }
 
     /// Sends [`Event::TracksUpdated`] with data from the received

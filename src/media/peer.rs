@@ -4,13 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{cell::RefCell, collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerConnectionState,
-    PeerId as Id, Track, TrackId, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
+    TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -84,17 +84,12 @@ impl PeerError {
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
+#[enum_delegate(
+    pub fn renegotiation_reason(&self) -> Option<RenegotiationReason>
+)]
 #[enum_delegate(
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
-)]
-#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
-#[enum_delegate(pub fn is_offerer(&self) -> bool)]
-#[enum_delegate(pub fn connection_state(&self) -> PeerConnectionState)]
-#[enum_delegate(
-    pub fn set_connection_state(
-        &self,
-        state: PeerConnectionState
-    )
 )]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -206,13 +201,7 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
-    /// Flag which indicates that this [`Peer`] is offerer.
-    ///
-    /// If `true` then this [`Peer`] should start renegotiation when it needed.
-    is_offerer: bool,
-
-    /// Current [`PeerConnectionState`] of this [`Peer`]
-    connection_state: RefCell<PeerConnectionState>,
+    renegotiation_reason: Option<RenegotiationReason>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -303,16 +292,6 @@ impl<T> Peer<T> {
         self.context.ice_user.replace(ice_user);
     }
 
-    /// Changes [`Peer`]'s connection state.
-    pub fn set_connection_state(&self, state: PeerConnectionState) {
-        self.context.connection_state.replace(state);
-    }
-
-    /// Returns [`Peer`] current connection state.
-    pub fn connection_state(&self) -> PeerConnectionState {
-        *self.context.connection_state.borrow()
-    }
-
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
     pub fn endpoints(&self) -> Vec<WeakEndpoint> {
         self.context.endpoints.clone()
@@ -341,10 +320,8 @@ impl<T> Peer<T> {
         self.context.senders.clone()
     }
 
-    /// Returns `true` if this [`Peer`] is offerer and will start renegotiation
-    /// when it will be needed.
-    pub fn is_offerer(&self) -> bool {
-        self.context.is_offerer
+    pub fn renegotiation_reason(&self) -> Option<RenegotiationReason> {
+        self.context.renegotiation_reason.clone()
     }
 }
 
@@ -394,6 +371,7 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
         let mut context = self.context;
+        context.renegotiation_reason = None;
         context.sdp_answer = Some(sdp_answer.to_string());
         Peer {
             context,
@@ -406,6 +384,7 @@ impl Peer<WaitLocalHaveRemote> {
     /// Sets local description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
+        context.renegotiation_reason = None;
         context.sdp_answer = Some(sdp_answer);
         Peer {
             context,
@@ -424,7 +403,6 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
-        is_offerer: bool,
     ) -> Self {
         let context = Context {
             id,
@@ -438,8 +416,7 @@ impl Peer<Stable> {
             senders: HashMap::new(),
             is_force_relayed,
             endpoints: Vec::new(),
-            is_offerer,
-            connection_state: RefCell::new(PeerConnectionState::New),
+            renegotiation_reason: None,
         };
         Self {
             context,
@@ -527,15 +504,12 @@ impl Peer<Stable> {
     /// [SDP] Offer and Answer.
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
-        if !self.context.is_offerer {
-            panic!(
-                "You're tried to start renegotiation of the Peer which isn't \
-                 offerer."
-            )
-        }
-
+    pub fn start_renegotiation(
+        self,
+        reason: RenegotiationReason,
+    ) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
+        context.renegotiation_reason = Some(reason);
         context.sdp_answer = None;
         context.sdp_offer = None;
         Peer {
@@ -543,6 +517,13 @@ impl Peer<Stable> {
             state: WaitLocalSdp {},
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenegotiationReason {
+    TracksAdded,
+    /* TracksRemoved,
+     * IceRestart */
 }
 
 #[cfg(test)]
@@ -571,6 +552,7 @@ pub mod tests {
                 ice_user: None,
                 endpoints: Vec::new(),
                 partner_member: MemberId::from("partner-member"),
+                renegotiation_reason: None,
             },
         };
 
