@@ -272,14 +272,6 @@ pub enum Event {
         tracks_patches: Vec<TrackPatch>,
     },
 
-    /// Media Server notifies Web Client about necessity to start
-    /// renegotiation, creating new SDP Offer.
-    RenegotiationStarted { peer_id: PeerId },
-
-    /// Media Server notifies Web Client about necessity to apply specified SDP
-    /// Offer to Web Client's RTCPeerConnection.
-    SdpOfferMade { peer_id: PeerId, sdp_offer: String },
-
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// Peer.
     TracksAdded {

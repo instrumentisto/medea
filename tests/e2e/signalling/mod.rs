@@ -246,8 +246,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             assert!(self.known_peers.contains(peer_id))
                         }
                         Event::PeersRemoved { .. }
-                        | Event::RenegotiationStarted { .. }
-                        | Event::SdpOfferMade { .. }
+                        // | Event::RenegotiationStarted { .. }
+                        // | Event::SdpOfferMade { .. }
                         | Event::TracksAdded { .. } => {}
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();

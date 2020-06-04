@@ -200,13 +200,6 @@ impl Room {
         ))
     }
 
-    fn start_renegotiation(
-        &mut self,
-        peer_id: PeerId,
-    ) -> ActFuture<Result<(), RoomError>> {
-        unimplemented!()
-    }
-
     fn send_tracks_added(
         &mut self,
         peer_id: PeerId,

@@ -976,67 +976,6 @@ impl EventHandler for InnerRoom {
                 .print();
         }
     }
-
-    /// Starts SDP renegotiation.
-    fn on_renegotiation_started(&mut self, peer_id: PeerId) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            let rpc = Rc::clone(&self.rpc);
-            spawn_local(
-                async move {
-                    let sdp_offer = peer
-                        .get_offer(Vec::new(), None)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    let mids = peer
-                        .get_mids()
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    rpc.send_command(Command::MakeSdpOffer {
-                        peer_id,
-                        sdp_offer,
-                        mids,
-                    });
-                    Result::<_, Traced<RoomError>>::Ok(())
-                }
-                .then(|result| async move {
-                    if let Err(err) = result {
-                        JasonError::from(err.into_parts()).print();
-                    };
-                }),
-            );
-        } else {
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
-        }
-    }
-
-    /// Sets received SDP offer as found `Peer`'s remote description and creates
-    /// and sends SDP answer based on received offer.
-    fn on_sdp_offer_made(&mut self, peer_id: PeerId, sdp_offer: String) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            let rpc = Rc::clone(&self.rpc);
-            spawn_local(
-                async move {
-                    let sdp_answer = peer
-                        .process_offer(sdp_offer, Vec::new(), None)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    rpc.send_command(Command::MakeSdpAnswer {
-                        peer_id,
-                        sdp_answer,
-                    });
-                    Result::<_, Traced<RoomError>>::Ok(())
-                }
-                .then(|result| async move {
-                    if let Err(err) = result {
-                        JasonError::from(err.into_parts()).print();
-                    };
-                }),
-            );
-        } else {
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
-        }
-    }
 }
 
 /// [`PeerEvent`]s handling.
