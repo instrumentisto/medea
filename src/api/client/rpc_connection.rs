@@ -9,6 +9,7 @@ use derive_more::{From, Into};
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{CloseDescription, Command, Event};
 
+use crate::signalling::room::RoomError;
 use crate::api::control::MemberId;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
@@ -106,7 +107,7 @@ pub enum AuthorizationError {
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), RoomError>")]
 pub struct RpcConnectionEstablished {
     /// ID of [`Member`] that establishes [`RpcConnection`].
     ///

@@ -30,6 +30,7 @@ use crate::{
 };
 
 use super::{Room, RoomError};
+use crate::signalling::room::ActFuture;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -179,7 +180,7 @@ impl Room {
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
         ctx: &mut Context<Self>,
-    ) -> Result<(), RoomError> {
+    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let member = self.members.get_member(&member_id)?;
 
         let is_member_have_this_sink_id =
@@ -258,10 +259,10 @@ impl Room {
         member.insert_sink(sink);
 
         if self.members.member_has_connection(member_id) {
-            self.init_member_connections(&member, ctx);
+            Ok(Box::new(self.init_member_connections(&member)))
+        } else {
+            Ok(Box::new(actix::fut::ok(())))
         }
-
-        Ok(())
     }
 
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every

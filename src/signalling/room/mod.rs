@@ -8,15 +8,14 @@ mod rpc_server;
 
 use std::sync::Arc;
 
-use actix::{
-    Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, WrapFuture as _,
-};
+use actix::AsyncContext as _;
+use actix::{Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler, MailboxError, WrapFuture as _, fut};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Event, PeerId};
 
+use crate::utils::actix_try_join_all;
 use crate::{
     api::control::{
         callback::{
@@ -241,7 +240,8 @@ impl Room {
     }
 
     /// Creates and interconnects all [`Peer`]s between connected [`Member`]
-    /// and all available at this moment other [`Member`]s.
+    /// and all available at this moment other [`Member`]s. Expects that
+    /// provided [`Member`] have active [`RpcConnection`].
     ///
     /// Availability is determined by checking [`RpcConnection`] of all
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
@@ -249,9 +249,8 @@ impl Room {
     fn init_member_connections(
         &mut self,
         member: &Member,
-        ctx: &mut <Self as Actor>::Context,
-    ) {
-        let mut connect_endpoints_tasks = Vec::new();
+    ) -> ActFuture<Result<(), RoomError>>{
+        let mut connect_tasks = Vec::new();
 
         for publisher in member.srcs().values() {
             for receiver in publisher.sinks() {
@@ -260,7 +259,7 @@ impl Room {
                 if receiver.peer_id().is_none()
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
-                    connect_endpoints_tasks.push(
+                    connect_tasks.push(
                         self.peers
                             .connect_endpoints(publisher.clone(), receiver),
                     );
@@ -274,32 +273,27 @@ impl Room {
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
-                connect_endpoints_tasks.push(
+                connect_tasks.push(
                     self.peers
                         .connect_endpoints(publisher.clone(), receiver.clone()),
                 )
             }
         }
 
-        for connect_endpoints_task in connect_endpoints_tasks {
-            connect_endpoints_task
-                .then(|result, this, _| match result {
-                    Ok(Some((peer1, peer2))) => {
-                        match this.send_peer_created(peer1, peer2) {
-                            Ok(fut) => fut,
-                            Err(err) => Box::new(actix::fut::err(err)),
-                        }
-                    }
-                    Err(err) => Box::new(actix::fut::err(err)),
-                    _ => Box::new(actix::fut::ok(())),
-                })
-                .map(|res, _, _| {
-                    if let Err(err) = res {
-                        error!("Failed connect peers, because {}.", err);
-                    }
-                })
-                .spawn(ctx);
+        if connect_tasks.is_empty() {
+            return Box::new(fut::ok(()));
         }
+
+        let endpoints_connected = actix_try_join_all(connect_tasks);
+
+        Box::new(endpoints_connected.map(|res, room, ctx| {
+            for response in res? {
+                if let Some((first_peer_id, second_peer_id)) = response {
+                    room.send_peer_created(first_peer_id, second_peer_id).unwrap().map(|_, _, _| ()).spawn(ctx);
+                }
+            }
+            Ok(())
+        }))
     }
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving

@@ -24,6 +24,7 @@ use crate::{
 };
 
 use super::{ActFuture, Room};
+use crate::signalling::room::RoomError;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
@@ -200,7 +201,7 @@ impl Handler<CommandMessage> for Room {
 }
 
 impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<Result<(), ()>>;
+    type Result = ActFuture<Result<(), RoomError>>;
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`][1], initiates
     /// media establishment between members.
@@ -221,21 +222,22 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .map(|res, room, ctx| match res {
+            .then(|res, room, ctx| match res {
                 Ok(member) => {
-                    room.init_member_connections(&member, ctx);
-                    if let Some(callback_url) = member.get_on_join() {
-                        room.callbacks.send_callback(
-                            callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
-                        );
-                    };
-                    Ok(())
+                    Box::new(room.init_member_connections(&member).map(move |res, room, _| {
+                        res?;
+                        if let Some(callback_url) = member.get_on_join() {
+                            room.callbacks.send_callback(
+                                callback_url,
+                                member.get_fid().into(),
+                                OnJoinEvent,
+                            );
+                        };
+                        Ok(())
+                    }))
                 }
                 Err(e) => {
-                    error!("RpcConnectionEstablished error {:?}", e);
-                    Err(())
+                    Box::new(actix::fut::err(e.into())) as ActFuture<_>
                 }
             });
         Box::new(fut)

@@ -1,5 +1,7 @@
 //! Helper utils used in project.
 
+mod actix_try_join_all;
+
 use std::{future::Future, pin::Pin, time::Instant};
 
 use actix::prelude::dev::{
@@ -8,6 +10,10 @@ use actix::prelude::dev::{
 };
 use chrono::{DateTime, Utc};
 use futures::future;
+
+pub use self::actix_try_join_all::{
+    actix_try_join_all,
+};
 
 /// Creates new [`HashMap`] from a list of key-value pairs.
 ///
