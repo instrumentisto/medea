@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
+use actix::{fut, fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
@@ -41,6 +41,7 @@ pub use self::{
     },
 };
 use crate::media::{peer::RenegotiationReason, MediaTrack};
+use actix::fut::Either;
 use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
 use std::rc::Rc;
 
@@ -213,7 +214,7 @@ impl PeersService {
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
-    pub fn get_peer_by_members_ids(
+    pub fn get_peers_between_members(
         &self,
         member_id: &MemberId,
         partner_member_id: &MemberId,
@@ -346,6 +347,56 @@ impl PeersService {
         removed_peers
     }
 
+    fn get_or_create_peers(
+        &self,
+        src: WebRtcPublishEndpoint,
+        sink: WebRtcPlayEndpoint,
+    ) -> ActFuture<Result<(PeerId, PeerId, bool), RoomError>> {
+        Box::new(fut::ok::<(), (), Room>(()).then(move |_, room, ctx| {
+            match room.peers.get_peers_between_members(
+                &src.owner().id(),
+                &sink.owner().id(),
+            ) {
+                None => {
+                    let (src_peer_id, sink_peer_id) =
+                        room.peers.create_peers(&src, &sink);
+
+                    Either::Left(
+                        room.peers
+                            .peer_post_construct(src_peer_id, &sink.into())
+                            .then(move |res, room, _| match res {
+                                Ok(_) => Box::new(
+                                    room.peers
+                                        .peer_post_construct(
+                                            sink_peer_id,
+                                            &src.into(),
+                                        )
+                                        .map(move |res, _, _| {
+                                            res.map(|_| {
+                                                (
+                                                    src_peer_id,
+                                                    sink_peer_id,
+                                                    true,
+                                                )
+                                            })
+                                        }),
+                                ),
+                                Err(err) => Box::new(actix::fut::err(err))
+                                    as ActFuture<_>,
+                            }),
+                    )
+                }
+                Some((first_peer_id, second_peer_id)) => {
+                    Either::Right(actix::fut::ok::<_, RoomError, Room>((
+                        first_peer_id,
+                        second_peer_id,
+                        false,
+                    )))
+                }
+            }
+        }))
+    }
+
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
     /// doesn't exist.
     ///
@@ -372,61 +423,41 @@ impl PeersService {
             src.owner().id(),
             sink.owner().id(),
         );
-        let src_owner = src.owner();
-        let sink_owner = sink.owner();
+        Box::new(self.get_or_create_peers(src.clone(), sink.clone()).map(
+            |peers_res, room, ctx| {
+                let (src_peer_id, sink_peer_id, is_new) = peers_res?;
 
-        if let Some((src_peer_id, sink_peer_id)) =
-            self.get_peer_by_members_ids(&src_owner.id(), &sink_owner.id())
-        {
-            // TODO: when dynamic patching of [`Room`] will be done then we need
-            //       rewrite this code to updating [`Peer`]s in not
-            //       [`Peer<New>`] state.
-            //       Also, don't forget to update `PeerSpec` in the
-            //       [`PeerMetricsService`].
-            let mut src_peer: Peer<Stable> =
-                self.take_inner_peer(src_peer_id).unwrap();
-            let mut sink_peer: Peer<Stable> =
-                self.take_inner_peer(sink_peer_id).unwrap();
+                // TODO: when dynamic patching of [`Room`] will be done then
+                //       we need rewrite this code to updating [`Peer`]s in
+                //       not [`Peer<Stable>`] state.
+                //       Also, don't forget to update `PeerSpec` in the
+                //       [`PeerMetricsService`].
+                if is_new {
+                    Ok(Some((src_peer_id, sink_peer_id)))
+                } else {
+                    let mut src_peer: Peer<Stable> =
+                        room.peers.take_inner_peer(src_peer_id).unwrap();
+                    let mut sink_peer: Peer<Stable> =
+                        room.peers.take_inner_peer(sink_peer_id).unwrap();
 
-            src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+                    src_peer.add_publisher(
+                        &mut sink_peer,
+                        room.peers.get_tracks_counter(),
+                    );
 
-            sink_peer.add_endpoint(&sink.into());
-            src_peer.add_endpoint(&src.into());
+                    // TODO: update `PeerSpec` in the [`PeerMetricsService`].
+                    //       traffic_watcher.register_peer
 
-            let src_peer = PeerStateMachine::from(src_peer);
-            let sink_peer = PeerStateMachine::from(sink_peer);
+                    sink_peer.add_endpoint(&sink.into());
+                    src_peer.add_endpoint(&src.into());
 
-            self.peer_metrics_service
-                .register_peer(&src_peer, self.peer_stats_ttl);
-            self.peer_metrics_service
-                .register_peer(&sink_peer, self.peer_stats_ttl);
+                    room.peers.add_peer(src_peer);
+                    room.peers.add_peer(sink_peer);
 
-            self.add_peer(src_peer);
-            self.add_peer(sink_peer);
-
-            Box::new(actix::fut::ok(None))
-        } else {
-            let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
-
-            Box::new(self.peer_post_construct(src_peer_id, src.into()).then(
-                move |res, room, _| {
-                    match res {
-                        Ok(_) => Box::new(
-                            room.peers
-                                .peer_post_construct(sink_peer_id, sink.into())
-                                .map(move |res, _, _| {
-                                    res.map(|_| {
-                                        Some((src_peer_id, sink_peer_id))
-                                    })
-                                }),
-                        ),
-                        Err(err) => {
-                            Box::new(actix::fut::err(err)) as ActFuture<_>
-                        }
-                    }
-                },
-            ))
-        }
+                    Ok(None)
+                }
+            },
+        ))
     }
 
     /// Creates and sets [`IceUser`], registers [`Peer`] in
@@ -434,10 +465,12 @@ impl PeersService {
     fn peer_post_construct(
         &self,
         peer_id: PeerId,
-        endpoint: Endpoint,
+        endpoint: &Endpoint,
     ) -> ActFuture<Result<(), RoomError>> {
         let room_id = self.room_id.clone();
         let turn_service = self.turn_service.clone();
+        let has_traffic_callback = endpoint.has_traffic_callback();
+        let is_force_relayed = endpoint.is_force_relayed();
         Box::new(
             wrap_future(async move {
                 Ok(turn_service
@@ -457,12 +490,12 @@ impl PeersService {
                 async move {
                     match res {
                         Ok(_) => {
-                            if endpoint.has_traffic_callback() {
+                            if has_traffic_callback {
                                 traffic_watcher
                                     .register_peer(
                                         room_id,
                                         peer_id,
-                                        endpoint.is_force_relayed(),
+                                        is_force_relayed,
                                     )
                                     .await
                                     .map_err(
@@ -605,4 +638,10 @@ impl PeersService {
         self.peers.insert(peer.id(), peer.into());
         self.peers.insert(partner_peer.id(), partner_peer.into());
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EndpointConnectionResponse {
+    Created((PeerId, PeerId)),
+    Updated(PeerId),
 }
