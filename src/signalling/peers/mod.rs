@@ -40,7 +40,9 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use crate::media::peer::RenegotiationReason;
+use crate::media::{peer::RenegotiationReason, MediaTrack};
+use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -256,6 +258,18 @@ impl PeersService {
     ) -> impl Iterator<Item = &'a PeerStateMachine> {
         self.peers
             .values()
+            .filter(move |peer| &peer.member_id() == member_id)
+    }
+
+    /// Returns mutable references to the all [`Peer`]s of specified [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    pub fn get_peers_by_member_id_mut<'a>(
+        &'a mut self,
+        member_id: &'a MemberId,
+    ) -> impl Iterator<Item = &'a mut PeerStateMachine> {
+        self.peers
+            .values_mut()
             .filter(move |peer| &peer.member_id() == member_id)
     }
 
@@ -533,18 +547,62 @@ impl PeersService {
     pub fn start_renegotiation(
         &mut self,
         peer_id: PeerId,
-    ) -> Result<&Peer<WaitLocalSdp>, RoomError> {
+    ) -> Result<&mut Peer<WaitLocalSdp>, RoomError> {
         let peer: Peer<Stable> = self.take_inner_peer(peer_id)?;
 
-        let renegotiating_peer = peer.start_renegotiation(RenegotiationReason::TracksAdded);
+        let renegotiating_peer =
+            peer.start_renegotiation(RenegotiationReason::TracksAdded);
         let renegotiating_peer_id = renegotiating_peer.id();
-        self.peers.insert(renegotiating_peer_id, renegotiating_peer.into());
-        match self.get_peer_by_id(renegotiating_peer_id)? {
+        self.peers
+            .insert(renegotiating_peer_id, renegotiating_peer.into());
+        match self.get_mut_peer_by_id(renegotiating_peer_id)? {
             PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
             _ => unreachable!(
                 "Peer with WaitLocalSdp state was inserted into the \
-                         PeerService store, but different state was gotten."
+                 PeerService store, but different state was gotten."
             ),
         }
+    }
+
+    // TODO: maybe rename and return Result
+    pub fn get_offerers_for_member_pair<'a>(
+        &'a mut self,
+        member_id: &'a MemberId,
+        partner_member_id: &'a MemberId,
+    ) -> Vec<PeerId> {
+        self.get_peers_by_member_id_mut(member_id)
+            .filter_map(|p| {
+                if &p.partner_member_id() == partner_member_id {
+                    Some(p.id())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn add_sink(&mut self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {
+        let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
+        let mut partner_peer: Peer<Stable> =
+            self.take_inner_peer(peer.partner_peer_id()).unwrap();
+        let track_audio = Rc::new(MediaTrack::new(
+            self.tracks_count.next_id(),
+            MediaType::Audio(AudioSettings {}),
+        ));
+        let track_video = Rc::new(MediaTrack::new(
+            self.tracks_count.next_id(),
+            MediaType::Video(VideoSettings {}),
+        ));
+
+        peer.add_sender(Rc::clone(&track_video));
+        peer.add_sender(Rc::clone(&track_audio));
+
+        partner_peer.add_receiver(track_video);
+        partner_peer.add_receiver(track_audio);
+
+        peer.add_endpoint(&Endpoint::from(sink));
+
+        self.peers.insert(peer.id(), peer.into());
+        self.peers.insert(partner_peer.id(), partner_peer.into());
     }
 }

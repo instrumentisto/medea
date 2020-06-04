@@ -22,6 +22,7 @@ use crate::{
         peers::Counter,
     },
 };
+use std::rc::Weak;
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
 ///
@@ -79,7 +80,7 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
+#[enum_delegate(pub fn get_tracks_to_apply(&mut self) -> Vec<Track>)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
@@ -202,6 +203,10 @@ pub struct Context {
     endpoints: Vec<WeakEndpoint>,
 
     renegotiation_reason: Option<RenegotiationReason>,
+
+    not_applied_senders: Vec<Weak<MediaTrack>>,
+
+    not_applied_receivers: Vec<Weak<MediaTrack>>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -238,38 +243,81 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    /// Returns [`Track`]s of this [`Peer`].
-    pub fn tracks(&self) -> Vec<Track> {
-        let tracks = self.context.senders.iter().fold(
-            Vec::new(),
-            |mut tracks, (_, track)| {
-                tracks.push(Track {
-                    id: track.id,
-                    media_type: track.media_type.clone(),
-                    direction: Direction::Send {
-                        receivers: vec![self.context.partner_peer],
-                        mid: track.mid(),
-                    },
-                    is_muted: false,
-                });
-                tracks
-            },
-        );
+    // /// Returns [`Track`]s of this [`Peer`].
+    // pub fn tracks(&self) -> Vec<Track> {
+    //     let tracks = self.context.senders.iter().fold(
+    //         Vec::new(),
+    //         |mut tracks, (_, track)| {
+    //             tracks.push(Track {
+    //                 id: track.id,
+    //                 media_type: track.media_type.clone(),
+    //                 direction: Direction::Send {
+    //                     receivers: vec![self.context.partner_peer],
+    //                     mid: track.mid(),
+    //                 },
+    //                 is_muted: false,
+    //             });
+    //             tracks
+    //         },
+    //     );
+    //     self.context
+    //         .receivers
+    //         .iter()
+    //         .fold(tracks, |mut tracks, (_, track)| {
+    //             tracks.push(Track {
+    //                 id: track.id,
+    //                 media_type: track.media_type.clone(),
+    //                 direction: Direction::Recv {
+    //                     sender: self.context.partner_peer,
+    //                     mid: track.mid(),
+    //                 },
+    //                 is_muted: false,
+    //             });
+    //             tracks
+    //         })
+    // }
+
+    // TODO: don't clear not_applied tracks on this call. Do it based on state
+    // changes.
+    pub fn get_tracks_to_apply(&mut self) -> Vec<Track> {
+        let partner_peer_id = self.partner_peer_id();
+        let mut tracks = Vec::new();
         self.context
-            .receivers
-            .iter()
-            .fold(tracks, |mut tracks, (_, track)| {
-                tracks.push(Track {
-                    id: track.id,
-                    media_type: track.media_type.clone(),
-                    direction: Direction::Recv {
-                        sender: self.context.partner_peer,
-                        mid: track.mid(),
-                    },
+            .not_applied_senders
+            .drain(..)
+            .filter_map(|t| Weak::upgrade(&t))
+            .for_each(|t| {
+                let track = Track {
+                    id: t.id,
                     is_muted: false,
-                });
-                tracks
-            })
+                    media_type: t.media_type.clone(),
+                    direction: Direction::Send {
+                        receivers: vec![partner_peer_id],
+                        mid: t.mid(),
+                    },
+                };
+                tracks.push(track);
+            });
+
+        self.context
+            .not_applied_receivers
+            .drain(..)
+            .filter_map(|t| Weak::upgrade(&t))
+            .for_each(|t| {
+                let track = Track {
+                    id: t.id,
+                    is_muted: false,
+                    media_type: t.media_type.clone(),
+                    direction: Direction::Recv {
+                        sender: partner_peer_id,
+                        mid: t.mid(),
+                    },
+                };
+
+                tracks.push(track);
+            });
+
+        tracks
     }
 
     /// Checks if this [`Peer`] has any send tracks.
@@ -417,6 +465,8 @@ impl Peer<Stable> {
             is_force_relayed,
             endpoints: Vec::new(),
             renegotiation_reason: None,
+            not_applied_receivers: Vec::new(),
+            not_applied_senders: Vec::new(),
         };
         Self {
             context,
@@ -470,11 +520,15 @@ impl Peer<Stable> {
 
     /// Adds [`Track`] to [`Peer`] for send.
     pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.context.not_applied_senders.push(Rc::downgrade(&track));
         self.context.senders.insert(track.id, track);
     }
 
     /// Adds [`Track`] to [`Peer`] for receive.
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.context
+            .not_applied_receivers
+            .push(Rc::downgrade(&track));
         self.context.receivers.insert(track.id, track);
     }
 
@@ -522,8 +576,8 @@ impl Peer<Stable> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenegotiationReason {
     TracksAdded,
-    // TracksRemoved,
-    // IceRestart,
+    /* TracksRemoved,
+     * IceRestart, */
 }
 
 #[cfg(test)]
@@ -553,6 +607,8 @@ pub mod tests {
                 endpoints: Vec::new(),
                 partner_member: MemberId::from("partner-member"),
                 renegotiation_reason: None,
+                not_applied_senders: Vec::new(),
+                not_applied_receivers: Vec::new(),
             },
         };
 

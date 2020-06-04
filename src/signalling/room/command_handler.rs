@@ -17,8 +17,7 @@ use crate::{
 
 use super::{ActFuture, Room, RoomError};
 
-impl Room {
-}
+impl Room {}
 
 impl CommandHandler for Room {
     type Output = Result<ActFuture<Result<(), RoomError>>, RoomError>;
@@ -41,7 +40,7 @@ impl CommandHandler for Room {
         let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
-        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
+        let mut to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
         let ice_servers = to_peer.ice_servers_list().ok_or_else(|| {
@@ -52,13 +51,13 @@ impl CommandHandler for Room {
             Event::TracksAdded {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
-                tracks: Vec::new(),
+                tracks: to_peer.get_tracks_to_apply(),
             }
         } else {
             Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
-                tracks: to_peer.tracks(),
+                tracks: to_peer.get_tracks_to_apply(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
             }

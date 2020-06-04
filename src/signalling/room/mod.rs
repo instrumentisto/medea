@@ -202,7 +202,7 @@ impl Room {
         };
         self.peers.add_peer(receiver);
 
-        let sender = sender.start();
+        let mut sender = sender.start();
         let member_id = sender.member_id();
         let ice_servers = sender
             .ice_servers_list()
@@ -210,7 +210,7 @@ impl Room {
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
-            tracks: sender.tracks(),
+            tracks: sender.get_tracks_to_apply(),
             ice_servers,
             force_relay: sender.is_force_relayed(),
         };

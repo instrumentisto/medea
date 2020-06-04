@@ -6,10 +6,10 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    ActorFuture as _, Context, ContextFutureSpawner as _, Handler, Message,
-    WrapFuture as _,
+    ActorFuture as _, AsyncContext as _, Context, ContextFutureSpawner as _,
+    Handler, Message, WrapFuture as _,
 };
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{Event, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -214,6 +214,38 @@ impl Room {
         );
 
         src.add_sink(sink.downgrade());
+
+        let src_member = src.owner();
+        let sink_member = sink.owner();
+        let mut peer_pairs = self
+            .peers
+            .get_offerers_for_member_pair(&src_member.id(), &sink_member.id());
+        if peer_pairs.is_empty() {
+            drop(peer_pairs);
+        } else {
+            let peer_id = peer_pairs.pop().unwrap();
+            self.peers.add_sink(peer_id, sink.clone());
+
+            let renegotiate_peer =
+                self.peers.start_renegotiation(peer_id).unwrap();
+            let renegotiate_peer_id = renegotiate_peer.id();
+            let renegoatiate_member_id = renegotiate_peer.member_id();
+            let tracks_to_apply = renegotiate_peer.get_tracks_to_apply();
+
+            ctx.spawn(
+                self.members
+                    .send_event_to_member(
+                        renegoatiate_member_id,
+                        Event::TracksAdded {
+                            peer_id: renegotiate_peer_id,
+                            sdp_offer: None,
+                            tracks: tracks_to_apply,
+                        },
+                    )
+                    .into_actor(self)
+                    .then(move |_, this, _| async {}.into_actor(this)),
+            );
+        }
 
         debug!(
             "Created WebRtcPlayEndpoint [id = {}] for Member [id = {}] in \
