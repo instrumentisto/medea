@@ -49,9 +49,10 @@ impl CommandHandler for Room {
         })?;
 
         let event = if from_peer.renegotiation_reason().is_some() {
-            Event::SdpOfferMade {
+            Event::TracksAdded {
                 peer_id: to_peer.id(),
-                sdp_offer,
+                sdp_offer: Some(sdp_offer),
+                tracks: Vec::new(),
             }
         } else {
             Event::PeerCreated {

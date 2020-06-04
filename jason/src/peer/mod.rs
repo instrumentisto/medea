@@ -587,30 +587,6 @@ impl PeerConnection {
         Ok(offer)
     }
 
-    /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
-    /// [`RtcPeerConnection`] and sets it as local description.
-    ///
-    /// Should be called after local tracks changes, which require
-    /// renegotiation.
-    ///
-    /// # Errors
-    ///
-    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
-    /// [RtcPeerConnection.createOffer()][1] fails.
-    ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_new_offer(&self) -> Result<String> {
-        Ok(self
-            .peer
-            .create_and_set_offer()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?)
-    }
-
     /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
     /// Requests local stream from [`MediaManager`] if no stream was provided.
@@ -799,10 +775,13 @@ impl PeerConnection {
             .update_tracks(recv)
             .map_err(tracerr::map_from_and_wrap!())?;
 
+        // set offer, which will create transceivers and discover remote tracks
+        // in receivers
         self.set_remote_offer(offer)
             .await
             .map_err(tracerr::wrap!())?;
 
+        // update senders
         self.media_connections
             .update_tracks(send)
             .map_err(tracerr::map_from_and_wrap!())?;
@@ -818,41 +797,6 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(answer)
-    }
-
-    /// Sets provided offer as remote offer.
-    ///
-    /// Creates answer and sets it as local description.
-    ///
-    /// Returns created answer.
-    ///
-    /// # Errors
-    ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
-    /// [RTCPeerConnection.setRemoteDescription()][1] fails.
-    ///
-    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
-    /// [RtcPeerConnection.createAnswer()][2] fails.
-    ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][3] fails.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
-    /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn proccess_new_remote_offer(
-        &self,
-        offer: String,
-    ) -> Result<String> {
-        self.set_remote_offer(offer)
-            .await
-            .map_err(tracerr::wrap!())?;
-
-        Ok(self
-            .peer
-            .create_and_set_answer()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?)
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.

@@ -379,29 +379,6 @@ impl Room {
             },
         ))
     }
-
-    /// Starts renegotiation of the `Peer` with provided [`PeerId`] and his
-    /// partner `Peer`.
-    ///
-    /// You can provided any [`PeerId`], but renegotiation will be started on
-    /// the offerer `Peer` in this pair. So [`Event::RenegotiationStarted`]
-    /// should be sent for [`Peer`] which will be returned from
-    /// [`PeerService::start_renegotiation`] (not just for provided
-    /// [`PeerId`]).
-    #[allow(dead_code)]
-    fn renegotiate_peer(
-        &mut self,
-        peer_id: PeerId,
-    ) -> Result<LocalBoxFuture<'static, Result<(), RoomError>>, RoomError> {
-        let renegotiation_peer = self.peers.start_renegotiation(peer_id)?;
-        let member_id = renegotiation_peer.member_id();
-        let peer_id = renegotiation_peer.id();
-
-        Ok(Box::pin(self.members.send_event_to_member(
-            member_id,
-            Event::RenegotiationStarted { peer_id },
-        )))
-    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
