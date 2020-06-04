@@ -40,6 +40,7 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
+use crate::media::peer::RenegotiationReason;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -180,7 +181,6 @@ impl PeersService {
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
-            true,
         );
         src_peer.add_endpoint(&src.clone().into());
 
@@ -190,7 +190,6 @@ impl PeersService {
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
-            false,
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
@@ -536,37 +535,16 @@ impl PeersService {
         peer_id: PeerId,
     ) -> Result<&Peer<WaitLocalSdp>, RoomError> {
         let peer: Peer<Stable> = self.take_inner_peer(peer_id)?;
-        if peer.is_offerer() {
-            let renegotiating_peer = peer.start_renegotiation();
-            self.peers.insert(peer_id, renegotiating_peer.into());
-            match self.get_peer_by_id(peer_id).unwrap() {
-                PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
-                _ => unreachable!(
-                    "Peer with WaitLocalSdp state was inserted into the \
-                     PeerService store, but different state was gotten."
-                ),
-            }
-        } else {
-            let partner_peer = self.take_inner_peer(peer.partner_peer_id())?;
-            if partner_peer.is_offerer() {
-                let renegotiating_peer = partner_peer.start_renegotiation();
-                let renegotiating_peer_id = renegotiating_peer.id();
-                self.peers
-                    .insert(renegotiating_peer_id, renegotiating_peer.into());
-                self.peers.insert(peer_id, peer.into());
-                match self.get_peer_by_id(renegotiating_peer_id).unwrap() {
-                    PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
-                    _ => unreachable!(
-                        "Peer with WaitLocalSdp state was inserted into the \
+
+        let renegotiating_peer = peer.start_renegotiation(RenegotiationReason::TracksAdded);
+        let renegotiating_peer_id = renegotiating_peer.id();
+        self.peers.insert(renegotiating_peer_id, renegotiating_peer.into());
+        match self.get_peer_by_id(renegotiating_peer_id)? {
+            PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
+            _ => unreachable!(
+                "Peer with WaitLocalSdp state was inserted into the \
                          PeerService store, but different state was gotten."
-                    ),
-                }
-            } else {
-                unreachable!(
-                    "Offerer Peer not found in the Peer pair which is should \
-                     be unreal."
-                )
-            }
+            ),
         }
     }
 }

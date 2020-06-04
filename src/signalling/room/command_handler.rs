@@ -18,74 +18,6 @@ use crate::{
 use super::{ActFuture, Room, RoomError};
 
 impl Room {
-    /// Updates specified [`Peer`] connection state.
-    ///
-    /// Initiates ICE restart if new connection state is
-    /// [`PeerConnectionState::Failed`], previous connection state is
-    /// [`PeerConnectionState::Connected`] or
-    /// [`PeerConnectionState::Disconnected`] and connected [`Peer`] connection
-    /// state is [`PeerConnectionState::Connected`] or
-    /// [`PeerConnectionState::Disconnected`].
-    fn update_peer_connection_state<S>(
-        &mut self,
-        peer_id: PeerId,
-        new_state: S,
-    ) -> LocalBoxFuture<'static, Result<(), RoomError>>
-    where
-        S: Into<PeerConnectionState>,
-    {
-        use PeerConnectionState as State;
-
-        let new_state: State = new_state.into();
-
-        let peer = match self.peers.get_peer_by_id(peer_id) {
-            Ok(peer) => peer,
-            Err(err) => return future::err(err).boxed_local(),
-        };
-
-        let old_state: State = peer.connection_state();
-
-        // check whether state really changed
-        if let (State::Failed, State::Disconnected) = (old_state, new_state) {
-            // Failed => Disconnected is still Failed
-            return future::ok(()).boxed_local();
-        } else {
-            peer.set_connection_state(new_state);
-        }
-
-        // maybe init ICE restart
-        match new_state {
-            State::Failed => match old_state {
-                State::Connected | State::Disconnected => {
-                    let connected_peer_state: State =
-                        match self.peers.get_peer_by_id(peer.partner_peer_id())
-                        {
-                            Ok(peer) => peer.connection_state(),
-                            Err(err) => return future::err(err).boxed_local(),
-                        };
-
-                    if let State::Failed = connected_peer_state {
-                        match self.peers.take_inner_peer::<Stable>(peer_id) {
-                            Ok(peer) => {
-                                let member_id = peer.member_id();
-                                self.peers.add_peer(peer.start_renegotiation());
-
-                                self.members.send_event_to_member(
-                                    member_id,
-                                    Event::RenegotiationStarted { peer_id },
-                                )
-                            }
-                            Err(err) => future::err(err).boxed_local(),
-                        }
-                    } else {
-                        future::ok(()).boxed_local()
-                    }
-                }
-                _ => future::ok(()).boxed_local(),
-            },
-            _ => future::ok(()).boxed_local(),
-        }
-    }
 }
 
 impl CommandHandler for Room {
@@ -116,18 +48,19 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = match from_peer.connection_state() {
-            PeerConnectionState::New => Event::PeerCreated {
+        let event = if from_peer.renegotiation_reason().is_some() {
+            Event::SdpOfferMade {
+                peer_id: to_peer.id(),
+                sdp_offer,
+            }
+        } else {
+            Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
                 tracks: to_peer.tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
-            },
-            _ => Event::SdpOfferMade {
-                peer_id: to_peer.id(),
-                sdp_offer,
-            },
+            }
         };
 
         self.peers.add_peer(from_peer);
@@ -214,13 +147,7 @@ impl CommandHandler for Room {
 
         Ok(Box::new(
             match metrics {
-                PM::IceConnectionState(state) => {
-                    self.update_peer_connection_state(peer_id, state)
-                }
-                PM::PeerConnectionState(state) => {
-                    self.update_peer_connection_state(peer_id, state)
-                }
-                PM::RtcStats(_) => future::ok(()).boxed_local(),
+                _ => future::ok(()).boxed_local(),
             }
             .into_actor(self),
         ))
