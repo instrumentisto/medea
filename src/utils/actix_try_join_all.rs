@@ -9,7 +9,7 @@ use actix::{fut::ActorFuture, Actor};
 #[derive(Debug)]
 enum ElemState<F, T, E>
 where
-    F: ActorFuture<Output = Result<T, E>>,
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
     Pending(F),
     Done(Option<T>),
@@ -17,17 +17,17 @@ where
 
 impl<F, T, E> ElemState<F, T, E>
 where
-    F: ActorFuture<Output = Result<T, E>>,
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
     fn pending_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut F>> {
-        match unsafe { self.get_unchecked_mut() } {
-            ElemState::Pending(f) => Some(unsafe { Pin::new_unchecked(f) }),
+        match self.get_mut() {
+            ElemState::Pending(f) => Some(Pin::new(f)),
             ElemState::Done(_) => None,
         }
     }
 
     fn take_done(self: Pin<&mut Self>) -> Option<T> {
-        match unsafe { self.get_unchecked_mut() } {
+        match self.get_mut() {
             ElemState::Pending(_) => None,
             ElemState::Done(output) => output.take(),
         }
@@ -39,10 +39,11 @@ impl<F, T, E> Unpin for ElemState<F, T, E> where
 {
 }
 
-fn iter_pin_mut<T>(slice: Pin<&mut [T]>) -> impl Iterator<Item = Pin<&mut T>> {
-    unsafe { slice.get_unchecked_mut() }
-        .iter_mut()
-        .map(|t| unsafe { Pin::new_unchecked(t) })
+fn iter_pin_mut<T>(slice: Pin<&mut [T]>) -> impl Iterator<Item = Pin<&mut T>>
+where
+    T: Unpin,
+{
+    slice.get_mut().iter_mut().map(Pin::new)
 }
 
 enum FinalState<E = ()> {
@@ -54,7 +55,7 @@ enum FinalState<E = ()> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ActixTryJoinAll<F, T, E>
 where
-    F: ActorFuture<Output = Result<T, E>>,
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
     elems: Pin<Box<[ElemState<F, T, E>]>>,
 }
@@ -62,7 +63,7 @@ where
 pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
 where
     I: IntoIterator<Item = F>,
-    F: ActorFuture<Output = Result<T, E>>,
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
     let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
     ActixTryJoinAll {
@@ -72,7 +73,7 @@ where
 
 impl<F, T, E> ActorFuture for ActixTryJoinAll<F, T, E>
 where
-    F: ActorFuture<Output = Result<T, E>>,
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
     type Actor = F::Actor;
     type Output = Result<Vec<T>, E>;
