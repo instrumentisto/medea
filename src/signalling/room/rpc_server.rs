@@ -90,7 +90,15 @@ impl RpcServer for Addr<Room> {
             connection,
         })
             .map(|res| match res {
-                Ok(_) => Ok(()),
+                Ok(r) => if let Err(e) = r {
+                    error!(
+                        "RpcConnectionEstablished failed cause: {:?}",
+                        e,
+                    );
+                    Err(())
+                } else {
+                    Ok(())
+                },
                 Err(e) => {
                     error!(
                         "Failed to send RpcConnectionEstablished cause {:?}",
