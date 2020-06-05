@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    ActorFuture as _, AsyncContext as _, Context, ContextFutureSpawner as _,
-    Handler, Message, WrapFuture as _,
+    fut, ActorFuture as _, AsyncContext as _, Context,
+    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
 use medea_client_api_proto::{Event, PeerId};
 use medea_control_api_proto::grpc::api as proto;
@@ -433,7 +433,7 @@ pub struct CreateEndpoint {
 }
 
 impl Handler<CreateEndpoint> for Room {
-    type Result = Result<(), RoomError>;
+    type Result = ActFuture<Result<(), RoomError>>;
 
     fn handle(
         &mut self,
@@ -442,23 +442,28 @@ impl Handler<CreateEndpoint> for Room {
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
-                self.create_sink_endpoint(
+                match self.create_sink_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
                     ctx,
-                )?;
+                ) {
+                    Ok(fut) => Box::new(fut),
+                    Err(e) => Box::new(fut::err(e)),
+                }
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
-                self.create_src_endpoint(
+                if let Err(e) = self.create_src_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     &endpoint,
-                )?;
+                ) {
+                    Box::new(fut::err(e))
+                } else {
+                    Box::new(fut::ok(()))
+                }
             }
         }
-
-        Ok(())
     }
 }
 

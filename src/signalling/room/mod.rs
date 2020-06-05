@@ -173,48 +173,27 @@ impl Room {
         &self.id
     }
 
-    /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
-    /// which of them has any outbound tracks. That [`Peer`] state will be
-    /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
-    /// [`New`] state. At least one of provided peers must have outbound
-    /// tracks.
+    /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
+    /// will be changed to [`WaitLocalSdp`] state.
     fn send_peer_created(
         &mut self,
-        peer1_id: PeerId,
-        peer2_id: PeerId,
+        peer_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
+        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
 
-        // decide which peer is sender
-        let (sender, receiver) = if peer1.is_sender() {
-            (peer1, peer2)
-        } else if peer2.is_sender() {
-            (peer2, peer1)
-        } else {
-            self.peers.add_peer(peer1);
-            self.peers.add_peer(peer2);
-            return Err(RoomError::BadRoomSpec(format!(
-                "Error while trying to connect Peer [id = {}] and Peer [id = \
-                 {}] cause neither of peers are senders",
-                peer1_id, peer2_id
-            )));
-        };
-        self.peers.add_peer(receiver);
-
-        let mut sender = sender.start();
-        let member_id = sender.member_id();
-        let ice_servers = sender
+        let peer = peer.start();
+        let member_id = peer.member_id();
+        let ice_servers = peer
             .ice_servers_list()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
-            peer_id: sender.id(),
+            peer_id: peer.id(),
             sdp_offer: None,
-            tracks: sender.get_tracks_to_apply(),
+            tracks: peer.get_tracks_to_apply(),
             ice_servers,
-            force_relay: sender.is_force_relayed(),
+            force_relay: peer.is_force_relayed(),
         };
-        self.peers.add_peer(sender);
+        self.peers.add_peer(peer);
         Ok(Box::new(
             self.members
                 .send_event_to_member(member_id, peer_created)
@@ -290,7 +269,7 @@ impl Room {
         Box::new(endpoints_connected.map(|res, room, ctx| {
             for response in res? {
                 if let Some((first_peer_id, second_peer_id)) = response {
-                    room.send_peer_created(first_peer_id, second_peer_id)
+                    room.send_peer_created(first_peer_id)
                         .unwrap()
                         .map(|_, _, _| ())
                         .spawn(ctx);

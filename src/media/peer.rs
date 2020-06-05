@@ -243,7 +243,7 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    pub fn get_tracks_to_apply(&mut self) -> Vec<Track> {
+    pub fn get_tracks_to_apply(&self) -> Vec<Track> {
         let partner_peer_id = self.partner_peer_id();
 
         self.context

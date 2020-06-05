@@ -20,8 +20,6 @@ use crate::{
 
 use super::{ActFuture, Room, RoomError};
 
-impl Room {}
-
 impl CommandHandler for Room {
     type Output = Result<ActFuture<Result<(), RoomError>>, RoomError>;
 
@@ -138,21 +136,13 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// Updates [`PeerConnectionState`] on [`PeerMetrics::IceConnectionState`]
-    /// and [`PeerMetrics::PeerConnectionState`].
+    /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        peer_id: PeerId,
-        metrics: PeerMetrics,
+        _: PeerId,
+        _: PeerMetrics,
     ) -> Self::Output {
-        use PeerMetrics as PM;
-
-        Ok(Box::new(
-            match metrics {
-                _ => future::ok(()).boxed_local(),
-            }
-            .into_actor(self),
-        ))
+        Ok(Box::new(actix::fut::ok(())))
     }
 
     /// Sends [`Event::TracksUpdated`] with data from the received
