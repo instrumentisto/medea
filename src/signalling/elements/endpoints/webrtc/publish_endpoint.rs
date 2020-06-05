@@ -274,8 +274,8 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             p2p: p2p as i32,
             id: self.id().to_string(),
             force_relay: self.is_force_relayed(),
-            audio_settings: self.audio_settings().map(|s| s.into()),
-            video_settings: self.video_settings().map(|s| s.into()),
+            audio_settings: self.audio_settings().map(Into::into),
+            video_settings: self.video_settings().map(Into::into),
             on_stop: String::new(),
             on_start: String::new(),
         }

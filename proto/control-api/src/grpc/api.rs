@@ -215,12 +215,12 @@ pub struct WebRtcPublishEndpoint {
     pub force_relay: bool,
     /// Settings for the audio media type of the 'WebRtcPublishEndpoint'.
     ///
-    /// If empty then audio shouldn't be published.
+    /// If empty then audio will not be published.
     #[prost(message, optional, tag="6")]
     pub audio_settings: ::std::option::Option<web_rtc_publish_endpoint::AudioSettings>,
     /// Settings for the video media type of the 'WebRtcPublishEndpoint'.
     ///
-    /// If empty then video shouldn't be published.
+    /// If empty then video will not be published.
     #[prost(message, optional, tag="7")]
     pub video_settings: ::std::option::Option<web_rtc_publish_endpoint::VideoSettings>,
 }
@@ -246,13 +246,18 @@ pub mod web_rtc_publish_endpoint {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum PublishingPolicy {
-        /// Audio or video media type __should__ be published.
+        /// Specified media type __may__ be published.
         ///
-        /// If this media type can't be gotten then a client application should go
-        /// to the failure state.
-        IfPossible = 0,
-        /// If this media type can't be got, then a client application can continue
-        /// working without this media type.
+        /// Media server will try to initialize publishing, but won't produce any
+        /// errors if user application will fail to or choose not to acquire required
+        /// track. Media server will approve user request to stop and restart
+        /// publishing specified media type.
+        PublishIfPossible = 0,
+        /// Specified media type __must__ be published.
+        ///
+        /// Media server will try to initialize publishing. If required media track
+        /// could not be acquired, then an error will be thrown. Media server will
+        /// deny all requests to stop publishing.
         Required = 1,
     }
     /// P2P mode of WebRTC interaction.

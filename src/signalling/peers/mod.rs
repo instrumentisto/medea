@@ -167,12 +167,13 @@ impl PeersService {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
-        debug!(
-            "Created peer between {} and {}.",
-            src_member_id, sink_member_id
-        );
         let src_peer_id = self.peers_count.next_id();
         let sink_peer_id = self.peers_count.next_id();
+
+        debug!(
+            "Created peers:[{}, {}] between {} and {}.",
+            src_peer_id, sink_peer_id, src_member_id, sink_member_id
+        );
 
         let mut src_peer = Peer::new(
             src_peer_id,

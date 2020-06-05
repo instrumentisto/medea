@@ -359,10 +359,10 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             id: self.id,
             force_relay: bool::default(),
             audio_settings: Some(AudioSettings {
-                publishing_policy: PublishingPolicy::IfPossible as i32,
+                publishing_policy: PublishingPolicy::PublishIfPossible as i32,
             }),
             video_settings: Some(VideoSettings {
-                publishing_policy: PublishingPolicy::IfPossible as i32,
+                publishing_policy: PublishingPolicy::PublishIfPossible as i32,
             }),
         }
     }
