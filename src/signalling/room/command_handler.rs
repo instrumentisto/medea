@@ -12,7 +12,10 @@ use medea_client_api_proto::{
 
 use crate::{
     log::prelude::*,
-    media::{Peer, Stable, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp},
+    media::{
+        Peer, RenegotiationReason, Stable, WaitLocalHaveRemote, WaitLocalSdp,
+        WaitRemoteSdp,
+    },
 };
 
 use super::{ActFuture, Room, RoomError};
@@ -47,20 +50,19 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = if from_peer.renegotiation_reason().is_some() {
-            Event::TracksAdded {
+        let event = match from_peer.renegotiation_reason() {
+            Some(RenegotiationReason::TracksAdded) => Event::TracksAdded {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
                 tracks: to_peer.get_tracks_to_apply(),
-            }
-        } else {
-            Event::PeerCreated {
+            },
+            None => Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
                 tracks: to_peer.get_tracks_to_apply(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
-            }
+            },
         };
 
         self.peers.add_peer(from_peer);
