@@ -23,14 +23,16 @@ use crate::{
         WebRtcPublishId,
     },
     log::prelude::*,
-    signalling::elements::{
-        endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-        member::MemberError,
+    signalling::{
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
+        },
+        room::ActFuture,
     },
 };
 
 use super::{Room, RoomError};
-use crate::signalling::room::ActFuture;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -218,17 +220,15 @@ impl Room {
 
         let src_member = src.owner();
         let sink_member = sink.owner();
-        let mut peer_pairs = self
+
+        if let Some((src_peer_id, _)) = self
             .peers
-            .get_offerers_for_member_pair(&src_member.id(), &sink_member.id());
-        if peer_pairs.is_empty() {
-            drop(peer_pairs);
-        } else {
-            let peer_id = peer_pairs.pop().unwrap();
-            self.peers.add_sink(peer_id, sink.clone());
+            .get_peers_between_members(&src_member.id(), &sink_member.id())
+        {
+            self.peers.add_sink(src_peer_id, sink.clone());
 
             let renegotiate_peer =
-                self.peers.start_renegotiation(peer_id).unwrap();
+                self.peers.start_renegotiation(src_peer_id).unwrap();
             let renegotiate_peer_id = renegotiate_peer.id();
             let renegoatiate_member_id = renegotiate_peer.member_id();
             let tracks_to_apply = renegotiate_peer.get_tracks_to_apply();

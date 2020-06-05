@@ -11,9 +11,7 @@ use actix::prelude::dev::{
 use chrono::{DateTime, Utc};
 use futures::future;
 
-pub use self::actix_try_join_all::{
-    actix_try_join_all,
-};
+pub use self::actix_try_join_all::actix_try_join_all;
 
 /// Creates new [`HashMap`] from a list of key-value pairs.
 ///

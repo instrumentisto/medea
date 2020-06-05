@@ -1,23 +1,23 @@
-use actix::fut::ActorFuture;
-use actix::{Actor};
 use core::{
     mem,
     pin::Pin,
     task::{Context, Poll},
 };
 
+use actix::{fut::ActorFuture, Actor};
+
 #[derive(Debug)]
 enum ElemState<F, T, E>
-    where
-        F: ActorFuture<Output = Result<T, E>>,
+where
+    F: ActorFuture<Output = Result<T, E>>,
 {
     Pending(F),
     Done(Option<T>),
 }
 
 impl<F, T, E> ElemState<F, T, E>
-    where
-        F: ActorFuture<Output = Result<T, E>>,
+where
+    F: ActorFuture<Output = Result<T, E>>,
 {
     fn pending_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut F>> {
         match unsafe { self.get_unchecked_mut() } {
@@ -34,7 +34,10 @@ impl<F, T, E> ElemState<F, T, E>
     }
 }
 
-impl<F, T, E> Unpin for ElemState<F, T, E> where F: ActorFuture<Output = Result<T, E>> + Unpin {}
+impl<F, T, E> Unpin for ElemState<F, T, E> where
+    F: ActorFuture<Output = Result<T, E>> + Unpin
+{
+}
 
 fn iter_pin_mut<T>(slice: Pin<&mut [T]>) -> impl Iterator<Item = Pin<&mut T>> {
     unsafe { slice.get_unchecked_mut() }
@@ -50,16 +53,16 @@ enum FinalState<E = ()> {
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ActixTryJoinAll<F, T, E>
-    where
-        F: ActorFuture<Output = Result<T, E>>,
+where
+    F: ActorFuture<Output = Result<T, E>>,
 {
     elems: Pin<Box<[ElemState<F, T, E>]>>,
 }
 
 pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
-    where
-        I: IntoIterator<Item = F>,
-        F: ActorFuture<Output = Result<T, E>>,
+where
+    I: IntoIterator<Item = F>,
+    F: ActorFuture<Output = Result<T, E>>,
 {
     let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
     ActixTryJoinAll {
@@ -68,11 +71,11 @@ pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
 }
 
 impl<F, T, E> ActorFuture for ActixTryJoinAll<F, T, E>
-    where
-        F: ActorFuture<Output = Result<T, E>>,
+where
+    F: ActorFuture<Output = Result<T, E>>,
 {
-    type Output = Result<Vec<T>, E>;
     type Actor = F::Actor;
+    type Output = Result<Vec<T>, E>;
 
     fn poll(
         mut self: Pin<&mut Self>,

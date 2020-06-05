@@ -243,81 +243,44 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    // /// Returns [`Track`]s of this [`Peer`].
-    // pub fn tracks(&self) -> Vec<Track> {
-    //     let tracks = self.context.senders.iter().fold(
-    //         Vec::new(),
-    //         |mut tracks, (_, track)| {
-    //             tracks.push(Track {
-    //                 id: track.id,
-    //                 media_type: track.media_type.clone(),
-    //                 direction: Direction::Send {
-    //                     receivers: vec![self.context.partner_peer],
-    //                     mid: track.mid(),
-    //                 },
-    //                 is_muted: false,
-    //             });
-    //             tracks
-    //         },
-    //     );
-    //     self.context
-    //         .receivers
-    //         .iter()
-    //         .fold(tracks, |mut tracks, (_, track)| {
-    //             tracks.push(Track {
-    //                 id: track.id,
-    //                 media_type: track.media_type.clone(),
-    //                 direction: Direction::Recv {
-    //                     sender: self.context.partner_peer,
-    //                     mid: track.mid(),
-    //                 },
-    //                 is_muted: false,
-    //             });
-    //             tracks
-    //         })
-    // }
-
-    // TODO: don't clear not_applied tracks on this call. Do it based on state
-    // changes.
     pub fn get_tracks_to_apply(&mut self) -> Vec<Track> {
         let partner_peer_id = self.partner_peer_id();
-        let mut tracks = Vec::new();
+
         self.context
             .not_applied_senders
-            .drain(..)
-            .filter_map(|t| Weak::upgrade(&t))
-            .for_each(|t| {
-                let track = Track {
-                    id: t.id,
-                    is_muted: false,
-                    media_type: t.media_type.clone(),
-                    direction: Direction::Send {
+            .iter()
+            .filter_map(Weak::upgrade)
+            .map(|t| {
+                (
+                    Direction::Send {
                         receivers: vec![partner_peer_id],
                         mid: t.mid(),
                     },
-                };
-                tracks.push(track);
-            });
-
-        self.context
-            .not_applied_receivers
-            .drain(..)
-            .filter_map(|t| Weak::upgrade(&t))
-            .for_each(|t| {
-                let track = Track {
-                    id: t.id,
-                    is_muted: false,
-                    media_type: t.media_type.clone(),
-                    direction: Direction::Recv {
-                        sender: partner_peer_id,
-                        mid: t.mid(),
-                    },
-                };
-
-                tracks.push(track);
-            });
-
-        tracks
+                    t,
+                )
+            })
+            .chain(
+                self.context
+                    .not_applied_receivers
+                    .iter()
+                    .filter_map(Weak::upgrade)
+                    .map(|t| {
+                        (
+                            Direction::Recv {
+                                sender: partner_peer_id,
+                                mid: t.mid(),
+                            },
+                            t,
+                        )
+                    }),
+            )
+            .map(|(direction, track)| Track {
+                id: track.id,
+                is_muted: false,
+                media_type: track.media_type.clone(),
+                direction,
+            })
+            .collect()
     }
 
     /// Checks if this [`Peer`] has any send tracks.
@@ -371,6 +334,12 @@ impl<T> Peer<T> {
     pub fn renegotiation_reason(&self) -> Option<RenegotiationReason> {
         self.context.renegotiation_reason.clone()
     }
+
+    fn renegotiation_finished(&mut self) {
+        self.context.renegotiation_reason = None;
+        self.context.not_applied_receivers = Vec::new();
+        self.context.not_applied_senders = Vec::new();
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -417,12 +386,12 @@ impl Peer<WaitLocalSdp> {
 
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
-    pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
-        let mut context = self.context;
-        context.renegotiation_reason = None;
-        context.sdp_answer = Some(sdp_answer.to_string());
+    pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
+        self.renegotiation_finished();
+        self.context.sdp_answer = Some(sdp_answer.to_string());
+
         Peer {
-            context,
+            context: self.context,
             state: Stable {},
         }
     }
@@ -430,12 +399,12 @@ impl Peer<WaitRemoteSdp> {
 
 impl Peer<WaitLocalHaveRemote> {
     /// Sets local description and transitions [`Peer`] to [`Stable`] state.
-    pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
-        let mut context = self.context;
-        context.renegotiation_reason = None;
-        context.sdp_answer = Some(sdp_answer);
+    pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
+        self.renegotiation_finished();
+        self.context.sdp_answer = Some(sdp_answer);
+
         Peer {
-            context,
+            context: self.context,
             state: Stable {},
         }
     }

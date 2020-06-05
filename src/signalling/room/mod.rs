@@ -8,14 +8,15 @@ mod rpc_server;
 
 use std::sync::Arc;
 
-use actix::AsyncContext as _;
-use actix::{Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler, MailboxError, WrapFuture as _, fut};
+use actix::{
+    fut, Actor, ActorFuture, AsyncContext as _, Context,
+    ContextFutureSpawner as _, Handler, MailboxError, WrapFuture as _,
+};
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Event, PeerId};
 
-use crate::utils::actix_try_join_all;
 use crate::{
     api::control::{
         callback::{
@@ -35,7 +36,7 @@ use crate::{
         peers::{PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
-    utils::ResponseActAnyFuture,
+    utils::{actix_try_join_all, ResponseActAnyFuture},
     AppContext,
 };
 
@@ -249,7 +250,7 @@ impl Room {
     fn init_member_connections(
         &mut self,
         member: &Member,
-    ) -> ActFuture<Result<(), RoomError>>{
+    ) -> ActFuture<Result<(), RoomError>> {
         let mut connect_tasks = Vec::new();
 
         for publisher in member.srcs().values() {
@@ -289,7 +290,10 @@ impl Room {
         Box::new(endpoints_connected.map(|res, room, ctx| {
             for response in res? {
                 if let Some((first_peer_id, second_peer_id)) = response {
-                    room.send_peer_created(first_peer_id, second_peer_id).unwrap().map(|_, _, _| ()).spawn(ctx);
+                    room.send_peer_created(first_peer_id, second_peer_id)
+                        .unwrap()
+                        .map(|_, _, _| ())
+                        .spawn(ctx);
                 }
             }
             Ok(())

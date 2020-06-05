@@ -224,21 +224,21 @@ impl Handler<RpcConnectionEstablished> for Room {
             .connection_established(ctx, msg.member_id, msg.connection)
             .then(|res, room, ctx| match res {
                 Ok(member) => {
-                    Box::new(room.init_member_connections(&member).map(move |res, room, _| {
-                        res?;
-                        if let Some(callback_url) = member.get_on_join() {
-                            room.callbacks.send_callback(
-                                callback_url,
-                                member.get_fid().into(),
-                                OnJoinEvent,
-                            );
-                        };
-                        Ok(())
-                    }))
+                    Box::new(room.init_member_connections(&member).map(
+                        move |res, room, _| {
+                            res?;
+                            if let Some(callback_url) = member.get_on_join() {
+                                room.callbacks.send_callback(
+                                    callback_url,
+                                    member.get_fid().into(),
+                                    OnJoinEvent,
+                                );
+                            };
+                            Ok(())
+                        },
+                    ))
                 }
-                Err(e) => {
-                    Box::new(actix::fut::err(e.into())) as ActFuture<_>
-                }
+                Err(e) => Box::new(actix::fut::err(e.into())) as ActFuture<_>,
             });
         Box::new(fut)
     }

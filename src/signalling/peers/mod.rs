@@ -7,19 +7,29 @@ mod traffic_watcher;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
 
-use actix::{fut, fut::wrap_future, ActorFuture, WrapFuture as _};
+use actix::{
+    fut,
+    fut::{wrap_future, Either},
+    ActorFuture, WrapFuture as _,
+};
 use derive_more::Display;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use medea_client_api_proto::{
+    AudioSettings, Incrementable, MediaType, PeerId, TrackId, VideoSettings,
+};
 
 use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{IceUser, Peer, PeerError, PeerStateMachine, Stable, WaitLocalSdp},
+    media::{
+        peer::RenegotiationReason, IceUser, MediaTrack, Peer, PeerError,
+        PeerStateMachine, Stable, WaitLocalSdp,
+    },
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -40,10 +50,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use crate::media::{peer::RenegotiationReason, MediaTrack};
-use actix::fut::Either;
-use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -595,23 +601,6 @@ impl PeersService {
                  PeerService store, but different state was gotten."
             ),
         }
-    }
-
-    // TODO: maybe rename and return Result
-    pub fn get_offerers_for_member_pair<'a>(
-        &'a mut self,
-        member_id: &'a MemberId,
-        partner_member_id: &'a MemberId,
-    ) -> Vec<PeerId> {
-        self.get_peers_by_member_id_mut(member_id)
-            .filter_map(|p| {
-                if &p.partner_member_id() == partner_member_id {
-                    Some(p.id())
-                } else {
-                    None
-                }
-            })
-            .collect()
     }
 
     pub fn add_sink(&mut self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {

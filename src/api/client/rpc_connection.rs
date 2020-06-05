@@ -9,8 +9,7 @@ use derive_more::{From, Into};
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{CloseDescription, Command, Event};
 
-use crate::signalling::room::RoomError;
-use crate::api::control::MemberId;
+use crate::{api::control::MemberId, signalling::room::RoomError};
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
 #[derive(Message)]
