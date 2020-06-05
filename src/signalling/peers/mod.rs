@@ -354,11 +354,10 @@ impl PeersService {
     }
 
     fn get_or_create_peers(
-        &self,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
     ) -> ActFuture<Result<(PeerId, PeerId, bool), RoomError>> {
-        Box::new(fut::ok::<(), (), Room>(()).then(move |_, room, ctx| {
+        Box::new(fut::ok::<(), (), Room>(()).then(move |_, room, _| {
             match room.peers.get_peers_between_members(
                 &src.owner().id(),
                 &sink.owner().id(),
@@ -420,7 +419,6 @@ impl PeersService {
     ///
     /// Panics if provided endpoints already have interconnected [`Peer`]s.
     pub fn connect_endpoints(
-        &mut self,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
     ) -> ActFuture<Result<Option<(PeerId, PeerId)>, RoomError>> {
@@ -429,8 +427,8 @@ impl PeersService {
             src.owner().id(),
             sink.owner().id(),
         );
-        Box::new(self.get_or_create_peers(src.clone(), sink.clone()).map(
-            |peers_res, room, ctx| {
+        Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).map(
+            |peers_res, room, _| {
                 let (src_peer_id, sink_peer_id, is_new) = peers_res?;
 
                 // TODO: when dynamic patching of [`Room`] will be done then

@@ -222,7 +222,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .then(|res, room, ctx| match res {
+            .then(|res, room, _| match res {
                 Ok(member) => {
                     Box::new(room.init_member_connections(&member).map(
                         move |res, room, _| {

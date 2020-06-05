@@ -4,10 +4,9 @@
 use std::collections::HashMap;
 
 use actix::WrapFuture as _;
-use futures::{future, future::LocalBoxFuture, FutureExt};
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, PeerConnectionState, PeerId,
-    PeerMetrics, TrackId, TrackPatch,
+    CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
+    TrackPatch,
 };
 
 use crate::{
@@ -41,7 +40,7 @@ impl CommandHandler for Room {
         let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
-        let mut to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
+        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
         let ice_servers = to_peer.ice_servers_list().ok_or_else(|| {

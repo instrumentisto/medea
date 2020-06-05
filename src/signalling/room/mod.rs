@@ -9,12 +9,11 @@ mod rpc_server;
 use std::sync::Arc;
 
 use actix::{
-    fut, Actor, ActorFuture, AsyncContext as _, Context,
-    ContextFutureSpawner as _, Handler, MailboxError, WrapFuture as _,
+    fut, Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
+    MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Event, PeerId};
 
 use crate::{
@@ -239,10 +238,10 @@ impl Room {
                 if receiver.peer_id().is_none()
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
-                    connect_tasks.push(
-                        self.peers
-                            .connect_endpoints(publisher.clone(), receiver),
-                    );
+                    connect_tasks.push(PeersService::connect_endpoints(
+                        publisher.clone(),
+                        receiver,
+                    ));
                 }
             }
         }
@@ -253,10 +252,10 @@ impl Room {
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
-                connect_tasks.push(
-                    self.peers
-                        .connect_endpoints(publisher.clone(), receiver.clone()),
-                )
+                connect_tasks.push(PeersService::connect_endpoints(
+                    publisher.clone(),
+                    receiver.clone(),
+                ))
             }
         }
 
@@ -268,7 +267,7 @@ impl Room {
 
         Box::new(endpoints_connected.map(|res, room, ctx| {
             for response in res? {
-                if let Some((first_peer_id, second_peer_id)) = response {
+                if let Some((first_peer_id, _)) = response {
                     room.send_peer_created(first_peer_id)
                         .unwrap()
                         .map(|_, _, _| ())

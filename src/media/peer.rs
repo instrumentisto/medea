@@ -249,31 +249,32 @@ impl<T> Peer<T> {
         self.context
             .not_applied_senders
             .iter()
-            .filter_map(Weak::upgrade)
-            .map(|t| {
-                (
-                    Direction::Send {
-                        receivers: vec![partner_peer_id],
-                        mid: t.mid(),
-                    },
-                    t,
-                )
+            .filter_map(|t| {
+                if let Some(t) = Weak::upgrade(&t) {
+                    Some((
+                        Direction::Send {
+                            receivers: vec![partner_peer_id],
+                            mid: t.mid(),
+                        },
+                        t,
+                    ))
+                } else {
+                    None
+                }
             })
-            .chain(
-                self.context
-                    .not_applied_receivers
-                    .iter()
-                    .filter_map(Weak::upgrade)
-                    .map(|t| {
-                        (
-                            Direction::Recv {
-                                sender: partner_peer_id,
-                                mid: t.mid(),
-                            },
-                            t,
-                        )
-                    }),
-            )
+            .chain(self.context.not_applied_receivers.iter().filter_map(|t| {
+                if let Some(t) = Weak::upgrade(t) {
+                    Some((
+                        Direction::Recv {
+                            sender: partner_peer_id,
+                            mid: t.mid(),
+                        },
+                        t,
+                    ))
+                } else {
+                    None
+                }
+            }))
             .map(|(direction, track)| Track {
                 id: track.id,
                 is_muted: false,
@@ -332,7 +333,7 @@ impl<T> Peer<T> {
     }
 
     pub fn renegotiation_reason(&self) -> Option<RenegotiationReason> {
-        self.context.renegotiation_reason.clone()
+        self.context.renegotiation_reason
     }
 
     fn renegotiation_finished(&mut self) {
