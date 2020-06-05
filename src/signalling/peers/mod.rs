@@ -434,8 +434,6 @@ impl PeersService {
                 // TODO: when dynamic patching of [`Room`] will be done then
                 //       we need rewrite this code to updating [`Peer`]s in
                 //       not [`Peer<Stable>`] state.
-                //       Also, don't forget to update `PeerSpec` in the
-                //       [`PeerMetricsService`].
                 if is_new {
                     Ok(Some((src_peer_id, sink_peer_id)))
                 } else {
@@ -449,11 +447,14 @@ impl PeersService {
                         room.peers.get_tracks_counter(),
                     );
 
-                    // TODO: update `PeerSpec` in the [`PeerMetricsService`].
-                    //       traffic_watcher.register_peer
-
                     sink_peer.add_endpoint(&sink.into());
                     src_peer.add_endpoint(&src.into());
+
+                    let src_peer = PeerStateMachine::from(src_peer);
+                    let sink_peer = PeerStateMachine::from(sink_peer);
+
+                    room.peers.peer_metrics_service.update_peer_tracks(&src_peer);
+                    room.peers.peer_metrics_service.update_peer_tracks(&sink_peer);
 
                     room.peers.add_peer(src_peer);
                     room.peers.add_peer(sink_peer);
