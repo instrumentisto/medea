@@ -49,7 +49,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
-- `is_important` field to `AudioSettings` and `VideoSettings` ([#106]).
+- `is_required` field to `AudioSettings` and `VideoSettings` ([#106]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58

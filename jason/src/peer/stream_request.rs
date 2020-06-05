@@ -185,7 +185,7 @@ impl SimpleStreamRequest {
 
         if let Some((_, video_caps)) = &self.video {
             if other.get_video().is_none() {
-                if video_caps.is_important() {
+                if video_caps.is_required() {
                     return Err(tracerr::new!(
                         StreamRequestError::ExpectedVideoTracks
                     ));
@@ -196,7 +196,7 @@ impl SimpleStreamRequest {
         }
         if let Some((_, audio_caps)) = &self.audio {
             if other.get_audio().is_none() {
-                if audio_caps.is_important() {
+                if audio_caps.is_required() {
                     return Err(tracerr::new!(
                         StreamRequestError::ExpectedAudioTracks
                     ));

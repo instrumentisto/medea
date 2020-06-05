@@ -290,8 +290,8 @@ pub struct Track {
 }
 
 impl Track {
-    pub fn is_important(&self) -> bool {
-        self.media_type.is_important()
+    pub fn is_required(&self) -> bool {
+        self.media_type.is_required()
     }
 }
 
@@ -343,10 +343,10 @@ pub enum MediaType {
 }
 
 impl MediaType {
-    pub fn is_important(&self) -> bool {
+    pub fn is_required(&self) -> bool {
         match self {
-            MediaType::Audio(audio) => audio.is_important,
-            MediaType::Video(video) => video.is_important,
+            MediaType::Audio(audio) => audio.is_required,
+            MediaType::Video(video) => video.is_required,
         }
     }
 }
@@ -357,7 +357,7 @@ pub struct AudioSettings {
     /// Importance of the audio media type.
     ///
     /// If `false` then audio can be not published.
-    pub is_important: bool,
+    pub is_required: bool,
 }
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
@@ -366,7 +366,7 @@ pub struct VideoSettings {
     /// Importance of the vidoe media type.
     ///
     /// If `false` then video can be not published.
-    pub is_important: bool,
+    pub is_required: bool,
 }
 
 #[cfg(feature = "jason")]

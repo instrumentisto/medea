@@ -242,10 +242,10 @@ impl TrackConstraints {
     ///
     /// If this [`TrackConstraints`] is important then without this
     /// [`TrackConstraints`] call session can't be started.
-    pub fn is_important(&self) -> bool {
+    pub fn is_required(&self) -> bool {
         match self {
-            TrackConstraints::Video(video) => video.is_important,
-            TrackConstraints::Audio(audio) => audio.is_important,
+            TrackConstraints::Video(video) => video.is_required,
+            TrackConstraints::Audio(audio) => audio.is_required,
         }
     }
 }
@@ -278,7 +278,7 @@ pub struct AudioTrackConstraints {
     ///
     /// If `true` then without this [`AudioTrackConstraints`] call session
     /// can't be started.
-    is_important: bool,
+    is_required: bool,
 }
 
 #[wasm_bindgen]
@@ -323,8 +323,8 @@ impl AudioTrackConstraints {
         if self.device_id.is_none() && another.device_id.is_some() {
             self.device_id = another.device_id;
         }
-        if !self.is_important && another.is_important {
-            self.is_important = another.is_important;
+        if !self.is_required && another.is_required {
+            self.is_required = another.is_required;
         }
     }
 
@@ -332,8 +332,8 @@ impl AudioTrackConstraints {
     ///
     /// If this [`AudioTrackConstraints`] is important then without this
     /// [`AudioTrackConstraints`] call session can't be started.
-    pub fn is_important(&self) -> bool {
-        self.is_important
+    pub fn is_required(&self) -> bool {
+        self.is_required
     }
 }
 
@@ -341,7 +341,7 @@ impl From<ProtoAudioConstraints> for AudioTrackConstraints {
     #[inline]
     fn from(caps: ProtoAudioConstraints) -> Self {
         Self {
-            is_important: caps.is_important,
+            is_required: caps.is_required,
             device_id: None,
         }
     }
@@ -373,7 +373,7 @@ pub struct VideoTrackConstraints {
     ///
     /// If `true` then without this [`VideoTrackConstraints`] call session
     /// can't be started.
-    is_important: bool,
+    is_required: bool,
 }
 
 /// Constraints applicable to video tracks that are sourced from some media
@@ -389,7 +389,7 @@ pub struct DeviceVideoTrackConstraints {
     ///
     /// If `true` then without this [`DeviceVideoTrackConstraints`] call
     /// session can't be started.
-    is_important: bool,
+    is_required: bool,
 }
 
 impl DeviceVideoTrackConstraints {
@@ -400,8 +400,8 @@ impl DeviceVideoTrackConstraints {
         if self.device_id.is_none() && another.device_id.is_some() {
             self.device_id = another.device_id;
         }
-        if !self.is_important && another.is_important {
-            self.is_important = another.is_important;
+        if !self.is_required && another.is_required {
+            self.is_required = another.is_required;
         }
     }
 
@@ -409,8 +409,8 @@ impl DeviceVideoTrackConstraints {
     ///
     /// If this [`DeviceVideoTrackConstraints`] is important then without this
     /// [`DeviceVideoTrackConstraints`] call session can't be started.
-    pub fn is_important(&self) -> bool {
-        self.is_important
+    pub fn is_required(&self) -> bool {
+        self.is_required
     }
 }
 
@@ -511,8 +511,8 @@ impl VideoTrackConstraints {
     /// if some constraint is not set on this one, then it will be applied from
     /// `another`.
     pub fn merge(&mut self, another: VideoTrackConstraints) {
-        if !self.is_important && another.is_important {
-            self.is_important = another.is_important;
+        if !self.is_required && another.is_required {
+            self.is_required = another.is_required;
         }
         match (self.constraints.as_mut(), another.constraints) {
             (None, Some(another)) => {
@@ -529,8 +529,8 @@ impl VideoTrackConstraints {
     ///
     /// If this [`VideoTrackConstraints`] is important then without this
     /// [`VideoTrackConstraints`] call session can't be started.
-    pub fn is_important(&self) -> bool {
-        self.is_important
+    pub fn is_required(&self) -> bool {
+        self.is_required
     }
 }
 
@@ -538,7 +538,7 @@ impl From<ProtoVideoConstraints> for VideoTrackConstraints {
     fn from(caps: ProtoVideoConstraints) -> Self {
         Self {
             constraints: None,
-            is_important: caps.is_important,
+            is_required: caps.is_required,
         }
     }
 }
@@ -566,7 +566,7 @@ impl From<DisplayVideoTrackConstraints> for SysMediaTrackConstraints {
 impl From<DeviceVideoTrackConstraints> for VideoTrackConstraints {
     fn from(constraints: DeviceVideoTrackConstraints) -> Self {
         Self {
-            is_important: constraints.is_important,
+            is_required: constraints.is_required,
             constraints: Some(StreamSource::Device(constraints)),
         }
     }
@@ -575,7 +575,7 @@ impl From<DeviceVideoTrackConstraints> for VideoTrackConstraints {
 impl From<DisplayVideoTrackConstraints> for VideoTrackConstraints {
     fn from(constraints: DisplayVideoTrackConstraints) -> Self {
         Self {
-            is_important: true,
+            is_required: true,
             constraints: Some(StreamSource::Display(constraints)),
         }
     }

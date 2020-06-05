@@ -513,7 +513,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Audio(AudioSettings {
-                    is_important: true,
+                    is_required: true,
                 }),
                 is_muted: false,
             },
@@ -524,7 +524,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
-                    is_important: true,
+                    is_required: true,
                 }),
                 is_muted: false,
             },
@@ -541,7 +541,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Audio(AudioSettings {
-                    is_important: true,
+                    is_required: true,
                 }),
                 is_muted: false,
             },
@@ -552,7 +552,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
-                    is_important: true,
+                    is_required: true,
                 }),
                 is_muted: false,
             },

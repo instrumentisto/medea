@@ -365,7 +365,7 @@ async fn multi_source_media_stream_constraints_build7() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
     constraints.video(VideoTrackConstraints::from(VideoSettings {
-        is_important: true,
+        is_required: true,
     }));
 
     let constraints: Option<MultiSourceMediaStreamConstraints> =
@@ -393,7 +393,7 @@ async fn multi_source_media_stream_constraints_build7() {
 async fn multi_source_media_stream_constraints_build8() {
     let mut constraints = MediaStreamSettings::new();
     constraints.video(VideoTrackConstraints::from(VideoSettings {
-        is_important: true,
+        is_required: true,
     }));
 
     let constraints: Option<MultiSourceMediaStreamConstraints> =

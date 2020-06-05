@@ -856,7 +856,7 @@ mod patches_generation {
                 id: audio_track_id,
                 is_muted: (audio_track_muted_state_fn)(i),
                 media_type: MediaType::Audio(AudioSettings {
-                    is_important: true,
+                    is_required: true,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
@@ -867,7 +867,7 @@ mod patches_generation {
                 id: video_track_id,
                 is_muted: false,
                 media_type: MediaType::Video(VideoSettings {
-                    is_important: true,
+                    is_required: true,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),

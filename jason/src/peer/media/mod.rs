@@ -241,7 +241,7 @@ impl MediaConnections {
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
-            let is_important = track.is_important();
+            let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let sndr = Sender::new(
@@ -252,7 +252,7 @@ impl MediaConnections {
                         inner.peer_events_sender.clone(),
                         mid,
                         track.is_muted.into(),
-                        is_important,
+                        is_required,
                     )
                     .map_err(tracerr::wrap!())?;
                     inner.senders.insert(track.id, sndr);
@@ -351,7 +351,7 @@ impl MediaConnections {
                         MediaConnectionsError::InvalidMediaTrack
                     ));
                 }
-            } else if sender.is_important() {
+            } else if sender.is_required() {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaStream
                 ));
@@ -406,7 +406,7 @@ impl MediaConnections {
             if rcv.sender_id == sender_id {
                 match rcv.track() {
                     None => {
-                        if rcv.is_important() {
+                        if rcv.is_required() {
                             return None;
                         }
                     }
@@ -471,7 +471,7 @@ pub struct Sender {
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
     mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
-    is_important: bool,
+    is_required: bool,
 }
 
 impl Sender {
@@ -492,7 +492,7 @@ impl Sender {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         mid: Option<String>,
         mute_state: StableMuteState,
-        is_important: bool,
+        is_required: bool,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -513,7 +513,7 @@ impl Sender {
             transceiver,
             mute_state,
             mute_timeout_handle: RefCell::new(None),
-            is_important,
+            is_required,
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -586,8 +586,8 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] is important and without it call
     /// session can't be started.
-    pub fn is_important(&self) -> bool {
-        self.caps.is_important()
+    pub fn is_required(&self) -> bool {
+        self.caps.is_required()
     }
 
     /// Stops mute/unmute timeout of this [`Sender`].
@@ -675,7 +675,7 @@ impl Sender {
         &self,
         desired_state: StableMuteState,
     ) -> Result<()> {
-        if !self.is_important {
+        if !self.is_required {
             let current_mute_state = self.mute_state.get();
             self.mute_state
                 .set(current_mute_state.transition_to(desired_state));
@@ -764,7 +764,7 @@ pub struct Receiver {
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
-    is_important: bool,
+    is_required: bool,
 }
 
 impl Receiver {
@@ -783,7 +783,7 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
-        let is_important = caps.is_important();
+        let is_required = caps.is_required();
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
             None => {
@@ -797,14 +797,14 @@ impl Receiver {
             transceiver,
             mid,
             track: None,
-            is_important,
+            is_required,
         }
     }
 
     /// Returns `true` if this [`Sender`] is important and without it call
     /// session can't be started.
-    pub fn is_important(&self) -> bool {
-        self.is_important
+    pub fn is_required(&self) -> bool {
+        self.is_required
     }
 
     /// Returns associated [`MediaStreamTrack`] with this [`Receiver`], if any.

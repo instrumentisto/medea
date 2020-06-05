@@ -134,7 +134,7 @@ pub fn get_test_tracks(
                 receivers: vec![PeerId(2)],
                 mid: None,
             },
-            media_type: MediaType::Audio(AudioSettings { is_important: true }),
+            media_type: MediaType::Audio(AudioSettings { is_required: true }),
             is_muted: is_audio_muted,
         },
         Track {
@@ -143,7 +143,7 @@ pub fn get_test_tracks(
                 receivers: vec![PeerId(2)],
                 mid: None,
             },
-            media_type: MediaType::Video(VideoSettings { is_important: true }),
+            media_type: MediaType::Video(VideoSettings { is_required: true }),
             is_muted: is_video_muted,
         },
     )

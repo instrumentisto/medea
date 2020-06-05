@@ -337,9 +337,9 @@ impl Peer<New> {
             let track_audio = Rc::new(MediaTrack::new(
                 tracks_count.next_id(),
                 MediaType::Audio(AudioSettings {
-                    is_important: audio_settings
+                    is_required: audio_settings
                         .publishing_policy
-                        .is_important(),
+                        .is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
@@ -349,9 +349,9 @@ impl Peer<New> {
             let track_video = Rc::new(MediaTrack::new(
                 tracks_count.next_id(),
                 MediaType::Video(VideoSettings {
-                    is_important: video_settings
+                    is_required: video_settings
                         .publishing_policy
-                        .is_important(),
+                        .is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));
@@ -516,7 +516,7 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Audio(AudioSettings { is_important: true }),
+                MediaType::Audio(AudioSettings { is_required: true }),
             );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
@@ -525,7 +525,7 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Video(VideoSettings { is_important: true }),
+                MediaType::Video(VideoSettings { is_required: true }),
             );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
@@ -534,7 +534,7 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Audio(AudioSettings { is_important: true }),
+                MediaType::Audio(AudioSettings { is_required: true }),
             );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
@@ -543,7 +543,7 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Video(VideoSettings { is_important: true }),
+                MediaType::Video(VideoSettings { is_required: true }),
             );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }

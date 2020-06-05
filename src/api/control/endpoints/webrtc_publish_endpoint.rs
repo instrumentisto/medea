@@ -99,7 +99,7 @@ impl PublishingPolicy {
     /// published.
     ///
     /// If `false` then media can be not published.
-    pub fn is_important(self) -> bool {
+    pub fn is_required(self) -> bool {
         match self {
             PublishingPolicy::IfPossible => false,
             PublishingPolicy::Required => true,
