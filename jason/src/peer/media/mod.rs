@@ -14,7 +14,7 @@ use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
+use web_sys::{console::trace, RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
@@ -74,6 +74,10 @@ pub enum MediaConnectionsError {
     /// [`MediaStreamTrack`].
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
+
+    #[display(fmt = "MuteState of Sender can't be transited into muted \
+                     state, because this Sender is required.")]
+    SenderIsRequired,
 }
 
 impl From<DroppedError> for MediaConnectionsError {
@@ -237,6 +241,7 @@ impl MediaConnections {
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
+            let is_important = track.is_important();
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let sndr = Sender::new(
@@ -247,6 +252,7 @@ impl MediaConnections {
                         inner.peer_events_sender.clone(),
                         mid,
                         track.is_muted.into(),
+                        is_important,
                     )
                     .map_err(tracerr::wrap!())?;
                     inner.senders.insert(track.id, sndr);
@@ -465,6 +471,7 @@ pub struct Sender {
     transceiver: RtcRtpTransceiver,
     mute_state: ObservableCell<MuteState>,
     mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+    is_important: bool,
 }
 
 impl Sender {
@@ -485,6 +492,7 @@ impl Sender {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         mid: Option<String>,
         mute_state: StableMuteState,
+        is_important: bool,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
@@ -505,6 +513,7 @@ impl Sender {
             transceiver,
             mute_state,
             mute_timeout_handle: RefCell::new(None),
+            is_important,
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -662,10 +671,23 @@ impl Sender {
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
-    pub fn mute_state_transition_to(&self, desired_state: StableMuteState) {
-        let current_mute_state = self.mute_state.get();
-        self.mute_state
-            .set(current_mute_state.transition_to(desired_state));
+    pub fn mute_state_transition_to(
+        &self,
+        desired_state: StableMuteState,
+    ) -> Result<()> {
+        if !self.is_important {
+            let current_mute_state = self.mute_state.get();
+            self.mute_state
+                .set(current_mute_state.transition_to(desired_state));
+            Ok(())
+        } else {
+            Err(tracerr::new!(MediaConnectionsError::SenderIsRequired))
+        }
+    }
+
+    pub fn cancel_transition(&self) {
+        let mute_state = self.mute_state.get();
+        self.mute_state.set(mute_state.cancel_transition());
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this

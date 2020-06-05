@@ -289,6 +289,12 @@ pub struct Track {
     pub is_muted: bool,
 }
 
+impl Track {
+    pub fn is_important(&self) -> bool {
+        self.media_type.is_important()
+    }
+}
+
 /// Path to existing [`Track`] and field which can be updated.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
@@ -334,6 +340,15 @@ pub enum Direction {
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
+}
+
+impl MediaType {
+    pub fn is_important(&self) -> bool {
+        match self {
+            MediaType::Audio(audio) => audio.is_important,
+            MediaType::Video(video) => video.is_important,
+        }
+    }
 }
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
