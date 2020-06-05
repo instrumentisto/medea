@@ -268,18 +268,6 @@ impl PeersService {
             .filter(move |peer| &peer.member_id() == member_id)
     }
 
-    /// Returns mutable references to the all [`Peer`]s of specified [`Member`].
-    ///
-    /// [`Member`]: crate::signalling::elements::member::Member
-    pub fn get_peers_by_member_id_mut<'a>(
-        &'a mut self,
-        member_id: &'a MemberId,
-    ) -> impl Iterator<Item = &'a mut PeerStateMachine> {
-        self.peers
-            .values_mut()
-            .filter(move |peer| &peer.member_id() == member_id)
-    }
-
     /// Returns owned [`Peer`] by its ID.
     ///
     /// # Errors
@@ -356,7 +344,7 @@ impl PeersService {
     fn get_or_create_peers(
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> ActFuture<Result<(PeerId, PeerId, bool), RoomError>> {
+    ) -> ActFuture<Result<CreatedOrGottenPeer, RoomError>> {
         Box::new(fut::ok::<(), (), Room>(()).then(move |_, room, _| {
             match room.peers.get_peers_between_members(
                 &src.owner().id(),
@@ -378,11 +366,10 @@ impl PeersService {
                                         )
                                         .map(move |res, _, _| {
                                             res.map(|_| {
-                                                (
+                                                CreatedOrGottenPeer::Created((
                                                     src_peer_id,
                                                     sink_peer_id,
-                                                    true,
-                                                )
+                                                ))
                                             })
                                         }),
                                 ),
@@ -392,11 +379,12 @@ impl PeersService {
                     )
                 }
                 Some((first_peer_id, second_peer_id)) => {
-                    Either::Right(actix::fut::ok::<_, RoomError, Room>((
-                        first_peer_id,
-                        second_peer_id,
-                        false,
-                    )))
+                    Either::Right(actix::fut::ok::<_, RoomError, Room>(
+                        CreatedOrGottenPeer::Gotten((
+                            first_peer_id,
+                            second_peer_id,
+                        )),
+                    ))
                 }
             }
         }))
@@ -429,37 +417,45 @@ impl PeersService {
         );
         Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).map(
             |peers_res, room, _| {
-                let (src_peer_id, sink_peer_id, is_new) = peers_res?;
-
                 // TODO: when dynamic patching of [`Room`] will be done then
                 //       we need rewrite this code to updating [`Peer`]s in
                 //       not [`Peer<Stable>`] state.
-                if is_new {
-                    Ok(Some((src_peer_id, sink_peer_id)))
-                } else {
-                    let mut src_peer: Peer<Stable> =
-                        room.peers.take_inner_peer(src_peer_id).unwrap();
-                    let mut sink_peer: Peer<Stable> =
-                        room.peers.take_inner_peer(sink_peer_id).unwrap();
+                match peers_res? {
+                    CreatedOrGottenPeer::Created(peer_ids_pair) => {
+                        Ok(Some(peer_ids_pair))
+                    }
+                    CreatedOrGottenPeer::Gotten((
+                        src_peer_id,
+                        sink_peer_id,
+                    )) => {
+                        let mut src_peer: Peer<Stable> =
+                            room.peers.take_inner_peer(src_peer_id).unwrap();
+                        let mut sink_peer: Peer<Stable> =
+                            room.peers.take_inner_peer(sink_peer_id).unwrap();
 
-                    src_peer.add_publisher(
-                        &mut sink_peer,
-                        room.peers.get_tracks_counter(),
-                    );
+                        src_peer.add_publisher(
+                            &mut sink_peer,
+                            room.peers.get_tracks_counter(),
+                        );
 
-                    sink_peer.add_endpoint(&sink.into());
-                    src_peer.add_endpoint(&src.into());
+                        sink_peer.add_endpoint(&sink.into());
+                        src_peer.add_endpoint(&src.into());
 
-                    let src_peer = PeerStateMachine::from(src_peer);
-                    let sink_peer = PeerStateMachine::from(sink_peer);
+                        let src_peer = PeerStateMachine::from(src_peer);
+                        let sink_peer = PeerStateMachine::from(sink_peer);
 
-                    room.peers.peer_metrics_service.update_peer_tracks(&src_peer);
-                    room.peers.peer_metrics_service.update_peer_tracks(&sink_peer);
+                        room.peers
+                            .peer_metrics_service
+                            .update_peer_tracks(&src_peer);
+                        room.peers
+                            .peer_metrics_service
+                            .update_peer_tracks(&sink_peer);
 
-                    room.peers.add_peer(src_peer);
-                    room.peers.add_peer(sink_peer);
+                        room.peers.add_peer(src_peer);
+                        room.peers.add_peer(sink_peer);
 
-                    Ok(None)
+                        Ok(None)
+                    }
                 }
             },
         ))
@@ -571,8 +567,6 @@ impl PeersService {
     ///
     /// # Panics
     ///
-    /// If `Peer` with provided [`PeerId`] and it's partner both not offerer.
-    ///
     /// If inserted `Peer` in [`WaitLocalSdp`] state isn't in this state.
     ///
     /// # Errors
@@ -629,7 +623,7 @@ impl PeersService {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum EndpointConnectionResponse {
+pub enum CreatedOrGottenPeer {
     Created((PeerId, PeerId)),
-    Updated(PeerId),
+    Gotten((PeerId, PeerId)),
 }

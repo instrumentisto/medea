@@ -571,7 +571,7 @@ impl PeerConnection {
         local_stream: Option<MediaStreamSettings>,
     ) -> Result<String> {
         self.media_connections
-            .update_tracks(tracks)
+            .create_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream(local_stream)
@@ -770,9 +770,9 @@ impl PeerConnection {
                 Direction::Recv { .. } => true,
             });
 
-        // update receivers
+        // create receivers
         self.media_connections
-            .update_tracks(recv)
+            .create_tracks(recv)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         // set offer, which will create transceivers and discover remote tracks
@@ -781,9 +781,9 @@ impl PeerConnection {
             .await
             .map_err(tracerr::wrap!())?;
 
-        // update senders
+        // create senders
         self.media_connections
-            .update_tracks(send)
+            .create_tracks(send)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream(local_constraints)

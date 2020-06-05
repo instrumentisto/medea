@@ -20,11 +20,11 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
+    signalling::room::RoomError,
     utils::ResponseActAnyFuture,
 };
 
 use super::{ActFuture, Room};
-use crate::signalling::room::RoomError;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
@@ -89,25 +89,17 @@ impl RpcServer for Addr<Room> {
             member_id,
             connection,
         })
-            .map(|res| match res {
-                Ok(r) => if let Err(e) = r {
-                    error!(
-                        "RpcConnectionEstablished failed cause: {:?}",
-                        e,
-                    );
-                    Err(())
-                } else {
-                    Ok(())
-                },
-                Err(e) => {
-                    error!(
-                        "Failed to send RpcConnectionEstablished cause {:?}",
-                        e,
-                    );
-                    Err(())
-                }
+        .map(|r| {
+            r.map_err(|e| {
+                error!("Failed to send RpcConnectionEstablished cause {:?}", e)
             })
-            .boxed_local()
+            .and_then(|r| {
+                r.map_err(|e| {
+                    error!("RpcConnectionEstablished failed cause: {:?}", e)
+                })
+            })
+        })
+        .boxed_local()
     }
 
     /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any

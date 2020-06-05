@@ -4,7 +4,12 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    fmt,
+    rc::{Rc, Weak},
+};
 
 use derive_more::Display;
 use failure::Fail;
@@ -22,7 +27,6 @@ use crate::{
         peers::Counter,
     },
 };
-use std::rc::Weak;
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
 ///
@@ -80,15 +84,9 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn get_tracks_to_apply(&mut self) -> Vec<Track>)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
-#[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
-#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
-#[enum_delegate(
-    pub fn renegotiation_reason(&self) -> Option<RenegotiationReason>
-)]
 #[enum_delegate(
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
@@ -204,9 +202,9 @@ pub struct Context {
 
     renegotiation_reason: Option<RenegotiationReason>,
 
-    not_applied_senders: Vec<Weak<MediaTrack>>,
+    unsynced_senders: Vec<Weak<MediaTrack>>,
 
-    not_applied_receivers: Vec<Weak<MediaTrack>>,
+    unsynced_receivers: Vec<Weak<MediaTrack>>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -243,37 +241,33 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    pub fn get_tracks_to_apply(&self) -> Vec<Track> {
+    pub fn get_unsynced_tracks(&self) -> Vec<Track> {
         let partner_peer_id = self.partner_peer_id();
 
         self.context
-            .not_applied_senders
+            .unsynced_senders
             .iter()
             .filter_map(|t| {
-                if let Some(t) = Weak::upgrade(&t) {
-                    Some((
+                Weak::upgrade(t).map(|t| {
+                    (
                         Direction::Send {
                             receivers: vec![partner_peer_id],
                             mid: t.mid(),
                         },
                         t,
-                    ))
-                } else {
-                    None
-                }
+                    )
+                })
             })
-            .chain(self.context.not_applied_receivers.iter().filter_map(|t| {
-                if let Some(t) = Weak::upgrade(t) {
-                    Some((
+            .chain(self.context.unsynced_receivers.iter().filter_map(|t| {
+                Weak::upgrade(t).map(|t| {
+                    (
                         Direction::Recv {
                             sender: partner_peer_id,
                             mid: t.mid(),
                         },
                         t,
-                    ))
-                } else {
-                    None
-                }
+                    )
+                })
             }))
             .map(|(direction, track)| Track {
                 id: track.id,
@@ -338,8 +332,8 @@ impl<T> Peer<T> {
 
     fn renegotiation_finished(&mut self) {
         self.context.renegotiation_reason = None;
-        self.context.not_applied_receivers = Vec::new();
-        self.context.not_applied_senders = Vec::new();
+        self.context.unsynced_receivers = Vec::new();
+        self.context.unsynced_senders = Vec::new();
     }
 }
 
@@ -370,17 +364,19 @@ impl Peer<WaitLocalSdp> {
         &mut self,
         mut mids: HashMap<TrackId, String>,
     ) -> Result<(), PeerError> {
-        for (id, track) in self
+        let tracks = self
             .context
             .senders
             .iter_mut()
-            .chain(self.context.receivers.iter_mut())
-        {
+            .chain(self.context.receivers.iter_mut());
+
+        for (id, track) in tracks {
             let mid = mids
                 .remove(&id)
                 .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
+
         Ok(())
     }
 }
@@ -435,9 +431,10 @@ impl Peer<Stable> {
             is_force_relayed,
             endpoints: Vec::new(),
             renegotiation_reason: None,
-            not_applied_receivers: Vec::new(),
-            not_applied_senders: Vec::new(),
+            unsynced_receivers: Vec::new(),
+            unsynced_senders: Vec::new(),
         };
+
         Self {
             context,
             state: Stable {},
@@ -490,15 +487,13 @@ impl Peer<Stable> {
 
     /// Adds [`Track`] to [`Peer`] for send.
     pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.context.not_applied_senders.push(Rc::downgrade(&track));
+        self.context.unsynced_senders.push(Rc::downgrade(&track));
         self.context.senders.insert(track.id, track);
     }
 
     /// Adds [`Track`] to [`Peer`] for receive.
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.context
-            .not_applied_receivers
-            .push(Rc::downgrade(&track));
+        self.context.unsynced_receivers.push(Rc::downgrade(&track));
         self.context.receivers.insert(track.id, track);
     }
 
@@ -536,6 +531,7 @@ impl Peer<Stable> {
         context.renegotiation_reason = Some(reason);
         context.sdp_answer = None;
         context.sdp_offer = None;
+
         Peer {
             context,
             state: WaitLocalSdp {},
@@ -543,11 +539,10 @@ impl Peer<Stable> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// TODO: Implement TracksRemoved and IceRestart reasons in the next PRs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RenegotiationReason {
     TracksAdded,
-    /* TracksRemoved,
-     * IceRestart, */
 }
 
 #[cfg(test)]
@@ -577,8 +572,8 @@ pub mod tests {
                 endpoints: Vec::new(),
                 partner_member: MemberId::from("partner-member"),
                 renegotiation_reason: None,
-                not_applied_senders: Vec::new(),
-                not_applied_receivers: Vec::new(),
+                unsynced_senders: Vec::new(),
+                unsynced_receivers: Vec::new(),
             },
         };
 

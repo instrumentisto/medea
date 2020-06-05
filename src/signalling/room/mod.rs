@@ -188,7 +188,7 @@ impl Room {
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             sdp_offer: None,
-            tracks: peer.get_tracks_to_apply(),
+            tracks: peer.get_unsynced_tracks(),
             ice_servers,
             force_relay: peer.is_force_relayed(),
         };

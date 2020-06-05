@@ -231,7 +231,7 @@ impl Room {
                 self.peers.start_renegotiation(src_peer_id).unwrap();
             let renegotiate_peer_id = renegotiate_peer.id();
             let renegoatiate_member_id = renegotiate_peer.member_id();
-            let tracks_to_apply = renegotiate_peer.get_tracks_to_apply();
+            let tracks_to_apply = renegotiate_peer.get_unsynced_tracks();
 
             ctx.spawn(
                 self.members

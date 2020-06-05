@@ -51,12 +51,12 @@ impl CommandHandler for Room {
             Some(RenegotiationReason::TracksAdded) => Event::TracksAdded {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_tracks_to_apply(),
+                tracks: to_peer.get_unsynced_tracks(),
             },
             None => Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_tracks_to_apply(),
+                tracks: to_peer.get_unsynced_tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
             },
