@@ -716,6 +716,18 @@ struct TracksUpdated {
 }
 ```
 
+#### 11. TracksAdded
+
+`Media Server` notifies about necessity to add new `Track`s into specified `Peer`.
+
+```rust
+struct TracksAdded {
+    peer_id: PeerId,
+    tracks: Vec<Track>,
+    sdp_offer: Option<String>,
+}
+```
+
 
 ### Commands
 
