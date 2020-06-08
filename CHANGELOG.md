@@ -29,7 +29,8 @@ All user visible changes to this project will be documented in this file. This p
     - gRPC Control API callbacks ([#63]):
         - `on_join`;
         - `on_leave`.
-    - Configuration of `Member`'s Client API RPC settings ([#95]).
+    - Configuration of `Member`'s Client API RPC settings ([#95]);
+    - Add new endpoints to the already interconnected `Member`s ([#105]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -37,7 +38,9 @@ All user visible changes to this project will be documented in this file. This p
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
-    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]).
+    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]);
+    - Implement `PeerConnection` renegotiation ([#105]);
+    - Implement `Event::TracksAdded` which is used for creating new `Track`s in the already connected `Peer` ([#105]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -70,6 +73,7 @@ All user visible changes to this project will be documented in this file. This p
 [#94]: /../../pull/94
 [#95]: /../../pull/95
 [#98]: /../../pull/98
+[#105]: /../../pull/105
 
 
 
