@@ -97,6 +97,7 @@ impl MediaTypeUnavailableError {
 /// Media types which can be requested in the constraints.
 ///
 /// Will be stored in the [`MediaTypeUnavailableError`].
+// TODO: JasonError must be used for all errors thrown to JS
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub enum UnavailableMediaType {
