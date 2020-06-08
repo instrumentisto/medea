@@ -224,6 +224,16 @@ impl MediaConnections {
         Ok(mids)
     }
 
+    pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
+        let inner = self.0.borrow();
+        let mut out = HashMap::new();
+        for (track_id, sender) in &inner.senders {
+            out.insert(*track_id, sender.is_publishing());
+        }
+
+        out
+    }
+
     /// Synchronizes local state with provided tracks. Creates new [`Sender`]s
     /// and [`Receiver`]s for each new [`Track`], and updates [`Track`] if
     /// its settings has been changed.
@@ -472,6 +482,7 @@ pub struct Sender {
     mute_state: ObservableCell<MuteState>,
     mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
     is_required: bool,
+    transceiver_direction: RefCell<TransceiverDirection>,
 }
 
 impl Sender {
@@ -514,6 +525,7 @@ impl Sender {
             mute_state,
             mute_timeout_handle: RefCell::new(None),
             is_required,
+            transceiver_direction: RefCell::new(TransceiverDirection::Inactive),
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -604,6 +616,16 @@ impl Sender {
         }
     }
 
+    pub fn is_publishing(&self) -> bool {
+        let transceiver_direction = *self.transceiver_direction.borrow();
+        match transceiver_direction {
+            TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {
+                false
+            }
+            TransceiverDirection::Sendonly => true,
+        }
+    }
+
     /// Returns [`TrackId`] of this [`Sender`].
     pub fn track_id(&self) -> TrackId {
         self.track_id
@@ -652,12 +674,15 @@ impl Sender {
 
             sender.track.borrow_mut().replace(new_track);
 
-            sender
-                .transceiver
-                .set_direction(RtcRtpTransceiverDirection::Sendonly);
+            sender.set_transceiver_direction(TransceiverDirection::Sendonly);
         }
 
         Ok(())
+    }
+
+    fn set_transceiver_direction(&self, direction: TransceiverDirection) {
+        self.transceiver.set_direction(direction.into());
+        *self.transceiver_direction.borrow_mut() = direction;
     }
 
     /// Checks whether [`Sender`] is in [`MuteState::Muted`].

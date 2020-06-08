@@ -127,9 +127,14 @@ pub enum Command {
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
+        senders_statuses: HashMap<TrackId, bool>,
     },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: PeerId,
+        sdp_answer: String,
+        senders_statuses: HashMap<TrackId, bool>,
+    },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,

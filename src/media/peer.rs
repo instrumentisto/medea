@@ -337,9 +337,7 @@ impl Peer<New> {
             let track_audio = Rc::new(MediaTrack::new(
                 tracks_count.next_id(),
                 MediaType::Audio(AudioSettings {
-                    is_required: audio_settings
-                        .publishing_policy
-                        .is_required(),
+                    is_required: audio_settings.publishing_policy.is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
@@ -349,9 +347,7 @@ impl Peer<New> {
             let track_video = Rc::new(MediaTrack::new(
                 tracks_count.next_id(),
                 MediaType::Video(VideoSettings {
-                    is_required: video_settings
-                        .publishing_policy
-                        .is_required(),
+                    is_required: video_settings.publishing_policy.is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));

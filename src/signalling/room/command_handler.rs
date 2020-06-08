@@ -31,7 +31,9 @@ impl CommandHandler for Room {
         from_peer_id: PeerId,
         sdp_offer: String,
         mids: HashMap<TrackId, String>,
+        senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
+        // TODO: handle senders_statuses.
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
         from_peer.set_mids(mids)?;
@@ -75,7 +77,9 @@ impl CommandHandler for Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
+        senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
+        // TODO: process senders_statuses
         let from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
 

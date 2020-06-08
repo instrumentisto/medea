@@ -818,9 +818,11 @@ impl EventHandler for InnerRoom {
                         let mids = peer
                             .get_mids()
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
+                            senders_statuses,
                             mids,
                         });
                     }
@@ -833,9 +835,11 @@ impl EventHandler for InnerRoom {
                             )
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
+                            senders_statuses,
                         });
                     }
                 };

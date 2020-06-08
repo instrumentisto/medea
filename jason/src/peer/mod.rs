@@ -549,6 +549,10 @@ impl PeerConnection {
         Ok(mids)
     }
 
+    pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
+        self.media_connections.get_senders_statuses()
+    }
+
     /// Syncs provided tracks creating all required `Sender`s and `Receiver`s,
     /// request local stream if required, get, set and return SDP offer.
     ///
