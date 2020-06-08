@@ -241,7 +241,7 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir)/
+	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
 endif
 endif
 
