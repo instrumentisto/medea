@@ -207,11 +207,11 @@ pub struct Context {
 
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] which should
     /// be sent to the client.
-    unsynced_senders: Vec<Weak<MediaTrack>>,
+    new_senders: Vec<Weak<MediaTrack>>,
 
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] which should
     /// be sent to the client.
-    unsynced_receivers: Vec<Weak<MediaTrack>>,
+    new_receivers: Vec<Weak<MediaTrack>>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -249,11 +249,11 @@ impl<T> Peer<T> {
     }
 
     /// Returns [`Track`]s of this [`Peer`] which should be sent to the client.
-    pub fn get_unsynced_tracks(&self) -> Vec<Track> {
+    pub fn get_new_tracks(&self) -> Vec<Track> {
         let partner_peer_id = self.partner_peer_id();
 
         self.context
-            .unsynced_senders
+            .new_senders
             .iter()
             .filter_map(|t| {
                 Weak::upgrade(t).map(|t| {
@@ -266,7 +266,7 @@ impl<T> Peer<T> {
                     )
                 })
             })
-            .chain(self.context.unsynced_receivers.iter().filter_map(|t| {
+            .chain(self.context.new_receivers.iter().filter_map(|t| {
                 Weak::upgrade(t).map(|t| {
                     (
                         Direction::Recv {
@@ -343,13 +343,13 @@ impl<T> Peer<T> {
 
     /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
     ///
-    /// Resets `unsynced_senders` and `unsynced_receivers`.
+    /// Resets `new_senders` and `new_receivers`.
     ///
     /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
         self.context.renegotiation_reason = None;
-        self.context.unsynced_receivers = Vec::new();
-        self.context.unsynced_senders = Vec::new();
+        self.context.new_receivers = Vec::new();
+        self.context.new_senders = Vec::new();
     }
 }
 
@@ -447,8 +447,8 @@ impl Peer<Stable> {
             is_force_relayed,
             endpoints: Vec::new(),
             renegotiation_reason: None,
-            unsynced_receivers: Vec::new(),
-            unsynced_senders: Vec::new(),
+            new_receivers: Vec::new(),
+            new_senders: Vec::new(),
         };
 
         Self {
@@ -503,13 +503,13 @@ impl Peer<Stable> {
 
     /// Adds [`Track`] to [`Peer`] for send.
     pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.context.unsynced_senders.push(Rc::downgrade(&track));
+        self.context.new_senders.push(Rc::downgrade(&track));
         self.context.senders.insert(track.id, track);
     }
 
     /// Adds [`Track`] to [`Peer`] for receive.
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.context.unsynced_receivers.push(Rc::downgrade(&track));
+        self.context.new_receivers.push(Rc::downgrade(&track));
         self.context.receivers.insert(track.id, track);
     }
 
@@ -594,8 +594,8 @@ pub mod tests {
                 endpoints: Vec::new(),
                 partner_member: MemberId::from("partner-member"),
                 renegotiation_reason: None,
-                unsynced_senders: Vec::new(),
-                unsynced_receivers: Vec::new(),
+                new_senders: Vec::new(),
+                new_receivers: Vec::new(),
             },
         };
 

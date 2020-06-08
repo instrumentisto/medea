@@ -228,15 +228,15 @@ impl Room {
             self.peers.add_sink(src_peer_id, sink.clone());
 
             let renegotiate_peer =
-                self.peers.start_renegotiation(src_peer_id).unwrap();
+                self.peers.start_renegotiation(src_peer_id)?;
             let renegotiate_peer_id = renegotiate_peer.id();
-            let renegoatiate_member_id = renegotiate_peer.member_id();
-            let tracks_to_apply = renegotiate_peer.get_unsynced_tracks();
+            let renegotiate_member_id = renegotiate_peer.member_id();
+            let tracks_to_apply = renegotiate_peer.get_new_tracks();
 
             ctx.spawn(
                 self.members
                     .send_event_to_member(
-                        renegoatiate_member_id,
+                        renegotiate_member_id,
                         Event::TracksAdded {
                             peer_id: renegotiate_peer_id,
                             sdp_offer: None,

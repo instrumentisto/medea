@@ -371,26 +371,25 @@ impl PeersService {
                                         )
                                         .map(move |res, _, _| {
                                             res.map(|_| {
-                                                CreatedOrGottenPeer::Created((
+                                                CreatedOrGottenPeer::Created(
                                                     src_peer_id,
                                                     sink_peer_id,
-                                                ))
+                                                )
                                             })
                                         }),
                                 ),
-                                Err(err) => Box::new(actix::fut::err(err))
-                                    as ActFuture<_>,
+                                Err(err) => {
+                                    Box::new(fut::err(err)) as ActFuture<_>
+                                }
                             }),
                     )
                 }
-                Some((first_peer_id, second_peer_id)) => {
-                    Either::Right(actix::fut::ok::<_, RoomError, Room>(
-                        CreatedOrGottenPeer::Gotten((
-                            first_peer_id,
-                            second_peer_id,
-                        )),
-                    ))
-                }
+                Some((first_peer_id, second_peer_id)) => Either::Right(
+                    fut::ok::<_, RoomError, Room>(CreatedOrGottenPeer::Gotten(
+                        first_peer_id,
+                        second_peer_id,
+                    )),
+                ),
             }
         }))
     }
@@ -426,13 +425,10 @@ impl PeersService {
                 //       we need rewrite this code to updating [`Peer`]s in
                 //       not [`Peer<Stable>`] state.
                 match peers_res? {
-                    CreatedOrGottenPeer::Created(peer_ids_pair) => {
-                        Ok(Some(peer_ids_pair))
+                    CreatedOrGottenPeer::Created(src_peer_id, sink_peer_id) => {
+                        Ok(Some((src_peer_id, sink_peer_id)))
                     }
-                    CreatedOrGottenPeer::Gotten((
-                        src_peer_id,
-                        sink_peer_id,
-                    )) => {
+                    CreatedOrGottenPeer::Gotten(src_peer_id, sink_peer_id) => {
                         let mut src_peer: Peer<Stable> =
                             room.peers.take_inner_peer(src_peer_id).unwrap();
                         let mut sink_peer: Peer<Stable> =
@@ -574,7 +570,6 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
     /// requested state.
-    #[cfg(feature = "askldfjsd")]
     pub fn start_renegotiation(
         &mut self,
         peer_id: PeerId,
@@ -627,8 +622,8 @@ impl PeersService {
 #[derive(Debug, Clone, Copy)]
 pub enum CreatedOrGottenPeer {
     /// Requested [`Peer`] pair was created.
-    Created((PeerId, PeerId)),
+    Created(PeerId, PeerId),
 
     /// Requested [`Peer`] pair already exist and returned.
-    Gotten((PeerId, PeerId)),
+    Gotten(PeerId, PeerId),
 }

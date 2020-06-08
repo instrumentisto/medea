@@ -188,7 +188,7 @@ impl Room {
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             sdp_offer: None,
-            tracks: peer.get_unsynced_tracks(),
+            tracks: peer.get_new_tracks(),
             ice_servers,
             force_relay: peer.is_force_relayed(),
         };
@@ -268,8 +268,7 @@ impl Room {
         Box::new(endpoints_connected.map(|res, room, ctx| {
             for response in res? {
                 if let Some((first_peer_id, _)) = response {
-                    room.send_peer_created(first_peer_id)
-                        .unwrap()
+                    room.send_peer_created(first_peer_id)?
                         .map(|_, _, _| ())
                         .spawn(ctx);
                 }

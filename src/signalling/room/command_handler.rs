@@ -51,12 +51,12 @@ impl CommandHandler for Room {
             Some(RenegotiationReason::TracksAdded) => Event::TracksAdded {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_unsynced_tracks(),
+                tracks: to_peer.get_new_tracks(),
             },
             None => Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_unsynced_tracks(),
+                tracks: to_peer.get_new_tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
             },
@@ -146,6 +146,8 @@ impl CommandHandler for Room {
 
     /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
+    ///
+    /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
