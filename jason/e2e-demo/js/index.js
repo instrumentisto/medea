@@ -328,19 +328,15 @@ window.onload = async function() {
       try {
         localStream = await jason.media_manager().init_local_stream(constraints)
       } catch (e) {
-        if(e.media_type()) {
-          let failed_media_type = e.media_type();
-          if(failed_media_type == "audio") {
-            constraints = await build_constraints(null, videoSelect);
-            localStream = await jason.media_manager().init_local_stream(constraints);
-          } else if (failed_media_type == "video") {
-            constraints = await build_constraints(audioSelect, null);
-            localStream = await jason.media_manager().init_local_stream(constraints);
-          } else {
-            console.error(e);
-          }
+        let failed_media_type = e.name();
+        if(failed_media_type == "AudioUserMediaFailed") {
+          constraints = await build_constraints(null, videoSelect);
+          localStream = await jason.media_manager().init_local_stream(constraints);
+        } else if (failed_media_type == "VideoUserMediaFailed") {
+          constraints = await build_constraints(audioSelect, null);
+          localStream = await jason.media_manager().init_local_stream(constraints);
         } else {
-          console.error(e);
+          console.error(e.message() || e);
         }
       }
       await updateLocalVideo(localStream);
