@@ -127,12 +127,14 @@ pub enum Command {
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
+        /// Publishing statuses of the senders from this `Peer`.
         senders_statuses: HashMap<TrackId, bool>,
     },
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
         peer_id: PeerId,
         sdp_answer: String,
+        /// Publishing statuses of the senders from this `Peer`.
         senders_statuses: HashMap<TrackId, bool>,
     },
     /// Web Client sends Ice Candidate.
@@ -295,6 +297,7 @@ pub struct Track {
 }
 
 impl Track {
+    /// Returns `true` if this [`Track`] is required for call starting.
     pub fn is_required(&self) -> bool {
         self.media_type.is_required()
     }
@@ -348,6 +351,7 @@ pub enum MediaType {
 }
 
 impl MediaType {
+    /// Returns `true` if this [`MediaType`] is required for call starting.
     pub fn is_required(&self) -> bool {
         match self {
             MediaType::Audio(audio) => audio.is_required,
@@ -368,7 +372,7 @@ pub struct AudioSettings {
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct VideoSettings {
-    /// Importance of the vidoe media type.
+    /// Importance of the video media type.
     ///
     /// If `false` then video can be not published.
     pub is_required: bool,

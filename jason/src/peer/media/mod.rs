@@ -719,6 +719,7 @@ impl Sender {
         }
     }
 
+    /// Cancels [`MuteState`] transition.
     pub fn cancel_transition(&self) {
         let mute_state = self.mute_state.get();
         self.mute_state.set(mute_state.cancel_transition());

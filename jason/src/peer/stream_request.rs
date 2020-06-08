@@ -161,11 +161,6 @@ impl SimpleStreamRequest {
     /// [`SimpleStreamRequest`] does not have some constraint, then it will be
     /// applied from [`MediaStreamSettings`].
     ///
-    /// If some caps are exists in the [`SimpleStreamRequest`] but doesn't
-    /// exists in the [`MediaStreamSettings`] and this caps doesn't
-    /// important then they will be remoted from the
-    /// [`SimpleStreamRequest`].
-    ///
     /// # Errors
     ///
     /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if

@@ -39,7 +39,10 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 /// [`WebRtcPublishEndpoint`].
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PublishingPolicy {
+    /// Publish this media type if it possible.
     IfPossible,
+
+    /// Don't start call if this media type can't be published.
     Required,
 }
 
