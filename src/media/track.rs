@@ -2,7 +2,7 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use medea_client_api_proto::{MediaType, TrackId as Id};
 
@@ -14,6 +14,7 @@ pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,
     pub media_type: MediaType,
+    is_disabled: Cell<bool>,
 }
 
 impl MediaTrack {
@@ -23,6 +24,7 @@ impl MediaTrack {
             id,
             mid: RefCell::new(None),
             media_type,
+            is_disabled: Cell::new(false),
         }
     }
 
@@ -32,5 +34,13 @@ impl MediaTrack {
 
     pub fn mid(&self) -> Option<String> {
         self.mid.borrow_mut().as_ref().cloned()
+    }
+
+    pub fn disabled(&self, is_disabled: bool) {
+        self.is_disabled.set(is_disabled);
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.is_disabled.get()
     }
 }

@@ -500,4 +500,11 @@ impl PeersService {
 
         peers_to_remove
     }
+
+    pub fn sync_peer_spec(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
+        let peer = self.get_peer_by_id(peer_id)?;
+        self.peer_metrics_service.update_peer_tracks(&peer);
+
+        Ok(())
+    }
 }

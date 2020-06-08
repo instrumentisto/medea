@@ -87,6 +87,12 @@ impl PeerError {
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
+#[enum_delegate(
+    pub fn update_senders_statuses(
+        &self,
+        senders_statuses: HashMap<TrackId, bool>,
+    )
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -278,6 +284,17 @@ impl<T> Peer<T> {
             }
         }
         self.context.endpoints.push(endpoint.downgrade());
+    }
+
+    pub fn update_senders_statuses(
+        &self,
+        senders_statuses: HashMap<TrackId, bool>,
+    ) {
+        for (track_id, is_publishing) in senders_statuses {
+            if let Some(sender) = self.context.senders.get(&track_id) {
+                sender.disabled(!is_publishing);
+            }
+        }
     }
 
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
