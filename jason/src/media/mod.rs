@@ -17,8 +17,8 @@ pub use self::{
     },
     device_info::InputDeviceInfo,
     manager::{
-        MediaManager, MediaManagerError, MediaManagerHandle,
-        MediaTypeUnavailableError, UnavailableMediaType,
+        GetUserMediaError, MediaManager, MediaManagerError, MediaManagerHandle,
+        UnavailableMediaType,
     },
     stream::{MediaStream, MediaStreamTrack, TrackKind},
 };

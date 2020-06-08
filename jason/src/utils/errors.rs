@@ -8,6 +8,8 @@ use derive_more::{Display, From};
 use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
+use crate::media::GetUserMediaError;
+
 pub use medea_macro::JsCaused;
 
 /// Prints provided message with [`Console.error()`].
@@ -138,6 +140,17 @@ where
 {
     fn from(traced: Traced<E>) -> Self {
         Self::from(traced.into_parts())
+    }
+}
+
+impl From<GetUserMediaError> for JasonError {
+    fn from(from: GetUserMediaError) -> Self {
+        Self {
+            name: from.media_type.error_name(),
+            trace: from.trace,
+            source: Some(from.source.into()),
+            message: from.media_type.message(),
+        }
     }
 }
 

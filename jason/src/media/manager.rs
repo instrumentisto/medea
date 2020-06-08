@@ -13,7 +13,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
-use tracerr::Traced;
+use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -74,30 +74,15 @@ pub enum MediaManagerError {
     EnumerateDevicesFailed(JsError),
 }
 
-/// Error which indicates that some media type from the requsted constraints
-/// can't be gotten.
-///
-/// Should be returned to the JS side, so JS side can create new request without
-/// errored media type.
-#[wasm_bindgen]
-#[derive(Debug, Clone)]
-pub struct MediaTypeUnavailableError {
-    /// Media type which can't be gotten.
+pub struct GetUserMediaError {
     pub media_type: UnavailableMediaType,
-}
-
-#[wasm_bindgen]
-impl MediaTypeUnavailableError {
-    /// Returns [`String`] with [`UnavailableMediaType`].
-    pub fn media_type(&self) -> String {
-        self.media_type.to_string()
-    }
+    pub trace: Trace,
+    pub source: JsError,
 }
 
 /// Media types which can be requested in the constraints.
 ///
 /// Will be stored in the [`MediaTypeUnavailableError`].
-// TODO: JasonError must be used for all errors thrown to JS
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy)]
 pub enum UnavailableMediaType {
@@ -114,6 +99,19 @@ pub enum UnavailableMediaType {
     Video,
 }
 
+impl UnavailableMediaType {
+    pub fn message(self) -> String {
+        format!("Failed to get user media with kind {}.", self.to_string())
+    }
+
+    pub fn error_name(self) -> &'static str {
+        match self {
+            Self::Audio => "AudioUserMediaFailed",
+            Self::Video => "VideoUserMediaFailed",
+        }
+    }
+}
+
 impl fmt::Display for UnavailableMediaType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let to_write = match self {
@@ -124,21 +122,25 @@ impl fmt::Display for UnavailableMediaType {
     }
 }
 
-impl TryFrom<&MediaManagerError> for MediaTypeUnavailableError {
+impl TryFrom<&Traced<MediaManagerError>> for GetUserMediaError {
     type Error = ();
 
     /// Tries to get failed to got media type from the
     /// [`MediaManagerError::GetUserMediaFailed`] error.
     fn try_from(
-        value: &MediaManagerError,
+        value: &Traced<MediaManagerError>,
     ) -> std::result::Result<Self, Self::Error> {
-        match value {
+        match value.as_ref() {
             MediaManagerError::GetUserMediaFailed(e) => {
                 [UnavailableMediaType::Audio, UnavailableMediaType::Video]
                     .iter()
                     .find(|t| e.message.contains(&t.to_string()))
                     .ok_or(())
-                    .map(|t| Self { media_type: *t })
+                    .map(|t| GetUserMediaError {
+                        media_type: *t,
+                        source: e.clone(),
+                        trace: value.trace().clone(),
+                    })
             }
             _ => Err(()),
         }
@@ -508,11 +510,10 @@ impl MediaManagerHandle {
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
                     .map_err(|e| {
-                        MediaTypeUnavailableError::try_from(e.as_ref())
-                            .map_or_else(
-                                move |_| JasonError::from(e).into(),
-                                |e| e.into(),
-                            )
+                        GetUserMediaError::try_from(&e).map_or_else(
+                            move |_| JasonError::from(e).into(),
+                            |e| JasonError::from(e).into(),
+                        )
                     })
             }),
             Err(err) => future_to_promise(future::err(err)),
