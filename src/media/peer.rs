@@ -286,6 +286,7 @@ impl<T> Peer<T> {
         self.context.endpoints.push(endpoint.downgrade());
     }
 
+    /// Updates this [`Peer`]'s senders statuses.
     pub fn update_senders_statuses(
         &self,
         senders_statuses: HashMap<TrackId, bool>,

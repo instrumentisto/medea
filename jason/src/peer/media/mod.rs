@@ -75,6 +75,7 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
 
+    /// Some [`Sender`] can't be muted because it required.
     #[display(fmt = "MuteState of Sender can't be transited into muted \
                      state, because this Sender is required.")]
     SenderIsRequired,
@@ -224,6 +225,8 @@ impl MediaConnections {
         Ok(mids)
     }
 
+    /// Returns publishing statuses of the all [`Sender`]s from this
+    /// [`MediaConnections`].
     pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
         let mut out = HashMap::new();
@@ -616,6 +619,7 @@ impl Sender {
         }
     }
 
+    /// Returns `true` if this [`Sender`] is publishes media traffic.
     pub fn is_publishing(&self) -> bool {
         let transceiver_direction = *self.transceiver_direction.borrow();
         match transceiver_direction {
@@ -680,6 +684,11 @@ impl Sender {
         Ok(())
     }
 
+    /// Sets provided [`TransceiverDirection`] of this [`Sender`]'s
+    /// [`RtcRtpTransceiver`].
+    ///
+    /// Sets [`Sender::transceiver_direction`] to the provided
+    /// [`TransceiverDirection`].
     fn set_transceiver_direction(&self, direction: TransceiverDirection) {
         self.transceiver.set_direction(direction.into());
         *self.transceiver_direction.borrow_mut() = direction;

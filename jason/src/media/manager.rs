@@ -74,9 +74,21 @@ pub enum MediaManagerError {
     EnumerateDevicesFailed(JsError),
 }
 
+/// Error which indicates that some media type from the requested constraints
+/// can't be gotten.
+///
+/// Should be converted to the [`JasonError`] and passed to the JS side.
 pub struct GetUserMediaError {
+    /// Media type which can't be gotten.
     pub media_type: UnavailableMediaType,
+
+    /// [`Trace`] from the [`Traced`] [`MediaConnectionsError`].
+    ///
+    /// Will be provided to the [`JasonError`] on convert.
     pub trace: Trace,
+
+    /// [`JsError`] based on which was decided which media type was failed to
+    /// get.
     pub source: JsError,
 }
 
@@ -100,10 +112,15 @@ pub enum UnavailableMediaType {
 }
 
 impl UnavailableMediaType {
+    /// Returns message which shoul be provided as [`JasonError::message`].
     pub fn message(self) -> String {
         format!("Failed to get user media with kind {}.", self.to_string())
     }
 
+    /// Returns name of the error for the [`JasonError::name`].
+    ///
+    /// Based on this name JS-side should get to know which media type was
+    /// failed.
     pub fn error_name(self) -> &'static str {
         match self {
             Self::Audio => "AudioUserMediaFailed",

@@ -549,6 +549,8 @@ impl PeerConnection {
         Ok(mids)
     }
 
+    /// Returns publishing statuses of the all [`Sender`]s from this
+    /// [`MediaConnections`].
     pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
         self.media_connections.get_senders_statuses()
     }
