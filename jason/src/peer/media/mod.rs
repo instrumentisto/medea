@@ -220,8 +220,7 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    /// Synchronizes local state with provided tracks. Creates new [`Sender`]s
-    /// and [`Receiver`]s for each new [`Track`].
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
     ///
     /// # Errors
     ///

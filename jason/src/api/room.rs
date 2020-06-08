@@ -760,6 +760,14 @@ impl InnerRoom {
 impl EventHandler for InnerRoom {
     type Output = ();
 
+    /// Adds provided [`Track`]s to the [`PeerConnection`] with provided
+    /// [`PeerId`].
+    ///
+    /// If `Some` SDP offer is provided then processes this SDP offer and sends
+    /// [`Command::MakeSdpAnswer`] to the media server.
+    ///
+    /// If `None` SDP offer is provided then creates SDP offer and sends
+    /// [`Command::MakeSdpOffer`] to the media server.
     fn on_tracks_added(
         &mut self,
         peer_id: PeerId,

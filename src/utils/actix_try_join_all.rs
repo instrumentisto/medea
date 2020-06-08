@@ -1,3 +1,8 @@
+//! [`futures::future::TryJoinAll`]/[`futures::future::try_join_all`] analog,
+//! but for the [`actix::ActorFuture`].
+//!
+//! Most likely you wanna use [`actix_try_join_all`] function from this module.
+
 use core::{
     mem,
     pin::Pin,
@@ -60,17 +65,6 @@ where
     elems: Pin<Box<[ElemState<F, T, E>]>>,
 }
 
-pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
-where
-    I: IntoIterator<Item = F>,
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
-{
-    let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
-    ActixTryJoinAll {
-        elems: elems.into(),
-    }
-}
-
 impl<F, T, E> ActorFuture for ActixTryJoinAll<F, T, E>
 where
     F: ActorFuture<Output = Result<T, E>> + Unpin,
@@ -115,5 +109,29 @@ where
                 Poll::Ready(Err(e))
             }
         }
+    }
+}
+
+/// Creates a future which represents either a collection of the results of the
+/// futures given or an error.
+/// The returned future will drive execution for all of its underlying futures,
+/// collecting the results into a destination `Vec<T>` in the same order as they
+/// were provided.
+///
+/// If any future returns an error then all other futures will be canceled and
+/// an error will be returned immediately. If all futures complete successfully,
+/// however, then the returned future will succeed with a [`Vec`] of all the
+/// successful results.
+///
+/// This function is analog for the [`futures::future::try_join_all`], but for
+/// the [`actix::ActorFuture`].
+pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
+where
+    I: IntoIterator<Item = F>,
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
+{
+    let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
+    ActixTryJoinAll {
+        elems: elems.into(),
     }
 }

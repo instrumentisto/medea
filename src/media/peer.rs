@@ -200,10 +200,17 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
+    /// Reason of a started renegotiation.
+    ///
+    /// If it `None` then no renegotiation is going.
     renegotiation_reason: Option<RenegotiationReason>,
 
+    /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] which should
+    /// be sent to the client.
     unsynced_senders: Vec<Weak<MediaTrack>>,
 
+    /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] which should
+    /// be sent to the client.
     unsynced_receivers: Vec<Weak<MediaTrack>>,
 }
 
@@ -241,6 +248,7 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
+    /// Returns [`Track`]s of this [`Peer`] which should be sent to the client.
     pub fn get_unsynced_tracks(&self) -> Vec<Track> {
         let partner_peer_id = self.partner_peer_id();
 
@@ -326,10 +334,18 @@ impl<T> Peer<T> {
         self.context.senders.clone()
     }
 
+    /// Returns reason of the started renegotiation if it is going.
+    ///
+    /// Returns `None` if no renegotiation is started.
     pub fn renegotiation_reason(&self) -> Option<RenegotiationReason> {
         self.context.renegotiation_reason
     }
 
+    /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
+    ///
+    /// Resets `unsynced_senders` and `unsynced_receivers`.
+    ///
+    /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
         self.context.renegotiation_reason = None;
         self.context.unsynced_receivers = Vec::new();
@@ -522,6 +538,9 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
+    /// Sets provided [`RenegotiationReason`] as current renegotiation reason of
+    /// this [`Peer`].
+    ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     pub fn start_renegotiation(
         self,
@@ -539,9 +558,12 @@ impl Peer<Stable> {
     }
 }
 
+/// Reason of the started renegotiation of this [`Peer`].
 // TODO: Implement TracksRemoved and IceRestart reasons in the next PRs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RenegotiationReason {
+    /// Renegotiation is started because some new [`Track`]s should be added to
+    /// the [`Peer`].
     TracksAdded,
 }
 

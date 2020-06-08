@@ -272,7 +272,7 @@ pub enum Event {
         tracks_patches: Vec<TrackPatch>,
     },
 
-    /// Media Server notifies about necessity to update [`Track`]s in specified
+    /// Media Server notifies about necessity to add [`Track`]s in specified
     /// Peer.
     TracksAdded {
         peer_id: PeerId,

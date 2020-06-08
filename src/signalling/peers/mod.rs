@@ -341,6 +341,11 @@ impl PeersService {
         removed_peers
     }
 
+    /// Returns already created [`Peer`] pair's [`PeerId`]s as
+    /// [`CreatedOrGottenPeer::Gotten`] variant.
+    ///
+    /// Returns newly created [`Peer`] pair's [`PeerId`]s as
+    /// [`CreatedOrGottenPeer::Created`] variant.
     fn get_or_create_peers(
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
@@ -558,13 +563,6 @@ impl PeersService {
 
     /// Starts renegotiation for a [`Peer`] with a provided [`PeerId`].
     ///
-    /// Renegotiation process will be started on a offerer [`Peer`].
-    /// If you will provided non-offerer [`PeerId`] then offerer [`Peer`]
-    /// will be found and renegotiation will be started with the found offerer
-    /// [`Peer`]. So you should send [`Event::RenegotiationStarted`] not for
-    /// a [`Peer`] which you provided, but with [`Peer`] which was returned
-    /// from this function.
-    ///
     /// # Panics
     ///
     /// If inserted `Peer` in [`WaitLocalSdp`] state isn't in this state.
@@ -576,6 +574,7 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
     /// requested state.
+    #[cfg(feature = "askldfjsd")]
     pub fn start_renegotiation(
         &mut self,
         peer_id: PeerId,
@@ -596,6 +595,8 @@ impl PeersService {
         }
     }
 
+    /// Adds new [`WebRtcPlayEndpoint`] to the [`Peer`] with a provided
+    /// [`PeerId`].
     pub fn add_sink(&mut self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {
         let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
         let mut partner_peer: Peer<Stable> =
@@ -622,8 +623,12 @@ impl PeersService {
     }
 }
 
+/// Result of the [`PeersService::get_or_create_peers`] function.
 #[derive(Debug, Clone, Copy)]
 pub enum CreatedOrGottenPeer {
+    /// Requested [`Peer`] pair was created.
     Created((PeerId, PeerId)),
+
+    /// Requested [`Peer`] pair already exist and returned.
     Gotten((PeerId, PeerId)),
 }
