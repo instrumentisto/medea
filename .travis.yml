@@ -24,14 +24,11 @@ jobs:
       stage: check
     - rust: nightly
       stage: build
-    # TODO: remove it when fix for medea-control-api-proto lints will be found
-    - rust: stable
-      stage: check
 
   include:
     - name: Clippy
       stage: check
-      rust: stable
+      rust: nightly
       before_script: rustup component add clippy
       script: make lint
 

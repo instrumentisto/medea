@@ -388,7 +388,9 @@ impl Handler<Delete> for Room {
                 StatefulFid::Endpoint(endpoint_fid) => {
                     endpoint_ids.push(endpoint_fid);
                 }
-                _ => warn!("Found Fid<IsRoomId> while deleting __from__ Room."),
+                StatefulFid::Room(_) => {
+                    warn!("Found Fid<IsRoomId> while deleting __from__ Room.")
+                }
             }
         }
         member_ids.into_iter().for_each(|fid| {
