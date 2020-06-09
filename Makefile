@@ -274,9 +274,8 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --all -- -D clippy::pedantic -D warnings \
-		-A clippy::wildcard_imports
-
+	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings \
+		-A clippy::wildcard_imports -A clippy::similar_names
 
 
 
