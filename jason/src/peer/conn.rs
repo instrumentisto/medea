@@ -1,7 +1,7 @@
 use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
 use derive_more::{Display, From};
-use medea_client_api_proto::{Direction as DirectionProto, IceServer, PeerConnectionState, Mid};
+use medea_client_api_proto::{Direction as DirectionProto, IceServer, PeerConnectionState, TrackId, Mid};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -682,6 +682,25 @@ impl RtcPeerConnection {
         }
 
         transceiver
+    }
+
+    pub fn remove_tracks(&self, mids: &[Mid]) {
+        use web_sys::RtcRtpTransceiver as SysRtcRtpTransceiver;
+        let mut transceivers_to_remove: Vec<_> = self.peer.get_transceivers().iter()
+            .map(SysRtcRtpTransceiver::from)
+            .filter(|t| {
+                if let Some(mid) = t.mid() {
+                    mids.contains(&Mid::from(mid))
+                } else {
+                    false
+                }
+            })
+            .collect();
+
+        for transceiver in transceivers_to_remove {
+            let sender = transceiver.sender();
+            self.peer.remove_track(&sender);
+        }
     }
 }
 
