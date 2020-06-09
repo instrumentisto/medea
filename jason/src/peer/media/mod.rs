@@ -3,7 +3,7 @@
 mod mute_state;
 
 use std::{
-    borrow::ToOwned, cell::RefCell, collections::HashMap, convert::From,
+    cell::RefCell, collections::HashMap, convert::From,
     future::Future, rc::Rc, time::Duration,
 };
 
@@ -29,6 +29,7 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
+use medea_client_api_proto::Mid;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -40,7 +41,7 @@ pub enum MediaConnectionsError {
 
     /// Could not find [`RtcRtpTransceiver`] by `mid`.
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
-    TransceiverNotFound(String),
+    TransceiverNotFound(Mid),
 
     /// Occurs when cannot get the `mid` from the [`Sender`].
     #[display(fmt = "Peer has senders without mid")]
@@ -193,7 +194,7 @@ impl MediaConnections {
     ///
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, Mid>> {
         let mut inner = self.0.borrow_mut();
         let mut mids =
             HashMap::with_capacity(inner.senders.len() + inner.receivers.len());
@@ -203,6 +204,7 @@ impl MediaConnections {
                 sender
                     .transceiver
                     .mid()
+                    .map(|mid| mid.into())
                     .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
@@ -212,7 +214,6 @@ impl MediaConnections {
                 *track_id,
                 receiver
                     .mid()
-                    .map(ToOwned::to_owned)
                     .ok_or(MediaConnectionsError::ReceiversWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
@@ -372,7 +373,7 @@ impl MediaConnections {
         if let Some(mid) = transceiver.mid() {
             for receiver in &mut inner.receivers.values_mut() {
                 if let Some(recv_mid) = &receiver.mid() {
-                    if recv_mid == &mid {
+                    if &recv_mid.0 == &mid {
                         receiver.transceiver.replace(transceiver);
                         receiver.track.replace(track);
                         return Some(receiver.sender_id);
@@ -489,7 +490,7 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        mid: Option<String>,
+        mid: Option<Mid>,
         mute_state: StableMuteState,
     ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
@@ -740,7 +741,7 @@ pub struct Receiver {
     track_id: TrackId,
     sender_id: PeerId,
     transceiver: Option<RtcRtpTransceiver>,
-    mid: Option<String>,
+    mid: Option<Mid>,
     track: Option<MediaStreamTrack>,
 }
 
@@ -758,7 +759,7 @@ impl Receiver {
         caps: &TrackConstraints,
         sender_id: PeerId,
         peer: &RtcPeerConnection,
-        mid: Option<String>,
+        mid: Option<Mid>,
     ) -> Self {
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
@@ -786,10 +787,10 @@ impl Receiver {
     ///
     /// Tries to fetch it from the underlying [`RtcRtpTransceiver`] if current
     /// value is `None`.
-    pub(crate) fn mid(&mut self) -> Option<&str> {
+    pub(crate) fn mid(&mut self) -> Option<Mid> {
         if self.mid.is_none() && self.transceiver.is_some() {
-            self.mid = self.transceiver.as_ref().unwrap().mid()
+            self.mid = self.transceiver.as_ref().unwrap().mid().map(Into::into)
         }
-        self.mid.as_deref()
+        self.mid.clone()
     }
 }

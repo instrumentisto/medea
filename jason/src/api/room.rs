@@ -10,11 +10,7 @@ use std::{
 use derive_more::Display;
 use futures::{channel::mpsc, future, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
-use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch,
-};
+use medea_client_api_proto::{Command, Direction, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch, Mid};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -997,7 +993,7 @@ impl PeerEventHandler for InnerRoom {
         peer_id: PeerId,
         candidate: String,
         sdp_m_line_index: Option<u16>,
-        sdp_mid: Option<String>,
+        sdp_mid: Option<Mid>,
     ) {
         self.rpc.send_command(Command::SetIceCandidate {
             peer_id,

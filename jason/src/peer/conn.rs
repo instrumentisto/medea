@@ -1,9 +1,7 @@
 use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
 use derive_more::{Display, From};
-use medea_client_api_proto::{
-    Direction as DirectionProto, IceServer, PeerConnectionState,
-};
+use medea_client_api_proto::{Direction as DirectionProto, IceServer, PeerConnectionState, Mid};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -46,7 +44,7 @@ pub struct IceCandidate {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
-    pub sdp_mid: Option<String>,
+    pub sdp_mid: Option<Mid>,
 }
 
 /// Representation of [RTCRtpTransceiver][1]'s [kind][2].
@@ -377,7 +375,7 @@ impl RtcPeerConnection {
                                 f(IceCandidate {
                                     candidate: c.candidate(),
                                     sdp_m_line_index: c.sdp_m_line_index(),
-                                    sdp_mid: c.sdp_mid(),
+                                    sdp_mid: c.sdp_mid().map(Into::into),
                                 });
                             }
                         },
@@ -511,12 +509,12 @@ impl RtcPeerConnection {
         &self,
         candidate: &str,
         sdp_m_line_index: Option<u16>,
-        sdp_mid: &Option<String>,
+        sdp_mid: &Option<Mid>,
     ) -> Result<()> {
         let mut cand_init = RtcIceCandidateInit::new(&candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
-            .sdp_mid(sdp_mid.as_ref().map(String::as_ref));
+            .sdp_mid(sdp_mid.as_ref().map(|a| a.0.as_str()));
         JsFuture::from(
             self.peer.add_ice_candidate_with_opt_rtc_ice_candidate_init(
                 Some(cand_init).as_ref(),
@@ -666,7 +664,7 @@ impl RtcPeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn get_transceiver_by_mid(
         &self,
-        mid: &str,
+        mid: &Mid,
     ) -> Option<RtcRtpTransceiver> {
         let mut transceiver = None;
 
@@ -676,7 +674,7 @@ impl RtcPeerConnection {
         for tr in transceivers {
             let tr = RtcRtpTransceiver::from(tr.unwrap());
             if let Some(tr_mid) = tr.mid() {
-                if mid.eq(&tr_mid) {
+                if &mid.0 == &tr_mid {
                     transceiver = Some(tr);
                     break;
                 }

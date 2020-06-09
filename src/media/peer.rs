@@ -13,10 +13,7 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings,
-};
+use medea_client_api_proto::{AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track, TrackId, VideoSettings, Mid};
 use medea_macro::enum_delegate;
 
 use crate::{
@@ -378,7 +375,7 @@ impl Peer<WaitLocalSdp> {
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn set_mids(
         &mut self,
-        mut mids: HashMap<TrackId, String>,
+        mut mids: HashMap<TrackId, Mid>,
     ) -> Result<(), PeerError> {
         let tracks = self
             .context
@@ -522,7 +519,7 @@ impl Peer<Stable> {
     ///
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, PeerError> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, Mid>, PeerError> {
         let mut mids = HashMap::with_capacity(self.context.senders.len());
         for (track_id, track) in &self.context.senders {
             mids.insert(

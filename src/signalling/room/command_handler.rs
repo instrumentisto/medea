@@ -4,10 +4,7 @@
 use std::collections::HashMap;
 
 use actix::WrapFuture as _;
-use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
-};
+use medea_client_api_proto::{CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId, TrackPatch, Mid};
 
 use crate::{
     log::prelude::*,
@@ -30,7 +27,7 @@ impl CommandHandler for Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-        mids: HashMap<TrackId, String>,
+        mids: HashMap<TrackId, Mid>,
     ) -> Self::Output {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;

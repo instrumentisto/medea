@@ -12,7 +12,7 @@ pub mod stats;
 
 use std::collections::HashMap;
 
-use derive_more::{Constructor, Display};
+use derive_more::{Constructor, From, Into, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
@@ -35,6 +35,14 @@ pub struct PeerId(pub u64);
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u64);
+
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Default)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Display, From, Into, PartialEq, Eq)]
+pub struct Mid(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -126,7 +134,7 @@ pub enum Command {
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-        mids: HashMap<TrackId, String>,
+        mids: HashMap<TrackId, Mid>,
     },
 
     /// Web Client sends SDP Answer.
@@ -288,7 +296,7 @@ pub enum Event {
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
-    pub sdp_mid: Option<String>,
+    pub sdp_mid: Option<Mid>,
 }
 
 /// [`Track`] with specified direction.
@@ -332,11 +340,11 @@ pub struct IceServer {
 pub enum Direction {
     Send {
         receivers: Vec<PeerId>,
-        mid: Option<String>,
+        mid: Option<Mid>,
     },
     Recv {
         sender: PeerId,
-        mid: Option<String>,
+        mid: Option<Mid>,
     },
 }
 
@@ -485,7 +493,7 @@ mod test {
     #[test]
     fn command() {
         let mut mids = HashMap::new();
-        mids.insert(TrackId(0), String::from("1"));
+        mids.insert(TrackId(0), "1".into());
 
         let command = ClientMsg::Command(Command::MakeSdpOffer {
             peer_id: PeerId(77),

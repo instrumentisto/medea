@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 
-use medea_client_api_proto::{MediaType, TrackId as Id};
+use medea_client_api_proto::{MediaType, TrackId as Id, Mid};
 
 /// Representation of [MediaStreamTrack][1] object.
 ///
@@ -12,7 +12,7 @@ use medea_client_api_proto::{MediaType, TrackId as Id};
 #[derive(Debug)]
 pub struct MediaTrack {
     pub id: Id,
-    mid: RefCell<Option<String>>,
+    mid: RefCell<Option<Mid>>,
     pub media_type: MediaType,
 }
 
@@ -26,11 +26,11 @@ impl MediaTrack {
         }
     }
 
-    pub fn set_mid(&self, mid: String) {
+    pub fn set_mid(&self, mid: Mid) {
         self.mid.borrow_mut().replace(mid);
     }
 
-    pub fn mid(&self) -> Option<String> {
+    pub fn mid(&self) -> Option<Mid> {
         self.mid.borrow_mut().as_ref().cloned()
     }
 }

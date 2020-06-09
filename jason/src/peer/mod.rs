@@ -20,10 +20,7 @@ use std::{
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::{
-    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
-};
+use medea_client_api_proto::{self as proto, stats::StatId, Direction, IceConnectionState, IceServer, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId, Mid};
 use medea_macro::dispatchable;
 use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
@@ -109,7 +106,7 @@ pub enum PeerEvent {
         ///
         /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
         /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
-        sdp_mid: Option<String>,
+        sdp_mid: Option<Mid>,
     },
 
     /// [`RtcPeerConnection`] received new stream from remote sender.
@@ -541,7 +538,7 @@ impl PeerConnection {
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://w3.org/TR/webrtc/#rtcrtptransceiver-interface
     #[inline]
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, Mid>> {
         let mids = self
             .media_connections
             .get_mids()
@@ -814,7 +811,7 @@ impl PeerConnection {
         &self,
         candidate: String,
         sdp_m_line_index: Option<u16>,
-        sdp_mid: Option<String>,
+        sdp_mid: Option<Mid>,
     ) -> Result<()> {
         if *self.has_remote_description.borrow() {
             self.peer
