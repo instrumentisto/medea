@@ -10,7 +10,7 @@
 
 pub mod stats;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use derive_more::{Constructor, From, Into, Display};
 use medea_macro::dispatchable;
@@ -286,6 +286,11 @@ pub enum Event {
         peer_id: PeerId,
         tracks: Vec<Track>,
         sdp_offer: Option<String>,
+    },
+
+    TracksRemoved {
+        peer_id: PeerId,
+        mids: HashSet<Mid>,
     },
 }
 

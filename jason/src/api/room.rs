@@ -33,6 +33,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use std::collections::HashSet;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -979,6 +980,10 @@ impl EventHandler for InnerRoom {
             JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
                 .print();
         }
+    }
+
+    fn on_tracks_removed(&mut self, peer_id: PeerId, mids: HashSet<Mid>) {
+
     }
 }
 
