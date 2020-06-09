@@ -28,7 +28,7 @@ jobs:
   include:
     - name: Clippy
       stage: check
-      rust: nighlty
+      rust: nightly
       before_script: rustup component add clippy
       script: make lint
 
