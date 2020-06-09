@@ -13,7 +13,7 @@ use medea_jason::{
 };
 use wasm_bindgen_test::*;
 
-use crate::get_test_tracks;
+use crate::get_test_unrequired_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -29,7 +29,7 @@ async fn get_test_media_connections(
         tx,
     );
     let (audio_track, video_track) =
-        get_test_tracks(!enabled_audio, !enabled_video);
+        get_test_unrequired_tracks(!enabled_audio, !enabled_video);
     let audio_track_id = audio_track.id;
     let video_track_id = video_track.id;
     media_connections
@@ -66,7 +66,7 @@ fn get_stream_request1() {
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     media_connections
         .update_tracks(vec![audio_track, video_track])
         .unwrap();

@@ -26,7 +26,7 @@ use medea_jason::{
 };
 use wasm_bindgen_test::*;
 
-use crate::{delay_for, get_test_tracks, timeout};
+use crate::{delay_for, get_test_unrequired_tracks, timeout};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -50,7 +50,7 @@ const VIDEO_TRACK_ID: u64 = 2;
 async fn mute_unmute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
 
@@ -76,7 +76,7 @@ async fn mute_unmute_audio() {
 async fn mute_unmute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -101,7 +101,7 @@ async fn mute_unmute_video() {
 async fn new_with_mute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(true, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(true, false);
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
 
@@ -117,7 +117,7 @@ async fn new_with_mute_audio() {
 async fn new_with_mute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, true);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, true);
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -145,7 +145,7 @@ async fn add_candidates_to_answerer_before_offer() {
 
     let pc2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
         .unwrap();
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None)
         .await
@@ -182,7 +182,7 @@ async fn add_candidates_to_offerer_before_answer() {
             .unwrap(),
     );
 
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     let offer = pc1
         .get_offer(vec![audio_track, video_track], None)
         .await
@@ -214,7 +214,7 @@ async fn normal_exchange_of_candidates() {
     .unwrap();
     let peer2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
         .unwrap();
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
 
     let offer = peer1
         .get_offer(vec![audio_track.clone(), video_track.clone()], None)
@@ -266,7 +266,7 @@ async fn handle_ice_candidates(
 async fn send_event_on_new_local_stream() {
     let (tx, mut rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, true);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, true);
     let id = PeerId(1);
     let peer = PeerConnection::new(id, tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
@@ -303,7 +303,7 @@ async fn ice_connection_state_changed_is_emitted() {
     .unwrap();
     let peer2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
         .unwrap();
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
 
     let offer = peer1
         .get_offer(vec![audio_track.clone(), video_track.clone()], None)
@@ -763,7 +763,7 @@ mod peer_stats_caching {
 async fn reset_transition_timers() {
     let (tx, _) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
     peer.get_offer(vec![audio_track, video_track], None)
