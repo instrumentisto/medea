@@ -440,7 +440,7 @@ impl WebSocketRpcClient {
                 .map_err(console_error)
                 .ok();
             }
-            _ => (),
+            ServerMsg::Ping(_) => {}
         }
     }
 
