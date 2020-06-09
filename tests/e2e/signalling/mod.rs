@@ -22,6 +22,7 @@ use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
     ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
 };
+use std::collections::HashMap;
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
@@ -213,6 +214,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     self.send_command(Command::MakeSdpAnswer {
                                         peer_id: *peer_id,
                                         sdp_answer: "responder_answer".into(),
+                                        senders_statuses: HashMap::new(),
                                     })
                                 }
                                 None => {
@@ -227,6 +229,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                 (id, mid.to_string())
                                             })
                                             .collect(),
+                                        senders_statuses: HashMap::new(),
                                     })
                                 }
                             };

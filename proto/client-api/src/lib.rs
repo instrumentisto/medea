@@ -515,6 +515,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
+            senders_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -523,7 +524,8 @@ mod test {
                 \"data\":{\
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"}\
+                    \"mids\":{\"0\":\"1\"},\
+                    \"senders_statuses\":{}\
                 }\
             }";
 
