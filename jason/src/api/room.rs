@@ -760,6 +760,103 @@ impl InnerRoom {
 impl EventHandler for InnerRoom {
     type Output = ();
 
+    /// Creates [`PeerConnection`] with a provided ID and all the
+    /// [`Connection`]s basing on provided [`Track`]s.
+    ///
+    /// If provided `sdp_offer` is `Some`, then offer is applied to a created
+    /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
+    fn on_peer_created(
+        &mut self,
+        peer_id: PeerId,
+        sdp_offer: Option<String>,
+        tracks: Vec<Track>,
+        ice_servers: Vec<IceServer>,
+        is_force_relayed: bool,
+    ) {
+        if let Err(err) = self
+            .peers
+            .create_peer(
+                peer_id,
+                ice_servers,
+                self.peer_event_sender.clone(),
+                is_force_relayed,
+            )
+            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+        {
+            JasonError::from(err).print();
+            return;
+        }
+
+        self.create_connections_from_tracks(&tracks);
+        self.on_tracks_added(peer_id, tracks, sdp_offer);
+    }
+
+    /// Applies specified SDP Answer to a specified [`PeerConnection`].
+    fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            spawn_local(async move {
+                if let Err(err) = peer
+                    .set_remote_answer(sdp_answer)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                {
+                    JasonError::from(err).print()
+                }
+            });
+        } else {
+            // TODO: No peer, whats next?
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
+    }
+
+    /// Applies specified [`IceCandidate`] to a specified [`PeerConnection`].
+    fn on_ice_candidate_discovered(
+        &mut self,
+        peer_id: PeerId,
+        candidate: IceCandidate,
+    ) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            spawn_local(async move {
+                let add = peer
+                    .add_ice_candidate(
+                        candidate.candidate,
+                        candidate.sdp_m_line_index,
+                        candidate.sdp_mid,
+                    )
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError));
+                if let Err(err) = add {
+                    JasonError::from(err).print();
+                }
+            });
+        } else {
+            // TODO: No peer, whats next?
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print()
+        }
+    }
+
+    /// Disposes specified [`PeerConnection`]s.
+    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
+        // TODO: drop connections
+        peer_ids.iter().for_each(|id| {
+            self.peers.remove(*id);
+        });
+    }
+
+    /// Updates [`Track`]s of this [`Room`].
+    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            if let Err(err) = peer.update_senders(tracks) {
+                JasonError::from(err).print();
+            }
+        } else {
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+        }
+    }
+
     /// Adds provided [`Track`]s to the [`PeerConnection`] with provided
     /// [`PeerId`].
     ///
@@ -827,158 +924,6 @@ impl EventHandler for InnerRoom {
                     };
                 }),
             );
-        } else {
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
-        }
-    }
-
-    /// Creates [`PeerConnection`] with a provided ID and all the
-    /// [`Connection`]s basing on provided [`Track`]s.
-    ///
-    /// If provided `sdp_offer` is `Some`, then offer is applied to a created
-    /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
-    fn on_peer_created(
-        &mut self,
-        peer_id: PeerId,
-        sdp_offer: Option<String>,
-        tracks: Vec<Track>,
-        ice_servers: Vec<IceServer>,
-        is_force_relayed: bool,
-    ) {
-        let peer = match self
-            .peers
-            .create_peer(
-                peer_id,
-                ice_servers,
-                self.peer_event_sender.clone(),
-                is_force_relayed,
-            )
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-        {
-            Ok(peer) => peer,
-            Err(err) => {
-                JasonError::from(err).print();
-                return;
-            }
-        };
-
-        self.create_connections_from_tracks(&tracks);
-
-        let local_stream_constraints = self.local_stream_settings.clone();
-        let rpc = Rc::clone(&self.rpc);
-        let error_callback = Rc::clone(&self.on_failed_local_stream);
-        spawn_local(
-            async move {
-                match sdp_offer {
-                    None => {
-                        let sdp_offer = peer
-                            .get_offer(tracks, local_stream_constraints)
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        let mids = peer
-                            .get_mids()
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        rpc.send_command(Command::MakeSdpOffer {
-                            peer_id,
-                            sdp_offer,
-                            mids,
-                        });
-                    }
-                    Some(offer) => {
-                        let sdp_answer = peer
-                            .process_offer(
-                                offer,
-                                tracks,
-                                local_stream_constraints,
-                            )
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        rpc.send_command(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer,
-                        });
-                    }
-                };
-                Result::<_, Traced<RoomError>>::Ok(())
-            }
-            .then(|result| async move {
-                if let Err(err) = result {
-                    let (err, trace) = err.into_parts();
-                    match err {
-                        RoomError::InvalidLocalStream(_)
-                        | RoomError::CouldNotGetLocalMedia(_) => {
-                            let e = JasonError::from((err, trace));
-                            e.print();
-                            error_callback.call(e);
-                        }
-                        _ => JasonError::from((err, trace)).print(),
-                    };
-                };
-            }),
-        );
-    }
-
-    /// Applies specified SDP Answer to a specified [`PeerConnection`].
-    fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            spawn_local(async move {
-                if let Err(err) = peer
-                    .set_remote_answer(sdp_answer)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                {
-                    JasonError::from(err).print()
-                }
-            });
-        } else {
-            // TODO: No peer, whats next?
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
-        }
-    }
-
-    /// Applies specified [`IceCandidate`] to a specified [`PeerConnection`].
-    fn on_ice_candidate_discovered(
-        &mut self,
-        peer_id: PeerId,
-        candidate: IceCandidate,
-    ) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            spawn_local(async move {
-                let add = peer
-                    .add_ice_candidate(
-                        candidate.candidate,
-                        candidate.sdp_m_line_index,
-                        candidate.sdp_mid,
-                    )
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!(=> RoomError));
-                if let Err(err) = add {
-                    JasonError::from(err).print();
-                }
-            });
-        } else {
-            // TODO: No peer, whats next?
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print()
-        }
-    }
-
-    /// Disposes specified [`PeerConnection`]s.
-    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
-        // TODO: drop connections
-        peer_ids.iter().for_each(|id| {
-            self.peers.remove(*id);
-        });
-    }
-
-    /// Updates [`Track`]s of this [`Room`].
-    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            if let Err(err) = peer.update_senders(tracks) {
-                JasonError::from(err).print();
-            }
         } else {
             JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
                 .print();

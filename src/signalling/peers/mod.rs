@@ -103,6 +103,16 @@ impl<T: Incrementable + Copy> Counter<T> {
     }
 }
 
+/// Result of the [`PeersService::get_or_create_peers`] function.
+#[derive(Debug, Clone, Copy)]
+pub enum GetOrCreatePeersResult {
+    /// Requested [`Peer`] pair was created.
+    Created(PeerId, PeerId),
+
+    /// Requested [`Peer`] pair already existed.
+    AlreadyExisted(PeerId, PeerId),
+}
+
 impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
@@ -203,6 +213,14 @@ impl PeersService {
         sink_peer.add_endpoint(&sink.clone().into());
 
         src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+
+        let src_peer = PeerStateMachine::from(src_peer);
+        let sink_peer = PeerStateMachine::from(sink_peer);
+
+        self.peer_metrics_service
+            .register_peer(&src_peer, self.peer_stats_ttl);
+        self.peer_metrics_service
+            .register_peer(&sink_peer, self.peer_stats_ttl);
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -349,7 +367,7 @@ impl PeersService {
     fn get_or_create_peers(
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> ActFuture<Result<CreatedOrGottenPeer, RoomError>> {
+    ) -> ActFuture<Result<GetOrCreatePeersResult, RoomError>> {
         Box::new(fut::ok::<(), (), Room>(()).then(move |_, room, _| {
             match room.peers.get_peers_between_members(
                 &src.owner().id(),
@@ -371,7 +389,7 @@ impl PeersService {
                                         )
                                         .map(move |res, _, _| {
                                             res.map(|_| {
-                                                CreatedOrGottenPeer::Created(
+                                                GetOrCreatePeersResult::Created(
                                                     src_peer_id,
                                                     sink_peer_id,
                                                 )
@@ -384,82 +402,16 @@ impl PeersService {
                             }),
                     )
                 }
-                Some((first_peer_id, second_peer_id)) => Either::Right(
-                    fut::ok::<_, RoomError, Room>(CreatedOrGottenPeer::Gotten(
-                        first_peer_id,
-                        second_peer_id,
-                    )),
-                ),
+                Some((first_peer_id, second_peer_id)) => {
+                    Either::Right(fut::ok::<_, RoomError, Room>(
+                        GetOrCreatePeersResult::AlreadyExisted(
+                            first_peer_id,
+                            second_peer_id,
+                        ),
+                    ))
+                }
             }
         }))
-    }
-
-    /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
-    /// doesn't exist.
-    ///
-    /// Adds `send` track to source member's [`Peer`] and `recv` to
-    /// sink member's [`Peer`]. Registers TURN credentials for created
-    /// [`Peer`]s.
-    ///
-    /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
-    ///
-    /// # Errors
-    ///
-    /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if provided endpoints already have interconnected [`Peer`]s.
-    pub fn connect_endpoints(
-        src: WebRtcPublishEndpoint,
-        sink: WebRtcPlayEndpoint,
-    ) -> ActFuture<Result<Option<(PeerId, PeerId)>, RoomError>> {
-        debug!(
-            "Connecting endpoints of Member [id = {}] with Member [id = {}]",
-            src.owner().id(),
-            sink.owner().id(),
-        );
-        Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).map(
-            |peers_res, room, _| {
-                // TODO: when dynamic patching of [`Room`] will be done then
-                //       we need rewrite this code to updating [`Peer`]s in
-                //       not [`Peer<Stable>`] state.
-                match peers_res? {
-                    CreatedOrGottenPeer::Created(src_peer_id, sink_peer_id) => {
-                        Ok(Some((src_peer_id, sink_peer_id)))
-                    }
-                    CreatedOrGottenPeer::Gotten(src_peer_id, sink_peer_id) => {
-                        let mut src_peer: Peer<Stable> =
-                            room.peers.take_inner_peer(src_peer_id).unwrap();
-                        let mut sink_peer: Peer<Stable> =
-                            room.peers.take_inner_peer(sink_peer_id).unwrap();
-
-                        src_peer.add_publisher(
-                            &mut sink_peer,
-                            room.peers.get_tracks_counter(),
-                        );
-
-                        sink_peer.add_endpoint(&sink.into());
-                        src_peer.add_endpoint(&src.into());
-
-                        let src_peer = PeerStateMachine::from(src_peer);
-                        let sink_peer = PeerStateMachine::from(sink_peer);
-
-                        room.peers
-                            .peer_metrics_service
-                            .update_peer_tracks(&src_peer);
-                        room.peers
-                            .peer_metrics_service
-                            .update_peer_tracks(&sink_peer);
-
-                        room.peers.add_peer(src_peer);
-                        room.peers.add_peer(sink_peer);
-
-                        Ok(None)
-                    }
-                }
-            },
-        ))
     }
 
     /// Creates and sets [`IceUser`], registers [`Peer`] in
@@ -513,6 +465,79 @@ impl PeersService {
                 .into_actor(room)
             }),
         )
+    }
+
+    /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
+    /// doesn't exist.
+    ///
+    /// Adds `send` track to source member's [`Peer`] and `recv` to
+    /// sink member's [`Peer`]. Registers TURN credentials for created
+    /// [`Peer`]s.
+    ///
+    /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
+    ///
+    /// # Errors
+    ///
+    /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if provided endpoints already have interconnected [`Peer`]s.
+    pub fn connect_endpoints(
+        src: WebRtcPublishEndpoint,
+        sink: WebRtcPlayEndpoint,
+    ) -> ActFuture<Result<Option<(PeerId, PeerId)>, RoomError>> {
+        debug!(
+            "Connecting endpoints of Member [id = {}] with Member [id = {}]",
+            src.owner().id(),
+            sink.owner().id(),
+        );
+        Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).map(
+            |peers_res, room, _| {
+                match peers_res? {
+                    GetOrCreatePeersResult::Created(
+                        src_peer_id,
+                        sink_peer_id,
+                    ) => Ok(Some((src_peer_id, sink_peer_id))),
+                    GetOrCreatePeersResult::AlreadyExisted(
+                        src_peer_id,
+                        sink_peer_id,
+                    ) => {
+                        // TODO: here we assume that peers are stable,
+                        //       which might not be the case, e.g. Control
+                        //       Service creates multiple endpoints in quick
+                        //       succession.
+                        let mut src_peer: Peer<Stable> =
+                            room.peers.take_inner_peer(src_peer_id).unwrap();
+                        let mut sink_peer: Peer<Stable> =
+                            room.peers.take_inner_peer(sink_peer_id).unwrap();
+
+                        src_peer.add_publisher(
+                            &mut sink_peer,
+                            room.peers.get_tracks_counter(),
+                        );
+
+                        sink_peer.add_endpoint(&sink.into());
+                        src_peer.add_endpoint(&src.into());
+
+                        let src_peer = PeerStateMachine::from(src_peer);
+                        let sink_peer = PeerStateMachine::from(sink_peer);
+
+                        room.peers
+                            .peer_metrics_service
+                            .update_peer_tracks(&src_peer);
+                        room.peers
+                            .peer_metrics_service
+                            .update_peer_tracks(&sink_peer);
+
+                        room.peers.add_peer(src_peer);
+                        room.peers.add_peer(sink_peer);
+
+                        Ok(None)
+                    }
+                }
+            },
+        ))
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -618,12 +643,13 @@ impl PeersService {
     }
 }
 
-/// Result of the [`PeersService::get_or_create_peers`] function.
-#[derive(Debug, Clone, Copy)]
-pub enum CreatedOrGottenPeer {
-    /// Requested [`Peer`] pair was created.
-    Created(PeerId, PeerId),
-
-    /// Requested [`Peer`] pair already exist and returned.
-    Gotten(PeerId, PeerId),
-}
+// TODO: so there is few errors here:
+//      1. peers_traffic_watcher.register_peer is called only after peer is
+//         created, and not called when we add new endpoints.
+//      2. peer_metrics_service.register_peer wasn't called anywhere
+//      so its time to cover this with unit tests:
+//      1. make sure that peer is registered in metrics service when it is
+// created      2. make sure that peer is update in metrics service when new
+// endpoint is added      3. peer registration in peers_traffic_watcher is
+// working as expected      4. peer state changes as expected after new endpoint
+// was added

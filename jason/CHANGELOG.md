@@ -57,7 +57,7 @@ All user visible changes to this project will be documented in this file. This p
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
         - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
-    - Processing of RPC events:
+    - Handling of RPC events:
         - `TracksAdded` for adding new `Track`s to the already connected `PeerConnection` ([#105])
 - Error handling:
     - Library API:

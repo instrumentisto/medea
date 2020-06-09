@@ -1,7 +1,4 @@
-//! [`futures::future::TryJoinAll`]/[`futures::future::try_join_all`] analog,
-//! but for the [`actix::ActorFuture`].
-//!
-//! Most likely you wanna use [`actix_try_join_all`] function from this module.
+//! [`futures::future::TryJoinAll`] for [`actix::ActorFuture`].
 
 use core::{
     mem,
@@ -11,50 +8,28 @@ use core::{
 
 use actix::{fut::ActorFuture, Actor};
 
-#[derive(Debug)]
-enum ElemState<F, T, E>
+/// Creates a future which represents either a collection of the results of the
+/// futures given or an error.
+/// The returned future will drive execution for all of its underlying futures,
+/// collecting the results into a destination `Vec<T>` in the same order as they
+/// were provided.
+///
+/// If any future returns an error then all other futures will be canceled and
+/// an error will be returned immediately. If all futures complete successfully,
+/// however, then the returned future will succeed with a [`Vec`] of all the
+/// successful results.
+///
+/// This function is analog for the [`futures::future::try_join_all`], but for
+/// the [`actix::ActorFuture`].
+pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
 where
+    I: IntoIterator<Item = F>,
     F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
-    Pending(F),
-    Done(Option<T>),
-}
-
-impl<F, T, E> ElemState<F, T, E>
-where
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
-{
-    fn pending_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut F>> {
-        match self.get_mut() {
-            ElemState::Pending(f) => Some(Pin::new(f)),
-            ElemState::Done(_) => None,
-        }
+    let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
+    ActixTryJoinAll {
+        elems: elems.into(),
     }
-
-    fn take_done(self: Pin<&mut Self>) -> Option<T> {
-        match self.get_mut() {
-            ElemState::Pending(_) => None,
-            ElemState::Done(output) => output.take(),
-        }
-    }
-}
-
-impl<F, T, E> Unpin for ElemState<F, T, E> where
-    F: ActorFuture<Output = Result<T, E>> + Unpin
-{
-}
-
-fn iter_pin_mut<T>(slice: Pin<&mut [T]>) -> impl Iterator<Item = Pin<&mut T>>
-where
-    T: Unpin,
-{
-    slice.get_mut().iter_mut().map(Pin::new)
-}
-
-enum FinalState<E = ()> {
-    Pending,
-    AllDone,
-    Error(E),
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -112,26 +87,48 @@ where
     }
 }
 
-/// Creates a future which represents either a collection of the results of the
-/// futures given or an error.
-/// The returned future will drive execution for all of its underlying futures,
-/// collecting the results into a destination `Vec<T>` in the same order as they
-/// were provided.
-///
-/// If any future returns an error then all other futures will be canceled and
-/// an error will be returned immediately. If all futures complete successfully,
-/// however, then the returned future will succeed with a [`Vec`] of all the
-/// successful results.
-///
-/// This function is analog for the [`futures::future::try_join_all`], but for
-/// the [`actix::ActorFuture`].
-pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
+#[derive(Debug)]
+enum ElemState<F, T, E>
 where
-    I: IntoIterator<Item = F>,
     F: ActorFuture<Output = Result<T, E>> + Unpin,
 {
-    let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
-    ActixTryJoinAll {
-        elems: elems.into(),
+    Pending(F),
+    Done(Option<T>),
+}
+
+impl<F, T, E> ElemState<F, T, E>
+where
+    F: ActorFuture<Output = Result<T, E>> + Unpin,
+{
+    fn pending_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut F>> {
+        match self.get_mut() {
+            ElemState::Pending(f) => Some(Pin::new(f)),
+            ElemState::Done(_) => None,
+        }
     }
+
+    fn take_done(self: Pin<&mut Self>) -> Option<T> {
+        match self.get_mut() {
+            ElemState::Pending(_) => None,
+            ElemState::Done(output) => output.take(),
+        }
+    }
+}
+
+impl<F, T, E> Unpin for ElemState<F, T, E> where
+    F: ActorFuture<Output = Result<T, E>> + Unpin
+{
+}
+
+fn iter_pin_mut<T>(slice: Pin<&mut [T]>) -> impl Iterator<Item = Pin<&mut T>>
+where
+    T: Unpin,
+{
+    slice.get_mut().iter_mut().map(Pin::new)
+}
+
+enum FinalState<E = ()> {
+    Pending,
+    AllDone,
+    Error(E),
 }

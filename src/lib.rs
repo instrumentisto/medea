@@ -2,14 +2,7 @@
 
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
-// TODO: remove `clippy::used_underscore_binding` when Rust will be updated to
-//       1.45.
-// https://github.com/rust-lang/rust-clippy/pull/5535#issuecomment-639112901
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::must_use_candidate,
-    clippy::used_underscore_binding
-)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 #[macro_use]
 pub mod utils;

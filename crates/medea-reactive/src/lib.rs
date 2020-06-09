@@ -1,8 +1,5 @@
 //! Reactive mutable data containers.
 
-// TODO: remove when Rust will be updated to 1.45.
-// https://github.com/rust-lang/rust-clippy/pull/5535#issuecomment-639112901
-#![allow(clippy::used_underscore_binding)]
 #![deny(
     intra_doc_link_resolution_failure,
     missing_debug_implementations,

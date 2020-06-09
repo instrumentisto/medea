@@ -218,6 +218,8 @@ impl Room {
 
         src.add_sink(sink.downgrade());
 
+        // ---
+        // i think that init_member_connections should encapsulate this
         let src_member = src.owner();
         let sink_member = sink.owner();
 
@@ -247,6 +249,7 @@ impl Room {
                     .then(move |_, this, _| async {}.into_actor(this)),
             );
         }
+        // ---
 
         debug!(
             "Created WebRtcPlayEndpoint [id = {}] for Member [id = {}] in \
