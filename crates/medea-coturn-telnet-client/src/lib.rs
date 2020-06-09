@@ -8,6 +8,9 @@
 //! [deadpool]: https://crates.io/crates/deadpool
 //! [Telnet]: https://en.wikipedia.org/wiki/Telnet
 
+// TODO: remove when Rust will be updated to 1.45.
+// https://github.com/rust-lang/rust-clippy/pull/5535#issuecomment-639112901
+#![allow(clippy::used_underscore_binding)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(
     intra_doc_link_resolution_failure,

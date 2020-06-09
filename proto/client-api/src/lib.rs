@@ -298,6 +298,7 @@ pub struct Track {
 
 impl Track {
     /// Returns `true` if this [`Track`] is required for call starting.
+    #[must_use]
     pub fn is_required(&self) -> bool {
         self.media_type.is_required()
     }
@@ -352,6 +353,7 @@ pub enum MediaType {
 
 impl MediaType {
     /// Returns `true` if this [`MediaType`] is required for call starting.
+    #[must_use]
     pub fn is_required(&self) -> bool {
         match self {
             MediaType::Audio(audio) => audio.is_required,

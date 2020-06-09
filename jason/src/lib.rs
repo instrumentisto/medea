@@ -4,7 +4,14 @@
 
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
-#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+// TODO: remove `clippy::used_underscore_binding` when Rust will be updated to
+//       1.45.
+// https://github.com/rust-lang/rust-clippy/pull/5535#issuecomment-639112901
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::used_underscore_binding
+)]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 

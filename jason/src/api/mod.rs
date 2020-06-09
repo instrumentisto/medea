@@ -70,7 +70,7 @@ impl Jason {
                 .borrow_mut()
                 .rooms
                 .drain(..)
-                .for_each(|room| room.close(reason.clone()));
+                .for_each(|room| room.close(reason));
             inner.borrow_mut().media_manager = Rc::default();
         }));
 
