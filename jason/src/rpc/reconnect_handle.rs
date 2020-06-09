@@ -95,7 +95,8 @@ impl ReconnectHandle {
             if upgrade_or_detached!(rpc, JsValue)?
                 .connect(token.clone())
                 .await
-                .is_err() {
+                .is_err()
+            {
                 backoff_delayer.delay().await;
             }
 

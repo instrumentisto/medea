@@ -99,7 +99,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
                         fields.unnamed.iter().map(|f| f.ty.clone()).collect();
                     quote! { data: (#(#args),*) }
                 }
-                syn::Fields::Unit => quote! {}
+                syn::Fields::Unit => quote! {},
             };
             let doc = format!(
                 "Handles [`{0}::{1}`] variant of [`{0}`].",
