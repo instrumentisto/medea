@@ -1,3 +1,5 @@
+//! Implementation of the `MediaTrack` with a `Send` direction.
+
 use std::{
     cell::RefCell, convert::From, future::Future, rc::Rc, time::Duration,
 };

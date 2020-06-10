@@ -20,7 +20,7 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.43
+RUST_VER := 1.44
 CHROME_VERSION := 83.0
 FIREFOX_VERSION := 77.0.1
 
@@ -272,10 +272,10 @@ endif
 #
 # Usage:
 #	make cargo.lint
-
+# TODO: Enable ignored lints when rust 1.45 is stabilized
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings \
-		-A clippy::wildcard_imports -A clippy::similar_names
+	cargo clippy --all -- -D clippy::pedantic -D warnings \
+		 -A clippy::similar_names -A clippy::used_underscore_binding
 
 
 

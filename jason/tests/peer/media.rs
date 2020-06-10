@@ -48,11 +48,13 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .mute_state_transition_to(StableMuteState::from(!enabled_audio));
+        .mute_state_transition_to(StableMuteState::from(!enabled_audio))
+        .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .mute_state_transition_to(StableMuteState::from(!enabled_video));
+        .mute_state_transition_to(StableMuteState::from(!enabled_video))
+        .unwrap();
 
     (media_connections, audio_track_id, video_track_id)
 }
@@ -110,7 +112,9 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!audio_track.is_muted());
     assert!(!video_track.is_muted());
 
-    audio_track.mute_state_transition_to(StableMuteState::Muted);
+    audio_track
+        .mute_state_transition_to(StableMuteState::Muted)
+        .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: audio_track_id,
@@ -120,7 +124,9 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(audio_track.is_muted());
     assert!(!video_track.is_muted());
 
-    video_track.mute_state_transition_to(StableMuteState::Muted);
+    video_track
+        .mute_state_transition_to(StableMuteState::Muted)
+        .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: video_track_id,
@@ -130,7 +136,9 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(audio_track.is_muted());
     assert!(video_track.is_muted());
 
-    audio_track.mute_state_transition_to(StableMuteState::NotMuted);
+    audio_track
+        .mute_state_transition_to(StableMuteState::NotMuted)
+        .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: audio_track_id,
@@ -140,7 +148,9 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!audio_track.is_muted());
     assert!(video_track.is_muted());
 
-    video_track.mute_state_transition_to(StableMuteState::NotMuted);
+    video_track
+        .mute_state_transition_to(StableMuteState::NotMuted)
+        .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: video_track_id,

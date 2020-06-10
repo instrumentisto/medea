@@ -1,3 +1,5 @@
+//! Implemntation of the `MediaTrack` with a `Recv` direction.
+
 use std::convert::From;
 
 use medea_client_api_proto as proto;
@@ -59,7 +61,7 @@ impl Receiver {
 
     /// Returns `true` if this [`Sender`] is important and without it call
     /// session can't be started.
-    pub fn is_required(&self) -> bool {
+    pub(crate) fn is_required(&self) -> bool {
         self.is_required
     }
 

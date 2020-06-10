@@ -204,8 +204,8 @@ async fn send_goes_to_transport() {
                     Command::MakeSdpOffer {
                         peer_id,
                         sdp_offer,
-                        mids,
-                        senders_statuses,
+                        mids: _,
+                        senders_statuses: _,
                     } => {
                         assert_eq!(peer_id, test_peer_id);
                         assert_eq!(sdp_offer, test_sdp_offer);
