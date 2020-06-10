@@ -53,6 +53,11 @@ impl CommandHandler for Room {
                 sdp_offer: Some(sdp_offer),
                 tracks: to_peer.get_new_tracks(),
             },
+            Some(RenegotiationReason::TracksRemoved) => Event::TracksRemoved {
+                peer_id: to_peer_id,
+                mids: to_peer.removed_tracks_mids(),
+                sdp_offer: Some(sdp_offer),
+            },
             None => Event::PeerCreated {
                 peer_id: to_peer.id(),
                 sdp_offer: Some(sdp_offer),

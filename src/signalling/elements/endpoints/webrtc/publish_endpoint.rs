@@ -2,11 +2,11 @@
 
 use std::{
     cell::RefCell,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{PeerId, TrackId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -25,6 +25,8 @@ use super::play_endpoint::WebRtcPlayEndpoint;
 struct WebRtcPublishEndpointInner {
     /// ID of this [`WebRtcPublishEndpoint`].
     id: Id,
+
+    tracks_ids: HashMap<PeerId, HashSet<TrackId>>,
 
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
@@ -123,6 +125,7 @@ impl WebRtcPublishEndpoint {
             sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
+            tracks_ids: HashMap::new(),
         })))
     }
 
@@ -201,6 +204,32 @@ impl WebRtcPublishEndpoint {
     /// [`WebRtcPublishEndpoint`].
     pub fn is_force_relayed(&self) -> bool {
         self.0.borrow().is_force_relayed
+    }
+
+    pub fn add_track_id(&self, peer_id: PeerId, track_id: TrackId) {
+        let mut inner = self.0.borrow_mut();
+        inner
+            .tracks_ids
+            .entry(peer_id)
+            .or_insert_with(|| HashSet::new())
+            .insert(track_id);
+    }
+
+    pub fn get_tracks_ids_by_peer_id(
+        &self,
+        peer_id: PeerId,
+    ) -> HashSet<TrackId> {
+        let inner = self.0.borrow();
+        inner
+            .tracks_ids
+            .get(&peer_id)
+            .cloned()
+            .unwrap_or_else(|| HashSet::new())
+    }
+
+    pub fn get_all_tracks_ids(&self) -> HashMap<PeerId, HashSet<TrackId>> {
+        let inner = self.0.borrow();
+        inner.tracks_ids.clone()
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer

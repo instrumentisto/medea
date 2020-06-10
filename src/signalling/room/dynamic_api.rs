@@ -30,9 +30,11 @@ use crate::{
         },
         room::ActFuture,
     },
+    utils::actix_try_join_all,
 };
 
 use super::{Room, RoomError};
+use crate::media::{Peer, RenegotiationReason, Stable};
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -77,29 +79,77 @@ impl Room {
         let endpoint_id =
             if let Some(member) = self.members.get_member_by_id(member_id) {
                 let play_id = endpoint_id.into();
-                if let Some(endpoint) = member.take_sink(&play_id) {
-                    if let Some(peer_id) = endpoint.peer_id() {
-                        let removed_peers =
-                            self.peers.remove_peers(member_id, &[peer_id]);
-                        for (member_id, peers) in removed_peers {
-                            self.member_peers_removed(
-                                peers.into_iter().map(|p| p.id()).collect(),
-                                member_id,
-                                ctx,
-                            )
-                            .map(|_, _, _| ())
-                            .spawn(ctx);
+                if let Some(sink_endpoint) = member.take_sink(&play_id) {
+                    let mut events = HashMap::new();
+                    let src_endpoint = sink_endpoint.src();
+                    if let Some(sink_peer_id) = sink_endpoint.peer_id() {
+                        let mut sink_peer: Peer<Stable> =
+                            self.peers.take_inner_peer(sink_peer_id).unwrap();
+                        let mut src_peer: Peer<Stable> = self
+                            .peers
+                            .take_inner_peer(sink_peer.partner_peer_id())
+                            .unwrap();
+                        let tracks_to_remove = src_endpoint
+                            .get_tracks_ids_by_peer_id(src_peer.id());
+                        sink_peer.remove_receivers(tracks_to_remove.clone());
+                        src_peer.remove_senders(tracks_to_remove.clone());
+
+                        if sink_peer.is_empty() && src_peer.is_empty() {
+                            member.peers_removed(&vec![sink_peer_id]);
+                            events.insert(
+                                sink_peer.member_id(),
+                                Event::PeersRemoved {
+                                    peer_ids: vec![sink_peer_id],
+                                },
+                            );
+                            events.insert(
+                                src_peer.member_id(),
+                                Event::PeersRemoved {
+                                    peer_ids: vec![src_peer.id()],
+                                },
+                            );
+                        } else {
+                            let sink_peer = sink_peer.start_renegotiation(
+                                RenegotiationReason::TracksRemoved,
+                            );
+                            let sink_peer_member_id = sink_peer.member_id();
+                            let removed_mids = sink_peer.removed_tracks_mids();
+                            self.peers.add_peer(sink_peer);
+                            self.peers.add_peer(src_peer);
+                            events.insert(
+                                sink_peer_member_id,
+                                Event::TracksRemoved {
+                                    peer_id: sink_peer_id,
+                                    sdp_offer: None,
+                                    mids: removed_mids,
+                                },
+                            );
                         }
                     }
+
+                    let mut futs = Vec::new();
+                    for (member_id, event) in events {
+                        debug!(
+                            "Event {:?} will be sent to the {} for Endpoint \
+                             delete.",
+                            event, member_id
+                        );
+                        futs.push(
+                            self.members
+                                .send_event_to_member(member_id, event)
+                                .into_actor(self),
+                        );
+                    }
+                    ctx.spawn(actix_try_join_all(futs).then(|res, this, _| {
+                        debug!("Delete Endpoint task was finished!");
+                        res.unwrap();
+                        async {}.into_actor(this)
+                    }));
                 }
 
                 let publish_id = String::from(play_id).into();
-                if let Some(endpoint) = member.take_src(&publish_id) {
-                    let peer_ids = endpoint.peer_ids();
-                    self.remove_peers(member_id, &peer_ids, ctx);
-                }
 
-                publish_id.into()
+                publish_id
             } else {
                 endpoint_id
             };

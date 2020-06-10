@@ -50,6 +50,7 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -202,7 +203,7 @@ impl PeersService {
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
-        src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+        src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter(), src);
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -437,6 +438,7 @@ impl PeersService {
                         src_peer.add_publisher(
                             &mut sink_peer,
                             room.peers.get_tracks_counter(),
+                            &src,
                         );
 
                         sink_peer.add_endpoint(&sink.into());
@@ -596,21 +598,9 @@ impl PeersService {
         let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
         let mut partner_peer: Peer<Stable> =
             self.take_inner_peer(peer.partner_peer_id()).unwrap();
-        let track_audio = Rc::new(MediaTrack::new(
-            self.tracks_count.next_id(),
-            MediaType::Audio(AudioSettings {}),
-        ));
-        let track_video = Rc::new(MediaTrack::new(
-            self.tracks_count.next_id(),
-            MediaType::Video(VideoSettings {}),
-        ));
+        let src = sink.src();
 
-        peer.add_sender(Rc::clone(&track_video));
-        peer.add_sender(Rc::clone(&track_audio));
-
-        partner_peer.add_receiver(track_video);
-        partner_peer.add_receiver(track_audio);
-
+        peer.add_publisher(&mut partner_peer, &mut self.tracks_count, &src);
         peer.add_endpoint(&Endpoint::from(sink));
 
         self.peers.insert(peer.id(), peer.into());

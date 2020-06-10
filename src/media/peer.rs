@@ -5,7 +5,7 @@
 #![allow(clippy::use_self)]
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt,
     rc::{Rc, Weak},
@@ -21,9 +21,12 @@ use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
+    log::prelude::*,
     media::{IceUser, MediaTrack},
     signalling::{
-        elements::endpoints::{Endpoint, WeakEndpoint},
+        elements::endpoints::{
+            webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
+        },
         peers::Counter,
     },
 };
@@ -212,6 +215,8 @@ pub struct Context {
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] which should
     /// be sent to the client.
     new_receivers: Vec<Weak<MediaTrack>>,
+
+    removed_tracks_mids: HashSet<Mid>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -341,6 +346,14 @@ impl<T> Peer<T> {
         self.context.renegotiation_reason
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.context.senders.is_empty() && self.context.receivers.is_empty()
+    }
+
+    pub fn removed_tracks_mids(&self) -> HashSet<Mid> {
+        self.context.removed_tracks_mids.clone()
+    }
+
     /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
     ///
     /// Resets `new_senders` and `new_receivers`.
@@ -350,6 +363,7 @@ impl<T> Peer<T> {
         self.context.renegotiation_reason = None;
         self.context.new_receivers = Vec::new();
         self.context.new_senders = Vec::new();
+        self.context.removed_tracks_mids = HashSet::new();
     }
 }
 
@@ -449,6 +463,7 @@ impl Peer<Stable> {
             renegotiation_reason: None,
             new_receivers: Vec::new(),
             new_senders: Vec::new(),
+            removed_tracks_mids: HashSet::new(),
         };
 
         Self {
@@ -463,6 +478,7 @@ impl Peer<Stable> {
         &mut self,
         partner_peer: &mut Peer<Stable>,
         tracks_count: &mut Counter<TrackId>,
+        src: &WebRtcPublishEndpoint,
     ) {
         let track_audio = Rc::new(MediaTrack::new(
             tracks_count.next_id(),
@@ -473,11 +489,44 @@ impl Peer<Stable> {
             MediaType::Video(VideoSettings {}),
         ));
 
+        src.add_track_id(self.id(), track_audio.id);
+        src.add_track_id(self.id(), track_video.id);
+
         self.add_sender(Rc::clone(&track_video));
         self.add_sender(Rc::clone(&track_audio));
 
         partner_peer.add_receiver(track_video);
         partner_peer.add_receiver(track_audio);
+    }
+
+    pub fn remove_senders(&mut self, tracks_ids: HashSet<TrackId>) {
+        debug!(
+            "Removing Send Tracks [ids = {:?}] from Peer [id = {}].",
+            tracks_ids,
+            self.id()
+        );
+        for track_id in tracks_ids {
+            if let Some(track) = self.context.senders.remove(&track_id) {
+                if let Some(mid) = track.mid() {
+                    self.context.removed_tracks_mids.insert(mid);
+                }
+            }
+        }
+    }
+
+    pub fn remove_receivers(&mut self, tracks_ids: HashSet<TrackId>) {
+        debug!(
+            "Removing Recv Tracks [ids = {:?}] from Peer [id = {}].",
+            tracks_ids,
+            self.id()
+        );
+        for track_id in tracks_ids {
+            if let Some(track) = self.context.receivers.remove(&track_id) {
+                if let Some(mid) = track.mid() {
+                    self.context.removed_tracks_mids.insert(mid);
+                }
+            }
+        }
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
@@ -565,6 +614,8 @@ pub enum RenegotiationReason {
     /// Renegotiation is started because some new [`Track`]s should be added to
     /// the [`Peer`].
     TracksAdded,
+
+    TracksRemoved,
 }
 
 #[cfg(test)]
