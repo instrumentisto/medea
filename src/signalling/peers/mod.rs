@@ -639,22 +639,8 @@ impl PeersService {
         let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
         let mut partner_peer: Peer<Stable> =
             self.take_inner_peer(peer.partner_peer_id()).unwrap();
-        let track_audio = Rc::new(MediaTrack::new(
-            self.tracks_count.next_id(),
-            MediaType::Audio(AudioSettings {}),
-        ));
-        let track_video = Rc::new(MediaTrack::new(
-            self.tracks_count.next_id(),
-            MediaType::Video(VideoSettings {}),
-        ));
 
-        peer.add_sender(Rc::clone(&track_video));
-        peer.add_sender(Rc::clone(&track_audio));
-
-        partner_peer.add_receiver(track_video);
-        partner_peer.add_receiver(track_audio);
-
-        peer.add_endpoint(&Endpoint::from(sink));
+        peer.add_endpoint(&sink.into());
 
         self.peers.insert(peer.id(), peer.into());
         self.peers.insert(partner_peer.id(), partner_peer.into());

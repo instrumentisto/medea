@@ -27,6 +27,7 @@ use crate::{
         peers::Counter,
     },
 };
+use crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint;
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
 ///
