@@ -498,7 +498,25 @@ impl PeersService {
                     GetOrCreatePeersResult::Created(
                         src_peer_id,
                         sink_peer_id,
-                    ) => Ok(Some((src_peer_id, sink_peer_id))),
+                    ) => {
+                        let src_peer: Peer<Stable> =
+                            room.peers.take_inner_peer(src_peer_id)?;
+                        let sink_peer: Peer<Stable> =
+                            room.peers.take_inner_peer(sink_peer_id)?;
+                        let src_peer = PeerStateMachine::from(src_peer);
+                        let sink_peer = PeerStateMachine::from(sink_peer);
+
+                        room.peers.peer_metrics_service.register_peer(
+                            &src_peer,
+                            room.peers.peer_stats_ttl,
+                        );
+                        room.peers.peer_metrics_service.register_peer(
+                            &sink_peer,
+                            room.peers.peer_stats_ttl,
+                        );
+
+                        Ok(Some((src_peer_id, sink_peer_id)))
+                    }
                     GetOrCreatePeersResult::AlreadyExisted(
                         src_peer_id,
                         sink_peer_id,
