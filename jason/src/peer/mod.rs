@@ -20,7 +20,10 @@ use std::{
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::{self as proto, stats::StatId, Direction, IceConnectionState, IceServer, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId, Mid};
+use medea_client_api_proto::{
+    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
+    Mid, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+};
 use medea_macro::dispatchable;
 use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
@@ -49,6 +52,7 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
+use std::collections::HashSet;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -826,6 +830,10 @@ impl PeerConnection {
             });
         }
         Ok(())
+    }
+
+    pub fn remove_tracks(&self, mids: &HashSet<Mid>) {
+        self.peer.remove_tracks(mids)
     }
 }
 

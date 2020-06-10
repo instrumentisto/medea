@@ -3,8 +3,8 @@
 mod mute_state;
 
 use std::{
-    cell::RefCell, collections::HashMap, convert::From,
-    future::Future, rc::Rc, time::Duration,
+    cell::RefCell, collections::HashMap, convert::From, future::Future, rc::Rc,
+    time::Duration,
 };
 
 use derive_more::Display;

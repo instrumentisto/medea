@@ -13,7 +13,10 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track, TrackId, VideoSettings, Mid};
+use medea_client_api_proto::{
+    AudioSettings, Direction, IceServer, MediaType, Mid, PeerId as Id, Track,
+    TrackId, VideoSettings,
+};
 use medea_macro::enum_delegate;
 
 use crate::{

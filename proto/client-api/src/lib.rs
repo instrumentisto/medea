@@ -12,7 +12,7 @@ pub mod stats;
 
 use std::collections::{HashMap, HashSet};
 
-use derive_more::{Constructor, From, Into, Display};
+use derive_more::{Constructor, Display, From, Into};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
@@ -36,10 +36,7 @@ pub struct PeerId(pub u64);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u64);
 
-#[cfg_attr(
-    feature = "medea",
-    derive(Deserialize, Debug, Hash, Default)
-)]
+#[cfg_attr(feature = "medea", derive(Deserialize, Debug, Hash, Default))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Display, From, Into, PartialEq, Eq)]
 pub struct Mid(pub String);
@@ -290,6 +287,7 @@ pub enum Event {
 
     TracksRemoved {
         peer_id: PeerId,
+        sdp_offer: Option<String>,
         mids: HashSet<Mid>,
     },
 }
