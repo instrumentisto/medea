@@ -23,11 +23,12 @@ use crate::{
     api::control::MemberId,
     media::{IceUser, MediaTrack},
     signalling::{
-        elements::endpoints::{Endpoint, WeakEndpoint},
+        elements::endpoints::{
+            webrtc::WebRtcPlayEndpoint, Endpoint, WeakEndpoint,
+        },
         peers::Counter,
     },
 };
-use crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint;
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
 ///

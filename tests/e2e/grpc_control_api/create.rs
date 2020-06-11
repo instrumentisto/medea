@@ -8,7 +8,10 @@
 use medea::api::control::error_codes::ErrorCode;
 use medea_control_api_proto::grpc::api as proto;
 
-use crate::grpc_control_api::{take_member, take_room, take_webrtc_pub};
+use crate::{
+    grpc_control_api::{take_member, take_room, take_webrtc_pub},
+    signalling::TestMember,
+};
 
 use super::{
     create_room_req, ControlClient, MemberBuilder, RoomBuilder,
@@ -210,6 +213,9 @@ mod member {
 mod endpoint {
 
     use super::*;
+    use medea_client_api_proto::Event;
+    use std::time::Duration;
+    use tokio::time::{delay_for, timeout};
 
     #[actix_rt::test]
     async fn endpoint() {
@@ -363,5 +369,87 @@ mod endpoint {
         } else {
             panic!("should err")
         }
+    }
+
+    #[actix_rt::test]
+    async fn create_endpoint_in_the_interconnected_members() {
+        const TEST_NAME: &str = "create_endpoint_in_the_interconnected_members";
+        use futures::channel::mpsc;
+
+        let mut client = ControlClient::new().await;
+        let credentials = client.create(create_room_req(TEST_NAME)).await;
+        use futures::StreamExt as _;
+
+        let (publisher_tx, mut rx): (mpsc::UnboundedSender<()>, _) =
+            mpsc::unbounded();
+        let publisher_done = timeout(Duration::from_secs(5), rx.next());
+        let (responder_tx, mut rx): (mpsc::UnboundedSender<()>, _) =
+            mpsc::unbounded();
+        let responder_done = timeout(Duration::from_secs(5), rx.next());
+
+        let publisher = TestMember::connect(
+            credentials.get("publisher").unwrap(),
+            Some(Box::new(move |event, ctx, events| {
+                match event {
+                    Event::TracksAdded { .. } => {
+                        publisher_tx.unbounded_send(()).unwrap();
+                    }
+                    _ => (),
+                };
+            })),
+            None,
+            None,
+        )
+        .await;
+        let responder = TestMember::connect(
+            credentials.get("responder").unwrap(),
+            Some(Box::new(move |event, ctx, events| {
+                match event {
+                    Event::TracksAdded { .. } => {
+                        responder_tx.unbounded_send(()).unwrap();
+                        let sdp_answer_mades_count = events
+                            .iter()
+                            .filter(|e| {
+                                if let Event::SdpAnswerMade { .. } = e {
+                                    true
+                                } else {
+                                    false
+                                }
+                            })
+                            .count();
+                        if sdp_answer_mades_count == 2 {
+                            responder_tx.unbounded_send(()).unwrap();
+                        }
+                    }
+                    _ => (),
+                };
+            })),
+            None,
+            None,
+        )
+        .await;
+
+        delay_for(Duration::from_millis(50)).await;
+
+        let create_publish_endpoint = WebRtcPublishEndpointBuilder::default()
+            .id("publish")
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
+            .build()
+            .unwrap()
+            .build_request(format!("{}/responder", TEST_NAME));
+        client.create(create_publish_endpoint).await;
+
+        let create_play_endpoint = WebRtcPlayEndpointBuilder::default()
+            .id("play-receiver")
+            .src(format!("local://{}/responder/publish", TEST_NAME))
+            .build()
+            .unwrap()
+            .build_request(format!("{}/publisher", TEST_NAME));
+        client.create(create_play_endpoint).await;
+
+        let (publisher_res, responder_res) =
+            futures::future::join(publisher_done, responder_done).await;
+        publisher_res.unwrap().unwrap();
+        responder_res.unwrap().unwrap();
     }
 }

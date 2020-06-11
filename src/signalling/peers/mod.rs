@@ -515,6 +515,9 @@ impl PeersService {
                             room.peers.peer_stats_ttl,
                         );
 
+                        room.peers.add_peer(src_peer);
+                        room.peers.add_peer(sink_peer);
+
                         Ok(Some((src_peer_id, sink_peer_id)))
                     }
                     GetOrCreatePeersResult::AlreadyExisted(

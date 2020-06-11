@@ -21,7 +21,9 @@ use awc::{
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
     ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
+    TrackId,
 };
+use std::collections::{HashMap, HashSet};
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
@@ -53,7 +55,11 @@ pub struct TestMember {
     events: Vec<Event>,
 
     /// List of peers created on this client.
-    known_peers: Vec<PeerId>,
+    known_peers: HashSet<PeerId>,
+
+    known_tracks: HashMap<TrackId, String>,
+
+    last_mid: u64,
 
     /// Max test lifetime, will panic when it will be exceeded.
     deadline: Option<Duration>,
@@ -103,7 +109,9 @@ impl TestMember {
             Self {
                 sink,
                 events: Vec::new(),
-                known_peers: Vec::new(),
+                known_peers: HashSet::new(),
+                known_tracks: HashMap::new(),
+                last_mid: 0,
                 deadline,
                 on_message,
                 on_connection_event,
@@ -128,6 +136,28 @@ impl TestMember {
             Self::connect(&uri, on_message, on_connection_event, deadline)
                 .await;
         })
+    }
+
+    pub fn get_mid(&mut self, track_id: TrackId) -> String {
+        if let Some(mid) = self.known_tracks.get(&track_id) {
+            return mid.to_string();
+        } else {
+            self.last_mid += 1;
+            let last_mid = self.last_mid;
+            let new_mid = format!("test-mid-{}", last_mid);
+            self.known_tracks.insert(track_id, new_mid.clone());
+            new_mid
+        }
+    }
+
+    fn add_mid(&mut self, track_id: TrackId, mid: String) {
+        self.known_tracks.insert(track_id, mid);
+    }
+
+    fn gen_mid(&mut self, track_id: TrackId) {
+        self.last_mid += 1;
+        let mid = self.last_mid.to_string();
+        self.add_mid(track_id, mid);
     }
 }
 
@@ -206,8 +236,25 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             sdp_offer,
                             tracks,
                             ..
+                        }
+                        | Event::TracksAdded {
+                            peer_id,
+                            sdp_offer,
+                            tracks,
                         } => {
-                            self.known_peers.push(*peer_id);
+                            self.known_peers.insert(*peer_id);
+                            tracks.iter().for_each(|t| {
+                                use medea_client_api_proto::Direction;
+                                let mid = match &t.direction {
+                                    Direction::Send { mid, .. } => mid.clone(),
+                                    Direction::Recv { mid, .. } => mid.clone(),
+                                };
+                                if let Some(mid) = mid {
+                                    self.add_mid(t.id, mid);
+                                } else {
+                                    self.gen_mid(t.id);
+                                }
+                            });
                             match sdp_offer {
                                 Some(_) => {
                                     self.send_command(Command::MakeSdpAnswer {
@@ -219,14 +266,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     self.send_command(Command::MakeSdpOffer {
                                         peer_id: *peer_id,
                                         sdp_offer: "caller_offer".into(),
-                                        mids: tracks
-                                            .iter()
-                                            .map(|t| t.id)
-                                            .enumerate()
-                                            .map(|(mid, id)| {
-                                                (id, mid.to_string())
-                                            })
-                                            .collect(),
+                                        mids: self.known_tracks.clone(),
                                     })
                                 }
                             };
@@ -245,8 +285,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                         | Event::TracksUpdated { peer_id, .. } => {
                             assert!(self.known_peers.contains(peer_id))
                         }
-                        Event::PeersRemoved { .. }
-                        | Event::TracksAdded { .. } => {}
+                        Event::PeersRemoved { .. } => {}
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);
