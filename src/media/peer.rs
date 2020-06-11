@@ -23,9 +23,7 @@ use crate::{
     api::control::MemberId,
     media::{IceUser, MediaTrack},
     signalling::{
-        elements::endpoints::{
-            webrtc::WebRtcPlayEndpoint, Endpoint, WeakEndpoint,
-        },
+        elements::endpoints::{Endpoint, WeakEndpoint},
         peers::Counter,
     },
 };

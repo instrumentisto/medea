@@ -135,7 +135,7 @@ pub struct Room {
     pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeersService,
+    pub peers: PeersService<Room>,
 
     /// Current state of this [`Room`].
     state: State,
@@ -265,7 +265,7 @@ impl Room {
 
         let endpoints_connected = actix_try_join_all(connect_tasks);
 
-        Box::new(endpoints_connected.map(|res, room, ctx| {
+        Box::new(endpoints_connected.map(|res, room: &mut Room, ctx| {
             for response in res? {
                 if let Some((first_peer_id, _)) = response {
                     room.send_peer_created(first_peer_id)?
