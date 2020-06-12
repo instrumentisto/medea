@@ -39,9 +39,13 @@ use crate::{
     AppContext,
 };
 
+use crate::signalling::elements::endpoints::webrtc::{
+    WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+};
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
+use futures::future;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -218,6 +222,30 @@ impl Room {
         )
     }
 
+    fn connect_endpoints(
+        src: WebRtcPublishEndpoint,
+        sink: WebRtcPlayEndpoint,
+    ) -> ActFuture<Result<(), RoomError>> {
+        use actix::AsyncContext as _;
+        Box::new(PeersService::connect_endpoints(src, sink).map(
+            |res, this: &mut Room, ctx| match res {
+                Ok(res) => {
+                    if let Some((first_peer_id, _)) = res {
+                        ctx.spawn(this.send_peer_created(first_peer_id)?.map(
+                            |res, this, ctx| {
+                                // TODO: unwrap res
+                            },
+                        ));
+                        Ok(())
+                    } else {
+                        Ok(())
+                    }
+                }
+                Err(e) => Err(e),
+            },
+        ))
+    }
+
     /// Creates and interconnects all [`Peer`]s between connected [`Member`]
     /// and all available at this moment other [`Member`]s. Expects that
     /// provided [`Member`] have active [`RpcConnection`].
@@ -238,7 +266,7 @@ impl Room {
                 if receiver.peer_id().is_none()
                     && self.members.member_has_connection(&receiver_owner.id())
                 {
-                    connect_tasks.push(PeersService::connect_endpoints(
+                    connect_tasks.push(Room::connect_endpoints(
                         publisher.clone(),
                         receiver,
                     ));
@@ -246,16 +274,44 @@ impl Room {
             }
         }
 
+        let member_id = member.id();
+
         for receiver in member.sinks().values() {
             let publisher = receiver.src();
+            let partner_member_id = publisher.owner().id();
 
             if receiver.peer_id().is_none()
-                && self.members.member_has_connection(&publisher.owner().id())
+                && self.members.member_has_connection(&partner_member_id)
             {
-                connect_tasks.push(PeersService::connect_endpoints(
-                    publisher.clone(),
-                    receiver.clone(),
-                ))
+                if let Some((src_peer_id, _)) = self
+                    .peers
+                    .get_peers_between_members(&partner_member_id, &member_id)
+                {
+                    self.peers.add_sink(src_peer_id, receiver.clone());
+                    let renegotiate_peer =
+                        self.peers.start_renegotiation(src_peer_id).unwrap();
+                    let renegotiatio_peer_id = renegotiate_peer.id();
+                    let renegotiatiate_member_id = renegotiate_peer.member_id();
+                    let tracks_to_apply = renegotiate_peer.get_new_tracks();
+
+                    connect_tasks.push(Box::new(
+                        self.members
+                            .send_event_to_member(
+                                renegotiatiate_member_id,
+                                Event::TracksAdded {
+                                    peer_id: renegotiatio_peer_id,
+                                    sdp_offer: None,
+                                    tracks: tracks_to_apply,
+                                },
+                            )
+                            .into_actor(self),
+                    ))
+                } else {
+                    connect_tasks.push(Room::connect_endpoints(
+                        publisher,
+                        receiver.clone(),
+                    ))
+                }
             }
         }
 
@@ -266,13 +322,9 @@ impl Room {
         let endpoints_connected = actix_try_join_all(connect_tasks);
 
         Box::new(endpoints_connected.map(|res, room: &mut Room, ctx| {
-            for response in res? {
-                if let Some((first_peer_id, _)) = response {
-                    room.send_peer_created(first_peer_id)?
-                        .map(|_, _, _| ())
-                        .spawn(ctx);
-                }
-            }
+            let res = res?;
+            println!("All resolved!");
+
             Ok(())
         }))
     }

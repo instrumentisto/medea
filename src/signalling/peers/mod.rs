@@ -590,6 +590,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                         src_peer_id,
                         sink_peer_id,
                     ) => {
+                        println!("Already exists");
                         // TODO: here we assume that peers are stable,
                         //       which might not be the case, e.g. Control
                         //       Service creates multiple endpoints in quick
@@ -704,10 +705,14 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// [`PeerId`].
     pub fn add_sink(&mut self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {
         let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
+        let mut partner_peer: Peer<Stable> =
+            self.take_inner_peer(peer.partner_peer_id()).unwrap();
 
-        peer.add_endpoint(&sink.into());
+        peer.add_publisher(&mut partner_peer, &mut self.tracks_count);
+        peer.add_endpoint(&Endpoint::from(sink));
 
         self.peers.insert(peer.id(), peer.into());
+        self.peers.insert(partner_peer.id(), partner_peer.into());
     }
 }
 
