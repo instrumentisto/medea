@@ -9,8 +9,8 @@ mod rpc_server;
 use std::sync::Arc;
 
 use actix::{
-    fut, Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, WrapFuture as _,
+    fut, Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
+    WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -30,7 +30,11 @@ use crate::{
     media::{Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
-        elements::{member::MemberError, Member, MembersLoadError},
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
+            Member, MembersLoadError,
+        },
         participants::{ParticipantService, ParticipantServiceErr},
         peers::{PeerTrafficWatcher, PeersService},
     },
@@ -39,13 +43,9 @@ use crate::{
     AppContext,
 };
 
-use crate::signalling::elements::endpoints::webrtc::{
-    WebRtcPlayEndpoint, WebRtcPublishEndpoint,
-};
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
-use futures::future;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -139,7 +139,7 @@ pub struct Room {
     pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeersService<Room>,
+    pub peers: PeersService<Self>,
 
     /// Current state of this [`Room`].
     state: State,
@@ -222,26 +222,33 @@ impl Room {
         )
     }
 
+    /// Connects provided [`WebRtcPublishEndpoint`] with a provided
+    /// [`WebRtcPlayEndpoint`].
+    ///
+    /// Calls [`PeersService::connect_endpoints`] with a provided endpoints.
+    ///
+    /// Sends [`Event::PeerCreated`] if this is newly created [`Peer`]s pair.
     fn connect_endpoints(
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
     ) -> ActFuture<Result<(), RoomError>> {
-        use actix::AsyncContext as _;
         Box::new(PeersService::connect_endpoints(src, sink).map(
-            |res, this: &mut Room, ctx| match res {
-                Ok(res) => {
-                    if let Some((first_peer_id, _)) = res {
-                        ctx.spawn(this.send_peer_created(first_peer_id)?.map(
-                            |res, this, ctx| {
-                                // TODO: unwrap res
-                            },
-                        ));
-                        Ok(())
-                    } else {
-                        Ok(())
-                    }
+            |res, this: &mut Room, ctx| {
+                if let Some((first_peer_id, _)) = res? {
+                    ctx.spawn(this.send_peer_created(first_peer_id)?.map(
+                        |res, room, ctx| {
+                            if let Err(e) = res {
+                                error!(
+                                    "Failed to connect Endpoints because: {:?}",
+                                    e
+                                );
+                                room.close_gracefully(ctx);
+                            }
+                        },
+                    ));
                 }
-                Err(e) => Err(e),
+
+                Ok(())
             },
         ))
     }
@@ -253,6 +260,10 @@ impl Room {
     /// Availability is determined by checking [`RpcConnection`] of all
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
     /// the connected [`Member`].
+    ///
+    /// Will start renegotiation with `MediaTrack`s adding if some not
+    /// interconnected `Endpoint`s will be found and if [`Peer`]s pair is
+    /// already exists.
     fn init_member_connections(
         &mut self,
         member: &Member,
@@ -275,7 +286,6 @@ impl Room {
         }
 
         let member_id = member.id();
-
         for receiver in member.sinks().values() {
             let publisher = receiver.src();
             let partner_member_id = publisher.owner().id();
@@ -289,19 +299,16 @@ impl Room {
                 {
                     self.peers.add_sink(src_peer_id, receiver.clone());
                     let renegotiate_peer =
-                        self.peers.start_renegotiation(src_peer_id).unwrap();
-                    let renegotiatio_peer_id = renegotiate_peer.id();
-                    let renegotiatiate_member_id = renegotiate_peer.member_id();
-                    let tracks_to_apply = renegotiate_peer.get_new_tracks();
+                        actix_try!(self.peers.start_renegotiation(src_peer_id));
 
                     connect_tasks.push(Box::new(
                         self.members
                             .send_event_to_member(
-                                renegotiatiate_member_id,
+                                renegotiate_peer.member_id(),
                                 Event::TracksAdded {
-                                    peer_id: renegotiatio_peer_id,
+                                    peer_id: renegotiate_peer.id(),
                                     sdp_offer: None,
-                                    tracks: tracks_to_apply,
+                                    tracks: renegotiate_peer.get_new_tracks(),
                                 },
                             )
                             .into_actor(self),
@@ -321,9 +328,8 @@ impl Room {
 
         let endpoints_connected = actix_try_join_all(connect_tasks);
 
-        Box::new(endpoints_connected.map(|res, room: &mut Room, ctx| {
-            let res = res?;
-            println!("All resolved!");
+        Box::new(endpoints_connected.map(|res, _, _| {
+            res?;
 
             Ok(())
         }))

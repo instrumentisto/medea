@@ -7,6 +7,7 @@ mod traffic_watcher;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    marker::PhantomData,
     sync::Arc,
     time::Duration,
 };
@@ -17,6 +18,7 @@ use actix::{
     Actor, ActorFuture, WrapFuture as _,
 };
 use derive_more::Display;
+use futures::future;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -47,8 +49,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use failure::_core::marker::PhantomData;
-use futures::future;
 
 #[derive(Debug)]
 pub struct PeersService<A> {
@@ -86,7 +86,8 @@ pub struct PeersService<A> {
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
 
-    _actor_future: PhantomData<A>,
+    /// Type of the [`Actor`] in whose context will be spawned [`ActFuture`]s.
+    _owner_actor: PhantomData<A>,
 }
 
 /// Simple ID counter.
@@ -114,23 +115,31 @@ pub enum GetOrCreatePeersResult {
     AlreadyExisted(PeerId, PeerId),
 }
 
+/// [`Actor`] in whose context will be spawned [`ActFuture`]s returned from the
+/// [`PeerService`].
 pub trait PeerServiceOwner: Actor {
+    /// Returns [`RoomId`] which owns [`PeerService`].
+    fn id(&self) -> &RoomId;
+
+    /// Returns reference to the [`PeersService`].
     fn peers(&self) -> &PeersService<Self>;
 
+    /// Returns mutable reference to the [`PeersService`].
     fn peers_mut(&mut self) -> &mut PeersService<Self>;
-
-    fn id(&self) -> &RoomId;
 }
 
 impl PeerServiceOwner for Room {
+    /// Returns reference to the [`Room::peers`].
     fn peers(&self) -> &PeersService<Self> {
         &self.peers
     }
 
+    /// Returns mutable reference to the [`Room::peers`].
     fn peers_mut(&mut self) -> &mut PeersService<Self> {
         &mut self.peers
     }
 
+    /// Returns reference to the [`Room::id`].
     fn id(&self) -> &RoomId {
         self.id()
     }
@@ -159,7 +168,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                 peers_traffic_watcher,
             ),
             peer_stats_ttl: media_conf.max_lag,
-            _actor_future: PhantomData::default(),
+            _owner_actor: PhantomData::default(),
         }
     }
 
@@ -523,19 +532,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         );
         Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).then(
             |peers_res, room, _| {
-                macro_rules! try_fut {
-                    ($e:expr) => {
-                        match $e {
-                            Ok(p) => p,
-                            Err(e) => {
-                                return Box::new(future::err(e).into_actor(room))
-                                    as ActFuture<_, _>;
-                            }
-                        };
-                    };
-                }
-
-                match try_fut!(peers_res) {
+                match actix_try!(peers_res) {
                     GetOrCreatePeersResult::Created(
                         src_peer_id,
                         sink_peer_id,
@@ -544,9 +541,9 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                         {
                             let this = room.peers_mut();
                             let src_peer: Peer<Stable> =
-                                try_fut!(this.take_inner_peer(src_peer_id));
+                                actix_try!(this.take_inner_peer(src_peer_id));
                             let sink_peer: Peer<Stable> =
-                                try_fut!(this.take_inner_peer(sink_peer_id));
+                                actix_try!(this.take_inner_peer(sink_peer_id));
                             let src_peer = PeerStateMachine::from(src_peer);
                             let sink_peer = PeerStateMachine::from(sink_peer);
 
@@ -578,7 +575,9 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                             .into_actor(room)
                             .then(move |res, room, _| {
                                 async move {
-                                    res.unwrap();
+                                    res.map_err(|e| {
+                                        RoomError::PeerTrafficWatcherMailbox(e)
+                                    })?;
                                     Ok(Some((src_peer_id, sink_peer_id)))
                                 }
                                 .into_actor(room)
@@ -590,7 +589,6 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                         src_peer_id,
                         sink_peer_id,
                     ) => {
-                        println!("Already exists");
                         // TODO: here we assume that peers are stable,
                         //       which might not be the case, e.g. Control
                         //       Service creates multiple endpoints in quick
@@ -745,12 +743,24 @@ mod tests {
 
     use super::*;
 
+    /// Mock for the [`PeersServiceOwner`] trait.
+    ///
+    /// In context of this [`Actor`] will be ran all [`ActFuture`]s received
+    /// from the [`PeerService`].
     struct PeersServiceOwnerMock {
+        /// Actual [`PeersService`].
         peers_service: PeersService<PeersServiceOwnerMock>,
+
+        /// All [`Member`]s which should be in the [`Room`].
+        ///
+        /// This is necessary so that [`Drop`] is not called on the created
+        /// [`Member`]s.
         members: Vec<Member>,
     }
 
     impl PeersServiceOwnerMock {
+        /// Returns empty [`PeersServiceOwnerMock`] with provided
+        /// [`PeerService`].
         pub fn new(peers: PeersService<PeersServiceOwnerMock>) -> Self {
             Self {
                 peers_service: peers,
@@ -764,19 +774,25 @@ mod tests {
     }
 
     impl PeerServiceOwner for PeersServiceOwnerMock {
+        /// Returns reference to the [`RoomId`] from the [`PeerService`].
+        fn id(&self) -> &RoomId {
+            &self.peers_service.room_id
+        }
+
+        /// Returns reference to the [`PeersServiceOwnerMock::peers_service`].
         fn peers(&self) -> &PeersService<Self> {
             &self.peers_service
         }
 
+        /// Returns mutable reference to the
+        /// [`PeersServiceOwnerMcok::peers_service`].
         fn peers_mut(&mut self) -> &mut PeersService<Self> {
             &mut self.peers_service
         }
-
-        fn id(&self) -> &RoomId {
-            &self.peers_service.room_id
-        }
     }
 
+    /// Checks that newly created [`Peer`] will be created in the
+    /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
     #[actix_rt::test]
     async fn peer_is_registered_in_metrics_service() {
         let mut mock = MockPeerTrafficWatcher::new();
@@ -875,6 +891,8 @@ mod tests {
         register_peer_done.await.unwrap().unwrap();
     }
 
+    /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
+    /// count will be updated in the [`PeerMetricsService`].
     #[actix_rt::test]
     async fn adding_new_endpoint_updates_peer_metrics() {
         let mut mock = MockPeerTrafficWatcher::new();

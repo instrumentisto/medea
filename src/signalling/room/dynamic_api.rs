@@ -6,10 +6,10 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut, ActorFuture as _, AsyncContext as _, Context,
-    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
+    fut, ActorFuture as _, Context, ContextFutureSpawner as _, Handler,
+    Message, WrapFuture as _,
 };
-use medea_client_api_proto::{Event, PeerId};
+use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -181,7 +181,6 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
-        ctx: &mut Context<Self>,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -410,7 +409,7 @@ impl Handler<CreateEndpoint> for Room {
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
@@ -418,7 +417,6 @@ impl Handler<CreateEndpoint> for Room {
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
-                    ctx,
                 ) {
                     Ok(fut) => Box::new(fut),
                     Err(e) => Box::new(fut::err(e)),

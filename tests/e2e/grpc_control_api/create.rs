@@ -211,11 +211,12 @@ mod member {
 }
 
 mod endpoint {
+    use std::time::Duration;
+
+    use medea_client_api_proto::Event;
+    use tokio::time::{delay_for, timeout};
 
     use super::*;
-    use medea_client_api_proto::Event;
-    use std::time::Duration;
-    use tokio::time::{delay_for, timeout};
 
     #[actix_rt::test]
     async fn endpoint() {
@@ -371,6 +372,8 @@ mod endpoint {
         }
     }
 
+    /// Checks that all needed [`Event`]s are sent when Control API adds
+    /// `Endpoint` to the already interconnected `Member`s.
     #[actix_rt::test]
     async fn create_endpoint_in_the_interconnected_members() {
         const TEST_NAME: &str = "create_endpoint_in_the_interconnected_members";
@@ -387,9 +390,9 @@ mod endpoint {
             mpsc::unbounded();
         let responder_done = timeout(Duration::from_secs(5), rx.next());
 
-        let publisher = TestMember::connect(
+        let _publisher = TestMember::connect(
             credentials.get("publisher").unwrap(),
-            Some(Box::new(move |event, ctx, events| {
+            Some(Box::new(move |event, _, _| {
                 match event {
                     Event::TracksAdded { .. } => {
                         publisher_tx.unbounded_send(()).unwrap();
@@ -401,9 +404,9 @@ mod endpoint {
             None,
         )
         .await;
-        let responder = TestMember::connect(
+        let _responder = TestMember::connect(
             credentials.get("responder").unwrap(),
-            Some(Box::new(move |event, ctx, events| {
+            Some(Box::new(move |event, _, events| {
                 match event {
                     Event::TracksAdded { .. } => {
                         responder_tx.unbounded_send(()).unwrap();
