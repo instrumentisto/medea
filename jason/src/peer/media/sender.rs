@@ -275,7 +275,9 @@ impl Sender {
         desired_state: StableMuteState,
     ) -> Result<()> {
         if self.is_required {
-            Err(tracerr::new!(MediaConnectionsError::SenderIsRequired))
+            Err(tracerr::new!(
+                MediaConnectionsError::CannotDisableRequiredSender
+            ))
         } else {
             let current_mute_state = self.mute_state.get();
             self.mute_state

@@ -193,7 +193,7 @@ impl PeersService {
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
-        src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter(), &src);
+        src_peer.add_publisher(&src, &mut sink_peer, self.get_tracks_counter());
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -364,9 +364,9 @@ impl PeersService {
                 self.take_inner_peer(sink_peer_id).unwrap();
 
             src_peer.add_publisher(
+                &src,
                 &mut sink_peer,
                 self.get_tracks_counter(),
-                &src,
             );
 
             sink_peer.add_endpoint(&sink.into());

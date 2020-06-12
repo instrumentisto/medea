@@ -14,7 +14,7 @@ pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,
     pub media_type: MediaType,
-    is_disabled: Cell<bool>,
+    enabled: Cell<bool>,
 }
 
 impl MediaTrack {
@@ -24,7 +24,7 @@ impl MediaTrack {
             id,
             mid: RefCell::new(None),
             media_type,
-            is_disabled: Cell::new(false),
+            enabled: Cell::new(true),
         }
     }
 
@@ -36,11 +36,11 @@ impl MediaTrack {
         self.mid.borrow_mut().as_ref().cloned()
     }
 
-    pub fn disabled(&self, is_disabled: bool) {
-        self.is_disabled.set(is_disabled);
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.set(enabled);
     }
 
-    pub fn is_disabled(&self) -> bool {
-        self.is_disabled.get()
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.get()
     }
 }

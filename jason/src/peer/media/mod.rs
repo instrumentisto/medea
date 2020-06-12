@@ -84,7 +84,7 @@ pub enum MediaConnectionsError {
     /// Some [`Sender`] can't be muted because it required.
     #[display(fmt = "MuteState of Sender can't be transited into muted \
                      state, because this Sender is required.")]
-    SenderIsRequired,
+    CannotDisableRequiredSender,
 }
 
 impl From<DroppedError> for MediaConnectionsError {
@@ -254,15 +254,6 @@ impl MediaConnections {
     /// exist.
     // TODO: Doesnt really updates anything, but only generates new senders
     //       and receivers atm.
-
-    // peer_id: PeerId,
-    // track_id: TrackId,
-    // caps: TrackConstraints,
-    // peer: &'a RtcPeerConnection,
-    // peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-    // mid: Option<String>,
-    // mute_state: StableMuteState,
-    // is_required: bool,
     pub fn update_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
@@ -401,12 +392,13 @@ impl MediaConnections {
     /// stored [`Receiver`], which is associated with a given
     /// [`RtcRtpTransceiver`].
     ///
-    /// Returns ID of associated [`Sender`] with a found [`Receiver`], if any.
+    /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
+    /// any.
     pub fn add_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
-    ) -> Option<PeerId> {
+    ) -> Option<(PeerId, TrackId)> {
         let mut inner = self.0.borrow_mut();
         if let Some(mid) = transceiver.mid() {
             for receiver in &mut inner.receivers.values_mut() {
@@ -414,7 +406,7 @@ impl MediaConnections {
                     if recv_mid == &mid {
                         receiver.transceiver.replace(transceiver);
                         receiver.track.replace(track);
-                        return Some(receiver.sender_id);
+                        return Some((receiver.sender_id, receiver.track_id));
                     }
                 }
             }
@@ -422,54 +414,10 @@ impl MediaConnections {
         None
     }
 
-    /// Returns [`MediaStreamTrack`]s being received from a specified sender,
-    /// but only if all important receiving [`MediaStreamTrack`]s are present
-    /// already.
-    pub fn get_stream_by_sender(
-        &self,
-        sender_id: PeerId,
-    ) -> Option<PeerMediaStream> {
-        let inner = self.0.borrow();
-        let stream = PeerMediaStream::new(sender_id);
-        for rcv in inner.receivers.values() {
-            if rcv.sender_id == sender_id {
-                match rcv.track() {
-                    None => {
-                        if rcv.is_required() {
-                            return None;
-                        }
-                    }
-                    Some(track) => {
-                        stream.add_track(rcv.track_id, track);
-                    }
-                }
-            }
-        }
-
-        if stream.is_empty() {
-            None
-        } else {
-            Some(stream)
-        }
-    }
-
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
     #[inline]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.0.borrow().senders.get(&id).cloned()
-    }
-
-    /// Returns [`MediaStreamTrack`] from this [`MediaConnections`] by its
-    /// [`TrackId`].
-    pub fn get_track_by_id(&self, id: TrackId) -> Option<MediaStreamTrack> {
-        let inner = self.0.borrow();
-        inner
-            .senders
-            .get(&id)
-            .and_then(|s| s.track.borrow().clone())
-            .or_else(|| {
-                inner.receivers.get(&id).and_then(|recv| recv.track.clone())
-            })
     }
 
     /// Stops all [`Sender`]s state transitions expiry timers.

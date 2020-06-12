@@ -293,7 +293,7 @@ impl<T> Peer<T> {
     ) {
         for (track_id, is_publishing) in senders_statuses {
             if let Some(sender) = self.context.senders.get(&track_id) {
-                sender.disabled(!is_publishing);
+                sender.set_enabled(is_publishing);
             }
         }
     }
@@ -343,33 +343,32 @@ impl Peer<New> {
     /// to `partner_peer`.
     ///
     /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
-    /// and [`WebRtcPublishEndpoint::video_settings`], so if `None` will be
-    /// returned then track for this media type wouldn't be created.
+    /// and [`WebRtcPublishEndpoint::video_settings`].
     pub fn add_publisher(
         &mut self,
-        partner_peer: &mut Peer<New>,
-        tracks_count: &mut Counter<TrackId>,
         src: &WebRtcPublishEndpoint,
+        publisher_peer: &mut Peer<New>,
+        tracks_counter: &mut Counter<TrackId>,
     ) {
         if let Some(audio_settings) = src.audio_settings() {
             let track_audio = Rc::new(MediaTrack::new(
-                tracks_count.next_id(),
+                tracks_counter.next_id(),
                 MediaType::Audio(AudioSettings {
                     is_required: audio_settings.publishing_policy.is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
-            partner_peer.add_receiver(track_audio);
+            publisher_peer.add_receiver(track_audio);
         }
         if let Some(video_settings) = src.video_settings() {
             let track_video = Rc::new(MediaTrack::new(
-                tracks_count.next_id(),
+                tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: video_settings.publishing_policy.is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));
-            partner_peer.add_receiver(track_video);
+            publisher_peer.add_receiver(track_video);
         }
     }
 

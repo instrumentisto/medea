@@ -321,22 +321,27 @@ window.onload = async function() {
   let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
   let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
   let localVideo = document.querySelector('.local-video > video');
-  let remoteVideos = new Map();
 
   async function initLocalStream() {
       let constraints = await build_constraints(audioSelect, videoSelect);
       try {
         localStream = await jason.media_manager().init_local_stream(constraints)
       } catch (e) {
-        let failed_media_type = e.name();
-        if(failed_media_type == "AudioUserMediaFailed") {
-          constraints = await build_constraints(null, videoSelect);
-          localStream = await jason.media_manager().init_local_stream(constraints);
-        } else if (failed_media_type == "VideoUserMediaFailed") {
-          constraints = await build_constraints(audioSelect, null);
-          localStream = await jason.media_manager().init_local_stream(constraints);
+        let origError = e.source();
+        if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
+          if (origError.message.includes("audio")) {
+            constraints = await build_constraints(null, videoSelect);
+            localStream = await jason.media_manager().init_local_stream(constraints);
+            alert("unable to get audio, will try to enter room with video only");
+          } else if (origError.message.includes("video")) {
+            constraints = await build_constraints(audioSelect, null);
+            localStream = await jason.media_manager().init_local_stream(constraints);
+            alert("unable to get video, will try to enter room with audio only");
+          } else {
+            throw e;
+          }
         } else {
-          console.error(e.message() || e);
+          throw e;
         }
       }
       await updateLocalVideo(localStream);
@@ -418,24 +423,17 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
-        let alreadyCreatedVideo = remoteVideos.get(stream.sender_peer_id());
-        if (alreadyCreatedVideo) {
-          alreadyCreatedVideo.srcObject = stream.get_media_stream();
-        } else {
-          let videoDiv = document.getElementsByClassName("remote-videos")[0];
-          let video = document.createElement("video");
-          let sender_peer_id = stream.sender_peer_id();
-          video.srcObject = stream.get_media_stream();
-          let innerVideoDiv = document.createElement("div");
-          innerVideoDiv.className = "video";
-          innerVideoDiv.appendChild(video);
-          videoDiv.appendChild(innerVideoDiv);
+        let videoDiv = document.getElementsByClassName("remote-videos")[0];
+        let video = document.createElement("video");
+        video.srcObject = stream.get_media_stream();
+        let innerVideoDiv = document.createElement("div");
+        innerVideoDiv.className = "video";
+        innerVideoDiv.appendChild(video);
+        videoDiv.appendChild(innerVideoDiv);
 
-          remoteVideos.set(sender_peer_id, video);
-          video.oncanplay = async () => {
-            await video.play();
-          };
-        }
+        video.oncanplay = async () => {
+          await video.play();
+        };
       });
     });
 

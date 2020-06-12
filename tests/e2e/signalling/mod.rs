@@ -5,7 +5,7 @@ mod pub_sub_signallng;
 mod rpc_settings;
 mod three_pubs;
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use actix::{
     Actor, ActorContext, Addr, Arbiter, AsyncContext, Context, Handler,
@@ -22,7 +22,6 @@ use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
     ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
 };
-use std::collections::HashMap;
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;

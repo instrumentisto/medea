@@ -23,11 +23,11 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
-    media::{MediaStream, MediaStreamSettings},
+    media::{MediaStream, MediaStreamSettings, MediaStreamTrack},
     peer::{
         MediaConnectionsError, MuteState, PeerError, PeerEvent,
-        PeerEventHandler, PeerMediaStream, PeerRepository, RtcStats, Sender,
-        StableMuteState, TransceiverKind,
+        PeerEventHandler, PeerRepository, RtcStats, Sender, StableMuteState,
+        TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -293,14 +293,14 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_new_connection.set_func(f))
+            .map(|inner| inner.borrow().on_new_connection.set_func(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_close.set_func(f))
+            .map(|inner| inner.borrow().on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback. This callback is invoked each time
@@ -311,7 +311,7 @@ impl RoomHandle {
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
+            .map(|inner| inner.borrow().on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -321,7 +321,7 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
+            .map(|inner| inner.borrow().on_failed_local_stream.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
@@ -331,7 +331,7 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_connection_loss.set_func(f))
+            .map(|inner| inner.borrow().on_connection_loss.set_func(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -611,7 +611,7 @@ impl InnerRoom {
     fn create_connections_from_tracks(&mut self, tracks: &[Track]) {
         let create_connection = |room: &mut Self, peer_id: &PeerId| {
             if !room.connections.contains_key(peer_id) {
-                let con = Connection::new();
+                let con = Connection::new(*peer_id);
                 room.on_new_connection.call(con.new_handle());
                 room.connections.insert(*peer_id, con);
             }
@@ -952,16 +952,17 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
-    /// Handles [`PeerEvent::NewRemoteStream`] event and passes received
-    /// [`MediaStream`] to the related [`Connection`].
-    fn on_new_remote_stream(
+    /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
+    /// [`MediaStreamTrack`] to the related [`Connection`].
+    fn on_new_remote_track(
         &mut self,
         _: PeerId,
         sender_id: PeerId,
-        remote_stream: PeerMediaStream,
+        track_id: TrackId,
+        track: MediaStreamTrack,
     ) {
         match self.connections.get(&sender_id) {
-            Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
+            Some(conn) => conn.add_remote_track(track_id, track),
             None => {
                 JasonError::from(tracerr::new!(RoomError::UnknownRemotePeer))
                     .print()

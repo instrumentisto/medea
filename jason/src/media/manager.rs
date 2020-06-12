@@ -5,7 +5,6 @@
 use std::{
     cell::RefCell,
     convert::TryFrom,
-    fmt,
     future::Future,
     rc::{Rc, Weak},
 };
@@ -13,7 +12,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
-use tracerr::{Trace, Traced};
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -72,96 +71,6 @@ pub enum MediaManagerError {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(JsError),
-}
-
-/// Error which indicates that some media type from the requested constraints
-/// can't be gotten.
-///
-/// Should be converted to the [`JasonError`] and passed to the JS side.
-pub struct GetUserMediaError {
-    /// Media type which can't be gotten.
-    pub media_type: UnavailableMediaType,
-
-    /// [`Trace`] from the [`Traced`] [`MediaConnectionsError`].
-    ///
-    /// Will be provided to the [`JasonError`] on convert.
-    pub trace: Trace,
-
-    /// [`JsError`] based on which was decided which media type was failed to
-    /// get.
-    pub source: JsError,
-}
-
-/// Media types which can be requested in the constraints.
-///
-/// Will be stored in the [`MediaTypeUnavailableError`].
-#[wasm_bindgen]
-#[derive(Debug, Clone, Copy)]
-pub enum UnavailableMediaType {
-    /// Audio media type can't be gotten.
-    ///
-    /// `audio` string will be returned to the JS side on
-    /// [`MediaTypeUnavailableError::media_type`] call.
-    Audio,
-
-    /// Video media type can't be gotten.
-    ///
-    /// `video` string will be returned to the JS side on
-    /// [`MediaTypeUnavailableError::media_type`] call.
-    Video,
-}
-
-impl UnavailableMediaType {
-    /// Returns message which shoul be provided as [`JasonError::message`].
-    pub fn message(self) -> String {
-        format!("Failed to get user media with kind {}.", self.to_string())
-    }
-
-    /// Returns name of the error for the [`JasonError::name`].
-    ///
-    /// Based on this name JS-side should get to know which media type was
-    /// failed.
-    pub fn error_name(self) -> &'static str {
-        match self {
-            Self::Audio => "AudioUserMediaFailed",
-            Self::Video => "VideoUserMediaFailed",
-        }
-    }
-}
-
-impl fmt::Display for UnavailableMediaType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let to_write = match self {
-            Self::Audio => "audio",
-            Self::Video => "video",
-        };
-        write!(f, "{}", to_write)
-    }
-}
-
-impl TryFrom<&Traced<MediaManagerError>> for GetUserMediaError {
-    type Error = ();
-
-    /// Tries to get failed to got media type from the
-    /// [`MediaManagerError::GetUserMediaFailed`] error.
-    fn try_from(
-        value: &Traced<MediaManagerError>,
-    ) -> std::result::Result<Self, Self::Error> {
-        match value.as_ref() {
-            MediaManagerError::GetUserMediaFailed(e) => {
-                [UnavailableMediaType::Audio, UnavailableMediaType::Video]
-                    .iter()
-                    .find(|t| e.message.contains(&t.to_string()))
-                    .ok_or(())
-                    .map(|t| GetUserMediaError {
-                        media_type: *t,
-                        source: e.clone(),
-                        trace: value.trace().clone(),
-                    })
-            }
-            _ => Err(()),
-        }
-    }
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
@@ -514,9 +423,6 @@ impl MediaManagerHandle {
 
     /// Returns [`MediaStream`](LocalMediaStream) object, built from provided
     /// [`MediaStreamSettings`].
-    ///
-    /// If some media type can't be gotten then exception with
-    /// [`MediaTypeUnavailableError`] will be throwed.
     pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {
         match upgrade_or_detached!(self.0)
             .map(|inner| inner.get_stream(caps.clone()))
@@ -526,12 +432,7 @@ impl MediaManagerHandle {
                     .await
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|e| {
-                        GetUserMediaError::try_from(&e).map_or_else(
-                            move |_| JasonError::from(e).into(),
-                            |e| JasonError::from(e).into(),
-                        )
-                    })
+                    .map_err(|e| JasonError::from(e).into())
             }),
             Err(err) => future_to_promise(future::err(err)),
         }

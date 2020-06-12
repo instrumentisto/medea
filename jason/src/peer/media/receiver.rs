@@ -22,7 +22,6 @@ pub struct Receiver {
     pub(super) transceiver: Option<RtcRtpTransceiver>,
     pub(super) mid: Option<String>,
     pub(super) track: Option<MediaStreamTrack>,
-    pub(super) is_required: bool,
 }
 
 impl Receiver {
@@ -41,7 +40,6 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
-        let is_required = caps.is_required();
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
             None => {
@@ -55,26 +53,14 @@ impl Receiver {
             transceiver,
             mid,
             track: None,
-            is_required,
         }
-    }
-
-    /// Returns `true` if this [`Sender`] is important and without it call
-    /// session can't be started.
-    pub(crate) fn is_required(&self) -> bool {
-        self.is_required
-    }
-
-    /// Returns associated [`MediaStreamTrack`] with this [`Receiver`], if any.
-    #[inline]
-    pub(crate) fn track(&self) -> Option<MediaStreamTrack> {
-        self.track.as_ref().cloned()
     }
 
     /// Returns `mid` of this [`Receiver`].
     ///
     /// Tries to fetch it from the underlying [`RtcRtpTransceiver`] if current
     /// value is `None`.
+    #[inline]
     pub(crate) fn mid(&mut self) -> Option<&str> {
         if self.mid.is_none() && self.transceiver.is_some() {
             self.mid = self.transceiver.as_ref().unwrap().mid()

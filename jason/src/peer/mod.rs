@@ -29,7 +29,7 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    media::{MediaManager, MediaManagerError, MediaStream},
+    media::{MediaManager, MediaManagerError, MediaStream, MediaStreamTrack},
     utils::{console_error, JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
@@ -112,8 +112,9 @@ pub enum PeerEvent {
         sdp_mid: Option<String>,
     },
 
-    /// [`RtcPeerConnection`] received new stream from remote sender.
-    NewRemoteStream {
+    /// [`RtcPeerConnection`] received new [`MediaStreamTrack`] from remote
+    /// sender.
+    NewRemoteTrack {
         /// ID of the [`PeerConnection`] that received new stream from remote
         /// sender.
         peer_id: Id,
@@ -121,8 +122,11 @@ pub enum PeerEvent {
         /// ID of the remote sender's [`PeerConnection`].
         sender_id: Id,
 
-        /// Received [`MediaStream`].
-        remote_stream: PeerMediaStream,
+        /// [`TrackId`] of provided [`MediaStreamTrack`].
+        track_id: TrackId,
+
+        /// Received MediaStreamTrack.
+        track: MediaStreamTrack,
     },
 
     /// [`RtcPeerConnection`] sent new local stream to remote members.
@@ -487,22 +491,17 @@ impl PeerConnection {
         track_event: &RtcTrackEvent,
     ) {
         let transceiver = track_event.transceiver();
-        let track = track_event.track();
+        let track = MediaStreamTrack::from(track_event.track());
 
-        if let Some(sender_id) =
-            media_connections.add_remote_track(transceiver, track.into())
+        if let Some((sender_id, track_id)) = media_connections
+            .add_remote_track(transceiver, Clone::clone(&track))
         {
-            if let Some(remote_stream) =
-                media_connections.get_stream_by_sender(sender_id)
-            {
-                // got all tracks from this sender, so emit
-                // PeerEvent::NewRemoteStream
-                let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
-                    peer_id: id,
-                    sender_id,
-                    remote_stream,
-                });
-            };
+            let _ = sender.unbounded_send(PeerEvent::NewRemoteTrack {
+                peer_id: id,
+                sender_id,
+                track_id,
+                track,
+            });
         } else {
             // TODO: means that this peer is out of sync, should be
             //       handled somehow (propagated to medea to init peer
