@@ -714,17 +714,6 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     }
 }
 
-// TODO: so there is few errors here:
-//      1. peers_traffic_watcher.register_peer is called only after peer is
-//         created, and not called when we add new endpoints.
-//      2. peer_metrics_service.register_peer wasn't called anywhere
-//      so its time to cover this with unit tests:
-//      1. make sure that peer is registered in metrics service when it is
-// created      2. make sure that peer is update in metrics service when new
-// endpoint is added      3. peer registration in peers_traffic_watcher is
-// working as expected      4. peer state changes as expected after new endpoint
-// was added
-
 #[cfg(test)]
 mod tests {
     use actix::{Actor, Handler, Message, WrapFuture};

@@ -387,7 +387,8 @@ endif
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                          [registry=<registry-host>]
-#	                                          [log=(no|yes)] )]
+#	                                          [log=(no|yes)]
+#                                             [logfile=(no|yes)] )]
 #	                        [wait=(5|<seconds>)] )]
 
 test-e2e-env = RUST_BACKTRACE=1 \
