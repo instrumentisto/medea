@@ -767,13 +767,15 @@ impl Sender {
 
 impl Drop for Sender {
     fn drop(&mut self) {
-        console_error("Sender dropped.");
-        self.transceiver
-            .set_direction(RtcRtpTransceiverDirection::Inactive);
-        let fut = JsFuture::from(self.transceiver.sender().replace_track(None));
-        spawn_local(async move {
-            let _ = fut.await;
-        });
+        if !self.transceiver.stopped() {
+            self.transceiver
+                .set_direction(RtcRtpTransceiverDirection::Inactive);
+            let fut =
+                JsFuture::from(self.transceiver.sender().replace_track(None));
+            spawn_local(async move {
+                let _ = fut.await;
+            });
+        }
     }
 }
 
@@ -842,12 +844,10 @@ impl Receiver {
 
 impl Drop for Receiver {
     fn drop(&mut self) {
-        console_error("Receiver dropped.");
         if let Some(transceiver) = &self.transceiver {
-            transceiver.set_direction(RtcRtpTransceiverDirection::Inactive);
-            // transceiver
-            //     .receiver()
-            //     .replace_track(None);
+            if !transceiver.stopped() {
+                transceiver.set_direction(RtcRtpTransceiverDirection::Inactive);
+            }
         }
     }
 }
