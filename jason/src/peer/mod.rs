@@ -450,7 +450,6 @@ impl PeerConnection {
     /// Handle `iceconnectionstatechange` event from underlying peer emitting
     /// [`PeerEvent::IceConnectionStateChanged`] event into this peers
     /// `peer_events_sender`.
-    #[allow(clippy::match_wildcard_for_single_variants)]
     fn on_ice_connection_state_changed(
         peer_id: Id,
         sender: &mpsc::UnboundedSender<PeerEvent>,

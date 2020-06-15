@@ -59,7 +59,6 @@ wee_alloc = { version = "0.4", optional = true }
         "RtcIceConnectionState",
         "RtcIceServer",
         "RtcIceTransportPolicy",
-        "RtcOfferOptions",
         "RtcPeerConnection", "RtcPeerConnectionIceEvent",
         "RtcRtpReceiver", "RtcRtpSender",
         "RtcRtpTransceiver", "RtcRtpTransceiverDirection",

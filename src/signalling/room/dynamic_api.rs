@@ -273,7 +273,6 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
-        ctx: &mut Context<Self>,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -309,36 +308,6 @@ impl Room {
         );
 
         src.add_sink(sink.downgrade());
-
-        let src_member = src.owner();
-        let sink_member = sink.owner();
-
-        if let Some((src_peer_id, _)) = self
-            .peers
-            .get_peers_between_members(&src_member.id(), &sink_member.id())
-        {
-            self.peers.add_sink(src_peer_id, sink.clone());
-
-            let renegotiate_peer =
-                self.peers.start_renegotiation(src_peer_id)?;
-            let renegotiate_peer_id = renegotiate_peer.id();
-            let renegotiate_member_id = renegotiate_peer.member_id();
-            let tracks_to_apply = renegotiate_peer.get_new_tracks();
-
-            ctx.spawn(
-                self.members
-                    .send_event_to_member(
-                        renegotiate_member_id,
-                        Event::TracksAdded {
-                            peer_id: renegotiate_peer_id,
-                            sdp_offer: None,
-                            tracks: tracks_to_apply,
-                        },
-                    )
-                    .into_actor(self)
-                    .then(move |_, this, _| async {}.into_actor(this)),
-            );
-        }
 
         debug!(
             "Created WebRtcPlayEndpoint [id = {}] for Member [id = {}] in \
@@ -532,7 +501,7 @@ impl Handler<CreateEndpoint> for Room {
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
@@ -540,7 +509,6 @@ impl Handler<CreateEndpoint> for Room {
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
-                    ctx,
                 ) {
                     Ok(fut) => Box::new(fut),
                     Err(e) => Box::new(fut::err(e)),

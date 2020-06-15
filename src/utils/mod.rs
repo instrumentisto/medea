@@ -109,6 +109,20 @@ macro_rules! impl_debug_by_struct_name {
     };
 }
 
+/// `?` analog but for the functions which will return boxed [`ActorFuture`].
+#[macro_export]
+macro_rules! actix_try {
+    ($e:expr) => {
+        match $e {
+            Ok(p) => p,
+            Err(e) => {
+                return Box::new(actix::fut::err(e.into()))
+                    as Box<dyn actix::fut::ActorFuture<Actor = _, Output = _>>;
+            }
+        };
+    };
+}
+
 // TODO: remove after https://github.com/actix/actix/pull/313
 /// Specialized future for asynchronous message handling. Exists because
 /// [`actix::ResponseFuture`] implements [`actix::dev::MessageResponse`] only

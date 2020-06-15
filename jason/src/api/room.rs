@@ -761,79 +761,6 @@ impl InnerRoom {
 impl EventHandler for InnerRoom {
     type Output = ();
 
-    /// Adds provided [`Track`]s to the [`PeerConnection`] with provided
-    /// [`PeerId`].
-    ///
-    /// If `Some` SDP offer is provided then processes this SDP offer and sends
-    /// [`Command::MakeSdpAnswer`] to the media server.
-    ///
-    /// If `None` SDP offer is provided then creates SDP offer and sends
-    /// [`Command::MakeSdpOffer`] to the media server.
-    fn on_tracks_added(
-        &mut self,
-        peer_id: PeerId,
-        tracks: Vec<Track>,
-        sdp_offer: Option<String>,
-    ) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            let local_stream_constraints = self.local_stream_settings.clone();
-            let rpc = Rc::clone(&self.rpc);
-            let error_callback = Rc::clone(&self.on_failed_local_stream);
-            spawn_local(
-                async move {
-                    match sdp_offer {
-                        None => {
-                            let sdp_offer = peer
-                                .get_offer(tracks, local_stream_constraints)
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            let mids = peer
-                                .get_mids()
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            rpc.send_command(Command::MakeSdpOffer {
-                                peer_id,
-                                sdp_offer,
-                                mids,
-                            });
-                        }
-                        Some(offer) => {
-                            let sdp_answer = peer
-                                .process_offer(
-                                    offer,
-                                    tracks,
-                                    local_stream_constraints,
-                                )
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            rpc.send_command(Command::MakeSdpAnswer {
-                                peer_id,
-                                sdp_answer,
-                            });
-                        }
-                    };
-                    Result::<_, Traced<RoomError>>::Ok(())
-                }
-                .then(|result| async move {
-                    if let Err(err) = result {
-                        let (err, trace) = err.into_parts();
-                        match err {
-                            RoomError::InvalidLocalStream(_)
-                            | RoomError::CouldNotGetLocalMedia(_) => {
-                                let e = JasonError::from((err, trace));
-                                e.print();
-                                error_callback.call(e);
-                            }
-                            _ => JasonError::from((err, trace)).print(),
-                        };
-                    };
-                }),
-            );
-        } else {
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
-        }
-    }
-
     /// Creates [`PeerConnection`] with a provided ID and all the
     /// [`Connection`]s basing on provided [`Track`]s.
     ///
@@ -847,7 +774,7 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) {
-        let peer = match self
+        if let Err(err) = self
             .peers
             .create_peer(
                 peer_id,
@@ -857,67 +784,12 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
-            Ok(peer) => peer,
-            Err(err) => {
-                JasonError::from(err).print();
-                return;
-            }
-        };
+            JasonError::from(err).print();
+            return;
+        }
 
         self.create_connections_from_tracks(&tracks);
-
-        let local_stream_constraints = self.local_stream_settings.clone();
-        let rpc = Rc::clone(&self.rpc);
-        let error_callback = Rc::clone(&self.on_failed_local_stream);
-        spawn_local(
-            async move {
-                match sdp_offer {
-                    None => {
-                        let sdp_offer = peer
-                            .get_offer(tracks, local_stream_constraints)
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        let mids = peer
-                            .get_mids()
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        rpc.send_command(Command::MakeSdpOffer {
-                            peer_id,
-                            sdp_offer,
-                            mids,
-                        });
-                    }
-                    Some(offer) => {
-                        let sdp_answer = peer
-                            .process_offer(
-                                offer,
-                                tracks,
-                                local_stream_constraints,
-                            )
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        rpc.send_command(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer,
-                        });
-                    }
-                };
-                Result::<_, Traced<RoomError>>::Ok(())
-            }
-            .then(|result| async move {
-                if let Err(err) = result {
-                    let (err, trace) = err.into_parts();
-                    match err {
-                        RoomError::InvalidLocalStream(_)
-                        | RoomError::CouldNotGetLocalMedia(_) => {
-                            let e = JasonError::from((err, trace));
-                            e.print();
-                            error_callback.call(e);
-                        }
-                        _ => JasonError::from((err, trace)).print(),
-                    };
-                };
-            }),
-        );
+        self.on_tracks_added(peer_id, tracks, sdp_offer);
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
@@ -1044,6 +916,79 @@ impl EventHandler for InnerRoom {
                     };
                 }),
             );
+        }
+    }
+
+    /// Adds provided [`Track`]s to the [`PeerConnection`] with provided
+    /// [`PeerId`].
+    ///
+    /// If `Some` SDP offer is provided then processes this SDP offer and sends
+    /// [`Command::MakeSdpAnswer`] to the media server.
+    ///
+    /// If `None` SDP offer is provided then creates SDP offer and sends
+    /// [`Command::MakeSdpOffer`] to the media server.
+    fn on_tracks_added(
+        &mut self,
+        peer_id: PeerId,
+        tracks: Vec<Track>,
+        sdp_offer: Option<String>,
+    ) {
+        if let Some(peer) = self.peers.get(peer_id) {
+            let local_stream_constraints = self.local_stream_settings.clone();
+            let rpc = Rc::clone(&self.rpc);
+            let error_callback = Rc::clone(&self.on_failed_local_stream);
+            spawn_local(
+                async move {
+                    match sdp_offer {
+                        None => {
+                            let sdp_offer = peer
+                                .get_offer(tracks, local_stream_constraints)
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            let mids = peer
+                                .get_mids()
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            rpc.send_command(Command::MakeSdpOffer {
+                                peer_id,
+                                sdp_offer,
+                                mids,
+                            });
+                        }
+                        Some(offer) => {
+                            let sdp_answer = peer
+                                .process_offer(
+                                    offer,
+                                    tracks,
+                                    local_stream_constraints,
+                                )
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            rpc.send_command(Command::MakeSdpAnswer {
+                                peer_id,
+                                sdp_answer,
+                            });
+                        }
+                    };
+                    Result::<_, Traced<RoomError>>::Ok(())
+                }
+                .then(|result| async move {
+                    if let Err(err) = result {
+                        let (err, trace) = err.into_parts();
+                        match err {
+                            RoomError::InvalidLocalStream(_)
+                            | RoomError::CouldNotGetLocalMedia(_) => {
+                                let e = JasonError::from((err, trace));
+                                e.print();
+                                error_callback.call(e);
+                            }
+                            _ => JasonError::from((err, trace)).print(),
+                        };
+                    };
+                }),
+            );
+        } else {
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
         }
     }
 }
