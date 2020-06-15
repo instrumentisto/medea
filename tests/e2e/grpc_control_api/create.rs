@@ -213,8 +213,9 @@ mod member {
 mod endpoint {
     use std::time::Duration;
 
+    use futures::{channel::mpsc, StreamExt as _};
     use medea_client_api_proto::Event;
-    use tokio::time::{delay_for, timeout};
+    use tokio::time::timeout;
 
     use super::*;
 
@@ -377,18 +378,16 @@ mod endpoint {
     #[actix_rt::test]
     async fn create_endpoint_in_the_interconnected_members() {
         const TEST_NAME: &str = "create_endpoint_in_the_interconnected_members";
-        use futures::channel::mpsc;
 
         let mut client = ControlClient::new().await;
         let credentials = client.create(create_room_req(TEST_NAME)).await;
-        use futures::StreamExt as _;
 
-        let (publisher_tx, mut rx): (mpsc::UnboundedSender<()>, _) =
-            mpsc::unbounded();
+        let (publisher_tx, mut rx) = mpsc::unbounded::<()>();
         let publisher_done = timeout(Duration::from_secs(5), rx.next());
-        let (responder_tx, mut rx): (mpsc::UnboundedSender<()>, _) =
-            mpsc::unbounded();
+        let (responder_tx, mut rx) = mpsc::unbounded::<()>();
         let responder_done = timeout(Duration::from_secs(5), rx.next());
+        let (negotiation_finished_tx, mut rx) = mpsc::unbounded::<()>();
+        let negotiation_finished = timeout(Duration::from_secs(5), rx.next());
 
         let _publisher = TestMember::connect(
             credentials.get("publisher").unwrap(),
@@ -396,6 +395,9 @@ mod endpoint {
                 match event {
                     Event::TracksAdded { .. } => {
                         publisher_tx.unbounded_send(()).unwrap();
+                    }
+                    Event::SdpAnswerMade { .. } => {
+                        negotiation_finished_tx.unbounded_send(()).unwrap();
                     }
                     _ => (),
                 };
@@ -432,7 +434,7 @@ mod endpoint {
         )
         .await;
 
-        delay_for(Duration::from_millis(50)).await;
+        negotiation_finished.await.unwrap();
 
         let create_publish_endpoint = WebRtcPublishEndpointBuilder::default()
             .id("publish")
