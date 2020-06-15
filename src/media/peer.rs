@@ -93,6 +93,7 @@ impl PeerError {
 #[enum_delegate(
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
+#[enum_delegate(pub fn removed_tracks_mids(&self) -> HashSet<Mid>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
