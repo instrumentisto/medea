@@ -29,7 +29,9 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
+use crate::utils::console_error;
 use medea_client_api_proto::Mid;
+use std::collections::HashSet;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -202,9 +204,7 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 sender
-                    .transceiver
                     .mid()
-                    .map(|mid| mid.into())
                     .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
@@ -281,6 +281,35 @@ impl MediaConnections {
             sender.update(&track_proto);
         }
         Ok(())
+    }
+
+    pub fn remove_tracks(&self, mids: &HashSet<Mid>) {
+        let mut inner = self.0.borrow_mut();
+
+        let mut senders_to_remove = HashSet::new();
+        for (track_id, sender) in &inner.senders {
+            if let Some(mid) = sender.mid() {
+                if mids.contains(&mid) {
+                    senders_to_remove.insert(*track_id);
+                }
+            }
+        }
+
+        let mut receivers_to_remove = HashSet::new();
+        for (track_id, receiver) in &mut inner.receivers {
+            if let Some(mid) = receiver.mid() {
+                if mids.contains(&mid) {
+                    receivers_to_remove.insert(*track_id);
+                }
+            }
+        }
+
+        for sender_id in senders_to_remove {
+            inner.senders.remove(&sender_id);
+        }
+        for receiver_id in receivers_to_remove {
+            inner.receivers.remove(&receiver_id);
+        }
     }
 
     /// Returns [`StreamRequest`] if this [`MediaConnections`] has [`Sender`]s.
@@ -611,6 +640,10 @@ impl Sender {
         self.mute_state.get()
     }
 
+    pub fn mid(&self) -> Option<Mid> {
+        self.transceiver.mid().map(|mid| mid.into())
+    }
+
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
     /// transceiver and enables transceivers sender by changing its
     /// direction to `sendonly`.
@@ -732,6 +765,18 @@ impl Sender {
     }
 }
 
+impl Drop for Sender {
+    fn drop(&mut self) {
+        console_error("Sender dropped.");
+        self.transceiver
+            .set_direction(RtcRtpTransceiverDirection::Inactive);
+        let fut = JsFuture::from(self.transceiver.sender().replace_track(None));
+        spawn_local(async move {
+            let _ = fut.await;
+        });
+    }
+}
+
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
 ///
@@ -792,5 +837,17 @@ impl Receiver {
             self.mid = self.transceiver.as_ref().unwrap().mid().map(Into::into)
         }
         self.mid.clone()
+    }
+}
+
+impl Drop for Receiver {
+    fn drop(&mut self) {
+        console_error("Receiver dropped.");
+        if let Some(transceiver) = &self.transceiver {
+            transceiver.set_direction(RtcRtpTransceiverDirection::Inactive);
+            // transceiver
+            //     .receiver()
+            //     .replace_track(None);
+        }
     }
 }

@@ -704,8 +704,9 @@ impl RtcPeerConnection {
             .collect();
 
         for transceiver in transceivers_to_remove {
-            let sender = transceiver.sender();
-            self.peer.remove_track(&sender);
+            transceiver.set_direction(RtcRtpTransceiverDirection::Inactive);
+            // let sender = transceiver.sender();
+            // self.peer.remove_track(&sender);
         }
     }
 }
