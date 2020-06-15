@@ -5,7 +5,7 @@ mod metrics;
 mod traffic_watcher;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
     marker::PhantomData,
     sync::Arc,
@@ -49,7 +49,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService<A> {
@@ -714,8 +713,8 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         src_peer.add_endpoint(&Endpoint::from(src));
         sink_peer.add_endpoint(&Endpoint::from(sink));
 
-        self.peers.insert(src_peer.id(), src_peer.into());
-        self.peers.insert(sink_peer.id(), sink_peer.into());
+        self.add_peer(src_peer);
+        self.add_peer(sink_peer);
     }
 }
 

@@ -857,12 +857,22 @@ impl EventHandler for InnerRoom {
         }
     }
 
+    /// Removes `MediaTrack`s with the provided [`TrackId`]s from `Peer` with a
+    /// provided [`PeerId`].
+    ///
+    /// Starts renegotiation process.
+    ///
+    /// If `tracks_ids` is empty then do nothing.
     fn on_tracks_removed(
         &mut self,
         peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks_ids: HashSet<TrackId>,
     ) {
+        if tracks_ids.is_empty() {
+            return;
+        }
+
         if let Some(peer) = self.peers.get(peer_id) {
             let local_stream_constraints = self.local_stream_settings.clone();
             let rpc = Rc::clone(&self.rpc);

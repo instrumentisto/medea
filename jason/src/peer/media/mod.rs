@@ -285,6 +285,10 @@ impl MediaConnections {
         Ok(())
     }
 
+    /// Removes [`Sender`]s and [`Receiver`]s with the provided [`TrackId`]s.
+    ///
+    /// This action will stop `Transceiver`s related to the provided
+    /// [`TrackId`]s.
     pub fn remove_tracks(&self, track_ids: &HashSet<TrackId>) {
         let mut inner = self.0.borrow_mut();
 
@@ -622,7 +626,9 @@ impl Sender {
         self.mute_state.get()
     }
 
-    pub fn mid(&self) -> Option<Mid> {
+    /// Returns `mid` of this [`Sender`] from the underlying
+    /// [`RtcRtpTransceiver`].
+    fn mid(&self) -> Option<Mid> {
         self.transceiver.mid().map(|mid| mid.into())
     }
 
@@ -748,6 +754,10 @@ impl Sender {
 }
 
 impl Drop for Sender {
+    /// Sets underlying [`RtcRtpTransceiver`]'s direction to the
+    /// [`RtcRtpTransceiverDirection::Inactive`].
+    ///
+    /// Replaces sender in the underlying [`RtcRtpTransceiver`] with `None`.
     fn drop(&mut self) {
         if !self.transceiver.stopped() {
             self.transceiver
@@ -825,6 +835,8 @@ impl Receiver {
 }
 
 impl Drop for Receiver {
+    /// Sets underlying [`RtcRtpTransceiver`]'s direction to the
+    /// [`RtcRtpTransceiverDirection::Inactive`].
     fn drop(&mut self) {
         if let Some(transceiver) = &self.transceiver {
             if !transceiver.stopped() {

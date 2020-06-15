@@ -36,6 +36,13 @@ pub struct PeerId(pub u64);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u64);
 
+/// A [`String`] which uniquely identifies the pairing of source and destination
+/// of the transceiver's stream. Its value is taken from the media ID of the SDP
+/// m-line.
+///
+/// [Web API doc][1]
+///
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
 #[cfg_attr(feature = "medea", derive(Deserialize, Debug, Hash, Default))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Display, From, Into, PartialEq, Eq)]
@@ -285,6 +292,8 @@ pub enum Event {
         sdp_offer: Option<String>,
     },
 
+    /// Media Server notifies about necessity to remove [`Track`]s from
+    /// specified Peer.
     TracksRemoved {
         peer_id: PeerId,
         sdp_offer: Option<String>,

@@ -69,6 +69,13 @@ impl Room {
         }
     }
 
+    /// Deletes provided [`WebRtcPublishEndpoint`].
+    ///
+    /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
+    /// action.
+    ///
+    /// Starts renegotiation in [`PeerService`] or fully deletes [`Peer`]s if it
+    /// needed.
     fn delete_src_endpoint(
         &mut self,
         src: &WebRtcPublishEndpoint,
@@ -81,6 +88,13 @@ impl Room {
         affected_peers
     }
 
+    /// Deletes provided [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
+    /// action.
+    ///
+    /// Starts renegotiation in [`PeerService`] or fully deletes [`Peer`]s if it
+    /// needed.
     fn delete_sink_endpoint(
         &mut self,
         sink_endpoint: &WebRtcPlayEndpoint,
@@ -118,6 +132,10 @@ impl Room {
     }
 
     /// Deletes endpoint from this [`Room`] by ID.
+    ///
+    /// Starts renegotiation process for the affected [`Peer`]s if it needed.
+    ///
+    /// Will delete [`Peer`] which are no longer needed.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -179,10 +197,6 @@ impl Room {
 
             let mut futs = Vec::new();
             for (member_id, event) in events {
-                debug!(
-                    "Event {:?} will be sent to the {} for Endpoint delete.",
-                    event, member_id
-                );
                 futs.push(
                     self.members
                         .send_event_to_member(member_id, event)
@@ -190,17 +204,10 @@ impl Room {
                 );
             }
             ctx.spawn(actix_try_join_all(futs).then(|res, this, _| {
-                debug!("Delete Endpoint task was finished!");
                 res.unwrap();
                 async {}.into_actor(this)
             }));
         }
-
-        // debug!(
-        //     "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
-        //      {}].",
-        //     endpoint_id, member_id, self.id
-        // );
     }
 
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].

@@ -26,6 +26,8 @@ struct WebRtcPublishEndpointInner {
     /// ID of this [`WebRtcPublishEndpoint`].
     id: Id,
 
+    /// [`TrackId`]s of the [`MediaTrack`]s related to this
+    /// [`WebRtcPublishEndpoint`].
     tracks_ids: HashMap<PeerId, HashSet<TrackId>>,
 
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
@@ -206,6 +208,8 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    /// Adds [`TrackId`] of the [`MediaTrack`] related to this
+    /// [`WebRtcPublishEndpoint`].
     pub fn add_track_id(&self, peer_id: PeerId, track_id: TrackId) {
         let mut inner = self.0.borrow_mut();
         inner
@@ -215,17 +219,14 @@ impl WebRtcPublishEndpoint {
             .insert(track_id);
     }
 
+    /// Returns [`TrackId`]s of the related to this [`WebRtcPublishEndpoint`]
+    /// [`MediaTrack`]s from the [`Peer`] with a provided [`PeerId`].
     pub fn get_tracks_ids_by_peer_id(
         &self,
         peer_id: PeerId,
     ) -> HashSet<TrackId> {
         let inner = self.0.borrow();
         inner.tracks_ids.get(&peer_id).cloned().unwrap_or_default()
-    }
-
-    pub fn get_all_tracks_ids(&self) -> HashMap<PeerId, HashSet<TrackId>> {
-        let inner = self.0.borrow();
-        inner.tracks_ids.clone()
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer

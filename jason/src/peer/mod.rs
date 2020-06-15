@@ -12,7 +12,7 @@ mod stream_request;
 
 use std::{
     cell::RefCell,
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     convert::TryFrom as _,
     hash::{Hash, Hasher},
     rc::Rc,
@@ -52,7 +52,6 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
-use std::collections::HashSet;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -831,6 +830,7 @@ impl PeerConnection {
         Ok(())
     }
 
+    /// Removes [`Sender`]s and [`Receivers`] with a provided [`TrackId`]s.
     pub fn remove_tracks(&self, mids: &HashSet<TrackId>) {
         self.media_connections.remove_tracks(mids);
     }

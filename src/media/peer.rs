@@ -21,7 +21,6 @@ use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
-    log::prelude::*,
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
@@ -217,6 +216,10 @@ pub struct Context {
     /// be sent to the client.
     new_receivers: Vec<Weak<MediaTrack>>,
 
+    /// [`TrackId`]s of the removed `MediaTrack`s.
+    ///
+    /// Will be cleaned when this [`Peer`] will be transfered into [`Stable`]
+    /// state.
     removed_tracks_ids: HashSet<TrackId>,
 }
 
@@ -347,17 +350,20 @@ impl<T> Peer<T> {
         self.context.renegotiation_reason
     }
 
+    /// Returns `true` if this [`Peer`] doesn't have any `Send` and `Recv`
+    /// [`MediaTrack`]s.
     pub fn is_empty(&self) -> bool {
         self.context.senders.is_empty() && self.context.receivers.is_empty()
     }
 
+    /// Returns [`TrackId`]s of the removed [`MediaTrack`]s.
     pub fn removed_tracks_ids(&self) -> HashSet<TrackId> {
         self.context.removed_tracks_ids.clone()
     }
 
     /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
     ///
-    /// Resets `new_senders` and `new_receivers`.
+    /// Resets `new_senders`, `new_receivers` and `removed_tracks_ids`.
     ///
     /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
@@ -475,6 +481,9 @@ impl Peer<Stable> {
 
     /// Adds `send` tracks to `self` and add `recv` for this `send`
     /// to `partner_peer`.
+    ///
+    /// Adds created [`MediaTrack`]s [`TrackId`]s to the provided
+    /// [`WebRtcPublishEndpoint`].
     pub fn add_publisher(
         &mut self,
         partner_peer: &mut Peer<Stable>,
@@ -500,12 +509,8 @@ impl Peer<Stable> {
         partner_peer.add_receiver(track_audio);
     }
 
+    /// Removes `Send` [`MediaTrack`]s with a provided [`TrackId`]s.
     pub fn remove_senders(&mut self, tracks_ids: HashSet<TrackId>) {
-        debug!(
-            "Removing Send Tracks [ids = {:?}] from Peer [id = {}].",
-            tracks_ids,
-            self.id()
-        );
         for track_id in tracks_ids {
             if self.context.senders.remove(&track_id).is_some() {
                 self.context.removed_tracks_ids.insert(track_id);
@@ -513,12 +518,8 @@ impl Peer<Stable> {
         }
     }
 
+    /// Removes `Recv` [`MediaTrack`]s with a provided [`TrackId`]s.
     pub fn remove_receivers(&mut self, tracks_ids: HashSet<TrackId>) {
-        debug!(
-            "Removing Recv Tracks [ids = {:?}] from Peer [id = {}].",
-            tracks_ids,
-            self.id()
-        );
         for track_id in tracks_ids {
             if self.context.receivers.remove(&track_id).is_some() {
                 self.context.removed_tracks_ids.insert(track_id);
@@ -605,13 +606,15 @@ impl Peer<Stable> {
 }
 
 /// Reason of the started renegotiation of this [`Peer`].
-// TODO: Implement TracksRemoved and IceRestart reasons in the next PRs.
+// TODO: Implement IceRestart reason in the next PRs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RenegotiationReason {
     /// Renegotiation is started because some new [`Track`]s should be added to
     /// the [`Peer`].
     TracksAdded,
 
+    /// Renegotiation is started because some [`Track`]s was removed from the
+    /// [`Peer`].
     TracksRemoved,
 }
 

@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use actix::{
     fut, Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
@@ -46,7 +46,6 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
-use std::collections::HashSet;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
