@@ -102,7 +102,7 @@ impl Room {
             src_peer.remove_senders(tracks_to_remove);
 
             if sink_peer.is_empty() && src_peer.is_empty() {
-                member.peers_removed(&[sink_peer_id]);
+                member.peers_removed(&hashset![sink_peer_id]);
                 affected_peers.insert((sink_peer.member_id(), sink_peer_id));
                 affected_peers.insert((src_peer.member_id(), src_peer.id()));
             } else {
@@ -161,13 +161,7 @@ impl Room {
             let mut events = HashMap::new();
 
             for (member_id, peer_ids) in removed_peers {
-                events.insert(
-                    member_id,
-                    Event::PeersRemoved {
-                        // TODO: PeersRemoved HashSet
-                        peer_ids: peer_ids.into_iter().collect(),
-                    },
-                );
+                events.insert(member_id, Event::PeersRemoved { peer_ids });
             }
 
             for (member_id, remove_tracks) in removed_tracks {

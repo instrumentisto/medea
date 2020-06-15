@@ -967,7 +967,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Disposes specified [`PeerConnection`]s.
-    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
+    fn on_peers_removed(&mut self, peer_ids: HashSet<PeerId>) {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);

@@ -47,6 +47,7 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -523,8 +524,8 @@ impl PeersService {
     pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
-        let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
+    ) -> HashMap<MemberId, HashSet<PeerId>> {
+        let mut peers_to_remove: HashMap<MemberId, HashSet<PeerId>> =
             HashMap::new();
 
         self.get_peers_by_member_id(member_id).for_each(|peer| {
@@ -535,19 +536,19 @@ impl PeersService {
                 .for_each(|partner_peer| {
                     peers_to_remove
                         .entry(partner_peer.member_id())
-                        .or_insert_with(Vec::new)
-                        .push(partner_peer.id());
+                        .or_default()
+                        .insert(partner_peer.id());
                 });
 
             peers_to_remove
                 .entry(peer.member_id())
-                .or_insert_with(Vec::new)
-                .push(peer.id());
+                .or_default()
+                .insert(peer.id());
         });
 
         peers_to_remove
             .values()
-            .flat_map(|peer_ids| peer_ids.iter())
+            .flat_map(HashSet::iter)
             .for_each(|id| {
                 self.peers.remove(id);
             });

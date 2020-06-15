@@ -42,6 +42,7 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
+use std::collections::HashSet;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -204,7 +205,7 @@ impl Room {
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
-        removed_peers_ids: Vec<PeerId>,
+        removed_peers_ids: HashSet<PeerId>,
     ) -> ActFuture<Result<(), RoomError>> {
         Box::new(
             self.members
@@ -311,7 +312,7 @@ impl Room {
     /// Signals about removing [`Member`]'s [`Peer`]s.
     fn member_peers_removed(
         &mut self,
-        peers_id: Vec<PeerId>,
+        peers_id: HashSet<PeerId>,
         member_id: MemberId,
         ctx: &mut Context<Self>,
     ) -> ActFuture<()> {

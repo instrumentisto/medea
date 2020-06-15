@@ -265,7 +265,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<PeerId> },
+    PeersRemoved { peer_ids: HashSet<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// Peer.

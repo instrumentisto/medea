@@ -31,6 +31,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use std::collections::HashSet;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -279,7 +280,7 @@ impl Member {
     /// All [`PeerId`]s related to this [`Member`] will be removed.
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    pub fn peers_removed(&self, peer_ids: &[PeerId]) {
+    pub fn peers_removed(&self, peer_ids: &HashSet<PeerId>) {
         self.srcs()
             .values()
             .for_each(|p| p.remove_peer_ids(peer_ids));

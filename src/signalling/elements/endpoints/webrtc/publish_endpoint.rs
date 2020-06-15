@@ -96,7 +96,7 @@ impl WebRtcPublishEndpointInner {
         self.peer_ids.remove(peer_id);
     }
 
-    fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
+    fn remove_peer_ids(&mut self, peer_ids: &HashSet<PeerId>) {
         for peer_id in peer_ids {
             self.remove_peer_id(peer_id)
         }
@@ -177,7 +177,7 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
-    pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
+    pub fn remove_peer_ids(&self, peer_ids: &HashSet<PeerId>) {
         self.0.borrow_mut().remove_peer_ids(peer_ids)
     }
 
