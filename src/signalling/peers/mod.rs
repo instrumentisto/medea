@@ -703,17 +703,19 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
 
     /// Adds new [`WebRtcPlayEndpoint`] to the [`Peer`] with a provided
     /// [`PeerId`].
-    pub fn add_sink(&mut self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {
-        let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
-        let mut partner_peer: Peer<Stable> =
-            self.take_inner_peer(peer.partner_peer_id()).unwrap();
+    pub fn add_sink(&mut self, src_peer_id: PeerId, sink: WebRtcPlayEndpoint) {
+        let mut src_peer: Peer<Stable> =
+            self.take_inner_peer(src_peer_id).unwrap();
+        let mut sink_peer: Peer<Stable> =
+            self.take_inner_peer(src_peer.partner_peer_id()).unwrap();
         let src = sink.src();
 
-        peer.add_publisher(&mut partner_peer, &mut self.tracks_count, &src);
-        peer.add_endpoint(&Endpoint::from(sink));
+        src_peer.add_publisher(&mut sink_peer, &mut self.tracks_count, &src);
+        src_peer.add_endpoint(&Endpoint::from(src));
+        sink_peer.add_endpoint(&Endpoint::from(sink));
 
-        self.peers.insert(peer.id(), peer.into());
-        self.peers.insert(partner_peer.id(), partner_peer.into());
+        self.peers.insert(src_peer.id(), src_peer.into());
+        self.peers.insert(sink_peer.id(), sink_peer.into());
     }
 }
 
