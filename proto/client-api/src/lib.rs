@@ -288,7 +288,7 @@ pub enum Event {
     TracksRemoved {
         peer_id: PeerId,
         sdp_offer: Option<String>,
-        mids: HashSet<Mid>,
+        tracks_ids: HashSet<TrackId>,
     },
 }
 

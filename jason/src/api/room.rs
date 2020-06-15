@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ops::DerefMut as _,
     rc::{Rc, Weak},
 };
@@ -37,7 +37,6 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use std::collections::HashSet;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -862,7 +861,7 @@ impl EventHandler for InnerRoom {
         &mut self,
         peer_id: PeerId,
         sdp_offer: Option<String>,
-        mids: HashSet<Mid>,
+        tracks_ids: HashSet<TrackId>,
     ) {
         if let Some(peer) = self.peers.get(peer_id) {
             let local_stream_constraints = self.local_stream_settings.clone();
@@ -870,7 +869,7 @@ impl EventHandler for InnerRoom {
             let error_callback = Rc::clone(&self.on_failed_local_stream);
             spawn_local(
                 async move {
-                    peer.remove_tracks(&mids);
+                    peer.remove_tracks(&tracks_ids);
                     if let Some(sdp_offer) = sdp_offer {
                         let sdp_answer = peer
                             .process_offer(
@@ -880,6 +879,7 @@ impl EventHandler for InnerRoom {
                             )
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
@@ -892,6 +892,7 @@ impl EventHandler for InnerRoom {
                         let mids = peer
                             .get_mids()
                             .map_err(tracerr::map_from_and_wrap!())?;
+
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,

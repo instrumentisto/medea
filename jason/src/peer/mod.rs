@@ -831,9 +831,8 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn remove_tracks(&self, mids: &HashSet<Mid>) {
+    pub fn remove_tracks(&self, mids: &HashSet<TrackId>) {
         self.media_connections.remove_tracks(mids);
-        // self.peer.remove_tracks(mids)
     }
 }
 

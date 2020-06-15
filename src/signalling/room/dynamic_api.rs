@@ -9,7 +9,7 @@ use actix::{
     fut, ActorFuture as _, AsyncContext as _, Context,
     ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
-use medea_client_api_proto::{Event, Mid, PeerId};
+use medea_client_api_proto::{Event, PeerId, TrackId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -143,7 +143,7 @@ impl Room {
                 HashMap::new();
             let mut removed_tracks: HashMap<
                 MemberId,
-                HashMap<PeerId, HashSet<Mid>>,
+                HashMap<PeerId, HashSet<TrackId>>,
             > = HashMap::new();
             for (member_id, peer_id) in affected_peers {
                 if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
@@ -152,7 +152,7 @@ impl Room {
                         .or_default()
                         .entry(peer_id)
                         .or_default()
-                        .extend(peer.removed_tracks_mids());
+                        .extend(peer.removed_tracks_ids());
                 } else {
                     removed_peers.entry(member_id).or_default().insert(peer_id);
                 };
@@ -165,13 +165,13 @@ impl Room {
             }
 
             for (member_id, remove_tracks) in removed_tracks {
-                for (updated_peer_id, removed_mid) in remove_tracks {
+                for (updated_peer_id, removed_id) in remove_tracks {
                     events.insert(
                         member_id.clone(),
                         Event::TracksRemoved {
                             peer_id: updated_peer_id,
                             sdp_offer: None,
-                            mids: removed_mid,
+                            tracks_ids: removed_id,
                         },
                     );
                 }

@@ -55,7 +55,7 @@ impl CommandHandler for Room {
             },
             Some(RenegotiationReason::TracksRemoved) => Event::TracksRemoved {
                 peer_id: to_peer_id,
-                mids: to_peer.removed_tracks_mids(),
+                tracks_ids: to_peer.removed_tracks_ids(),
                 sdp_offer: Some(sdp_offer),
             },
             None => Event::PeerCreated {

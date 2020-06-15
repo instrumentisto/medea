@@ -285,32 +285,12 @@ impl MediaConnections {
         Ok(())
     }
 
-    pub fn remove_tracks(&self, mids: &HashSet<Mid>) {
+    pub fn remove_tracks(&self, track_ids: &HashSet<TrackId>) {
         let mut inner = self.0.borrow_mut();
 
-        let mut senders_to_remove = HashSet::new();
-        for (track_id, sender) in &inner.senders {
-            if let Some(mid) = sender.mid() {
-                if mids.contains(&mid) {
-                    senders_to_remove.insert(*track_id);
-                }
-            }
-        }
-
-        let mut receivers_to_remove = HashSet::new();
-        for (track_id, receiver) in &mut inner.receivers {
-            if let Some(mid) = receiver.mid() {
-                if mids.contains(&mid) {
-                    receivers_to_remove.insert(*track_id);
-                }
-            }
-        }
-
-        for sender_id in senders_to_remove {
-            inner.senders.remove(&sender_id);
-        }
-        for receiver_id in receivers_to_remove {
-            inner.receivers.remove(&receiver_id);
+        for track_id in track_ids {
+            inner.senders.remove(&track_id);
+            inner.receivers.remove(&track_id);
         }
     }
 

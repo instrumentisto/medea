@@ -93,7 +93,7 @@ impl PeerError {
 #[enum_delegate(
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
-#[enum_delegate(pub fn removed_tracks_mids(&self) -> HashSet<Mid>)]
+#[enum_delegate(pub fn removed_tracks_ids(&self) -> HashSet<TrackId>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -217,7 +217,7 @@ pub struct Context {
     /// be sent to the client.
     new_receivers: Vec<Weak<MediaTrack>>,
 
-    removed_tracks_mids: HashSet<Mid>,
+    removed_tracks_ids: HashSet<TrackId>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -351,8 +351,8 @@ impl<T> Peer<T> {
         self.context.senders.is_empty() && self.context.receivers.is_empty()
     }
 
-    pub fn removed_tracks_mids(&self) -> HashSet<Mid> {
-        self.context.removed_tracks_mids.clone()
+    pub fn removed_tracks_ids(&self) -> HashSet<TrackId> {
+        self.context.removed_tracks_ids.clone()
     }
 
     /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
@@ -364,7 +364,7 @@ impl<T> Peer<T> {
         self.context.renegotiation_reason = None;
         self.context.new_receivers = Vec::new();
         self.context.new_senders = Vec::new();
-        self.context.removed_tracks_mids = HashSet::new();
+        self.context.removed_tracks_ids = HashSet::new();
     }
 }
 
@@ -464,7 +464,7 @@ impl Peer<Stable> {
             renegotiation_reason: None,
             new_receivers: Vec::new(),
             new_senders: Vec::new(),
-            removed_tracks_mids: HashSet::new(),
+            removed_tracks_ids: HashSet::new(),
         };
 
         Self {
@@ -507,10 +507,8 @@ impl Peer<Stable> {
             self.id()
         );
         for track_id in tracks_ids {
-            if let Some(track) = self.context.senders.remove(&track_id) {
-                if let Some(mid) = track.mid() {
-                    self.context.removed_tracks_mids.insert(mid);
-                }
+            if self.context.senders.remove(&track_id).is_some() {
+                self.context.removed_tracks_ids.insert(track_id);
             }
         }
     }
@@ -522,10 +520,8 @@ impl Peer<Stable> {
             self.id()
         );
         for track_id in tracks_ids {
-            if let Some(track) = self.context.receivers.remove(&track_id) {
-                if let Some(mid) = track.mid() {
-                    self.context.removed_tracks_mids.insert(mid);
-                }
+            if self.context.receivers.remove(&track_id).is_some() {
+                self.context.removed_tracks_ids.insert(track_id);
             }
         }
     }
