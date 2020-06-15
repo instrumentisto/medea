@@ -2,7 +2,7 @@ use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
 use derive_more::{Display, From};
 use medea_client_api_proto::{
-    Direction as DirectionProto, IceServer, Mid, PeerConnectionState, TrackId,
+    Direction as DirectionProto, IceServer, Mid, PeerConnectionState,
 };
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
@@ -25,7 +25,6 @@ use crate::{
 };
 
 use super::ice_server::RtcIceServers;
-use std::collections::HashSet;
 
 /// [RTCIceCandidate][1] representation.
 ///
@@ -677,7 +676,7 @@ impl RtcPeerConnection {
         for tr in transceivers {
             let tr = RtcRtpTransceiver::from(tr.unwrap());
             if let Some(tr_mid) = tr.mid() {
-                if &mid.0 == &tr_mid {
+                if mid.0 == tr_mid {
                     transceiver = Some(tr);
                     break;
                 }
@@ -685,29 +684,6 @@ impl RtcPeerConnection {
         }
 
         transceiver
-    }
-
-    pub fn remove_tracks(&self, mids: &HashSet<Mid>) {
-        use web_sys::RtcRtpTransceiver as SysRtcRtpTransceiver;
-        let mut transceivers_to_remove: Vec<_> = self
-            .peer
-            .get_transceivers()
-            .iter()
-            .map(SysRtcRtpTransceiver::from)
-            .filter(|t| {
-                if let Some(mid) = t.mid() {
-                    mids.contains(&Mid::from(mid))
-                } else {
-                    false
-                }
-            })
-            .collect();
-
-        for transceiver in transceivers_to_remove {
-            transceiver.set_direction(RtcRtpTransceiverDirection::Inactive);
-            // let sender = transceiver.sender();
-            // self.peer.remove_track(&sender);
-        }
     }
 }
 

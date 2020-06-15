@@ -3,13 +3,18 @@
 mod mute_state;
 
 use std::{
-    cell::RefCell, collections::HashMap, convert::From, future::Future, rc::Rc,
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    convert::From,
+    future::Future,
+    rc::Rc,
     time::Duration,
 };
 
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
+use medea_client_api_proto::Mid;
 use medea_reactive::{DroppedError, ObservableCell};
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -29,9 +34,6 @@ use super::{
 };
 
 pub use self::mute_state::{MuteState, MuteStateTransition, StableMuteState};
-use crate::utils::console_error;
-use medea_client_api_proto::Mid;
-use std::collections::HashSet;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -402,7 +404,7 @@ impl MediaConnections {
         if let Some(mid) = transceiver.mid() {
             for receiver in &mut inner.receivers.values_mut() {
                 if let Some(recv_mid) = &receiver.mid() {
-                    if &recv_mid.0 == &mid {
+                    if recv_mid.0 == mid {
                         receiver.transceiver.replace(transceiver);
                         receiver.track.replace(track);
                         return Some(receiver.sender_id);

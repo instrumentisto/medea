@@ -7,7 +7,6 @@ mod traffic_watcher;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
-    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -18,17 +17,15 @@ use actix::{
     ActorFuture, WrapFuture as _,
 };
 use derive_more::Display;
-use medea_client_api_proto::{
-    AudioSettings, Incrementable, MediaType, PeerId, TrackId, VideoSettings,
-};
+use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
     media::{
-        peer::RenegotiationReason, IceUser, MediaTrack, Peer, PeerError,
-        PeerStateMachine, Stable, WaitLocalSdp,
+        peer::RenegotiationReason, IceUser, Peer, PeerError, PeerStateMachine,
+        Stable, WaitLocalSdp,
     },
     signalling::{
         elements::endpoints::{
@@ -50,7 +47,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {

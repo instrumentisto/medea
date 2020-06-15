@@ -211,7 +211,7 @@ impl WebRtcPublishEndpoint {
         inner
             .tracks_ids
             .entry(peer_id)
-            .or_insert_with(|| HashSet::new())
+            .or_default()
             .insert(track_id);
     }
 
@@ -220,11 +220,7 @@ impl WebRtcPublishEndpoint {
         peer_id: PeerId,
     ) -> HashSet<TrackId> {
         let inner = self.0.borrow();
-        inner
-            .tracks_ids
-            .get(&peer_id)
-            .cloned()
-            .unwrap_or_else(|| HashSet::new())
+        inner.tracks_ids.get(&peer_id).cloned().unwrap_or_default()
     }
 
     pub fn get_all_tracks_ids(&self) -> HashMap<PeerId, HashSet<TrackId>> {

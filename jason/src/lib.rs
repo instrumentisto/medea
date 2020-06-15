@@ -12,7 +12,6 @@
     clippy::must_use_candidate,
     clippy::used_underscore_binding
 )]
-#![allow()]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 

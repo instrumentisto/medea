@@ -9,7 +9,7 @@ use actix::{
     fut, ActorFuture as _, AsyncContext as _, Context,
     ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
-use medea_client_api_proto::{Event, Mid, PeerId, TrackId};
+use medea_client_api_proto::{Event, Mid, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -23,6 +23,7 @@ use crate::{
         WebRtcPublishId,
     },
     log::prelude::*,
+    media::{Peer, RenegotiationReason, Stable},
     signalling::{
         elements::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -34,7 +35,6 @@ use crate::{
 };
 
 use super::{Room, RoomError};
-use crate::media::{Peer, RenegotiationReason, Stable};
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -71,11 +71,11 @@ impl Room {
 
     fn delete_src_endpoint(
         &mut self,
-        src: WebRtcPublishEndpoint,
+        src: &WebRtcPublishEndpoint,
     ) -> HashSet<(MemberId, PeerId)> {
         let mut affected_peers = HashSet::new();
         for sink in src.sinks() {
-            affected_peers.extend(self.delete_sink_endpoint(sink));
+            affected_peers.extend(self.delete_sink_endpoint(&sink));
         }
 
         affected_peers
@@ -83,7 +83,7 @@ impl Room {
 
     fn delete_sink_endpoint(
         &mut self,
-        sink_endpoint: WebRtcPlayEndpoint,
+        sink_endpoint: &WebRtcPlayEndpoint,
     ) -> HashSet<(MemberId, PeerId)> {
         let member = sink_endpoint.owner();
         let mut affected_peers = HashSet::new();
@@ -99,10 +99,10 @@ impl Room {
             let tracks_to_remove =
                 src_endpoint.get_tracks_ids_by_peer_id(src_peer.id());
             sink_peer.remove_receivers(tracks_to_remove.clone());
-            src_peer.remove_senders(tracks_to_remove.clone());
+            src_peer.remove_senders(tracks_to_remove);
 
             if sink_peer.is_empty() && src_peer.is_empty() {
-                member.peers_removed(&vec![sink_peer_id]);
+                member.peers_removed(&[sink_peer_id]);
                 affected_peers.insert((sink_peer.member_id(), sink_peer_id));
                 affected_peers.insert((src_peer.member_id(), src_peer.id()));
             } else {
@@ -128,12 +128,12 @@ impl Room {
             let play_id = endpoint_id.into();
             let affected_peers =
                 if let Some(sink_endpoint) = member.take_sink(&play_id) {
-                    self.delete_sink_endpoint(sink_endpoint)
+                    self.delete_sink_endpoint(&sink_endpoint)
                 } else {
                     let publish_id = String::from(play_id).into();
 
                     if let Some(src_endpoint) = member.take_src(&publish_id) {
-                        self.delete_src_endpoint(src_endpoint)
+                        self.delete_src_endpoint(&src_endpoint)
                     } else {
                         HashSet::new()
                     }
