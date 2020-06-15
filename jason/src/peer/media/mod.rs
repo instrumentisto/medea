@@ -626,7 +626,7 @@ impl Sender {
         self.mute_state.get()
     }
 
-    /// Returns `mid` of this [`Sender`] from the underlying
+    /// Returns [`Mid`] of this [`Sender`] from the underlying
     /// [`RtcRtpTransceiver`].
     fn mid(&self) -> Option<Mid> {
         self.transceiver.mid().map(|mid| mid.into())
