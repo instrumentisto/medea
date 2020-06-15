@@ -505,7 +505,7 @@ mod test {
     #[test]
     fn command() {
         let mut mids = HashMap::new();
-        mids.insert(TrackId(0), "1".into());
+        mids.insert(TrackId(0), Mid("1".to_string()));
 
         let command = ClientMsg::Command(Command::MakeSdpOffer {
             peer_id: PeerId(77),

@@ -23,8 +23,8 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
-    TrackId,
+    ClientMsg, Command, Event, IceCandidate, Mid, PeerId, RpcSettings,
+    ServerMsg, TrackId,
 };
 
 pub type MessageHandler =
@@ -61,7 +61,7 @@ pub struct TestMember {
 
     /// List of the mids which was already generated and sent to the media
     /// server.
-    known_tracks_mids: HashMap<TrackId, String>,
+    known_tracks_mids: HashMap<TrackId, Mid>,
 
     /// Number of the lastly generated mid.
     last_mid: u64,
@@ -147,20 +147,20 @@ impl TestMember {
     ///
     /// This function will generate new mid if no mid for the provided
     /// [`TrackId`] was found.
-    pub fn get_mid(&mut self, track_id: TrackId) -> String {
+    pub fn get_mid(&mut self, track_id: TrackId) -> Mid {
         if let Some(mid) = self.known_tracks_mids.get(&track_id) {
-            return mid.to_string();
+            return mid.clone();
         } else {
             self.last_mid += 1;
             let last_mid = self.last_mid;
-            let new_mid = format!("test-mid-{}", last_mid);
+            let new_mid: Mid = format!("test-mid-{}", last_mid).into();
             self.known_tracks_mids.insert(track_id, new_mid.clone());
             new_mid
         }
     }
 
     /// Adds provided mid to the `MediaTrack` with a provided [`TrackId`].
-    fn add_mid(&mut self, track_id: TrackId, mid: String) {
+    fn add_mid(&mut self, track_id: TrackId, mid: Mid) {
         self.known_tracks_mids.insert(track_id, mid);
     }
 
@@ -168,7 +168,7 @@ impl TestMember {
     fn generate_mid(&mut self, track_id: TrackId) {
         self.last_mid += 1;
         let mid = self.last_mid.to_string();
-        self.add_mid(track_id, mid);
+        self.add_mid(track_id, mid.into());
     }
 }
 
@@ -296,7 +296,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                         | Event::TracksUpdated { peer_id, .. } => {
                             assert!(self.known_peers.contains(peer_id))
                         }
-                        Event::PeersRemoved { .. } => {}
+                        Event::PeersRemoved { .. }
+                        | Event::TracksRemoved { .. } => {}
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);

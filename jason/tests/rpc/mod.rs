@@ -4,7 +4,10 @@ mod backoff_delayer;
 mod heartbeat;
 mod websocket;
 
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use futures::{
     channel::{mpsc, oneshot},
@@ -17,14 +20,13 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
 use medea_jason::rpc::{
-    websocket::MockRpcTransport, ClientDisconnect, CloseMsg, RpcClient,
-    RpcTransport, WebSocketRpcClient,
+    websocket::{MockRpcTransport, TransportState},
+    ClientDisconnect, CloseMsg, RpcClient, RpcTransport, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::{delay_for, timeout};
-use medea_jason::rpc::websocket::TransportState;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -59,22 +61,24 @@ fn on_message_mock(
 /// 4. Check that subscriber from step 2 receives this [`Event`].
 #[wasm_bindgen_test]
 async fn message_received_from_transport_is_transmitted_to_sub() {
-    const SRV_EVENT: Event = Event::PeersRemoved {
-        peer_ids: Vec::new(),
+    let srv_event: Event = Event::PeersRemoved {
+        peer_ids: HashSet::new(),
     };
 
-    let ws = WebSocketRpcClient::new(Box::new(|_| {
+    let srv_event_clone = srv_event.clone();
+    let ws = WebSocketRpcClient::new(Box::new(move |_| {
         let mut transport = MockRpcTransport::new();
         transport.expect_on_state_change().return_once(|| {
             stream::once(async { TransportState::Open }).boxed()
         });
-        transport.expect_on_message().returning(|| {
+        let srv_event = srv_event_clone.clone();
+        transport.expect_on_message().returning(move || {
             stream::iter(vec![
                 ServerMsg::RpcSettings(RpcSettings {
                     idle_timeout_ms: 10_000,
                     ping_interval_ms: 10_000,
                 }),
-                ServerMsg::Event(SRV_EVENT),
+                ServerMsg::Event(srv_event.clone()),
             ])
             .boxed()
         });
@@ -86,7 +90,7 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 
     let mut stream = ws.subscribe();
     ws.connect(String::new()).await.unwrap();
-    assert_eq!(stream.next().await.unwrap(), SRV_EVENT);
+    assert_eq!(stream.next().await.unwrap(), srv_event);
 }
 
 /// Tests [`WebSocketRpcClient::unsub`] function.

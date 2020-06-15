@@ -647,6 +647,7 @@ pub mod tests {
                 renegotiation_reason: None,
                 new_senders: Vec::new(),
                 new_receivers: Vec::new(),
+                removed_tracks_ids: HashSet::new(),
             },
         };
 
