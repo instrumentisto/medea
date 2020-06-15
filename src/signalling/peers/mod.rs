@@ -702,6 +702,11 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
 
     /// Adds new [`WebRtcPlayEndpoint`] to the [`Peer`] with a provided
     /// [`PeerId`].
+    ///
+    /// ## Panics
+    ///
+    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
+    /// [`Stable`] state.
     pub fn add_sink(&mut self, src_peer_id: PeerId, sink: WebRtcPlayEndpoint) {
         let mut src_peer: Peer<Stable> =
             self.take_inner_peer(src_peer_id).unwrap();
@@ -715,6 +720,76 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
+    }
+
+    /// Deletes provided [`WebRtcPublishEndpoint`].
+    ///
+    /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
+    /// action.
+    ///
+    /// Starts renegotiation in [`PeerService`] or fully deletes [`Peer`]s if it
+    /// needed.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
+    /// [`Stable`] state.
+    pub fn delete_src_endpoint(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+    ) -> HashSet<(MemberId, PeerId)> {
+        let mut affected_peers = HashSet::new();
+        for sink in src.sinks() {
+            affected_peers.extend(self.delete_sink_endpoint(&sink));
+        }
+
+        affected_peers
+    }
+
+    /// Deletes provided [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
+    /// action.
+    ///
+    /// Starts renegotiation in [`PeerService`] or fully deletes [`Peer`]s if it
+    /// needed.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
+    /// [`Stable`] state.
+    pub fn delete_sink_endpoint(
+        &mut self,
+        sink_endpoint: &WebRtcPlayEndpoint,
+    ) -> HashSet<(MemberId, PeerId)> {
+        let member = sink_endpoint.owner();
+        let mut affected_peers = HashSet::new();
+        let src_endpoint = sink_endpoint.src();
+        if let Some(sink_peer_id) = sink_endpoint.peer_id() {
+            let mut sink_peer: Peer<Stable> =
+                self.take_inner_peer(sink_peer_id).unwrap();
+            let mut src_peer: Peer<Stable> =
+                self.take_inner_peer(sink_peer.partner_peer_id()).unwrap();
+
+            let tracks_to_remove =
+                src_endpoint.get_tracks_ids_by_peer_id(src_peer.id());
+            sink_peer.remove_receivers(tracks_to_remove.clone());
+            src_peer.remove_senders(tracks_to_remove);
+
+            if sink_peer.is_empty() && src_peer.is_empty() {
+                member.peers_removed(&hashset![sink_peer_id]);
+                affected_peers.insert((sink_peer.member_id(), sink_peer_id));
+                affected_peers.insert((src_peer.member_id(), src_peer.id()));
+            } else {
+                let sink_peer = sink_peer
+                    .start_renegotiation(RenegotiationReason::TracksRemoved);
+                affected_peers.insert((sink_peer.member_id(), sink_peer_id));
+                self.add_peer(sink_peer);
+                self.add_peer(src_peer);
+            }
+        }
+
+        affected_peers
     }
 }
 
