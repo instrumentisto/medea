@@ -241,7 +241,7 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir)/
+	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
 endif
 endif
 
@@ -389,7 +389,8 @@ endif
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                          [registry=<registry-host>]
-#	                                          [log=(no|yes)] )]
+#	                                          [log=(no|yes)]
+#                                             [logfile=(no|yes)] )]
 #	                        [wait=(5|<seconds>)] )]
 
 test-e2e-env = RUST_BACKTRACE=1 \
@@ -403,7 +404,8 @@ ifeq ($(up),yes)
 	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
-	                     TAG=$(TAG) registry=$(registry)
+	                     TAG=$(TAG) registry=$(registry) \
+	                     logfile=$(logfile)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -712,8 +714,12 @@ ifeq ($(log),yes)
 endif
 endif
 else
+ifeq ($(logfile),yes)
+	rm -f /tmp/medea.log
+endif
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
+		$(if $(call eq,$(logfile),yes),> /tmp/medea.log,) \
 		$(if $(call eq,$(background),yes),&,)
 endif
 
