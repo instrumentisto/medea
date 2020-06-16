@@ -255,6 +255,10 @@ pub mod web_rtc_publish_endpoint {
         /// track couldn't be acquired, then an error will be thrown. Media server
         /// will deny all requests to stop publishing.
         Required = 1,
+        /// Media type MUST not be published.
+        ///
+        /// Media server will not try to initialize publishing.
+        Disabled = 2,
     }
     /// P2P mode of WebRTC interaction.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]

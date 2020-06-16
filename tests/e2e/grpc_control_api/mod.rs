@@ -350,7 +350,7 @@ impl WebRtcPublishEndpoint {
 impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     fn into(self) -> proto::WebRtcPublishEndpoint {
         use proto::web_rtc_publish_endpoint::{
-            AudioSettings, PublishingPolicy, VideoSettings,
+            AudioSettings, PublishPolicy, VideoSettings,
         };
         proto::WebRtcPublishEndpoint {
             p2p: self.p2p_mode as i32,
@@ -359,10 +359,10 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             id: self.id,
             force_relay: bool::default(),
             audio_settings: Some(AudioSettings {
-                publishing_policy: PublishingPolicy::PublishIfPossible as i32,
+                publish_policy: PublishPolicy::Optional as i32,
             }),
             video_settings: Some(VideoSettings {
-                publishing_policy: PublishingPolicy::PublishIfPossible as i32,
+                publish_policy: PublishPolicy::Optional as i32,
             }),
         }
     }

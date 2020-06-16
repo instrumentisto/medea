@@ -42,12 +42,12 @@ struct WebRtcPublishEndpointInner {
     /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
     ///
     /// If `None` then audio shouldn't be published.
-    audio_settings: Option<AudioSettings>,
+    audio_settings: AudioSettings,
 
     /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
     ///
     /// If `None` then video shouldn't be published.
-    video_settings: Option<VideoSettings>,
+    video_settings: VideoSettings,
 
     /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
     ///
@@ -125,8 +125,8 @@ impl WebRtcPublishEndpoint {
         p2p: P2pMode,
         owner: WeakMember,
         is_force_relayed: bool,
-        audio_settings: Option<AudioSettings>,
-        video_settings: Option<VideoSettings>,
+        audio_settings: AudioSettings,
+        video_settings: VideoSettings,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
@@ -220,14 +220,14 @@ impl WebRtcPublishEndpoint {
     /// Returns [`AudioSettings`] of this [`WebRtcPublishEndpoint`].
     ///
     /// If `None` returned then audio shouldn't be published.
-    pub fn audio_settings(&self) -> Option<AudioSettings> {
+    pub fn audio_settings(&self) -> AudioSettings {
         self.0.borrow().audio_settings
     }
 
     /// Returns [`VideoSettings`] of this [`WebRtcPublishEndpoint`].
     ///
     /// If `None` returned then video shouldn't be published.
-    pub fn video_settings(&self) -> Option<VideoSettings> {
+    pub fn video_settings(&self) -> VideoSettings {
         self.0.borrow().video_settings
     }
 
@@ -274,8 +274,8 @@ impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             p2p: p2p as i32,
             id: self.id().to_string(),
             force_relay: self.is_force_relayed(),
-            audio_settings: self.audio_settings().map(Into::into),
-            video_settings: self.video_settings().map(Into::into),
+            audio_settings: Some(self.audio_settings().into()),
+            video_settings: Some(self.video_settings().into()),
             on_stop: String::new(),
             on_start: String::new(),
         }

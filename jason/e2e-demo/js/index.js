@@ -45,12 +45,6 @@ async function createMember(roomId, memberId) {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
       force_relay: false,
-      audio_settings: {
-        publishing_policy: "IfPossible",
-      },
-      video_settings: {
-        publishing_policy: "IfPossible",
-      }
     }
   };
 
@@ -157,12 +151,6 @@ const controlDebugWindows = {
             kind: endpointType,
             p2p: p2pMode,
             force_relay: isForceRelay,
-            audio_settings: {
-              publishing_policy: "IfPossible",
-            },
-            video_settings: {
-              publishing_policy: "IfPossible",
-            },
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
           let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
@@ -171,12 +159,6 @@ const controlDebugWindows = {
             kind: endpointType,
             src: source,
             force_relay: isForceRelay,
-            audio_settings: {
-              publishing_policy: "IfPossible",
-            },
-            video_settings: {
-              publishing_policy: "IfPossible",
-            }
           });
       }
     })

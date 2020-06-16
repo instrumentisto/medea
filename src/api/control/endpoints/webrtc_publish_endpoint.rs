@@ -66,25 +66,27 @@ pub struct WebRtcPublishEndpoint {
     /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
     ///
     /// If `None` then audio shouldn't be published.
-    pub audio_settings: Option<AudioSettings>,
+    #[serde(default)]
+    pub audio_settings: AudioSettings,
 
     /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
     ///
     /// If `None` then video shouldn't be published.
-    pub video_settings: Option<VideoSettings>,
+    #[serde(default)]
+    pub video_settings: VideoSettings,
 }
 
 /// Publishing policy of the video or audio media type in the
 /// [`WebRtcPublishEndpoint`].
-#[derive(Clone, Copy, Debug, Deserialize)]
-pub enum PublishingPolicy {
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+pub enum PublishPolicy {
     /// Specified media type __may__ be published.
     ///
     /// Media server will try to initialize publishing, but won't produce any
     /// errors if user application will fail to or choose not to acquire
     /// required track. Media server will approve user request to stop and
     /// restart publishing specified media type.
-    IfPossible,
+    Optional,
 
     /// Specified media type __must__ be published.
     ///
@@ -92,43 +94,52 @@ pub enum PublishingPolicy {
     /// could not be acquired, then an error will be thrown. Media server will
     /// deny all requests to stop publishing.
     Required,
+
+    /// Media type __must__ not be published.
+    ///
+    /// Media server will not try to initialize publishing.
+    Disabled,
 }
 
-impl PublishingPolicy {
+impl Default for PublishPolicy {
+    fn default() -> Self {
+        Self::Optional
+    }
+}
+
+impl PublishPolicy {
     /// Returns `true` if publishing policy prescribes that media __should__ be
     /// published.
     ///
     /// If `false` then media can be not published.
     pub fn is_required(self) -> bool {
         match self {
-            PublishingPolicy::IfPossible => false,
-            PublishingPolicy::Required => true,
+            PublishPolicy::Optional | PublishPolicy::Disabled => false,
+            PublishPolicy::Required => true,
         }
     }
 }
 
-impl From<proto::web_rtc_publish_endpoint::PublishingPolicy>
-    for PublishingPolicy
-{
-    fn from(from: proto::web_rtc_publish_endpoint::PublishingPolicy) -> Self {
-        use proto::web_rtc_publish_endpoint::PublishingPolicy::{
-            PublishIfPossible, Required,
+impl From<proto::web_rtc_publish_endpoint::PublishPolicy> for PublishPolicy {
+    fn from(from: proto::web_rtc_publish_endpoint::PublishPolicy) -> Self {
+        use proto::web_rtc_publish_endpoint::PublishPolicy::{
+            Disabled, Optional, Required,
         };
 
         match from {
-            PublishIfPossible => Self::IfPossible,
+            Optional => Self::Optional,
             Required => Self::Required,
+            Disabled => Self::Disabled,
         }
     }
 }
 
-impl From<PublishingPolicy>
-    for proto::web_rtc_publish_endpoint::PublishingPolicy
-{
-    fn from(from: PublishingPolicy) -> Self {
+impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
+    fn from(from: PublishPolicy) -> Self {
         match from {
-            PublishingPolicy::IfPossible => Self::PublishIfPossible,
-            PublishingPolicy::Required => Self::Required,
+            PublishPolicy::Optional => Self::Optional,
+            PublishPolicy::Required => Self::Required,
+            PublishPolicy::Disabled => Self::Disabled,
         }
     }
 }
@@ -138,15 +149,24 @@ impl From<PublishingPolicy>
 pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].
-    pub publishing_policy: PublishingPolicy,
+    #[serde(default)]
+    pub publish_policy: PublishPolicy,
+}
+
+impl Default for AudioSettings {
+    fn default() -> Self {
+        Self {
+            publish_policy: PublishPolicy::default(),
+        }
+    }
 }
 
 impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
     fn from(from: &proto::web_rtc_publish_endpoint::AudioSettings) -> Self {
         Self {
-            publishing_policy:
-                proto::web_rtc_publish_endpoint::PublishingPolicy::from_i32(
-                    from.publishing_policy,
+            publish_policy:
+                proto::web_rtc_publish_endpoint::PublishPolicy::from_i32(
+                    from.publish_policy,
                 )
                 .unwrap_or_default()
                 .into(),
@@ -157,7 +177,7 @@ impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
 impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     fn from(from: AudioSettings) -> Self {
         Self {
-            publishing_policy: from.publishing_policy as i32,
+            publish_policy: from.publish_policy as i32,
         }
     }
 }
@@ -167,15 +187,24 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
-    pub publishing_policy: PublishingPolicy,
+    #[serde(default)]
+    pub publish_policy: PublishPolicy,
+}
+
+impl Default for VideoSettings {
+    fn default() -> Self {
+        Self {
+            publish_policy: PublishPolicy::default(),
+        }
+    }
 }
 
 impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
     fn from(from: &proto::web_rtc_publish_endpoint::VideoSettings) -> Self {
         Self {
-            publishing_policy:
-                proto::web_rtc_publish_endpoint::PublishingPolicy::from_i32(
-                    from.publishing_policy,
+            publish_policy:
+                proto::web_rtc_publish_endpoint::PublishPolicy::from_i32(
+                    from.publish_policy,
                 )
                 .unwrap_or_default()
                 .into(),
@@ -186,7 +215,7 @@ impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
     fn from(from: VideoSettings) -> Self {
         Self {
-            publishing_policy: from.publishing_policy as i32,
+            publish_policy: from.publish_policy as i32,
         }
     }
 }
@@ -201,11 +230,13 @@ impl From<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
             audio_settings: value
                 .audio_settings
                 .as_ref()
-                .map(AudioSettings::from),
+                .map(AudioSettings::from)
+                .unwrap_or_default(),
             video_settings: value
                 .video_settings
                 .as_ref()
-                .map(VideoSettings::from),
+                .map(VideoSettings::from)
+                .unwrap_or_default(),
             force_relay: value.force_relay,
         }
     }

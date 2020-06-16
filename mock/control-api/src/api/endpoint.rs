@@ -38,36 +38,45 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 /// Publishing policy of the video or audio media type in the
 /// [`WebRtcPublishEndpoint`].
 #[derive(Debug, Deserialize, Serialize)]
-pub enum PublishingPolicy {
+pub enum PublishPolicy {
     /// Publish this media type if it possible.
-    IfPossible,
+    Optional,
 
     /// Don't start call if this media type can't be published.
     Required,
+
+    /// Media type __must__ not be published.
+    ///
+    /// Media server will not try to initialize publishing.
+    Disabled,
 }
 
-impl From<proto::web_rtc_publish_endpoint::PublishingPolicy>
-    for PublishingPolicy
-{
-    fn from(proto: proto::web_rtc_publish_endpoint::PublishingPolicy) -> Self {
-        use proto::web_rtc_publish_endpoint::PublishingPolicy::{
-            PublishIfPossible, Required,
+impl Default for PublishPolicy {
+    fn default() -> Self {
+        Self::Optional
+    }
+}
+
+impl From<proto::web_rtc_publish_endpoint::PublishPolicy> for PublishPolicy {
+    fn from(proto: proto::web_rtc_publish_endpoint::PublishPolicy) -> Self {
+        use proto::web_rtc_publish_endpoint::PublishPolicy::{
+            Disabled, Optional, Required,
         };
 
         match proto {
+            Optional => Self::Optional,
             Required => Self::Required,
-            PublishIfPossible => Self::IfPossible,
+            Disabled => Self::Disabled,
         }
     }
 }
 
-impl From<PublishingPolicy>
-    for proto::web_rtc_publish_endpoint::PublishingPolicy
-{
-    fn from(from: PublishingPolicy) -> Self {
+impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
+    fn from(from: PublishPolicy) -> Self {
         match from {
-            PublishingPolicy::IfPossible => Self::PublishIfPossible,
-            PublishingPolicy::Required => Self::Required,
+            PublishPolicy::Optional => Self::Optional,
+            PublishPolicy::Required => Self::Required,
+            PublishPolicy::Disabled => Self::Disabled,
         }
     }
 }
@@ -77,15 +86,24 @@ impl From<PublishingPolicy>
 pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].
-    publishing_policy: PublishingPolicy,
+    #[serde(default)]
+    publish_policy: PublishPolicy,
+}
+
+impl Default for AudioSettings {
+    fn default() -> Self {
+        Self {
+            publish_policy: PublishPolicy::default(),
+        }
+    }
 }
 
 impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
     fn from(proto: proto::web_rtc_publish_endpoint::AudioSettings) -> Self {
         Self {
-            publishing_policy:
-                proto::web_rtc_publish_endpoint::PublishingPolicy::from_i32(
-                    proto.publishing_policy,
+            publish_policy:
+                proto::web_rtc_publish_endpoint::PublishPolicy::from_i32(
+                    proto.publish_policy,
                 )
                 .unwrap_or_default()
                 .into(),
@@ -96,7 +114,7 @@ impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
 impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     fn from(from: AudioSettings) -> Self {
         Self {
-            publishing_policy: from.publishing_policy as i32,
+            publish_policy: from.publish_policy as i32,
         }
     }
 }
@@ -106,13 +124,22 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
-    publishing_policy: PublishingPolicy,
+    #[serde(default)]
+    publish_policy: PublishPolicy,
+}
+
+impl Default for VideoSettings {
+    fn default() -> Self {
+        Self {
+            publish_policy: PublishPolicy::default(),
+        }
+    }
 }
 
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
     fn from(from: VideoSettings) -> Self {
         Self {
-            publishing_policy: from.publishing_policy as i32,
+            publish_policy: from.publish_policy as i32,
         }
     }
 }
@@ -120,9 +147,9 @@ impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
 impl From<proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
     fn from(proto: proto::web_rtc_publish_endpoint::VideoSettings) -> Self {
         Self {
-            publishing_policy:
-                proto::web_rtc_publish_endpoint::PublishingPolicy::from_i32(
-                    proto.publishing_policy,
+            publish_policy:
+                proto::web_rtc_publish_endpoint::PublishPolicy::from_i32(
+                    proto.publish_policy,
                 )
                 .unwrap_or_default()
                 .into(),
@@ -149,12 +176,14 @@ pub struct WebRtcPublishEndpoint {
     /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
     ///
     /// If `None` then audio shouldn't be published.
-    audio_settings: Option<AudioSettings>,
+    #[serde(default)]
+    audio_settings: AudioSettings,
 
     /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
     ///
     /// If `None` then video shouldn't be published.
-    video_settings: Option<VideoSettings>,
+    #[serde(default)]
+    video_settings: VideoSettings,
 }
 
 impl WebRtcPublishEndpoint {
@@ -169,8 +198,8 @@ impl WebRtcPublishEndpoint {
             force_relay: self.force_relay,
             on_start: String::new(),
             on_stop: String::new(),
-            audio_settings: self.audio_settings.map(Into::into),
-            video_settings: self.video_settings.map(Into::into),
+            audio_settings: Some(self.audio_settings.into()),
+            video_settings: Some(self.video_settings.into()),
         }
     }
 }
@@ -183,8 +212,14 @@ impl From<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
                 .unwrap_or_default()
                 .into(),
             force_relay: proto.force_relay,
-            audio_settings: proto.audio_settings.map(Into::into),
-            video_settings: proto.video_settings.map(Into::into),
+            audio_settings: proto
+                .audio_settings
+                .map(Into::into)
+                .unwrap_or_default(),
+            video_settings: proto
+                .video_settings
+                .map(Into::into)
+                .unwrap_or_default(),
         }
     }
 }

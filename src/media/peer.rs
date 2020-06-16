@@ -15,7 +15,9 @@ use medea_client_api_proto::{
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId,
+    api::control::{
+        endpoints::webrtc_publish_endpoint::PublishPolicy, MemberId,
+    },
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
@@ -350,21 +352,24 @@ impl Peer<New> {
         publisher_peer: &mut Peer<New>,
         tracks_counter: &mut Counter<TrackId>,
     ) {
-        if let Some(audio_settings) = src.audio_settings() {
+        let audio_settings = src.audio_settings();
+        if audio_settings.publish_policy != PublishPolicy::Disabled {
             let track_audio = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Audio(AudioSettings {
-                    is_required: audio_settings.publishing_policy.is_required(),
+                    is_required: audio_settings.publish_policy.is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
             publisher_peer.add_receiver(track_audio);
         }
-        if let Some(video_settings) = src.video_settings() {
+
+        let video_settings = src.video_settings();
+        if video_settings.publish_policy != PublishPolicy::Disabled {
             let track_video = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
-                    is_required: video_settings.publishing_policy.is_required(),
+                    is_required: video_settings.publish_policy.is_required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));

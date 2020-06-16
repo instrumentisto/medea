@@ -14,10 +14,6 @@ spec:
             spec:
               p2p: Always
               force_relay: true
-              audio_settings:
-                publish_policy: Optional
-              video_settings:
-                publish_policy: Optional
           play-responder:
             kind: WebRtcPlayEndpoint
             spec:
@@ -35,10 +31,6 @@ spec:
             spec:
               p2p: Always
               force_relay: true
-              audio_settings:
-                publish_policy: Optional
-              video_settings:
-                publish_policy: Optional
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
