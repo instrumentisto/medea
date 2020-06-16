@@ -728,6 +728,18 @@ struct TracksAdded {
 }
 ```
 
+#### 12. TracksRemoved
+
+`Media Server` notifies about necessity to remove `Track`s from specified `Peer`.
+
+```rust
+struct TracksRemoved {
+    peer_id: PeerId,
+    sdp_offer: Option<String>,
+    tracks_ids: HashSet<TrackId>,
+}
+```
+
 
 ### Commands
 

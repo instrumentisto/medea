@@ -58,7 +58,8 @@ All user visible changes to this project will be documented in this file. This p
         - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
-        - `TracksAdded` for adding new `Track`s to the already connected `PeerConnection` ([#105])
+        - `TracksAdded` for adding new `Track`s to the already connected `PeerConnection` ([#105]);
+        - `TracksRemoved` for removing `Track`s from the already connected `PeerConnection` ([#109]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -82,6 +83,7 @@ All user visible changes to this project will be documented in this file. This p
 [#90]: /../../pull/90
 [#97]: /../../pull/97
 [#105]: /../../pull/105
+[#109]: /../../pull/109
 
 
 

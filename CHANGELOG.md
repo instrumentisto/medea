@@ -30,7 +30,8 @@ All user visible changes to this project will be documented in this file. This p
         - `on_join`;
         - `on_leave`.
     - Configuration of `Member`'s Client API RPC settings ([#95]);
-    - Add new endpoints to the already interconnected `Member`s ([#105]).
+    - Add new endpoints to the already interconnected `Member`s ([#105]);
+    - Remove endpoints from the already inteconnected `Member`s ([#109]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -40,7 +41,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]);
     - Implement `PeerConnection` renegotiation ([#105]);
-    - Implement `Event::TracksAdded` which is used for creating new `Track`s in the already connected `Peer` ([#105]).
+    - Implement `Event::TracksAdded` which is used for creating new `Track`s in the already connected `Peer` ([#105]);
+    - Implement `Event::TracksRemoved` which is used for removing `Track`s from the already connected `Peer` ([#109]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -74,6 +76,7 @@ All user visible changes to this project will be documented in this file. This p
 [#95]: /../../pull/95
 [#98]: /../../pull/98
 [#105]: /../../pull/105
+[#109]: /../../pull/109
 
 
 

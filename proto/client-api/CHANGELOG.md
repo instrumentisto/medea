@@ -49,7 +49,8 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
-- `TracksAdded` event ([#105]).
+- `TracksAdded` event ([#105]);
+- `TrackRemoved` event ([#109]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
