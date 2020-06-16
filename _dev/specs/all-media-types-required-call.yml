@@ -12,9 +12,9 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_policy: Required
+                publish_policy: Required
               video_settings:
-                publishing_policy: Required
+                publish_policy: Required
           play-responder:
             kind: WebRtcPlayEndpoint
             spec:
@@ -29,9 +29,9 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_policy: Required
+                publish_policy: Required
               video_settings:
-                publishing_policy: Required
+                publish_policy: Required
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:

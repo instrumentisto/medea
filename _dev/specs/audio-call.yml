@@ -17,7 +17,7 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_policy: IfPossible
+                publish_policy: Optional
           play-member-2:
             kind: WebRtcPlayEndpoint
             spec:
@@ -37,7 +37,7 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_policy: IfPossible
+                publish_policy: Optional
           play-member-1:
             kind: WebRtcPlayEndpoint
             spec:

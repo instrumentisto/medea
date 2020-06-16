@@ -20,10 +20,10 @@ async function createRoom(roomId, memberId) {
               p2p: 'Always',
               force_relay: false,
               audio_settings: {
-                publishing_policy: "IfPossible"
+                publish_policy: "Optional"
               },
               video_settings: {
-                publishing_policy: "IfPossible"
+                publish_policy: "Optional"
               }
             },
           },

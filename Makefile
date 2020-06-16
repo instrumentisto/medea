@@ -272,10 +272,12 @@ endif
 #
 # Usage:
 #	make cargo.lint
-# TODO: Enable ignored lints when rust 1.45 is stabilized
+
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings \
-		 -A clippy::similar_names -A clippy::used_underscore_binding
+		-A clippy::similar_names -A clippy::used_underscore_binding
+# TODO: Enable ignored lints when Rust 1.45 is released.
+
 
 
 

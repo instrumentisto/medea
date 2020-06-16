@@ -213,51 +213,47 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[prost(bool, tag="5")]
     pub force_relay: bool,
-    /// Settings for the audio media type of the 'WebRtcPublishEndpoint'.
-    ///
-    /// If empty then audio will not be published.
+    /// Settings for the audio media type of this element.
+    /// If empty, then no audio will be published.
     #[prost(message, optional, tag="6")]
     pub audio_settings: ::std::option::Option<web_rtc_publish_endpoint::AudioSettings>,
-    /// Settings for the video media type of the 'WebRtcPublishEndpoint'.
-    ///
-    /// If empty then video will not be published.
+    /// Settings for the video media type of this element.
+    /// If empty, then no video will be published.
     #[prost(message, optional, tag="7")]
     pub video_settings: ::std::option::Option<web_rtc_publish_endpoint::VideoSettings>,
 }
 pub mod web_rtc_publish_endpoint {
-    /// Settings for the video media type of the 'WebRtcPublishEndpoint'.
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct VideoSettings {
-        /// Publishing policy of the video media type in the
-        /// 'WebRtcPublishEndpoint'.
-        #[prost(enumeration="PublishingPolicy", tag="1")]
-        pub publishing_policy: i32,
-    }
-    /// Settings for the audio media type of the 'WebRtcPublishEndpoint'.
+    /// Audio media type settings of WebRtcPublishEndpoint.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AudioSettings {
-        /// Publishing policy of the audio media type in the
-        /// 'WebRtcPublishEndpoint'.
-        #[prost(enumeration="PublishingPolicy", tag="1")]
-        pub publishing_policy: i32,
+        /// Policy to publish audio media type with.
+        #[prost(enumeration="PublishPolicy", tag="1")]
+        pub publish_policy: i32,
     }
-    /// Publishing policy of the video or audio media type in the
-    /// 'WebRtcPublishEndpoint'.
+    /// Video media type settings of WebRtcPublishEndpoint.
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct VideoSettings {
+        /// Policy to publish video media type with.
+        #[prost(enumeration="PublishPolicy", tag="1")]
+        pub publish_policy: i32,
+    }
+    /// Policy of how the video or audio media type can be published in
+    /// WebRtcPublishEndpoint.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
-    pub enum PublishingPolicy {
-        /// Specified media type __may__ be published.
+    pub enum PublishPolicy {
+        /// Media type MAY be published.
         ///
         /// Media server will try to initialize publishing, but won't produce any
-        /// errors if user application will fail to or choose not to acquire required
-        /// track. Media server will approve user request to stop and restart
-        /// publishing specified media type.
-        PublishIfPossible = 0,
-        /// Specified media type __must__ be published.
+        /// errors if user application fails to (or chooses not to) acquire a
+        /// required media track. Media server will approve user requests to stop and
+        /// to restart publishing the specified media type.
+        Optional = 0,
+        /// Media type MUST be published.
         ///
-        /// Media server will try to initialize publishing. If required media track
-        /// could not be acquired, then an error will be thrown. Media server will
-        /// deny all requests to stop publishing.
+        /// Media server will try to initialize publishing, and if a required media
+        /// track couldn't be acquired, then an error will be thrown. Media server
+        /// will deny all requests to stop publishing.
         Required = 1,
     }
     /// P2P mode of WebRTC interaction.

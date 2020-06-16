@@ -21,9 +21,9 @@ spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
               audio_settings:
-                publishing_policy: IfPossible
+                publish_policy: Optional
               video_settings:
-                publishing_policy: IfPossible
+                publish_policy: Optional
           # Media element which is able to play media data for client
           # via WebRTC.
           play-responder:
@@ -45,9 +45,9 @@ spec:
             spec:
               p2p: Always
               audio_settings:
-                publishing_policy: IfPossible
+                publish_policy: Optional
               video_settings:
-                publishing_policy: IfPossible
+                publish_policy: Optional
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
