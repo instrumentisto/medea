@@ -19,12 +19,6 @@ async function createRoom(roomId, memberId) {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always',
               force_relay: false,
-              audio_settings: {
-                publish_policy: "Optional"
-              },
-              video_settings: {
-                publish_policy: "Optional"
-              }
             },
           },
           on_join: "grpc://127.0.0.1:9099",

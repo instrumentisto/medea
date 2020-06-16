@@ -11,10 +11,6 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-              audio_settings:
-                publish_policy: Optional
-              video_settings:
-                publish_policy: Optional
           play-member-2:
             kind: WebRtcPlayEndpoint
             spec:
@@ -32,10 +28,6 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-              audio_settings:
-                publish_policy: Optional
-              video_settings:
-                publish_policy: Optional
           play-member-1:
             kind: WebRtcPlayEndpoint
             spec:
@@ -53,10 +45,6 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-              audio_settings:
-                publish_policy: Optional
-              video_settings:
-                publish_policy: Optional
           play-member-2:
             kind: WebRtcPlayEndpoint
             spec:

@@ -12,10 +12,6 @@ spec:
             spec:
               p2p: Always
               force_relay: true
-              audio_settings:
-                publish_policy: Optional
-              video_settings:
-                publish_policy: Optional
     responder:
       kind: Member
       credentials: test
