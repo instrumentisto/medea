@@ -15,7 +15,7 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings,
+    TrackId, TrackUpdate, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -203,7 +203,7 @@ pub struct Context {
     /// Reason of a started renegotiation.
     ///
     /// If it `None` then no renegotiation is going.
-    renegotiation_reason: Option<RenegotiationReason>,
+    is_renegotiate: bool,
 
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] which should
     /// be sent to the client.
@@ -246,6 +246,15 @@ impl<T> Peer<T> {
     /// [`Member`]: crate::signalling::elements::member::Member
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
+    }
+
+    pub fn get_updates(&self) -> Vec<TrackUpdate> {
+        let new_tracks = self.get_new_tracks();
+
+        new_tracks
+            .into_iter()
+            .map(|t| TrackUpdate::Added(t))
+            .collect()
     }
 
     /// Returns [`Track`]s of this [`Peer`] which should be sent to the client.
@@ -337,8 +346,8 @@ impl<T> Peer<T> {
     /// Returns reason of the started renegotiation if it is going.
     ///
     /// Returns `None` if no renegotiation is started.
-    pub fn renegotiation_reason(&self) -> Option<RenegotiationReason> {
-        self.context.renegotiation_reason
+    pub fn is_renegotiate(&self) -> bool {
+        self.context.is_renegotiate
     }
 
     /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
@@ -347,7 +356,7 @@ impl<T> Peer<T> {
     ///
     /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
-        self.context.renegotiation_reason = None;
+        self.context.is_renegotiate = false;
         self.context.new_receivers = Vec::new();
         self.context.new_senders = Vec::new();
     }
@@ -446,7 +455,7 @@ impl Peer<Stable> {
             senders: HashMap::new(),
             is_force_relayed,
             endpoints: Vec::new(),
-            renegotiation_reason: None,
+            is_renegotiate: false,
             new_receivers: Vec::new(),
             new_senders: Vec::new(),
         };
@@ -542,12 +551,9 @@ impl Peer<Stable> {
     /// this [`Peer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_renegotiation(
-        self,
-        reason: RenegotiationReason,
-    ) -> Peer<WaitLocalSdp> {
+    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
-        context.renegotiation_reason = Some(reason);
+        context.is_renegotiate = true;
         context.sdp_answer = None;
         context.sdp_offer = None;
 
@@ -593,7 +599,7 @@ pub mod tests {
                 ice_user: None,
                 endpoints: Vec::new(),
                 partner_member: MemberId::from("partner-member"),
-                renegotiation_reason: None,
+                is_renegotiate: false,
                 new_senders: Vec::new(),
                 new_receivers: Vec::new(),
             },

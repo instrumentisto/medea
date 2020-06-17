@@ -25,10 +25,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{
-        peer::RenegotiationReason, IceUser, Peer, PeerError, PeerStateMachine,
-        Stable, WaitLocalSdp,
-    },
+    media::{IceUser, Peer, PeerError, PeerStateMachine, Stable, WaitLocalSdp},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -685,8 +682,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     ) -> Result<&mut Peer<WaitLocalSdp>, RoomError> {
         let peer: Peer<Stable> = self.take_inner_peer(peer_id)?;
 
-        let renegotiating_peer =
-            peer.start_renegotiation(RenegotiationReason::TracksAdded);
+        let renegotiating_peer = peer.start_renegotiation();
         let renegotiating_peer_id = renegotiating_peer.id();
         self.peers
             .insert(renegotiating_peer_id, renegotiating_peer.into());
