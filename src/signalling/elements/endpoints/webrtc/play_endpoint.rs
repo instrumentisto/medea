@@ -170,7 +170,10 @@ impl WebRtcPlayEndpoint {
 
     pub fn has_traffic_callback(&self) -> bool {
         // TODO: should be implement in the on-start-on-stop branch
-        false
+        #[cfg(test)]
+        return true;
+        #[cfg(not(test))]
+        return false;
     }
 
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak

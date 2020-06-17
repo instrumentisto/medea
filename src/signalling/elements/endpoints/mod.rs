@@ -28,10 +28,12 @@ impl Endpoint {
     #[allow(clippy::unused_self)]
     #[inline]
     pub fn has_traffic_callback(&self) -> bool {
-        // TODO: Delegate this call to
-        //       `WebRtcPublishEndpoint`/`WebRtcPlayEndpoint`.
-
-        false
+        match self {
+            Endpoint::WebRtcPlayEndpoint(play) => play.has_traffic_callback(),
+            Endpoint::WebRtcPublishEndpoint(publish) => {
+                publish.has_traffic_callback()
+            }
+        }
     }
 
     /// Returns [`Weak`] reference to this [`Endpoint`].

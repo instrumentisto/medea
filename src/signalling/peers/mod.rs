@@ -529,12 +529,12 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         );
         Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).then(
             |peers_res, room, _| {
+                let mut futs = Vec::new();
                 match actix_try!(peers_res) {
                     GetOrCreatePeersResult::Created(
                         src_peer_id,
                         sink_peer_id,
                     ) => {
-                        let mut futs = Vec::new();
                         {
                             let this = room.peers_mut();
                             let src_peer: Peer<Stable> =
@@ -548,25 +548,6 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                                 .register_peer(&src_peer, this.peer_stats_ttl);
                             this.peer_metrics_service
                                 .register_peer(&sink_peer, this.peer_stats_ttl);
-
-                            if src.has_traffic_callback() {
-                                futs.push(
-                                    this.peers_traffic_watcher.register_peer(
-                                        this.room_id.clone(),
-                                        sink_peer_id,
-                                        sink.is_force_relayed(),
-                                    ),
-                                );
-                            }
-                            if sink.has_traffic_callback() {
-                                futs.push(
-                                    this.peers_traffic_watcher.register_peer(
-                                        this.room_id.clone(),
-                                        src_peer_id,
-                                        sink.is_force_relayed(),
-                                    ),
-                                );
-                            }
 
                             this.add_peer(src_peer);
                             this.add_peer(sink_peer);
@@ -605,6 +586,25 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                             this.get_tracks_counter(),
                         );
 
+                        if src.has_traffic_callback() {
+                            futs.push(
+                                this.peers_traffic_watcher.register_peer(
+                                    this.room_id.clone(),
+                                    sink_peer_id,
+                                    sink.is_force_relayed(),
+                                ),
+                            );
+                        }
+                        if sink.has_traffic_callback() {
+                            futs.push(
+                                this.peers_traffic_watcher.register_peer(
+                                    this.room_id.clone(),
+                                    src_peer_id,
+                                    sink.is_force_relayed(),
+                                ),
+                            );
+                        }
+
                         sink_peer.add_endpoint(&sink.into());
                         src_peer.add_endpoint(&src.into());
 
@@ -618,7 +618,19 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                         this.add_peer(src_peer);
                         this.add_peer(sink_peer);
 
-                        Box::new(future::ok(None).into_actor(room))
+                        let fut = future::try_join_all(futs)
+                            .into_actor(room)
+                            .then(move |res, room, _| {
+                                async move {
+                                    res.map_err(|e| {
+                                        RoomError::PeerTrafficWatcherMailbox(e)
+                                    })?;
+                                    Ok(None)
+                                }
+                                .into_actor(room)
+                            });
+
+                        Box::new(fut) as ActFuture<_, _>
                     }
                 }
             },
@@ -888,8 +900,15 @@ mod tests {
         mock.expect_register_room()
             .returning(|_, _| Box::pin(future::ok(())));
         mock.expect_unregister_room().returning(|_| {});
-        mock.expect_register_peer()
-            .returning(move |_, _, _| Box::pin(future::ok(())));
+        let (register_peer_tx, mut register_peer_rx) = mpsc::unbounded();
+        let register_peer_done = timeout(
+            Duration::from_secs(1),
+            register_peer_rx.take(4).collect::<Vec<_>>(),
+        );
+        mock.expect_register_peer().returning(move |_, _, _| {
+            register_peer_tx.unbounded_send(()).unwrap();
+            Box::pin(future::ok(()))
+        });
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
@@ -1008,5 +1027,6 @@ mod tests {
 
         let runner = PeersServiceOwnerMock::new(peers).start();
         runner.send(RunTest).await.unwrap().unwrap();
+        register_peer_done.await.unwrap();
     }
 }
