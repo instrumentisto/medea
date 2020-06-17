@@ -162,7 +162,7 @@ impl CommandHandler for Room {
                             negotiation_role: None,
                             updates: tracks_patches
                                 .into_iter()
-                                .map(|t| TrackUpdate::Updated(t))
+                                .map(TrackUpdate::Updated)
                                 .collect(),
                         },
                     )

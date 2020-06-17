@@ -310,7 +310,7 @@ impl Room {
                                     updates: renegotiate_peer
                                         .get_new_tracks()
                                         .into_iter()
-                                        .map(|t| TrackUpdate::Added(t))
+                                        .map(TrackUpdate::Added)
                                         .collect(),
                                     negotiation_role: Some(
                                         NegotiationRole::Offerer,

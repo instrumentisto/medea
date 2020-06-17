@@ -251,10 +251,7 @@ impl<T> Peer<T> {
     pub fn get_updates(&self) -> Vec<TrackUpdate> {
         let new_tracks = self.get_new_tracks();
 
-        new_tracks
-            .into_iter()
-            .map(|t| TrackUpdate::Added(t))
-            .collect()
+        new_tracks.into_iter().map(TrackUpdate::Added).collect()
     }
 
     /// Returns [`Track`]s of this [`Peer`] which should be sent to the client.

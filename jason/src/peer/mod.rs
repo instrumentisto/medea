@@ -587,6 +587,13 @@ impl PeerConnection {
         Ok(offer)
     }
 
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
+    /// new [`Sender`] cause transceiver with specified `mid` does not
+    /// exist.
     pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
         self.media_connections
             .create_tracks(tracks)
@@ -595,6 +602,23 @@ impl PeerConnection {
         Ok(())
     }
 
+    /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
+    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
+    /// description.
+    ///
+    /// Should be called after local tracks changes, which require
+    /// renegotiation.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
+    /// [RtcPeerConnection.createOffer()][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let offer = self
             .peer
@@ -817,6 +841,22 @@ impl PeerConnection {
         Ok(answer)
     }
 
+    /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
+    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
+    /// description.
+    ///
+    /// Should be called whenever remote description has been changed.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
+    /// [RtcPeerConnection.createAnswer()][1] fails.
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][2] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
+    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn create_and_set_answer(&self) -> Result<String> {
         let answer = self
             .peer

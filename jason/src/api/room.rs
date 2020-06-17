@@ -790,7 +790,7 @@ impl EventHandler for InnerRoom {
         self.create_connections_from_tracks(&tracks);
         self.on_tracks_applied(
             peer_id,
-            tracks.into_iter().map(|t| TrackUpdate::Added(t)).collect(),
+            tracks.into_iter().map(TrackUpdate::Added).collect(),
             Some(negotiation_role),
         );
     }
@@ -891,13 +891,12 @@ impl EventHandler for InnerRoom {
                         .map_err(tracerr::map_from_and_wrap!())?;
 
                     if let Some(negotiation_role) = &negotiation_role {
-                        match negotiation_role {
-                            NegotiationRole::Answerer(sdp_offer) => {
-                                peer.set_remote_offer(sdp_offer.clone())
-                                    .await
-                                    .map_err(tracerr::map_from_and_wrap!())?;
-                            }
-                            _ => (),
+                        if let NegotiationRole::Answerer(sdp_offer) =
+                            negotiation_role
+                        {
+                            peer.set_remote_offer(sdp_offer.clone())
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
                         }
                     }
 
