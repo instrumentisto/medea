@@ -79,3 +79,6 @@ ingress:
   tls:
     enabled: yes
     auto: yes
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Cache-Control: must-revalidate";
