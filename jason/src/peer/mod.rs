@@ -587,6 +587,24 @@ impl PeerConnection {
         Ok(offer)
     }
 
+    pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+        self.media_connections
+            .create_tracks(tracks)
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(())
+    }
+
+    pub async fn create_and_set_offer(&self) -> Result<String> {
+        let offer = self
+            .peer
+            .create_and_set_offer()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(offer)
+    }
+
     /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
     /// Requests local stream from [`MediaManager`] if no stream was provided.
@@ -682,7 +700,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-    async fn set_remote_offer(&self, offer: String) -> Result<()> {
+    pub async fn set_remote_offer(&self, offer: String) -> Result<()> {
         self.set_remote_description(SdpType::Offer(offer))
             .await
             .map_err(tracerr::wrap!())
@@ -790,6 +808,16 @@ impl PeerConnection {
             .await
             .map_err(tracerr::wrap!())?;
 
+        let answer = self
+            .peer
+            .create_and_set_answer()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(answer)
+    }
+
+    pub async fn create_and_set_answer(&self) -> Result<String> {
         let answer = self
             .peer
             .create_and_set_answer()

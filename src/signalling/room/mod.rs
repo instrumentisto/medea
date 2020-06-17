@@ -14,7 +14,7 @@ use actix::{
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::{Event, PeerId};
+use medea_client_api_proto::{Event, NegotiationRole, PeerId, TrackUpdate};
 
 use crate::{
     api::control::{
@@ -191,7 +191,7 @@ impl Room {
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
-            sdp_offer: None,
+            negotiation_role: NegotiationRole::Offerer,
             tracks: peer.get_new_tracks(),
             ice_servers,
             force_relay: peer.is_force_relayed(),
@@ -305,10 +305,16 @@ impl Room {
                         self.members
                             .send_event_to_member(
                                 renegotiate_peer.member_id(),
-                                Event::TracksAdded {
+                                Event::TracksApplied {
                                     peer_id: renegotiate_peer.id(),
-                                    sdp_offer: None,
-                                    tracks: renegotiate_peer.get_new_tracks(),
+                                    updates: renegotiate_peer
+                                        .get_new_tracks()
+                                        .into_iter()
+                                        .map(|t| TrackUpdate::Added(t))
+                                        .collect(),
+                                    negotiation_role: Some(
+                                        NegotiationRole::Offerer,
+                                    ),
                                 },
                             )
                             .into_actor(self),

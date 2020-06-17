@@ -12,8 +12,8 @@ use futures::{channel::mpsc, future, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch,
+    IceConnectionState, IceServer, NegotiationRole, PeerConnectionState,
+    PeerId, PeerMetrics, Track, TrackId, TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -768,7 +768,7 @@ impl EventHandler for InnerRoom {
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,
-        sdp_offer: Option<String>,
+        negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
@@ -788,7 +788,11 @@ impl EventHandler for InnerRoom {
         }
 
         self.create_connections_from_tracks(&tracks);
-        self.on_tracks_added(peer_id, tracks, sdp_offer);
+        self.on_tracks_applied(
+            peer_id,
+            tracks.into_iter().map(|t| TrackUpdate::Added(t)).collect(),
+            Some(negotiation_role),
+        );
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
@@ -845,68 +849,90 @@ impl EventHandler for InnerRoom {
         });
     }
 
-    /// Updates [`Track`]s of this [`Room`].
-    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            if let Err(err) = peer.update_senders(tracks) {
-                JasonError::from(err).print();
-            }
-        } else {
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
-        }
-    }
-
-    /// Adds provided [`Track`]s to the [`PeerConnection`] with provided
-    /// [`PeerId`].
-    ///
-    /// If `Some` SDP offer is provided then processes this SDP offer and sends
-    /// [`Command::MakeSdpAnswer`] to the media server.
-    ///
-    /// If `None` SDP offer is provided then creates SDP offer and sends
-    /// [`Command::MakeSdpOffer`] to the media server.
-    fn on_tracks_added(
+    fn on_tracks_applied(
         &mut self,
         peer_id: PeerId,
-        tracks: Vec<Track>,
-        sdp_offer: Option<String>,
+        updates: Vec<TrackUpdate>,
+        negotiation_role: Option<NegotiationRole>,
     ) {
         if let Some(peer) = self.peers.get(peer_id) {
+            let mut new_tracks = Vec::new();
+            let mut updated_tracks = Vec::new();
+
+            for update in updates {
+                match update {
+                    TrackUpdate::Added(track) => {
+                        new_tracks.push(track);
+                    }
+                    TrackUpdate::Updated(track_patch) => {
+                        updated_tracks.push(track_patch);
+                    }
+                }
+            }
+
+            // TODO: use drain_filter when its stable
+            let (new_recv, new_send): (Vec<_>, Vec<_>) = new_tracks
+                .into_iter()
+                .partition(|track| match track.direction {
+                    Direction::Send { .. } => false,
+                    Direction::Recv { .. } => true,
+                });
+
             let local_stream_constraints = self.local_stream_settings.clone();
             let rpc = Rc::clone(&self.rpc);
             let error_callback = Rc::clone(&self.on_failed_local_stream);
+
             spawn_local(
                 async move {
-                    match sdp_offer {
-                        None => {
-                            let sdp_offer = peer
-                                .get_offer(tracks, local_stream_constraints)
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            let mids = peer
-                                .get_mids()
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            rpc.send_command(Command::MakeSdpOffer {
-                                peer_id,
-                                sdp_offer,
-                                mids,
-                            });
+                    peer.create_tracks(new_recv)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    peer.update_senders(updated_tracks)
+                        .map_err(tracerr::map_from_and_wrap!())?;
+
+                    if let Some(negotiation_role) = &negotiation_role {
+                        match negotiation_role {
+                            NegotiationRole::Answerer(sdp_offer) => {
+                                peer.set_remote_offer(sdp_offer.clone())
+                                    .await
+                                    .map_err(tracerr::map_from_and_wrap!())?;
+                            }
+                            _ => (),
                         }
-                        Some(offer) => {
-                            let sdp_answer = peer
-                                .process_offer(
-                                    offer,
-                                    tracks,
-                                    local_stream_constraints,
-                                )
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            rpc.send_command(Command::MakeSdpAnswer {
-                                peer_id,
-                                sdp_answer,
-                            });
+                    }
+
+                    peer.create_tracks(new_send)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    peer.update_local_stream(local_stream_constraints)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+
+                    if let Some(negotiation_role) = negotiation_role {
+                        match negotiation_role {
+                            NegotiationRole::Offerer => {
+                                let sdp_offer = peer
+                                    .create_and_set_offer()
+                                    .await
+                                    .map_err(tracerr::map_from_and_wrap!())?;
+                                rpc.send_command(Command::MakeSdpOffer {
+                                    peer_id,
+                                    sdp_offer,
+                                    mids: peer.get_mids().unwrap(),
+                                });
+                            }
+                            NegotiationRole::Answerer(_) => {
+                                let sdp_answer = peer
+                                    .create_and_set_answer()
+                                    .await
+                                    .map_err(tracerr::map_from_and_wrap!())?;
+                                rpc.send_command(Command::MakeSdpAnswer {
+                                    peer_id,
+                                    sdp_answer,
+                                });
+                            }
                         }
-                    };
+                    }
                     Result::<_, Traced<RoomError>>::Ok(())
                 }
                 .then(|result| async move {
@@ -923,10 +949,7 @@ impl EventHandler for InnerRoom {
                         };
                     };
                 }),
-            );
-        } else {
-            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
-                .print();
+            )
         }
     }
 }

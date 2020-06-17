@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
+    TrackId, TrackPatch, TrackUpdate,
 };
 
 use crate::{
@@ -48,14 +48,18 @@ impl CommandHandler for Room {
         })?;
 
         let event = match from_peer.renegotiation_reason() {
-            Some(RenegotiationReason::TracksAdded) => Event::TracksAdded {
+            Some(RenegotiationReason::TracksAdded) => Event::TracksApplied {
                 peer_id: to_peer.id(),
-                sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_new_tracks(),
+                negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
+                updates: to_peer
+                    .get_new_tracks()
+                    .into_iter()
+                    .map(|t| TrackUpdate::Added(t))
+                    .collect(),
             },
             None => Event::PeerCreated {
                 peer_id: to_peer.id(),
-                sdp_offer: Some(sdp_offer),
+                negotiation_role: NegotiationRole::Answerer(sdp_offer),
                 tracks: to_peer.get_new_tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
@@ -159,9 +163,13 @@ impl CommandHandler for Room {
                 self.members
                     .send_event_to_member(
                         member_id,
-                        Event::TracksUpdated {
+                        Event::TracksApplied {
                             peer_id,
-                            tracks_patches,
+                            negotiation_role: None,
+                            updates: tracks_patches
+                                .into_iter()
+                                .map(|t| TrackUpdate::Updated(t))
+                                .collect(),
                         },
                     )
                     .into_actor(self),

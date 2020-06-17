@@ -241,7 +241,7 @@ pub enum Event {
     /// creation.
     PeerCreated {
         peer_id: PeerId,
-        sdp_offer: Option<String>,
+        negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         force_relay: bool,
@@ -262,23 +262,25 @@ pub enum Event {
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
 
-    /// Media Server notifies about necessity to update [`Track`]s in specified
-    /// Peer.
-    ///
-    /// Can be used to update existing [`Track`] settings (e.g. change to lower
-    /// video resolution, mute audio).
-    TracksUpdated {
+    TracksApplied {
         peer_id: PeerId,
-        tracks_patches: Vec<TrackPatch>,
+        updates: Vec<TrackUpdate>,
+        negotiation_role: Option<NegotiationRole>,
     },
+}
 
-    /// Media Server notifies about necessity to add [`Track`]s in specified
-    /// Peer.
-    TracksAdded {
-        peer_id: PeerId,
-        tracks: Vec<Track>,
-        sdp_offer: Option<String>,
-    },
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub enum NegotiationRole {
+    Offerer,
+    Answerer(String),
+}
+
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub enum TrackUpdate {
+    Added(Track),
+    Updated(TrackPatch),
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
