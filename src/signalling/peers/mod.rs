@@ -585,8 +585,8 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                             futs.push(
                                 this.peers_traffic_watcher.register_peer(
                                     this.room_id.clone(),
-                                    sink_peer_id,
-                                    sink.is_force_relayed(),
+                                    src_peer_id,
+                                    src.is_force_relayed(),
                                 ),
                             );
                         }
@@ -594,7 +594,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                             futs.push(
                                 this.peers_traffic_watcher.register_peer(
                                     this.room_id.clone(),
-                                    src_peer_id,
+                                    sink_peer_id,
                                     sink.is_force_relayed(),
                                 ),
                             );
