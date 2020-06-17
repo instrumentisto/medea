@@ -6,7 +6,9 @@ use futures::{
     channel::mpsc,
     stream::{self, BoxStream, StreamExt as _},
 };
-use medea_client_api_proto::{Command, Event, PeerId};
+use medea_client_api_proto::{
+    Command, Event, NegotiationRole, PeerId, TrackUpdate,
+};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
@@ -61,9 +63,13 @@ fn get_test_room_and_exist_peer(
             tracks_patches,
         } => {
             event_tx
-                .unbounded_send(Event::TracksUpdated {
+                .unbounded_send(Event::TracksApplied {
                     peer_id,
-                    tracks_patches,
+                    updates: tracks_patches
+                        .into_iter()
+                        .map(TrackUpdate::Updated)
+                        .collect(),
+                    negotiation_role: None,
                 })
                 .unwrap();
         }
@@ -410,7 +416,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            sdp_offer: None,
+            negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
             force_relay: false,
@@ -480,7 +486,7 @@ async fn error_get_local_stream_on_new_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            sdp_offer: None,
+            negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
             force_relay: false,

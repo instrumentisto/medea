@@ -23,8 +23,8 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, PeerId, RpcSettings, ServerMsg,
-    TrackId,
+    ClientMsg, Command, Event, IceCandidate, NegotiationRole, PeerId,
+    RpcSettings, ServerMsg, TrackId, TrackUpdate,
 };
 
 pub type MessageHandler =
@@ -244,14 +244,9 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                     match &event {
                         Event::PeerCreated {
                             peer_id,
-                            sdp_offer,
+                            negotiation_role,
                             tracks,
                             ..
-                        }
-                        | Event::TracksAdded {
-                            peer_id,
-                            sdp_offer,
-                            tracks,
                         } => {
                             self.known_peers.insert(*peer_id);
                             tracks.iter().for_each(|t| {
@@ -266,21 +261,23 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     self.generate_mid(t.id);
                                 }
                             });
-                            match sdp_offer {
-                                Some(_) => {
-                                    self.send_command(Command::MakeSdpAnswer {
-                                        peer_id: *peer_id,
-                                        sdp_answer: "responder_answer".into(),
-                                    })
-                                }
-                                None => {
+
+                            match negotiation_role {
+                                NegotiationRole::Offerer => {
                                     self.send_command(Command::MakeSdpOffer {
                                         peer_id: *peer_id,
                                         sdp_offer: "caller_offer".into(),
                                         mids: self.known_tracks_mids.clone(),
                                     })
                                 }
-                            };
+                                NegotiationRole::Answerer(sdp_offer) => {
+                                    assert_eq!(sdp_offer, "caller_offer");
+                                    self.send_command(Command::MakeSdpAnswer {
+                                        peer_id: *peer_id,
+                                        sdp_answer: "responder_answer".into(),
+                                    })
+                                }
+                            }
 
                             self.send_command(Command::SetIceCandidate {
                                 peer_id: *peer_id,
@@ -291,9 +288,56 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                 },
                             });
                         }
+                        Event::TracksApplied {
+                            peer_id,
+                            negotiation_role,
+                            updates,
+                        } => {
+                            assert!(self.known_peers.contains(peer_id));
+                            updates.iter().for_each(|t| {
+                                use medea_client_api_proto::Direction;
+                                if let TrackUpdate::Added(track) = t {
+                                    let mid = match &track.direction {
+                                        Direction::Send { mid, .. } => {
+                                            mid.clone()
+                                        }
+                                        Direction::Recv { mid, .. } => {
+                                            mid.clone()
+                                        }
+                                    };
+                                    if let Some(mid) = mid {
+                                        self.add_mid(track.id, mid);
+                                    } else {
+                                        self.generate_mid(track.id);
+                                    }
+                                }
+                            });
+
+                            if let Some(negotiation_role) = negotiation_role {
+                                match negotiation_role {
+                                    NegotiationRole::Answerer(sdp_offer) => {
+                                        assert_eq!(sdp_offer, "caller_offer");
+                                        self.send_command(
+                                            Command::MakeSdpAnswer {
+                                                peer_id: *peer_id,
+                                                sdp_answer: "responder_answer"
+                                                    .into(),
+                                            },
+                                        )
+                                    }
+                                    NegotiationRole::Offerer => self
+                                        .send_command(Command::MakeSdpOffer {
+                                            peer_id: *peer_id,
+                                            sdp_offer: "caller_offer".into(),
+                                            mids: self
+                                                .known_tracks_mids
+                                                .clone(),
+                                        }),
+                                }
+                            }
+                        }
                         Event::SdpAnswerMade { peer_id, .. }
-                        | Event::IceCandidateDiscovered { peer_id, .. }
-                        | Event::TracksUpdated { peer_id, .. } => {
+                        | Event::IceCandidateDiscovered { peer_id, .. } => {
                             assert!(self.known_peers.contains(peer_id))
                         }
                         Event::PeersRemoved { .. } => {}
