@@ -849,6 +849,9 @@ impl EventHandler for InnerRoom {
         });
     }
 
+    /// Creates new `Track`s, updates existing [`Sender`]s with [`TrackPatch`]s.
+    ///
+    /// Will start renegotiation process if `negotiate_role` isn't `None`.
     fn on_tracks_applied(
         &mut self,
         peer_id: PeerId,

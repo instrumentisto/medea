@@ -200,9 +200,11 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
-    /// Reason of a started renegotiation.
+    /// Status of renegotiation process.
     ///
-    /// If it `None` then no renegotiation is going.
+    /// If `true` then renegotiation is going.
+    ///
+    /// If `false` then not renegotiation is in progress.
     is_renegotiate: bool,
 
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] which should
@@ -248,6 +250,8 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
+    /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
+    /// client in the [`Event::TracksApplied`].
     pub fn get_updates(&self) -> Vec<TrackUpdate> {
         let new_tracks = self.get_new_tracks();
 
@@ -340,14 +344,14 @@ impl<T> Peer<T> {
         self.context.senders.clone()
     }
 
-    /// Returns reason of the started renegotiation if it is going.
+    /// Returns `true` if renegotiation is going.
     ///
-    /// Returns `None` if no renegotiation is started.
+    /// Returns `false` if no renegotiation is started.
     pub fn is_renegotiate(&self) -> bool {
         self.context.is_renegotiate
     }
 
-    /// Resets [`RenegotiationReason`] of this [`Peer`] to `None`.
+    /// Resets [`Context::is_renegotiate`] to `false`.
     ///
     /// Resets `new_senders` and `new_receivers`.
     ///
@@ -544,8 +548,9 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Sets provided [`RenegotiationReason`] as current renegotiation reason of
-    /// this [`Peer`].
+    /// Sets [`Context::is_renegotiate`] to `true`.
+    ///
+    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
@@ -559,15 +564,6 @@ impl Peer<Stable> {
             state: WaitLocalSdp {},
         }
     }
-}
-
-/// Reason of the started renegotiation of this [`Peer`].
-// TODO: Implement TracksRemoved and IceRestart reasons in the next PRs.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RenegotiationReason {
-    /// Renegotiation is started because some new [`Track`]s should be added to
-    /// the [`Peer`].
-    TracksAdded,
 }
 
 #[cfg(test)]

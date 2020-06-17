@@ -544,11 +544,6 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                             let src_peer = PeerStateMachine::from(src_peer);
                             let sink_peer = PeerStateMachine::from(sink_peer);
 
-                            this.peer_metrics_service
-                                .register_peer(&src_peer, this.peer_stats_ttl);
-                            this.peer_metrics_service
-                                .register_peer(&sink_peer, this.peer_stats_ttl);
-
                             this.add_peer(src_peer);
                             this.add_peer(sink_peer);
                         }

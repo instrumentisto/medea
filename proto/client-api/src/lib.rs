@@ -262,24 +262,43 @@ pub enum Event {
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
 
+    /// Media Server notifies about necessity to update [`Track`]s in specified
+    /// `Peer`.
     TracksApplied {
+        /// [`PeerId`] of `Peer` where [`Track`]s should be updated.
         peer_id: PeerId,
+
+        /// List of [`TrackUpdate`]s which should be applied.
         updates: Vec<TrackUpdate>,
+
+        /// Negotiation role based on which should be sent
+        /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
+        ///
+        /// If it `None` then no renegotiation should be done.
         negotiation_role: Option<NegotiationRole>,
     },
 }
 
+/// Negotiation role based on which should be sent [`Command::MakeSdpOffer`] or
+/// [`Command::MakeSdpAnswer`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub enum NegotiationRole {
+    /// [`Command::MakeSdpOffer`] should be sent by client.
     Offerer,
+
+    /// [`Command::MakeSdpAnswer`] should be sent by client.
     Answerer(String),
 }
 
+/// [`Track`] update which should be applied to the `Peer`.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub enum TrackUpdate {
+    /// New [`Track`] should be added to the `Peer`.
     Added(Track),
+
+    /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
     Updated(TrackPatch),
 }
 

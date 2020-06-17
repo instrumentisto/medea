@@ -703,31 +703,6 @@ It's recommended to cache `Peer` ID and `Member` ID relations in `Web Client`'s 
 ```
 </details>
 
-#### 10. TracksUpdated
-
-`Media Server` notifies about necessity to update `Track`s in specified `Peer`.
-
-Can be used to update existing `Track` settings (e.g. change to lower video resolution, mute audio).
-
-```rust
-struct TracksUpdated {
-    peer_id: PeerId,
-    tracks_patches: Vec<TrackPatch>,
-}
-```
-
-#### 11. TracksAdded
-
-`Media Server` notifies about necessity to add new `Track`s into specified `Peer`.
-
-```rust
-struct TracksAdded {
-    peer_id: PeerId,
-    tracks: Vec<Track>,
-    sdp_offer: Option<String>,
-}
-```
-
 
 ### Commands
 

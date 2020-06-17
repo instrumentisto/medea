@@ -25,8 +25,8 @@ All user visible changes to this project will be documented in this file. This p
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` and `PeerConnectionState` metrics ([#71], [#87]);
 - `RpcSettings` server message ([#75]);
 - `force_relay` field to `PeerCreated` event ([#79]);
-- `UpdateTracks` command and `TracksUpdated` event ([#81]);
-- `StatsUpdate` metric into `AddPeerConnectionMetrics` command ([#90]).
+- `TracksApplied` event's `TrackUpdate::Update` ([#81]);
+- `StatsUpdate` metric into `AddPeerConnectionMetrics` command ([#90]);
 - `RTCPeerConnection` stats ([#90]):
     - `RtcCodecStats`;
     - `RtcInboundRtpStreamStats`;
@@ -49,7 +49,8 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
-- `TracksAdded` event ([#105]).
+- `TracksApplied` event ([#105]);
+- `TrackApplied` event's `TrackUpdate::Added` ([#105]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
