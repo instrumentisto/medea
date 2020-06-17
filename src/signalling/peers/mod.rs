@@ -895,7 +895,7 @@ mod tests {
         mock.expect_register_room()
             .returning(|_, _| Box::pin(future::ok(())));
         mock.expect_unregister_room().returning(|_| {});
-        let (register_peer_tx, mut register_peer_rx) = mpsc::unbounded();
+        let (register_peer_tx, register_peer_rx) = mpsc::unbounded();
         let register_peer_done = timeout(
             Duration::from_secs(1),
             register_peer_rx.take(4).collect::<Vec<_>>(),

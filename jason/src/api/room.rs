@@ -920,7 +920,9 @@ impl EventHandler for InnerRoom {
                                 rpc.send_command(Command::MakeSdpOffer {
                                     peer_id,
                                     sdp_offer,
-                                    mids: peer.get_mids().unwrap(),
+                                    mids: peer.get_mids().map_err(
+                                        tracerr::map_from_and_wrap!(),
+                                    )?,
                                 });
                             }
                             NegotiationRole::Answerer(_) => {
