@@ -617,23 +617,27 @@ impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            debug!(
-                "Peer [id = {}] from a Room [id = {}] was registered in the \
-                 PeersTrafficWatcher with {:?} sources.",
-                msg.peer_id, msg.room_id, msg.flow_metrics_sources
-            );
-            room.peers.insert(
-                msg.peer_id,
-                PeerStat {
-                    peer_id: msg.peer_id,
-                    state: PeerState::New,
-                    init_task_handler: None,
-                    tracked_sources: msg.flow_metrics_sources,
-                    started_at: None,
-                    received_sources: HashMap::new(),
-                    traffic_flowing_timeout: self.traffic_report_ttl,
-                },
-            );
+            if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
+                peer.tracked_sources.extend(msg.flow_metrics_sources);
+            } else {
+                debug!(
+                    "Peer [id = {}] from a Room [id = {}] was registered in \
+                     the PeersTrafficWatcher with {:?} sources.",
+                    msg.peer_id, msg.room_id, msg.flow_metrics_sources
+                );
+                room.peers.insert(
+                    msg.peer_id,
+                    PeerStat {
+                        peer_id: msg.peer_id,
+                        state: PeerState::New,
+                        init_task_handler: None,
+                        tracked_sources: msg.flow_metrics_sources,
+                        started_at: None,
+                        received_sources: HashMap::new(),
+                        traffic_flowing_timeout: self.traffic_report_ttl,
+                    },
+                );
+            }
         }
     }
 }

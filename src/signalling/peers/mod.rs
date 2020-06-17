@@ -549,20 +549,24 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                             this.peer_metrics_service
                                 .register_peer(&sink_peer, this.peer_stats_ttl);
 
-                            futs.push(
-                                this.peers_traffic_watcher.register_peer(
-                                    this.room_id.clone(),
-                                    sink_peer_id,
-                                    false,
-                                ),
-                            );
-                            futs.push(
-                                this.peers_traffic_watcher.register_peer(
-                                    this.room_id.clone(),
-                                    src_peer_id,
-                                    false,
-                                ),
-                            );
+                            if src.has_traffic_callback() {
+                                futs.push(
+                                    this.peers_traffic_watcher.register_peer(
+                                        this.room_id.clone(),
+                                        sink_peer_id,
+                                        sink.is_force_relayed(),
+                                    ),
+                                );
+                            }
+                            if sink.has_traffic_callback() {
+                                futs.push(
+                                    this.peers_traffic_watcher.register_peer(
+                                        this.room_id.clone(),
+                                        src_peer_id,
+                                        sink.is_force_relayed(),
+                                    ),
+                                );
+                            }
 
                             this.add_peer(src_peer);
                             this.add_peer(sink_peer);

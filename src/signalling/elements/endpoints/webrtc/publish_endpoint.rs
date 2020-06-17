@@ -203,6 +203,11 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    pub fn has_traffic_callback(&self) -> bool {
+        // TODO: should be implement in the on-start-on-stop branch
+        false
+    }
+
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
