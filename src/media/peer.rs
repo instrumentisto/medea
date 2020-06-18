@@ -198,12 +198,7 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
-    /// Status of renegotiation process.
-    ///
-    /// If `true` then renegotiation is going.
-    ///
-    /// If `false` then not renegotiation is in progress.
-    is_renegotiate: bool,
+    is_known_to_remote: bool,
 
     /// Tracks changes, that remote Peer is not aware of.
     pending_track_updates: Vec<TrackChange>,
@@ -215,6 +210,7 @@ enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddSendTrack(Rc<MediaTrack>),
+
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
@@ -350,14 +346,11 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
-    /// Returns `true` if renegotiation is going.
-    ///
-    /// Returns `false` if no renegotiation is started.
-    pub fn is_renegotiate(&self) -> bool {
-        self.context.is_renegotiate
+    pub fn is_known_to_remote(&self) -> bool {
+        self.context.is_known_to_remote
     }
 
-    /// Resets [`Context::is_renegotiate`] to `false`.
+    /// Sets [`Self::is_known_to_remote`] to `true`.
     ///
     /// Resets `pending_changes` buffer.
     ///
@@ -365,7 +358,7 @@ impl<T> Peer<T> {
     fn renegotiation_finished(&mut self) {
         // TODO: peer_created_on_remote / known_to_remote
         //       change on stable => any other transition
-        self.context.is_renegotiate = false;
+        self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
     }
 }
@@ -463,7 +456,7 @@ impl Peer<Stable> {
             senders: HashMap::new(),
             is_force_relayed,
             endpoints: Vec::new(),
-            is_renegotiate: false,
+            is_known_to_remote: false,
             pending_track_updates: Vec::new(),
         };
 
@@ -549,7 +542,6 @@ impl Peer<Stable> {
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
-        context.is_renegotiate = true;
         context.sdp_answer = None;
         context.sdp_offer = None;
 

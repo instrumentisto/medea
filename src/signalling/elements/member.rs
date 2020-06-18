@@ -312,21 +312,16 @@ impl Member {
     }
 
     pub fn partners(&self) -> Vec<Member> {
-        // TODO: store in vec / hashset
         let this = self.0.borrow();
-        let mut result: Vec<Member> = this
-            .srcs
+        this.srcs
             .values()
-            .flat_map(|src| src.sinks().into_iter().map(|sink| sink.owner()))
+            .flat_map(|src| src.sinks().into_iter().map(|s| s.owner()))
             .chain(this.sinks.values().map(|sink| sink.src().owner()))
-            .collect();
-
-        result.sort_unstable_by(|this, that| {
-            this.0.borrow().id.cmp(&that.0.borrow().id)
-        });
-        result.dedup_by(|this, that| this.0.borrow().id == that.0.borrow().id);
-
-        result
+            .map(|m| (m.id(), m))
+            .collect::<HashMap<_, _>>()
+            .into_iter()
+            .map(|x| x.1)
+            .collect()
     }
 
     /// Inserts sink endpoint into this [`Member`].
@@ -441,7 +436,6 @@ impl Member {
 
     /// Compares pointers. If both pointers point to the same address, then
     /// returns `true`.
-    #[cfg(test)]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
     }

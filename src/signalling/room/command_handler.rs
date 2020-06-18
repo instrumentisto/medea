@@ -44,7 +44,7 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = if from_peer.is_renegotiate() {
+        let event = if from_peer.is_known_to_remote() {
             Event::TracksApplied {
                 peer_id: to_peer_id,
                 negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
