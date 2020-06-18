@@ -40,13 +40,9 @@ struct WebRtcPublishEndpointInner {
     owner: WeakMember,
 
     /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
-    ///
-    /// If `None` then audio shouldn't be published.
     audio_settings: AudioSettings,
 
     /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
-    ///
-    /// If `None` then video shouldn't be published.
     video_settings: VideoSettings,
 
     /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
@@ -218,15 +214,11 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns [`AudioSettings`] of this [`WebRtcPublishEndpoint`].
-    ///
-    /// If `None` returned then audio shouldn't be published.
     pub fn audio_settings(&self) -> AudioSettings {
         self.0.borrow().audio_settings
     }
 
     /// Returns [`VideoSettings`] of this [`WebRtcPublishEndpoint`].
-    ///
-    /// If `None` returned then video shouldn't be published.
     pub fn video_settings(&self) -> VideoSettings {
         self.0.borrow().video_settings
     }

@@ -214,11 +214,9 @@ pub struct WebRtcPublishEndpoint {
     #[prost(bool, tag="5")]
     pub force_relay: bool,
     /// Settings for the audio media type of this element.
-    /// If empty, then no audio will be published.
     #[prost(message, optional, tag="6")]
     pub audio_settings: ::std::option::Option<web_rtc_publish_endpoint::AudioSettings>,
     /// Settings for the video media type of this element.
-    /// If empty, then no video will be published.
     #[prost(message, optional, tag="7")]
     pub video_settings: ::std::option::Option<web_rtc_publish_endpoint::VideoSettings>,
 }

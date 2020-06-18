@@ -176,10 +176,8 @@ message WebRtcPublishEndpoint {
   // Option to relay all media through a TURN server forcibly.
   bool force_relay = 5;
   // Settings for the audio media type of this element.
-  // If empty, then no audio will be published.
   AudioSettings audio_settings = 6;
   // Settings for the video media type of this element.
-  // If empty, then no video will be published.
   VideoSettings video_settings = 7;
 
   // Audio media type settings of WebRtcPublishEndpoint.

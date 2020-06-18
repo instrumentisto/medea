@@ -174,14 +174,10 @@ pub struct WebRtcPublishEndpoint {
     force_relay: bool,
 
     /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
-    ///
-    /// If `None` then audio shouldn't be published.
     #[serde(default)]
     audio_settings: AudioSettings,
 
     /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
-    ///
-    /// If `None` then video shouldn't be published.
     #[serde(default)]
     video_settings: VideoSettings,
 }
