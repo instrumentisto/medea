@@ -20,9 +20,9 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.43
-CHROME_VERSION := 81.0
-FIREFOX_VERSION := 76.0.1
+RUST_VER := 1.44
+CHROME_VERSION := 83.0
+FIREFOX_VERSION := 77.0.1
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -241,7 +241,7 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir)/
+	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
 endif
 endif
 
@@ -275,7 +275,8 @@ endif
 
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings \
-		-A clippy::wildcard_imports
+		-A clippy::used_underscore_binding
+# TODO: Enable ignored lints when Rust 1.45 is released.
 
 
 
@@ -388,7 +389,8 @@ endif
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                          [registry=<registry-host>]
-#	                                          [log=(no|yes)] )]
+#	                                          [log=(no|yes)]
+#                                             [log-to-file=(no|yes)] )]
 #	                        [wait=(5|<seconds>)] )]
 
 test-e2e-env = RUST_BACKTRACE=1 \
@@ -402,7 +404,8 @@ ifeq ($(up),yes)
 	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
-	                     TAG=$(TAG) registry=$(registry)
+	                     TAG=$(TAG) registry=$(registry) \
+	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -694,6 +697,7 @@ docker.up.demo: docker.down.demo
 #	                                       [registry=<registry-host>]]
 #	                                       [( [background=no]
 #	                                        | background=yes [log=(no|yes)] )])]
+#	                     [log-to-file=(no|yes)]
 
 docker-up-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
@@ -711,8 +715,12 @@ ifeq ($(log),yes)
 endif
 endif
 else
+ifeq ($(log-to-file),yes)
+	@rm -f /tmp/medea.log
+endif
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
+		$(if $(call eq,$(log-to-file),yes),> /tmp/medea.log,) \
 		$(if $(call eq,$(background),yes),&,)
 endif
 
