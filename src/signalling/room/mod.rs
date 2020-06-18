@@ -9,7 +9,8 @@ mod rpc_server;
 use std::sync::Arc;
 
 use actix::{
-    fut, Actor, ActorFuture, Context, Handler, MailboxError, WrapFuture as _,
+    fut, Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
+    WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -31,13 +32,14 @@ use crate::{
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{PeerTrafficWatcher, PeersService, ConnectEndpointsResult},
+        peers::{ConnectEndpointsResult, PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::{actix_try_join_all, ResponseActAnyFuture},
     AppContext,
 };
 
+use crate::media::PeerStateMachine;
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
@@ -222,6 +224,7 @@ impl Room {
         member2: &Member,
     ) -> ActFuture<Result<(), RoomError>> {
         let member2_id = member2.id();
+        let member1_id = member1.id();
         let mut connect_endpoints_tasks = Vec::new();
 
         for src in member1.srcs().values() {
@@ -243,28 +246,75 @@ impl Room {
         }
 
         Box::new(actix_try_join_all(connect_endpoints_tasks).then(
-            move |result, room: &mut Room, _| {
+            move |result, room: &mut Room, ctx| {
                 let connected_peers = actix_try!(result);
-                // TODO:
-                //      1. remove NoOp's
-                //      2. group by (PeerId,PeerId)
-                //      3. if group contains Created => send_peer_created
-                //      4. else => start renegotiation
-                // Vec<ConnectEndpointsResult>
-                //     ConnectEndpointsResult::NoOp((PeerId,PeerId)),
-                //     ConnectEndpointsResult::Created((PeerId,PeerId)),
-                //     ConnectEndpointsResult::Updated((PeerId,PeerId))
 
-                // let new_peers =
-                //     connect_results.into_iter().find_map(|item| item);
-                //
-                // if let Some((peer_id, _)) = new_peers {
-                //     actix_try!(room.send_peer_created(peer_id))
-                // } else {
-                //     // renegotiation
-                //     Box::new(fut::ok(()))
-                // }
-                Box::new(fut::ok(()))
+                let mut spawn_futs = Vec::new();
+                let mut then_futs = Vec::new();
+
+                for connected_peer in connected_peers {
+                    match connected_peer {
+                        ConnectEndpointsResult::NoOp(
+                            first_peer_id,
+                            second_peer_id,
+                        ) => {
+                            // Just do nothing
+                        }
+                        ConnectEndpointsResult::Updated(
+                            first_peer_id,
+                            second_peer_id,
+                        ) => {
+                            let first_peer: Peer<Stable> = actix_try!(room
+                                .peers
+                                .take_inner_peer(first_peer_id));
+                            let first_peer = first_peer.start_renegotiation();
+                            then_futs.push(Box::new(
+                                room.members
+                                    .send_event_to_member(
+                                        first_peer.member_id(),
+                                        Event::TracksApplied {
+                                            updates: first_peer.get_updates(),
+                                            negotiation_role: Some(
+                                                NegotiationRole::Offerer,
+                                            ),
+                                            peer_id: first_peer_id,
+                                        },
+                                    )
+                                    .into_actor(room),
+                            )
+                                as ActFuture<_>);
+
+                            room.peers.add_peer(first_peer);
+                        }
+                        ConnectEndpointsResult::Created(
+                            first_peer_id,
+                            second_peer_id,
+                        ) => {
+                            spawn_futs.push(actix_try!(
+                                room.send_peer_created(second_peer_id)
+                            ));
+                        }
+                    }
+                }
+
+                ctx.spawn(actix_try_join_all(spawn_futs).map(
+                    |res, room, ctx| {
+                        if let Err(e) = res {
+                            error!(
+                                "Failed to connect Endpoints because: {:?}",
+                                e
+                            );
+                            room.close_gracefully(ctx);
+                        }
+                    },
+                ));
+
+                Box::new(actix_try_join_all(then_futs).map(
+                    |res, room, this| {
+                        res?;
+                        Ok(())
+                    },
+                ))
             },
         ))
     }

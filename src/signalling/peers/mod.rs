@@ -112,6 +112,7 @@ enum GetOrCreatePeersResult {
     AlreadyExisted(PeerId, PeerId),
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum ConnectEndpointsResult {
     Created(PeerId, PeerId),
 
@@ -531,7 +532,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
     ) -> ActFuture<A, Result<ConnectEndpointsResult, RoomError>> {
-        use ConnectEndpointsResult::{Created, Updated, NoOp};
+        use ConnectEndpointsResult::{Created, NoOp, Updated};
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
             src.owner().id(),
