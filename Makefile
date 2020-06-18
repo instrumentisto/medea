@@ -275,7 +275,7 @@ endif
 
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings \
-		-A clippy::similar_names -A clippy::used_underscore_binding
+		-A clippy::used_underscore_binding
 # TODO: Enable ignored lints when Rust 1.45 is released.
 
 
@@ -389,7 +389,8 @@ endif
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                          [registry=<registry-host>]
-#	                                          [log=(no|yes)] )]
+#	                                          [log=(no|yes)]
+#                                             [log-to-file=(no|yes)] )]
 #	                        [wait=(5|<seconds>)] )]
 
 test-e2e-env = RUST_BACKTRACE=1 \
@@ -404,7 +405,7 @@ ifeq ($(up),yes)
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     TAG=$(TAG) registry=$(registry) \
-	                     logfile=$(logfile)
+	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -696,6 +697,7 @@ docker.up.demo: docker.down.demo
 #	                                       [registry=<registry-host>]]
 #	                                       [( [background=no]
 #	                                        | background=yes [log=(no|yes)] )])]
+#	                     [log-to-file=(no|yes)]
 
 docker-up-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
@@ -713,12 +715,12 @@ ifeq ($(log),yes)
 endif
 endif
 else
-ifeq ($(logfile),yes)
-	rm -f /tmp/medea.log
+ifeq ($(log-to-file),yes)
+	@rm -f /tmp/medea.log
 endif
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
-		$(if $(call eq,$(logfile),yes),> /tmp/medea.log,) \
+		$(if $(call eq,$(log-to-file),yes),> /tmp/medea.log,) \
 		$(if $(call eq,$(background),yes),&,)
 endif
 
