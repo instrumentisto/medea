@@ -397,9 +397,7 @@ mod endpoint {
                     Event::TracksApplied { updates, .. } => {
                         if updates
                             .iter()
-                            .filter(|u| enum_eq!(TrackUpdate::Added, u))
-                            .next()
-                            .is_some()
+                            .any(|u| enum_eq!(TrackUpdate::Added, u))
                         {
                             publisher_tx.unbounded_send(()).unwrap();
                         }
@@ -417,31 +415,23 @@ mod endpoint {
         let _responder = TestMember::connect(
             credentials.get("responder").unwrap(),
             Some(Box::new(move |event, _, events| {
-                match event {
-                    Event::TracksApplied { updates, .. } => {
-                        if updates
+                if let Event::TracksApplied { updates, .. } = event {
+                    if updates.iter().any(|u| enum_eq!(TrackUpdate::Added, u)) {
+                        responder_tx.unbounded_send(()).unwrap();
+                        let sdp_answer_mades_count = events
                             .iter()
-                            .filter(|u| enum_eq!(TrackUpdate::Added, u))
-                            .next()
-                            .is_some()
-                        {
+                            .filter(|e| {
+                                if let Event::SdpAnswerMade { .. } = e {
+                                    true
+                                } else {
+                                    false
+                                }
+                            })
+                            .count();
+                        if sdp_answer_mades_count == 2 {
                             responder_tx.unbounded_send(()).unwrap();
-                            let sdp_answer_mades_count = events
-                                .iter()
-                                .filter(|e| {
-                                    if let Event::SdpAnswerMade { .. } = e {
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                })
-                                .count();
-                            if sdp_answer_mades_count == 2 {
-                                responder_tx.unbounded_send(()).unwrap();
-                            }
                         }
                     }
-                    _ => (),
                 };
             })),
             None,

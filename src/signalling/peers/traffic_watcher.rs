@@ -754,7 +754,7 @@ mod tests {
     async fn correct_stopped_at_when_init_timeout_stop() {
         let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(100),
-            ..Default::default()
+            max_lag: Duration::from_secs(999),
         })
         .await;
         helper
@@ -780,7 +780,6 @@ mod tests {
         let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_secs(999),
             max_lag: Duration::from_millis(50),
-            ..Default::default()
         })
         .await;
         helper
@@ -852,7 +851,6 @@ mod tests {
         let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(30),
             max_lag: Duration::from_secs(999),
-            ..Default::default()
         })
         .await;
         helper
@@ -966,7 +964,6 @@ mod tests {
             let mut helper = Helper::new(&conf::Media {
                 init_timeout: Duration::from_secs(999),
                 max_lag: Duration::from_secs(999),
-                ..Default::default()
             })
             .await;
             helper

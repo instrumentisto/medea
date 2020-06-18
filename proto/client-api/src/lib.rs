@@ -299,6 +299,7 @@ pub enum TrackUpdate {
     Added(Track),
 
     /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
+    /// Can only refer tracks already known to the `Peer`.
     Updated(TrackPatch),
 }
 

@@ -94,7 +94,7 @@ pub struct Counter<T> {
 }
 
 impl<T: Incrementable + Copy> Counter<T> {
-    /// Returns id and increase counter.
+    /// Returns id and increase counter.connect_endpoints
     pub fn next_id(&mut self) -> T {
         let id = self.count;
         self.count = self.count.incr();
@@ -104,12 +104,20 @@ impl<T: Incrementable + Copy> Counter<T> {
 
 /// Result of the [`PeersService::get_or_create_peers`] function.
 #[derive(Debug, Clone, Copy)]
-pub enum GetOrCreatePeersResult {
+enum GetOrCreatePeersResult {
     /// Requested [`Peer`] pair was created.
     Created(PeerId, PeerId),
 
     /// Requested [`Peer`] pair already existed.
     AlreadyExisted(PeerId, PeerId),
+}
+
+pub enum ConnectEndpointsResult {
+    Created(PeerId, PeerId),
+
+    Updated(PeerId, PeerId),
+
+    NoOp(PeerId, PeerId),
 }
 
 /// [`Actor`] in whose context will be spawned [`ActFuture`]s returned from the
@@ -518,10 +526,12 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// # Panics
     ///
     /// Panics if provided endpoints already have interconnected [`Peer`]s.
+    // TODO: try to get rid of this ActFuture
     pub fn connect_endpoints(
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> ActFuture<A, Result<Option<(PeerId, PeerId)>, RoomError>> {
+    ) -> ActFuture<A, Result<ConnectEndpointsResult, RoomError>> {
+        use ConnectEndpointsResult::{Created, Updated, NoOp};
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
             src.owner().id(),
@@ -529,103 +539,81 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         );
         Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).then(
             |peers_res, room, _| {
-                let mut futs = Vec::new();
                 match actix_try!(peers_res) {
                     GetOrCreatePeersResult::Created(
                         src_peer_id,
                         sink_peer_id,
-                    ) => {
-                        {
-                            let this = room.peers_mut();
-                            let src_peer: Peer<Stable> =
-                                actix_try!(this.take_inner_peer(src_peer_id));
-                            let sink_peer: Peer<Stable> =
-                                actix_try!(this.take_inner_peer(sink_peer_id));
-                            let src_peer = PeerStateMachine::from(src_peer);
-                            let sink_peer = PeerStateMachine::from(sink_peer);
-
-                            this.add_peer(src_peer);
-                            this.add_peer(sink_peer);
-                        }
-
-                        let fut = future::try_join_all(futs)
-                            .into_actor(room)
-                            .then(move |res, room, _| {
-                                async move {
-                                    res.map_err(|e| {
-                                        RoomError::PeerTrafficWatcherMailbox(e)
-                                    })?;
-                                    Ok(Some((src_peer_id, sink_peer_id)))
-                                }
-                                .into_actor(room)
-                            });
-
-                        Box::new(fut) as ActFuture<_, _>
-                    }
+                    ) => Box::new(fut::ok(Created(src_peer_id, sink_peer_id))),
                     GetOrCreatePeersResult::AlreadyExisted(
                         src_peer_id,
                         sink_peer_id,
                     ) => {
-                        // TODO: here we assume that peers are stable,
-                        //       which might not be the case, e.g. Control
-                        //       Service creates multiple endpoints in quick
-                        //       succession.
-                        let this = room.peers_mut();
-                        let mut src_peer: Peer<Stable> =
-                            this.take_inner_peer(src_peer_id).unwrap();
-                        let mut sink_peer: Peer<Stable> =
-                            this.take_inner_peer(sink_peer_id).unwrap();
+                        if sink.peer_id().is_some()
+                            || src.peer_ids().contains(&src_peer_id)
+                        {
+                            // already connected, so no-op
+                            Box::new(fut::ok(NoOp(src_peer_id, sink_peer_id)))
+                        } else {
+                            let mut futs = Vec::new();
+                            // TODO: here we assume that peers are stable,
+                            //       which might not be the case, e.g. Control
+                            //       Service creates multiple endpoints in quick
+                            //       succession.
+                            let this = room.peers_mut();
+                            let mut src_peer: Peer<Stable> =
+                                this.take_inner_peer(src_peer_id).unwrap();
+                            let mut sink_peer: Peer<Stable> =
+                                this.take_inner_peer(sink_peer_id).unwrap();
 
-                        src_peer.add_publisher(
-                            &mut sink_peer,
-                            this.get_tracks_counter(),
-                        );
-
-                        if src.has_traffic_callback() {
-                            futs.push(
-                                this.peers_traffic_watcher.register_peer(
-                                    this.room_id.clone(),
-                                    src_peer_id,
-                                    src.is_force_relayed(),
-                                ),
+                            src_peer.add_publisher(
+                                &mut sink_peer,
+                                this.get_tracks_counter(),
                             );
-                        }
-                        if sink.has_traffic_callback() {
-                            futs.push(
-                                this.peers_traffic_watcher.register_peer(
-                                    this.room_id.clone(),
-                                    sink_peer_id,
-                                    sink.is_force_relayed(),
-                                ),
-                            );
-                        }
 
-                        sink_peer.add_endpoint(&sink.into());
-                        src_peer.add_endpoint(&src.into());
+                            if src.has_traffic_callback() {
+                                futs.push(
+                                    this.peers_traffic_watcher.register_peer(
+                                        this.room_id.clone(),
+                                        src_peer_id,
+                                        src.is_force_relayed(),
+                                    ),
+                                );
+                            }
+                            if sink.has_traffic_callback() {
+                                futs.push(
+                                    this.peers_traffic_watcher.register_peer(
+                                        this.room_id.clone(),
+                                        sink_peer_id,
+                                        sink.is_force_relayed(),
+                                    ),
+                                );
+                            }
 
-                        let src_peer = PeerStateMachine::from(src_peer);
-                        let sink_peer = PeerStateMachine::from(sink_peer);
+                            sink_peer.add_endpoint(&sink.into());
+                            src_peer.add_endpoint(&src.into());
 
-                        this.peer_metrics_service.update_peer_tracks(&src_peer);
-                        this.peer_metrics_service
-                            .update_peer_tracks(&sink_peer);
+                            let src_peer = PeerStateMachine::from(src_peer);
+                            let sink_peer = PeerStateMachine::from(sink_peer);
 
-                        this.add_peer(src_peer);
-                        this.add_peer(sink_peer);
+                            this.peer_metrics_service
+                                .update_peer_tracks(&src_peer);
+                            this.peer_metrics_service
+                                .update_peer_tracks(&sink_peer);
 
-                        let fut = future::try_join_all(futs)
-                            .into_actor(room)
-                            .then(move |res, room, _| {
-                                async move {
+                            this.add_peer(src_peer);
+                            this.add_peer(sink_peer);
+
+                            let fut = future::try_join_all(futs)
+                                .into_actor(room)
+                                .map(move |res, room, _| {
                                     res.map_err(|e| {
                                         RoomError::PeerTrafficWatcherMailbox(e)
                                     })?;
-                                    Ok(None)
-                                }
-                                .into_actor(room)
-                            });
+                                    Ok(Updated(src_peer_id, sink_peer_id))
+                                });
 
-                        Box::new(fut) as ActFuture<_, _>
+                            Box::new(fut)
+                        }
                     }
                 }
             },
@@ -791,27 +779,6 @@ mod tests {
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
     #[actix_rt::test]
     async fn peer_is_registered_in_metrics_service() {
-        let mut mock = MockPeerTrafficWatcher::new();
-        mock.expect_register_room()
-            .returning(|_, _| Box::pin(future::ok(())));
-        mock.expect_unregister_room().returning(|_| {});
-        let (register_peer_tx, mut register_peer_rx) = mpsc::unbounded();
-        let register_peer_done =
-            timeout(Duration::from_secs(1), register_peer_rx.next());
-        mock.expect_register_peer().returning(move |_, _, _| {
-            register_peer_tx.unbounded_send(()).unwrap();
-            Box::pin(future::ok(()))
-        });
-        mock.expect_traffic_flows().returning(|_, _, _| {});
-        mock.expect_traffic_stopped().returning(|_, _, _| {});
-
-        let peers: PeersService<PeersServiceOwnerMock> = PeersService::new(
-            "test".into(),
-            new_turn_auth_service_mock(),
-            Arc::new(mock),
-            &conf::Media::default(),
-        );
-
         #[derive(Message)]
         #[rtype(result = "Result<(), ()>")]
         struct RunTest;
@@ -882,24 +849,13 @@ mod tests {
             }
         }
 
-        let runner = PeersServiceOwnerMock::new(peers).start();
-        runner.send(RunTest).await.unwrap().unwrap();
-        register_peer_done.await.unwrap().unwrap();
-    }
-
-    /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
-    /// count will be updated in the [`PeerMetricsService`].
-    #[actix_rt::test]
-    async fn adding_new_endpoint_updates_peer_metrics() {
         let mut mock = MockPeerTrafficWatcher::new();
         mock.expect_register_room()
             .returning(|_, _| Box::pin(future::ok(())));
         mock.expect_unregister_room().returning(|_| {});
-        let (register_peer_tx, register_peer_rx) = mpsc::unbounded();
-        let register_peer_done = timeout(
-            Duration::from_secs(1),
-            register_peer_rx.take(4).collect::<Vec<_>>(),
-        );
+        let (register_peer_tx, mut register_peer_rx) = mpsc::unbounded();
+        let register_peer_done =
+            timeout(Duration::from_secs(1), register_peer_rx.next());
         mock.expect_register_peer().returning(move |_, _, _| {
             register_peer_tx.unbounded_send(()).unwrap();
             Box::pin(future::ok(()))
@@ -914,6 +870,15 @@ mod tests {
             &conf::Media::default(),
         );
 
+        let runner = PeersServiceOwnerMock::new(peers).start();
+        runner.send(RunTest).await.unwrap().unwrap();
+        register_peer_done.await.unwrap().unwrap();
+    }
+
+    /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
+    /// count will be updated in the [`PeerMetricsService`].
+    #[actix_rt::test]
+    async fn adding_new_endpoint_updates_peer_metrics() {
         #[derive(Message)]
         #[rtype(result = "Result<(), ()>")]
         struct RunTest;
@@ -1019,6 +984,29 @@ mod tests {
                 }))
             }
         }
+
+        let mut mock = MockPeerTrafficWatcher::new();
+        mock.expect_register_room()
+            .returning(|_, _| Box::pin(future::ok(())));
+        mock.expect_unregister_room().returning(|_| {});
+        let (register_peer_tx, register_peer_rx) = mpsc::unbounded();
+        let register_peer_done = timeout(
+            Duration::from_secs(1),
+            register_peer_rx.take(4).collect::<Vec<_>>(),
+        );
+        mock.expect_register_peer().returning(move |_, _, _| {
+            register_peer_tx.unbounded_send(()).unwrap();
+            Box::pin(future::ok(()))
+        });
+        mock.expect_traffic_flows().returning(|_, _, _| {});
+        mock.expect_traffic_stopped().returning(|_, _, _| {});
+
+        let peers: PeersService<PeersServiceOwnerMock> = PeersService::new(
+            "test".into(),
+            new_turn_auth_service_mock(),
+            Arc::new(mock),
+            &conf::Media::default(),
+        );
 
         let runner = PeersServiceOwnerMock::new(peers).start();
         runner.send(RunTest).await.unwrap().unwrap();

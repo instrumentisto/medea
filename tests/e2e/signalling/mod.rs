@@ -149,7 +149,7 @@ impl TestMember {
     /// [`TrackId`] was found.
     pub fn get_mid(&mut self, track_id: TrackId) -> String {
         if let Some(mid) = self.known_tracks_mids.get(&track_id) {
-            return mid.to_string();
+            mid.to_string()
         } else {
             self.last_mid += 1;
             let last_mid = self.last_mid;
@@ -252,8 +252,10 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             tracks.iter().for_each(|t| {
                                 use medea_client_api_proto::Direction;
                                 let mid = match &t.direction {
-                                    Direction::Send { mid, .. } => mid.clone(),
-                                    Direction::Recv { mid, .. } => mid.clone(),
+                                    Direction::Send { mid, .. }
+                                    | Direction::Recv { mid, .. } => {
+                                        mid.clone()
+                                    }
                                 };
                                 if let Some(mid) = mid {
                                     self.add_mid(t.id, mid);
@@ -298,10 +300,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                 use medea_client_api_proto::Direction;
                                 if let TrackUpdate::Added(track) = t {
                                     let mid = match &track.direction {
-                                        Direction::Send { mid, .. } => {
-                                            mid.clone()
-                                        }
-                                        Direction::Recv { mid, .. } => {
+                                        Direction::Send { mid, .. }
+                                        | Direction::Recv { mid, .. } => {
                                             mid.clone()
                                         }
                                     };

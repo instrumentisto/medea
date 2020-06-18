@@ -9,12 +9,11 @@ mod rpc_server;
 use std::sync::Arc;
 
 use actix::{
-    fut, Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
-    WrapFuture as _,
+    fut, Actor, ActorFuture, Context, Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::{Event, NegotiationRole, PeerId, TrackUpdate};
+use medea_client_api_proto::{Event, NegotiationRole, PeerId};
 
 use crate::{
     api::control::{
@@ -30,13 +29,9 @@ use crate::{
     media::{Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
-        elements::{
-            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            member::MemberError,
-            Member, MembersLoadError,
-        },
+        elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{PeerTrafficWatcher, PeersService},
+        peers::{PeerTrafficWatcher, PeersService, ConnectEndpointsResult},
     },
     turn::TurnServiceErr,
     utils::{actix_try_join_all, ResponseActAnyFuture},
@@ -192,7 +187,7 @@ impl Room {
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             negotiation_role: NegotiationRole::Offerer,
-            tracks: peer.get_new_tracks(),
+            tracks: peer.new_tracks(),
             ice_servers,
             force_relay: peer.is_force_relayed(),
         };
@@ -222,33 +217,54 @@ impl Room {
         )
     }
 
-    /// Connects provided [`WebRtcPublishEndpoint`] with a provided
-    /// [`WebRtcPlayEndpoint`].
-    ///
-    /// Calls [`PeersService::connect_endpoints`] with a provided endpoints.
-    ///
-    /// Sends [`Event::PeerCreated`] if this is newly created [`Peer`]s pair.
-    fn connect_endpoints(
-        src: WebRtcPublishEndpoint,
-        sink: WebRtcPlayEndpoint,
+    fn connect_members(
+        member1: &Member,
+        member2: &Member,
     ) -> ActFuture<Result<(), RoomError>> {
-        Box::new(PeersService::connect_endpoints(src, sink).map(
-            |res, this: &mut Room, ctx| {
-                if let Some((first_peer_id, _)) = res? {
-                    ctx.spawn(this.send_peer_created(first_peer_id)?.map(
-                        |res, room, ctx| {
-                            if let Err(e) = res {
-                                error!(
-                                    "Failed to connect Endpoints because: {:?}",
-                                    e
-                                );
-                                room.close_gracefully(ctx);
-                            }
-                        },
-                    ));
-                }
+        let member2_id = member2.id();
+        let mut connect_endpoints_tasks = Vec::new();
 
-                Ok(())
+        for src in member1.srcs().values() {
+            for sink in src.sinks() {
+                if sink.owner().id() == member2_id {
+                    connect_endpoints_tasks.push(
+                        PeersService::connect_endpoints(src.clone(), sink),
+                    );
+                }
+            }
+        }
+
+        for sink in member1.sinks().values() {
+            let src = sink.src();
+            if src.owner().id() == member2_id {
+                connect_endpoints_tasks
+                    .push(PeersService::connect_endpoints(src, sink.clone()))
+            }
+        }
+
+        Box::new(actix_try_join_all(connect_endpoints_tasks).then(
+            move |result, room: &mut Room, _| {
+                let connected_peers = actix_try!(result);
+                // TODO:
+                //      1. remove NoOp's
+                //      2. group by (PeerId,PeerId)
+                //      3. if group contains Created => send_peer_created
+                //      4. else => start renegotiation
+                // Vec<ConnectEndpointsResult>
+                //     ConnectEndpointsResult::NoOp((PeerId,PeerId)),
+                //     ConnectEndpointsResult::Created((PeerId,PeerId)),
+                //     ConnectEndpointsResult::Updated((PeerId,PeerId))
+
+                // let new_peers =
+                //     connect_results.into_iter().find_map(|item| item);
+                //
+                // if let Some((peer_id, _)) = new_peers {
+                //     actix_try!(room.send_peer_created(peer_id))
+                // } else {
+                //     // renegotiation
+                //     Box::new(fut::ok(()))
+                // }
+                Box::new(fut::ok(()))
             },
         ))
     }
@@ -268,77 +284,19 @@ impl Room {
         &mut self,
         member: &Member,
     ) -> ActFuture<Result<(), RoomError>> {
-        let mut connect_tasks = Vec::new();
-
-        for publisher in member.srcs().values() {
-            for receiver in publisher.sinks() {
-                let receiver_owner = receiver.owner();
-
-                if receiver.peer_id().is_none()
-                    && self.members.member_has_connection(&receiver_owner.id())
-                {
-                    connect_tasks.push(Room::connect_endpoints(
-                        publisher.clone(),
-                        receiver,
-                    ));
-                }
-            }
-        }
-
-        let member_id = member.id();
-        for receiver in member.sinks().values() {
-            let publisher = receiver.src();
-            let partner_member_id = publisher.owner().id();
-
-            if receiver.peer_id().is_none()
-                && self.members.member_has_connection(&partner_member_id)
-            {
-                if let Some((src_peer_id, _)) = self
-                    .peers
-                    .get_peers_between_members(&partner_member_id, &member_id)
-                {
-                    self.peers.add_sink(src_peer_id, receiver.clone());
-                    let renegotiate_peer =
-                        actix_try!(self.peers.start_renegotiation(src_peer_id));
-
-                    connect_tasks.push(Box::new(
-                        self.members
-                            .send_event_to_member(
-                                renegotiate_peer.member_id(),
-                                Event::TracksApplied {
-                                    peer_id: renegotiate_peer.id(),
-                                    updates: renegotiate_peer
-                                        .get_new_tracks()
-                                        .into_iter()
-                                        .map(TrackUpdate::Added)
-                                        .collect(),
-                                    negotiation_role: Some(
-                                        NegotiationRole::Offerer,
-                                    ),
-                                },
-                            )
-                            .into_actor(self),
-                    ))
+        let connect_members_tasks =
+            member.partners().into_iter().filter_map(|partner| {
+                if self.members.member_has_connection(&partner.id()) {
+                    Some(Self::connect_members(&partner, member))
                 } else {
-                    connect_tasks.push(Room::connect_endpoints(
-                        publisher,
-                        receiver.clone(),
-                    ))
+                    None
                 }
-            }
-        }
+            });
 
-        if connect_tasks.is_empty() {
-            return Box::new(fut::ok(()));
-        }
-
-        let endpoints_connected = actix_try_join_all(connect_tasks);
-
-        Box::new(endpoints_connected.map(|res, _, _| {
-            res?;
-
-            Ok(())
-        }))
+        Box::new(
+            actix_try_join_all(connect_members_tasks)
+                .map(|result, _, _| result.map(|_| ())),
+        )
     }
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving

@@ -4,12 +4,7 @@
 
 #![allow(clippy::use_self)]
 
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    fmt,
-    rc::{Rc, Weak},
-};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
@@ -86,9 +81,9 @@ impl PeerError {
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
-#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
+#[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
-    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
+    pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[derive(Debug)]
 pub enum PeerStateMachine {
@@ -207,13 +202,47 @@ pub struct Context {
     /// If `false` then not renegotiation is in progress.
     is_renegotiate: bool,
 
-    /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] which should
-    /// be sent to the client.
-    new_senders: Vec<Weak<MediaTrack>>,
+    /// Tracks changes, that remote Peer is not aware of.
+    pending_track_updates: Vec<TrackChange>,
+}
 
-    /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] which should
-    /// be sent to the client.
-    new_receivers: Vec<Weak<MediaTrack>>,
+/// Tracks changes, that remote Peer is not aware of.
+#[derive(Debug)]
+enum TrackChange {
+    /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
+    /// Peer is not aware of.
+    AddSendTrack(Rc<MediaTrack>),
+    /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
+    /// Peer is not aware of.
+    AddRecvTrack(Rc<MediaTrack>),
+}
+
+impl TrackChange {
+    fn try_as_track(&self, partner_peer_id: Id) -> Option<Track> {
+        let (direction, track) = match self {
+            TrackChange::AddSendTrack(track) => (
+                Direction::Send {
+                    receivers: vec![partner_peer_id],
+                    mid: track.mid(),
+                },
+                track,
+            ),
+            TrackChange::AddRecvTrack(track) => (
+                Direction::Recv {
+                    sender: partner_peer_id,
+                    mid: track.mid(),
+                },
+                track,
+            ),
+        };
+
+        Some(Track {
+            id: track.id,
+            is_muted: false,
+            media_type: track.media_type.clone(),
+            direction,
+        })
+    }
 }
 
 /// [RTCPeerConnection] representation.
@@ -253,46 +282,20 @@ impl<T> Peer<T> {
     /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
     /// client in the [`Event::TracksApplied`].
     pub fn get_updates(&self) -> Vec<TrackUpdate> {
-        let new_tracks = self.get_new_tracks();
-
-        new_tracks.into_iter().map(TrackUpdate::Added).collect()
+        self.context
+            .pending_track_updates
+            .iter()
+            .map(|change| change.try_as_track(self.partner_peer_id()).unwrap())
+            .map(TrackUpdate::Added)
+            .collect()
     }
 
-    /// Returns [`Track`]s of this [`Peer`] which should be sent to the client.
-    pub fn get_new_tracks(&self) -> Vec<Track> {
-        let partner_peer_id = self.partner_peer_id();
-
+    /// Returns [`Track`]s that remote Peer is not aware of.
+    pub fn new_tracks(&self) -> Vec<Track> {
         self.context
-            .new_senders
+            .pending_track_updates
             .iter()
-            .filter_map(|t| {
-                Weak::upgrade(t).map(|t| {
-                    (
-                        Direction::Send {
-                            receivers: vec![partner_peer_id],
-                            mid: t.mid(),
-                        },
-                        t,
-                    )
-                })
-            })
-            .chain(self.context.new_receivers.iter().filter_map(|t| {
-                Weak::upgrade(t).map(|t| {
-                    (
-                        Direction::Recv {
-                            sender: partner_peer_id,
-                            mid: t.mid(),
-                        },
-                        t,
-                    )
-                })
-            }))
-            .map(|(direction, track)| Track {
-                id: track.id,
-                is_muted: false,
-                media_type: track.media_type.clone(),
-                direction,
-            })
+            .filter_map(|update| update.try_as_track(self.partner_peer_id()))
             .collect()
     }
 
@@ -335,13 +338,13 @@ impl<T> Peer<T> {
     }
 
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
-    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
-        self.context.receivers.clone()
+    pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
+        &self.context.receivers
     }
 
     /// Returns all sending [`MediaTrack`]s of this [`Peer`].
-    pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
-        self.context.senders.clone()
+    pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
+        &self.context.senders
     }
 
     /// Returns `true` if renegotiation is going.
@@ -353,13 +356,14 @@ impl<T> Peer<T> {
 
     /// Resets [`Context::is_renegotiate`] to `false`.
     ///
-    /// Resets `new_senders` and `new_receivers`.
+    /// Resets `pending_changes` buffer.
     ///
     /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
+        // TODO: peer_created_on_remote / known_to_remote
+        //       change on stable => any other transition
         self.context.is_renegotiate = false;
-        self.context.new_receivers = Vec::new();
-        self.context.new_senders = Vec::new();
+        self.context.pending_track_updates.clear();
     }
 }
 
@@ -457,8 +461,7 @@ impl Peer<Stable> {
             is_force_relayed,
             endpoints: Vec::new(),
             is_renegotiate: false,
-            new_receivers: Vec::new(),
-            new_senders: Vec::new(),
+            pending_track_updates: Vec::new(),
         };
 
         Self {
@@ -511,18 +514,6 @@ impl Peer<Stable> {
         }
     }
 
-    /// Adds [`Track`] to [`Peer`] for send.
-    pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.context.new_senders.push(Rc::downgrade(&track));
-        self.context.senders.insert(track.id, track);
-    }
-
-    /// Adds [`Track`] to [`Peer`] for receive.
-    pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.context.new_receivers.push(Rc::downgrade(&track));
-        self.context.receivers.insert(track.id, track);
-    }
-
     /// Returns [mid]s of this [`Peer`].
     ///
     /// # Errors
@@ -564,6 +555,28 @@ impl Peer<Stable> {
             state: WaitLocalSdp {},
         }
     }
+
+    /// Adds [`Track`] to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] is considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks`.
+    fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.context
+            .pending_track_updates
+            .push(TrackChange::AddSendTrack(Rc::clone(&track)));
+        self.context.senders.insert(track.id, track);
+    }
+
+    /// Adds [`Track`] to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] is considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks`.
+    fn add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.context
+            .pending_track_updates
+            .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
+        self.context.receivers.insert(track.id, track);
+    }
 }
 
 #[cfg(test)]
@@ -578,25 +591,13 @@ pub mod tests {
         recv_audio: u32,
         recv_video: u32,
     ) -> PeerStateMachine {
-        let mut peer = Peer {
-            state: Stable {},
-            context: Context {
-                id: Id(1),
-                sdp_offer: None,
-                sdp_answer: None,
-                senders: HashMap::new(),
-                receivers: HashMap::new(),
-                member_id: MemberId::from("test-member"),
-                is_force_relayed: false,
-                partner_peer: Id(2),
-                ice_user: None,
-                endpoints: Vec::new(),
-                partner_member: MemberId::from("partner-member"),
-                is_renegotiate: false,
-                new_senders: Vec::new(),
-                new_receivers: Vec::new(),
-            },
-        };
+        let mut peer = Peer::new(
+            Id(1),
+            MemberId::from("test-member"),
+            Id(2),
+            MemberId::from("partner-member"),
+            false,
+        );
 
         let mut track_id_counter = Counter::default();
 
