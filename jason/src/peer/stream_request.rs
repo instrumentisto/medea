@@ -122,7 +122,7 @@ impl SimpleStreamRequest {
     pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
         use StreamRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
-        let result_stream = PeerMediaStream::new_local();
+        let result_stream = PeerMediaStream::new();
 
         let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
             .into_tracks()

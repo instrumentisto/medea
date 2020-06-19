@@ -18,7 +18,7 @@ async function createRoom(roomId, memberId) {
             publish: {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always',
-              force_relay: false,
+              force_relay: false
             },
           },
           on_join: "grpc://127.0.0.1:9099",
@@ -38,7 +38,7 @@ async function createMember(roomId, memberId) {
     publish: {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
-      force_relay: false,
+      force_relay: false
     }
   };
 

@@ -2,6 +2,7 @@
 
 use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
+use smart_default::SmartDefault;
 
 /// P2P mode of [`WebRtcPublishEndpoint`].
 #[derive(Debug, Deserialize, Serialize)]
@@ -37,9 +38,10 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 
 /// Publishing policy of the video or audio media type in the
 /// [`WebRtcPublishEndpoint`].
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, SmartDefault)]
 pub enum PublishPolicy {
     /// Publish this media type if it possible.
+    #[default]
     Optional,
 
     /// Don't start call if this media type can't be published.
@@ -49,12 +51,6 @@ pub enum PublishPolicy {
     ///
     /// Media server will not try to initialize publishing.
     Disabled,
-}
-
-impl Default for PublishPolicy {
-    fn default() -> Self {
-        Self::Optional
-    }
 }
 
 impl From<proto::web_rtc_publish_endpoint::PublishPolicy> for PublishPolicy {
@@ -82,20 +78,12 @@ impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
 }
 
 /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
     publish_policy: PublishPolicy,
-}
-
-impl Default for AudioSettings {
-    fn default() -> Self {
-        Self {
-            publish_policy: PublishPolicy::default(),
-        }
-    }
 }
 
 impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
@@ -120,20 +108,12 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 }
 
 /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
     publish_policy: PublishPolicy,
-}
-
-impl Default for VideoSettings {
-    fn default() -> Self {
-        Self {
-            publish_policy: PublishPolicy::default(),
-        }
-    }
 }
 
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {

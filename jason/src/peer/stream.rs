@@ -8,7 +8,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{PeerId, TrackId};
+use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
@@ -22,12 +22,6 @@ use crate::{
 /// Shared between JS side ([`RemoteMediaStream`]) and Rust side
 /// ([`PeerMediaStream`]).
 struct InnerStream {
-    /// [`PeerId`] of the remote [`Sender`] from which this [`PeerMediaStream`]
-    /// receives media.
-    ///
-    /// If `None` then this is local [`PeerMediaStream`].
-    sender_peer_id: Option<PeerId>,
-
     /// Actual underlying [MediaStream][1] object.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
@@ -41,20 +35,9 @@ struct InnerStream {
 }
 
 impl InnerStream {
-    /// Instantiates new remote [`InnerStream`].
-    fn new(sender_peer_id: PeerId) -> Self {
+    /// Instantiates new [`InnerStream`].
+    fn new() -> Self {
         Self {
-            sender_peer_id: Some(sender_peer_id),
-            stream: SysMediaStream::new().unwrap(),
-            audio_tracks: HashMap::new(),
-            video_tracks: HashMap::new(),
-        }
-    }
-
-    /// Instantiates new local [`InnerStream`].
-    fn new_local() -> Self {
-        Self {
-            sender_peer_id: None,
             stream: SysMediaStream::new().unwrap(),
             audio_tracks: HashMap::new(),
             video_tracks: HashMap::new(),
@@ -88,14 +71,9 @@ pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
 
 #[allow(clippy::new_without_default)]
 impl PeerMediaStream {
-    /// Creates empty remote [`PeerMediaStream`].
-    pub fn new(sender_peer_id: PeerId) -> Self {
-        Self(Rc::new(RefCell::new(InnerStream::new(sender_peer_id))))
-    }
-
-    /// Creates empty local [`PeerMediaStream`].
-    pub fn new_local() -> Self {
-        Self(Rc::new(RefCell::new(InnerStream::new_local())))
+    /// Creates empty [`PeerMediaStream`].
+    pub fn new() -> Self {
+        Self(Rc::new(RefCell::new(InnerStream::new())))
     }
 
     /// Adds provided [`MediaStreamTrack`] to a stream.
@@ -137,13 +115,6 @@ impl PeerMediaStream {
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.borrow().stream)
     }
-
-    /// Returns `true` if this [`PeerMediaStream`] doesn't have any
-    /// [`MediaTrack`]s.
-    pub fn is_empty(&self) -> bool {
-        let inner = self.0.borrow();
-        inner.audio_tracks.is_empty() && inner.video_tracks.is_empty()
-    }
 }
 
 /// JS side handle to [`PeerMediaStream`].
@@ -161,13 +132,5 @@ impl RemoteMediaStream {
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| Clone::clone(&inner.borrow().stream))
-    }
-
-    /// Returns [`PeerId`] of the sender [`PeerConnection`].
-    ///
-    /// Return `null` if this is local [`RemoteMediaStream`].
-    pub fn sender_peer_id(&self) -> Result<Option<u64>, JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow().sender_peer_id.map(|id| id.0))
     }
 }

@@ -44,7 +44,7 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RemoteMediaStream.sender_peer_id` function to get remote sender's peer id ([#106]);
+    - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
     - Library API:

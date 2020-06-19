@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use futures::{
-    channel::mpsc,
+    channel::{mpsc, oneshot},
     stream::{self, StreamExt as _},
 };
 use medea_client_api_proto::{Command, Event, IceServer, PeerId};
@@ -16,13 +16,14 @@ use medea_jason::{
     },
     rpc::MockRpcClient,
     utils::JasonError,
+    DeviceVideoTrackConstraints,
 };
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{
-    get_test_required_tracks, get_test_unrequired_tracks,
-    wait_and_check_test_result, MockNavigator,
+    get_test_required_tracks, get_test_tracks, get_test_unrequired_tracks,
+    timeout, wait_and_check_test_result, MockNavigator,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -481,6 +482,56 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         .unwrap();
 
     wait_and_check_test_result(test_result, || {}).await;
+}
+
+#[wasm_bindgen_test]
+async fn no_errors_if_track_not_provided_when_its_optional() {
+    async fn helper(
+        audio_required: bool,
+        video_required: bool,
+        add_audio: bool,
+        add_video: bool,
+    ) -> Result<(), ()> {
+        let (test_tx, test_rx) = oneshot::channel();
+        let closure = wasm_bindgen::closure::Closure::once_into_js(move || {
+            test_tx.send(()).unwrap();
+        });
+        let (room, peer) = get_test_room_and_exist_peer(1);
+        let (audio_track, video_track) =
+            get_test_tracks(false, false, audio_required, video_required);
+        peer.get_offer(vec![audio_track, video_track], None)
+            .await
+            .unwrap();
+
+        let mut constraints = MediaStreamSettings::new();
+        if add_audio {
+            constraints.audio(AudioTrackConstraints::new());
+        }
+        if add_video {
+            constraints.device_video(DeviceVideoTrackConstraints::new());
+        }
+
+        let room_handle = room.new_handle();
+        room_handle.on_failed_local_stream(closure.into()).unwrap();
+        JsFuture::from(room_handle.set_local_media_settings(&constraints))
+            .await
+            .unwrap();
+
+        timeout(1000, test_rx)
+            .await
+            .map(|rx| rx.unwrap())
+            .map_err(|_| ())
+    }
+
+    // on_failed_local_stream callback does not fire
+    helper(true, false, true, false).await.unwrap_err();
+    helper(false, true, false, true).await.unwrap_err();
+    helper(false, false, false, false).await.unwrap_err();
+
+    // on_failed_local_stream callback fires
+    helper(true, false, false, true).await.unwrap();
+    helper(false, true, true, false).await.unwrap();
+    helper(true, true, false, false).await.unwrap();
 }
 
 #[wasm_bindgen_test]

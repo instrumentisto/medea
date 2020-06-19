@@ -125,7 +125,7 @@ pub enum PeerEvent {
         /// [`TrackId`] of provided [`MediaStreamTrack`].
         track_id: TrackId,
 
-        /// Received MediaStreamTrack.
+        /// Received [`MediaStreamTrack`].
         track: MediaStreamTrack,
     },
 

@@ -611,7 +611,7 @@ impl InnerRoom {
     fn create_connections_from_tracks(&mut self, tracks: &[Track]) {
         let create_connection = |room: &mut Self, peer_id: &PeerId| {
             if !room.connections.contains_key(peer_id) {
-                let con = Connection::new(*peer_id);
+                let con = Connection::new();
                 room.on_new_connection.call(con.new_handle());
                 room.connections.insert(*peer_id, con);
             }

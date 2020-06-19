@@ -6,6 +6,7 @@ use std::convert::From;
 
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
+use smart_default::SmartDefault;
 
 use medea_control_api_proto::grpc::api as proto;
 
@@ -74,7 +75,7 @@ pub struct WebRtcPublishEndpoint {
 
 /// Publishing policy of the video or audio media type in the
 /// [`WebRtcPublishEndpoint`].
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, SmartDefault)]
 pub enum PublishPolicy {
     /// Specified media type __may__ be published.
     ///
@@ -82,6 +83,7 @@ pub enum PublishPolicy {
     /// errors if user application will fail to or choose not to acquire
     /// required track. Media server will approve user request to stop and
     /// restart publishing specified media type.
+    #[default]
     Optional,
 
     /// Specified media type __must__ be published.
@@ -95,12 +97,6 @@ pub enum PublishPolicy {
     ///
     /// Media server will not try to initialize publishing.
     Disabled,
-}
-
-impl Default for PublishPolicy {
-    fn default() -> Self {
-        Self::Optional
-    }
 }
 
 impl PublishPolicy {
@@ -141,20 +137,12 @@ impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
 }
 
 /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
 pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
     pub publish_policy: PublishPolicy,
-}
-
-impl Default for AudioSettings {
-    fn default() -> Self {
-        Self {
-            publish_policy: PublishPolicy::default(),
-        }
-    }
 }
 
 impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
@@ -179,20 +167,12 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 }
 
 /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
 pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
     pub publish_policy: PublishPolicy,
-}
-
-impl Default for VideoSettings {
-    fn default() -> Self {
-        Self {
-            publish_policy: PublishPolicy::default(),
-        }
-    }
 }
 
 impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {

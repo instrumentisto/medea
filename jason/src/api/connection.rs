@@ -5,7 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{PeerId, TrackId};
+use medea_client_api_proto::TrackId;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -19,7 +19,6 @@ use crate::{
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    remote_id: PeerId,
     remote_stream: RefCell<Option<PeerMediaStream>>,
     on_remote_stream: Callback<RemoteMediaStream>,
 }
@@ -48,9 +47,8 @@ pub(crate) struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub(crate) fn new(remote_id: PeerId) -> Self {
+    pub(crate) fn new() -> Self {
         Self(Rc::new(InnerConnection {
-            remote_id,
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback::default(),
         }))
@@ -69,8 +67,7 @@ impl Connection {
     ) {
         let is_new_stream = self.0.remote_stream.borrow().is_none();
         let mut remote_stream_ref = self.0.remote_stream.borrow_mut();
-        let stream = remote_stream_ref
-            .get_or_insert_with(|| PeerMediaStream::new(self.0.remote_id));
+        let stream = remote_stream_ref.get_or_insert_with(PeerMediaStream::new);
         stream.add_track(track_id, track);
 
         if is_new_stream {
