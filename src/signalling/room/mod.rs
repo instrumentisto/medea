@@ -135,7 +135,7 @@ pub struct Room {
     pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeersService<Self>,
+    pub peers: PeersService,
 
     /// Current state of this [`Room`].
     state: State,

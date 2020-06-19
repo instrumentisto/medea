@@ -7,16 +7,10 @@ mod traffic_watcher;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
-    marker::PhantomData,
     sync::Arc,
     time::Duration,
 };
 
-use actix::{
-    fut,
-    fut::{wrap_future, Either},
-    Actor, ActorFuture, WrapFuture as _,
-};
 use derive_more::Display;
 use futures::{future, future::LocalBoxFuture, FutureExt};
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
@@ -25,14 +19,13 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{IceUser, Peer, PeerError, PeerStateMachine, Stable, WaitLocalSdp},
+    media::{Peer, PeerError, PeerStateMachine, Stable},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Endpoint,
         },
         room::RoomError,
-        Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
@@ -64,11 +57,11 @@ impl PeerRepository {
         peer_id: PeerId,
         f: impl FnOnce(&PeerStateMachine) -> T,
     ) -> Result<T, RoomError> {
-        Ok((f(self
+        Ok(f(self
             .0
             .borrow()
             .get(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?)))
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
     }
 
     pub fn map_peer_by_id_mut<T>(
@@ -76,11 +69,11 @@ impl PeerRepository {
         peer_id: PeerId,
         f: impl FnOnce(&mut PeerStateMachine) -> T,
     ) -> Result<T, RoomError> {
-        Ok((f(self
+        Ok(f(self
             .0
             .borrow_mut()
             .get_mut(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?)))
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
     }
 
     pub fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
@@ -200,7 +193,7 @@ impl PeerRepository {
 }
 
 #[derive(Debug)]
-pub struct PeersService<A> {
+pub struct PeersService {
     /// [`RoomId`] of the [`Room`] which owns this [`PeerRepository`].
     room_id: RoomId,
 
@@ -229,14 +222,11 @@ pub struct PeersService<A> {
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: PeersMetricsService,
+    peer_metrics_service: Rc<RefCell<PeersMetricsService>>,
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
-
-    /// Type of the [`Actor`] in whose context will be spawned [`ActFuture`]s.
-    _owner_actor: PhantomData<A>,
 }
 
 /// Simple ID counter.
@@ -274,38 +264,7 @@ pub enum ConnectEndpointsResult {
     NoOp(PeerId, PeerId),
 }
 
-/// [`Actor`] in whose context will be spawned [`ActFuture`]s returned from the
-/// [`PeerService`].
-pub trait PeerServiceOwner: Actor {
-    /// Returns [`RoomId`] which owns [`PeerService`].
-    fn id(&self) -> &RoomId;
-
-    /// Returns reference to the [`PeersService`].
-    fn peers(&self) -> &PeersService<Self>;
-
-    /// Returns mutable reference to the [`PeersService`].
-    fn peers_mut(&mut self) -> &mut PeersService<Self>;
-}
-
-impl PeerServiceOwner for Room {
-    /// Returns reference to the [`Room::peers`].
-    fn peers(&self) -> &PeersService<Self> {
-        &self.peers
-    }
-
-    /// Returns mutable reference to the [`Room::peers`].
-    fn peers_mut(&mut self) -> &mut PeersService<Self> {
-        &mut self.peers
-    }
-
-    /// Returns reference to the [`Room::id`].
-    fn id(&self) -> &RoomId {
-        self.id()
-    }
-}
-
-
-impl<A: Actor + PeerServiceOwner> PeersService<A> {
+impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
     pub fn new(
@@ -321,12 +280,10 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_traffic_watcher: peers_traffic_watcher.clone(),
-            peer_metrics_service: PeersMetricsService::new(
-                room_id,
-                peers_traffic_watcher,
-            ),
+            peer_metrics_service: Rc::new(RefCell::new(
+                PeersMetricsService::new(room_id, peers_traffic_watcher),
+            )),
             peer_stats_ttl: media_conf.max_lag,
-            _owner_actor: PhantomData::default(),
         }
     }
 
@@ -343,14 +300,6 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         f: impl FnOnce(&PeerStateMachine) -> T,
     ) -> Result<T, RoomError> {
         self.peers.map_peer_by_id(peer_id, f)
-    }
-
-    pub fn map_peer_by_id_mut<T>(
-        &self,
-        peer_id: PeerId,
-        f: impl FnOnce(&mut PeerStateMachine) -> T,
-    ) -> Result<T, RoomError> {
-        self.peers.map_peer_by_id_mut(peer_id, f)
     }
 
     /// Creates interconnected [`Peer`]s for provided endpoints and saves them
@@ -396,8 +345,10 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         let sink_peer = PeerStateMachine::from(sink_peer);
 
         self.peer_metrics_service
+            .borrow_mut()
             .register_peer(&src_peer, self.peer_stats_ttl);
         self.peer_metrics_service
+            .borrow_mut()
             .register_peer(&sink_peer, self.peer_stats_ttl);
 
         self.add_peer(src_peer);
@@ -480,6 +431,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
             .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
             .collect();
         self.peer_metrics_service
+            .borrow_mut()
             .unregister_peers(&peers_to_unregister);
         self.peers_traffic_watcher
             .unregister_peers(self.room_id.clone(), peers_to_unregister);
@@ -599,6 +551,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         let peers = self.peers.clone();
         let track_count = self.tracks_count.clone();
         let peers_traffic_watcher = self.peers_traffic_watcher.clone();
+        let peer_metrics_service = self.peer_metrics_service.clone();
         let room_id = self.room_id.clone();
         async move {
             match get_or_create_peers.await? {
@@ -645,6 +598,9 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                         sink_peer.add_endpoint(&sink.into());
                         src_peer.add_endpoint(&src.into());
 
+                        let src_peer = PeerStateMachine::from(src_peer);
+                        let sink_peer = PeerStateMachine::from(sink_peer);
+
                         // TODO
                         // TODO
                         // TODO
@@ -661,6 +617,12 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                         //     .update_peer_tracks(&src_peer);
                         // this.peer_metrics_service
                         //     .update_peer_tracks(&sink_peer);
+                        peer_metrics_service
+                            .borrow_mut()
+                            .update_peer_tracks(&src_peer);
+                        peer_metrics_service
+                            .borrow_mut()
+                            .update_peer_tracks(&sink_peer);
 
                         peers.add_peer(src_peer);
                         peers.add_peer(sink_peer);
