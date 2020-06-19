@@ -9,7 +9,7 @@ mod rpc_server;
 use std::sync::Arc;
 
 use actix::{
-    fut, Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
+    Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
     WrapFuture as _,
 };
 use derive_more::{Display, From};
@@ -39,7 +39,6 @@ use crate::{
     AppContext,
 };
 
-use crate::media::PeerStateMachine;
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
@@ -220,19 +219,18 @@ impl Room {
     }
 
     fn connect_members(
+        &mut self,
         member1: &Member,
         member2: &Member,
     ) -> ActFuture<Result<(), RoomError>> {
         let member2_id = member2.id();
-        let member1_id = member1.id();
         let mut connect_endpoints_tasks = Vec::new();
 
         for src in member1.srcs().values() {
             for sink in src.sinks() {
                 if sink.owner().id() == member2_id {
-                    connect_endpoints_tasks.push(
-                        PeersService::connect_endpoints(src.clone(), sink),
-                    );
+                    connect_endpoints_tasks
+                        .push(self.peers.connect_endpoints(src.clone(), sink));
                 }
             }
         }
@@ -241,82 +239,81 @@ impl Room {
             let src = sink.src();
             if src.owner().id() == member2_id {
                 connect_endpoints_tasks
-                    .push(PeersService::connect_endpoints(src, sink.clone()))
+                    .push(self.peers.connect_endpoints(src, sink.clone()))
             }
         }
 
-        Box::new(actix_try_join_all(connect_endpoints_tasks).then(
-            move |result, room: &mut Room, ctx| {
-                let connected_peers = actix_try!(result);
+        Box::new(
+            futures::future::try_join_all(connect_endpoints_tasks)
+                .into_actor(self)
+                .then(move |result, room: &mut Room, ctx| {
+                    let connected_peers = actix_try!(result);
 
-                let mut spawn_futs = Vec::new();
-                let mut then_futs = Vec::new();
+                    let mut spawn_futs = Vec::new();
+                    let mut then_futs = Vec::new();
 
-                for connected_peer in connected_peers {
-                    match connected_peer {
-                        ConnectEndpointsResult::NoOp(
-                            first_peer_id,
-                            second_peer_id,
-                        ) => {
-                            // Just do nothing
-                        }
-                        ConnectEndpointsResult::Updated(
-                            first_peer_id,
-                            second_peer_id,
-                        ) => {
-                            let first_peer: Peer<Stable> = actix_try!(room
-                                .peers
-                                .take_inner_peer(first_peer_id));
-                            let first_peer = first_peer.start_renegotiation();
-                            then_futs.push(Box::new(
-                                room.members
-                                    .send_event_to_member(
-                                        first_peer.member_id(),
-                                        Event::TracksApplied {
-                                            updates: first_peer.get_updates(),
-                                            negotiation_role: Some(
-                                                NegotiationRole::Offerer,
-                                            ),
-                                            peer_id: first_peer_id,
-                                        },
-                                    )
-                                    .into_actor(room),
-                            )
-                                as ActFuture<_>);
+                    for connected_peer in connected_peers {
+                        match connected_peer {
+                            ConnectEndpointsResult::NoOp(_, _) => {
+                                // Just do nothing
+                            }
+                            ConnectEndpointsResult::Updated(
+                                first_peer_id,
+                                _,
+                            ) => {
+                                let first_peer: Peer<Stable> = actix_try!(room
+                                    .peers
+                                    .take_inner_peer(first_peer_id));
+                                let first_peer =
+                                    first_peer.start_renegotiation();
+                                then_futs.push(Box::new(
+                                    room.members
+                                        .send_event_to_member(
+                                            first_peer.member_id(),
+                                            Event::TracksApplied {
+                                                updates: first_peer
+                                                    .get_updates(),
+                                                negotiation_role: Some(
+                                                    NegotiationRole::Offerer,
+                                                ),
+                                                peer_id: first_peer_id,
+                                            },
+                                        )
+                                        .into_actor(room),
+                                )
+                                    as ActFuture<_>);
 
-                            room.peers.add_peer(first_peer);
-                        }
-                        ConnectEndpointsResult::Created(
-                            first_peer_id,
-                            second_peer_id,
-                        ) => {
-                            spawn_futs.push(actix_try!(
-                                room.send_peer_created(second_peer_id)
-                            ));
+                                room.peers.add_peer(first_peer);
+                            }
+                            ConnectEndpointsResult::Created(
+                                _,
+                                second_peer_id,
+                            ) => {
+                                spawn_futs.push(actix_try!(
+                                    room.send_peer_created(second_peer_id)
+                                ));
+                            }
                         }
                     }
-                }
 
-                ctx.spawn(actix_try_join_all(spawn_futs).map(
-                    |res, room, ctx| {
-                        if let Err(e) = res {
-                            error!(
-                                "Failed to connect Endpoints because: {:?}",
-                                e
-                            );
-                            room.close_gracefully(ctx);
-                        }
-                    },
-                ));
+                    ctx.spawn(actix_try_join_all(spawn_futs).map(
+                        |res, room, ctx| {
+                            if let Err(e) = res {
+                                error!(
+                                    "Failed to connect Endpoints because: {:?}",
+                                    e
+                                );
+                                room.close_gracefully(ctx);
+                            }
+                        },
+                    ));
 
-                Box::new(actix_try_join_all(then_futs).map(
-                    |res, room, this| {
+                    Box::new(actix_try_join_all(then_futs).map(|res, _, _| {
                         res?;
                         Ok(())
-                    },
-                ))
-            },
-        ))
+                    }))
+                }),
+        )
     }
 
     /// Creates and interconnects all [`Peer`]s between connected [`Member`]
@@ -337,7 +334,7 @@ impl Room {
         let connect_members_tasks =
             member.partners().into_iter().filter_map(|partner| {
                 if self.members.member_has_connection(&partner.id()) {
-                    Some(Self::connect_members(&partner, member))
+                    Some(self.connect_members(&partner, member))
                 } else {
                     None
                 }

@@ -356,8 +356,6 @@ impl<T> Peer<T> {
     ///
     /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
-        // TODO: peer_created_on_remote / known_to_remote
-        //       change on stable => any other transition
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
     }
@@ -471,7 +469,7 @@ impl Peer<Stable> {
     pub fn add_publisher(
         &mut self,
         partner_peer: &mut Peer<Stable>,
-        tracks_count: &mut Counter<TrackId>,
+        tracks_count: &Counter<TrackId>,
     ) {
         let track_audio = Rc::new(MediaTrack::new(
             tracks_count.next_id(),

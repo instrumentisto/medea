@@ -118,9 +118,11 @@ impl CommandHandler for Room {
             return Ok(Box::new(actix::fut::ok(())));
         }
 
-        let to_peer_id =
-            self.peers.get_peer_by_id(from_peer_id)?.partner_peer_id();
-        let to_member_id = self.peers.get_peer_by_id(to_peer_id)?.member_id();
+        let to_peer_id = self
+            .peers
+            .map_peer_by_id(from_peer_id, |p| p.partner_peer_id())?;
+        let to_member_id =
+            self.peers.map_peer_by_id(to_peer_id, |p| p.member_id())?;
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,
@@ -151,8 +153,9 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
-            let member_id = p.member_id();
+        if let Ok(member_id) =
+            self.peers.map_peer_by_id(peer_id, |p| p.member_id())
+        {
             Ok(Box::new(
                 self.members
                     .send_event_to_member(
