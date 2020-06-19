@@ -231,8 +231,9 @@ impl Room {
         for src in member1.srcs().values() {
             for sink in src.sinks() {
                 if sink.owner().id() == member2_id {
-                    connect_endpoints_tasks
-                        .push(self.peers.connect_endpoints(src.clone(), sink));
+                    connect_endpoints_tasks.push(
+                        self.peers.clone().connect_endpoints(src.clone(), sink),
+                    );
                 }
             }
         }
@@ -240,8 +241,9 @@ impl Room {
         for sink in member1.sinks().values() {
             let src = sink.src();
             if src.owner().id() == member2_id {
-                connect_endpoints_tasks
-                    .push(self.peers.connect_endpoints(src, sink.clone()))
+                connect_endpoints_tasks.push(
+                    self.peers.clone().connect_endpoints(src, sink.clone()),
+                )
             }
         }
 

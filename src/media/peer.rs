@@ -592,7 +592,7 @@ pub mod tests {
             false,
         );
 
-        let mut track_id_counter = Counter::default();
+        let track_id_counter = Counter::default();
 
         for _ in 0..send_audio {
             let track_id = track_id_counter.next_id();
