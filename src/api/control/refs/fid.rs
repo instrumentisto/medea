@@ -7,8 +7,12 @@ use std::{
 
 use derive_more::{Display, From};
 use failure::Fail;
+use medea_macro::enum_delegate;
 
-use crate::{api::control::RoomId, impls_for_stateful_refs};
+use crate::{
+    api::control::{EndpointId, MemberId, RoomId},
+    impls_for_stateful_refs,
+};
 
 use super::{ToEndpoint, ToMember, ToRoom};
 
@@ -71,24 +75,12 @@ impl Display for Fid<ToEndpoint> {
 }
 
 /// Enum for storing [`Fid`]s in all states.
+#[enum_delegate(pub fn room_id(&self) -> &RoomId)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulFid {
     Room(Fid<ToRoom>),
     Member(Fid<ToMember>),
     Endpoint(Fid<ToEndpoint>),
-}
-
-impl StatefulFid {
-    /// Returns reference to [`RoomId`].
-    ///
-    /// This is possible in any [`StatefulFid`] state.
-    pub fn room_id(&self) -> &RoomId {
-        match self {
-            StatefulFid::Room(uri) => uri.room_id(),
-            StatefulFid::Member(uri) => uri.room_id(),
-            StatefulFid::Endpoint(uri) => uri.room_id(),
-        }
-    }
 }
 
 impl TryFrom<String> for StatefulFid {
@@ -117,7 +109,7 @@ impl TryFrom<String> for StatefulFid {
                 member_id
             }
         } else {
-            return Ok(Fid::<ToRoom>::new(room_id.into()).into());
+            return Ok(Fid::<ToRoom>::new(RoomId::from(room_id)).into());
         };
 
         let endpoint_id = if let Some(endpoint_id) = splitted.next() {
@@ -128,8 +120,8 @@ impl TryFrom<String> for StatefulFid {
             }
         } else {
             return Ok(Fid::<ToMember>::new(
-                room_id.to_string().into(),
-                member_id.to_string().into(),
+                RoomId::from(room_id),
+                MemberId::from(member_id),
             )
             .into());
         };
@@ -138,9 +130,9 @@ impl TryFrom<String> for StatefulFid {
             Err(ParseFidError::TooManyPaths(value))
         } else {
             Ok(Fid::<ToEndpoint>::new(
-                room_id.to_string().into(),
-                member_id.to_string().into(),
-                endpoint_id.to_string().into(),
+                RoomId::from(room_id),
+                MemberId::from(member_id),
+                EndpointId::from(endpoint_id),
             )
             .into())
         }
@@ -190,7 +182,7 @@ mod specs {
 
     #[test]
     fn successful_parse_to_room() {
-        let room_id: RoomId = "room_id".to_string().into();
+        let room_id = RoomId::from("room_id");
         let fid = StatefulFid::try_from(format!("{}", room_id)).unwrap();
         match fid {
             StatefulFid::Room(room_fid) => {
@@ -202,8 +194,8 @@ mod specs {
 
     #[test]
     fn successful_parse_to_member() {
-        let room_id: RoomId = "room_id".to_string().into();
-        let member_id: MemberId = "member_id".to_string().into();
+        let room_id = RoomId::from("room_id");
+        let member_id = MemberId::from("member_id");
         let fid = StatefulFid::try_from(format!("{}/{}", room_id, member_id))
             .unwrap();
 
@@ -218,9 +210,9 @@ mod specs {
 
     #[test]
     fn successful_parse_to_endpoint() {
-        let room_id: RoomId = "room_id".to_string().into();
-        let member_id: MemberId = "member_id".to_string().into();
-        let endpoint_id: EndpointId = "endpoint_id".to_string().into();
+        let room_id = RoomId::from("room_id");
+        let member_id = MemberId::from("member_id");
+        let endpoint_id = EndpointId::from("endpoint_id");
         let fid = StatefulFid::try_from(format!(
             "{}/{}/{}",
             room_id, member_id, endpoint_id

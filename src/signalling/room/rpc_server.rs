@@ -14,12 +14,15 @@ use crate::{
             RpcConnectionSettings,
         },
         control::{
-            callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
+            callback::{
+                CallbackRequest, OnJoinEvent, OnLeaveEvent, OnLeaveReason,
+            },
             MemberId,
         },
         RpcServer,
     },
     log::prelude::*,
+    media::PeerStateMachine,
     utils::ResponseActAnyFuture,
 };
 
@@ -227,8 +230,10 @@ impl Handler<RpcConnectionEstablished> for Room {
                     if let Some(callback_url) = member.get_on_join() {
                         room.callbacks.send_callback(
                             callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
+                            CallbackRequest::new_at_now(
+                                member.get_fid(),
+                                OnJoinEvent,
+                            ),
                         );
                     };
                     Ok(())
@@ -249,6 +254,8 @@ impl Handler<RpcConnectionClosed> for Room {
     /// connections.
     ///
     /// Removes all related for disconnected `Member` `Peer`s.
+    ///
+    /// Sends [`Endpoint`]'s `on_stop` callbacks to the Control API.
     ///
     /// Sends [`PeersRemoved`] message to `Member`.
     ///
@@ -276,8 +283,10 @@ impl Handler<RpcConnectionClosed> for Room {
                     };
                     self.callbacks.send_callback(
                         on_leave_url,
-                        member.get_fid().into(),
-                        OnLeaveEvent::new(reason),
+                        CallbackRequest::new_at_now(
+                            member.get_fid(),
+                            OnLeaveEvent::new(reason),
+                        ),
                     );
                 }
             } else {
@@ -289,8 +298,18 @@ impl Handler<RpcConnectionClosed> for Room {
                 self.close_gracefully(ctx).spawn(ctx);
             }
 
-            let removed_peers =
-                self.peers.remove_peers_related_to_member(&msg.member_id);
+            let peers_to_remove: Vec<_> = self
+                .peers
+                .get_peers_by_member_id(&msg.member_id)
+                .map(PeerStateMachine::id)
+                .collect();
+
+            let removed_peers = self
+                .remove_peers(&msg.member_id, &peers_to_remove, ctx)
+                .into_iter()
+                .map(|(member_id, peer)| {
+                    (member_id, peer.into_iter().map(|p| p.id()).collect())
+                });
 
             for (peer_member_id, peers_ids) in removed_peers {
                 // Here we may have some problems. If two participants

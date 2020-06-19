@@ -2,60 +2,87 @@ kind: Room
 id: three-members-conference
 spec:
   pipeline:
-    # Here we're defining a member who initiates video call.
-    caller:
+    member-1:
       kind: Member
       credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
       spec:
         pipeline:
-          # Media element which is able to receive media data from client
-          # via WebRTC.
           publish:
             kind: WebRtcPublishEndpoint
             spec:
-              # Actually, it receives not media data, but ICE candidates only.
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
               p2p: Always
-          # Media element which is able to play media data for client
-          # via WebRTC.
           play-responder-1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder-1/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+              src: "local://three-members-conference/member-2/publish"
           play-responder-2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder-2/publish"
-    responder-1:
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+              src: "local://three-members-conference/member-3/publish"
+    member-2:
       kind: Member
       credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
       spec:
         pipeline:
           publish:
             kind: WebRtcPublishEndpoint
             spec:
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
               p2p: Always
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/caller/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+              src: "local://three-members-conference/member-1/publish"
           play-responder-2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder-2/publish"
-    responder-2:
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+              src: "local://three-members-conference/member-3/publish"
+    member-3:
       kind: Member
       credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
       spec:
         pipeline:
           publish:
             kind: WebRtcPublishEndpoint
             spec:
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
               p2p: Always
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/caller/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+              src: "local://three-members-conference/member-1/publish"
           play-responder-1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder-1/publish"
+              force_relay: true
+              on_start: "grpc://127.0.0.1:9099"
+              on_stop: "grpc://127.0.0.1:9099"
+              src: "local://three-members-conference/member-2/publish"

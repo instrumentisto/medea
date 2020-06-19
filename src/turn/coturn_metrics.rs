@@ -179,6 +179,11 @@ impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
             CoturnAllocationEvent::Deleted => {
                 *allocations_count -= 1;
                 if *allocations_count == 0 {
+                    debug!(
+                        "Peer [id = {}] from Room [id = {}] traffic stopped \
+                         because his allocations was removed in the Coturn.",
+                        event.peer_id, event.room_id
+                    );
                     self.peer_traffic_watcher.traffic_stopped(
                         event.room_id,
                         event.peer_id,

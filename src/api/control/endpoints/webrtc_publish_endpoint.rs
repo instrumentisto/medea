@@ -2,16 +2,18 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use derive_more::{Display, From, Into};
+use std::convert::TryFrom;
+
+use derive_more::{Display, From};
+use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::api as proto;
+use crate::api::control::{callback::url::CallbackUrl, TryFromProtobufError};
 
 /// ID of [`WebRtcPublishEndpoint`].
-#[derive(
-    Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From, Into,
-)]
-pub struct WebRtcPublishId(String);
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
+#[from(forward)]
+pub struct WebRtcPublishId(pub String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Deserialize, Debug)]
@@ -60,16 +62,39 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
     pub force_relay: bool,
+
+    /// `on_start` Control API callback URL.
+    pub on_start: Option<CallbackUrl>,
+
+    /// `on_stop` Control API callback URL.
+    pub on_stop: Option<CallbackUrl>,
 }
 
-impl From<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
-    fn from(value: &proto::WebRtcPublishEndpoint) -> Self {
-        Self {
+impl TryFrom<&proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
+    type Error = TryFromProtobufError;
+
+    fn try_from(
+        value: &proto::WebRtcPublishEndpoint,
+    ) -> Result<Self, Self::Error> {
+        let on_start = value
+            .on_start
+            .clone()
+            .map(CallbackUrl::try_from)
+            .transpose()?;
+        let on_stop = value
+            .on_stop
+            .clone()
+            .map(CallbackUrl::try_from)
+            .transpose()?;
+
+        Ok(WebRtcPublishEndpoint {
             p2p: P2pMode::from(
                 proto::web_rtc_publish_endpoint::P2p::from_i32(value.p2p)
                     .unwrap_or_default(),
             ),
             force_relay: value.force_relay,
-        }
+            on_start,
+            on_stop,
+        })
     }
 }

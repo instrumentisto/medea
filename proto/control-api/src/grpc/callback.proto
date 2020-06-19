@@ -21,6 +21,8 @@ message Request {
   oneof event {
     OnJoin on_join = 3;
     OnLeave on_leave = 4;
+    OnStart on_start = 5;
+    OnStop on_stop = 6;
   }
 }
 
@@ -29,6 +31,65 @@ message Request {
 // We don't use 'google.protobuf.Empty' to be able to add
 // some fields (if necessary) in the future.
 message Response {}
+
+// Media type of the traffic which starts/stops flowing in some Endpoint.
+enum MediaType {
+  /// Started/stopped audio traffic.
+  AUDIO = 0;
+
+  /// Started/stopped video traffic.
+  VIDEO = 1;
+
+  /// Started/stopped audio and video traffic.
+  BOTH = 2;
+}
+
+// Media direction of the Endpoint for which OnStart or OnStop Control API callback
+// was received.
+enum MediaDirection {
+  // Endpoint is a publisher.
+  PUBLISH = 0;
+
+  // Endpoint is a player.
+  PLAY = 1;
+}
+
+// Event which fires when Endpoint starts sending/receiving media traffic.
+message OnStart {
+  // Media type of the traffic which starts flowing in some Endpoint.
+  MediaType media_type = 1;
+
+  // Media direction of the Endpoint for which this callback was received.
+  MediaDirection media_direction = 2;
+}
+
+// Event which fires when Endpoint stops sending/receiving media traffic.
+message OnStop {
+  /// Media type of the traffic which stops flowing in some Endpoint.
+  MediaType media_type = 1;
+  /// Media direction of the Endpoint for which this callback was received.
+  MediaDirection media_direction = 2;
+  // Reason of why Endpoint was stopped.
+  Reason reason = 3;
+
+  // Reason of why some Endpoint was stopped.
+  enum Reason {
+    // All traffic of some Endpoint was stopped flowing.
+    TRAFFIC_NOT_FLOWING = 0;
+
+    // Endpoint was muted.
+    MUTED = 1;
+
+    // Source Endpoint of a Endpoint for which received this OnStop callback was muted.
+    SRC_MUTED = 2;
+
+    // Some traffic flows within Endpoint, but incorrectly.
+    WRONG_TRAFFIC_FLOWING = 3;
+
+    // Traffic stopped because Endpoint was removed.
+    ENDPOINT_REMOVED = 4;
+  }
+}
 
 // Event that fires when Member joins a Room.
 message OnJoin {}

@@ -4,6 +4,8 @@ pub mod clients;
 pub mod service;
 pub mod url;
 
+use std::convert::From;
+
 use actix::Message;
 use chrono::{DateTime, Utc};
 use clients::CallbackClientError;
@@ -68,21 +70,140 @@ impl Into<proto::OnJoin> for OnJoinEvent {
     }
 }
 
-/// All callbacks which can happen.
+/// `on_start` Control API callback.
+#[derive(Debug)]
+pub struct OnStartEvent {
+    /// [`MediaType`] of the traffic which starts flowing in some `Endpoint`.
+    pub media_type: MediaType,
+
+    /// [`MediaDirection`] of the `Endpoint` for which this callback was
+    /// received.
+    pub direction: MediaDirection,
+}
+
+impl Into<proto::OnStart> for OnStartEvent {
+    fn into(self) -> proto::OnStart {
+        let media_type: proto::MediaType = self.media_type.into();
+        let direction: proto::MediaDirection = self.direction.into();
+
+        proto::OnStart {
+            media_type: media_type as i32,
+            media_direction: direction as i32,
+        }
+    }
+}
+
+impl Into<proto::MediaType> for MediaType {
+    fn into(self) -> proto::MediaType {
+        match self {
+            MediaType::Audio => proto::MediaType::Audio,
+            MediaType::Video => proto::MediaType::Video,
+            MediaType::Both => proto::MediaType::Both,
+        }
+    }
+}
+
+impl From<&medea_client_api_proto::MediaType> for MediaType {
+    fn from(media_type: &medea_client_api_proto::MediaType) -> Self {
+        use medea_client_api_proto::MediaType as MediaTypeProto;
+
+        match media_type {
+            MediaTypeProto::Audio(_) => MediaType::Audio,
+            MediaTypeProto::Video(_) => MediaType::Video,
+        }
+    }
+}
+
+/// Reason of why some `Endpoint` was stopped.
+#[derive(Clone, Copy, Debug)]
+pub enum OnStopReason {
+    /// All traffic of some `Endpoint` was stopped flowing.
+    TrafficNotFlowing,
+
+    /// `Endpoint` was muted.
+    Muted,
+
+    /// Source `Endpoint` of a `Endpoint` for which received this `on_stop`
+    /// callback was muted.
+    SrcMuted,
+
+    /// Some traffic flows within `Endpoint`, but incorrectly.
+    WrongTrafficFlowing,
+
+    /// Traffic stopped because Endpoint was removed.
+    EndpointRemoved,
+}
+
+impl Into<proto::on_stop::Reason> for OnStopReason {
+    fn into(self) -> proto::on_stop::Reason {
+        match self {
+            OnStopReason::TrafficNotFlowing => {
+                proto::on_stop::Reason::TrafficNotFlowing
+            }
+            OnStopReason::EndpointRemoved => {
+                proto::on_stop::Reason::EndpointRemoved
+            }
+            OnStopReason::Muted => proto::on_stop::Reason::Muted,
+            OnStopReason::SrcMuted => proto::on_stop::Reason::SrcMuted,
+            OnStopReason::WrongTrafficFlowing => {
+                proto::on_stop::Reason::WrongTrafficFlowing
+            }
+        }
+    }
+}
+
+/// `on_stop` Control API callback.
+#[derive(Debug)]
+pub struct OnStopEvent {
+    /// [`MediaType`] of the traffic which stops flowing in some `Endpoint`.
+    pub media_type: MediaType,
+
+    /// [`MediaDirection`] of the `Endpoint` for which this callback was
+    /// received.
+    pub media_direction: MediaDirection,
+
+    /// Reason of why `Endpoint` was stopped.
+    pub reason: OnStopReason,
+}
+
+impl Into<proto::OnStop> for OnStopEvent {
+    fn into(self) -> proto::OnStop {
+        let media_type: proto::MediaType = self.media_type.into();
+        let media_direction: proto::MediaDirection =
+            self.media_direction.into();
+        let reason: proto::on_stop::Reason = self.reason.into();
+
+        proto::OnStop {
+            media_type: media_type as i32,
+            media_direction: media_direction as i32,
+            reason: reason as i32,
+        }
+    }
+}
+
+/// All possible Control API callbacks.
 #[derive(Debug, From)]
 pub enum CallbackEvent {
-    OnJoin(OnJoinEvent),
-    OnLeave(OnLeaveEvent),
+    Join(OnJoinEvent),
+    Leave(OnLeaveEvent),
+    Start(OnStartEvent),
+    Stop(OnStopEvent),
 }
 
 impl Into<proto::request::Event> for CallbackEvent {
     fn into(self) -> proto::request::Event {
         match self {
-            Self::OnJoin(on_join) => {
+            Self::Join(on_join) => {
                 proto::request::Event::OnJoin(on_join.into())
             }
-            Self::OnLeave(on_leave) => {
+            Self::Leave(on_leave) => {
                 proto::request::Event::OnLeave(on_leave.into())
+            }
+            Self::Start(on_start) => {
+                proto::request::Event::OnStart(on_start.into())
+            }
+            Self::Stop(on_stop) => {
+                proto::request::Event::OnStop(on_stop.into())
             }
         }
     }
@@ -132,17 +253,6 @@ impl MediaType {
     }
 }
 
-impl From<&medea_client_api_proto::MediaType> for MediaType {
-    fn from(media_type: &medea_client_api_proto::MediaType) -> Self {
-        use medea_client_api_proto::MediaType as MediaTypeProto;
-
-        match media_type {
-            MediaTypeProto::Audio(_) => MediaType::Audio,
-            MediaTypeProto::Video(_) => MediaType::Video,
-        }
-    }
-}
-
 /// Media direction of the `Endpoint` for which `on_start` or `on_stop` Control
 /// API callback was received.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -152,6 +262,15 @@ pub enum MediaDirection {
 
     /// `Endpoint` is a player.
     Play,
+}
+
+impl Into<proto::MediaDirection> for MediaDirection {
+    fn into(self) -> proto::MediaDirection {
+        match self {
+            MediaDirection::Play => proto::MediaDirection::Play,
+            MediaDirection::Publish => proto::MediaDirection::Publish,
+        }
+    }
 }
 
 /// Control API callback.
@@ -174,12 +293,30 @@ pub struct CallbackRequest {
 }
 
 impl CallbackRequest {
-    /// Returns [`CallbackRequest`] with provided fields and current time as
-    /// `at`.
-    pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
+    /// Returns new [`CallbackRequest`] with provided fields.
+    pub fn new<F, E, D>(fid: F, event: E, datetime: D) -> Self
+    where
+        E: Into<CallbackEvent>,
+        F: Into<StatefulFid>,
+        D: Into<DateTime<Utc>>,
+    {
         Self {
-            fid: element,
-            event,
+            fid: fid.into(),
+            event: event.into(),
+            at: datetime.into(),
+        }
+    }
+
+    /// Returns new [`CallbackRequest`] with provided fields and `at` field set
+    /// to current date time.
+    pub fn new_at_now<F, E>(fid: F, event: E) -> Self
+    where
+        E: Into<CallbackEvent>,
+        F: Into<StatefulFid>,
+    {
+        Self {
+            fid: fid.into(),
+            event: event.into(),
             at: Utc::now(),
         }
     }

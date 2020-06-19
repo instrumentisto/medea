@@ -10,12 +10,12 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, VideoSettings,
+    TrackId, TrackPatch, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId,
+    api::control::{callback::MediaType as CallbackMediaType, MemberId},
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{Endpoint, WeakEndpoint},
@@ -81,6 +81,10 @@ impl PeerError {
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(pub fn update_track(&self, patch: &TrackPatch))]
+#[enum_delegate(
+    pub fn is_senders_muted(&self, kind: CallbackMediaType) -> bool
+)]
 #[enum_delegate(
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
@@ -276,6 +280,28 @@ impl<T> Peer<T> {
             }
         }
         self.context.endpoints.push(endpoint.downgrade());
+    }
+
+    /// Updates [`MediaTrack`] from this [`Peer`] by provided [`TrackPatch`].
+    pub fn update_track(&self, patch: &TrackPatch) {
+        let track_id = patch.id;
+        let track = self
+            .context
+            .senders
+            .get(&track_id)
+            .or_else(|| self.context.receivers.get(&track_id));
+        if let Some(track) = track {
+            track.update(patch);
+        }
+    }
+
+    /// Checks that all `senders` with provided [`CallbackMediaType`] is
+    /// currently muted.
+    pub fn is_senders_muted(&self, kind: CallbackMediaType) -> bool {
+        self.context.senders.values().any(|track| {
+            CallbackMediaType::from(&track.media_type) == kind
+                && track.is_muted()
+        })
     }
 
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].

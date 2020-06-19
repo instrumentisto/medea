@@ -2,3 +2,7 @@
 idle_timeout = "1s"
 ping_interval = "500ms"
 reconnect_timeout = "0ms"
+
+[media]
+max_lag = "5s"
+init_timeout = "5s"

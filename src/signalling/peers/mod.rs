@@ -1,6 +1,6 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
-mod media_traffic_state;
+pub mod media_traffic_state;
 mod metrics;
 mod traffic_watcher;
 
@@ -13,7 +13,8 @@ use std::{
 
 use actix::{fut::wrap_future, ActorFuture, WrapFuture as _};
 use derive_more::Display;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use futures::Stream;
+use medea_client_api_proto::{stats::RtcStat, Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::{MemberId, RoomId},
@@ -167,12 +168,13 @@ impl PeersService {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
-        debug!(
-            "Created peer between {} and {}.",
-            src_member_id, sink_member_id
-        );
         let src_peer_id = self.peers_count.next_id();
         let sink_peer_id = self.peers_count.next_id();
+
+        debug!(
+            "Created peers between {} and {}: {} and {}",
+            src_member_id, sink_member_id, src_peer_id, sink_peer_id
+        );
 
         let mut src_peer = Peer::new(
             src_peer_id,
@@ -454,45 +456,45 @@ impl PeersService {
         )
     }
 
-    /// Removes all [`Peer`]s related to given [`Member`].
-    /// Note, that this function will also remove all partners [`Peer`]s.
-    ///
-    /// Returns [`HashMap`] with all removed [`Peer`]s:
-    /// key - [`Peer`]'s owner [`MemberId`],
-    /// value - removed [`Peer`]'s [`PeerId`].
-    // TODO: remove in #91.
-    pub fn remove_peers_related_to_member(
+    /// Returns [`Endpoint`]s for which provided
+    /// [`Peer`] was created.
+    pub fn get_endpoints_by_peer_id(&self, peer_id: PeerId) -> Vec<Endpoint> {
+        self.peers
+            .get(&peer_id)
+            .map(|peer| {
+                peer.endpoints()
+                    .into_iter()
+                    .filter_map(|e| e.upgrade())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Propagates stats to [`PeersMetricsService`].
+    pub fn add_stats(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+        self.peer_metrics_service.add_stat(peer_id, stats);
+    }
+
+    /// Returns [`Stream`] of [`PeerMetricsEvent`]s from underlying
+    /// [`PeerMetricsService`].
+    pub fn subscribe_to_metrics_events(
         &mut self,
-        member_id: &MemberId,
-    ) -> HashMap<MemberId, Vec<PeerId>> {
-        let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
-            HashMap::new();
+    ) -> impl Stream<Item = PeersMetricsEvent> {
+        self.peer_metrics_service.subscribe()
+    }
 
-        self.get_peers_by_member_id(member_id).for_each(|peer| {
-            self.get_peers_by_member_id(&peer.partner_member_id())
-                .filter(|partner_peer| {
-                    &partner_peer.partner_member_id() == member_id
-                })
-                .for_each(|partner_peer| {
-                    peers_to_remove
-                        .entry(partner_peer.member_id())
-                        .or_insert_with(Vec::new)
-                        .push(partner_peer.id());
-                });
+    /// Runs [`Peer`]s stats validation in the underlying [`PeerMetricsEvent`]s.
+    ///
+    /// This task should be ran every second.
+    pub fn check_peers(&mut self) {
+        self.peer_metrics_service.check_peers();
+    }
 
-            peers_to_remove
-                .entry(peer.member_id())
-                .or_insert_with(Vec::new)
-                .push(peer.id());
-        });
-
-        peers_to_remove
-            .values()
-            .flat_map(|peer_ids| peer_ids.iter())
-            .for_each(|id| {
-                self.peers.remove(id);
-            });
-
-        peers_to_remove
+    /// Updates [`PeerSpec`] of the [`Peer`] with provided [`PeerId`] in the
+    /// [`PeerMetricsService`].
+    pub fn update_peer_tracks(&mut self, peer_id: PeerId) {
+        if let Some(peer) = self.peers.get(&peer_id) {
+            self.peer_metrics_service.update_peer_tracks(peer);
+        }
     }
 }

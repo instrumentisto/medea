@@ -19,6 +19,7 @@ use crate::{
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         repo::{TurnDatabase, TurnDatabaseErr},
+        CoturnUsername,
     },
 };
 
@@ -63,6 +64,14 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 
     /// Deletes batch of [`IceUser`]s.
     async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr>;
+
+    /// Lists Coturn [`Session`]s associated with provided [`RoomId`] and
+    /// [`PeerId`].
+    async fn get_sessions(
+        &self,
+        room_id: RoomId,
+        peer_id: PeerId,
+    ) -> Result<Vec<String>, TurnServiceErr>;
 }
 
 /// [`TurnAuthService`] implementation backed by Redis database.
@@ -149,6 +158,19 @@ impl TurnAuthService for Service {
         self.coturn_cli.delete_sessions(users.as_slice()).await?;
         Ok(())
     }
+
+    /// Lists Coturn [`Session`]s associated with provided [`RoomId`] and
+    /// [`PeerId`].
+    async fn get_sessions(
+        &self,
+        room_id: RoomId,
+        peer_id: PeerId,
+    ) -> Result<Vec<String>, TurnServiceErr> {
+        Ok(self
+            .coturn_cli
+            .get_sessions(CoturnUsername { room_id, peer_id })
+            .await?)
+    }
 }
 
 /// Create new instance [`TurnAuthService`].
@@ -198,7 +220,7 @@ pub fn new_turn_auth_service<'a>(
 pub mod test {
     use std::sync::Arc;
 
-    use crate::media::IceUser;
+    use crate::{api::control::room::Id, media::IceUser};
 
     use super::*;
 
@@ -222,6 +244,14 @@ pub mod test {
 
         async fn delete(&self, _: &[IceUser]) -> Result<(), TurnServiceErr> {
             Ok(())
+        }
+
+        async fn get_sessions(
+            &self,
+            _: Id,
+            _: PeerId,
+        ) -> Result<Vec<String>, TurnServiceErr> {
+            Ok(Vec::new())
         }
     }
 

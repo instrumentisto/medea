@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 
-use medea_client_api_proto::{MediaType, TrackId as Id};
+use medea_client_api_proto::{MediaType, TrackId as Id, TrackPatch};
 
 /// Representation of [MediaStreamTrack][1] object.
 ///
@@ -14,6 +14,7 @@ pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,
     pub media_type: MediaType,
+    is_muted: RefCell<bool>,
 }
 
 impl MediaTrack {
@@ -23,6 +24,7 @@ impl MediaTrack {
             id,
             mid: RefCell::new(None),
             media_type,
+            is_muted: RefCell::new(false),
         }
     }
 
@@ -32,5 +34,17 @@ impl MediaTrack {
 
     pub fn mid(&self) -> Option<String> {
         self.mid.borrow_mut().as_ref().cloned()
+    }
+
+    /// Updates this [`MediaTrack`] by provided [`TrackPatch`].
+    pub fn update(&self, patch: &TrackPatch) {
+        if let Some(is_muted) = patch.is_muted {
+            *self.is_muted.borrow_mut() = is_muted;
+        }
+    }
+
+    /// Returns `true` if this [`MediaTrack`] is currently muted.
+    pub fn is_muted(&self) -> bool {
+        *self.is_muted.borrow()
     }
 }

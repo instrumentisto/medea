@@ -7,7 +7,7 @@ pub mod webrtc_publish_endpoint;
 
 use std::convert::TryFrom;
 
-use derive_more::{Display, From, Into};
+use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -19,22 +19,21 @@ pub use webrtc_play_endpoint::{WebRtcPlayEndpoint, WebRtcPlayId};
 pub use webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId};
 
 /// ID of `Endpoint`.
-#[derive(
-    Clone, Debug, Deserialize, Display, Eq, From, Hash, Into, PartialEq,
-)]
+#[derive(Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq)]
+#[from(forward)]
 pub struct Id(pub String);
 
 macro_rules! impl_from_into {
     ($id:ty) => {
         impl std::convert::From<Id> for $id {
             fn from(id: Id) -> Self {
-                String::from(id).into()
+                <$id>::from(id.0)
             }
         }
 
         impl std::convert::From<$id> for Id {
             fn from(id: $id) -> Self {
-                String::from(id).into()
+                Id::from(id.0)
             }
         }
     };
@@ -80,7 +79,7 @@ impl TryFrom<(Id, proto::member::element::El)> for EndpointSpec {
                 Ok(Self::WebRtcPlay(play))
             }
             El::WebrtcPub(elem) => {
-                let publish = WebRtcPublishEndpoint::from(&elem);
+                let publish = WebRtcPublishEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPublish(publish))
             }
         }
@@ -101,7 +100,7 @@ impl TryFrom<(Id, proto::create_request::El)> for EndpointSpec {
                 Ok(Self::WebRtcPlay(play))
             }
             El::WebrtcPub(elem) => {
-                let publish = WebRtcPublishEndpoint::from(&elem);
+                let publish = WebRtcPublishEndpoint::try_from(&elem)?;
                 Ok(Self::WebRtcPublish(publish))
             }
             El::Member(_) | El::Room(_) => {

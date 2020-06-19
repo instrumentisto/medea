@@ -211,6 +211,8 @@ impl Member {
                     publisher.downgrade(),
                     this_member.downgrade(),
                     spec_play_endpoint.force_relay,
+                    spec_play_endpoint.on_start.clone(),
+                    spec_play_endpoint.on_stop.clone(),
                 );
 
                 self.insert_sink(new_play_endpoint.clone());
@@ -223,6 +225,8 @@ impl Member {
                     publisher_endpoint.p2p,
                     publisher_member.downgrade(),
                     publisher_endpoint.force_relay,
+                    publisher_endpoint.on_start.clone(),
+                    publisher_endpoint.on_stop.clone(),
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -231,6 +235,8 @@ impl Member {
                     new_publish.downgrade(),
                     this_member.downgrade(),
                     spec_play_endpoint.force_relay,
+                    spec_play_endpoint.on_start.clone(),
+                    spec_play_endpoint.on_stop.clone(),
                 );
 
                 new_publish.add_sink(new_self_play.downgrade());
@@ -252,6 +258,8 @@ impl Member {
                     e.p2p,
                     this_member.downgrade(),
                     e.force_relay,
+                    e.on_start.clone(),
+                    e.on_stop.clone(),
                 ));
             });
 
@@ -384,6 +392,8 @@ impl Member {
             src.downgrade(),
             member.downgrade(),
             spec.force_relay,
+            spec.on_start,
+            spec.on_stop,
         );
 
         src.add_sink(sink.downgrade());
@@ -406,7 +416,7 @@ impl Member {
             return Ok(Endpoint::WebRtcPublishEndpoint(publish_endpoint));
         }
 
-        let webrtc_play_id = String::from(webrtc_publish_id).into();
+        let webrtc_play_id = EndpointId::from(webrtc_publish_id).into();
         if let Some(play_endpoint) = self.get_sink_by_id(&webrtc_play_id) {
             return Ok(Endpoint::WebRtcPlayEndpoint(play_endpoint));
         }
@@ -568,13 +578,12 @@ impl Into<proto::Member> for Member {
             id: self.id().to_string(),
             credentials: self.credentials(),
             on_leave: self
-                .get_on_leave()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
-            on_join: self
-                .get_on_join()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
+                .0
+                .borrow()
+                .on_leave
+                .as_ref()
+                .map(ToString::to_string),
+            on_join: self.0.borrow().on_join.as_ref().map(ToString::to_string),
             reconnect_timeout: Some(self.get_reconnect_timeout().into()),
             idle_timeout: Some(self.get_idle_timeout().into()),
             ping_interval: Some(self.get_ping_interval().into()),

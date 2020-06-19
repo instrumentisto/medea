@@ -8,15 +8,10 @@ use actix::Arbiter;
 use tokio::sync::RwLock;
 
 use crate::{
-    api::control::{
-        callback::{
-            clients::{
-                CallbackClient, CallbackClientError, CallbackClientFactory,
-            },
-            url::CallbackUrl,
-            CallbackEvent, CallbackRequest,
-        },
-        refs::StatefulFid,
+    api::control::callback::{
+        clients::{CallbackClient, CallbackClientError, CallbackClientFactory},
+        url::CallbackUrl,
+        CallbackRequest,
     },
     log::prelude::*,
 };
@@ -84,16 +79,14 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
     /// Will use existing [`CallbackClient`] or create new.
     // TODO: Add buffering and resending for failed 'Callback' sends.
     //       https://github.com/instrumentisto/medea/issues/61
-    pub fn send_callback<T: Into<CallbackEvent> + 'static>(
+    pub fn send_callback(
         &self,
         callback_url: CallbackUrl,
-        fid: StatefulFid,
-        event: T,
+        request: CallbackRequest,
     ) {
         let this = self.clone();
         Arbiter::spawn(async move {
-            let req = CallbackRequest::new(fid, event.into());
-            if let Err(e) = this.send_request(req, callback_url).await {
+            if let Err(e) = this.send_request(request, callback_url).await {
                 error!("Failed to send callback because {:?}.", e);
             }
         })
@@ -108,18 +101,21 @@ mod tests {
     use serial_test_derive::serial;
     use tokio::time;
 
-    use crate::api::control::callback::{
-        clients::{MockCallbackClient, MockCallbackClientFactory},
-        OnJoinEvent,
+    use crate::api::control::{
+        callback::{
+            clients::{MockCallbackClient, MockCallbackClientFactory},
+            CallbackEvent, OnJoinEvent,
+        },
+        refs::StatefulFid,
     };
 
     use super::*;
 
     /// Returns [`CallbackRequest`] to a `foo` element.
     fn callback_request() -> CallbackRequest {
-        CallbackRequest::new(
+        CallbackRequest::new_at_now(
             StatefulFid::try_from("foo".to_string()).unwrap(),
-            CallbackEvent::OnJoin(OnJoinEvent),
+            CallbackEvent::Join(OnJoinEvent),
         )
     }
 

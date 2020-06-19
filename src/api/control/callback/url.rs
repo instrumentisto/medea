@@ -29,7 +29,7 @@ impl GrpcCallbackUrl {
 }
 
 /// All callback URLs which supported by Medea.
-#[derive(Clone, derive_more::Display, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Display, Debug, Eq, PartialEq, Hash)]
 pub enum CallbackUrl {
     /// gRPC callbacks type.
     Grpc(GrpcCallbackUrl),

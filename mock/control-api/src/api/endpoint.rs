@@ -50,6 +50,14 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
     force_relay: bool,
+
+    /// URL to which `OnStart` Control API callback will be sent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_start: Option<String>,
+
+    /// URL to which `OnStop` Control API callback will be sent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_stop: Option<String>,
 }
 
 impl WebRtcPublishEndpoint {
@@ -62,8 +70,8 @@ impl WebRtcPublishEndpoint {
             id,
             p2p: p2p as i32,
             force_relay: self.force_relay,
-            on_start: String::new(),
-            on_stop: String::new(),
+            on_start: self.on_start,
+            on_stop: self.on_stop,
         }
     }
 }
@@ -76,6 +84,8 @@ impl From<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
                 .unwrap_or_default()
                 .into(),
             force_relay: proto.force_relay,
+            on_start: proto.on_start,
+            on_stop: proto.on_stop,
         }
     }
 }
@@ -96,6 +106,14 @@ pub struct WebRtcPlayEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
     force_relay: bool,
+
+    /// URL to which `OnStart` Control API callback will be sent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_start: Option<String>,
+
+    /// URL to which `OnStop` Control API callback will be sent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_stop: Option<String>,
 }
 
 impl WebRtcPlayEndpoint {
@@ -107,8 +125,8 @@ impl WebRtcPlayEndpoint {
             id,
             src: self.src,
             force_relay: self.force_relay,
-            on_start: String::new(),
-            on_stop: String::new(),
+            on_start: self.on_start,
+            on_stop: self.on_stop,
         }
     }
 }
@@ -119,6 +137,8 @@ impl From<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
             id: proto.id,
             src: proto.src,
             force_relay: proto.force_relay,
+            on_start: proto.on_start,
+            on_stop: proto.on_stop,
         }
     }
 }

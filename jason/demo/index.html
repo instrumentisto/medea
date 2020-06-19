@@ -43,6 +43,8 @@
           kind: 'WebRtcPublishEndpoint',
           p2p: 'Always',
           force_relay: isForceRelay,
+          on_start: "grpc://127.0.0.1:9099",
+          on_stop: "grpc://127.0.0.1:9099"
         },
       };
 
@@ -53,6 +55,8 @@
           kind: 'WebRtcPlayEndpoint',
           src: 'local://' + roomId + '/' + memberId + "/publish",
           force_relay: isForceRelay,
+          on_start: "grpc://127.0.0.1:9099",
+          on_stop: "grpc://127.0.0.1:9099"
         };
       }
 
@@ -63,6 +67,8 @@
           kind: 'Member',
           credentials: 'test',
           pipeline: pipeline,
+          on_join: "grpc://127.0.0.1:9099",
+          on_leave: "grpc://127.0.0.1:9099"
         },
       });
 
@@ -85,6 +91,8 @@
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
             force_relay: controlRoom.data.element.pipeline[id].pipeline.publish.force_relay,
+            on_start: "grpc://127.0.0.1:9099",
+            on_stop: "grpc://127.0.0.1:9099"
           }
         });
         play_requests.push(playRequest);

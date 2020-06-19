@@ -63,8 +63,8 @@ impl Member {
             pipeline: member_elements,
             id,
             credentials: self.credentials.unwrap_or_default(),
-            on_join: self.on_join.unwrap_or_default(),
-            on_leave: self.on_leave.unwrap_or_default(),
+            on_join: self.on_join,
+            on_leave: self.on_leave,
             idle_timeout: self.idle_timeout.map(Into::into),
             reconnect_timeout: self.reconnect_timeout.map(Into::into),
             ping_interval: self.ping_interval.map(Into::into),
@@ -92,8 +92,8 @@ impl From<proto::Member> for Member {
             id: proto.id,
             pipeline: member_pipeline,
             credentials: Some(proto.credentials),
-            on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
-            on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
+            on_join: proto.on_join,
+            on_leave: proto.on_leave,
             idle_timeout: proto.idle_timeout.map(|dur| dur.try_into().unwrap()),
             reconnect_timeout: proto
                 .reconnect_timeout

@@ -189,7 +189,7 @@ impl ControlApiService {
                         play.id.into(),
                     ),
                     proto::create_request::El::WebrtcPub(publish) => (
-                        Ok(WebRtcPublishEndpoint::from(&publish))
+                        WebRtcPublishEndpoint::try_from(&publish)
                             .map(EndpointSpec::from),
                         publish.id.into(),
                     ),

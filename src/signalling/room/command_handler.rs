@@ -10,11 +10,13 @@ use medea_client_api_proto::{
 };
 
 use crate::{
+    api::control::callback::MediaType,
     log::prelude::*,
     media::{
         New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
+    signalling::elements::endpoints::Endpoint,
 };
 
 use super::{ActFuture, Room, RoomError};
@@ -149,26 +151,65 @@ impl CommandHandler for Room {
         ))
     }
 
-    /// Does nothing atm.
+    /// Provides received [`PeerMetrics::RtcStats`] into [`PeerMetricsService`].
     fn on_add_peer_connection_metrics(
         &mut self,
-        _: PeerId,
-        _: PeerMetrics,
+        peer_id: PeerId,
+        metrics: PeerMetrics,
     ) -> Self::Output {
+        match metrics {
+            PeerMetrics::RtcStats(stats) => {
+                self.peers.add_stats(peer_id, stats);
+            }
+            PeerMetrics::IceConnectionState(_)
+            | PeerMetrics::PeerConnectionState(_) => {
+                // TODO: implemented in ice-restart
+            }
+        }
+
         Ok(Box::new(actix::fut::ok(())))
     }
 
     /// Sends [`Event::TracksUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
-    /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
+    /// Updates [`Peer`]'s [`MediaTrack`]s with provided [`TrackPatch`]s.
+    ///
+    /// Updates [`Endpoint`]s mute state accordingly to updated [`Peer`].
+    ///
+    /// Updates [`PeerTracks`] of the [`PeerMetricsService`] by updated
+    /// [`Peer`].
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
-            let member_id = p.member_id();
+        debug!("Updating Peer [id = {}] tracks.", peer_id);
+        if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
+            tracks_patches
+                .iter()
+                .for_each(|patch| peer.update_track(patch));
+            let member_id = peer.member_id();
+
+            for weak_endpoint in peer.endpoints() {
+                if let Some(endpoint) = weak_endpoint.upgrade() {
+                    if let Endpoint::WebRtcPublishEndpoint(publish) = endpoint {
+                        if peer.is_senders_muted(MediaType::Audio) {
+                            publish.mute_audio();
+                        } else {
+                            publish.unmute_audio();
+                        }
+                        if peer.is_senders_muted(MediaType::Video) {
+                            publish.mute_video();
+                        } else {
+                            publish.unmute_video();
+                        }
+                    }
+                }
+            }
+
+            self.peers.update_peer_tracks(peer_id);
+
             Ok(Box::new(
                 self.members
                     .send_event_to_member(

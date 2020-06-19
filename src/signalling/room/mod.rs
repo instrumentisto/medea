@@ -6,11 +6,11 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use actix::{
-    Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
-    MailboxError, WrapFuture as _,
+    Actor, ActorFuture, AsyncContext, Context, ContextFutureSpawner as _,
+    Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -20,7 +20,7 @@ use crate::{
     api::control::{
         callback::{
             clients::CallbackClientFactoryImpl, service::CallbackService,
-            OnLeaveEvent, OnLeaveReason,
+            CallbackRequest, OnLeaveEvent, OnLeaveReason,
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
         room::RoomSpec,
@@ -96,10 +96,10 @@ pub enum RoomError {
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 
-    /// [`MailboxError`] returned on sending message to [`PeerTrafficWatcher`]
-    /// service.
+    /// [`MailboxError`] return on sending message to the
+    /// [`PeerTrafficWatcher`] service. service.
     #[display(
-        fmt = "Mailbox error while sending message to PeerTrafficWatcher \
+        fmt = "Mailbox error while sending message to the PeerTrafficWatcher \
                service: {}",
         _0
     )]
@@ -252,7 +252,7 @@ impl Room {
     ) {
         let mut connect_endpoints_tasks = Vec::new();
 
-        for publisher in member.srcs().values() {
+        for (_, publisher) in member.srcs().drain() {
             for receiver in publisher.sinks() {
                 let receiver_owner = receiver.owner();
 
@@ -267,16 +267,14 @@ impl Room {
             }
         }
 
-        for receiver in member.sinks().values() {
+        for (_, receiver) in member.sinks().drain() {
             let publisher = receiver.src();
 
             if receiver.peer_id().is_none()
                 && self.members.member_has_connection(&publisher.owner().id())
             {
-                connect_endpoints_tasks.push(
-                    self.peers
-                        .connect_endpoints(publisher.clone(), receiver.clone()),
-                )
+                connect_endpoints_tasks
+                    .push(self.peers.connect_endpoints(publisher, receiver))
             }
         }
 
@@ -320,8 +318,10 @@ impl Room {
             .for_each(|(member, on_leave)| {
                 self.callbacks.send_callback(
                     on_leave,
-                    member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                    CallbackRequest::new_at_now(
+                        member.get_fid(),
+                        OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                    ),
                 );
             });
 
@@ -340,7 +340,7 @@ impl Room {
         ctx: &mut Context<Self>,
     ) -> ActFuture<()> {
         info!(
-            "Peers {:?} removed for member [id = {}].",
+            "Peers {:?} removed for Member [id = {}].",
             peers_id, member_id
         );
         if let Some(member) = self.members.get_member_by_id(&member_id) {
@@ -385,8 +385,12 @@ impl Room {
 impl Actor for Room {
     type Context = Context<Self>;
 
-    fn started(&mut self, _: &mut Self::Context) {
+    fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
+        ctx.run_interval(Duration::from_secs(1), |this, _| {
+            this.peers.check_peers();
+        });
+        ctx.add_stream(self.peers.subscribe_to_metrics_events());
     }
 }
 

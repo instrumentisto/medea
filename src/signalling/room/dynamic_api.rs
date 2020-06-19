@@ -9,6 +9,7 @@ use actix::{
     ActorFuture as _, Context, ContextFutureSpawner as _, Handler, Message,
     WrapFuture as _,
 };
+use chrono::Utc;
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
@@ -23,6 +24,7 @@ use crate::{
         WebRtcPublishId,
     },
     log::prelude::*,
+    media::peer::PeerStateMachine,
     signalling::elements::{
         endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         member::MemberError,
@@ -33,6 +35,11 @@ use super::{Room, RoomError};
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
+    ///
+    /// Sends `on_stop` callbacks for endpoints which was affected by this
+    /// action.
+    ///
+    /// `on_stop` wouldn't be sent for endpoints which deleted [`Member`] owns.
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
             "Deleting Member [id = {}] in Room [id = {}].",
@@ -53,7 +60,23 @@ impl Room {
 
             // Send PeersRemoved to `Member`s which have related to this
             // `Member` `Peer`s.
-            self.remove_peers(&member.id(), &peers, ctx);
+            let peers = self.remove_peers(member_id, &peers, ctx);
+            #[allow(clippy::filter_map)]
+            peers
+                .into_iter()
+                .filter(|(key, _)| key != member_id)
+                .flat_map(|(_, peers)| peers.into_iter())
+                .flat_map(|peer| {
+                    peer.endpoints().into_iter().filter_map(move |endpoint| {
+                        endpoint.get_traffic_not_flowing_on_stop(
+                            peer.id(),
+                            Utc::now(),
+                        )
+                    })
+                })
+                .for_each(|(url, req)| {
+                    self.callbacks.send_callback(url, req);
+                });
 
             self.members.delete_member(member_id, ctx);
 
@@ -65,47 +88,63 @@ impl Room {
     }
 
     /// Deletes endpoint from this [`Room`] by ID.
+    ///
+    /// Sends `on_stop` callbacks for endpoints which was affected by this
+    /// action.
+    ///
+    /// `on_stop` wouldn't be sent for endpoint which will be deleted by this
+    /// function.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
-        let endpoint_id =
-            if let Some(member) = self.members.get_member_by_id(member_id) {
-                let play_id = endpoint_id.into();
-                if let Some(endpoint) = member.take_sink(&play_id) {
-                    if let Some(peer_id) = endpoint.peer_id() {
-                        let removed_peers =
-                            self.peers.remove_peers(member_id, &[peer_id]);
-                        for (member_id, peers) in removed_peers {
-                            self.member_peers_removed(
-                                peers.into_iter().map(|p| p.id()).collect(),
-                                member_id,
-                                ctx,
-                            )
-                            .map(|_, _, _| ())
-                            .spawn(ctx);
-                        }
-                    }
-                }
-
-                let publish_id = String::from(play_id).into();
-                if let Some(endpoint) = member.take_src(&publish_id) {
-                    let peer_ids = endpoint.peer_ids();
-                    self.remove_peers(member_id, &peer_ids, ctx);
-                }
-
-                publish_id.into()
-            } else {
-                endpoint_id
-            };
-
         debug!(
-            "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
+            "Removing Endpoint [id = {}] in Member [id = {}] from Room [id = \
              {}].",
             endpoint_id, member_id, self.id
         );
+        let mut removed_peers = None;
+        if let Some(member) = self.members.get_member_by_id(member_id) {
+            let play_id = endpoint_id.into();
+            if let Some(endpoint) = member.take_sink(&play_id) {
+                if let Some(peer_id) = endpoint.peer_id() {
+                    removed_peers = Some(self.remove_peers(
+                        member_id,
+                        &hashset![peer_id],
+                        ctx,
+                    ));
+                }
+            } else {
+                let publish_id = EndpointId::from(play_id).into();
+                if let Some(endpoint) = member.take_src(&publish_id) {
+                    let peer_ids = endpoint.peer_ids();
+                    removed_peers =
+                        Some(self.remove_peers(member_id, &peer_ids, ctx));
+                }
+            }
+        }
+
+        if let Some(removed_peers) = removed_peers {
+            removed_peers
+                .values()
+                .flat_map(|peers| {
+                    peers.iter().flat_map(|peer| {
+                        peer.endpoints().into_iter().filter_map(
+                            move |endpoint| {
+                                endpoint.get_traffic_not_flowing_on_stop(
+                                    peer.id(),
+                                    Utc::now(),
+                                )
+                            },
+                        )
+                    })
+                })
+                .for_each(|(url, req)| {
+                    self.callbacks.send_callback(url, req);
+                });
+        }
     }
 
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
@@ -131,7 +170,7 @@ impl Room {
         let is_member_have_this_src_id =
             member.get_src_by_id(&publish_id).is_some();
 
-        let play_id = String::from(publish_id).into();
+        let play_id = EndpointId::from(publish_id).into();
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&play_id).is_some();
 
@@ -142,10 +181,12 @@ impl Room {
         }
 
         let endpoint = WebRtcPublishEndpoint::new(
-            String::from(play_id).into(),
+            EndpointId::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
             spec.force_relay,
+            spec.on_start.clone(),
+            spec.on_stop.clone(),
         );
 
         debug!(
@@ -185,7 +226,7 @@ impl Room {
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&endpoint_id).is_some();
 
-        let publish_id = String::from(endpoint_id).into();
+        let publish_id = EndpointId::from(endpoint_id).into();
         let is_member_have_this_src_id =
             member.get_src_by_id(&publish_id).is_some();
         if is_member_have_this_sink_id || is_member_have_this_src_id {
@@ -206,11 +247,13 @@ impl Room {
             })?;
 
         let sink = WebRtcPlayEndpoint::new(
-            String::from(publish_id).into(),
+            EndpointId::from(publish_id).into(),
             spec.src,
             src.downgrade(),
             member.downgrade(),
             spec.force_relay,
+            spec.on_start,
+            spec.on_stop,
         );
 
         src.add_sink(sink.downgrade());
@@ -237,25 +280,30 @@ impl Room {
     ///
     /// This will delete [`Peer`]s from [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] event to [`Member`].
-    fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
+    pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,
         peer_ids_to_remove: Peers,
         ctx: &mut Context<Self>,
-    ) {
-        debug!("Remove peers.");
-        self.peers
-            .remove_peers(&member_id, peer_ids_to_remove)
-            .into_iter()
-            .for_each(|(member_id, peers)| {
-                self.member_peers_removed(
-                    peers.into_iter().map(|p| p.id()).collect(),
-                    member_id,
-                    ctx,
+    ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
+        let removed_peers =
+            self.peers.remove_peers(&member_id, peer_ids_to_remove);
+
+        removed_peers
+            .iter()
+            .map(|(member_id, peers)| {
+                (
+                    member_id.clone(),
+                    peers.iter().map(PeerStateMachine::id).collect(),
                 )
-                .map(|_, _, _| ())
-                .spawn(ctx);
+            })
+            .for_each(|(member_id, peers_id)| {
+                self.member_peers_removed(peers_id, member_id, ctx)
+                    .map(|_, _, _| ())
+                    .spawn(ctx);
             });
+
+        removed_peers
     }
 }
 

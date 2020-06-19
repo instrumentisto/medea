@@ -14,7 +14,7 @@ use medea_coturn_telnet_client::{
     CoturnTelnetError,
 };
 
-use crate::media::IceUser;
+use crate::{media::IceUser, turn::CoturnUsername};
 
 /// Possible errors returned by [`CoturnTelnetClient`].
 #[derive(Display, Debug, Fail, From)]
@@ -81,6 +81,24 @@ impl CoturnTelnetClient {
             conn.delete_sessions(sessions).await?;
         }
         Ok(())
+    }
+
+    /// Lists sessions by [`CoturnUsername`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoturnCliError::CliError`] if some error occurs while working
+    /// with [`CoturnTelnetConnection`].
+    ///
+    /// Returns [`CoturnCliError::PoolError`] if error occured while getting
+    /// [`CoturnTelnerConnection`] from the connections pool.
+    pub async fn get_sessions(
+        &self,
+        username: CoturnUsername,
+    ) -> Result<Vec<String>, CoturnCliError> {
+        let mut connection = self.0.get().await?;
+
+        Ok(connection.print_sessions(username.to_string()).await?)
     }
 }
 

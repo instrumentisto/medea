@@ -252,6 +252,8 @@ impl TryFrom<String> for StatefulLocalUri {
 
 #[cfg(test)]
 mod specs {
+    use crate::api::control::EndpointId;
+
     use super::*;
 
     #[test]
@@ -298,7 +300,7 @@ mod specs {
         .unwrap();
         if let StatefulLocalUri::Endpoint(endpoint) = local_uri {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
-            assert_eq!(endpoint_id, String::from("endpoint_id").into());
+            assert_eq!(endpoint_id, EndpointId::from("endpoint_id"));
             let (member_id, room_uri) = member_uri.take_member_id();
             assert_eq!(member_id, MemberId("room_element_id".to_string()));
             let room_id = room_uri.take_room_id();
