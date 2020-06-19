@@ -133,10 +133,10 @@ pub struct Room {
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
-    pub members: ParticipantService,
+    members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeersService,
+    peers: PeersService,
 
     /// Current state of this [`Room`].
     state: State,
@@ -219,6 +219,7 @@ impl Room {
         )
     }
 
+    /// Connects interconnected [`Endpoint`]s between provided [`Member`]s.
     fn connect_members(
         &mut self,
         member1: &Member,
@@ -267,7 +268,7 @@ impl Room {
                                     let first_peer: Peer<Stable> =
                                         actix_try!(room
                                             .peers
-                                            .take_inner_peer(first_peer_id),);
+                                            .take_inner_peer(first_peer_id));
                                     let first_peer =
                                         first_peer.start_renegotiation();
                                     let event = Event::TracksApplied {

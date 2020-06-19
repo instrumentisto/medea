@@ -294,6 +294,9 @@ impl PeersService {
         self.peers.add_peer(peer)
     }
 
+    /// Maps [`PeerStateMachine`] with a provided [`PeerId`].
+    ///
+    /// Returns result of the provided [`FnOnce`].
     pub fn map_peer_by_id<T>(
         &self,
         peer_id: PeerId,
