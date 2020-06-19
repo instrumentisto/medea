@@ -601,22 +601,6 @@ impl PeersService {
                         let src_peer = PeerStateMachine::from(src_peer);
                         let sink_peer = PeerStateMachine::from(sink_peer);
 
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // TODO
-                        // this.peer_metrics_service
-                        //     .update_peer_tracks(&src_peer);
-                        // this.peer_metrics_service
-                        //     .update_peer_tracks(&sink_peer);
                         peer_metrics_service
                             .borrow_mut()
                             .update_peer_tracks(&src_peer);
@@ -686,128 +670,10 @@ mod tests {
 
     use super::*;
 
-    /// Mock for the [`PeersServiceOwner`] trait.
-    ///
-    /// In context of this [`Actor`] will be ran all [`ActFuture`]s received
-    /// from the [`PeerService`].
-    struct PeersServiceOwnerMock {
-        /// Actual [`PeersService`].
-        peers_service: PeersService<PeersServiceOwnerMock>,
-
-        /// All [`Member`]s which should be in the [`Room`].
-        ///
-        /// This is necessary so that [`Drop`] is not called on the created
-        /// [`Member`]s.
-        members: Vec<Member>,
-    }
-
-    impl PeersServiceOwnerMock {
-        /// Returns empty [`PeersServiceOwnerMock`] with provided
-        /// [`PeerService`].
-        pub fn new(peers: PeersService<PeersServiceOwnerMock>) -> Self {
-            Self {
-                peers_service: peers,
-                members: Vec::new(),
-            }
-        }
-    }
-
-    impl Actor for PeersServiceOwnerMock {
-        type Context = actix::Context<Self>;
-    }
-
-    impl PeerServiceOwner for PeersServiceOwnerMock {
-        /// Returns reference to the [`RoomId`] from the [`PeerService`].
-        fn id(&self) -> &RoomId {
-            &self.peers_service.room_id
-        }
-
-        /// Returns reference to the [`PeersServiceOwnerMock::peers_service`].
-        fn peers(&self) -> &PeersService<Self> {
-            &self.peers_service
-        }
-
-        /// Returns mutable reference to the
-        /// [`PeersServiceOwnerMcok::peers_service`].
-        fn peers_mut(&mut self) -> &mut PeersService<Self> {
-            &mut self.peers_service
-        }
-    }
-
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
     #[actix_rt::test]
     async fn peer_is_registered_in_metrics_service() {
-        #[derive(Message)]
-        #[rtype(result = "Result<(), ()>")]
-        struct RunTest;
-
-        impl Handler<RunTest> for PeersServiceOwnerMock {
-            type Result = ActFuture<PeersServiceOwnerMock, Result<(), ()>>;
-
-            fn handle(
-                &mut self,
-                _: RunTest,
-                _: &mut Self::Context,
-            ) -> Self::Result {
-                let publisher = Member::new(
-                    "publisher".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let receiver = Member::new(
-                    "receiver".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let publish = WebRtcPublishEndpoint::new(
-                    "publish".to_string().into(),
-                    P2pMode::Always,
-                    publisher.downgrade(),
-                    false,
-                );
-                let play = WebRtcPlayEndpoint::new(
-                    "play-publisher".to_string().into(),
-                    SrcUri::try_from(
-                        "local://test/publisher/publish".to_string(),
-                    )
-                    .unwrap(),
-                    publish.downgrade(),
-                    receiver.downgrade(),
-                    false,
-                );
-
-                self.members.push(publisher);
-                self.members.push(receiver);
-
-                let fut =
-                    PeersService::<PeersServiceOwnerMock>::connect_endpoints(
-                        publish, play,
-                    );
-
-                Box::new(fut.then(|res, this, _| {
-                    res.unwrap();
-
-                    assert!(this
-                        .peers_service
-                        .peer_metrics_service
-                        .is_peer_registered(PeerId(0)));
-                    assert!(this
-                        .peers_service
-                        .peer_metrics_service
-                        .is_peer_registered(PeerId(1)));
-
-                    async { Ok(()) }.into_actor(this)
-                }))
-            }
-        }
-
         let mut mock = MockPeerTrafficWatcher::new();
         mock.expect_register_room()
             .returning(|_, _| Box::pin(future::ok(())));
@@ -822,128 +688,62 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
-        let peers: PeersService<PeersServiceOwnerMock> = PeersService::new(
+        let mut peers = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
         );
 
-        let runner = PeersServiceOwnerMock::new(peers).start();
-        runner.send(RunTest).await.unwrap().unwrap();
+        let publisher = Member::new(
+            "publisher".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let receiver = Member::new(
+            "receiver".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let publish = WebRtcPublishEndpoint::new(
+            "publish".to_string().into(),
+            P2pMode::Always,
+            publisher.downgrade(),
+            false,
+        );
+        let play = WebRtcPlayEndpoint::new(
+            "play-publisher".to_string().into(),
+            SrcUri::try_from("local://test/publisher/publish".to_string())
+                .unwrap(),
+            publish.downgrade(),
+            receiver.downgrade(),
+            false,
+        );
+
+        peers.connect_endpoints(publish, play).await.unwrap();
+
         register_peer_done.await.unwrap().unwrap();
+
+        assert!(peers
+            .peer_metrics_service
+            .borrow()
+            .is_peer_registered(PeerId(0)));
+        assert!(peers
+            .peer_metrics_service
+            .borrow()
+            .is_peer_registered(PeerId(1)));
     }
 
     /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
     /// count will be updated in the [`PeerMetricsService`].
     #[actix_rt::test]
     async fn adding_new_endpoint_updates_peer_metrics() {
-        #[derive(Message)]
-        #[rtype(result = "Result<(), ()>")]
-        struct RunTest;
-
-        impl Handler<RunTest> for PeersServiceOwnerMock {
-            type Result = ActFuture<PeersServiceOwnerMock, Result<(), ()>>;
-
-            fn handle(
-                &mut self,
-                _: RunTest,
-                _: &mut Self::Context,
-            ) -> Self::Result {
-                let publisher = Member::new(
-                    "publisher".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let receiver = Member::new(
-                    "receiver".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let publish = WebRtcPublishEndpoint::new(
-                    "publish".to_string().into(),
-                    P2pMode::Always,
-                    publisher.downgrade(),
-                    false,
-                );
-                let play = WebRtcPlayEndpoint::new(
-                    "play-publisher".to_string().into(),
-                    SrcUri::try_from(
-                        "local://test/publisher/publish".to_string(),
-                    )
-                    .unwrap(),
-                    publish.downgrade(),
-                    receiver.downgrade(),
-                    false,
-                );
-
-                self.members.push(publisher.clone());
-                self.members.push(receiver.clone());
-
-                let fut =
-                    PeersService::<PeersServiceOwnerMock>::connect_endpoints(
-                        publish, play,
-                    );
-
-                Box::new(fut.then(move |res, this, _| {
-                    res.unwrap();
-
-                    let first_peer_tracks_count = this
-                        .peers_service
-                        .peer_metrics_service
-                        .peer_tracks_count(PeerId(0));
-                    assert_eq!(first_peer_tracks_count, 2);
-                    let second_peer_tracks_count = this
-                        .peers_service
-                        .peer_metrics_service
-                        .peer_tracks_count(PeerId(1));
-                    assert_eq!(second_peer_tracks_count, 2);
-
-                    let publish = WebRtcPublishEndpoint::new(
-                        "publish".to_string().into(),
-                        P2pMode::Always,
-                        receiver.downgrade(),
-                        false,
-                    );
-                    let play = WebRtcPlayEndpoint::new(
-                        "play-publisher".to_string().into(),
-                        SrcUri::try_from(
-                            "local://test/publisher/publish".to_string(),
-                        )
-                        .unwrap(),
-                        publish.downgrade(),
-                        publisher.downgrade(),
-                        false,
-                    );
-
-                    PeersService::<PeersServiceOwnerMock>::connect_endpoints(
-                        publish, play,
-                    )
-                    .then(|res, this, _| {
-                        res.unwrap();
-                        let first_peer_tracks_count = this
-                            .peers_service
-                            .peer_metrics_service
-                            .peer_tracks_count(PeerId(0));
-                        assert_eq!(first_peer_tracks_count, 4);
-                        let second_peer_tracks_count = this
-                            .peers_service
-                            .peer_metrics_service
-                            .peer_tracks_count(PeerId(1));
-                        assert_eq!(second_peer_tracks_count, 4);
-
-                        async { Ok(()) }.into_actor(this)
-                    })
-                }))
-            }
-        }
-
         let mut mock = MockPeerTrafficWatcher::new();
         mock.expect_register_room()
             .returning(|_, _| Box::pin(future::ok(())));
@@ -960,15 +760,85 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
-        let peers: PeersService<PeersServiceOwnerMock> = PeersService::new(
+        let mut peers = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
         );
 
-        let runner = PeersServiceOwnerMock::new(peers).start();
-        runner.send(RunTest).await.unwrap().unwrap();
+        let publisher = Member::new(
+            "publisher".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let receiver = Member::new(
+            "receiver".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let publish = WebRtcPublishEndpoint::new(
+            "publish".to_string().into(),
+            P2pMode::Always,
+            publisher.downgrade(),
+            false,
+        );
+        let play = WebRtcPlayEndpoint::new(
+            "play-publisher".to_string().into(),
+            SrcUri::try_from("local://test/publisher/publish".to_string())
+                .unwrap(),
+            publish.downgrade(),
+            receiver.downgrade(),
+            false,
+        );
+
+        peers.connect_endpoints(publish, play).await.unwrap();
+
+        let first_peer_tracks_count = peers
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(0));
+        assert_eq!(first_peer_tracks_count, 2);
+        let second_peer_tracks_count = peers
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(1));
+        assert_eq!(second_peer_tracks_count, 2);
+
+        let publish = WebRtcPublishEndpoint::new(
+            "publish".to_string().into(),
+            P2pMode::Always,
+            receiver.downgrade(),
+            false,
+        );
+        let play = WebRtcPlayEndpoint::new(
+            "play-publisher".to_string().into(),
+            SrcUri::try_from("local://test/publisher/publish".to_string())
+                .unwrap(),
+            publish.downgrade(),
+            publisher.downgrade(),
+            false,
+        );
+
+        peers.connect_endpoints(publish, play).await.unwrap();
+
+        let first_peer_tracks_count = peers
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(0));
+        assert_eq!(first_peer_tracks_count, 4);
+        let second_peer_tracks_count = peers
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(1));
+        assert_eq!(second_peer_tracks_count, 4);
+
         register_peer_done.await.unwrap();
     }
 }
