@@ -42,6 +42,7 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
+use std::collections::HashSet;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -251,6 +252,7 @@ impl Room {
 
                     let mut spawn_futs = Vec::new();
                     let mut then_futs = Vec::new();
+                    let mut known_peer_ids = HashSet::new();
 
                     for connected_peer in connected_peers {
                         match connected_peer {
@@ -259,39 +261,49 @@ impl Room {
                             }
                             ConnectEndpointsResult::Updated(
                                 first_peer_id,
-                                _,
-                            ) => {
-                                let first_peer: Peer<Stable> = actix_try!(room
-                                    .peers
-                                    .take_inner_peer(first_peer_id));
-                                let first_peer =
-                                    first_peer.start_renegotiation();
-                                then_futs.push(Box::new(
-                                    room.members
-                                        .send_event_to_member(
-                                            first_peer.member_id(),
-                                            Event::TracksApplied {
-                                                updates: first_peer
-                                                    .get_updates(),
-                                                negotiation_role: Some(
-                                                    NegotiationRole::Offerer,
-                                                ),
-                                                peer_id: first_peer_id,
-                                            },
-                                        )
-                                        .into_actor(room),
-                                )
-                                    as ActFuture<_>);
-
-                                room.peers.add_peer(first_peer);
-                            }
-                            ConnectEndpointsResult::Created(
-                                _,
                                 second_peer_id,
                             ) => {
-                                spawn_futs.push(actix_try!(
-                                    room.send_peer_created(second_peer_id)
-                                ));
+                                if !known_peer_ids.contains(&first_peer_id) {
+                                    let first_peer: Peer<Stable> =
+                                        actix_try!(room
+                                            .peers
+                                            .take_inner_peer(first_peer_id),);
+                                    let first_peer =
+                                        first_peer.start_renegotiation();
+                                    let event = Event::TracksApplied {
+                                        updates: first_peer.get_updates(),
+                                        negotiation_role: Some(
+                                            NegotiationRole::Offerer,
+                                        ),
+                                        peer_id: first_peer_id,
+                                    };
+                                    then_futs.push(Box::new(
+                                        room.members
+                                            .send_event_to_member(
+                                                first_peer.member_id(),
+                                                event,
+                                            )
+                                            .into_actor(room),
+                                    )
+                                        as ActFuture<_>);
+
+                                    room.peers.add_peer(first_peer);
+
+                                    known_peer_ids.insert(first_peer_id);
+                                    known_peer_ids.insert(second_peer_id);
+                                }
+                            }
+                            ConnectEndpointsResult::Created(
+                                first_peer_id,
+                                second_peer_id,
+                            ) => {
+                                if !known_peer_ids.contains(&first_peer_id) {
+                                    spawn_futs
+                                        .push(actix_try!(room
+                                            .send_peer_created(first_peer_id)));
+                                    known_peer_ids.insert(first_peer_id);
+                                    known_peer_ids.insert(second_peer_id);
+                                }
                             }
                         }
                     }
