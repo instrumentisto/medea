@@ -223,6 +223,8 @@ impl Member {
                     publisher_endpoint.p2p,
                     publisher_member.downgrade(),
                     publisher_endpoint.force_relay,
+                    publisher_endpoint.audio_settings,
+                    publisher_endpoint.video_settings,
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -252,6 +254,8 @@ impl Member {
                     e.p2p,
                     this_member.downgrade(),
                     e.force_relay,
+                    e.audio_settings,
+                    e.video_settings,
                 ));
             });
 

@@ -1530,6 +1530,7 @@ dependencies = [
  "slog-scope",
  "slog-stdlog",
  "slog-term",
+ "smart-default",
  "tonic",
 ]
 

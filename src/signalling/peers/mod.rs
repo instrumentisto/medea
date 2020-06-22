@@ -355,12 +355,13 @@ impl PeersService {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
-        debug!(
-            "Created peer between {} and {}.",
-            src_member_id, sink_member_id
-        );
         let src_peer_id = self.0.peers_count.next_id();
         let sink_peer_id = self.0.peers_count.next_id();
+
+        debug!(
+            "Created peers:[{}, {}] between {} and {}.",
+            src_peer_id, sink_peer_id, src_member_id, sink_member_id,
+        );
 
         let mut src_peer = Peer::new(
             src_peer_id,
@@ -380,7 +381,7 @@ impl PeersService {
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
-        src_peer.add_publisher(&mut sink_peer, &self.0.tracks_count);
+        src_peer.add_publisher(&src, &mut sink_peer, &self.0.tracks_count);
 
         let src_peer = PeerStateMachine::from(src_peer);
         let sink_peer = PeerStateMachine::from(sink_peer);
@@ -607,8 +608,11 @@ impl PeersService {
                     let mut sink_peer: Peer<Stable> =
                         self.0.peers.take_inner_peer(sink_peer_id).unwrap();
 
-                    src_peer
-                        .add_publisher(&mut sink_peer, &self.0.tracks_count);
+                    src_peer.add_publisher(
+                        &src,
+                        &mut sink_peer,
+                        &self.0.tracks_count,
+                    );
 
                     if src.has_traffic_callback() {
                         futs.push(self.0.peers_traffic_watcher.register_peer(
@@ -675,11 +679,32 @@ impl PeersService {
         let mut partner_peer: Peer<Stable> =
             self.take_inner_peer(peer.partner_peer_id()).unwrap();
 
-        peer.add_publisher(&mut partner_peer, &self.0.tracks_count);
+        peer.add_publisher(
+            &sink.src(),
+            &mut partner_peer,
+            &self.0.tracks_count,
+        );
         peer.add_endpoint(&Endpoint::from(sink));
 
         self.0.peers.add_peer(peer);
         self.0.peers.add_peer(partner_peer);
+    }
+
+    /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the
+    /// [`PeerMetricsService`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn sync_peer_spec(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
+        self.0.peers.map_peer_by_id(peer_id, |peer| {
+            self.0
+                .peer_metrics_service
+                .borrow_mut()
+                .update_peer_tracks(&peer);
+        })?;
+        Ok(())
     }
 }
 
@@ -699,6 +724,9 @@ mod tests {
     };
 
     use super::*;
+    use crate::api::control::endpoints::webrtc_publish_endpoint::{
+        AudioSettings, VideoSettings,
+    };
 
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
@@ -746,6 +774,8 @@ mod tests {
             P2pMode::Always,
             publisher.downgrade(),
             false,
+            AudioSettings::default(),
+            VideoSettings::default(),
         );
         let play = WebRtcPlayEndpoint::new(
             "play-publisher".to_string().into(),
@@ -824,6 +854,8 @@ mod tests {
             P2pMode::Always,
             publisher.downgrade(),
             false,
+            AudioSettings::default(),
+            VideoSettings::default(),
         );
         let play = WebRtcPlayEndpoint::new(
             "play-publisher".to_string().into(),
@@ -858,6 +890,8 @@ mod tests {
             P2pMode::Always,
             receiver.downgrade(),
             false,
+            AudioSettings::default(),
+            VideoSettings::default(),
         );
         let play = WebRtcPlayEndpoint::new(
             "play-publisher".to_string().into(),

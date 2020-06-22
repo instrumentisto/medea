@@ -120,17 +120,24 @@ pub enum Command {
     MakeSdpOffer {
         peer_id: PeerId,
         sdp_offer: String,
-        /// Associations between [`Track`] and transceiver's [media
-        /// description][1].
+        /// Associations between [`Track`] and transceiver's
+        /// [media description][1].
         ///
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
+        /// Publishing statuses of the senders from this Peer.
+        senders_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: PeerId,
+        sdp_answer: String,
+        /// Publishing statuses of the senders from this Peer.
+        senders_statuses: HashMap<TrackId, bool>,
+    },
 
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
@@ -323,6 +330,14 @@ pub struct Track {
     pub is_muted: bool,
 }
 
+impl Track {
+    /// Returns `true` if this [`Track`] is required to call starting.
+    #[must_use]
+    pub fn is_required(&self) -> bool {
+        self.media_type.is_required()
+    }
+}
+
 /// Path to existing [`Track`] and field which can be updated.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
@@ -370,13 +385,34 @@ pub enum MediaType {
     Video(VideoSettings),
 }
 
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
-#[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct AudioSettings {}
+impl MediaType {
+    /// Returns `true` if this [`MediaType`] is required to call starting.
+    #[must_use]
+    pub fn is_required(&self) -> bool {
+        match self {
+            MediaType::Audio(audio) => audio.is_required,
+            MediaType::Video(video) => video.is_required,
+        }
+    }
+}
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct VideoSettings {}
+pub struct AudioSettings {
+    /// Importance of the audio media type.
+    ///
+    /// If `false` then audio may be not published.
+    pub is_required: bool,
+}
+
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub struct VideoSettings {
+    /// Importance of the video media type.
+    ///
+    /// If `false` then video may be not published.
+    pub is_required: bool,
+}
 
 #[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
@@ -513,6 +549,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
+            senders_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -521,7 +558,8 @@ mod test {
                 \"data\":{\
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"}\
+                    \"mids\":{\"0\":\"1\"},\
+                    \"senders_statuses\":{}\
                 }\
             }";
 

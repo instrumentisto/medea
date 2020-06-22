@@ -123,9 +123,25 @@ extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
 
+pub fn get_test_required_tracks(
+    is_audio_muted: bool,
+    is_video_muted: bool,
+) -> (Track, Track) {
+    get_test_tracks(is_audio_muted, is_video_muted, true, true)
+}
+
+pub fn get_test_unrequired_tracks(
+    is_audio_muted: bool,
+    is_video_muted: bool,
+) -> (Track, Track) {
+    get_test_tracks(is_audio_muted, is_video_muted, false, false)
+}
+
 pub fn get_test_tracks(
     is_audio_muted: bool,
     is_video_muted: bool,
+    is_audio_required: bool,
+    is_video_required: bool,
 ) -> (Track, Track) {
     (
         Track {
@@ -134,7 +150,9 @@ pub fn get_test_tracks(
                 receivers: vec![PeerId(2)],
                 mid: None,
             },
-            media_type: MediaType::Audio(AudioSettings {}),
+            media_type: MediaType::Audio(AudioSettings {
+                is_required: is_audio_required,
+            }),
             is_muted: is_audio_muted,
         },
         Track {
@@ -143,7 +161,9 @@ pub fn get_test_tracks(
                 receivers: vec![PeerId(2)],
                 mid: None,
             },
-            media_type: MediaType::Video(VideoSettings {}),
+            media_type: MediaType::Video(VideoSettings {
+                is_required: is_video_required,
+            }),
             is_muted: is_video_muted,
         },
     )

@@ -315,7 +315,7 @@ impl PeersMetricsService {
 
     /// Updates [`Peer`]s internal representation. Must be called each time
     /// [`Peer`] tracks set changes (some track was added or removed).
-    pub fn update_peer_tracks(&mut self, peer: &Peer) {
+    pub fn update_peer_tracks(&self, peer: &Peer) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
         }
@@ -452,13 +452,13 @@ impl From<&Peer> for PeerTracks {
         let mut audio_recv = 0;
         let mut video_recv = 0;
 
-        for sender in peer.senders().values() {
+        for sender in peer.senders().values().filter(|t| t.is_enabled()) {
             match sender.media_type {
                 MediaTypeProto::Audio(_) => audio_send += 1,
                 MediaTypeProto::Video(_) => video_send += 1,
             }
         }
-        for receiver in peer.receivers().values() {
+        for receiver in peer.receivers().values().filter(|t| t.is_enabled()) {
             match receiver.media_type {
                 MediaTypeProto::Audio(_) => audio_recv += 1,
                 MediaTypeProto::Video(_) => video_recv += 1,

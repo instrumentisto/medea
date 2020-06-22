@@ -270,6 +270,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                         peer_id: *peer_id,
                                         sdp_offer: "caller_offer".into(),
                                         mids: self.known_tracks_mids.clone(),
+                                        senders_statuses: HashMap::new(),
                                     })
                                 }
                                 NegotiationRole::Answerer(sdp_offer) => {
@@ -277,6 +278,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     self.send_command(Command::MakeSdpAnswer {
                                         peer_id: *peer_id,
                                         sdp_answer: "responder_answer".into(),
+                                        senders_statuses: HashMap::new(),
                                     })
                                 }
                             }
@@ -322,6 +324,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                 peer_id: *peer_id,
                                                 sdp_answer: "responder_answer"
                                                     .into(),
+                                                senders_statuses: HashMap::new(
+                                                ),
                                             },
                                         )
                                     }
@@ -332,6 +336,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                             mids: self
                                                 .known_tracks_mids
                                                 .clone(),
+                                            senders_statuses: HashMap::new(),
                                         }),
                                 }
                             }

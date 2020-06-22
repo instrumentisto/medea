@@ -49,6 +49,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
+- `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
 - `TracksApplied` event ([#105]);
 - `TrackApplied` event's `TrackUpdate::Added` ([#105]).
 
@@ -62,6 +63,7 @@ All user visible changes to this project will be documented in this file. This p
 [#90]: /../../pull/90
 [#102]: /../../pull/102
 [#105]: /../../pull/105
+[#106]: /../../pull/106
 
 
 
