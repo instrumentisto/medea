@@ -175,6 +175,44 @@ message WebRtcPublishEndpoint {
   string on_stop = 4;
   // Option to relay all media through a TURN server forcibly.
   bool force_relay = 5;
+  // Settings for the audio media type of this element.
+  AudioSettings audio_settings = 6;
+  // Settings for the video media type of this element.
+  VideoSettings video_settings = 7;
+
+  // Audio media type settings of WebRtcPublishEndpoint.
+  message AudioSettings {
+    // Policy to publish audio media type with.
+    PublishPolicy publish_policy = 1;
+  }
+
+  // Video media type settings of WebRtcPublishEndpoint.
+  message VideoSettings {
+    // Policy to publish video media type with.
+    PublishPolicy publish_policy = 1;
+  }
+
+  // Policy of how the video or audio media type can be published in
+  // WebRtcPublishEndpoint.
+  enum PublishPolicy {
+    // Media type MAY be published.
+    //
+    // Media server will try to initialize publishing, but won't produce any
+    // errors if user application fails to (or chooses not to) acquire a
+    // required media track. Media server will approve user requests to stop and
+    // to restart publishing the specified media type.
+    OPTIONAL = 0;
+    // Media type MUST be published.
+    //
+    // Media server will try to initialize publishing, and if a required media
+    // track couldn't be acquired, then an error will be thrown. Media server
+    // will deny all requests to stop publishing.
+    REQUIRED = 1;
+    // Media type MUST not be published.
+    //
+    // Media server will not try to initialize publishing.
+    DISABLED = 2;
+  }
 
   // P2P mode of WebRTC interaction.
   enum P2P {

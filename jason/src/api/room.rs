@@ -8,7 +8,10 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, future, Future, FutureExt as _, StreamExt as _};
+use futures::{
+    channel::mpsc, future, future::Either, Future, FutureExt as _,
+    StreamExt as _,
+};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
@@ -20,11 +23,11 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
-    media::{MediaStream, MediaStreamSettings},
+    media::{MediaStream, MediaStreamSettings, MediaStreamTrack},
     peer::{
         MediaConnectionsError, MuteState, PeerError, PeerEvent,
-        PeerEventHandler, PeerMediaStream, PeerRepository, RtcStats,
-        StableMuteState, TransceiverKind,
+        PeerEventHandler, PeerRepository, RtcStats, Sender, StableMuteState,
+        TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -290,14 +293,14 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_new_connection.set_func(f))
+            .map(|inner| inner.borrow().on_new_connection.set_func(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_close.set_func(f))
+            .map(|inner| inner.borrow().on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback. This callback is invoked each time
@@ -308,7 +311,7 @@ impl RoomHandle {
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_local_stream.set_func(f))
+            .map(|inner| inner.borrow().on_local_stream.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -318,7 +321,7 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_failed_local_stream.set_func(f))
+            .map(|inner| inner.borrow().on_failed_local_stream.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
@@ -328,7 +331,7 @@ impl RoomHandle {
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.borrow_mut().on_connection_loss.set_func(f))
+            .map(|inner| inner.borrow().on_connection_loss.set_func(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -645,23 +648,35 @@ impl InnerRoom {
                 .iter()
                 .map(|peer| {
                     let desired_state = StableMuteState::from(is_muted);
-                    let tracks_patches: Vec<_> = peer
-                        .get_senders(kind)
-                        .into_iter()
-                        .filter(|sender| match sender.mute_state() {
-                            MuteState::Transition(t) => {
-                                t.intended() != desired_state
+                    let senders = peer.get_senders(kind);
+
+                    let senders_to_mute =
+                        senders.into_iter().filter(|sender| {
+                            match sender.mute_state() {
+                                MuteState::Transition(t) => {
+                                    t.intended() != desired_state
+                                }
+                                MuteState::Stable(s) => s != desired_state,
                             }
-                            MuteState::Stable(s) => s != desired_state,
-                        })
-                        .map(|sender| {
-                            sender.mute_state_transition_to(desired_state);
-                            TrackPatch {
-                                id: sender.track_id(),
-                                is_muted: Some(is_muted),
+                        });
+
+                    let mut processed_senders: Vec<Rc<Sender>> = Vec::new();
+                    let mut tracks_patches = Vec::new();
+                    for sender in senders_to_mute {
+                        if let Err(e) =
+                            sender.mute_state_transition_to(desired_state)
+                        {
+                            for processed_sender in processed_senders {
+                                processed_sender.cancel_transition();
                             }
-                        })
-                        .collect();
+                            return Either::Left(future::err(tracerr::new!(e)));
+                        }
+                        tracks_patches.push(TrackPatch {
+                            id: sender.track_id(),
+                            is_muted: Some(is_muted),
+                        });
+                        processed_senders.push(sender);
+                    }
 
                     let wait_state_change: Vec<_> = peer
                         .get_senders(kind)
@@ -678,15 +693,12 @@ impl InnerRoom {
                         });
                     }
 
-                    future::join_all(wait_state_change)
+                    Either::Right(future::try_join_all(wait_state_change))
                 })
                 .collect();
 
-            future::join_all(peer_mute_state_changed)
+            future::try_join_all(peer_mute_state_changed)
                 .await
-                .into_iter()
-                .flat_map(IntoIterator::into_iter)
-                .collect::<Result<Vec<_>, _>>()
                 .map(|_| ())
                 .map_err(tracerr::map_from_and_wrap!())
         }
@@ -806,9 +818,11 @@ impl EventHandler for InnerRoom {
                         let mids = peer
                             .get_mids()
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
+                            senders_statuses,
                             mids,
                         });
                     }
@@ -821,9 +835,11 @@ impl EventHandler for InnerRoom {
                             )
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
+                            senders_statuses,
                         });
                     }
                 };
@@ -936,16 +952,17 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
-    /// Handles [`PeerEvent::NewRemoteStream`] event and passes received
-    /// [`MediaStream`] to the related [`Connection`].
-    fn on_new_remote_stream(
+    /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
+    /// [`MediaStreamTrack`] to the related [`Connection`].
+    fn on_new_remote_track(
         &mut self,
         _: PeerId,
         sender_id: PeerId,
-        remote_stream: PeerMediaStream,
+        track_id: TrackId,
+        track: MediaStreamTrack,
     ) {
         match self.connections.get(&sender_id) {
-            Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
+            Some(conn) => conn.add_remote_track(track_id, track),
             None => {
                 JasonError::from(tracerr::new!(RoomError::UnknownRemotePeer))
                     .print()

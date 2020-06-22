@@ -5,7 +5,7 @@ mod pub_sub_signallng;
 mod rpc_settings;
 mod three_pubs;
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use actix::{
     Actor, ActorContext, Addr, Arbiter, AsyncContext, Context, Handler,
@@ -213,6 +213,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     self.send_command(Command::MakeSdpAnswer {
                                         peer_id: *peer_id,
                                         sdp_answer: "responder_answer".into(),
+                                        senders_statuses: HashMap::new(),
                                     })
                                 }
                                 None => {
@@ -227,6 +228,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                 (id, mid.to_string())
                                             })
                                             .collect(),
+                                        senders_statuses: HashMap::new(),
                                     })
                                 }
                             };

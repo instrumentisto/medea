@@ -167,12 +167,13 @@ impl PeersService {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
-        debug!(
-            "Created peer between {} and {}.",
-            src_member_id, sink_member_id
-        );
         let src_peer_id = self.peers_count.next_id();
         let sink_peer_id = self.peers_count.next_id();
+
+        debug!(
+            "Created peers:[{}, {}] between {} and {}.",
+            src_peer_id, sink_peer_id, src_member_id, sink_member_id,
+        );
 
         let mut src_peer = Peer::new(
             src_peer_id,
@@ -192,7 +193,7 @@ impl PeersService {
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
-        src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+        src_peer.add_publisher(&src, &mut sink_peer, self.get_tracks_counter());
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -362,7 +363,11 @@ impl PeersService {
             let mut sink_peer: Peer<New> =
                 self.take_inner_peer(sink_peer_id).unwrap();
 
-            src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter());
+            src_peer.add_publisher(
+                &src,
+                &mut sink_peer,
+                self.get_tracks_counter(),
+            );
 
             sink_peer.add_endpoint(&sink.into());
             src_peer.add_endpoint(&src.into());
@@ -494,5 +499,18 @@ impl PeersService {
             });
 
         peers_to_remove
+    }
+
+    /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the
+    /// [`PeerMetricsService`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn sync_peer_spec(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
+        let peer = self.get_peer_by_id(peer_id)?;
+        self.peer_metrics_service.update_peer_tracks(&peer);
+        Ok(())
     }
 }

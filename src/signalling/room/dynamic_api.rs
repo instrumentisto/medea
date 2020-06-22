@@ -146,6 +146,8 @@ impl Room {
             spec.p2p,
             member.downgrade(),
             spec.force_relay,
+            spec.audio_settings,
+            spec.video_settings,
         );
 
         debug!(
@@ -355,7 +357,9 @@ impl Handler<Delete> for Room {
                 StatefulFid::Endpoint(endpoint_fid) => {
                     endpoint_ids.push(endpoint_fid);
                 }
-                _ => warn!("Found Fid<IsRoomId> while deleting __from__ Room."),
+                StatefulFid::Room(_) => {
+                    warn!("Found Fid<IsRoomId> while deleting __from__ Room.");
+                }
             }
         }
         member_ids.into_iter().for_each(|fid| {

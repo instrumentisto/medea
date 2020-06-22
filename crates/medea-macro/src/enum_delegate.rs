@@ -77,7 +77,7 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> Result<TokenStream> {
             .into_iter()
             .filter_map(|i| match i {
                 syn::FnArg::Typed(c) => Some(c.pat),
-                _ => None,
+                syn::FnArg::Receiver { .. } => None,
             })
             .collect::<Vec<_>>(),
     );

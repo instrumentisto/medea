@@ -392,6 +392,8 @@ impl ParticipantService {
                 publish.p2p,
                 signalling_member.downgrade(),
                 publish.force_relay,
+                publish.audio_settings,
+                publish.video_settings,
             );
             signalling_member.insert_src(signalling_publish);
         }

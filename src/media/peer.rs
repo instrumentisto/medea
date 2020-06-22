@@ -15,10 +15,14 @@ use medea_client_api_proto::{
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId,
+    api::control::{
+        endpoints::webrtc_publish_endpoint::PublishPolicy, MemberId,
+    },
     media::{IceUser, MediaTrack},
     signalling::{
-        elements::endpoints::{Endpoint, WeakEndpoint},
+        elements::endpoints::{
+            webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
+        },
         peers::Counter,
     },
 };
@@ -85,6 +89,12 @@ impl PeerError {
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
+#[enum_delegate(
+    pub fn update_senders_statuses(
+        &self,
+        senders_statuses: HashMap<TrackId, bool>,
+    )
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -278,6 +288,18 @@ impl<T> Peer<T> {
         self.context.endpoints.push(endpoint.downgrade());
     }
 
+    /// Updates this [`Peer`]'s senders statuses.
+    pub fn update_senders_statuses(
+        &self,
+        senders_statuses: HashMap<TrackId, bool>,
+    ) {
+        for (track_id, is_publishing) in senders_statuses {
+            if let Some(sender) = self.context.senders.get(&track_id) {
+                sender.set_enabled(is_publishing);
+            }
+        }
+    }
+
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
     pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
         self.context.receivers.clone()
@@ -321,25 +343,38 @@ impl Peer<New> {
 
     /// Adds `send` tracks to `self` and add `recv` for this `send`
     /// to `partner_peer`.
+    ///
+    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
+    /// and [`WebRtcPublishEndpoint::video_settings`].
     pub fn add_publisher(
         &mut self,
-        partner_peer: &mut Peer<New>,
-        tracks_count: &mut Counter<TrackId>,
+        src: &WebRtcPublishEndpoint,
+        publisher_peer: &mut Peer<New>,
+        tracks_counter: &mut Counter<TrackId>,
     ) {
-        let track_audio = Rc::new(MediaTrack::new(
-            tracks_count.next_id(),
-            MediaType::Audio(AudioSettings {}),
-        ));
-        let track_video = Rc::new(MediaTrack::new(
-            tracks_count.next_id(),
-            MediaType::Video(VideoSettings {}),
-        ));
+        let audio_settings = src.audio_settings();
+        if audio_settings.publish_policy != PublishPolicy::Disabled {
+            let track_audio = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Audio(AudioSettings {
+                    is_required: audio_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_audio));
+            publisher_peer.add_receiver(track_audio);
+        }
 
-        self.add_sender(Rc::clone(&track_video));
-        self.add_sender(Rc::clone(&track_audio));
-
-        partner_peer.add_receiver(track_video);
-        partner_peer.add_receiver(track_audio);
+        let video_settings = src.video_settings();
+        if video_settings.publish_policy != PublishPolicy::Disabled {
+            let track_video = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: video_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_video));
+            publisher_peer.add_receiver(track_video);
+        }
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
@@ -497,29 +532,37 @@ pub mod tests {
 
         for _ in 0..send_audio {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Audio(AudioSettings { is_required: true }),
+            );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
 
         for _ in 0..send_video {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Video(VideoSettings { is_required: true }),
+            );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
 
         for _ in 0..recv_audio {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Audio(AudioSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Audio(AudioSettings { is_required: true }),
+            );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
 
         for _ in 0..recv_video {
             let track_id = track_id_counter.next_id();
-            let track =
-                MediaTrack::new(track_id, MediaType::Video(VideoSettings {}));
+            let track = MediaTrack::new(
+                track_id,
+                MediaType::Video(VideoSettings { is_required: true }),
+            );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
 
