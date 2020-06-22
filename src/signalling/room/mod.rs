@@ -247,7 +247,7 @@ impl Room {
         }
 
         Box::new(
-            futures::future::try_join_all(connect_endpoints_tasks)
+            future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
                 .then(move |result, room: &mut Room, ctx| {
                     let connected_peers = actix_try!(result);

@@ -290,7 +290,11 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .map(|change| change.try_as_track(self.partner_peer_id()).unwrap())
+            .map(|change| {
+                // TODO: remove this unwrap when new TrackChanges will be
+                // implemented.
+                change.try_as_track(self.partner_peer_id()).unwrap()
+            })
             .map(TrackUpdate::Added)
             .collect()
     }

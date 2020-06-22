@@ -42,6 +42,7 @@ pub use self::{
     },
 };
 
+/// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
 #[derive(Debug)]
 struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
 
@@ -258,7 +259,7 @@ pub struct PeersService(Rc<PeersServiceInner>);
 /// Simple ID counter.
 #[derive(Default, Debug, Clone, Display)]
 pub struct Counter<T: Copy> {
-    count: Rc<Cell<T>>,
+    count: Cell<T>,
 }
 
 impl<T: Incrementable + Copy> Counter<T> {
@@ -281,12 +282,16 @@ enum GetOrCreatePeersResult {
     AlreadyExisted(PeerId, PeerId),
 }
 
+/// Result of the [`PeersService::connect_endpoints`] function.
 #[derive(Debug, Clone, Copy)]
 pub enum ConnectEndpointsResult {
+    /// New [`Peer`] pair was created.
     Created(PeerId, PeerId),
 
+    /// [`Peer`] pair was updated.
     Updated(PeerId, PeerId),
 
+    /// Nothing was done because endpoints already interconnected.
     NoOp(PeerId, PeerId),
 }
 
