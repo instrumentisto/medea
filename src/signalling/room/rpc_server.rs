@@ -20,6 +20,7 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
+    media::PeerStateMachine,
     signalling::room::RoomError,
     utils::ResponseActAnyFuture,
 };
@@ -68,14 +69,13 @@ impl Room {
 
         let peer_member_id = self
             .peers
-            .map_peer_by_id(peer_id, |p| p.member_id())
+            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
             .map_err(|_| PeerNotFound(peer_id))?;
-        // let peer = self
-        //     .peers
-        //     .get_peer_by_id(peer_id)
+
         if peer_member_id != command.member_id {
             return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
         }
+
         Ok(())
     }
 }

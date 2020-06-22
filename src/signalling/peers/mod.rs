@@ -5,8 +5,10 @@ mod metrics;
 mod traffic_watcher;
 
 use std::{
+    cell::{Cell, RefCell},
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -39,19 +41,23 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
 
 #[derive(Debug)]
 struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
 
 impl PeerRepository {
+    /// Returns empty [`PeerRepository`].
     pub fn new() -> Self {
         Self(RefCell::new(HashMap::new()))
     }
 
+    /// Applies a function to the [`PeerStateMachine`] reference with provided
+    /// [`PeerId`] (if any found).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn map_peer_by_id<T>(
         &self,
         peer_id: PeerId,
@@ -64,6 +70,13 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
     }
 
+    /// Applies a function to the mutable [`PeerStateMachine`] reference with
+    /// provided [`PeerId`] (if any found).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn map_peer_by_id_mut<T>(
         &self,
         peer_id: PeerId,
@@ -76,10 +89,20 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
     }
 
+    /// Removes [`PeerStateMachine`] with a provided [`PeerId`].
+    ///
+    /// Returns removed [`PeerStateMachine`] if it existed.
     pub fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
         self.0.borrow_mut().remove(&peer_id)
     }
 
+    /// Removes [`PeerStateMachine`] with a provided [`PeerId`] and returns
+    /// removed [`PeerStateMachine`] if it existed.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
         self.remove(peer_id)
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
@@ -294,13 +317,19 @@ impl PeersService {
     /// Store [`Peer`] in [`Room`].
     ///
     /// [`Room`]: crate::signalling::Room
+    #[inline]
     pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
         self.0.peers.add_peer(peer)
     }
 
-    /// Maps [`PeerStateMachine`] with a provided [`PeerId`].
+    /// Applies a function to the [`PeerStateMachine`] reference with provided
+    /// [`PeerId`] (if any found).
     ///
-    /// Returns result of the provided [`FnOnce`].
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    #[inline]
     pub fn map_peer_by_id<T>(
         &self,
         peer_id: PeerId,
@@ -371,6 +400,7 @@ impl PeersService {
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
+    #[inline]
     pub fn get_peers_between_members(
         &self,
         member_id: &MemberId,
@@ -457,28 +487,24 @@ impl PeersService {
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
     ) -> Result<GetOrCreatePeersResult, RoomError> {
-        match self
+        if let Some((first_peer_id, second_peer_id)) = self
             .get_peers_between_members(&src.owner().id(), &sink.owner().id())
         {
-            Some((first_peer_id, second_peer_id)) => {
-                Ok(GetOrCreatePeersResult::AlreadyExisted(
-                    first_peer_id,
-                    second_peer_id,
-                ))
-            }
-            None => {
-                let (src_peer_id, sink_peer_id) =
-                    self.create_peers(&src, &sink);
+            Ok(GetOrCreatePeersResult::AlreadyExisted(
+                first_peer_id,
+                second_peer_id,
+            ))
+        } else {
+            let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
 
-                self.clone()
-                    .peer_post_construct(src_peer_id, &src.into())
-                    .await?;
-                self.clone()
-                    .peer_post_construct(sink_peer_id, &sink.into())
-                    .await?;
+            self.clone()
+                .peer_post_construct(src_peer_id, &src.into())
+                .await?;
+            self.clone()
+                .peer_post_construct(sink_peer_id, &sink.into())
+                .await?;
 
-                Ok(GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id))
-            }
+            Ok(GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id))
         }
     }
 
@@ -629,6 +655,7 @@ impl PeersService {
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     // TODO: remove in #91.
+    #[inline]
     pub fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,
