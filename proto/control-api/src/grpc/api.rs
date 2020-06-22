@@ -240,23 +240,23 @@ pub mod web_rtc_publish_endpoint {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum PublishPolicy {
-        /// Media type MUST not be published.
-        ///
-        /// Media server will not try to initialize publishing.
-        Disabled = 0,
         /// Media type MAY be published.
         ///
         /// Media server will try to initialize publishing, but won't produce any
         /// errors if user application fails to (or chooses not to) acquire a
         /// required media track. Media server will approve user requests to stop and
         /// to restart publishing the specified media type.
-        Optional = 1,
+        Optional = 0,
         /// Media type MUST be published.
         ///
         /// Media server will try to initialize publishing, and if a required media
         /// track couldn't be acquired, then an error will be thrown. Media server
         /// will deny all requests to stop publishing.
-        Required = 2,
+        Required = 1,
+        /// Media type MUST not be published.
+        ///
+        /// Media server will not try to initialize publishing.
+        Disabled = 2,
     }
     /// P2P mode of WebRTC interaction.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
