@@ -1,0 +1,44 @@
+kind: Room
+id: audio-call
+spec:
+  pipeline:
+    member-1:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      idle_timeout: 1m
+      reconnect_timeout: 1m
+      ping_interval: 10s
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+              video_settings:
+                publish_policy: Disabled
+          play-member-2:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://audio-call/member-2/publish"
+    member-2:
+      kind: Member
+      credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
+      idle_timeout: 1m
+      reconnect_timeout: 1m
+      ping_interval: 10s
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+              video_settings:
+                publish_policy: Disabled
+          play-member-1:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://audio-call/member-1/publish"

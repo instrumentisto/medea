@@ -8,10 +8,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 
-use std::{
-    cell::{Ref, RefCell},
-    ops::{Deref, DerefMut},
-};
+use std::cell::{Ref, RefCell};
 
 use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 
@@ -104,7 +101,7 @@ where
     #[inline]
     pub fn borrow(&self) -> Ref<'_, D> {
         let reference = self.0.borrow();
-        Ref::map(reference, |observable| observable.deref())
+        Ref::map(reference, |observable| &**observable)
     }
 
     /// Returns [`Future`] which will resolve only on modifications that
@@ -178,10 +175,7 @@ where
     /// and returns the old one.
     #[inline]
     pub fn replace(&self, mut new_data: D) -> D {
-        std::mem::swap(
-            self.0.borrow_mut().borrow_mut().deref_mut(),
-            &mut new_data,
-        );
+        std::mem::swap(&mut *self.0.borrow_mut().borrow_mut(), &mut new_data);
         new_data
     }
 

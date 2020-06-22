@@ -290,7 +290,7 @@ impl Room {
                         }
                     }
                     Err(err) => Box::new(actix::fut::err(err)),
-                    _ => Box::new(actix::fut::ok(())),
+                    Ok(_) => Box::new(actix::fut::ok(())),
                 })
                 .map(|res, _, _| {
                     if let Err(err) = res {

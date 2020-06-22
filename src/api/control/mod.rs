@@ -249,7 +249,7 @@ pub async fn start_static_rooms(
             e,
         ),
         Err(e) => panic!("{}", e),
-        _ => {}
+        Ok(_) => {}
     };
     Ok(())
 }

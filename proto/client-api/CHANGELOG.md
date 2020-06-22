@@ -43,7 +43,8 @@ All user visible changes to this project will be documented in this file. This p
         - `RtcIceCandidateStats`;
         - `RtcCertificateStats`;
         - `RtcIceServerStats`.
-    - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]).
+    - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
+- `is_required` field to `AudioSettings` and `VideoSettings` ([#106]).
 - Events: 
     - `RpcSettings` ([#75]);
     - `force_relay` field to `PeerCreated` event ([#79]);
@@ -65,6 +66,7 @@ All user visible changes to this project will be documented in this file. This p
 [#89]: /../../pull/89
 [#90]: /../../pull/90
 [#102]: /../../pull/102
+[#106]: /../../pull/106
 
 
 

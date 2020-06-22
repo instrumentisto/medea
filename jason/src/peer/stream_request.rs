@@ -120,10 +120,7 @@ impl SimpleStreamRequest {
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
     /// [`MediaStream`] doesn't have expected video track.
     pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
-        use StreamRequestError::{
-            ExpectedAudioTracks, ExpectedVideoTracks, InvalidAudioTrack,
-            InvalidVideoTrack,
-        };
+        use StreamRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let result_stream = PeerMediaStream::new();
 
@@ -136,28 +133,22 @@ impl SimpleStreamRequest {
             });
 
         if let Some((id, audio)) = &self.audio {
-            if audio_tracks.len() == 1 {
-                let track = audio_tracks.into_iter().next().unwrap();
+            if let Some(track) = audio_tracks.into_iter().next() {
                 if audio.satisfies(track.as_ref()) {
                     result_stream.add_track(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
                 }
-            } else {
-                return Err(tracerr::new!(ExpectedAudioTracks));
             }
         }
 
         if let Some((id, video)) = &self.video {
-            if video_tracks.len() == 1 {
-                let track = video_tracks.into_iter().next().unwrap();
+            if let Some(track) = video_tracks.into_iter().next() {
                 if video.satisfies(track.as_ref()) {
                     result_stream.add_track(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
                 }
-            } else {
-                return Err(tracerr::new!(ExpectedVideoTracks));
             }
         }
 
@@ -174,35 +165,53 @@ impl SimpleStreamRequest {
     ///
     /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if
     /// [`SimpleStreamRequest`] contains [`AudioTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] doesn't.
+    /// [`MediaStreamSettings`] doesn't and this [`AudioTrackConstraints`] are
+    /// important.
     ///
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
     /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] doesn't.
+    /// [`MediaStreamSettings`] doesn't and this [`VideoTrackConstraints`] are
+    /// important.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
     ) -> Result<()> {
         let mut other = other.into();
 
-        if let Some((_, audio)) = self.audio.as_mut() {
-            if let Some(other_audio) = other.take_audio() {
-                audio.merge(other_audio)
-            } else {
-                return Err(tracerr::new!(
-                    StreamRequestError::ExpectedAudioTracks
-                ));
+        if let Some((_, video_caps)) = &self.video {
+            if other.get_video().is_none() {
+                if video_caps.is_required() {
+                    return Err(tracerr::new!(
+                        StreamRequestError::ExpectedVideoTracks
+                    ));
+                } else {
+                    self.video.take();
+                }
             }
-        };
-        if let Some((_, video)) = self.video.as_mut() {
-            if let Some(other_video) = other.take_video() {
-                video.merge(other_video)
-            } else {
-                return Err(tracerr::new!(
-                    StreamRequestError::ExpectedVideoTracks
-                ));
+        }
+        if let Some((_, audio_caps)) = &self.audio {
+            if other.get_audio().is_none() {
+                if audio_caps.is_required() {
+                    return Err(tracerr::new!(
+                        StreamRequestError::ExpectedAudioTracks
+                    ));
+                } else {
+                    self.audio.take();
+                }
             }
-        };
+        }
+
+        if let Some(other_audio) = other.take_audio() {
+            if let Some((_, audio)) = self.audio.as_mut() {
+                audio.merge(other_audio);
+            }
+        }
+        if let Some(other_video) = other.take_video() {
+            if let Some((_, video)) = self.video.as_mut() {
+                video.merge(other_video);
+            }
+        }
+
         Ok(())
     }
 }

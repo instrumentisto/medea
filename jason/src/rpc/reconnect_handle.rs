@@ -92,9 +92,10 @@ impl ReconnectHandle {
                 Duration::from_millis(u64::from(max_delay)).into(),
             );
             backoff_delayer.delay().await;
-            while let Err(_) = upgrade_or_detached!(rpc, JsValue)?
+            if upgrade_or_detached!(rpc, JsValue)?
                 .connect(token.clone())
                 .await
+                .is_err()
             {
                 backoff_delayer.delay().await;
             }

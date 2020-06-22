@@ -44,6 +44,7 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+    - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]);
     - ICE restart support ([#89]).
 - Room management:
@@ -83,6 +84,7 @@ All user visible changes to this project will be documented in this file. This p
 [#89]: /../../pull/89
 [#90]: /../../pull/90
 [#97]: /../../pull/97
+[#106]: /../../pull/106
 
 
 

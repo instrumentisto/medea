@@ -126,7 +126,7 @@ impl MediaType {
             MediaType::Both => match after {
                 MediaType::Audio => Some(MediaType::Video),
                 MediaType::Video => Some(MediaType::Audio),
-                _ => None,
+                MediaType::Both => None,
             },
         }
     }

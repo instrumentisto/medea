@@ -287,9 +287,47 @@ window.onload = async function() {
 
   bindControlDebugMenu();
 
+  let room = newRoom();
+  let isCallStarted = false;
+  let localStream = null;
+  let isAudioMuted = false;
+  let isVideoMuted = false;
+  let connectBtnsDiv = document.getElementsByClassName('connect')[0];
+  let controlBtns = document.getElementsByClassName('control')[0];
+  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+  let localVideo = document.querySelector('.local-video > video');
+
+  async function initLocalStream() {
+      let constraints = await build_constraints(audioSelect, videoSelect);
+      try {
+        localStream = await jason.media_manager().init_local_stream(constraints)
+      } catch (e) {
+        let origError = e.source();
+        if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
+          if (origError.message.includes("audio")) {
+            constraints = await build_constraints(null, videoSelect);
+            localStream = await jason.media_manager().init_local_stream(constraints);
+            alert("unable to get audio, will try to enter room with video only");
+          } else if (origError.message.includes("video")) {
+            constraints = await build_constraints(audioSelect, null);
+            localStream = await jason.media_manager().init_local_stream(constraints);
+            alert("unable to get video, will try to enter room with audio only");
+          } else {
+            throw e;
+          }
+        } else {
+          throw e;
+        }
+      }
+      await updateLocalVideo(localStream);
+
+      return constraints;
+  }
+
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    const current_audio = current_stream.getAudioTracks().pop().label || "disable";
-    const current_video = current_stream.getVideoTracks().pop().label || "disable";
+    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
+    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -313,40 +351,33 @@ window.onload = async function() {
 
   async function build_constraints(audio_select, video_select) {
     let constraints = new rust.MediaStreamSettings();
-    let audio = new rust.AudioTrackConstraints();
-    let audioSource = audio_select.options[audio_select.selectedIndex];
-    if (audioSource) {
-      audio.device_id(audioSource.value);
-    }
-    constraints.audio(audio);
-
-    let videoSource = video_select.options[video_select.selectedIndex];
-    if (videoSource) {
-      if (videoSource.value === "screen") {
-        let video = new rust.DisplayVideoTrackConstraints();
-        constraints.display_video(video);
-      } else {
-        let video = new rust.DeviceVideoTrackConstraints();
-        video.device_id(videoSource.value);
-        constraints.device_video(video);
+    if (audio_select != null) {
+      let audio = new rust.AudioTrackConstraints();
+      let audioSource = audio_select.options[audio_select.selectedIndex];
+      if (audioSource) {
+        audio.device_id(audioSource.value);
       }
-    } else {
-      constraints.device_video(new rust.DeviceVideoTrackConstraints());
+      constraints.audio(audio);
+    }
+
+    if (video_select != null) {
+      let videoSource = video_select.options[video_select.selectedIndex];
+      if (videoSource) {
+        if (videoSource.value === "screen") {
+          let video = new rust.DisplayVideoTrackConstraints();
+          constraints.display_video(video);
+        } else {
+          let video = new rust.DeviceVideoTrackConstraints();
+          video.device_id(videoSource.value);
+          constraints.device_video(video);
+        }
+      } else {
+        constraints.device_video(new rust.DeviceVideoTrackConstraints());
+      }
     }
 
     return constraints;
   }
-
-  let room = newRoom();
-  let isCallStarted = false;
-  let localStream = null;
-  let isAudioMuted = false;
-  let isVideoMuted = false;
-  let connectBtnsDiv = document.getElementsByClassName('connect')[0];
-  let controlBtns = document.getElementsByClassName('control')[0];
-  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-  let localVideo = document.querySelector('.local-video > video');
 
   const updateLocalVideo = async (stream) => {
     localVideo.srcObject = stream.get_media_stream();
@@ -358,13 +389,11 @@ window.onload = async function() {
     room = await jason.init_room();
 
     try {
-      const constraints = await build_constraints(audioSelect, videoSelect);
-      localStream = await jason.media_manager().init_local_stream(constraints)
-      await updateLocalVideo(localStream);
+      const constraints = await initLocalStream();
       await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
       await room.set_local_media_settings(constraints);
     } catch (e) {
-      console.error("Init local video failed: " + e.message());
+      console.error("Init local video failed: " + e);
     }
 
     room.on_new_connection( (connection) => {
@@ -378,7 +407,9 @@ window.onload = async function() {
         innerVideoDiv.appendChild(video);
         videoDiv.appendChild(innerVideoDiv);
 
-        await video.play();
+        video.oncanplay = async () => {
+          await video.play();
+        };
       });
     });
 
@@ -442,13 +473,12 @@ window.onload = async function() {
 
     audioSelect.addEventListener('change', async () => {
       try {
-        const constraints = await build_constraints(audioSelect, videoSelect);
+        let constraints = await build_constraints(audioSelect, videoSelect);
         if (localStream && localStream.ptr > 0 ){
           localStream.free();
         }
         if (!isAudioMuted) {
-          localStream = await jason.media_manager().init_local_stream(constraints)
-          await updateLocalVideo(localStream);
+          constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
       } catch (e) {
@@ -458,13 +488,12 @@ window.onload = async function() {
 
     videoSelect.addEventListener('change', async () => {
       try {
-        const constraints = await build_constraints(audioSelect, videoSelect);
+        let constraints = await build_constraints(audioSelect, videoSelect);
         if (localStream && localStream.ptr > 0 ){
           localStream.free();
         }
         if (!isVideoMuted) {
-          localStream = await jason.media_manager().init_local_stream(constraints)
-          await updateLocalVideo(localStream);
+          constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
       } catch (e) {
@@ -502,9 +531,7 @@ window.onload = async function() {
       try {
         if (isVideoMuted) {
           if (!isCallStarted) {
-            const constraints = await build_constraints(audioSelect, videoSelect);
-            localStream = await jason.media_manager().init_local_stream(constraints)
-            await updateLocalVideo(localStream);
+            await initLocalStream();
           }
           await room.unmute_video();
           isVideoMuted = false;

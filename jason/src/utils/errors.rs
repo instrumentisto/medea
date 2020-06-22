@@ -111,10 +111,8 @@ impl JasonError {
     }
 
     /// Returns JS side error if it the cause.
-    pub fn source(&self) -> JsValue {
-        self.source
-            .as_ref()
-            .map_or(JsValue::undefined(), Into::into)
+    pub fn source(&self) -> Option<js_sys::Error> {
+        Clone::clone(&self.source)
     }
 }
 

@@ -105,10 +105,12 @@ impl CommandHandler for Room {
         from_peer_id: PeerId,
         sdp_offer: String,
         mids: HashMap<TrackId, String>,
+        senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
         from_peer.set_mids(mids)?;
+        from_peer.update_senders_statuses(senders_statuses);
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
@@ -138,6 +140,8 @@ impl CommandHandler for Room {
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
 
+        self.peers.sync_peer_spec(from_peer_id)?;
+
         Ok(Box::new(
             self.members
                 .send_event_to_member(to_member_id, event)
@@ -155,9 +159,11 @@ impl CommandHandler for Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
+        senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
         let from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
+        from_peer.update_senders_statuses(senders_statuses);
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<WaitRemoteSdp> =
@@ -174,6 +180,8 @@ impl CommandHandler for Room {
 
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
+
+        self.peers.sync_peer_spec(from_peer_id)?;
 
         Ok(Box::new(
             self.members

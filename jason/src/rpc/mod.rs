@@ -440,7 +440,7 @@ impl WebSocketRpcClient {
                 .map_err(console_error)
                 .ok();
             }
-            _ => (),
+            ServerMsg::Ping(_) => {}
         }
     }
 
@@ -464,7 +464,7 @@ impl WebSocketRpcClient {
         let mut on_idle = heartbeat.on_idle();
         let weak_this = Rc::downgrade(&self.0);
         spawn_local(async move {
-            while let Some(_) = on_idle.next().await {
+            while on_idle.next().await.is_some() {
                 if let Some(this) = weak_this.upgrade().map(Self) {
                     this.handle_connection_loss(ClosedStateReason::Idle);
                 }
@@ -696,7 +696,7 @@ impl Drop for Inner {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
         if let Some(socket) = self.sock.take() {
-            socket.set_close_reason(self.close_reason.clone());
+            socket.set_close_reason(self.close_reason);
         }
     }
 }
