@@ -715,7 +715,10 @@ mod tests {
 
     use crate::{
         api::control::{
-            endpoints::webrtc_publish_endpoint::P2pMode, refs::SrcUri,
+            endpoints::webrtc_publish_endpoint::{
+                AudioSettings, P2pMode, VideoSettings,
+            },
+            refs::SrcUri,
         },
         signalling::{
             elements::Member, peers::traffic_watcher::MockPeerTrafficWatcher,
@@ -724,9 +727,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::api::control::endpoints::webrtc_publish_endpoint::{
-        AudioSettings, VideoSettings,
-    };
 
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].

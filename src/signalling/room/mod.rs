@@ -294,7 +294,9 @@ impl Room {
                             }
                         }
                         _ => {
-                            // TODO
+                            // Temporary change, because renegotiation
+                            // functional will be
+                            // implemented in the #105 PR.
                             Box::new(actix::fut::ok(()))
                         }
                     },

@@ -205,7 +205,7 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
-    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
+    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`]
     /// for this [`Peer`] was sent to the client).
     is_known_to_remote: bool,
 
@@ -371,7 +371,7 @@ impl<T> Peer<T> {
     /// Resets `pending_changes` buffer.
     ///
     /// Should be called when renegotiation was finished.
-    fn renegotiation_finished(&mut self) {
+    fn negotiation_finished(&mut self) {
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
     }
@@ -424,7 +424,7 @@ impl Peer<WaitLocalSdp> {
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
-        self.renegotiation_finished();
+        self.negotiation_finished();
         self.context.sdp_answer = Some(sdp_answer.to_string());
 
         Peer {
@@ -437,7 +437,7 @@ impl Peer<WaitRemoteSdp> {
 impl Peer<WaitLocalHaveRemote> {
     /// Sets local description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
-        self.renegotiation_finished();
+        self.negotiation_finished();
         self.context.sdp_answer = Some(sdp_answer);
 
         Peer {
@@ -557,25 +557,6 @@ impl Peer<Stable> {
             );
         }
         Ok(mids)
-    }
-
-    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
-    /// [SDP] Offer and Answer.
-    ///
-    /// Sets [`Context::is_renegotiate`] to `true`.
-    ///
-    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
-    ///
-    /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
-        let mut context = self.context;
-        context.sdp_answer = None;
-        context.sdp_offer = None;
-
-        Peer {
-            context,
-            state: WaitLocalSdp {},
-        }
     }
 
     /// Adds [`Track`] to [`Peer`] send tracks list.
