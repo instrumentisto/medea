@@ -172,7 +172,7 @@ impl PeersService {
 
         debug!(
             "Created peers:[{}, {}] between {} and {}.",
-            src_peer_id, sink_peer_id, src_member_id, sink_member_id
+            src_peer_id, sink_peer_id, src_member_id, sink_member_id,
         );
 
         let mut src_peer = Peer::new(
@@ -511,7 +511,6 @@ impl PeersService {
     pub fn sync_peer_spec(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer = self.get_peer_by_id(peer_id)?;
         self.peer_metrics_service.update_peer_tracks(&peer);
-
         Ok(())
     }
 }

@@ -235,11 +235,11 @@ impl MediaConnections {
     /// [`MediaConnections`].
     pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
+
         let mut out = HashMap::new();
         for (track_id, sender) in &inner.senders {
             out.insert(*track_id, sender.is_publishing());
         }
-
         out
     }
 

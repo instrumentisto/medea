@@ -2,8 +2,6 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::convert::From;
-
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 use smart_default::SmartDefault;
@@ -77,6 +75,11 @@ pub struct WebRtcPublishEndpoint {
 /// [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, SmartDefault)]
 pub enum PublishPolicy {
+    /// Media type __must__ not be published.
+    ///
+    /// Media server will not try to initialize publishing.
+    Disabled,
+
     /// Specified media type __may__ be published.
     ///
     /// Media server will try to initialize publishing, but won't produce any
@@ -92,41 +95,36 @@ pub enum PublishPolicy {
     /// could not be acquired, then an error will be thrown. Media server will
     /// deny all requests to stop publishing.
     Required,
-
-    /// Media type __must__ not be published.
-    ///
-    /// Media server will not try to initialize publishing.
-    Disabled,
 }
 
 impl PublishPolicy {
     /// Returns `true` if publishing policy prescribes that media __should__ be
     /// published.
     ///
-    /// If `false` then media can be not published.
+    /// If `false` then media may be not published.
+    #[inline]
     pub fn is_required(self) -> bool {
         match self {
-            PublishPolicy::Optional | PublishPolicy::Disabled => false,
-            PublishPolicy::Required => true,
+            Self::Optional | Self::Disabled => false,
+            Self::Required => true,
         }
     }
 }
 
 impl From<proto::web_rtc_publish_endpoint::PublishPolicy> for PublishPolicy {
+    #[inline]
     fn from(from: proto::web_rtc_publish_endpoint::PublishPolicy) -> Self {
-        use proto::web_rtc_publish_endpoint::PublishPolicy::{
-            Disabled, Optional, Required,
-        };
-
+        use proto::web_rtc_publish_endpoint::PublishPolicy as Proto;
         match from {
-            Optional => Self::Optional,
-            Required => Self::Required,
-            Disabled => Self::Disabled,
+            Proto::Optional => Self::Optional,
+            Proto::Required => Self::Required,
+            Proto::Disabled => Self::Disabled,
         }
     }
 }
 
 impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
+    #[inline]
     fn from(from: PublishPolicy) -> Self {
         match from {
             PublishPolicy::Optional => Self::Optional,
@@ -159,6 +157,7 @@ impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
 }
 
 impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
+    #[inline]
     fn from(from: AudioSettings) -> Self {
         Self {
             publish_policy: from.publish_policy as i32,
@@ -189,6 +188,7 @@ impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
 }
 
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
+    #[inline]
     fn from(from: VideoSettings) -> Self {
         Self {
             publish_policy: from.publish_policy as i32,

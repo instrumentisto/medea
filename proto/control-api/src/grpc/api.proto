@@ -195,23 +195,23 @@ message WebRtcPublishEndpoint {
   // Policy of how the video or audio media type can be published in
   // WebRtcPublishEndpoint.
   enum PublishPolicy {
+    // Media type MUST not be published.
+    //
+    // Media server will not try to initialize publishing.
+    DISABLED = 0;
     // Media type MAY be published.
     //
     // Media server will try to initialize publishing, but won't produce any
     // errors if user application fails to (or chooses not to) acquire a
     // required media track. Media server will approve user requests to stop and
     // to restart publishing the specified media type.
-    OPTIONAL = 0;
+    OPTIONAL = 1;
     // Media type MUST be published.
     //
     // Media server will try to initialize publishing, and if a required media
     // track couldn't be acquired, then an error will be thrown. Media server
     // will deny all requests to stop publishing.
-    REQUIRED = 1;
-    // Media type MUST not be published.
-    //
-    // Media server will not try to initialize publishing.
-    DISABLED = 2;
+    REQUIRED = 2;
   }
 
   // P2P mode of WebRTC interaction.

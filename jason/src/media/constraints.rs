@@ -274,7 +274,7 @@ pub struct AudioTrackConstraints {
     /// track.
     device_id: Option<String>,
 
-    /// Importance of this [`AudioTrackConstraints`]
+    /// Importance of this [`AudioTrackConstraints`].
     ///
     /// If `true` then without this [`AudioTrackConstraints`] call session
     /// can't be started.
@@ -369,7 +369,7 @@ pub struct VideoTrackConstraints {
         StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints>,
     >,
 
-    /// Importance of this [`VideoTrackConstraints`]
+    /// Importance of this [`VideoTrackConstraints`].
     ///
     /// If `true` then without this [`VideoTrackConstraints`] call session
     /// can't be started.
@@ -385,7 +385,7 @@ pub struct DeviceVideoTrackConstraints {
     /// track.
     device_id: Option<String>,
 
-    /// Importance of this [`DeviceVideoTrackConstraints`]
+    /// Importance of this [`DeviceVideoTrackConstraints`].
     ///
     /// If `true` then without this [`DeviceVideoTrackConstraints`] call
     /// session can't be started.

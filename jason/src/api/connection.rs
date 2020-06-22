@@ -57,9 +57,8 @@ impl Connection {
     /// Adds provided [`MediaStreamTrack`] to remote stream of this
     /// [`Connection`].
     ///
-    /// If this is the first track added to this connection, then new
+    /// If this is the first track added to this [`Connection`], then a new
     /// [`PeerMediaStream`] is built and sent to `on_remote_stream` callback.
-    #[inline]
     pub(crate) fn add_remote_track(
         &self,
         track_id: TrackId,

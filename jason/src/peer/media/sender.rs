@@ -1,8 +1,6 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
-use std::{
-    cell::RefCell, convert::From, future::Future, rc::Rc, time::Duration,
-};
+use std::{cell::RefCell, future::Future, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
@@ -38,10 +36,10 @@ pub struct SenderBuilder<'a> {
 }
 
 impl<'a> SenderBuilder<'a> {
-    /// Builds new [`RtcRtpTransceiver`] if provided `mid` is `None`,
-    /// otherwise retrieves existing [`RtcRtpTransceiver`] via provided `mid`
-    /// from a provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`]
-    /// lookup fails.
+    /// Builds new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
+    /// retrieves existing [`RtcRtpTransceiver`] via provided `mid` from a
+    /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
+    /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
         let kind = TransceiverKind::from(&self.caps);
         let transceiver = match self.mid {

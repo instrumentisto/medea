@@ -99,8 +99,7 @@ pub enum TransceiverDirection {
 
     /// [`inactive` direction][1] of transceiver.
     ///
-    /// [1]:
-    /// https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-inactive
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-inactive
     Inactive,
 }
 
