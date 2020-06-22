@@ -15,6 +15,7 @@ use actix::{
 use derive_more::{Display, From};
 use failure::Fail;
 use medea_client_api_proto::{Event, NegotiationRole, PeerId};
+use futures::future;
 
 use crate::{
     api::control::{
