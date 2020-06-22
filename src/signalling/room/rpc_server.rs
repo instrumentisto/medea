@@ -20,6 +20,7 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
+    media::PeerStateMachine,
     utils::ResponseActAnyFuture,
 };
 
@@ -65,13 +66,15 @@ impl Room {
             | C::UpdateTracks { peer_id, .. } => peer_id,
         };
 
-        let peer = self
+        let peer_member_id = self
             .peers
-            .get_peer_by_id(peer_id)
+            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
             .map_err(|_| PeerNotFound(peer_id))?;
-        if peer.member_id() != command.member_id {
-            return Err(PeerBelongsToAnotherMember(peer_id, peer.member_id()));
+
+        if peer_member_id != command.member_id {
+            return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
         }
+
         Ok(())
     }
 }

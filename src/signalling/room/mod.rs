@@ -27,12 +27,12 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{New, Peer, PeerError},
+    media::{Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{PeerTrafficWatcher, PeersService},
+        peers::{ConnectEndpointsResult, PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
@@ -182,8 +182,8 @@ impl Room {
         peer1_id: PeerId,
         peer2_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
+        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
+        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
 
         // decide which peer is sender
         let (sender, receiver) = if peer1.is_sender() {
@@ -209,7 +209,7 @@ impl Room {
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
-            tracks: sender.tracks(),
+            tracks: sender.new_tracks(),
             ice_servers,
             force_relay: sender.is_force_relayed(),
         };
@@ -261,6 +261,7 @@ impl Room {
                 {
                     connect_endpoints_tasks.push(
                         self.peers
+                            .clone()
                             .connect_endpoints(publisher.clone(), receiver),
                     );
                 }
@@ -275,6 +276,7 @@ impl Room {
             {
                 connect_endpoints_tasks.push(
                     self.peers
+                        .clone()
                         .connect_endpoints(publisher.clone(), receiver.clone()),
                 )
             }
@@ -282,15 +284,21 @@ impl Room {
 
         for connect_endpoints_task in connect_endpoints_tasks {
             connect_endpoints_task
+                .into_actor(self)
                 .then(|result, this, _| match result {
-                    Ok(Some((peer1, peer2))) => {
-                        match this.send_peer_created(peer1, peer2) {
-                            Ok(fut) => fut,
-                            Err(err) => Box::new(actix::fut::err(err)),
+                    Ok(res) => match res {
+                        ConnectEndpointsResult::Created(peer1, peer2) => {
+                            match this.send_peer_created(peer1, peer2) {
+                                Ok(fut) => fut,
+                                Err(err) => Box::new(actix::fut::err(err)),
+                            }
                         }
-                    }
+                        _ => {
+                            // TODO
+                            Box::new(actix::fut::ok(()))
+                        }
+                    },
                     Err(err) => Box::new(actix::fut::err(err)),
-                    Ok(_) => Box::new(actix::fut::ok(())),
                 })
                 .map(|res, _, _| {
                     if let Err(err) = res {

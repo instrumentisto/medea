@@ -27,25 +27,28 @@ use crate::{
     },
 };
 
-/// Newly initialized [`Peer`] ready to signalling.
+/// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
+///
+/// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
-pub struct New {}
+pub struct WaitLocalSdp;
 
-/// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
+/// [`Peer`] has remote [SDP] and is waiting for local [SDP].
+///
+/// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
-pub struct WaitLocalSdp {}
+pub struct WaitLocalHaveRemote;
 
-/// [`Peer`] has remote SDP and is waiting for local SDP.
+/// [`Peer`] has local [SDP] and is waiting for remote [SDP].
+///
+/// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
-pub struct WaitLocalHaveRemote {}
+pub struct WaitRemoteSdp;
 
-/// [`Peer`] has local SDP and is waiting for remote SDP.
+/// There is no negotiation happening atm. It may have ended or haven't started
+/// yet.
 #[derive(Debug, PartialEq)]
-pub struct WaitRemoteSdp {}
-
-/// SDP exchange ended.
-#[derive(Debug, PartialEq)]
-pub struct Stable {}
+pub struct Stable;
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
 #[derive(Debug, Display, Fail)]
@@ -80,15 +83,12 @@ impl PeerError {
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
-#[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
-#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
-    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>>
+    pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
-#[enum_delegate(pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
     pub fn update_senders_statuses(
         &self,
@@ -97,7 +97,6 @@ impl PeerError {
 )]
 #[derive(Debug)]
 pub enum PeerStateMachine {
-    New(Peer<New>),
     WaitLocalSdp(Peer<WaitLocalSdp>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
@@ -108,7 +107,6 @@ impl fmt::Display for PeerStateMachine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
-            PeerStateMachine::New(_) => write!(f, "New"),
             PeerStateMachine::WaitLocalSdp(_) => write!(f, "WaitLocalSdp"),
             PeerStateMachine::WaitLocalHaveRemote(_) => {
                 write!(f, "WaitLocalHaveRemote")
@@ -138,15 +136,18 @@ macro_rules! impl_peer_converts {
         }
 
         impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
-            type Error = PeerError;
+            type Error = (PeerError, PeerStateMachine);
 
             fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerError::WrongState(
-                        peer.id(),
-                        stringify!($peer_type),
-                        format!("{}", peer),
+                    _ => Err((
+                        PeerError::WrongState(
+                            peer.id(),
+                            stringify!($peer_type),
+                            format!("{}", peer),
+                        ),
+                        peer,
                     )),
                 }
             }
@@ -160,7 +161,6 @@ macro_rules! impl_peer_converts {
     };
 }
 
-impl_peer_converts!(New);
 impl_peer_converts!(WaitLocalSdp);
 impl_peer_converts!(WaitLocalHaveRemote);
 impl_peer_converts!(WaitRemoteSdp);
@@ -168,18 +168,93 @@ impl_peer_converts!(Stable);
 
 #[derive(Debug)]
 pub struct Context {
+    /// [`PeerId`] of this [`Peer`].
     id: Id,
+
+    /// [`MemberId`] of a [`Member`] which owns this [`Peer`].
     member_id: MemberId,
+
+    /// [`PeerId`] of a partner [`Peer`].
     partner_peer: Id,
+
+    /// [`MemberId`] of a partner [`Peer`]'s owner.
     partner_member: MemberId,
+
+    /// [`IceUser`] created for this [`Peer`].
     ice_user: Option<IceUser>,
+
+    /// [SDP] offer of this [`Peer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
     sdp_offer: Option<String>,
+
+    /// [SDP] answer of this [`Peer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
     sdp_answer: Option<String>,
+
+    /// All [`MediaTrack`]s with a `Recv` direction`.
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
+
+    /// All [`MediaTrack`]s with a `Send` direction.
     senders: HashMap<TrackId, Rc<MediaTrack>>,
+
+    /// If `true` then this [`Peer`] must be forcibly connected through TURN.
     is_force_relayed: bool,
+
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
+
+    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
+    /// for this [`Peer`] was sent to the client).
+    is_known_to_remote: bool,
+
+    /// Tracks changes, that remote [`Peer`] is not aware of.
+    pending_track_updates: Vec<TrackChange>,
+}
+
+/// Tracks changes, that remote Peer is not aware of.
+#[derive(Debug)]
+enum TrackChange {
+    /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
+    /// Peer is not aware of.
+    AddSendTrack(Rc<MediaTrack>),
+
+    /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
+    /// Peer is not aware of.
+    AddRecvTrack(Rc<MediaTrack>),
+}
+
+impl TrackChange {
+    /// Tries to return [`Track`] based on this [`TrackChange`].
+    ///
+    /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
+    /// creation.
+    fn try_as_track(&self, partner_peer_id: Id) -> Option<Track> {
+        let (direction, track) = match self {
+            TrackChange::AddSendTrack(track) => (
+                Direction::Send {
+                    receivers: vec![partner_peer_id],
+                    mid: track.mid(),
+                },
+                track,
+            ),
+            TrackChange::AddRecvTrack(track) => (
+                Direction::Recv {
+                    sender: partner_peer_id,
+                    mid: track.mid(),
+                },
+                track,
+            ),
+        };
+
+        Some(Track {
+            id: track.id,
+            is_muted: false,
+            media_type: track.media_type.clone(),
+            direction,
+        })
+    }
 }
 
 /// [RTCPeerConnection] representation.
@@ -216,38 +291,13 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
-    /// Returns [`Track`]s of this [`Peer`].
-    pub fn tracks(&self) -> Vec<Track> {
-        let tracks = self.context.senders.iter().fold(
-            Vec::new(),
-            |mut tracks, (_, track)| {
-                tracks.push(Track {
-                    id: track.id,
-                    media_type: track.media_type.clone(),
-                    direction: Direction::Send {
-                        receivers: vec![self.context.partner_peer],
-                        mid: track.mid(),
-                    },
-                    is_muted: false,
-                });
-                tracks
-            },
-        );
+    /// Returns [`Track`]s that remote [`Peer`] is not aware of.
+    pub fn new_tracks(&self) -> Vec<Track> {
         self.context
-            .receivers
+            .pending_track_updates
             .iter()
-            .fold(tracks, |mut tracks, (_, track)| {
-                tracks.push(Track {
-                    id: track.id,
-                    media_type: track.media_type.clone(),
-                    direction: Direction::Recv {
-                        sender: self.context.partner_peer,
-                        mid: track.mid(),
-                    },
-                    is_muted: false,
-                });
-                tracks
-            })
+            .filter_map(|update| update.try_as_track(self.partner_peer_id()))
+            .collect()
     }
 
     /// Checks if this [`Peer`] has any send tracks.
@@ -301,117 +351,35 @@ impl<T> Peer<T> {
     }
 
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
-    pub fn receivers(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
-        self.context.receivers.clone()
+    pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
+        &self.context.receivers
     }
 
     /// Returns all sending [`MediaTrack`]s of this [`Peer`].
-    pub fn senders(&self) -> HashMap<TrackId, Rc<MediaTrack>> {
-        self.context.senders.clone()
+    pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
+        &self.context.senders
     }
-}
 
-impl Peer<New> {
-    /// Creates new [`Peer`] for [`Member`].
+    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
+    /// for this [`Peer`] was sent to the client).
+    pub fn is_known_to_remote(&self) -> bool {
+        self.context.is_known_to_remote
+    }
+
+    /// Sets [`Self::is_known_to_remote`] to `true`.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
-    pub fn new(
-        id: Id,
-        member_id: MemberId,
-        partner_peer: Id,
-        partner_member: MemberId,
-        is_force_relayed: bool,
-    ) -> Self {
-        let context = Context {
-            id,
-            member_id,
-            partner_peer,
-            partner_member,
-            ice_user: None,
-            sdp_offer: None,
-            sdp_answer: None,
-            receivers: HashMap::new(),
-            senders: HashMap::new(),
-            is_force_relayed,
-            endpoints: Vec::new(),
-        };
-        Self {
-            context,
-            state: New {},
-        }
-    }
-
-    /// Adds `send` tracks to `self` and add `recv` for this `send`
-    /// to `partner_peer`.
+    /// Resets `pending_changes` buffer.
     ///
-    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
-    /// and [`WebRtcPublishEndpoint::video_settings`].
-    pub fn add_publisher(
-        &mut self,
-        src: &WebRtcPublishEndpoint,
-        publisher_peer: &mut Peer<New>,
-        tracks_counter: &mut Counter<TrackId>,
-    ) {
-        let audio_settings = src.audio_settings();
-        if audio_settings.publish_policy != PublishPolicy::Disabled {
-            let track_audio = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Audio(AudioSettings {
-                    is_required: audio_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.add_sender(Rc::clone(&track_audio));
-            publisher_peer.add_receiver(track_audio);
-        }
-
-        let video_settings = src.video_settings();
-        if video_settings.publish_policy != PublishPolicy::Disabled {
-            let track_video = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Video(VideoSettings {
-                    is_required: video_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.add_sender(Rc::clone(&track_video));
-            publisher_peer.add_receiver(track_video);
-        }
-    }
-
-    /// Transition new [`Peer`] into state of waiting for local description.
-    pub fn start(self) -> Peer<WaitLocalSdp> {
-        Peer {
-            context: self.context,
-            state: WaitLocalSdp {},
-        }
-    }
-
-    /// Transition new [`Peer`] into state of waiting for remote description.
-    pub fn set_remote_sdp(
-        self,
-        sdp_offer: String,
-    ) -> Peer<WaitLocalHaveRemote> {
-        let mut context = self.context;
-        context.sdp_offer = Some(sdp_offer);
-        Peer {
-            context,
-            state: WaitLocalHaveRemote {},
-        }
-    }
-
-    /// Adds [`Track`] to [`Peer`] for send.
-    pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.context.senders.insert(track.id, track);
-    }
-
-    /// Adds [`Track`] to [`Peer`] for receive.
-    pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.context.receivers.insert(track.id, track);
+    /// Should be called when renegotiation was finished.
+    fn renegotiation_finished(&mut self) {
+        self.context.is_known_to_remote = true;
+        self.context.pending_track_updates.clear();
     }
 }
 
 impl Peer<WaitLocalSdp> {
-    /// Sets local description and transition [`Peer`]
-    /// to [`WaitRemoteSdp`] state.
+    /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
+    /// state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
@@ -436,46 +404,139 @@ impl Peer<WaitLocalSdp> {
         &mut self,
         mut mids: HashMap<TrackId, String>,
     ) -> Result<(), PeerError> {
-        for (id, track) in self
+        let tracks = self
             .context
             .senders
             .iter_mut()
-            .chain(self.context.receivers.iter_mut())
-        {
+            .chain(self.context.receivers.iter_mut());
+
+        for (id, track) in tracks {
             let mid = mids
                 .remove(&id)
                 .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
+
         Ok(())
     }
 }
 
 impl Peer<WaitRemoteSdp> {
-    /// Sets remote description and transition [`Peer`] to [`Stable`] state.
-    pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
-        let mut context = self.context;
-        context.sdp_answer = Some(sdp_answer.to_string());
+    /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
+    pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
+        self.renegotiation_finished();
+        self.context.sdp_answer = Some(sdp_answer.to_string());
+
         Peer {
-            context,
+            context: self.context,
             state: Stable {},
         }
     }
 }
 
 impl Peer<WaitLocalHaveRemote> {
-    /// Sets local description and transition [`Peer`] to [`Stable`] state.
-    pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
-        let mut context = self.context;
-        context.sdp_answer = Some(sdp_answer);
+    /// Sets local description and transitions [`Peer`] to [`Stable`] state.
+    pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
+        self.renegotiation_finished();
+        self.context.sdp_answer = Some(sdp_answer);
+
         Peer {
-            context,
+            context: self.context,
             state: Stable {},
         }
     }
 }
 
 impl Peer<Stable> {
+    /// Creates new [`Peer`] for [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    pub fn new(
+        id: Id,
+        member_id: MemberId,
+        partner_peer: Id,
+        partner_member: MemberId,
+        is_force_relayed: bool,
+    ) -> Self {
+        let context = Context {
+            id,
+            member_id,
+            partner_peer,
+            partner_member,
+            ice_user: None,
+            sdp_offer: None,
+            sdp_answer: None,
+            receivers: HashMap::new(),
+            senders: HashMap::new(),
+            is_force_relayed,
+            endpoints: Vec::new(),
+            is_known_to_remote: false,
+            pending_track_updates: Vec::new(),
+        };
+
+        Self {
+            context,
+            state: Stable {},
+        }
+    }
+
+    /// Adds `send` tracks to `self` and add `recv` for this `send`
+    /// to `partner_peer`.
+    ///
+    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
+    /// and [`WebRtcPublishEndpoint::video_settings`].
+    pub fn add_publisher(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        partner_peer: &mut Peer<Stable>,
+        tracks_counter: &Counter<TrackId>,
+    ) {
+        let audio_settings = src.audio_settings();
+        if audio_settings.publish_policy != PublishPolicy::Disabled {
+            let track_audio = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Audio(AudioSettings {
+                    is_required: audio_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_audio));
+            partner_peer.add_receiver(track_audio);
+        }
+
+        let video_settings = src.video_settings();
+        if video_settings.publish_policy != PublishPolicy::Disabled {
+            let track_video = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: video_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_video));
+            partner_peer.add_receiver(track_video);
+        }
+    }
+
+    /// Transition new [`Peer`] into state of waiting for local description.
+    pub fn start(self) -> Peer<WaitLocalSdp> {
+        Peer {
+            context: self.context,
+            state: WaitLocalSdp {},
+        }
+    }
+
+    /// Transition new [`Peer`] into state of waiting for remote description.
+    pub fn set_remote_sdp(
+        self,
+        sdp_offer: String,
+    ) -> Peer<WaitLocalHaveRemote> {
+        let mut context = self.context;
+        context.sdp_offer = Some(sdp_offer);
+        Peer {
+            context,
+            state: WaitLocalHaveRemote {},
+        }
+    }
+
     /// Returns [mid]s of this [`Peer`].
     ///
     /// # Errors
@@ -497,6 +558,47 @@ impl Peer<Stable> {
         }
         Ok(mids)
     }
+
+    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
+    /// [SDP] Offer and Answer.
+    ///
+    /// Sets [`Context::is_renegotiate`] to `true`.
+    ///
+    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
+    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
+        let mut context = self.context;
+        context.sdp_answer = None;
+        context.sdp_offer = None;
+
+        Peer {
+            context,
+            state: WaitLocalSdp {},
+        }
+    }
+
+    /// Adds [`Track`] to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] is considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks`.
+    fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.context
+            .pending_track_updates
+            .push(TrackChange::AddSendTrack(Rc::clone(&track)));
+        self.context.senders.insert(track.id, track);
+    }
+
+    /// Adds [`Track`] to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] is considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks`.
+    fn add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.context
+            .pending_track_updates
+            .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
+        self.context.receivers.insert(track.id, track);
+    }
 }
 
 #[cfg(test)]
@@ -511,24 +613,15 @@ pub mod tests {
         recv_audio: u32,
         recv_video: u32,
     ) -> PeerStateMachine {
-        let mut peer = Peer {
-            state: Stable {},
-            context: Context {
-                id: Id(1),
-                sdp_offer: None,
-                sdp_answer: None,
-                senders: HashMap::new(),
-                receivers: HashMap::new(),
-                member_id: MemberId::from("test-member"),
-                is_force_relayed: false,
-                partner_peer: Id(2),
-                ice_user: None,
-                endpoints: Vec::new(),
-                partner_member: MemberId::from("partner-member"),
-            },
-        };
+        let mut peer = Peer::new(
+            Id(1),
+            MemberId::from("test-member"),
+            Id(2),
+            MemberId::from("partner-member"),
+            false,
+        );
 
-        let mut track_id_counter = Counter::default();
+        let track_id_counter = Counter::default();
 
         for _ in 0..send_audio {
             let track_id = track_id_counter.next_id();

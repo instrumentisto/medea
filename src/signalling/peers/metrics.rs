@@ -409,7 +409,7 @@ pub enum PeersMetricsEvent {
 ///
 /// This spec is compared with [`Peer`]s actual stats, to calculate difference
 /// between expected and actual [`Peer`] state.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct PeerTracks {
     /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
     /// [`MediaType::Audio`].
@@ -859,6 +859,30 @@ mod tests {
     };
 
     use super::PeersMetricsService;
+
+    impl PeersMetricsService {
+        /// Returns `true` if `Peer` with a provided [`PeerId`] isn't registered
+        /// in the [`PeersMetricsService`].
+        pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
+            self.peers.contains_key(&peer_id)
+        }
+
+        /// Returns count of the `MediaTrack` which are registerd in the
+        /// [`PeersMetricsService`].
+        pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
+            if let Some(peer) = self.peers.get(&peer_id) {
+                let peer_tracks = peer.borrow().tracks_spec;
+                let mut tracks_count = 0;
+                tracks_count += peer_tracks.audio_recv;
+                tracks_count += peer_tracks.video_recv;
+                tracks_count += peer_tracks.audio_send;
+                tracks_count += peer_tracks.video_send;
+                tracks_count
+            } else {
+                0
+            }
+        }
+    }
 
     /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
     /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
