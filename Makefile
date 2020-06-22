@@ -272,6 +272,7 @@ endif
 #
 # Usage:
 #	make cargo.lint
+
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings \
 		-A clippy::used_underscore_binding

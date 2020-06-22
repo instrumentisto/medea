@@ -311,6 +311,7 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
+    /// Returns partner [`Member`]s of this [`Member`].
     pub fn partners(&self) -> Vec<Member> {
         let this = self.0.borrow();
         this.srcs
@@ -436,6 +437,7 @@ impl Member {
 
     /// Compares pointers. If both pointers point to the same address, then
     /// returns `true`.
+    #[cfg(test)]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
     }

@@ -198,9 +198,11 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
+    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
+    /// for this [`Peer`] was sent to the client).
     is_known_to_remote: bool,
 
-    /// Tracks changes, that remote Peer is not aware of.
+    /// Tracks changes, that remote [`Peer`] is not aware of.
     pending_track_updates: Vec<TrackChange>,
 }
 
@@ -217,6 +219,10 @@ enum TrackChange {
 }
 
 impl TrackChange {
+    /// Tries to return [`Track`] based on this [`TrackChange`].
+    ///
+    /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
+    /// creation.
     fn try_as_track(&self, partner_peer_id: Id) -> Option<Track> {
         let (direction, track) = match self {
             TrackChange::AddSendTrack(track) => (
@@ -289,7 +295,7 @@ impl<T> Peer<T> {
             .collect()
     }
 
-    /// Returns [`Track`]s that remote Peer is not aware of.
+    /// Returns [`Track`]s that remote [`Peer`] is not aware of.
     pub fn new_tracks(&self) -> Vec<Track> {
         self.context
             .pending_track_updates
@@ -346,6 +352,8 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
+    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
+    /// for this [`Peer`] was sent to the client).
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
     }
@@ -362,8 +370,8 @@ impl<T> Peer<T> {
 }
 
 impl Peer<WaitLocalSdp> {
-    /// Sets local description and transition [`Peer`]
-    /// to [`WaitRemoteSdp`] state.
+    /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
+    /// state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
