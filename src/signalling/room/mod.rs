@@ -43,6 +43,7 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
+use std::rc::Rc;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -136,7 +137,7 @@ pub struct Room {
     members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    peers: PeersService,
+    peers: Rc<PeersService>,
 
     /// Current state of this [`Room`].
     state: State,
