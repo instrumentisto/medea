@@ -289,8 +289,8 @@ impl PeersService {
     /// [`CreatedOrGottenPeer::Created`] variant.
     async fn get_or_create_peers(
         &self,
-        src: WebRtcPublishEndpoint,
-        sink: WebRtcPlayEndpoint,
+        src: &WebRtcPublishEndpoint,
+        sink: &WebRtcPlayEndpoint,
     ) -> Result<GetOrCreatePeersResult, RoomError> {
         if let Some((first_peer_id, second_peer_id)) = self
             .get_peers_between_members(&src.owner().id(), &sink.owner().id())
@@ -302,8 +302,10 @@ impl PeersService {
         } else {
             let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
 
-            self.peer_post_construct(src_peer_id, &src.into()).await?;
-            self.peer_post_construct(sink_peer_id, &sink.into()).await?;
+            self.peer_post_construct(src_peer_id, &src.clone().into())
+                .await?;
+            self.peer_post_construct(sink_peer_id, &sink.clone().into())
+                .await?;
 
             Ok(GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id))
         }
@@ -335,7 +337,7 @@ impl PeersService {
             src.owner().id(),
             sink.owner().id(),
         );
-        match self.get_or_create_peers(src.clone(), sink.clone()).await? {
+        match self.get_or_create_peers(&src, &sink).await? {
             GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id) => {
                 Ok(Some((src_peer_id, sink_peer_id)))
             }
@@ -349,7 +351,6 @@ impl PeersService {
                     // already connected, so no-op
                     Ok(None)
                 } else {
-                    let mut futs = Vec::new();
                     // TODO: here we assume that peers are stable,
                     //       which might not be the case, e.g. Control
                     //       Service creates multiple endpoints in quick
@@ -365,19 +366,24 @@ impl PeersService {
                         &self.tracks_count,
                     );
 
+                    let mut register_peer_tasks = Vec::new();
                     if src.has_traffic_callback() {
-                        futs.push(self.peers_traffic_watcher.register_peer(
-                            self.room_id.clone(),
-                            src_peer_id,
-                            src.is_force_relayed(),
-                        ));
+                        register_peer_tasks.push(
+                            self.peers_traffic_watcher.register_peer(
+                                self.room_id.clone(),
+                                src_peer_id,
+                                src.is_force_relayed(),
+                            ),
+                        );
                     }
                     if sink.has_traffic_callback() {
-                        futs.push(self.peers_traffic_watcher.register_peer(
-                            self.room_id.clone(),
-                            sink_peer_id,
-                            sink.is_force_relayed(),
-                        ));
+                        register_peer_tasks.push(
+                            self.peers_traffic_watcher.register_peer(
+                                self.room_id.clone(),
+                                sink_peer_id,
+                                sink.is_force_relayed(),
+                            ),
+                        );
                     }
 
                     sink_peer.add_endpoint(&sink.into());
@@ -396,7 +402,7 @@ impl PeersService {
                     self.peers.add_peer(src_peer);
                     self.peers.add_peer(sink_peer);
 
-                    future::try_join_all(futs)
+                    future::try_join_all(register_peer_tasks)
                         .await
                         .map_err(RoomError::PeerTrafficWatcherMailbox)?;
 
@@ -413,21 +419,21 @@ impl PeersService {
         peer_id: PeerId,
         endpoint: &Endpoint,
     ) -> Result<(), RoomError> {
-        let has_traffic_callback = endpoint.has_traffic_callback();
-        let is_force_relayed = endpoint.is_force_relayed();
-
         let ice_user = self
             .turn_service
             .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
             .await?;
 
-        let _ = self
-            .peers
-            .map_peer_by_id_mut(peer_id, move |p| p.set_ice_user(ice_user));
+        self.peers
+            .map_peer_by_id_mut(peer_id, move |p| p.set_ice_user(ice_user))?;
 
-        if has_traffic_callback {
+        if endpoint.has_traffic_callback() {
             self.peers_traffic_watcher
-                .register_peer(self.room_id.clone(), peer_id, is_force_relayed)
+                .register_peer(
+                    self.room_id.clone(),
+                    peer_id,
+                    endpoint.is_force_relayed(),
+                )
                 .await
                 .map_err(RoomError::PeerTrafficWatcherMailbox)
         } else {
