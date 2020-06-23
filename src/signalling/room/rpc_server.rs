@@ -1,6 +1,8 @@
 //! Implementation of the [`RpcServer`] and related [`Command`]s and functions.
 
-use actix::{ActorFuture, Addr, ContextFutureSpawner as _, Handler};
+use actix::{
+    ActorFuture, Addr, AsyncContext, ContextFutureSpawner as _, Handler,
+};
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
@@ -225,10 +227,10 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .then(|res, room, _| {
+            .then(|res, room, ctx| {
                 let member = actix_try!(res);
                 Box::new(
-                    room.init_member_connections(&member)
+                    room.init_member_connections(&member, ctx.address())
                         .map(|res, _, _| res.map(|_| member)),
                 )
             })

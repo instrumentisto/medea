@@ -9,8 +9,8 @@ mod rpc_server;
 use std::{collections::HashSet, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
-    WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
+    MailboxError, WeakAddr, WrapFuture as _, WrapFuture,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -40,6 +40,9 @@ use crate::{
     AppContext,
 };
 
+use actix::Message;
+
+use crate::media::peer::RenegotiationSubscriber;
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
@@ -224,6 +227,7 @@ impl Room {
         &mut self,
         member1: &Member,
         member2: &Member,
+        room_addr: Addr<Room>,
     ) -> ActFuture<Result<(), RoomError>> {
         let member2_id = member2.id();
         let mut connect_endpoints_tasks = Vec::new();
@@ -232,7 +236,11 @@ impl Room {
             for sink in src.sinks() {
                 if sink.owner().id() == member2_id {
                     connect_endpoints_tasks.push(
-                        self.peers.clone().connect_endpoints(src.clone(), sink),
+                        self.peers.clone().connect_endpoints(
+                            src.clone(),
+                            sink,
+                            room_addr.clone(),
+                        ),
                     );
                 }
             }
@@ -242,7 +250,11 @@ impl Room {
             let src = sink.src();
             if src.owner().id() == member2_id {
                 connect_endpoints_tasks.push(
-                    self.peers.clone().connect_endpoints(src, sink.clone()),
+                    self.peers.clone().connect_endpoints(
+                        src,
+                        sink.clone(),
+                        room_addr.clone(),
+                    ),
                 )
             }
         }
@@ -253,9 +265,9 @@ impl Room {
                 .then(move |result, room: &mut Room, ctx| {
                     let connected_peers = actix_try!(result);
 
-                    let mut spawn_futs = Vec::new();
-                    let mut then_futs = Vec::new();
-                    let mut known_peer_ids = HashSet::new();
+                    // let mut spawn_futs = Vec::new();
+                    // let mut then_futs = Vec::new();
+                    // let mut known_peer_ids = HashSet::new();
 
                     for connected_peer in connected_peers {
                         match connected_peer {
@@ -266,67 +278,92 @@ impl Room {
                                 first_peer_id,
                                 second_peer_id,
                             ) => {
-                                if !known_peer_ids.contains(&first_peer_id) {
-                                    let first_peer: Peer<Stable> =
-                                        actix_try!(room
-                                            .peers
-                                            .take_inner_peer(first_peer_id));
-                                    let first_peer =
-                                        first_peer.start_renegotiation();
-                                    let event = Event::TracksApplied {
-                                        updates: first_peer.get_updates(),
-                                        negotiation_role: Some(
-                                            NegotiationRole::Offerer,
-                                        ),
-                                        peer_id: first_peer_id,
-                                    };
-                                    then_futs.push(Box::new(
-                                        room.members
-                                            .send_event_to_member(
-                                                first_peer.member_id(),
-                                                event,
-                                            )
-                                            .into_actor(room),
-                                    )
-                                        as ActFuture<_>);
-
-                                    room.peers.add_peer(first_peer);
-
-                                    known_peer_ids.insert(first_peer_id);
-                                    known_peer_ids.insert(second_peer_id);
-                                }
+                                room.peers.map_peer_by_id_mut(
+                                    first_peer_id,
+                                    |peer| {
+                                        peer.run_renegotiation_transaction();
+                                    },
+                                );
+                                room.peers.map_peer_by_id_mut(
+                                    second_peer_id,
+                                    |peer| {
+                                        peer.run_renegotiation_transaction();
+                                    },
+                                );
+                                // if !known_peer_ids.contains(&first_peer_id) {
+                                //     let first_peer: Peer<Stable> =
+                                //         actix_try!(room
+                                //             .peers
+                                //             .take_inner_peer(first_peer_id));
+                                //     let first_peer =
+                                //         first_peer.start_renegotiation();
+                                //     let event = Event::TracksApplied {
+                                //         updates: first_peer.get_updates(),
+                                //         negotiation_role: Some(
+                                //             NegotiationRole::Offerer,
+                                //         ),
+                                //         peer_id: first_peer_id,
+                                //     };
+                                //     then_futs.push(Box::new(
+                                //         room.members
+                                //             .send_event_to_member(
+                                //                 first_peer.member_id(),
+                                //                 event,
+                                //             )
+                                //             .into_actor(room),
+                                //     )
+                                //         as ActFuture<_>);
+                                //
+                                //     room.peers.add_peer(first_peer);
+                                //
+                                // }
+                                // known_peer_ids.insert(first_peer_id);
+                                // known_peer_ids.insert(second_peer_id);
                             }
                             ConnectEndpointsResult::Created(
                                 first_peer_id,
                                 second_peer_id,
                             ) => {
-                                if !known_peer_ids.contains(&first_peer_id) {
-                                    spawn_futs
-                                        .push(actix_try!(room
-                                            .send_peer_created(first_peer_id)));
-                                    known_peer_ids.insert(first_peer_id);
-                                    known_peer_ids.insert(second_peer_id);
-                                }
+                                room.peers.map_peer_by_id_mut(
+                                    first_peer_id,
+                                    |peer| {
+                                        peer.run_renegotiation_transaction();
+                                    },
+                                );
+                                room.peers.map_peer_by_id_mut(
+                                    second_peer_id,
+                                    |peer| {
+                                        peer.run_renegotiation_transaction();
+                                    },
+                                );
+                                // if !known_peer_ids.contains(&first_peer_id) {
+                                // spawn_futs
+                                //     .push(actix_try!(room
+                                //         .send_peer_created(first_peer_id)));
+                                //     known_peer_ids.insert(first_peer_id);
+                                //     known_peer_ids.insert(second_peer_id);
+                                // }
                             }
                         }
                     }
 
-                    ctx.spawn(actix_try_join_all(spawn_futs).map(
-                        |res, room, ctx| {
-                            if let Err(e) = res {
-                                error!(
-                                    "Failed to connect Endpoints because: {:?}",
-                                    e
-                                );
-                                room.close_gracefully(ctx);
-                            }
-                        },
-                    ));
+                    // ctx.spawn(actix_try_join_all(spawn_futs).map(
+                    //     |res, room, ctx| {
+                    //         if let Err(e) = res {
+                    //             error!(
+                    //                 "Failed to connect Endpoints because:
+                    // {:?}",                 e
+                    //             );
+                    //             room.close_gracefully(ctx);
+                    //         }
+                    //     },
+                    // ));
 
-                    Box::new(actix_try_join_all(then_futs).map(|res, _, _| {
-                        res?;
-                        Ok(())
-                    }))
+                    // Box::new(actix_try_join_all(then_futs).map(|res, _, _| {
+                    //     res?;
+                    //     Ok(())
+                    // }))
+                    Box::new(actix::fut::ok(()))
                 }),
         )
     }
@@ -345,11 +382,16 @@ impl Room {
     fn init_member_connections(
         &mut self,
         member: &Member,
+        room_addr: Addr<Room>,
     ) -> ActFuture<Result<(), RoomError>> {
         let connect_members_tasks =
             member.partners().into_iter().filter_map(|partner| {
                 if self.members.member_has_connection(&partner.id()) {
-                    Some(self.connect_members(&partner, member))
+                    Some(self.connect_members(
+                        &partner,
+                        member,
+                        room_addr.clone(),
+                    ))
                 } else {
                     None
                 }
@@ -437,6 +479,67 @@ impl Room {
                 }
             },
         ))
+    }
+}
+
+#[derive(Message, Clone, Debug, Copy)]
+#[rtype(result = "()")]
+pub struct RenegotiationNeeded(pub PeerId);
+
+impl Handler<RenegotiationNeeded> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: RenegotiationNeeded,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        // TODO: unwrap
+        println!("\n\n\nRENEGOTIATION NEEDED\n\n\n");
+        let peer: Peer<Stable> = self.peers.take_inner_peer(msg.0).unwrap();
+        let is_partner_stable = self
+            .peers
+            .map_peer_by_id(peer.partner_peer_id(), |p| p.is_stable())
+            .unwrap();
+
+        if is_partner_stable {
+            if peer.is_known_to_remote() {
+                let peer = peer.start_renegotiation();
+                let event = Event::TracksApplied {
+                    updates: peer.get_updates(),
+                    negotiation_role: Some(NegotiationRole::Offerer),
+                    peer_id: peer.id(),
+                };
+                let fut = self
+                    .members
+                    .send_event_to_member(peer.member_id(), event)
+                    .into_actor(self)
+                    .map(|res, _, _| {
+                        res.unwrap();
+                    });
+
+                self.peers.add_peer(peer);
+
+                use actix::AsyncContext as _;
+                ctx.spawn(fut);
+            } else {
+                let peer_id = peer.id();
+                self.peers.add_peer(peer);
+                ctx.spawn(
+                    self.send_peer_created(peer_id)
+                        .unwrap()
+                        .map(|res, _, _| res.unwrap()),
+                );
+            }
+        } else {
+            self.peers.add_peer(peer);
+        }
+    }
+}
+
+impl RenegotiationSubscriber for Addr<Room> {
+    fn renegotiation_needed(&self, peer_id: PeerId) {
+        self.do_send(RenegotiationNeeded(peer_id));
     }
 }
 

@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut, ActorFuture as _, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _,
+    fut, ActorFuture as _, Addr, AsyncContext, Context,
+    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
@@ -183,6 +183,7 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
+        room_addr: Addr<Room>,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -230,7 +231,7 @@ impl Room {
         member.insert_sink(sink);
 
         if self.members.member_has_connection(member_id) {
-            Ok(Box::new(self.init_member_connections(&member)))
+            Ok(Box::new(self.init_member_connections(&member, room_addr)))
         } else {
             Ok(Box::new(actix::fut::ok(())))
         }
@@ -411,7 +412,7 @@ impl Handler<CreateEndpoint> for Room {
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
@@ -419,6 +420,7 @@ impl Handler<CreateEndpoint> for Room {
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
+                    ctx.address(),
                 ) {
                     Ok(fut) => Box::new(fut),
                     Err(e) => Box::new(fut::err(e)),

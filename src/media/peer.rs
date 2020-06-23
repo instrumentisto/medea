@@ -4,13 +4,14 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{collections::HashMap, convert::TryFrom, fmt, mem, rc::Rc};
 
+use actix::{Addr, Message};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, TrackUpdate, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, PeerId,
+    Track, TrackId, TrackUpdate, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -24,8 +25,30 @@ use crate::{
             webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
         },
         peers::Counter,
+        Room,
     },
 };
+
+struct Executable(Box<dyn FnOnce(&mut Peer<Stable>)>);
+
+impl Executable {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: FnOnce(&mut Peer<Stable>) + 'static,
+    {
+        Self(Box::new(f))
+    }
+}
+
+impl fmt::Debug for Executable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Executable").finish()
+    }
+}
+
+pub trait RenegotiationSubscriber: fmt::Debug {
+    fn renegotiation_needed(&self, peer_id: PeerId);
+}
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
 ///
@@ -104,6 +127,27 @@ pub enum PeerStateMachine {
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
+}
+
+impl PeerStateMachine {
+    pub fn run_renegotiation_transaction(&mut self) {
+        match self {
+            PeerStateMachine::Stable(stable_peer) => {
+                stable_peer.run_change_transactions();
+            }
+            _ => {
+                // Transactions will be ran when `PeerStateMachine` will be
+                // Stable.
+            }
+        }
+    }
+
+    pub fn is_stable(&self) -> bool {
+        match self {
+            PeerStateMachine::Stable(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for PeerStateMachine {
@@ -214,6 +258,10 @@ pub struct Context {
 
     /// Tracks changes, that remote [`Peer`] is not aware of.
     pending_track_updates: Vec<TrackChange>,
+
+    changes_queue: Vec<Executable>,
+
+    renegotiation_subscriber: Box<dyn RenegotiationSubscriber>,
 }
 
 /// Tracks changes, that remote Peer is not aware of.
@@ -383,16 +431,6 @@ impl<T> Peer<T> {
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
     }
-
-    /// Sets [`Self::is_known_to_remote`] to `true`.
-    ///
-    /// Resets `pending_changes` buffer.
-    ///
-    /// Should be called when renegotiation was finished.
-    fn renegotiation_finished(&mut self) {
-        self.context.is_known_to_remote = true;
-        self.context.pending_track_updates.clear();
-    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -442,26 +480,31 @@ impl Peer<WaitLocalSdp> {
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
-        self.renegotiation_finished();
         self.context.sdp_answer = Some(sdp_answer.to_string());
 
-        Peer {
+        let mut peer = Peer {
             context: self.context,
             state: Stable {},
-        }
+        };
+
+        peer.renegotiation_finished();
+
+        peer
     }
 }
 
 impl Peer<WaitLocalHaveRemote> {
     /// Sets local description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
-        self.renegotiation_finished();
         self.context.sdp_answer = Some(sdp_answer);
 
-        Peer {
+        let mut peer = Peer {
             context: self.context,
             state: Stable {},
-        }
+        };
+        peer.renegotiation_finished();
+
+        peer
     }
 }
 
@@ -475,6 +518,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
+        renegotiation_subscriber: Box<dyn RenegotiationSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -490,6 +534,8 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
+            changes_queue: Vec::new(),
+            renegotiation_subscriber,
         };
 
         Self {
@@ -602,9 +648,13 @@ impl Peer<Stable> {
     /// obtained by calling `Peer.new_tracks`.
     fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.context
-            .pending_track_updates
-            .push(TrackChange::AddSendTrack(Rc::clone(&track)));
-        self.context.senders.insert(track.id, track);
+            .changes_queue
+            .push(Executable::new(move |peer| {
+                peer.context
+                    .pending_track_updates
+                    .push(TrackChange::AddSendTrack(Rc::clone(&track)));
+                peer.context.senders.insert(track.id, track);
+            }));
     }
 
     /// Adds [`Track`] to [`Peer`] receive tracks list.
@@ -613,9 +663,40 @@ impl Peer<Stable> {
     /// obtained by calling `Peer.new_tracks`.
     fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.context
-            .pending_track_updates
-            .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
-        self.context.receivers.insert(track.id, track);
+            .changes_queue
+            .push(Executable::new(move |peer| {
+                peer.context
+                    .pending_track_updates
+                    .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
+                peer.context.receivers.insert(track.id, track);
+            }));
+    }
+
+    /// Sets [`Self::is_known_to_remote`] to `true`.
+    ///
+    /// Resets `pending_changes` buffer.
+    ///
+    /// Should be called when renegotiation was finished.
+    fn renegotiation_finished(&mut self) {
+        self.context.is_known_to_remote = true;
+        self.context.pending_track_updates.clear();
+        self.run_change_transactions();
+    }
+
+    fn run_change_transactions(&mut self) {
+        let mut changes_queue = Vec::new();
+
+        mem::swap(&mut changes_queue, &mut self.context.changes_queue);
+
+        if !changes_queue.is_empty() {
+            for change in changes_queue {
+                (change.0)(self);
+            }
+
+            self.context
+                .renegotiation_subscriber
+                .renegotiation_needed(self.id());
+        }
     }
 }
 
