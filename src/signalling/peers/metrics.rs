@@ -861,13 +861,14 @@ mod tests {
     use super::PeersMetricsService;
 
     impl PeersMetricsService {
-        /// Returns `true` if `Peer` with a provided [`PeerId`] isn't registered
-        /// in the [`PeersMetricsService`].
+        /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
+        /// registered in the [`PeersMetricsService`].
+        #[inline]
         pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
             self.peers.contains_key(&peer_id)
         }
 
-        /// Returns count of the `MediaTrack` which are registerd in the
+        /// Returns count of the [`MediaTrack`] which are registered in the
         /// [`PeersMetricsService`].
         pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
             if let Some(peer) = self.peers.get(&peer_id) {

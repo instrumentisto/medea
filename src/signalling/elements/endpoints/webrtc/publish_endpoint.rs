@@ -215,6 +215,7 @@ impl WebRtcPublishEndpoint {
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     #[allow(clippy::unused_self)]
+    #[inline]
     pub fn has_traffic_callback(&self) -> bool {
         // TODO: Must depend on on_start/on_stop endpoint callbacks, when those
         //       will be added (#91).

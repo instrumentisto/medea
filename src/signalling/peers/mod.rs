@@ -560,7 +560,7 @@ impl PeerRepository {
         self.take(peer_id)?.try_into().map_err(Into::into)
     }
 
-    /// Store [`Peer`] in [`Room`].
+    /// Stores [`Peer`] in [`Room`].
     ///
     /// [`Room`]: crate::signalling::Room
     pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
