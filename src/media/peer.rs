@@ -216,7 +216,7 @@ pub struct Context {
     pending_track_updates: Vec<TrackChange>,
 }
 
-/// Tracks changes, that remote Peer is not aware of.
+/// Tracks changes, that remote [`Peer`] is not aware of.
 #[derive(Debug)]
 enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
