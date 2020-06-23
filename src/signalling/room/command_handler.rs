@@ -12,8 +12,8 @@ use medea_client_api_proto::{
 use crate::{
     log::prelude::*,
     media::{
-        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
-        WaitLocalSdp, WaitRemoteSdp,
+        New, Peer, PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp,
+        WaitRemoteSdp,
     },
 };
 
@@ -123,28 +123,12 @@ impl CommandHandler for Room {
             return Ok(Box::new(actix::fut::ok(())));
         }
 
-        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
-        if let PeerStateMachine::New(_) = from_peer {
-            return Err(PeerError::WrongState(
-                from_peer_id,
-                "Not New",
-                format!("{}", from_peer),
-            )
-            .into());
-        }
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
-        if let PeerStateMachine::New(_) = to_peer {
-            return Err(PeerError::WrongState(
-                to_peer_id,
-                "Not New",
-                format!("{}", to_peer),
-            )
-            .into());
-        }
-
-        let to_member_id = to_peer.member_id();
+        let to_peer_id = self
+            .peers
+            .map_peer_by_id(from_peer_id, PeerStateMachine::partner_peer_id)?;
+        let to_member_id = self
+            .peers
+            .map_peer_by_id(to_peer_id, PeerStateMachine::member_id)?;
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,
@@ -175,8 +159,10 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
-            let member_id = p.member_id();
+        if let Ok(member_id) = self
+            .peers
+            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
+        {
             Ok(Box::new(
                 self.members
                     .send_event_to_member(

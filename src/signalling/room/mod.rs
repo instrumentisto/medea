@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use actix::{
     Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
@@ -132,10 +132,10 @@ pub struct Room {
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
-    pub members: ParticipantService,
+    members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeersService,
+    peers: Rc<PeersService>,
 
     /// Current state of this [`Room`].
     state: State,
@@ -261,6 +261,7 @@ impl Room {
                 {
                     connect_endpoints_tasks.push(
                         self.peers
+                            .clone()
                             .connect_endpoints(publisher.clone(), receiver),
                     );
                 }
@@ -275,6 +276,7 @@ impl Room {
             {
                 connect_endpoints_tasks.push(
                     self.peers
+                        .clone()
                         .connect_endpoints(publisher.clone(), receiver.clone()),
                 )
             }
@@ -282,6 +284,7 @@ impl Room {
 
         for connect_endpoints_task in connect_endpoints_tasks {
             connect_endpoints_task
+                .into_actor(self)
                 .then(|result, this, _| match result {
                     Ok(Some((peer1, peer2))) => {
                         match this.send_peer_created(peer1, peer2) {

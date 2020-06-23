@@ -213,6 +213,15 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    /// Returns `true` if `on_start` or `on_stop` callback is set.
+    #[allow(clippy::unused_self)]
+    #[inline]
+    pub fn has_traffic_callback(&self) -> bool {
+        // TODO: Must depend on on_start/on_stop endpoint callbacks, when those
+        //       will be added (#91).
+        true
+    }
+
     /// Returns [`AudioSettings`] of this [`WebRtcPublishEndpoint`].
     pub fn audio_settings(&self) -> AudioSettings {
         self.0.borrow().audio_settings

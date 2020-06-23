@@ -104,7 +104,7 @@ impl PeersMetricsService {
     ///
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
-    pub fn check_peers(&mut self) {
+    pub fn check_peers(&self) {
         for peer in self
             .peers
             .values()
@@ -202,7 +202,7 @@ impl PeersMetricsService {
     /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
     /// TrackTrafficStarted`] to the [`Room`] if some
     /// [`MediaType`]/[`Direction`] was stopped.
-    pub fn add_stats(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
@@ -409,7 +409,7 @@ pub enum PeersMetricsEvent {
 ///
 /// This spec is compared with [`Peer`]s actual stats, to calculate difference
 /// between expected and actual [`Peer`] state.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct PeerTracks {
     /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
     /// [`MediaType::Audio`].
@@ -860,6 +860,31 @@ mod tests {
 
     use super::PeersMetricsService;
 
+    impl PeersMetricsService {
+        /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
+        /// registered in the [`PeersMetricsService`].
+        #[inline]
+        pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
+            self.peers.contains_key(&peer_id)
+        }
+
+        /// Returns count of the [`MediaTrack`] which are registered in the
+        /// [`PeersMetricsService`].
+        pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
+            if let Some(peer) = self.peers.get(&peer_id) {
+                let peer_tracks = peer.borrow().tracks_spec;
+                let mut tracks_count = 0;
+                tracks_count += peer_tracks.audio_recv;
+                tracks_count += peer_tracks.video_recv;
+                tracks_count += peer_tracks.audio_send;
+                tracks_count += peer_tracks.video_send;
+                tracks_count
+            } else {
+                0
+            }
+        }
+    }
+
     /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
     /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
     /// `is_audio`.
@@ -1009,7 +1034,7 @@ mod tests {
         /// Generates [`RtcStats`] and adds them to inner
         /// [`PeersMetricsService`] for `PeerId(1)`.
         pub fn add_stats(
-            &mut self,
+            &self,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
@@ -1112,7 +1137,7 @@ mod tests {
         }
 
         /// Calls [`PeerMetricsService::check_peers`].
-        pub fn check_peers(&mut self) {
+        pub fn check_peers(&self) {
             self.metrics.check_peers();
         }
 

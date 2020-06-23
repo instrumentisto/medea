@@ -350,7 +350,7 @@ impl Peer<New> {
         &mut self,
         src: &WebRtcPublishEndpoint,
         publisher_peer: &mut Peer<New>,
-        tracks_counter: &mut Counter<TrackId>,
+        tracks_counter: &Counter<TrackId>,
     ) {
         let audio_settings = src.audio_settings();
         if audio_settings.publish_policy != PublishPolicy::Disabled {
@@ -528,7 +528,7 @@ pub mod tests {
             },
         };
 
-        let mut track_id_counter = Counter::default();
+        let track_id_counter = Counter::default();
 
         for _ in 0..send_audio {
             let track_id = track_id_counter.next_id();
