@@ -104,7 +104,7 @@ impl PeersMetricsService {
     ///
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
-    pub fn check_peers(&mut self) {
+    pub fn check_peers(&self) {
         for peer in self
             .peers
             .values()
@@ -202,7 +202,7 @@ impl PeersMetricsService {
     /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
     /// TrackTrafficStarted`] to the [`Room`] if some
     /// [`MediaType`]/[`Direction`] was stopped.
-    pub fn add_stats(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
@@ -1033,7 +1033,7 @@ mod tests {
         /// Generates [`RtcStats`] and adds them to inner
         /// [`PeersMetricsService`] for `PeerId(1)`.
         pub fn add_stats(
-            &mut self,
+            &self,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
@@ -1136,7 +1136,7 @@ mod tests {
         }
 
         /// Calls [`PeerMetricsService::check_peers`].
-        pub fn check_peers(&mut self) {
+        pub fn check_peers(&self) {
             self.metrics.check_peers();
         }
 

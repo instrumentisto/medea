@@ -12,7 +12,7 @@ use medea_client_api_proto::{
 use crate::{
     log::prelude::*,
     media::{
-        Peer, PeerStateMachine, Stable, WaitLocalHaveRemote, WaitLocalSdp,
+        New, Peer, PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp,
         WaitRemoteSdp,
     },
 };
@@ -39,7 +39,7 @@ impl CommandHandler for Room {
         from_peer.update_senders_statuses(senders_statuses);
 
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
+        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
@@ -52,7 +52,7 @@ impl CommandHandler for Room {
         let event = Event::PeerCreated {
             peer_id: to_peer.id(),
             sdp_offer: Some(sdp_offer),
-            tracks: to_peer.new_tracks(),
+            tracks: to_peer.tracks(),
             ice_servers,
             force_relay: to_peer.is_force_relayed(),
         };

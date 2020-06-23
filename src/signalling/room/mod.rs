@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use actix::{
     Actor, ActorFuture, Context, ContextFutureSpawner as _, Handler,
@@ -27,12 +27,12 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{Peer, PeerError, Stable},
+    media::{New, Peer, PeerError},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{ConnectEndpointsResult, PeerTrafficWatcher, PeersService},
+        peers::{PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::ResponseActAnyFuture,
@@ -132,10 +132,10 @@ pub struct Room {
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
-    pub members: ParticipantService,
+    members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    pub peers: PeersService,
+    peers: Rc<PeersService>,
 
     /// Current state of this [`Room`].
     state: State,
@@ -182,8 +182,8 @@ impl Room {
         peer1_id: PeerId,
         peer2_id: PeerId,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer1: Peer<Stable> = self.peers.take_inner_peer(peer1_id)?;
-        let peer2: Peer<Stable> = self.peers.take_inner_peer(peer2_id)?;
+        let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
+        let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
 
         // decide which peer is sender
         let (sender, receiver) = if peer1.is_sender() {
@@ -209,7 +209,7 @@ impl Room {
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
-            tracks: sender.new_tracks(),
+            tracks: sender.tracks(),
             ice_servers,
             force_relay: sender.is_force_relayed(),
         };
@@ -286,21 +286,14 @@ impl Room {
             connect_endpoints_task
                 .into_actor(self)
                 .then(|result, this, _| match result {
-                    Ok(res) => match res {
-                        ConnectEndpointsResult::Created(peer1, peer2) => {
-                            match this.send_peer_created(peer1, peer2) {
-                                Ok(fut) => fut,
-                                Err(err) => Box::new(actix::fut::err(err)),
-                            }
+                    Ok(Some((peer1, peer2))) => {
+                        match this.send_peer_created(peer1, peer2) {
+                            Ok(fut) => fut,
+                            Err(err) => Box::new(actix::fut::err(err)),
                         }
-                        _ => {
-                            // Temporary change, because renegotiation
-                            // functional will be
-                            // implemented in the #105 PR.
-                            Box::new(actix::fut::ok(()))
-                        }
-                    },
+                    }
                     Err(err) => Box::new(actix::fut::err(err)),
+                    Ok(_) => Box::new(actix::fut::ok(())),
                 })
                 .map(|res, _, _| {
                     if let Err(err) = res {

@@ -70,11 +70,9 @@ impl Room {
             .peers
             .map_peer_by_id(peer_id, PeerStateMachine::member_id)
             .map_err(|_| PeerNotFound(peer_id))?;
-
         if peer_member_id != command.member_id {
             return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
         }
-
         Ok(())
     }
 }
