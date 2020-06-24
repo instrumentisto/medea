@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
@@ -139,7 +139,7 @@ pub struct Room {
     members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    peers: PeersService,
+    peers: Rc<PeersService>,
 
     /// Current state of this [`Room`].
     state: State,

@@ -17,6 +17,7 @@ use crate::signalling::elements::endpoints::webrtc::{
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
+#[enum_delegate(pub fn has_traffic_callback(&self) -> bool)]
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(webrtc::WebRtcPublishEndpoint),
@@ -24,18 +25,6 @@ pub enum Endpoint {
 }
 
 impl Endpoint {
-    /// Returns `true` if `on_start` or `on_stop` callback is set.
-    #[allow(clippy::unused_self)]
-    #[inline]
-    pub fn has_traffic_callback(&self) -> bool {
-        match self {
-            Endpoint::WebRtcPlayEndpoint(play) => play.has_traffic_callback(),
-            Endpoint::WebRtcPublishEndpoint(publish) => {
-                publish.has_traffic_callback()
-            }
-        }
-    }
-
     /// Returns [`Weak`] reference to this [`Endpoint`].
     pub fn downgrade(&self) -> WeakEndpoint {
         match self {
