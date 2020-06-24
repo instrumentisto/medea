@@ -652,6 +652,7 @@ mod room_service_specs {
             RootElement,
         },
         conf::{self, Conf},
+        media::peer::tests::dummy_renegotiation_sub_mock,
     };
 
     use super::*;
@@ -755,6 +756,7 @@ mod room_service_specs {
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
+            dummy_renegotiation_sub_mock(),
         )
         .unwrap()
         .start();
@@ -804,6 +806,7 @@ mod room_service_specs {
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
+            dummy_renegotiation_sub_mock(),
         )
         .unwrap()
         .start();
@@ -872,6 +875,7 @@ mod room_service_specs {
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
+            dummy_renegotiation_sub_mock(),
         )
         .unwrap()
         .start();
@@ -894,6 +898,7 @@ mod room_service_specs {
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
+            dummy_renegotiation_sub_mock(),
         )
         .unwrap()
         .start();
@@ -917,6 +922,7 @@ mod room_service_specs {
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
+            dummy_renegotiation_sub_mock(),
         )
         .unwrap()
         .start();

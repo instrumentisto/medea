@@ -320,6 +320,7 @@ mod test {
     use crate::{
         api::control::{pipeline::Pipeline, MemberSpec, RoomId, RoomSpec},
         conf::{self, Conf},
+        media::peer::tests::dummy_renegotiation_sub_mock,
         signalling::peers::build_peers_traffic_watcher,
         AppContext,
     };
@@ -340,6 +341,7 @@ mod test {
             &room_spec,
             &ctx,
             build_peers_traffic_watcher(&conf::Media::default()),
+            dummy_renegotiation_sub_mock(),
         )
         .unwrap()
     }

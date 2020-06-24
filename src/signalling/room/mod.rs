@@ -497,23 +497,29 @@ impl Room {
 }
 
 #[derive(Message, Clone, Debug, Copy)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), RoomError>")]
 pub struct RenegotiationNeeded(pub PeerId);
 
 impl Handler<RenegotiationNeeded> for Room {
-    type Result = ();
+    type Result = ActFuture<Result<(), RoomError>>;
 
     fn handle(
         &mut self,
         msg: RenegotiationNeeded,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        // TODO: unwrap
-        let peer: Peer<Stable> = self.peers.take_inner_peer(msg.0).unwrap();
-        let is_partner_stable = self
-            .peers
-            .map_peer_by_id(peer.partner_peer_id(), PeerStateMachine::is_stable)
-            .unwrap();
+        use actix::fut;
+
+        let peer: Peer<Stable> =
+            if let Ok(peer) = self.peers.take_inner_peer(msg.0) {
+                peer
+            } else {
+                return Box::new(fut::ok(()));
+            };
+        let is_partner_stable = actix_try!(self.peers.map_peer_by_id(
+            peer.partner_peer_id(),
+            PeerStateMachine::is_stable
+        ));
 
         if is_partner_stable {
             if peer.is_known_to_remote() {
@@ -523,28 +529,24 @@ impl Handler<RenegotiationNeeded> for Room {
                     negotiation_role: Some(NegotiationRole::Offerer),
                     peer_id: peer.id(),
                 };
-                let fut = self
-                    .members
-                    .send_event_to_member(peer.member_id(), event)
-                    .into_actor(self)
-                    .map(|res, _, _| {
-                        res.unwrap();
-                    });
 
+                let peer_member_id = peer.member_id();
                 self.peers.add_peer(peer);
 
-                ctx.spawn(fut);
+                Box::new(
+                    self.members
+                        .send_event_to_member(peer_member_id, event)
+                        .into_actor(self),
+                )
             } else {
                 let peer_id = peer.id();
                 self.peers.add_peer(peer);
-                ctx.spawn(
-                    self.send_peer_created(peer_id)
-                        .unwrap()
-                        .map(|res, _, _| res.unwrap()),
-                );
+                Box::new(actix_try!(self.send_peer_created(peer_id)))
             }
         } else {
             self.peers.add_peer(peer);
+
+            Box::new(fut::ok(()))
         }
     }
 }

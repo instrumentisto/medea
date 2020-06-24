@@ -44,10 +44,18 @@ impl fmt::Debug for Executable {
     }
 }
 
+#[cfg_attr(test, mockall::automock)]
 pub trait RenegotiationSubscriber: fmt::Debug {
     fn renegotiation_needed(&self, peer_id: PeerId);
 
     fn box_clone(&self) -> Box<dyn RenegotiationSubscriber>;
+}
+
+#[cfg(test)]
+impl std::fmt::Debug for MockRenegotiationSubscriber {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("RenegotiationSubscriber").finish()
+    }
 }
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
@@ -699,6 +707,15 @@ impl Peer<Stable> {
 pub mod tests {
     use super::*;
 
+    pub fn dummy_renegotiation_sub_mock() -> Box<dyn RenegotiationSubscriber> {
+        let mut mock = MockRenegotiationSubscriber::new();
+        mock.expect_renegotiation_needed().returning(|_| ());
+        mock.expect_box_clone()
+            .returning(|| dummy_renegotiation_sub_mock());
+
+        Box::new(mock)
+    }
+
     /// Returns [`PeerStateMachine`] with provided count of the `MediaTrack`s
     /// media types.
     pub fn test_peer_from_peer_tracks(
@@ -713,6 +730,7 @@ pub mod tests {
             Id(2),
             MemberId::from("partner-member"),
             false,
+            dummy_renegotiation_sub_mock(),
         );
 
         let track_id_counter = Counter::default();

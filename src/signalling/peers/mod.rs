@@ -740,8 +740,12 @@ mod tests {
 
     use crate::{
         api::control::{
-            endpoints::webrtc_publish_endpoint::P2pMode, refs::SrcUri,
+            endpoints::webrtc_publish_endpoint::{
+                AudioSettings, P2pMode, VideoSettings,
+            },
+            refs::SrcUri,
         },
+        media::peer::tests::dummy_renegotiation_sub_mock,
         signalling::{
             elements::Member, peers::traffic_watcher::MockPeerTrafficWatcher,
         },
@@ -749,9 +753,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::api::control::endpoints::webrtc_publish_endpoint::{
-        AudioSettings, VideoSettings,
-    };
 
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
@@ -776,6 +777,7 @@ mod tests {
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
+            dummy_renegotiation_sub_mock(),
         );
 
         let publisher = Member::new(
@@ -856,6 +858,7 @@ mod tests {
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
+            dummy_renegotiation_sub_mock(),
         );
 
         let publisher = Member::new(
