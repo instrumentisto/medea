@@ -518,10 +518,17 @@ impl Handler<RenegotiationNeeded> for Room {
             } else {
                 return Box::new(fut::ok(()));
             };
-        let is_partner_stable = actix_try!(self.peers.map_peer_by_id(
-            peer.partner_peer_id(),
-            PeerStateMachine::is_stable
-        ));
+        let is_partner_stable = match self
+            .peers
+            .map_peer_by_id(peer.partner_peer_id(), PeerStateMachine::is_stable)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                self.peers.add_peer(peer);
+
+                return Box::new(fut::err(e));
+            }
+        };
 
         if is_partner_stable {
             if peer.is_known_to_remote() {
