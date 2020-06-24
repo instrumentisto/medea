@@ -9,7 +9,7 @@ mod rpc_server;
 use std::{rc::Rc, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
+    fut, Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
     MailboxError, Message, WeakAddr, WrapFuture as _,
 };
 use derive_more::{Display, From};
@@ -186,6 +186,7 @@ impl Room {
         context: &AppContext,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Addr<Self>, RoomError> {
+        // 16 is the default actix address channel capacity.
         let (_, rx) = actix::dev::channel::channel(16);
 
         let ctx = Context::with_receiver(rx);
@@ -430,8 +431,6 @@ impl Handler<RenegotiationNeeded> for Room {
         msg: RenegotiationNeeded,
         _: &mut Self::Context,
     ) -> Self::Result {
-        use actix::fut;
-
         actix_try!(self.peers.update_peer_tracks(msg.0));
 
         let peer: Peer<Stable> =

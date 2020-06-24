@@ -4,7 +4,12 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{
+    collections::{HashMap, VecDeque},
+    convert::TryFrom,
+    fmt,
+    rc::Rc,
+};
 
 use derive_more::Display;
 use failure::Fail;
@@ -26,7 +31,6 @@ use crate::{
         peers::Counter,
     },
 };
-use std::collections::VecDeque;
 
 /// Job which will be ran on this [`Peer`] when it will be in [`Stable`] state.
 ///
@@ -75,9 +79,9 @@ pub trait RenegotiationSubscriber: fmt::Debug {
 }
 
 #[cfg(test)]
-impl std::fmt::Debug for MockRenegotiationSubscriber {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("RenegotiationSubscriber").finish()
+impl fmt::Debug for MockRenegotiationSubscriber {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("MockRenegotiationSubscriber").finish()
     }
 }
 
@@ -533,7 +537,6 @@ impl Peer<WaitRemoteSdp> {
             context: self.context,
             state: Stable {},
         };
-
         peer.renegotiation_finished();
 
         peer
