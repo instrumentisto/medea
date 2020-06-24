@@ -510,6 +510,8 @@ impl Handler<RenegotiationNeeded> for Room {
     ) -> Self::Result {
         use actix::fut;
 
+        actix_try!(self.peers.update_peer_tracks(msg.0));
+
         let peer: Peer<Stable> =
             if let Ok(peer) = self.peers.take_inner_peer(msg.0) {
                 peer

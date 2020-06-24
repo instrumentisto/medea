@@ -660,15 +660,6 @@ impl PeersService {
                     let src_peer = PeerStateMachine::from(src_peer);
                     let sink_peer = PeerStateMachine::from(sink_peer);
 
-                    self.0
-                        .peer_metrics_service
-                        .borrow_mut()
-                        .update_peer_tracks(&src_peer);
-                    self.0
-                        .peer_metrics_service
-                        .borrow_mut()
-                        .update_peer_tracks(&sink_peer);
-
                     self.0.peers.add_peer(src_peer);
                     self.0.peers.add_peer(sink_peer);
 
@@ -680,6 +671,24 @@ impl PeersService {
                 }
             }
         }
+    }
+
+    /// Updates [`PeerMetricsService`] tracks of the [`Peer`] with provided
+    /// [`PeerId`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn update_peer_tracks(&self, peer_id: PeerId) -> Result<(), RoomError> {
+        self.0.peers.map_peer_by_id(peer_id, |peer| {
+            self.0
+                .peer_metrics_service
+                .borrow_mut()
+                .update_peer_tracks(peer);
+        })?;
+
+        Ok(())
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -813,11 +822,29 @@ mod tests {
             false,
         );
 
-        peers_service
+        let res = peers_service
             .clone()
             .connect_endpoints(publish, play)
             .await
             .unwrap();
+        if let ConnectEndpointsResult::Created(first_peer_id, second_peer_id) =
+            res
+        {
+            peers_service
+                .map_peer_by_id_mut(first_peer_id, |peer| {
+                    peer.run_renegotiation_transaction();
+                })
+                .unwrap();
+            peers_service
+                .map_peer_by_id_mut(second_peer_id, |peer| {
+                    peer.run_renegotiation_transaction();
+                })
+                .unwrap();
+            peers_service.update_peer_tracks(first_peer_id).unwrap();
+            peers_service.update_peer_tracks(second_peer_id).unwrap();
+        } else {
+            panic!("Expected ConnectEndpointsResult::Created!")
+        }
 
         register_peer_done.await.unwrap().unwrap();
 
@@ -894,11 +921,30 @@ mod tests {
             false,
         );
 
-        peers_service
+        let res = peers_service
             .clone()
             .connect_endpoints(publish, play)
             .await
             .unwrap();
+
+        if let ConnectEndpointsResult::Created(first_peer_id, second_peer_id) =
+            res
+        {
+            peers_service
+                .map_peer_by_id_mut(first_peer_id, |peer| {
+                    peer.run_renegotiation_transaction();
+                })
+                .unwrap();
+            peers_service
+                .map_peer_by_id_mut(second_peer_id, |peer| {
+                    peer.run_renegotiation_transaction();
+                })
+                .unwrap();
+            peers_service.update_peer_tracks(first_peer_id).unwrap();
+            peers_service.update_peer_tracks(second_peer_id).unwrap();
+        } else {
+            panic!("Expected ConnectEndpointsResult::Created!")
+        }
 
         let first_peer_tracks_count = peers_service
             .0
@@ -930,11 +976,30 @@ mod tests {
             false,
         );
 
-        peers_service
+        let res = peers_service
             .clone()
             .connect_endpoints(publish, play)
             .await
             .unwrap();
+
+        if let ConnectEndpointsResult::Updated(first_peer_id, second_peer_id) =
+            res
+        {
+            peers_service
+                .map_peer_by_id_mut(first_peer_id, |peer| {
+                    peer.run_renegotiation_transaction();
+                })
+                .unwrap();
+            peers_service
+                .map_peer_by_id_mut(second_peer_id, |peer| {
+                    peer.run_renegotiation_transaction();
+                })
+                .unwrap();
+            peers_service.update_peer_tracks(first_peer_id).unwrap();
+            peers_service.update_peer_tracks(second_peer_id).unwrap();
+        } else {
+            panic!("Expected ConnectEndpointsResult::Updated!")
+        }
 
         let first_peer_tracks_count = peers_service
             .0
