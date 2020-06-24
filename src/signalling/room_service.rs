@@ -3,8 +3,7 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use actix::{
-    Actor, Addr, AsyncContext, Context, Handler, MailboxError, Message,
-    ResponseFuture,
+    Actor, Addr, Context, Handler, MailboxError, Message, ResponseFuture,
 };
 use derive_more::Display;
 use failure::Fail;

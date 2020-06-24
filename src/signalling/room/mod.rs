@@ -6,11 +6,11 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
-    MailboxError, WeakAddr, WrapFuture as _, WrapFuture,
+    MailboxError, Message, WeakAddr, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -28,7 +28,10 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{Peer, PeerError, Stable},
+    media::{
+        peer::RenegotiationSubscriber, Peer, PeerError, PeerStateMachine,
+        Stable,
+    },
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
@@ -40,9 +43,6 @@ use crate::{
     AppContext,
 };
 
-use actix::Message;
-
-use crate::media::peer::RenegotiationSubscriber;
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
@@ -173,14 +173,22 @@ impl Room {
         })
     }
 
+    /// Starts new instance of [`Room`].
+    ///
+    /// Returns [`Addr`] to the newly created [`Room`] [`Actor`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::BadRoomSpec`] if [`RoomSpec`] transformation
+    /// fails.
     pub fn start(
         room_spec: &RoomSpec,
         context: &AppContext,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Addr<Self>, RoomError> {
-        let (tx, rx) = actix::dev::channel::channel(16);
+        let (_, rx) = actix::dev::channel::channel(16);
 
-        let mut ctx = Context::with_receiver(rx);
+        let ctx = Context::with_receiver(rx);
         let this = Room::new(
             room_spec,
             context,
@@ -247,7 +255,6 @@ impl Room {
         &mut self,
         member1: &Member,
         member2: &Member,
-        room_addr: CloneableWeakAddr<Room>,
     ) -> ActFuture<Result<(), RoomError>> {
         let member2_id = member2.id();
         let mut connect_endpoints_tasks = Vec::new();
@@ -274,7 +281,7 @@ impl Room {
         Box::new(
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
-                .then(move |result, room: &mut Room, ctx| {
+                .then(move |result, room: &mut Room, _| {
                     let connected_peers = actix_try!(result);
 
                     // let mut spawn_futs = Vec::new();
@@ -290,18 +297,18 @@ impl Room {
                                 first_peer_id,
                                 second_peer_id,
                             ) => {
-                                room.peers.map_peer_by_id_mut(
+                                actix_try!(room.peers.map_peer_by_id_mut(
                                     first_peer_id,
                                     |peer| {
                                         peer.run_renegotiation_transaction();
                                     },
-                                );
-                                room.peers.map_peer_by_id_mut(
+                                ));
+                                actix_try!(room.peers.map_peer_by_id_mut(
                                     second_peer_id,
                                     |peer| {
                                         peer.run_renegotiation_transaction();
                                     },
-                                );
+                                ));
                                 // if !known_peer_ids.contains(&first_peer_id) {
                                 //     let first_peer: Peer<Stable> =
                                 //         actix_try!(room
@@ -336,18 +343,18 @@ impl Room {
                                 first_peer_id,
                                 second_peer_id,
                             ) => {
-                                room.peers.map_peer_by_id_mut(
+                                actix_try!(room.peers.map_peer_by_id_mut(
                                     first_peer_id,
                                     |peer| {
                                         peer.run_renegotiation_transaction();
                                     },
-                                );
-                                room.peers.map_peer_by_id_mut(
+                                ));
+                                actix_try!(room.peers.map_peer_by_id_mut(
                                     second_peer_id,
                                     |peer| {
                                         peer.run_renegotiation_transaction();
                                     },
-                                );
+                                ));
                                 // if !known_peer_ids.contains(&first_peer_id) {
                                 // spawn_futs
                                 //     .push(actix_try!(room
@@ -394,16 +401,11 @@ impl Room {
     fn init_member_connections(
         &mut self,
         member: &Member,
-        room_addr: CloneableWeakAddr<Room>,
     ) -> ActFuture<Result<(), RoomError>> {
         let connect_members_tasks =
             member.partners().into_iter().filter_map(|partner| {
                 if self.members.member_has_connection(&partner.id()) {
-                    Some(self.connect_members(
-                        &partner,
-                        member,
-                        room_addr.clone(),
-                    ))
+                    Some(self.connect_members(&partner, member))
                 } else {
                     None
                 }
@@ -507,11 +509,10 @@ impl Handler<RenegotiationNeeded> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         // TODO: unwrap
-        println!("\n\n\nRENEGOTIATION NEEDED\n\n\n");
         let peer: Peer<Stable> = self.peers.take_inner_peer(msg.0).unwrap();
         let is_partner_stable = self
             .peers
-            .map_peer_by_id(peer.partner_peer_id(), |p| p.is_stable())
+            .map_peer_by_id(peer.partner_peer_id(), PeerStateMachine::is_stable)
             .unwrap();
 
         if is_partner_stable {
@@ -532,7 +533,6 @@ impl Handler<RenegotiationNeeded> for Room {
 
                 self.peers.add_peer(peer);
 
-                use actix::AsyncContext as _;
                 ctx.spawn(fut);
             } else {
                 let peer_id = peer.id();

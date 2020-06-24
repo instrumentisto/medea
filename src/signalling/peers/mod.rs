@@ -21,7 +21,10 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{Peer, PeerError, PeerStateMachine, Stable},
+    media::{
+        peer::RenegotiationSubscriber, Peer, PeerError, PeerStateMachine,
+        Stable,
+    },
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -41,8 +44,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use crate::{media::peer::RenegotiationSubscriber, signalling::Room};
-use actix::Addr;
 
 /// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
 #[derive(Debug)]
@@ -349,6 +350,13 @@ impl PeersService {
         self.0.peers.map_peer_by_id(peer_id, f)
     }
 
+    /// Applies a function to the mutable [`PeerStateMachine`] reference with
+    /// provided [`PeerId`] (if any found).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     #[inline]
     pub fn map_peer_by_id_mut<T>(
         &self,

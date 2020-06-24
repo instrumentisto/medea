@@ -6,7 +6,6 @@
 
 use std::{collections::HashMap, convert::TryFrom, fmt, mem, rc::Rc};
 
-use actix::{Addr, Message};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
@@ -25,7 +24,6 @@ use crate::{
             webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
         },
         peers::Counter,
-        Room,
     },
 };
 
@@ -133,21 +131,16 @@ pub enum PeerStateMachine {
 
 impl PeerStateMachine {
     pub fn run_renegotiation_transaction(&mut self) {
-        match self {
-            PeerStateMachine::Stable(stable_peer) => {
-                stable_peer.run_change_transactions();
-            }
-            _ => {
-                // Transactions will be ran when `PeerStateMachine` will be
-                // Stable.
-            }
+        if let PeerStateMachine::Stable(stable_peer) = self {
+            stable_peer.run_change_transactions();
         }
     }
 
     pub fn is_stable(&self) -> bool {
-        match self {
-            PeerStateMachine::Stable(_) => true,
-            _ => false,
+        if let PeerStateMachine::Stable(_) = self {
+            true
+        } else {
+            false
         }
     }
 }
