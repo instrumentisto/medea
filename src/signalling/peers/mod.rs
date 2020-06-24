@@ -754,14 +754,46 @@ mod tests {
             },
             refs::SrcUri,
         },
-        media::peer::tests::dummy_renegotiation_sub_mock,
         signalling::{
             elements::Member, peers::traffic_watcher::MockPeerTrafficWatcher,
         },
         turn::service::test::new_turn_auth_service_mock,
     };
+    use futures::Stream;
 
     use super::*;
+    use std::collections::HashSet;
+
+    #[derive(Debug, Clone)]
+    struct RenegotiationSubMock(
+        Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>,
+    );
+
+    impl RenegotiationSubMock {
+        pub fn new() -> Self {
+            Self(Rc::new(RefCell::new(Vec::new())))
+        }
+
+        pub fn subscribe(&self) -> impl Stream<Item = PeerId> {
+            let (tx, rx) = mpsc::unbounded();
+
+            self.0.borrow_mut().push(tx);
+
+            rx
+        }
+    }
+
+    impl RenegotiationSubscriber for RenegotiationSubMock {
+        fn renegotiation_needed(&self, peer_id: PeerId) {
+            self.0.borrow().iter().for_each(|sender| {
+                sender.unbounded_send(peer_id).unwrap();
+            });
+        }
+
+        fn box_clone(&self) -> Box<dyn RenegotiationSubscriber> {
+            Box::new(self.clone())
+        }
+    }
 
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
@@ -781,12 +813,15 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
+        let renegotiation_sub = RenegotiationSubMock::new();
+        let renegotiations = renegotiation_sub.subscribe();
+
         let peers_service = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
-            dummy_renegotiation_sub_mock(),
+            Box::new(renegotiation_sub),
         );
 
         let publisher = Member::new(
@@ -858,6 +893,11 @@ mod tests {
             .peer_metrics_service
             .borrow()
             .is_peer_registered(PeerId(1)));
+
+        let renegotiate_peer_ids: HashSet<_> =
+            renegotiations.take(2).collect().await;
+        assert!(renegotiate_peer_ids.contains(&PeerId(0)));
+        assert!(renegotiate_peer_ids.contains(&PeerId(1)));
     }
 
     /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
@@ -880,12 +920,15 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
+        let renegotiation_sub = RenegotiationSubMock::new();
+        let renegotiations = renegotiation_sub.subscribe();
+
         let peers_service = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
-            dummy_renegotiation_sub_mock(),
+            Box::new(renegotiation_sub),
         );
 
         let publisher = Member::new(
@@ -1015,5 +1058,10 @@ mod tests {
         assert_eq!(second_peer_tracks_count, 4);
 
         register_peer_done.await.unwrap();
+
+        let renegotiate_peer_ids: HashSet<_> =
+            renegotiations.take(4).collect().await;
+        assert!(renegotiate_peer_ids.contains(&PeerId(0)));
+        assert!(renegotiate_peer_ids.contains(&PeerId(1)));
     }
 }
