@@ -33,6 +33,7 @@ use crate::{
 };
 
 use super::{Room, RoomError};
+use crate::signalling::room::CloneableWeakAddr;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -183,7 +184,7 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
-        room_addr: Addr<Room>,
+        room_addr: CloneableWeakAddr<Room>,
     ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -420,7 +421,7 @@ impl Handler<CreateEndpoint> for Room {
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
-                    ctx.address(),
+                    ctx.address().downgrade().into(),
                 ) {
                     Ok(fut) => Box::new(fut),
                     Err(e) => Box::new(fut::err(e)),

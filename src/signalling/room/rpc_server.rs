@@ -230,8 +230,11 @@ impl Handler<RpcConnectionEstablished> for Room {
             .then(|res, room, ctx| {
                 let member = actix_try!(res);
                 Box::new(
-                    room.init_member_connections(&member, ctx.address())
-                        .map(|res, _, _| res.map(|_| member)),
+                    room.init_member_connections(
+                        &member,
+                        ctx.address().downgrade().into(),
+                    )
+                    .map(|res, _, _| res.map(|_| member)),
                 )
             })
             .map(|result, room, _| {

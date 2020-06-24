@@ -227,7 +227,7 @@ impl Room {
         &mut self,
         member1: &Member,
         member2: &Member,
-        room_addr: Addr<Room>,
+        room_addr: CloneableWeakAddr<Room>,
     ) -> ActFuture<Result<(), RoomError>> {
         let member2_id = member2.id();
         let mut connect_endpoints_tasks = Vec::new();
@@ -382,7 +382,7 @@ impl Room {
     fn init_member_connections(
         &mut self,
         member: &Member,
-        room_addr: Addr<Room>,
+        room_addr: CloneableWeakAddr<Room>,
     ) -> ActFuture<Result<(), RoomError>> {
         let connect_members_tasks =
             member.partners().into_iter().filter_map(|partner| {
@@ -537,9 +537,29 @@ impl Handler<RenegotiationNeeded> for Room {
     }
 }
 
-impl RenegotiationSubscriber for Addr<Room> {
+// TODO: Remove this and use WeakAddr when
+//       https://github.com/actix/actix/pull/385 will be released.
+#[derive(From, Debug)]
+pub struct CloneableWeakAddr<T: Actor>(WeakAddr<T>);
+
+impl<T> Clone for CloneableWeakAddr<T>
+where
+    T: Actor,
+{
+    fn clone(&self) -> Self {
+        if let Some(addr) = self.0.upgrade() {
+            addr.downgrade().into()
+        } else {
+            panic!("Failed to clone CloneableWeakAddr!")
+        }
+    }
+}
+
+impl RenegotiationSubscriber for CloneableWeakAddr<Room> {
     fn renegotiation_needed(&self, peer_id: PeerId) {
-        self.do_send(RenegotiationNeeded(peer_id));
+        if let Some(addr) = self.0.upgrade() {
+            addr.do_send(RenegotiationNeeded(peer_id));
+        }
     }
 }
 
