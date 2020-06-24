@@ -356,6 +356,21 @@ impl PeersService {
         }
     }
 
+    /// Calls [`PeerStateMachine::run_scheduled_jobs`] on the
+    /// [`PeerStateMachine`] with a provided [`PeerId`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn run_scheduled_jobs(&self, peer_id: PeerId) -> Result<(), RoomError> {
+        self.peers.map_peer_by_id_mut(peer_id, |peer| {
+            peer.run_scheduled_jobs();
+        })?;
+
+        Ok(())
+    }
+
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
     /// doesn't exist.
     ///
@@ -376,9 +391,7 @@ impl PeersService {
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> Result<ConnectEndpointsResult, RoomError> {
-        use ConnectEndpointsResult::{Created, NoOp, Updated};
-
+    ) -> Result<Option<(PeerId, PeerId)>, RoomError> {
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
             src.owner().id(),
@@ -386,7 +399,7 @@ impl PeersService {
         );
         match self.get_or_create_peers(&src, &sink).await? {
             GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id) => {
-                Ok(Created(src_peer_id, sink_peer_id))
+                Ok(Some((src_peer_id, sink_peer_id)))
             }
             GetOrCreatePeersResult::AlreadyExisted(
                 src_peer_id,
@@ -396,7 +409,7 @@ impl PeersService {
                     || src.peer_ids().contains(&src_peer_id)
                 {
                     // already connected, so no-op
-                    Ok(NoOp(src_peer_id, sink_peer_id))
+                    Ok(None)
                 } else {
                     // TODO: here we assume that peers are stable,
                     //       which might not be the case, e.g. Control
@@ -446,7 +459,7 @@ impl PeersService {
                         .await
                         .map_err(RoomError::PeerTrafficWatcherMailbox)?;
 
-                    Ok(Updated(src_peer_id, sink_peer_id))
+                    Ok(Some((src_peer_id, sink_peer_id)))
                 }
             }
         }
@@ -768,7 +781,7 @@ mod tests {
         /// [`Stream`].
         fn renegotiation_needed(&self, peer_id: PeerId) {
             self.0.borrow().iter().for_each(|sender| {
-                sender.unbounded_send(peer_id).unwrap();
+                let _ = sender.unbounded_send(peer_id);
             });
         }
 
@@ -840,29 +853,17 @@ mod tests {
             false,
         );
 
-        let res = peers_service
+        let (src_peer_id, sink_peer_id) = peers_service
             .clone()
             .connect_endpoints(publish, play)
             .await
+            .unwrap()
             .unwrap();
-        if let ConnectEndpointsResult::Created(first_peer_id, second_peer_id) =
-            res
-        {
-            peers_service
-                .map_peer_by_id_mut(first_peer_id, |peer| {
-                    peer.run_scheduled_jobs();
-                })
-                .unwrap();
-            peers_service
-                .map_peer_by_id_mut(second_peer_id, |peer| {
-                    peer.run_scheduled_jobs();
-                })
-                .unwrap();
-            peers_service.update_peer_tracks(first_peer_id).unwrap();
-            peers_service.update_peer_tracks(second_peer_id).unwrap();
-        } else {
-            panic!("Expected ConnectEndpointsResult::Created!")
-        }
+
+        peers_service.run_scheduled_jobs(src_peer_id).unwrap();
+        peers_service.run_scheduled_jobs(sink_peer_id).unwrap();
+        peers_service.update_peer_tracks(src_peer_id).unwrap();
+        peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
         register_peer_done.await.unwrap().unwrap();
 
@@ -945,30 +946,17 @@ mod tests {
             false,
         );
 
-        let res = peers_service
+        let (src_peer_id, sink_peer_id) = peers_service
             .clone()
             .connect_endpoints(publish, play)
             .await
+            .unwrap()
             .unwrap();
 
-        if let ConnectEndpointsResult::Created(first_peer_id, second_peer_id) =
-            res
-        {
-            peers_service
-                .map_peer_by_id_mut(first_peer_id, |peer| {
-                    peer.run_scheduled_jobs();
-                })
-                .unwrap();
-            peers_service
-                .map_peer_by_id_mut(second_peer_id, |peer| {
-                    peer.run_scheduled_jobs();
-                })
-                .unwrap();
-            peers_service.update_peer_tracks(first_peer_id).unwrap();
-            peers_service.update_peer_tracks(second_peer_id).unwrap();
-        } else {
-            panic!("Expected ConnectEndpointsResult::Created!")
-        }
+        peers_service.run_scheduled_jobs(src_peer_id).unwrap();
+        peers_service.run_scheduled_jobs(sink_peer_id).unwrap();
+        peers_service.update_peer_tracks(src_peer_id).unwrap();
+        peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
         let first_peer_tracks_count = peers_service
             .peer_metrics_service
@@ -998,30 +986,17 @@ mod tests {
             false,
         );
 
-        let res = peers_service
+        let (src_peer_id, sink_peer_id) = peers_service
             .clone()
             .connect_endpoints(publish, play)
             .await
+            .unwrap()
             .unwrap();
 
-        if let ConnectEndpointsResult::Updated(first_peer_id, second_peer_id) =
-            res
-        {
-            peers_service
-                .map_peer_by_id_mut(first_peer_id, |peer| {
-                    peer.run_scheduled_jobs();
-                })
-                .unwrap();
-            peers_service
-                .map_peer_by_id_mut(second_peer_id, |peer| {
-                    peer.run_scheduled_jobs();
-                })
-                .unwrap();
-            peers_service.update_peer_tracks(first_peer_id).unwrap();
-            peers_service.update_peer_tracks(second_peer_id).unwrap();
-        } else {
-            panic!("Expected ConnectEndpointsResult::Updated!")
-        }
+        peers_service.run_scheduled_jobs(src_peer_id).unwrap();
+        peers_service.run_scheduled_jobs(sink_peer_id).unwrap();
+        peers_service.update_peer_tracks(src_peer_id).unwrap();
+        peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
         let first_peer_tracks_count = peers_service
             .peer_metrics_service

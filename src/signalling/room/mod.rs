@@ -36,7 +36,7 @@ use crate::{
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{ConnectEndpointsResult, PeerTrafficWatcher, PeersService},
+        peers::{PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::{actix_try_join_all, ResponseActAnyFuture},
@@ -281,52 +281,15 @@ impl Room {
         Box::new(
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
-                .then(move |result, room: &mut Room, _| {
-                    let connected_peers = actix_try!(result);
-
-                    for connected_peer in connected_peers {
-                        match connected_peer {
-                            ConnectEndpointsResult::NoOp(_, _) => {
-                                // Just do nothing
-                            }
-                            ConnectEndpointsResult::Updated(
-                                first_peer_id,
-                                second_peer_id,
-                            ) => {
-                                actix_try!(room.peers.map_peer_by_id_mut(
-                                    first_peer_id,
-                                    |peer| {
-                                        peer.run_scheduled_jobs();
-                                    },
-                                ));
-                                actix_try!(room.peers.map_peer_by_id_mut(
-                                    second_peer_id,
-                                    |peer| {
-                                        peer.run_scheduled_jobs();
-                                    },
-                                ));
-                            }
-                            ConnectEndpointsResult::Created(
-                                first_peer_id,
-                                second_peer_id,
-                            ) => {
-                                actix_try!(room.peers.map_peer_by_id_mut(
-                                    first_peer_id,
-                                    |peer| {
-                                        peer.run_scheduled_jobs();
-                                    },
-                                ));
-                                actix_try!(room.peers.map_peer_by_id_mut(
-                                    second_peer_id,
-                                    |peer| {
-                                        peer.run_scheduled_jobs();
-                                    },
-                                ));
-                            }
-                        }
+                .map(move |result, room: &mut Room, _| {
+                    for (src_peer_id, sink_peer_id) in
+                        result?.into_iter().filter_map(|r| r)
+                    {
+                        room.peers.run_scheduled_jobs(src_peer_id)?;
+                        room.peers.run_scheduled_jobs(sink_peer_id)?;
                     }
 
-                    Box::new(actix::fut::ok(()))
+                    Ok(())
                 }),
         )
     }
