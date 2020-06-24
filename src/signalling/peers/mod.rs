@@ -81,6 +81,8 @@ pub struct PeersService {
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
 
+    /// Subscriber to the events which indicates that renegotiation process
+    /// should be started for the some [`Peer`].
     renegotiation_sub: Box<dyn RenegotiationSubscriber>,
 }
 
@@ -715,7 +717,9 @@ impl PeerRepository {
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc, future, StreamExt as _};
+    use std::collections::HashSet;
+
+    use futures::{channel::mpsc, future, Stream, StreamExt as _};
     use tokio::time::timeout;
 
     use crate::{
@@ -730,21 +734,26 @@ mod tests {
         },
         turn::service::test::new_turn_auth_service_mock,
     };
-    use futures::Stream;
 
     use super::*;
-    use std::collections::HashSet;
 
+    /// Mock for the [`RenegotiationSubscriber`] trait.
+    ///
+    /// You can subscribe to the [`Stream`] into which will be sent all
+    /// [`PeerId`]s of [`Peer`] which are should be renegotiated.
     #[derive(Debug, Clone)]
     struct RenegotiationSubMock(
         Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>,
     );
 
     impl RenegotiationSubMock {
+        /// Returns new empty [`RenegotiationSubMock`].
         pub fn new() -> Self {
             Self(Rc::new(RefCell::new(Vec::new())))
         }
 
+        /// Returns [`Stream`] into which will be sent all [`PeerId`]s of
+        /// [`Peer`] which are should be renegotiated.
         pub fn subscribe(&self) -> impl Stream<Item = PeerId> {
             let (tx, rx) = mpsc::unbounded();
 
@@ -755,12 +764,15 @@ mod tests {
     }
 
     impl RenegotiationSubscriber for RenegotiationSubMock {
+        /// Sends [`PeerId`] to the [`RenegotiationSubMock::subscribe`]
+        /// [`Stream`].
         fn renegotiation_needed(&self, peer_id: PeerId) {
             self.0.borrow().iter().for_each(|sender| {
                 sender.unbounded_send(peer_id).unwrap();
             });
         }
 
+        /// Clones [`RenegotiationSubMock`].
         fn box_clone(&self) -> Box<dyn RenegotiationSubscriber> {
             Box::new(self.clone())
         }
@@ -838,12 +850,12 @@ mod tests {
         {
             peers_service
                 .map_peer_by_id_mut(first_peer_id, |peer| {
-                    peer.run_renegotiation_transaction();
+                    peer.run_scheduled_jobs();
                 })
                 .unwrap();
             peers_service
                 .map_peer_by_id_mut(second_peer_id, |peer| {
-                    peer.run_renegotiation_transaction();
+                    peer.run_scheduled_jobs();
                 })
                 .unwrap();
             peers_service.update_peer_tracks(first_peer_id).unwrap();
@@ -944,12 +956,12 @@ mod tests {
         {
             peers_service
                 .map_peer_by_id_mut(first_peer_id, |peer| {
-                    peer.run_renegotiation_transaction();
+                    peer.run_scheduled_jobs();
                 })
                 .unwrap();
             peers_service
                 .map_peer_by_id_mut(second_peer_id, |peer| {
-                    peer.run_renegotiation_transaction();
+                    peer.run_scheduled_jobs();
                 })
                 .unwrap();
             peers_service.update_peer_tracks(first_peer_id).unwrap();
@@ -997,12 +1009,12 @@ mod tests {
         {
             peers_service
                 .map_peer_by_id_mut(first_peer_id, |peer| {
-                    peer.run_renegotiation_transaction();
+                    peer.run_scheduled_jobs();
                 })
                 .unwrap();
             peers_service
                 .map_peer_by_id_mut(second_peer_id, |peer| {
-                    peer.run_renegotiation_transaction();
+                    peer.run_scheduled_jobs();
                 })
                 .unwrap();
             peers_service.update_peer_tracks(first_peer_id).unwrap();

@@ -4,7 +4,7 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, mem, rc::Rc};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
@@ -26,28 +26,51 @@ use crate::{
         peers::Counter,
     },
 };
+use std::collections::VecDeque;
 
-struct Executable(Box<dyn FnOnce(&mut Peer<Stable>)>);
+/// Job which will be ran on this [`Peer`] when it will be in [`Stable`] state.
+///
+/// If [`Peer`] state currently is not [`Stable`] then we should just wait for
+/// [`Stable`] state before running this [`Job`].
+///
+/// After all queued [`Job`]s are executed, renegotiation __should__ be
+/// performed.
+struct Job(Box<dyn FnOnce(&mut Peer<Stable>)>);
 
-impl Executable {
+impl Job {
+    /// Returns new [`Job`] with provided [`FnOnce`] which will be ran on
+    /// [`Job::run`] call.
     pub fn new<F>(f: F) -> Self
     where
         F: FnOnce(&mut Peer<Stable>) + 'static,
     {
         Self(Box::new(f))
     }
-}
 
-impl fmt::Debug for Executable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Executable").finish()
+    /// Calls [`Job`]'s [`FnOnce`] with provided [`Peer`] as parameter.
+    pub fn run(self, peer: &mut Peer<Stable>) {
+        (self.0)(peer);
     }
 }
 
+impl fmt::Debug for Job {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Job").finish()
+    }
+}
+
+/// Subscriber to the events which indicates that renegotiation process should
+/// be started for the some [`Peer`].
 #[cfg_attr(test, mockall::automock)]
 pub trait RenegotiationSubscriber: fmt::Debug {
+    /// Starts renegotiation process for the [`Peer`] with a provided
+    /// [`PeerId`].
+    ///
+    /// Provided [`Peer`] and it's partner [`Peer`] should be in [`Stable`],
+    /// otherwise nothing will be done.
     fn renegotiation_needed(&self, peer_id: PeerId);
 
+    /// Returns clone of this [`RenegotiationSubscriber`].
     fn box_clone(&self) -> Box<dyn RenegotiationSubscriber>;
 }
 
@@ -138,12 +161,23 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
-    pub fn run_renegotiation_transaction(&mut self) {
+    /// Runs [`Job`]s which are scheduled for this [`PeerStateMachine`].
+    ///
+    /// [`Job`]s will be ran __only if [`Peer`] is in [`Stable`]__ state.
+    ///
+    /// Returns `true` if at least one [`Job`] was ran.
+    ///
+    /// Returns `false` if nothing was done.
+    pub fn run_scheduled_jobs(&mut self) -> bool {
         if let PeerStateMachine::Stable(stable_peer) = self {
-            stable_peer.run_change_transactions();
+            stable_peer.run_scheduled_jobs()
+        } else {
+            false
         }
     }
 
+    /// Returns `true` if this [`PeerStateMachine`] currently in [`Stable`]
+    /// state.
     pub fn is_stable(&self) -> bool {
         if let PeerStateMachine::Stable(_) = self {
             true
@@ -262,8 +296,18 @@ pub struct Context {
     /// Tracks changes, that remote [`Peer`] is not aware of.
     pending_track_updates: Vec<TrackChange>,
 
-    changes_queue: Vec<Executable>,
+    /// Queue of the [`Job`]s which are should be ran when this [`Peer`] will
+    /// be [`Stable`].
+    ///
+    /// [`Job`]s will be ran on [`Peer::renegotiation_finished`] and on
+    /// [`Peer::run_scheduled_jobs`] actions.
+    ///
+    /// After this [`Job`]s will be executed, renegotiation process should be
+    /// started for this [`Peer`].
+    jobs_queue: VecDeque<Job>,
 
+    /// Subscriber to the events which indicates that renegotiation process
+    /// should be started for this [`Peer`].
     renegotiation_subscriber: Box<dyn RenegotiationSubscriber>,
 }
 
@@ -537,7 +581,7 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
-            changes_queue: Vec::new(),
+            jobs_queue: VecDeque::new(),
             renegotiation_subscriber,
         };
 
@@ -547,8 +591,11 @@ impl Peer<Stable> {
         }
     }
 
-    /// Adds `send` tracks to `self` and add `recv` for this `send`
-    /// to `partner_peer`.
+    /// Schedules `send` tracks adding to `self` and `recv` tracks for this
+    /// `send` to `partner_peer`.
+    ///
+    /// Actually __nothing will be done__ after this function call. This action
+    /// will be ran only before renegotiation start.
     ///
     /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
     /// and [`WebRtcPublishEndpoint::video_settings`].
@@ -566,8 +613,8 @@ impl Peer<Stable> {
                     is_required: audio_settings.publish_policy.is_required(),
                 }),
             ));
-            self.add_sender(Rc::clone(&track_audio));
-            partner_peer.add_receiver(track_audio);
+            self.schedule_add_sender(Rc::clone(&track_audio));
+            partner_peer.schedule_add_receiver(track_audio);
         }
 
         let video_settings = src.video_settings();
@@ -578,8 +625,8 @@ impl Peer<Stable> {
                     is_required: video_settings.publish_policy.is_required(),
                 }),
             ));
-            self.add_sender(Rc::clone(&track_video));
-            partner_peer.add_receiver(track_video);
+            self.schedule_add_sender(Rc::clone(&track_video));
+            partner_peer.schedule_add_receiver(track_video);
         }
     }
 
@@ -645,60 +692,70 @@ impl Peer<Stable> {
         }
     }
 
-    /// Adds [`Track`] to [`Peer`] send tracks list.
-    ///
-    /// This [`Track`] is considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks`.
-    fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.context
-            .changes_queue
-            .push(Executable::new(move |peer| {
-                peer.context
-                    .pending_track_updates
-                    .push(TrackChange::AddSendTrack(Rc::clone(&track)));
-                peer.context.senders.insert(track.id, track);
-            }));
+    /// Schedules [`Job`] which will be ran before renegotiation process start.
+    fn schedule_job(&mut self, job: Job) {
+        self.context.jobs_queue.push_back(job);
     }
 
-    /// Adds [`Track`] to [`Peer`] receive tracks list.
+    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
     ///
-    /// This [`Track`] is considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks`.
-    fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.context
-            .changes_queue
-            .push(Executable::new(move |peer| {
-                peer.context
-                    .pending_track_updates
-                    .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
-                peer.context.receivers.insert(track.id, track);
-            }));
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
+    /// be ran.
+    fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_job(Job::new(move |peer| {
+            peer.context
+                .pending_track_updates
+                .push(TrackChange::AddSendTrack(Rc::clone(&track)));
+            peer.context.senders.insert(track.id, track);
+        }))
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
+    /// be ran.
+    fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_job(Job::new(move |peer| {
+            peer.context
+                .pending_track_updates
+                .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
+            peer.context.receivers.insert(track.id, track);
+        }));
     }
 
     /// Sets [`Self::is_known_to_remote`] to `true`.
     ///
     /// Resets `pending_changes` buffer.
     ///
+    /// Runs all scheduled [`Job`]s of this [`Peer`].
+    ///
     /// Should be called when renegotiation was finished.
     fn renegotiation_finished(&mut self) {
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
-        self.run_change_transactions();
+        self.run_scheduled_jobs();
     }
 
-    fn run_change_transactions(&mut self) {
-        let mut changes_queue = Vec::new();
-
-        mem::swap(&mut changes_queue, &mut self.context.changes_queue);
-
-        if !changes_queue.is_empty() {
-            for change in changes_queue {
-                (change.0)(self);
+    /// Runs [`Job`]s which are scheduled for this [`Peer`].
+    ///
+    /// Returns `true` if at least one [`Job`] was ran.
+    ///
+    /// Returns `false` if nothing was done.
+    fn run_scheduled_jobs(&mut self) -> bool {
+        if self.context.jobs_queue.is_empty() {
+            false
+        } else {
+            while let Some(job) = self.context.jobs_queue.pop_back() {
+                job.run(self);
             }
 
             self.context
                 .renegotiation_subscriber
                 .renegotiation_needed(self.id());
+
+            true
         }
     }
 }
@@ -707,6 +764,7 @@ impl Peer<Stable> {
 pub mod tests {
     use super::*;
 
+    /// Returns dummy [`RenegotiationSubscriber`] mock which just does nothing.
     pub fn dummy_renegotiation_sub_mock() -> Box<dyn RenegotiationSubscriber> {
         let mut mock = MockRenegotiationSubscriber::new();
         mock.expect_renegotiation_needed().returning(|_| ());
