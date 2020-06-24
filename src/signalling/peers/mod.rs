@@ -253,6 +253,8 @@ pub struct PeersServiceInner {
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
+
+    renegotiation_sub: Box<dyn RenegotiationSubscriber>,
 }
 
 #[derive(Clone, Debug)]
@@ -305,6 +307,7 @@ impl PeersService {
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         media_conf: &conf::Media,
+        renegotiation_sub: Box<dyn RenegotiationSubscriber>,
     ) -> Self {
         Self(Rc::new(PeersServiceInner {
             room_id: room_id.clone(),
@@ -318,6 +321,7 @@ impl PeersService {
                 peers_traffic_watcher,
             )),
             peer_stats_ttl: media_conf.max_lag,
+            renegotiation_sub,
         }))
     }
 
@@ -358,15 +362,11 @@ impl PeersService {
     /// in [`PeerService`].
     ///
     /// Returns [`PeerId`]s of the created [`Peer`]s.
-    fn create_peers<T>(
+    fn create_peers(
         &self,
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
-        renegotiation_subscriber: T,
-    ) -> (PeerId, PeerId)
-    where
-        T: RenegotiationSubscriber + Clone + 'static,
-    {
+    ) -> (PeerId, PeerId) {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
@@ -384,7 +384,7 @@ impl PeersService {
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
-            Box::new(renegotiation_subscriber.clone()),
+            self.0.renegotiation_sub.box_clone(),
         );
         src_peer.add_endpoint(&src.clone().into());
 
@@ -394,7 +394,7 @@ impl PeersService {
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
-            Box::new(renegotiation_subscriber),
+            self.0.renegotiation_sub.box_clone(),
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
@@ -505,15 +505,11 @@ impl PeersService {
     ///
     /// Returns newly created [`Peer`] pair's [`PeerId`]s as
     /// [`CreatedOrGottenPeer::Created`] variant.
-    async fn get_or_create_peers<T>(
+    async fn get_or_create_peers(
         self,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-        renegotiation_sub: T,
-    ) -> Result<GetOrCreatePeersResult, RoomError>
-    where
-        T: RenegotiationSubscriber + Clone + 'static,
-    {
+    ) -> Result<GetOrCreatePeersResult, RoomError> {
         if let Some((first_peer_id, second_peer_id)) = self
             .get_peers_between_members(&src.owner().id(), &sink.owner().id())
         {
@@ -522,8 +518,7 @@ impl PeersService {
                 second_peer_id,
             ))
         } else {
-            let (src_peer_id, sink_peer_id) =
-                self.create_peers(&src, &sink, renegotiation_sub);
+            let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
 
             self.clone()
                 .peer_post_construct(src_peer_id, &src.into())
@@ -592,15 +587,11 @@ impl PeersService {
     /// # Panics
     ///
     /// Panics if provided endpoints already have interconnected [`Peer`]s.
-    pub async fn connect_endpoints<T>(
+    pub async fn connect_endpoints(
         self,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-        renegotiation_sub: T,
-    ) -> Result<ConnectEndpointsResult, RoomError>
-    where
-        T: RenegotiationSubscriber + Clone + 'static,
-    {
+    ) -> Result<ConnectEndpointsResult, RoomError> {
         use ConnectEndpointsResult::{Created, NoOp, Updated};
 
         debug!(
@@ -608,11 +599,8 @@ impl PeersService {
             src.owner().id(),
             sink.owner().id(),
         );
-        let get_or_create_peers = self.clone().get_or_create_peers(
-            src.clone(),
-            sink.clone(),
-            renegotiation_sub,
-        );
+        let get_or_create_peers =
+            self.clone().get_or_create_peers(src.clone(), sink.clone());
         match get_or_create_peers.await? {
             GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id) => {
                 Ok(Created(src_peer_id, sink_peer_id))

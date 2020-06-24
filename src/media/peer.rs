@@ -48,6 +48,8 @@ impl fmt::Debug for Executable {
 
 pub trait RenegotiationSubscriber: fmt::Debug {
     fn renegotiation_needed(&self, peer_id: PeerId);
+
+    fn box_clone(&self) -> Box<dyn RenegotiationSubscriber>;
 }
 
 /// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].

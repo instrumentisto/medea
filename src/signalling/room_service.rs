@@ -3,7 +3,8 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use actix::{
-    Actor, Addr, Context, Handler, MailboxError, Message, ResponseFuture,
+    Actor, Addr, AsyncContext, Context, Handler, MailboxError, Message,
+    ResponseFuture,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -231,9 +232,12 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room =
-                Room::new(&spec, &self.app, self.peer_traffic_watcher.clone())?
-                    .start();
+            let room = Room::start(
+                &spec,
+                &self.app,
+                self.peer_traffic_watcher.clone(),
+            )?;
+
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -289,12 +293,11 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(
+        let room_addr = Room::start(
             &room_spec,
             &self.app,
             self.peer_traffic_watcher.clone(),
         )?;
-        let room_addr = room.start();
 
         shutdown::subscribe(
             &self.graceful_shutdown,

@@ -156,6 +156,7 @@ impl Room {
         room_spec: &RoomSpec,
         context: &AppContext,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        renegotiation_sub: Box<dyn RenegotiationSubscriber>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -164,11 +165,30 @@ impl Room {
                 context.turn_service.clone(),
                 peers_traffic_watcher,
                 &context.config.media,
+                renegotiation_sub,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
         })
+    }
+
+    pub fn start(
+        room_spec: &RoomSpec,
+        context: &AppContext,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+    ) -> Result<Addr<Self>, RoomError> {
+        let (tx, rx) = actix::dev::channel::channel(16);
+
+        let mut ctx = Context::with_receiver(rx);
+        let this = Room::new(
+            room_spec,
+            context,
+            peers_traffic_watcher,
+            Box::new(CloneableWeakAddr::from(ctx.address().downgrade())),
+        )?;
+
+        Ok(ctx.run(this))
     }
 
     /// Returns [`RoomId`] of this [`Room`].
@@ -236,11 +256,7 @@ impl Room {
             for sink in src.sinks() {
                 if sink.owner().id() == member2_id {
                     connect_endpoints_tasks.push(
-                        self.peers.clone().connect_endpoints(
-                            src.clone(),
-                            sink,
-                            room_addr.clone(),
-                        ),
+                        self.peers.clone().connect_endpoints(src.clone(), sink),
                     );
                 }
             }
@@ -250,11 +266,7 @@ impl Room {
             let src = sink.src();
             if src.owner().id() == member2_id {
                 connect_endpoints_tasks.push(
-                    self.peers.clone().connect_endpoints(
-                        src,
-                        sink.clone(),
-                        room_addr.clone(),
-                    ),
+                    self.peers.clone().connect_endpoints(src, sink.clone()),
                 )
             }
         }
@@ -560,6 +572,10 @@ impl RenegotiationSubscriber for CloneableWeakAddr<Room> {
         if let Some(addr) = self.0.upgrade() {
             addr.do_send(RenegotiationNeeded(peer_id));
         }
+    }
+
+    fn box_clone(&self) -> Box<dyn RenegotiationSubscriber> {
+        Box::new(self.clone())
     }
 }
 
