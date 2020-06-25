@@ -9,7 +9,8 @@ mod rpc_server;
 use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, Context, Handler, MailboxError, WrapFuture as _,
+    Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
+    WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -283,7 +284,7 @@ impl Room {
         Box::new(
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
-                .then(move |result, room: &mut Room, _| {
+                .then(move |result, room: &mut Room, ctx| {
                     let connected_peers = actix_try!(result);
 
                     // If there are at least one
@@ -325,17 +326,30 @@ impl Room {
                         });
 
                     let mut futs = Vec::with_capacity(peer_pairs_actions.len());
+                    let mut ctx_futs = Vec::new();
                     for (_, action) in peer_pairs_actions.drain() {
-                        let action = match action {
+                        match action {
                             ConnectEndpointsResult::Created(id1, _) => {
-                                room.send_peer_created(id1)
+                                ctx_futs.push(room.send_peer_created(id1));
                             }
                             ConnectEndpointsResult::Updated(id1, _) => {
-                                room.send_tracks_applied(id1)
+                                futs.push(room.send_tracks_applied(id1));
                             }
-                        };
-                        futs.push(action)
+                        }
                     }
+
+                    ctx.spawn(actix_try_join_all(ctx_futs).map(
+                        |res, room, ctx| {
+                            if let Err(e) = res {
+                                error!(
+                                    "Failed to connect Endpoints because: {:?}",
+                                    e
+                                );
+                                room.close_gracefully(ctx);
+                            }
+                        },
+                    ));
+
                     Box::new(
                         actix_try_join_all(futs)
                             .map(|res, _, _| res.map(|_| ())),
