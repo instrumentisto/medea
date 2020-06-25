@@ -156,6 +156,23 @@ impl PeerError {
         senders_statuses: HashMap<TrackId, bool>,
     )
 )]
+#[enum_delegate(
+    pub fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>)
+)]
+#[enum_delegate(
+    pub fn schedule_add_sender(&mut self, track: Rc<MediaTrack>)
+)]
+#[enum_delegate(
+    pub fn add_endpoint(&mut self, endpoint: &Endpoint)
+)]
+#[enum_delegate(
+    pub fn add_publisher(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        partner_peer: &mut PeerStateMachine,
+        tracks_counter: &Counter<TrackId>,
+    )
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -515,6 +532,45 @@ impl<T> Peer<T> {
             peer.context.receivers.insert(track.id, track);
         }));
     }
+
+    /// Schedules `send` tracks adding to `self` and `recv` tracks for this
+    /// `send` to `partner_peer`.
+    ///
+    /// Actually __nothing will be done__ after this function call. This action
+    /// will be ran only before renegotiation start.
+    ///
+    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
+    /// and [`WebRtcPublishEndpoint::video_settings`].
+    pub fn add_publisher(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        partner_peer: &mut PeerStateMachine,
+        tracks_counter: &Counter<TrackId>,
+    ) {
+        let audio_settings = src.audio_settings();
+        if audio_settings.publish_policy != PublishPolicy::Disabled {
+            let track_audio = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Audio(AudioSettings {
+                    is_required: audio_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.schedule_add_sender(Rc::clone(&track_audio));
+            partner_peer.schedule_add_receiver(track_audio);
+        }
+
+        let video_settings = src.video_settings();
+        if video_settings.publish_policy != PublishPolicy::Disabled {
+            let track_video = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: video_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.schedule_add_sender(Rc::clone(&track_video));
+            partner_peer.schedule_add_receiver(track_video);
+        }
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -624,45 +680,6 @@ impl Peer<Stable> {
         Self {
             context,
             state: Stable {},
-        }
-    }
-
-    /// Schedules `send` tracks adding to `self` and `recv` tracks for this
-    /// `send` to `partner_peer`.
-    ///
-    /// Actually __nothing will be done__ after this function call. This action
-    /// will be ran only before renegotiation start.
-    ///
-    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
-    /// and [`WebRtcPublishEndpoint::video_settings`].
-    pub fn add_publisher(
-        &mut self,
-        src: &WebRtcPublishEndpoint,
-        partner_peer: &mut Peer<Stable>,
-        tracks_counter: &Counter<TrackId>,
-    ) {
-        let audio_settings = src.audio_settings();
-        if audio_settings.publish_policy != PublishPolicy::Disabled {
-            let track_audio = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Audio(AudioSettings {
-                    is_required: audio_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.schedule_add_sender(Rc::clone(&track_audio));
-            partner_peer.schedule_add_receiver(track_audio);
-        }
-
-        let video_settings = src.video_settings();
-        if video_settings.publish_policy != PublishPolicy::Disabled {
-            let track_video = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Video(VideoSettings {
-                    is_required: video_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.schedule_add_sender(Rc::clone(&track_video));
-            partner_peer.schedule_add_receiver(track_video);
         }
     }
 

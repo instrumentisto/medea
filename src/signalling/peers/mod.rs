@@ -21,10 +21,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{
-        peer::RenegotiationSubscriber, Peer, PeerError, PeerStateMachine,
-        Stable,
-    },
+    media::{peer::RenegotiationSubscriber, Peer, PeerError, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -211,30 +208,27 @@ impl PeersService {
             src_peer_id, sink_peer_id, src_member_id, sink_member_id,
         );
 
-        let mut src_peer = Peer::new(
+        let mut src_peer = PeerStateMachine::from(Peer::new(
             src_peer_id,
             src_member_id.clone(),
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
             self.renegotiation_sub.box_clone(),
-        );
+        ));
         src_peer.add_endpoint(&src.clone().into());
 
-        let mut sink_peer = Peer::new(
+        let mut sink_peer = PeerStateMachine::from(Peer::new(
             sink_peer_id,
             sink_member_id,
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
             self.renegotiation_sub.box_clone(),
-        );
+        ));
         sink_peer.add_endpoint(&sink.clone().into());
 
         src_peer.add_publisher(&src, &mut sink_peer, &self.tracks_count);
-
-        let src_peer = PeerStateMachine::from(src_peer);
-        let sink_peer = PeerStateMachine::from(sink_peer);
 
         self.peer_metrics_service
             .borrow_mut()
@@ -411,14 +405,8 @@ impl PeersService {
                     // already connected, so no-op
                     Ok(None)
                 } else {
-                    // TODO: here we assume that peers are stable,
-                    //       which might not be the case, e.g. Control
-                    //       Service creates multiple endpoints in quick
-                    //       succession.
-                    let mut src_peer: Peer<Stable> =
-                        self.peers.take_inner_peer(src_peer_id).unwrap();
-                    let mut sink_peer: Peer<Stable> =
-                        self.peers.take_inner_peer(sink_peer_id).unwrap();
+                    let mut src_peer = self.peers.take(src_peer_id)?;
+                    let mut sink_peer = self.peers.take(sink_peer_id)?;
 
                     src_peer.add_publisher(
                         &src,
@@ -448,9 +436,6 @@ impl PeersService {
 
                     sink_peer.add_endpoint(&sink.into());
                     src_peer.add_endpoint(&src.into());
-
-                    let src_peer = PeerStateMachine::from(src_peer);
-                    let sink_peer = PeerStateMachine::from(sink_peer);
 
                     self.peers.add_peer(src_peer);
                     self.peers.add_peer(sink_peer);
@@ -524,17 +509,6 @@ impl PeersService {
         member_id: &MemberId,
     ) -> HashMap<MemberId, Vec<PeerId>> {
         self.peers.remove_peers_related_to_member(member_id)
-    }
-
-    /// Adds new [`WebRtcPlayEndpoint`] to the [`Peer`] with a provided
-    /// [`PeerId`].
-    pub fn add_sink(&self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {
-        let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
-        let mut partner_peer: Peer<Stable> =
-            self.take_inner_peer(peer.partner_peer_id()).unwrap();
-
-        peer.add_publisher(&sink.src(), &mut partner_peer, &self.tracks_count);
-        peer.add_endpoint(&Endpoint::from(sink));
     }
 
     /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the
