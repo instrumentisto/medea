@@ -482,6 +482,39 @@ impl<T> Peer<T> {
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
     }
+
+    /// Schedules [`Job`] which will be ran before renegotiation process start.
+    fn schedule_job(&mut self, job: Job) {
+        self.context.jobs_queue.push_back(job);
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
+    /// be ran.
+    fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_job(Job::new(move |peer| {
+            peer.context
+                .pending_track_updates
+                .push(TrackChange::AddSendTrack(Rc::clone(&track)));
+            peer.context.senders.insert(track.id, track);
+        }))
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
+    /// be ran.
+    fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_job(Job::new(move |peer| {
+            peer.context
+                .pending_track_updates
+                .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
+            peer.context.receivers.insert(track.id, track);
+        }));
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -695,39 +728,6 @@ impl Peer<Stable> {
         }
     }
 
-    /// Schedules [`Job`] which will be ran before renegotiation process start.
-    fn schedule_job(&mut self, job: Job) {
-        self.context.jobs_queue.push_back(job);
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
-    /// be ran.
-    fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_job(Job::new(move |peer| {
-            peer.context
-                .pending_track_updates
-                .push(TrackChange::AddSendTrack(Rc::clone(&track)));
-            peer.context.senders.insert(track.id, track);
-        }))
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
-    /// be ran.
-    fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_job(Job::new(move |peer| {
-            peer.context
-                .pending_track_updates
-                .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
-            peer.context.receivers.insert(track.id, track);
-        }));
-    }
-
     /// Sets [`Self::is_known_to_remote`] to `true`.
     ///
     /// Resets `pending_changes` buffer.
@@ -833,5 +833,81 @@ pub mod tests {
         }
 
         peer.into()
+    }
+
+    fn media_track(track_id: u64) -> Rc<MediaTrack> {
+        Rc::new(MediaTrack::new(
+            TrackId(track_id),
+            MediaType::Video(VideoSettings { is_required: true }),
+        ))
+    }
+
+    #[test]
+    fn scheduled_tasks_normally_ran() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut renegotiation_sub = MockRenegotiationSubscriber::new();
+        renegotiation_sub.expect_renegotiation_needed().returning(
+            move |peer_id| {
+                tx.send(peer_id).unwrap();
+            },
+        );
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Box::new(renegotiation_sub),
+        );
+
+        peer.schedule_add_receiver(media_track(0));
+        peer.schedule_add_sender(media_track(1));
+
+        assert!(peer.context.senders.is_empty());
+        assert!(peer.context.receivers.is_empty());
+
+        assert!(peer.run_scheduled_jobs());
+        assert_eq!(rx.recv().unwrap(), PeerId(0));
+
+        assert_eq!(peer.context.senders.len(), 1);
+        assert_eq!(peer.context.receivers.len(), 1);
+    }
+
+    #[test]
+    fn scheduled_tasks_will_be_ran_on_stable() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut renegotiation_sub = MockRenegotiationSubscriber::new();
+        renegotiation_sub.expect_renegotiation_needed().returning(
+            move |peer_id| {
+                tx.send(peer_id).unwrap();
+            },
+        );
+
+        let peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Box::new(renegotiation_sub),
+        );
+
+        let mut peer = peer.start();
+        peer.schedule_add_sender(media_track(0));
+        peer.schedule_add_receiver(media_track(1));
+        assert!(peer.context.senders.is_empty());
+        assert!(peer.context.receivers.is_empty());
+
+        let peer = peer.set_local_sdp(String::new());
+        assert!(peer.context.senders.is_empty());
+        assert!(peer.context.receivers.is_empty());
+
+        let peer = peer.set_remote_sdp("");
+        assert_eq!(peer.context.receivers.len(), 1);
+        assert_eq!(peer.context.senders.len(), 1);
+        assert_eq!(peer.context.pending_track_updates.len(), 2);
+        assert_eq!(peer.context.jobs_queue.len(), 0);
+        assert_eq!(rx.recv().unwrap(), PeerId(0));
     }
 }
