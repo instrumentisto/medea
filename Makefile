@@ -408,7 +408,7 @@ ifeq ($(up),yes)
 	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
-	RUST_BACKTRACE=1 cargo test --test e2e
+	RUST_BACKTRACE=1 cargo test --test e2e signalling::pub_sub_signallng
 ifeq ($(up),yes)
 	-make down
 endif

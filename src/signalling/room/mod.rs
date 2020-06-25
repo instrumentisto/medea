@@ -255,15 +255,15 @@ impl Room {
     /// Connects interconnected [`Endpoint`]s between provided [`Member`]s.
     fn connect_members(
         &mut self,
-        member1: &Member,
-        member2: &Member,
+        partner_member: &Member,
+        member: &Member,
     ) -> ActFuture<Result<(), RoomError>> {
-        let member2_id = member2.id();
+        let member_id = member.id();
         let mut connect_endpoints_tasks = Vec::new();
 
-        for src in member1.srcs().values() {
+        for src in partner_member.srcs().values() {
             for sink in src.sinks() {
-                if sink.owner().id() == member2_id {
+                if sink.owner().id() == member_id {
                     connect_endpoints_tasks.push(
                         self.peers.clone().connect_endpoints(src.clone(), sink),
                     );
@@ -271,9 +271,9 @@ impl Room {
             }
         }
 
-        for sink in member1.sinks().values() {
+        for sink in partner_member.sinks().values() {
             let src = sink.src();
-            if src.owner().id() == member2_id {
+            if src.owner().id() == member_id {
                 connect_endpoints_tasks.push(
                     self.peers.clone().connect_endpoints(src, sink.clone()),
                 )
@@ -327,11 +327,20 @@ impl Room {
                     let mut futs = Vec::with_capacity(peer_pairs_actions.len());
                     for (_, action) in peer_pairs_actions.drain() {
                         let action = match action {
-                            ConnectEndpointsResult::Created(id1, _) => {
-                                room.send_peer_created(id1)
+                            ConnectEndpointsResult::Created(src_peer_id, sink_peer_id) => {
+                                let src_member_id = actix_try!(room
+                                    .peers
+                                    .map_peer_by_id(src_peer_id, |peer| {
+                                        peer.member_id()
+                                    }));
+                                if src_member_id == member_id {
+                                    room.send_peer_created(sink_peer_id)
+                                } else {
+                                    room.send_peer_created(src_peer_id)
+                                }
                             }
-                            ConnectEndpointsResult::Updated(id1, _) => {
-                                room.send_tracks_applied(id1)
+                            ConnectEndpointsResult::Updated(src_peer_id, _) => {
+                                room.send_tracks_applied(src_peer_id)
                             }
                         };
                         futs.push(action)
