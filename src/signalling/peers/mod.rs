@@ -79,7 +79,7 @@ pub struct PeersService {
     peer_stats_ttl: Duration,
 
     /// Subscriber to the events which indicates that renegotiation process
-    /// should be started for the some [`Peer`].
+    /// should be started for a some [`Peer`].
     renegotiation_sub: Box<dyn RenegotiationSubscriber>,
 }
 
@@ -377,10 +377,6 @@ impl PeersService {
     /// # Errors
     ///
     /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if provided endpoints already have interconnected [`Peer`]s.
     pub async fn connect_endpoints(
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,

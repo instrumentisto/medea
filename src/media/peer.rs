@@ -156,15 +156,9 @@ impl PeerError {
         senders_statuses: HashMap<TrackId, bool>,
     )
 )]
-#[enum_delegate(
-    pub fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>)
-)]
-#[enum_delegate(
-    pub fn schedule_add_sender(&mut self, track: Rc<MediaTrack>)
-)]
-#[enum_delegate(
-    pub fn add_endpoint(&mut self, endpoint: &Endpoint)
-)]
+#[enum_delegate(pub fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>))]
+#[enum_delegate(pub fn schedule_add_sender(&mut self, track: Rc<MediaTrack>))]
+#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
     pub fn add_publisher(
         &mut self,
@@ -323,7 +317,7 @@ pub struct Context {
     /// [`Job`]s will be ran on [`Peer::renegotiation_finished`] and on
     /// [`Peer::run_scheduled_jobs`] actions.
     ///
-    /// After this [`Job`]s will be executed, renegotiation process should be
+    /// When this [`Job`]s will be executed, renegotiation process should be
     /// started for this [`Peer`].
     jobs_queue: VecDeque<Job>,
 
@@ -745,19 +739,6 @@ impl Peer<Stable> {
         }
     }
 
-    /// Sets [`Self::is_known_to_remote`] to `true`.
-    ///
-    /// Resets `pending_changes` buffer.
-    ///
-    /// Runs all scheduled [`Job`]s of this [`Peer`].
-    ///
-    /// Should be called when renegotiation was finished.
-    fn renegotiation_finished(&mut self) {
-        self.context.is_known_to_remote = true;
-        self.context.pending_track_updates.clear();
-        self.run_scheduled_jobs();
-    }
-
     /// Runs [`Job`]s which are scheduled for this [`Peer`].
     ///
     /// Returns `true` if at least one [`Job`] was ran.
@@ -778,13 +759,26 @@ impl Peer<Stable> {
             true
         }
     }
+
+    /// Sets [`Context::is_known_to_remote`] to `true`.
+    ///
+    /// Resets [`Context::pending_track_updates`] buffer.
+    ///
+    /// Runs all scheduled [`Job`]s of this [`Peer`].
+    ///
+    /// Should be called when renegotiation was finished.
+    fn renegotiation_finished(&mut self) {
+        self.context.is_known_to_remote = true;
+        self.context.pending_track_updates.clear();
+        self.run_scheduled_jobs();
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
 
-    /// Returns dummy [`RenegotiationSubscriber`] mock which just does nothing.
+    /// Returns dummy [`RenegotiationSubscriber`] mock which does nothing.
     pub fn dummy_renegotiation_sub_mock() -> Box<dyn RenegotiationSubscriber> {
         let mut mock = MockRenegotiationSubscriber::new();
         mock.expect_renegotiation_needed().returning(|_| ());
