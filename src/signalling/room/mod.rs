@@ -6,11 +6,10 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{collections::HashSet, rc::Rc, sync::Arc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
-    WrapFuture as _,
+    Actor, ActorFuture, Context, Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -178,14 +177,16 @@ impl Room {
     fn send_peer_created(
         &mut self,
         peer_id: PeerId,
-    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
+    ) -> ActFuture<Result<(), RoomError>> {
+        let peer: Peer<Stable> =
+            actix_try!(self.peers.take_inner_peer(peer_id));
 
         let peer = peer.start();
         let member_id = peer.member_id();
         let ice_servers = peer
             .ice_servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()));
+        let ice_servers = actix_try!(ice_servers);
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             negotiation_role: NegotiationRole::Offerer,
@@ -194,11 +195,43 @@ impl Room {
             force_relay: peer.is_force_relayed(),
         };
         self.peers.add_peer(peer);
-        Ok(Box::new(
+        Box::new(
             self.members
                 .send_event_to_member(member_id, peer_created)
                 .into_actor(self),
-        ))
+        )
+    }
+
+    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
+    /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
+    /// [`NegotiationRole::Offerer`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if [`Peer`] lookup fails, or it is not in [`Stable`] state.
+    fn send_tracks_applied(
+        &mut self,
+        peer_id: PeerId,
+    ) -> ActFuture<Result<(), RoomError>> {
+        let peer: Peer<Stable> =
+            actix_try!(self.peers.take_inner_peer(peer_id));
+        let peer = peer.start_renegotiation();
+        let updates = peer.get_updates();
+        let member_id = peer.member_id();
+        self.peers.add_peer(peer);
+
+        Box::new(
+            self.members
+                .send_event_to_member(
+                    member_id,
+                    Event::TracksApplied {
+                        updates,
+                        negotiation_role: Some(NegotiationRole::Offerer),
+                        peer_id,
+                    },
+                )
+                .into_actor(self),
+        )
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
@@ -250,83 +283,63 @@ impl Room {
         Box::new(
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
-                .then(move |result, room: &mut Room, ctx| {
+                .then(move |result, room: &mut Room, _| {
                     let connected_peers = actix_try!(result);
 
-                    let mut spawn_futs = Vec::new();
-                    let mut then_futs = Vec::new();
-                    let mut known_peer_ids = HashSet::new();
+                    // If there are at least one
+                    // ConnectEndpointsResult::Created for Peers pair, then
+                    // Peers should be created on remote.
+                    //
+                    // If there only ConnectEndpointsResult::Updated for Peers
+                    // pair, then Peers should be renegotiated.
+                    let mut peer_pairs_actions: HashMap<
+                        (PeerId, PeerId),
+                        ConnectEndpointsResult,
+                    > = HashMap::new();
 
-                    for connected_peer in connected_peers {
-                        match connected_peer {
-                            ConnectEndpointsResult::NoOp(_, _) => {
-                                // Just do nothing
+                    // We should keep PeerId's pairs order-agnostic for correct
+                    // Hash and Eq.
+                    let sort_pair =
+                        |(id1, id2): (PeerId, PeerId)| -> (PeerId, PeerId) {
+                            if id1.0.lt(&id2.0) {
+                                (id1, id2)
+                            } else {
+                                (id2, id1)
                             }
-                            ConnectEndpointsResult::Updated(
-                                first_peer_id,
-                                second_peer_id,
-                            ) => {
-                                if !known_peer_ids.contains(&first_peer_id) {
-                                    let first_peer: Peer<Stable> =
-                                        actix_try!(room
-                                            .peers
-                                            .take_inner_peer(first_peer_id));
-                                    let first_peer =
-                                        first_peer.start_renegotiation();
-                                    let event = Event::TracksApplied {
-                                        updates: first_peer.get_updates(),
-                                        negotiation_role: Some(
-                                            NegotiationRole::Offerer,
-                                        ),
-                                        peer_id: first_peer_id,
-                                    };
-                                    then_futs.push(Box::new(
-                                        room.members
-                                            .send_event_to_member(
-                                                first_peer.member_id(),
-                                                event,
-                                            )
-                                            .into_actor(room),
-                                    )
-                                        as ActFuture<_>);
+                        };
 
-                                    room.peers.add_peer(first_peer);
+                    // Fill `peer_pairs_actions` map.
+                    connected_peers
+                        .into_iter()
+                        .filter_map(|item| item)
+                        .for_each(|item| match item {
+                            ConnectEndpointsResult::Created(id1, id2) => {
+                                peer_pairs_actions
+                                    .insert(sort_pair((id1, id2)), item);
+                            }
+                            ConnectEndpointsResult::Updated(id1, id2) => {
+                                peer_pairs_actions
+                                    .entry(sort_pair((id1, id2)))
+                                    .or_insert_with(|| item);
+                            }
+                        });
 
-                                    known_peer_ids.insert(first_peer_id);
-                                    known_peer_ids.insert(second_peer_id);
-                                }
+                    let mut futs = Vec::with_capacity(peer_pairs_actions.len());
+                    for (_, action) in peer_pairs_actions.drain() {
+                        let action = match action {
+                            ConnectEndpointsResult::Created(id1, _) => {
+                                room.send_peer_created(id1)
                             }
-                            ConnectEndpointsResult::Created(
-                                first_peer_id,
-                                second_peer_id,
-                            ) => {
-                                if !known_peer_ids.contains(&first_peer_id) {
-                                    spawn_futs
-                                        .push(actix_try!(room
-                                            .send_peer_created(first_peer_id)));
-                                    known_peer_ids.insert(first_peer_id);
-                                    known_peer_ids.insert(second_peer_id);
-                                }
+                            ConnectEndpointsResult::Updated(id1, _) => {
+                                room.send_tracks_applied(id1)
                             }
-                        }
+                        };
+                        futs.push(action)
                     }
-
-                    ctx.spawn(actix_try_join_all(spawn_futs).map(
-                        |res, room, ctx| {
-                            if let Err(e) = res {
-                                error!(
-                                    "Failed to connect Endpoints because: {:?}",
-                                    e
-                                );
-                                room.close_gracefully(ctx);
-                            }
-                        },
-                    ));
-
-                    Box::new(actix_try_join_all(then_futs).map(|res, _, _| {
-                        res?;
-                        Ok(())
-                    }))
+                    Box::new(
+                        actix_try_join_all(futs)
+                            .map(|res, _, _| res.map(|_| ())),
+                    )
                 }),
         )
     }

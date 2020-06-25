@@ -156,7 +156,7 @@ impl CommandHandler for Room {
         Ok(Box::new(actix::fut::ok(())))
     }
 
-    /// Sends [`Event::TracksUpdated`] with data from the received
+    /// Sends [`Event::TracksApplied`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
     /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks

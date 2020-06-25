@@ -28,18 +28,7 @@ use crate::api::control::{
 const CREDENTIALS_LEN: usize = 32;
 
 /// ID of `Member`.
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Eq,
-    Hash,
-    PartialEq,
-    PartialOrd,
-    Ord,
-    From,
-    Display,
-)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
 #[from(forward)]
 pub struct Id(pub String);
 

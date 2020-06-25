@@ -113,9 +113,6 @@ pub enum ConnectEndpointsResult {
 
     /// [`Peer`] pair was updated.
     Updated(PeerId, PeerId),
-
-    /// Nothing was done because endpoints already interconnected.
-    NoOp(PeerId, PeerId),
 }
 
 impl PeersService {
@@ -349,8 +346,8 @@ impl PeersService {
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> Result<ConnectEndpointsResult, RoomError> {
-        use ConnectEndpointsResult::{Created, NoOp, Updated};
+    ) -> Result<Option<ConnectEndpointsResult>, RoomError> {
+        use ConnectEndpointsResult::{Created, Updated};
 
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
@@ -359,7 +356,7 @@ impl PeersService {
         );
         match self.get_or_create_peers(&src, &sink).await? {
             GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id) => {
-                Ok(Created(src_peer_id, sink_peer_id))
+                Ok(Some(Created(src_peer_id, sink_peer_id)))
             }
             GetOrCreatePeersResult::AlreadyExisted(
                 src_peer_id,
@@ -369,7 +366,7 @@ impl PeersService {
                     || src.peer_ids().contains(&src_peer_id)
                 {
                     // already connected, so no-op
-                    Ok(NoOp(src_peer_id, sink_peer_id))
+                    Ok(None)
                 } else {
                     // TODO: here we assume that peers are stable,
                     //       which might not be the case, e.g. Control
@@ -426,7 +423,7 @@ impl PeersService {
                         .await
                         .map_err(RoomError::PeerTrafficWatcherMailbox)?;
 
-                    Ok(Updated(src_peer_id, sink_peer_id))
+                    Ok(Some(Updated(src_peer_id, sink_peer_id)))
                 }
             }
         }
@@ -474,17 +471,6 @@ impl PeersService {
         member_id: &MemberId,
     ) -> HashMap<MemberId, Vec<PeerId>> {
         self.peers.remove_peers_related_to_member(member_id)
-    }
-
-    /// Adds new [`WebRtcPlayEndpoint`] to the [`Peer`] with a provided
-    /// [`PeerId`].
-    pub fn add_sink(&self, peer_id: PeerId, sink: WebRtcPlayEndpoint) {
-        let mut peer: Peer<Stable> = self.take_inner_peer(peer_id).unwrap();
-        let mut partner_peer: Peer<Stable> =
-            self.take_inner_peer(peer.partner_peer_id()).unwrap();
-
-        peer.add_publisher(&sink.src(), &mut partner_peer, &self.tracks_count);
-        peer.add_endpoint(&Endpoint::from(sink));
     }
 
     /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the

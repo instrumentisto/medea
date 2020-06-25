@@ -1089,7 +1089,7 @@ Metrics list will be extended as needed.
 
 #### 10. UpdateTracks
 
-`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `Event::TracksUpdated`.
+`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `Event::TracksApplied`.
 
 ```rust
 struct UpdateTracks {

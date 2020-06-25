@@ -85,10 +85,12 @@ impl PeerError {
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
-#[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
+#[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
+#[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
+#[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
     pub fn get_updates(&self) -> Vec<TrackUpdate>
 )]
@@ -208,8 +210,7 @@ pub struct Context {
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
-    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
-    /// for this [`Peer`] was sent to the client).
+    /// Is this `Peer` was created on remote.
     is_known_to_remote: bool,
 
     /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -302,7 +303,7 @@ impl<T> Peer<T> {
             .iter()
             .map(|change| {
                 // TODO: remove this unwrap when new TrackChanges will be
-                // implemented.
+                //       implemented.
                 change.try_as_track(self.partner_peer_id()).unwrap()
             })
             .map(TrackUpdate::Added)
@@ -389,7 +390,7 @@ impl<T> Peer<T> {
     /// Resets `pending_changes` buffer.
     ///
     /// Should be called when renegotiation was finished.
-    fn renegotiation_finished(&mut self) {
+    fn negotiation_finished(&mut self) {
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
     }
@@ -442,7 +443,7 @@ impl Peer<WaitLocalSdp> {
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
-        self.renegotiation_finished();
+        self.negotiation_finished();
         self.context.sdp_answer = Some(sdp_answer.to_string());
 
         Peer {
@@ -455,7 +456,7 @@ impl Peer<WaitRemoteSdp> {
 impl Peer<WaitLocalHaveRemote> {
     /// Sets local description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
-        self.renegotiation_finished();
+        self.negotiation_finished();
         self.context.sdp_answer = Some(sdp_answer);
 
         Peer {

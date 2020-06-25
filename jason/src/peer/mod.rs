@@ -607,33 +607,6 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
-    /// description.
-    ///
-    /// Should be called after local tracks changes, which require
-    /// renegotiation.
-    ///
-    /// # Errors
-    ///
-    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
-    /// [RtcPeerConnection.createOffer()][1] fails.
-    ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_and_set_offer(&self) -> Result<String> {
-        let offer = self
-            .peer
-            .create_and_set_offer()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(offer)
-    }
-
     /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
     /// Requests local stream from [`MediaManager`] if no stream was provided.
@@ -729,7 +702,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-    pub async fn set_remote_offer(&self, offer: String) -> Result<()> {
+    async fn set_remote_offer(&self, offer: String) -> Result<()> {
         self.set_remote_description(SdpType::Offer(offer))
             .await
             .map_err(tracerr::wrap!())
@@ -837,32 +810,6 @@ impl PeerConnection {
             .await
             .map_err(tracerr::wrap!())?;
 
-        let answer = self
-            .peer
-            .create_and_set_answer()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(answer)
-    }
-
-    /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
-    /// description.
-    ///
-    /// Should be called whenever remote description has been changed.
-    ///
-    /// # Errors
-    ///
-    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
-    /// [RtcPeerConnection.createAnswer()][1] fails.
-    ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_and_set_answer(&self) -> Result<String> {
         let answer = self
             .peer
             .create_and_set_answer()

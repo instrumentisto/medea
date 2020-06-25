@@ -152,7 +152,7 @@ pub enum Command {
     },
 
     /// Web Client asks permission to update [`Track`]s in specified Peer.
-    /// Media Server gives permission by sending [`Event::TracksUpdated`].
+    /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
@@ -286,8 +286,11 @@ pub enum Event {
     },
 }
 
-/// Negotiation role based on which should be sent [`Command::MakeSdpOffer`] or
-/// [`Command::MakeSdpAnswer`].
+/// `Peer` negotiation role. Some [`Event`]s can trigger SPD negotiation, if
+/// [`Event`] contains [`NegotiationRole::Offerer`], then `Peer` is expected to
+/// create SDP Offer and send it via [`Command::MakeSdpOffer`],  if [`Event`]
+/// contains [`NegotiationRole::Answerer`], then `Peer` is expected to apply
+/// provided SDP Offer and provide its SDP Answer in [`Command::MakeSdpAnswer`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub enum NegotiationRole {
