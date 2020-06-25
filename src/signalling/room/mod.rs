@@ -325,33 +325,35 @@ impl Room {
                             }
                         });
 
-                    let mut futs = Vec::with_capacity(peer_pairs_actions.len());
-                    let mut ctx_futs = Vec::new();
+                    let mut peer_updates = Vec::new();
+                    let mut peer_creates = Vec::new();
                     for (_, action) in peer_pairs_actions.drain() {
                         match action {
                             ConnectEndpointsResult::Created(id1, _) => {
-                                ctx_futs.push(room.send_peer_created(id1));
+                                peer_creates.push(room.send_peer_created(id1));
                             }
                             ConnectEndpointsResult::Updated(id1, _) => {
-                                futs.push(room.send_tracks_applied(id1));
+                                peer_updates
+                                    .push(room.send_tracks_applied(id1));
                             }
                         }
                     }
 
-                    ctx.spawn(actix_try_join_all(ctx_futs).map(
-                        |res, room, ctx| {
+                    // TODO: peer_creates are spawned to avoid deadlock.
+                    //       Fixed in #111.
+                    ctx.spawn(actix_try_join_all(peer_creates).map(
+                        |res, _, _| {
                             if let Err(e) = res {
                                 error!(
                                     "Failed to connect Endpoints because: {:?}",
                                     e
                                 );
-                                room.close_gracefully(ctx);
                             }
                         },
                     ));
 
                     Box::new(
-                        actix_try_join_all(futs)
+                        actix_try_join_all(peer_updates)
                             .map(|res, _, _| res.map(|_| ())),
                     )
                 }),
