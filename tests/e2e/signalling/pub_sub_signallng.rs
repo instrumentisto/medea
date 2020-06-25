@@ -60,11 +60,9 @@ fn pub_sub_video_call() {
                     for track in tracks {
                         match &track.direction {
                             Direction::Send { receivers, .. } => {
-                                assert!(is_caller);
                                 assert!(!receivers.contains(&peer_id));
                             }
                             Direction::Recv { sender, .. } => {
-                                assert!(!is_caller);
                                 assert_ne!(sender, peer_id);
                             }
                         }
