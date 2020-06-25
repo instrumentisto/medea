@@ -748,7 +748,7 @@ impl Peer<Stable> {
         if self.context.jobs_queue.is_empty() {
             false
         } else {
-            while let Some(job) = self.context.jobs_queue.pop_back() {
+            while let Some(job) = self.context.jobs_queue.pop_front() {
                 job.run(self);
             }
 
