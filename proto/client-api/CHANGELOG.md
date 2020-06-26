@@ -50,7 +50,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
 - `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
-- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants  ([#81],[#105]).
+- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
