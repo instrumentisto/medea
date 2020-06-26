@@ -5,20 +5,17 @@ mod receiver;
 mod sender;
 
 use std::{
-    borrow::ToOwned,
     cell::RefCell,
     collections::{HashMap, HashSet},
     convert::From,
-    future::Future,
     rc::Rc,
-    time::Duration,
 };
 
 use derive_more::Display;
 use futures::{channel::mpsc, future};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::Mid;
-use medea_reactive::{DroppedError, ObservableCell};
+use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;

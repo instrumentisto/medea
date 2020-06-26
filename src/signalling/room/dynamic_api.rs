@@ -9,7 +9,7 @@ use actix::{
     fut, ActorFuture as _, AsyncContext as _, Context,
     ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
-use medea_client_api_proto::{Event, PeerId, TrackId};
+use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -94,55 +94,11 @@ impl Room {
                     }
                 };
 
-            let mut removed_peers: HashMap<MemberId, HashSet<PeerId>> =
-                HashMap::new();
-            let mut removed_tracks: HashMap<
-                MemberId,
-                HashMap<PeerId, HashSet<TrackId>>,
-            > = HashMap::new();
-            for (member_id, peer_id) in affected_peers {
-                let removed_tracks_ids = self
-                    .peers
-                    .map_peer_by_id(peer_id, |peer| peer.removed_tracks_ids());
-                if let Ok(removed_tracks_ids) = removed_tracks_ids {
-                    removed_tracks
-                        .entry(member_id)
-                        .or_default()
-                        .entry(peer_id)
-                        .or_default()
-                        .extend(removed_tracks_ids);
-                } else {
-                    removed_peers.entry(member_id).or_default().insert(peer_id);
-                };
-            }
+            let futs: Vec<_> = affected_peers
+                .into_iter()
+                .map(|peer_id| self.send_tracks_applied(peer_id))
+                .collect();
 
-            let mut events = HashMap::new();
-
-            for (member_id, peer_ids) in removed_peers {
-                events.insert(member_id, Event::PeersRemoved { peer_ids });
-            }
-
-            for (member_id, remove_tracks) in removed_tracks {
-                for (updated_peer_id, removed_id) in remove_tracks {
-                    events.insert(
-                        member_id.clone(),
-                        Event::TracksRemoved {
-                            peer_id: updated_peer_id,
-                            sdp_offer: None,
-                            tracks_ids: removed_id,
-                        },
-                    );
-                }
-            }
-
-            let mut futs = Vec::new();
-            for (member_id, event) in events {
-                futs.push(
-                    self.members
-                        .send_event_to_member(member_id, event)
-                        .into_actor(self),
-                );
-            }
             ctx.spawn(actix_try_join_all(futs).map(|res, this, ctx| {
                 if let Err(e) = res {
                     error!(

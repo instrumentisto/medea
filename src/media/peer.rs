@@ -105,7 +105,6 @@ impl PeerError {
         senders_statuses: HashMap<TrackId, bool>,
     )
 )]
-#[enum_delegate(pub fn removed_tracks_ids(&self) -> HashSet<TrackId>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -221,10 +220,6 @@ pub struct Context {
 
     /// Tracks changes, that remote [`Peer`] is not aware of.
     pending_track_updates: Vec<TrackChange>,
-
-    /// Will be cleaned when this [`Peer`] will be transfered into [`Stable`]
-    /// state.
-    removed_tracks_ids: HashSet<TrackId>,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -237,37 +232,49 @@ enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
+
+    /// [`TrackId`] of the removed [`MediaTrack`]. Remote Peer currently
+    /// doesn't know that this [`MediaTrack`] was removed on the server.
+    RemoveTrack(TrackId),
 }
 
 impl TrackChange {
-    /// Tries to return [`Track`] based on this [`TrackChange`].
+    /// Tries to return new [`Track`] based on this [`TrackChange`].
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
     /// creation.
-    fn try_as_track(&self, partner_peer_id: Id) -> Option<Track> {
-        let (direction, track) = match self {
-            TrackChange::AddSendTrack(track) => (
-                Direction::Send {
+    fn as_new_track(&self, partner_peer_id: Id) -> Option<Track> {
+        match self.as_track_update(partner_peer_id) {
+            TrackUpdate::Added(track) => Some(track),
+            _ => None,
+        }
+    }
+
+    /// Returns [`TrackUpdate`] based on this [`TrackChange`].
+    fn as_track_update(&self, partner_peer_id: Id) -> TrackUpdate {
+        match self {
+            TrackChange::AddSendTrack(track) => TrackUpdate::Added(Track {
+                id: track.id,
+                is_muted: false,
+                media_type: track.media_type.clone(),
+                direction: Direction::Send {
                     receivers: vec![partner_peer_id],
                     mid: track.mid(),
                 },
-                track,
-            ),
-            TrackChange::AddRecvTrack(track) => (
-                Direction::Recv {
+            }),
+            TrackChange::AddRecvTrack(track) => TrackUpdate::Added(Track {
+                id: track.id,
+                is_muted: false,
+                media_type: track.media_type.clone(),
+                direction: Direction::Recv {
                     sender: partner_peer_id,
                     mid: track.mid(),
                 },
-                track,
-            ),
-        };
-
-        Some(Track {
-            id: track.id,
-            is_muted: false,
-            media_type: track.media_type.clone(),
-            direction,
-        })
+            }),
+            TrackChange::RemoveTrack(track_id) => {
+                TrackUpdate::Removed(*track_id)
+            }
+        }
     }
 }
 
@@ -311,12 +318,7 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .map(|change| {
-                // TODO: remove this unwrap when new TrackChanges will be
-                //       implemented.
-                change.try_as_track(self.partner_peer_id()).unwrap()
-            })
-            .map(TrackUpdate::Added)
+            .map(|change| change.as_track_update(self.partner_peer_id()))
             .collect()
     }
 
@@ -325,7 +327,7 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .filter_map(|update| update.try_as_track(self.partner_peer_id()))
+            .filter_map(|update| update.as_new_track(self.partner_peer_id()))
             .collect()
     }
 
@@ -409,11 +411,6 @@ impl<T> Peer<T> {
     /// [`MediaTrack`]s.
     pub fn is_empty(&self) -> bool {
         self.context.senders.is_empty() && self.context.receivers.is_empty()
-    }
-
-    /// Returns [`TrackId`]s of the removed [`MediaTrack`]s.
-    pub fn removed_tracks_ids(&self) -> HashSet<TrackId> {
-        self.context.removed_tracks_ids.clone()
     }
 }
 
@@ -512,7 +509,6 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
-            removed_tracks_ids: HashSet::new(),
         };
 
         Self {
@@ -563,7 +559,9 @@ impl Peer<Stable> {
     pub fn remove_senders(&mut self, tracks_ids: HashSet<TrackId>) {
         for track_id in tracks_ids {
             if self.context.senders.remove(&track_id).is_some() {
-                self.context.removed_tracks_ids.insert(track_id);
+                self.context
+                    .pending_track_updates
+                    .push(TrackChange::RemoveTrack(track_id));
             }
         }
     }
@@ -572,7 +570,9 @@ impl Peer<Stable> {
     pub fn remove_receivers(&mut self, tracks_ids: HashSet<TrackId>) {
         for track_id in tracks_ids {
             if self.context.receivers.remove(&track_id).is_some() {
-                self.context.removed_tracks_ids.insert(track_id);
+                self.context
+                    .pending_track_updates
+                    .push(TrackChange::RemoveTrack(track_id));
             }
         }
     }

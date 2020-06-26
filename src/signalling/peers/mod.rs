@@ -297,19 +297,35 @@ impl PeersService {
         removed_peers
     }
 
+    /// Deletes provided [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns [`PeerId`] which was affected by this action.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
+    /// [`Stable`] state.
     #[inline]
     pub fn delete_sink_endpoint(
         &self,
         sink: &WebRtcPlayEndpoint,
-    ) -> HashSet<(MemberId, PeerId)> {
+    ) -> HashSet<PeerId> {
         self.peers.delete_sink_endpoint(sink)
     }
 
+    /// Deletes provided [`WebRtcPublishEndpoint`].
+    ///
+    /// Returns [`PeerId`] which was affected by this action.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
+    /// [`Stable`] state.
     #[inline]
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> HashSet<(MemberId, PeerId)> {
+    ) -> HashSet<PeerId> {
         self.peers.delete_src_endpoint(src)
     }
 
@@ -635,9 +651,6 @@ impl PeerRepository {
     /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
     /// action.
     ///
-    /// Starts renegotiation in [`PeerService`] or fully deletes [`Peer`]s if it
-    /// needed.
-    ///
     /// ## Panics
     ///
     /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
@@ -645,7 +658,7 @@ impl PeerRepository {
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> HashSet<(MemberId, PeerId)> {
+    ) -> HashSet<PeerId> {
         let mut affected_peers = HashSet::new();
         for sink in src.sinks() {
             affected_peers.extend(self.delete_sink_endpoint(&sink));
@@ -669,7 +682,7 @@ impl PeerRepository {
     pub fn delete_sink_endpoint(
         &self,
         sink_endpoint: &WebRtcPlayEndpoint,
-    ) -> HashSet<(MemberId, PeerId)> {
+    ) -> HashSet<PeerId> {
         let mut affected_peers = HashSet::new();
 
         if let Some(sink_peer_id) = sink_endpoint.peer_id() {
@@ -688,10 +701,10 @@ impl PeerRepository {
                 let member = sink_endpoint.owner();
                 member.peers_removed(&hashset![sink_peer_id]);
 
-                affected_peers.insert((sink_peer.member_id(), sink_peer_id));
-                affected_peers.insert((src_peer.member_id(), src_peer.id()));
+                affected_peers.insert(sink_peer_id);
+                affected_peers.insert(src_peer.id());
             } else {
-                affected_peers.insert((sink_peer.member_id(), sink_peer_id));
+                affected_peers.insert(sink_peer_id);
 
                 self.add_peer(sink_peer);
                 self.add_peer(src_peer);

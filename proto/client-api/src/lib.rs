@@ -297,14 +297,6 @@ pub enum Event {
         /// If it `None` then no renegotiation should be done.
         negotiation_role: Option<NegotiationRole>,
     },
-
-    /// Media Server notifies about necessity to remove [`Track`]s from
-    /// specified Peer.
-    TracksRemoved {
-        peer_id: PeerId,
-        sdp_offer: Option<String>,
-        tracks_ids: HashSet<TrackId>,
-    },
 }
 
 /// `Peer` negotiation role. Some [`Event`]s can trigger SPD negotiation, if
@@ -330,8 +322,14 @@ pub enum TrackUpdate {
     Added(Track),
 
     /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
+    ///
     /// Can only refer tracks already known to the `Peer`.
     Updated(TrackPatch),
+
+    /// `Track` with a provided [`TrackId`] should be removed from the `Peer`.
+    ///
+    /// Can only refer tracks already known to the `Peer`.
+    Removed(TrackId),
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

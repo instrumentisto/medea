@@ -8,6 +8,7 @@ mod rpc_server;
 
 use std::{
     collections::{HashMap, HashSet},
+    rc::Rc,
     sync::Arc,
 };
 
@@ -46,7 +47,6 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
-use std::rc::Rc;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;

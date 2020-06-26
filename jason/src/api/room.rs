@@ -919,81 +919,6 @@ impl EventHandler for InnerRoom {
         });
     }
 
-    /// Removes `MediaTrack`s with the provided [`TrackId`]s from `Peer` with a
-    /// provided [`PeerId`].
-    ///
-    /// Starts renegotiation process.
-    ///
-    /// If `tracks_ids` is empty then do nothing.
-    fn on_tracks_removed(
-        &mut self,
-        peer_id: PeerId,
-        sdp_offer: Option<String>,
-        tracks_ids: HashSet<TrackId>,
-    ) {
-        if tracks_ids.is_empty() {
-            return;
-        }
-
-        if let Some(peer) = self.peers.get(peer_id) {
-            let local_stream_constraints = self.local_stream_settings.clone();
-            let rpc = Rc::clone(&self.rpc);
-            let error_callback = Rc::clone(&self.on_failed_local_stream);
-            spawn_local(
-                async move {
-                    peer.remove_tracks(&tracks_ids);
-                    if let Some(sdp_offer) = sdp_offer {
-                        let sdp_answer = peer
-                            .process_offer(
-                                sdp_offer,
-                                Vec::new(),
-                                local_stream_constraints,
-                            )
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-
-                        rpc.send_command(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer,
-                            senders_statuses: peer.get_senders_statuses(),
-                        });
-                    } else {
-                        let sdp_offer = peer
-                            .get_offer(Vec::new(), local_stream_constraints)
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        let mids = peer
-                            .get_mids()
-                            .map_err(tracerr::map_from_and_wrap!())?;
-
-                        rpc.send_command(Command::MakeSdpOffer {
-                            peer_id,
-                            sdp_offer,
-                            mids,
-                            senders_statuses: peer.get_senders_statuses(),
-                        });
-                    }
-
-                    Result::<_, Traced<RoomError>>::Ok(())
-                }
-                .then(|result| async move {
-                    if let Err(err) = result {
-                        let (err, trace) = err.into_parts();
-                        match err {
-                            RoomError::InvalidLocalStream(_)
-                            | RoomError::CouldNotGetLocalMedia(_) => {
-                                let e = JasonError::from((err, trace));
-                                e.print();
-                                error_callback.call(e);
-                            }
-                            _ => JasonError::from((err, trace)).print(),
-                        };
-                    };
-                }),
-            );
-        }
-    }
-
     /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
     /// [`TrackUpdate`]s.
     ///
@@ -1015,6 +940,7 @@ impl EventHandler for InnerRoom {
 
         let mut new_tracks = Vec::new();
         let mut patches = Vec::new();
+        let mut removed_tracks = HashSet::new();
 
         for update in updates {
             match update {
@@ -1023,6 +949,9 @@ impl EventHandler for InnerRoom {
                 }
                 TrackUpdate::Updated(track_patch) => {
                     patches.push(track_patch);
+                }
+                TrackUpdate::Removed(track_id) => {
+                    removed_tracks.insert(track_id);
                 }
             }
         }
@@ -1039,6 +968,7 @@ impl EventHandler for InnerRoom {
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(
             async move {
+                peer.remove_tracks(&removed_tracks);
                 match negotiation_role {
                     None => {
                         peer.create_tracks(new_tracks)
