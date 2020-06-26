@@ -210,14 +210,16 @@ impl Room {
     fn send_peer_created(
         &mut self,
         peer_id: PeerId,
-    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
-        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
+    ) -> ActFuture<Result<(), RoomError>> {
+        let peer: Peer<Stable> =
+            actix_try!(self.peers.take_inner_peer(peer_id));
 
         let peer = peer.start();
         let member_id = peer.member_id();
         let ice_servers = peer
             .ice_servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()));
+        let ice_servers = actix_try!(ice_servers);
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             negotiation_role: NegotiationRole::Offerer,
@@ -226,11 +228,11 @@ impl Room {
             force_relay: peer.is_force_relayed(),
         };
         self.peers.add_peer(peer);
-        Ok(Box::new(
+        Box::new(
             self.members
                 .send_event_to_member(member_id, peer_created)
                 .into_actor(self),
-        ))
+        )
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
@@ -471,7 +473,7 @@ impl Handler<RenegotiationNeeded> for Room {
             } else {
                 let peer_id = peer.id();
                 self.peers.add_peer(peer);
-                Box::new(actix_try!(self.send_peer_created(peer_id)))
+                self.send_peer_created(peer_id)
             }
         } else {
             self.peers.add_peer(peer);

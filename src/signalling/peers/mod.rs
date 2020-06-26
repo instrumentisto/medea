@@ -84,7 +84,7 @@ pub struct PeersService {
 }
 
 /// Simple ID counter.
-#[derive(Default, Debug, Clone, Display)]
+#[derive(Clone, Debug, Default, Display)]
 pub struct Counter<T: Copy> {
     count: Cell<T>,
 }
@@ -100,7 +100,7 @@ impl<T: Incrementable + Copy> Counter<T> {
 }
 
 /// Result of the [`PeersService::get_or_create_peers`] function.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum GetOrCreatePeersResult {
     /// Requested [`Peer`] pair was created.
     Created(PeerId, PeerId),
@@ -110,16 +110,13 @@ enum GetOrCreatePeersResult {
 }
 
 /// Result of the [`PeersService::connect_endpoints`] function.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ConnectEndpointsResult {
     /// New [`Peer`] pair was created.
     Created(PeerId, PeerId),
 
     /// [`Peer`] pair was updated.
     Updated(PeerId, PeerId),
-
-    /// Nothing was done because endpoints already interconnected.
-    NoOp(PeerId, PeerId),
 }
 
 impl PeersService {
@@ -609,14 +606,13 @@ impl PeerRepository {
         <Peer<S> as TryFrom<PeerStateMachine>>::Error:
             Into<(PeerError, PeerStateMachine)>,
     {
-        match self.take(peer_id)?.try_into() {
-            Ok(peer) => Ok(peer),
-            Err(err) => {
-                let (err, peer) = err.into();
-                self.add_peer(peer);
-                Err(RoomError::from(err))
-            }
-        }
+        type Err<S> = <Peer<S> as TryFrom<PeerStateMachine>>::Error;
+
+        self.take(peer_id)?.try_into().map_err(|e: Err<S>| {
+            let (err, peer) = e.into();
+            self.add_peer(peer);
+            RoomError::from(err)
+        })
     }
 
     /// Stores [`Peer`] in [`Room`].

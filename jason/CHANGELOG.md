@@ -56,10 +56,10 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
-        - `TracksApplied`'s `TrackUpdate::Updated` for muting/unmuting ([#81]);
+        - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
-        - `TracksApplied`'s `TrackUpdate::Added` for adding new `Track`s to the already connected `PeerConnection` ([#105])
+        - `TracksApplied` ([#105]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])

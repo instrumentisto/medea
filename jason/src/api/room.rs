@@ -785,7 +785,7 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) {
-        if let Err(err) = self
+        let peer = match self
             .peers
             .create_peer(
                 peer_id,
@@ -795,15 +795,73 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
-            JasonError::from(err).print();
-            return;
-        }
+            Ok(peer) => peer,
+            Err(err) => {
+                JasonError::from(err).print();
+                return;
+            }
+        };
 
         self.create_connections_from_tracks(&tracks);
-        self.on_tracks_applied(
-            peer_id,
-            tracks.into_iter().map(TrackUpdate::Added).collect(),
-            Some(negotiation_role),
+
+        // TODO(alexlapa): Eliminate code duplication (on_tracks_applied).
+        //                 Doing Room refactoring in another PR, it`ll allow
+        //                 to fix this smoothly.
+        let local_stream_constraints = self.local_stream_settings.clone();
+        let rpc = Rc::clone(&self.rpc);
+        let error_callback = Rc::clone(&self.on_failed_local_stream);
+        spawn_local(
+            async move {
+                match negotiation_role {
+                    NegotiationRole::Offerer => {
+                        let sdp_offer = peer
+                            .get_offer(tracks, local_stream_constraints)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let mids = peer
+                            .get_mids()
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
+                        rpc.send_command(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer,
+                            senders_statuses,
+                            mids,
+                        });
+                    }
+                    NegotiationRole::Answerer(offer) => {
+                        let sdp_answer = peer
+                            .process_offer(
+                                offer,
+                                tracks,
+                                local_stream_constraints,
+                            )
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
+                        rpc.send_command(Command::MakeSdpAnswer {
+                            peer_id,
+                            sdp_answer,
+                            senders_statuses,
+                        });
+                    }
+                };
+                Result::<_, Traced<RoomError>>::Ok(())
+            }
+            .then(|result| async move {
+                if let Err(err) = result {
+                    let (err, trace) = err.into_parts();
+                    match err {
+                        RoomError::InvalidLocalStream(_)
+                        | RoomError::CouldNotGetLocalMedia(_) => {
+                            let e = JasonError::from((err, trace));
+                            e.print();
+                            error_callback.call(e);
+                        }
+                        _ => JasonError::from((err, trace)).print(),
+                    };
+                };
+            }),
         );
     }
 
@@ -872,109 +930,96 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            let mut new_tracks = Vec::new();
-            let mut updated_tracks = Vec::new();
+        let peer = if let Some(peer) = self.peers.get(peer_id) {
+            peer
+        } else {
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
+            return;
+        };
 
-            for update in updates {
-                match update {
-                    TrackUpdate::Added(track) => {
-                        new_tracks.push(track);
-                    }
-                    TrackUpdate::Updated(track_patch) => {
-                        updated_tracks.push(track_patch);
-                    }
+        let mut new_tracks = Vec::new();
+        let mut patches = Vec::new();
+
+        for update in updates {
+            match update {
+                TrackUpdate::Added(track) => {
+                    new_tracks.push(track);
+                }
+                TrackUpdate::Updated(track_patch) => {
+                    patches.push(track_patch);
                 }
             }
-
-            // TODO: use drain_filter when its stable
-            let (new_recv, new_send): (Vec<_>, Vec<_>) = new_tracks
-                .into_iter()
-                .partition(|track| match track.direction {
-                    Direction::Send { .. } => false,
-                    Direction::Recv { .. } => true,
-                });
-
-            let local_stream_constraints = self.local_stream_settings.clone();
-            let rpc = Rc::clone(&self.rpc);
-            let error_callback = Rc::clone(&self.on_failed_local_stream);
-
-            spawn_local(
-                async move {
-                    peer.create_tracks(new_recv)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    peer.update_senders(updated_tracks)
-                        .map_err(tracerr::map_from_and_wrap!())?;
-
-                    if let Some(negotiation_role) = &negotiation_role {
-                        if let NegotiationRole::Answerer(sdp_offer) =
-                            negotiation_role
-                        {
-                            peer.set_remote_offer(sdp_offer.clone())
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                        }
-                    }
-
-                    peer.create_tracks(new_send)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    peer.update_local_stream(local_stream_constraints)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-
-                    if let Some(negotiation_role) = negotiation_role {
-                        match negotiation_role {
-                            NegotiationRole::Offerer => {
-                                let sdp_offer = peer
-                                    .create_and_set_offer()
-                                    .await
-                                    .map_err(tracerr::map_from_and_wrap!())?;
-                                let senders_statuses =
-                                    peer.get_senders_statuses();
-                                rpc.send_command(Command::MakeSdpOffer {
-                                    peer_id,
-                                    sdp_offer,
-                                    senders_statuses,
-                                    mids: peer.get_mids().map_err(
-                                        tracerr::map_from_and_wrap!(),
-                                    )?,
-                                });
-                            }
-                            NegotiationRole::Answerer(_) => {
-                                let sdp_answer = peer
-                                    .create_and_set_answer()
-                                    .await
-                                    .map_err(tracerr::map_from_and_wrap!())?;
-                                let senders_statuses =
-                                    peer.get_senders_statuses();
-                                rpc.send_command(Command::MakeSdpAnswer {
-                                    peer_id,
-                                    senders_statuses,
-                                    sdp_answer,
-                                });
-                            }
-                        }
-                    }
-                    Result::<_, Traced<RoomError>>::Ok(())
-                }
-                .then(|result| async move {
-                    if let Err(err) = result {
-                        let (err, trace) = err.into_parts();
-                        match err {
-                            RoomError::InvalidLocalStream(_)
-                            | RoomError::CouldNotGetLocalMedia(_) => {
-                                let e = JasonError::from((err, trace));
-                                e.print();
-                                error_callback.call(e);
-                            }
-                            _ => JasonError::from((err, trace)).print(),
-                        };
-                    };
-                }),
-            )
         }
+        if let Err(err) = peer.update_senders(patches) {
+            JasonError::from(err).print();
+            return;
+        }
+
+        // TODO(alexlapa): Eliminate code duplication (on_peer_created).
+        //                 Doing Room refactoring in another PR, it`ll allow
+        //                 to fix this smoothly.
+        let local_stream_constraints = self.local_stream_settings.clone();
+        let rpc = Rc::clone(&self.rpc);
+        let error_callback = Rc::clone(&self.on_failed_local_stream);
+        spawn_local(
+            async move {
+                match negotiation_role {
+                    None => {
+                        peer.create_tracks(new_tracks)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                    }
+                    Some(NegotiationRole::Offerer) => {
+                        let sdp_offer = peer
+                            .get_offer(new_tracks, local_stream_constraints)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let mids = peer
+                            .get_mids()
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
+                        rpc.send_command(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer,
+                            senders_statuses,
+                            mids,
+                        });
+                    }
+                    Some(NegotiationRole::Answerer(offer)) => {
+                        let sdp_answer = peer
+                            .process_offer(
+                                offer,
+                                new_tracks,
+                                local_stream_constraints,
+                            )
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
+                        rpc.send_command(Command::MakeSdpAnswer {
+                            peer_id,
+                            sdp_answer,
+                            senders_statuses,
+                        });
+                    }
+                };
+                Result::<_, Traced<RoomError>>::Ok(())
+            }
+            .then(|result| async move {
+                if let Err(err) = result {
+                    let (err, trace) = err.into_parts();
+                    match err {
+                        RoomError::InvalidLocalStream(_)
+                        | RoomError::CouldNotGetLocalMedia(_) => {
+                            let e = JasonError::from((err, trace));
+                            e.print();
+                            error_callback.call(e);
+                        }
+                        _ => JasonError::from((err, trace)).print(),
+                    };
+                };
+            }),
+        )
     }
 }
 

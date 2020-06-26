@@ -97,13 +97,13 @@ fn pub_sub_video_call() {
 
         let deadline = Some(std::time::Duration::from_secs(5));
         TestMember::start(
-            format!("{}/caller/test", base_url),
+            format!("{}/responder/test", base_url),
             Some(Box::new(test_fn)),
             None,
             deadline,
         );
         TestMember::start(
-            format!("{}/responder/test", base_url),
+            format!("{}/caller/test", base_url),
             Some(Box::new(test_fn)),
             None,
             deadline,
