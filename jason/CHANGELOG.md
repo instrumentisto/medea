@@ -57,7 +57,9 @@ All user visible changes to this project will be documented in this file. This p
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
         - `ApplyTracks` for muting/unmuting ([#81]);
-        - `AddPeerConnectionStats` with `RtcStats` ([#90]).
+        - `AddPeerConnectionStats` with `RtcStats` ([#90]);
+    - Handling of RPC events:
+        - `TracksApplied` ([#105]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -80,6 +82,7 @@ All user visible changes to this project will be documented in this file. This p
 [#87]: /../../pull/87
 [#90]: /../../pull/90
 [#97]: /../../pull/97
+[#105]: /../../pull/105
 [#106]: /../../pull/106
 
 

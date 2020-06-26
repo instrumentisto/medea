@@ -130,6 +130,7 @@ pub enum Command {
         /// Publishing statuses of the senders from this Peer.
         senders_statuses: HashMap<TrackId, bool>,
     },
+
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
         peer_id: PeerId,
@@ -137,18 +138,21 @@ pub enum Command {
         /// Publishing statuses of the senders from this Peer.
         senders_statuses: HashMap<TrackId, bool>,
     },
+
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
+
     /// Web Client sends Peer Connection metrics.
     AddPeerConnectionMetrics {
         peer_id: PeerId,
         metrics: PeerMetrics,
     },
+
     /// Web Client asks permission to update [`Track`]s in specified Peer.
-    /// Media Server gives permission by sending [`Event::TracksUpdated`].
+    /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
@@ -244,7 +248,7 @@ pub enum Event {
     /// creation.
     PeerCreated {
         peer_id: PeerId,
-        sdp_offer: Option<String>,
+        negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         force_relay: bool,
@@ -266,14 +270,50 @@ pub enum Event {
     PeersRemoved { peer_ids: Vec<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
-    /// Peer.
-    ///
-    /// Can be used to update existing [`Track`] settings (e.g. change to lower
-    /// video resolution, mute audio).
-    TracksUpdated {
+    /// `Peer`.
+    TracksApplied {
+        /// [`PeerId`] of `Peer` where [`Track`]s should be updated.
         peer_id: PeerId,
-        tracks_patches: Vec<TrackPatch>,
+
+        /// List of [`TrackUpdate`]s which should be applied.
+        updates: Vec<TrackUpdate>,
+
+        /// Negotiation role basing on which should be sent
+        /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
+        ///
+        /// If `None` then no renegotiation should be done.
+        negotiation_role: Option<NegotiationRole>,
     },
+}
+
+/// `Peer`'s negotiation role.
+///
+/// Some [`Event`]s can trigger SDP negotiation.
+/// - If [`Event`] contains [`NegotiationRole::Offerer`], then `Peer` is
+///   expected to create SDP Offer and send it via [`Command::MakeSdpOffer`].
+/// - If [`Event`] contains [`NegotiationRole::Answerer`], then `Peer` is
+///   expected to apply provided SDP Offer and provide its SDP Answer in a
+///   [`Command::MakeSdpAnswer`].
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub enum NegotiationRole {
+    /// [`Command::MakeSdpOffer`] should be sent by client.
+    Offerer,
+
+    /// [`Command::MakeSdpAnswer`] should be sent by client.
+    Answerer(String),
+}
+
+/// [`Track`] update which should be applied to the `Peer`.
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub enum TrackUpdate {
+    /// New [`Track`] should be added to the `Peer`.
+    Added(Track),
+
+    /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
+    /// Can only refer tracks already known to the `Peer`.
+    Updated(TrackPatch),
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

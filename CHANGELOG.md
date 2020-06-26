@@ -37,7 +37,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
-    - Send `Command::UpdateTracks` on `Event::TracksUpdated` ([#81]).
+    - Emit `TracksApplied` event to create new and update existing tracks ([#105]);
+    - `PeerConnection` renegotiation functionality ([#105]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -55,7 +56,8 @@ All user visible changes to this project will be documented in this file. This p
 ### Fixed
 
 - Signalling:
-    - Room crashing when handling commands with non-existent `peer_id` ([#86]).
+    - Room crashing when handling commands with non-existent `peer_id` ([#86]);
+    - Adding new endpoints to the already interconnected `Member`s ([#105]).
 
 [#28]: /../../pull/28
 [#33]: /../../pull/33
@@ -70,6 +72,7 @@ All user visible changes to this project will be documented in this file. This p
 [#94]: /../../pull/94
 [#95]: /../../pull/95
 [#98]: /../../pull/98
+[#105]: /../../pull/105
 
 
 

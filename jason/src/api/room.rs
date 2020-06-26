@@ -15,8 +15,8 @@ use futures::{
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch,
+    IceConnectionState, IceServer, NegotiationRole, PeerConnectionState,
+    PeerId, PeerMetrics, Track, TrackId, TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -780,7 +780,7 @@ impl EventHandler for InnerRoom {
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,
-        sdp_offer: Option<String>,
+        negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
@@ -804,13 +804,16 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
+        // TODO(alexlapa): Eliminate code duplication (on_tracks_applied).
+        //                 Doing Room refactoring in another PR, it`ll allow
+        //                 to fix this smoothly.
         let local_stream_constraints = self.local_stream_settings.clone();
         let rpc = Rc::clone(&self.rpc);
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(
             async move {
-                match sdp_offer {
-                    None => {
+                match negotiation_role {
+                    NegotiationRole::Offerer => {
                         let sdp_offer = peer
                             .get_offer(tracks, local_stream_constraints)
                             .await
@@ -826,7 +829,7 @@ impl EventHandler for InnerRoom {
                             mids,
                         });
                     }
-                    Some(offer) => {
+                    NegotiationRole::Answerer(offer) => {
                         let sdp_answer = peer
                             .process_offer(
                                 offer,
@@ -916,16 +919,107 @@ impl EventHandler for InnerRoom {
         });
     }
 
-    /// Updates [`Track`]s of this [`Room`].
-    fn on_tracks_updated(&mut self, peer_id: PeerId, tracks: Vec<TrackPatch>) {
-        if let Some(peer) = self.peers.get(peer_id) {
-            if let Err(err) = peer.update_senders(tracks) {
-                JasonError::from(err).print();
-            }
+    /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
+    /// [`TrackUpdate`]s.
+    ///
+    /// Will start renegotiation process if `Some` [`NegotiationRole`] is
+    /// provided.
+    fn on_tracks_applied(
+        &mut self,
+        peer_id: PeerId,
+        updates: Vec<TrackUpdate>,
+        negotiation_role: Option<NegotiationRole>,
+    ) {
+        let peer = if let Some(peer) = self.peers.get(peer_id) {
+            peer
         } else {
             JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
                 .print();
+            return;
+        };
+
+        let mut new_tracks = Vec::new();
+        let mut patches = Vec::new();
+
+        for update in updates {
+            match update {
+                TrackUpdate::Added(track) => {
+                    new_tracks.push(track);
+                }
+                TrackUpdate::Updated(track_patch) => {
+                    patches.push(track_patch);
+                }
+            }
         }
+        if let Err(err) = peer.update_senders(patches) {
+            JasonError::from(err).print();
+            return;
+        }
+
+        // TODO(alexlapa): Eliminate code duplication (on_peer_created).
+        //                 Doing Room refactoring in another PR, it`ll allow
+        //                 to fix this smoothly.
+        let local_stream_constraints = self.local_stream_settings.clone();
+        let rpc = Rc::clone(&self.rpc);
+        let error_callback = Rc::clone(&self.on_failed_local_stream);
+        spawn_local(
+            async move {
+                match negotiation_role {
+                    None => {
+                        peer.create_tracks(new_tracks)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                    }
+                    Some(NegotiationRole::Offerer) => {
+                        let sdp_offer = peer
+                            .get_offer(new_tracks, local_stream_constraints)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let mids = peer
+                            .get_mids()
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
+                        rpc.send_command(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer,
+                            senders_statuses,
+                            mids,
+                        });
+                    }
+                    Some(NegotiationRole::Answerer(offer)) => {
+                        let sdp_answer = peer
+                            .process_offer(
+                                offer,
+                                new_tracks,
+                                local_stream_constraints,
+                            )
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let senders_statuses = peer.get_senders_statuses();
+                        rpc.send_command(Command::MakeSdpAnswer {
+                            peer_id,
+                            sdp_answer,
+                            senders_statuses,
+                        });
+                    }
+                };
+                Result::<_, Traced<RoomError>>::Ok(())
+            }
+            .then(|result| async move {
+                if let Err(err) = result {
+                    let (err, trace) = err.into_parts();
+                    match err {
+                        RoomError::InvalidLocalStream(_)
+                        | RoomError::CouldNotGetLocalMedia(_) => {
+                            let e = JasonError::from((err, trace));
+                            e.print();
+                            error_callback.call(e);
+                        }
+                        _ => JasonError::from((err, trace)).print(),
+                    };
+                };
+            }),
+        )
     }
 }
 

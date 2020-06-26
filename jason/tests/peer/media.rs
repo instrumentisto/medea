@@ -33,7 +33,7 @@ async fn get_test_media_connections(
     let audio_track_id = audio_track.id;
     let video_track_id = video_track.id;
     media_connections
-        .update_tracks(vec![audio_track, video_track])
+        .create_tracks(vec![audio_track, video_track])
         .unwrap();
     let request = media_connections.get_stream_request().unwrap();
     let caps = SimpleStreamRequest::try_from(request).unwrap();
@@ -70,7 +70,7 @@ fn get_stream_request1() {
     );
     let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
     media_connections
-        .update_tracks(vec![audio_track, video_track])
+        .create_tracks(vec![audio_track, video_track])
         .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_some());
@@ -85,7 +85,7 @@ fn get_stream_request2() {
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
-    media_connections.update_tracks(Vec::new()).unwrap();
+    media_connections.create_tracks(Vec::new()).unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());
 }

@@ -243,18 +243,14 @@ impl MediaConnections {
         out
     }
 
-    /// Synchronizes local state with provided tracks. Creates new [`Sender`]s
-    /// and [`Receiver`]s for each new [`Track`], and updates [`Track`] if
-    /// its settings has been changed.
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
     ///
     /// # Errors
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] cause transceiver with specified `mid` does not
     /// exist.
-    // TODO: Doesnt really updates anything, but only generates new senders
-    //       and receivers atm.
-    pub fn update_tracks<I: IntoIterator<Item = Track>>(
+    pub fn create_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
     ) -> Result<()> {

@@ -21,6 +21,7 @@ use crate::{
     },
     log::prelude::*,
     media::PeerStateMachine,
+    signalling::room::RoomError,
     utils::ResponseActAnyFuture,
 };
 
@@ -70,9 +71,11 @@ impl Room {
             .peers
             .map_peer_by_id(peer_id, PeerStateMachine::member_id)
             .map_err(|_| PeerNotFound(peer_id))?;
+
         if peer_member_id != command.member_id {
             return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
         }
+
         Ok(())
     }
 }
@@ -89,17 +92,17 @@ impl RpcServer for Addr<Room> {
             member_id,
             connection,
         })
-            .map(|res| match res {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    error!(
-                        "Failed to send RpcConnectionEstablished cause {:?}",
-                        e,
-                    );
-                    Err(())
-                }
+        .map(|r| {
+            r.map_err(|e| {
+                error!("Failed to send RpcConnectionEstablished cause {:?}", e)
             })
-            .boxed_local()
+            .and_then(|r| {
+                r.map_err(|e| {
+                    error!("RpcConnectionEstablished failed cause: {:?}", e)
+                })
+            })
+        })
+        .boxed_local()
     }
 
     /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
@@ -201,7 +204,7 @@ impl Handler<CommandMessage> for Room {
 }
 
 impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<Result<(), ()>>;
+    type Result = ActFuture<Result<(), RoomError>>;
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`][1], initiates
     /// media establishment between members.
@@ -222,22 +225,23 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .map(|res, room, ctx| match res {
-                Ok(member) => {
-                    room.init_member_connections(&member, ctx);
-                    if let Some(callback_url) = member.get_on_join() {
-                        room.callbacks.send_callback(
-                            callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
-                        );
-                    };
-                    Ok(())
-                }
-                Err(e) => {
-                    error!("RpcConnectionEstablished error {:?}", e);
-                    Err(())
-                }
+            .then(|res, room, _| {
+                let member = actix_try!(res);
+                Box::new(
+                    room.init_member_connections(&member)
+                        .map(|res, _, _| res.map(|_| member)),
+                )
+            })
+            .map(|result, room, _| {
+                let member = result?;
+                if let Some(callback_url) = member.get_on_join() {
+                    room.callbacks.send_callback(
+                        callback_url,
+                        member.get_fid().into(),
+                        OnJoinEvent,
+                    );
+                };
+                Ok(())
             });
         Box::new(fut)
     }

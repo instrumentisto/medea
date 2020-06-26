@@ -315,6 +315,20 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
+    /// Returns partner [`Member`]s of this [`Member`].
+    pub fn partners(&self) -> Vec<Member> {
+        let this = self.0.borrow();
+        this.srcs
+            .values()
+            .flat_map(|src| src.sinks().into_iter().map(|s| s.owner()))
+            .chain(this.sinks.values().map(|s| s.src().owner()))
+            .map(|member| (member.id(), member))
+            .collect::<HashMap<_, _>>()
+            .into_iter()
+            .map(|(_, member)| member)
+            .collect()
+    }
+
     /// Inserts sink endpoint into this [`Member`].
     pub fn insert_sink(&self, endpoint: WebRtcPlayEndpoint) {
         self.0.borrow_mut().sinks.insert(endpoint.id(), endpoint);
