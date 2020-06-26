@@ -198,6 +198,57 @@ impl From<MediaConnectionsError> for RoomError {
 pub struct RoomHandle(Weak<InnerRoom>);
 
 impl RoomHandle {
+    /// Implements externally visible `RoomHandle::join`.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
+    /// `on_connection_loss` callbacks are not set.
+    ///
+    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
+    /// server.
+    pub async fn inner_join(&self, token: String) -> Result<(), JasonError> {
+        let inner = upgrade_or_detached!(self.0, JasonError)?;
+
+        if !inner.on_failed_local_stream.is_set() {
+            return Err(JasonError::from(tracerr::new!(
+                RoomError::CallbackNotSet("Room.on_failed_local_stream()")
+            )));
+        }
+
+        if !inner.on_connection_loss.is_set() {
+            return Err(JasonError::from(tracerr::new!(
+                RoomError::CallbackNotSet("Room.on_connection_loss()")
+            )));
+        }
+
+        inner
+            .rpc
+            .connect(token)
+            .await
+            .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
+
+        let mut connection_loss_stream = inner.rpc.on_connection_loss();
+        let weak_inner = Rc::downgrade(&inner);
+        spawn_local(async move {
+            while connection_loss_stream.next().await.is_some() {
+                match upgrade_or_detached!(weak_inner, JsValue) {
+                    Ok(inner) => {
+                        let reconnect_handle =
+                            ReconnectHandle::new(Rc::downgrade(&inner.rpc));
+                        inner.on_connection_loss.call(reconnect_handle);
+                    }
+                    Err(e) => {
+                        console_error(e);
+                        break;
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
+
     /// Calls [`InnerRoom::toggle_mute`] until all [`PeerConnection`]s of this
     /// [`Room`] will have same [`MuteState`] as requested.
     async fn toggle_mute(
@@ -278,9 +329,9 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
-        let inner = upgrade_or_detached!(self.0, JasonError);
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            inner?.inner_join(token).await.map_err(JasonError::from)?;
+            this.inner_join(token).await?;
             Ok(JsValue::undefined())
         })
     }
@@ -550,57 +601,6 @@ impl InnerRoom {
     /// to be triggered after this function call.
     fn set_close_reason(&self, reason: CloseReason) {
         self.close_reason.replace(reason);
-    }
-
-    /// Implements externally visible `RoomHandle::join`.
-    ///
-    /// # Errors
-    ///
-    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
-    /// `on_connection_loss` callbacks are not set.
-    ///
-    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
-    /// server.
-    pub async fn inner_join(
-        self: Rc<Self>,
-        token: String,
-    ) -> Result<(), Traced<RoomError>> {
-        if !self.on_failed_local_stream.is_set() {
-            return Err(tracerr::new!(RoomError::CallbackNotSet(
-                "Room.on_failed_local_stream()"
-            )));
-        }
-
-        if !self.on_connection_loss.is_set() {
-            return Err(tracerr::new!(RoomError::CallbackNotSet(
-                "Room.on_connection_loss()"
-            )));
-        }
-
-        self.rpc
-            .connect(token)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        let mut connection_loss_stream = self.rpc.on_connection_loss();
-        let weak_inner = Rc::downgrade(&self);
-        spawn_local(async move {
-            while connection_loss_stream.next().await.is_some() {
-                match upgrade_or_detached!(weak_inner, JsValue) {
-                    Ok(inner) => {
-                        let reconnect_handle =
-                            ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                        inner.on_connection_loss.call(reconnect_handle);
-                    }
-                    Err(e) => {
-                        console_error(e);
-                        break;
-                    }
-                }
-            }
-        });
-
-        Ok(())
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided
