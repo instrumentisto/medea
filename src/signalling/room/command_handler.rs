@@ -5,14 +5,14 @@ use std::collections::HashMap;
 
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, Mid, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    CommandHandler, Event, IceCandidate, Mid, NegotiationRole, PeerId,
+    PeerMetrics, TrackId, TrackPatch, TrackUpdate,
 };
 
 use crate::{
     log::prelude::*,
     media::{
-        Peer, RenegotiationReason, Stable, WaitLocalHaveRemote, WaitLocalSdp,
+        Peer, PeerStateMachine, Stable, WaitLocalHaveRemote, WaitLocalSdp,
         WaitRemoteSdp,
     },
 };
@@ -31,10 +31,12 @@ impl CommandHandler for Room {
         from_peer_id: PeerId,
         sdp_offer: String,
         mids: HashMap<TrackId, Mid>,
+        senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
         from_peer.set_mids(mids)?;
+        from_peer.update_senders_statuses(senders_statuses);
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
@@ -47,28 +49,26 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = match from_peer.renegotiation_reason() {
-            Some(RenegotiationReason::TracksAdded) => Event::TracksAdded {
-                peer_id: to_peer.id(),
-                sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_new_tracks(),
-            },
-            Some(RenegotiationReason::TracksRemoved) => Event::TracksRemoved {
+        let event = if from_peer.is_known_to_remote() {
+            Event::TracksApplied {
                 peer_id: to_peer_id,
-                tracks_ids: to_peer.removed_tracks_ids(),
-                sdp_offer: Some(sdp_offer),
-            },
-            None => Event::PeerCreated {
+                negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
+                updates: to_peer.get_updates(),
+            }
+        } else {
+            Event::PeerCreated {
                 peer_id: to_peer.id(),
-                sdp_offer: Some(sdp_offer),
-                tracks: to_peer.get_new_tracks(),
+                negotiation_role: NegotiationRole::Answerer(sdp_offer),
+                tracks: to_peer.new_tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
-            },
+            }
         };
 
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
+
+        self.peers.sync_peer_spec(from_peer_id)?;
 
         Ok(Box::new(
             self.members
@@ -85,9 +85,11 @@ impl CommandHandler for Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
+        senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
         let from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
+        from_peer.update_senders_statuses(senders_statuses);
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<WaitRemoteSdp> =
@@ -104,6 +106,8 @@ impl CommandHandler for Room {
 
         self.peers.add_peer(from_peer);
         self.peers.add_peer(to_peer);
+
+        self.peers.sync_peer_spec(from_peer_id)?;
 
         Ok(Box::new(
             self.members
@@ -125,9 +129,12 @@ impl CommandHandler for Room {
             return Ok(Box::new(actix::fut::ok(())));
         }
 
-        let to_peer_id =
-            self.peers.get_peer_by_id(from_peer_id)?.partner_peer_id();
-        let to_member_id = self.peers.get_peer_by_id(to_peer_id)?.member_id();
+        let to_peer_id = self
+            .peers
+            .map_peer_by_id(from_peer_id, PeerStateMachine::partner_peer_id)?;
+        let to_member_id = self
+            .peers
+            .map_peer_by_id(to_peer_id, PeerStateMachine::member_id)?;
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,
@@ -149,7 +156,7 @@ impl CommandHandler for Room {
         Ok(Box::new(actix::fut::ok(())))
     }
 
-    /// Sends [`Event::TracksUpdated`] with data from the received
+    /// Sends [`Event::TracksApplied`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
     /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
@@ -158,15 +165,21 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(p) = self.peers.get_peer_by_id(peer_id) {
-            let member_id = p.member_id();
+        if let Ok(member_id) = self
+            .peers
+            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
+        {
             Ok(Box::new(
                 self.members
                     .send_event_to_member(
                         member_id,
-                        Event::TracksUpdated {
+                        Event::TracksApplied {
                             peer_id,
-                            tracks_patches,
+                            negotiation_role: None,
+                            updates: tracks_patches
+                                .into_iter()
+                                .map(TrackUpdate::Updated)
+                                .collect(),
                         },
                     )
                     .into_actor(self),

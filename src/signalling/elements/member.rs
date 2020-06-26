@@ -223,6 +223,8 @@ impl Member {
                     publisher_endpoint.p2p,
                     publisher_member.downgrade(),
                     publisher_endpoint.force_relay,
+                    publisher_endpoint.audio_settings,
+                    publisher_endpoint.video_settings,
                 );
 
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -252,6 +254,8 @@ impl Member {
                     e.p2p,
                     this_member.downgrade(),
                     e.force_relay,
+                    e.audio_settings,
+                    e.video_settings,
                 ));
             });
 
@@ -309,6 +313,20 @@ impl Member {
     /// Returns all sinks endpoints of this [`Member`].
     pub fn sinks(&self) -> HashMap<WebRtcPlayId, WebRtcPlayEndpoint> {
         self.0.borrow().sinks.clone()
+    }
+
+    /// Returns partner [`Member`]s of this [`Member`].
+    pub fn partners(&self) -> Vec<Member> {
+        let this = self.0.borrow();
+        this.srcs
+            .values()
+            .flat_map(|src| src.sinks().into_iter().map(|s| s.owner()))
+            .chain(this.sinks.values().map(|sink| sink.src().owner()))
+            .map(|m| (m.id(), m))
+            .collect::<HashMap<_, _>>()
+            .into_iter()
+            .map(|x| x.1)
+            .collect()
     }
 
     /// Inserts sink endpoint into this [`Member`].

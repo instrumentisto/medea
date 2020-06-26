@@ -132,17 +132,25 @@ pub enum Command {
     MakeSdpOffer {
         peer_id: PeerId,
         sdp_offer: String,
-        /// Associations between [`Track`] and transceiver's [media
-        /// description][1].
+        /// Associations between [`Track`] and transceiver's
+        /// [media description][1].
         ///
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, Mid>,
+
+        /// Publishing statuses of the senders from this Peer.
+        senders_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: PeerId,
+        sdp_answer: String,
+        /// Publishing statuses of the senders from this Peer.
+        senders_statuses: HashMap<TrackId, bool>,
+    },
 
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
@@ -157,7 +165,7 @@ pub enum Command {
     },
 
     /// Web Client asks permission to update [`Track`]s in specified Peer.
-    /// Media Server gives permission by sending [`Event::TracksUpdated`].
+    /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
@@ -253,7 +261,7 @@ pub enum Event {
     /// creation.
     PeerCreated {
         peer_id: PeerId,
-        sdp_offer: Option<String>,
+        negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         force_relay: bool,
@@ -275,21 +283,19 @@ pub enum Event {
     PeersRemoved { peer_ids: HashSet<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
-    /// Peer.
-    ///
-    /// Can be used to update existing [`Track`] settings (e.g. change to lower
-    /// video resolution, mute audio).
-    TracksUpdated {
+    /// `Peer`.
+    TracksApplied {
+        /// [`PeerId`] of `Peer` where [`Track`]s should be updated.
         peer_id: PeerId,
-        tracks_patches: Vec<TrackPatch>,
-    },
 
-    /// Media Server notifies about necessity to add [`Track`]s in specified
-    /// Peer.
-    TracksAdded {
-        peer_id: PeerId,
-        tracks: Vec<Track>,
-        sdp_offer: Option<String>,
+        /// List of [`TrackUpdate`]s which should be applied.
+        updates: Vec<TrackUpdate>,
+
+        /// Negotiation role based on which should be sent
+        /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
+        ///
+        /// If it `None` then no renegotiation should be done.
+        negotiation_role: Option<NegotiationRole>,
     },
 
     /// Media Server notifies about necessity to remove [`Track`]s from
@@ -299,6 +305,33 @@ pub enum Event {
         sdp_offer: Option<String>,
         tracks_ids: HashSet<TrackId>,
     },
+}
+
+/// `Peer` negotiation role. Some [`Event`]s can trigger SPD negotiation, if
+/// [`Event`] contains [`NegotiationRole::Offerer`], then `Peer` is expected to
+/// create SDP Offer and send it via [`Command::MakeSdpOffer`],  if [`Event`]
+/// contains [`NegotiationRole::Answerer`], then `Peer` is expected to apply
+/// provided SDP Offer and provide its SDP Answer in [`Command::MakeSdpAnswer`].
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub enum NegotiationRole {
+    /// [`Command::MakeSdpOffer`] should be sent by client.
+    Offerer,
+
+    /// [`Command::MakeSdpAnswer`] should be sent by client.
+    Answerer(String),
+}
+
+/// [`Track`] update which should be applied to the `Peer`.
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub enum TrackUpdate {
+    /// New [`Track`] should be added to the `Peer`.
+    Added(Track),
+
+    /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
+    /// Can only refer tracks already known to the `Peer`.
+    Updated(TrackPatch),
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -319,6 +352,14 @@ pub struct Track {
     pub direction: Direction,
     pub media_type: MediaType,
     pub is_muted: bool,
+}
+
+impl Track {
+    /// Returns `true` if this [`Track`] is required to call starting.
+    #[must_use]
+    pub fn is_required(&self) -> bool {
+        self.media_type.is_required()
+    }
 }
 
 /// Path to existing [`Track`] and field which can be updated.
@@ -368,13 +409,34 @@ pub enum MediaType {
     Video(VideoSettings),
 }
 
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
-#[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct AudioSettings {}
+impl MediaType {
+    /// Returns `true` if this [`MediaType`] is required to call starting.
+    #[must_use]
+    pub fn is_required(&self) -> bool {
+        match self {
+            MediaType::Audio(audio) => audio.is_required,
+            MediaType::Video(video) => video.is_required,
+        }
+    }
+}
 
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct VideoSettings {}
+pub struct AudioSettings {
+    /// Importance of the audio media type.
+    ///
+    /// If `false` then audio may be not published.
+    pub is_required: bool,
+}
+
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub struct VideoSettings {
+    /// Importance of the video media type.
+    ///
+    /// If `false` then video may be not published.
+    pub is_required: bool,
+}
 
 #[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
@@ -511,6 +573,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
+            senders_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -519,7 +582,8 @@ mod test {
                 \"data\":{\
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"}\
+                    \"mids\":{\"0\":\"1\"},\
+                    \"senders_statuses\":{}\
                 }\
             }";
 

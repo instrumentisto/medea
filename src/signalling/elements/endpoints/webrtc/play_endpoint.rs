@@ -168,6 +168,15 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().is_force_relayed
     }
 
+    /// Returns `true` if `on_start` or `on_stop` callback is set.
+    #[allow(clippy::unused_self)]
+    #[inline]
+    pub fn has_traffic_callback(&self) -> bool {
+        // TODO: Must depend on on_start/on_stop endpoint callbacks, when those
+        //       will be added (#91).
+        true
+    }
+
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
     /// pointer.
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {

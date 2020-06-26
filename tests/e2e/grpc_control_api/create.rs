@@ -9,6 +9,7 @@ use medea::api::control::error_codes::ErrorCode;
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
+    enum_eq,
     grpc_control_api::{take_member, take_room, take_webrtc_pub},
     signalling::TestMember,
 };
@@ -214,7 +215,7 @@ mod endpoint {
     use std::time::Duration;
 
     use futures::{channel::mpsc, StreamExt as _};
-    use medea_client_api_proto::Event;
+    use medea_client_api_proto::{Event, TrackUpdate};
     use tokio::time::timeout;
 
     use super::*;
@@ -393,8 +394,13 @@ mod endpoint {
             credentials.get("publisher").unwrap(),
             Some(Box::new(move |event, _, _| {
                 match event {
-                    Event::TracksAdded { .. } => {
-                        publisher_tx.unbounded_send(()).unwrap();
+                    Event::TracksApplied { updates, .. } => {
+                        if updates
+                            .iter()
+                            .any(|u| enum_eq!(TrackUpdate::Added, u))
+                        {
+                            publisher_tx.unbounded_send(()).unwrap();
+                        }
                     }
                     Event::SdpAnswerMade { .. } => {
                         negotiation_finished_tx.unbounded_send(()).unwrap();
@@ -409,8 +415,8 @@ mod endpoint {
         let _responder = TestMember::connect(
             credentials.get("responder").unwrap(),
             Some(Box::new(move |event, _, events| {
-                match event {
-                    Event::TracksAdded { .. } => {
+                if let Event::TracksApplied { updates, .. } = event {
+                    if updates.iter().any(|u| enum_eq!(TrackUpdate::Added, u)) {
                         responder_tx.unbounded_send(()).unwrap();
                         let sdp_answer_mades_count = events
                             .iter()
@@ -426,7 +432,6 @@ mod endpoint {
                             responder_tx.unbounded_send(()).unwrap();
                         }
                     }
-                    _ => (),
                 };
             })),
             None,

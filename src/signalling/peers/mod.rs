@@ -5,18 +5,14 @@ mod metrics;
 mod traffic_watcher;
 
 use std::{
+    cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
-    marker::PhantomData,
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
 
-use actix::{
-    fut,
-    fut::{wrap_future, Either},
-    Actor, ActorFuture, WrapFuture as _,
-};
 use derive_more::Display;
 use futures::future;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
@@ -25,17 +21,13 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{
-        peer::RenegotiationReason, IceUser, Peer, PeerError, PeerStateMachine,
-        Stable, WaitLocalSdp,
-    },
+    media::{Peer, PeerError, PeerStateMachine, Stable},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Endpoint,
         },
         room::RoomError,
-        Room,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
@@ -51,7 +43,7 @@ pub use self::{
 };
 
 #[derive(Debug)]
-pub struct PeersService<A> {
+pub struct PeersService {
     /// [`RoomId`] of the [`Room`] which owns this [`PeerRepository`].
     room_id: RoomId,
 
@@ -63,7 +55,7 @@ pub struct PeersService<A> {
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     /// [`Room`]: crate::signalling::Room
-    peers: HashMap<PeerId, PeerStateMachine>,
+    peers: PeerRepository,
 
     /// Count of [`Peer`]s in this [`Room`].
     ///
@@ -80,34 +72,32 @@ pub struct PeersService<A> {
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: PeersMetricsService,
+    peer_metrics_service: RefCell<PeersMetricsService>,
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
-
-    /// Type of the [`Actor`] in whose context will be spawned [`ActFuture`]s.
-    _owner_actor: PhantomData<A>,
 }
 
 /// Simple ID counter.
-#[derive(Default, Debug, Clone, Copy, Display)]
-pub struct Counter<T> {
-    count: T,
+#[derive(Default, Debug, Clone, Display)]
+pub struct Counter<T: Copy> {
+    count: Cell<T>,
 }
 
 impl<T: Incrementable + Copy> Counter<T> {
     /// Returns id and increase counter.
-    pub fn next_id(&mut self) -> T {
-        let id = self.count;
-        self.count = self.count.incr();
+    pub fn next_id(&self) -> T {
+        let id = self.count.get();
+        self.count.set(id.incr());
+
         id
     }
 }
 
 /// Result of the [`PeersService::get_or_create_peers`] function.
 #[derive(Debug, Clone, Copy)]
-pub enum GetOrCreatePeersResult {
+enum GetOrCreatePeersResult {
     /// Requested [`Peer`] pair was created.
     Created(PeerId, PeerId),
 
@@ -115,39 +105,17 @@ pub enum GetOrCreatePeersResult {
     AlreadyExisted(PeerId, PeerId),
 }
 
-/// [`Actor`] in whose context will be spawned [`ActFuture`]s returned from the
-/// [`PeerService`].
-pub trait PeerServiceOwner: Actor {
-    /// Returns [`RoomId`] which owns [`PeerService`].
-    fn id(&self) -> &RoomId;
+/// Result of the [`PeersService::connect_endpoints`] function.
+#[derive(Debug, Clone, Copy)]
+pub enum ConnectEndpointsResult {
+    /// New [`Peer`] pair was created.
+    Created(PeerId, PeerId),
 
-    /// Returns reference to the [`PeersService`].
-    fn peers(&self) -> &PeersService<Self>;
-
-    /// Returns mutable reference to the [`PeersService`].
-    fn peers_mut(&mut self) -> &mut PeersService<Self>;
+    /// [`Peer`] pair was updated.
+    Updated(PeerId, PeerId),
 }
 
-impl PeerServiceOwner for Room {
-    /// Returns reference to the [`Room::peers`].
-    fn peers(&self) -> &PeersService<Self> {
-        &self.peers
-    }
-
-    /// Returns mutable reference to the [`Room::peers`].
-    fn peers_mut(&mut self) -> &mut PeersService<Self> {
-        &mut self.peers
-    }
-
-    /// Returns reference to the [`Room::id`].
-    fn id(&self) -> &RoomId {
-        self.id()
-    }
-}
-
-type ActFuture<A, O> = Box<dyn ActorFuture<Actor = A, Output = O>>;
-
-impl<A: Actor + PeerServiceOwner> PeersService<A> {
+impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
     pub fn new(
@@ -155,59 +123,44 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         media_conf: &conf::Media,
-    ) -> Self {
-        Self {
+    ) -> Rc<Self> {
+        Rc::new(Self {
             room_id: room_id.clone(),
             turn_service,
-            peers: HashMap::new(),
+            peers: PeerRepository::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_traffic_watcher: peers_traffic_watcher.clone(),
-            peer_metrics_service: PeersMetricsService::new(
+            peer_metrics_service: RefCell::new(PeersMetricsService::new(
                 room_id,
                 peers_traffic_watcher,
-            ),
+            )),
             peer_stats_ttl: media_conf.max_lag,
-            _owner_actor: PhantomData::default(),
-        }
+        })
     }
 
     /// Store [`Peer`] in [`Room`].
     ///
     /// [`Room`]: crate::signalling::Room
-    pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, peer: S) {
-        let peer = peer.into();
-        self.peers.insert(peer.id(), peer);
+    #[inline]
+    pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
+        self.peers.add_peer(peer)
     }
 
-    /// Returns borrowed [`PeerStateMachine`] by its ID.
+    /// Applies a function to the [`PeerStateMachine`] reference with provided
+    /// [`PeerId`] (if any found).
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn get_peer_by_id(
+    #[inline]
+    pub fn map_peer_by_id<T>(
         &self,
         peer_id: PeerId,
-    ) -> Result<&PeerStateMachine, RoomError> {
-        self.peers
-            .get(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
-    }
-
-    /// Returns mutably borrowed [`PeerStateMachine`] by its ID.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
-    /// exist in [`PeerRepository`].
-    pub fn get_mut_peer_by_id(
-        &mut self,
-        peer_id: PeerId,
-    ) -> Result<&mut PeerStateMachine, RoomError> {
-        self.peers
-            .get_mut(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+        f: impl FnOnce(&PeerStateMachine) -> T,
+    ) -> Result<T, RoomError> {
+        self.peers.map_peer_by_id(peer_id, f)
     }
 
     /// Creates interconnected [`Peer`]s for provided endpoints and saves them
@@ -215,19 +168,20 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     ///
     /// Returns [`PeerId`]s of the created [`Peer`]s.
     fn create_peers(
-        &mut self,
+        &self,
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
     ) -> (PeerId, PeerId) {
         let src_member_id = src.owner().id();
         let sink_member_id = sink.owner().id();
 
-        debug!(
-            "Created peer between {} and {}.",
-            src_member_id, sink_member_id
-        );
         let src_peer_id = self.peers_count.next_id();
         let sink_peer_id = self.peers_count.next_id();
+
+        debug!(
+            "Created peers:[{}, {}] between {} and {}.",
+            src_peer_id, sink_peer_id, src_member_id, sink_member_id,
+        );
 
         let mut src_peer = Peer::new(
             src_peer_id,
@@ -247,14 +201,16 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         );
         sink_peer.add_endpoint(&sink.clone().into());
 
-        src_peer.add_publisher(&mut sink_peer, self.get_tracks_counter(), src);
+        src_peer.add_publisher(&src, &mut sink_peer, &self.tracks_count);
 
         let src_peer = PeerStateMachine::from(src_peer);
         let sink_peer = PeerStateMachine::from(sink_peer);
 
         self.peer_metrics_service
+            .borrow_mut()
             .register_peer(&src_peer, self.peer_stats_ttl);
         self.peer_metrics_service
+            .borrow_mut()
             .register_peer(&sink_peer, self.peer_stats_ttl);
 
         self.add_peer(src_peer);
@@ -263,62 +219,19 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         (src_peer_id, sink_peer_id)
     }
 
-    /// Returns mutable reference to track counter.
-    pub fn get_tracks_counter(&mut self) -> &mut Counter<TrackId> {
-        &mut self.tracks_count
-    }
-
     /// Lookups [`Peer`] of [`Member`] with ID `member_id` which
     /// connected with `partner_member_id`.
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
+    #[inline]
     pub fn get_peers_between_members(
         &self,
         member_id: &MemberId,
         partner_member_id: &MemberId,
     ) -> Option<(PeerId, PeerId)> {
-        for peer in self.peers.values() {
-            if &peer.member_id() == member_id
-                && &peer.partner_member_id() == partner_member_id
-            {
-                return Some((peer.id(), peer.partner_peer_id()));
-            }
-        }
-
-        None
-    }
-
-    /// Returns borrowed [`Peer`] by its ID.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
-    /// exist in [`PeerRepository`].
-    pub fn get_inner_peer_by_id<'a, S>(
-        &'a self,
-        peer_id: PeerId,
-    ) -> Result<&'a Peer<S>, RoomError>
-    where
-        &'a Peer<S>: std::convert::TryFrom<&'a PeerStateMachine>,
-        <&'a Peer<S> as TryFrom<&'a PeerStateMachine>>::Error: Into<RoomError>,
-    {
-        match self.peers.get(&peer_id) {
-            Some(peer) => peer.try_into().map_err(Into::into),
-            None => Err(RoomError::PeerNotFound(peer_id)),
-        }
-    }
-
-    /// Returns all [`Peer`]s of specified [`Member`].
-    ///
-    /// [`Member`]: crate::signalling::elements::member::Member
-    pub fn get_peers_by_member_id<'a>(
-        &'a self,
-        member_id: &'a MemberId,
-    ) -> impl Iterator<Item = &'a PeerStateMachine> {
         self.peers
-            .values()
-            .filter(move |peer| &peer.member_id() == member_id)
+            .get_peers_between_members(member_id, partner_member_id)
     }
 
     /// Returns owned [`Peer`] by its ID.
@@ -331,7 +244,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
     /// requested state.
     pub fn take_inner_peer<S>(
-        &mut self,
+        &self,
         peer_id: PeerId,
     ) -> Result<Peer<S>, RoomError>
     where
@@ -339,17 +252,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         <Peer<S> as TryFrom<PeerStateMachine>>::Error:
             Into<(PeerError, PeerStateMachine)>,
     {
-        match self.peers.remove(&peer_id) {
-            Some(peer) => match peer.try_into() {
-                Ok(peer) => Ok(peer),
-                Err(err) => {
-                    let (err, peer) = err.into();
-                    self.peers.insert(peer_id, peer);
-                    Err(RoomError::from(err))
-                }
-            },
-            None => Err(RoomError::PeerNotFound(peer_id)),
-        }
+        self.peers.take_inner_peer(peer_id)
     }
 
     /// Deletes [`PeerStateMachine`]s from this [`PeerRepository`] and send
@@ -359,17 +262,16 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
     pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
-        &mut self,
+        &self,
         member_id: &MemberId,
         peer_ids: Peers,
     ) -> HashMap<MemberId, Vec<PeerStateMachine>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
-            if let Some(peer) = self.peers.remove(&peer_id) {
+            if let Some(peer) = self.peers.remove(*peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
-                if let Some(partner_peer) = self.peers.remove(&partner_peer_id)
-                {
+                if let Some(partner_peer) = self.peers.remove(partner_peer_id) {
                     removed_peers
                         .entry(partner_member_id)
                         .or_insert_with(Vec::new)
@@ -387,6 +289,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
             .flat_map(|peer| peer.iter().map(PeerStateMachine::id))
             .collect();
         self.peer_metrics_service
+            .borrow_mut()
             .unregister_peers(&peers_to_unregister);
         self.peers_traffic_watcher
             .unregister_peers(self.room_id.clone(), peers_to_unregister);
@@ -394,115 +297,49 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
         removed_peers
     }
 
+    #[inline]
+    pub fn delete_sink_endpoint(
+        &self,
+        sink: &WebRtcPlayEndpoint,
+    ) -> HashSet<(MemberId, PeerId)> {
+        self.peers.delete_sink_endpoint(sink)
+    }
+
+    #[inline]
+    pub fn delete_src_endpoint(
+        &self,
+        src: &WebRtcPublishEndpoint,
+    ) -> HashSet<(MemberId, PeerId)> {
+        self.peers.delete_src_endpoint(src)
+    }
+
     /// Returns already created [`Peer`] pair's [`PeerId`]s as
     /// [`CreatedOrGottenPeer::Gotten`] variant.
     ///
     /// Returns newly created [`Peer`] pair's [`PeerId`]s as
     /// [`CreatedOrGottenPeer::Created`] variant.
-    fn get_or_create_peers(
-        src: WebRtcPublishEndpoint,
-        sink: WebRtcPlayEndpoint,
-    ) -> ActFuture<A, Result<GetOrCreatePeersResult, RoomError>> {
-        Box::new(fut::ok::<(), (), A>(()).then(move |_, room, _| {
-            match room.peers().get_peers_between_members(
-                &src.owner().id(),
-                &sink.owner().id(),
-            ) {
-                None => {
-                    let (src_peer_id, sink_peer_id) =
-                        room.peers_mut().create_peers(&src, &sink);
-
-                    Either::Left(
-                        room.peers()
-                            .peer_post_construct(src_peer_id, &sink.into())
-                            .then(move |res, room, _| match res {
-                                Ok(_) => Box::new(
-                                    room.peers()
-                                        .peer_post_construct(
-                                            sink_peer_id,
-                                            &src.into(),
-                                        )
-                                        .map(move |res, _, _| {
-                                            res.map(|_| {
-                                                GetOrCreatePeersResult::Created(
-                                                    src_peer_id,
-                                                    sink_peer_id,
-                                                )
-                                            })
-                                        }),
-                                ),
-                                Err(err) => {
-                                    Box::new(fut::err(err)) as ActFuture<A, _>
-                                }
-                            }),
-                    )
-                }
-                Some((first_peer_id, second_peer_id)) => {
-                    Either::Right(fut::ok::<_, RoomError, A>(
-                        GetOrCreatePeersResult::AlreadyExisted(
-                            first_peer_id,
-                            second_peer_id,
-                        ),
-                    ))
-                }
-            }
-        }))
-    }
-
-    /// Creates and sets [`IceUser`], registers [`Peer`] in
-    /// [`PeerTrafficWatcher`].
-    fn peer_post_construct(
+    async fn get_or_create_peers(
         &self,
-        peer_id: PeerId,
-        endpoint: &Endpoint,
-    ) -> ActFuture<A, Result<(), RoomError>> {
-        let room_id = self.room_id.clone();
-        let turn_service = self.turn_service.clone();
-        let has_traffic_callback = endpoint.has_traffic_callback();
-        let is_force_relayed = endpoint.is_force_relayed();
-        Box::new(
-            wrap_future(async move {
-                Ok(turn_service
-                    .create(room_id, peer_id, UnreachablePolicy::ReturnErr)
-                    .await?)
-            })
-            .map(move |res: Result<IceUser, RoomError>, room: &mut A, _| {
-                res.map(|ice_user| {
-                    if let Ok(peer) =
-                        room.peers_mut().get_mut_peer_by_id(peer_id)
-                    {
-                        peer.set_ice_user(ice_user)
-                    }
-                })
-            })
-            .then(move |res, room: &mut A, _| {
-                let room_id = room.id().clone();
-                let traffic_watcher =
-                    room.peers().peers_traffic_watcher.clone();
-                async move {
-                    match res {
-                        Ok(_) => {
-                            if has_traffic_callback {
-                                traffic_watcher
-                                    .register_peer(
-                                        room_id,
-                                        peer_id,
-                                        is_force_relayed,
-                                    )
-                                    .await
-                                    .map_err(
-                                        RoomError::PeerTrafficWatcherMailbox,
-                                    )
-                            } else {
-                                Ok(())
-                            }
-                        }
-                        Err(err) => Err(err),
-                    }
-                }
-                .into_actor(room)
-            }),
-        )
+        src: &WebRtcPublishEndpoint,
+        sink: &WebRtcPlayEndpoint,
+    ) -> Result<GetOrCreatePeersResult, RoomError> {
+        if let Some((first_peer_id, second_peer_id)) = self
+            .get_peers_between_members(&src.owner().id(), &sink.owner().id())
+        {
+            Ok(GetOrCreatePeersResult::AlreadyExisted(
+                first_peer_id,
+                second_peer_id,
+            ))
+        } else {
+            let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
+
+            self.peer_post_construct(src_peer_id, &src.clone().into())
+                .await?;
+            self.peer_post_construct(sink_peer_id, &sink.clone().into())
+                .await?;
+
+            Ok(GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id))
+        }
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
@@ -521,108 +358,120 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// # Panics
     ///
     /// Panics if provided endpoints already have interconnected [`Peer`]s.
-    pub fn connect_endpoints(
+    pub async fn connect_endpoints(
+        self: Rc<Self>,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> ActFuture<A, Result<Option<(PeerId, PeerId)>, RoomError>> {
+    ) -> Result<Option<ConnectEndpointsResult>, RoomError> {
+        use ConnectEndpointsResult::{Created, Updated};
+
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
             src.owner().id(),
             sink.owner().id(),
         );
-        Box::new(Self::get_or_create_peers(src.clone(), sink.clone()).then(
-            |peers_res, room, _| {
-                match actix_try!(peers_res) {
-                    GetOrCreatePeersResult::Created(
-                        src_peer_id,
-                        sink_peer_id,
-                    ) => {
-                        let mut futs = Vec::new();
-                        {
-                            let this = room.peers_mut();
-                            let src_peer: Peer<Stable> =
-                                actix_try!(this.take_inner_peer(src_peer_id));
-                            let sink_peer: Peer<Stable> =
-                                actix_try!(this.take_inner_peer(sink_peer_id));
-                            let src_peer = PeerStateMachine::from(src_peer);
-                            let sink_peer = PeerStateMachine::from(sink_peer);
+        match self.get_or_create_peers(&src, &sink).await? {
+            GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id) => {
+                Ok(Some(Created(src_peer_id, sink_peer_id)))
+            }
+            GetOrCreatePeersResult::AlreadyExisted(
+                src_peer_id,
+                sink_peer_id,
+            ) => {
+                if sink.peer_id().is_some()
+                    || src.peer_ids().contains(&src_peer_id)
+                {
+                    // already connected, so no-op
+                    Ok(None)
+                } else {
+                    // TODO: here we assume that peers are stable,
+                    //       which might not be the case, e.g. Control
+                    //       Service creates multiple endpoints in quick
+                    //       succession.
+                    let mut src_peer: Peer<Stable> =
+                        self.peers.take_inner_peer(src_peer_id).unwrap();
+                    let mut sink_peer: Peer<Stable> =
+                        self.peers.take_inner_peer(sink_peer_id).unwrap();
 
-                            this.peer_metrics_service
-                                .register_peer(&src_peer, this.peer_stats_ttl);
-                            this.peer_metrics_service
-                                .register_peer(&sink_peer, this.peer_stats_ttl);
+                    src_peer.add_publisher(
+                        &src,
+                        &mut sink_peer,
+                        &self.tracks_count,
+                    );
 
-                            futs.push(
-                                this.peers_traffic_watcher.register_peer(
-                                    this.room_id.clone(),
-                                    sink_peer_id,
-                                    false,
-                                ),
-                            );
-                            futs.push(
-                                this.peers_traffic_watcher.register_peer(
-                                    this.room_id.clone(),
-                                    src_peer_id,
-                                    false,
-                                ),
-                            );
-
-                            this.add_peer(src_peer);
-                            this.add_peer(sink_peer);
-                        }
-
-                        let fut = future::try_join_all(futs)
-                            .into_actor(room)
-                            .then(move |res, room, _| {
-                                async move {
-                                    res.map_err(|e| {
-                                        RoomError::PeerTrafficWatcherMailbox(e)
-                                    })?;
-                                    Ok(Some((src_peer_id, sink_peer_id)))
-                                }
-                                .into_actor(room)
-                            });
-
-                        Box::new(fut) as ActFuture<_, _>
-                    }
-                    GetOrCreatePeersResult::AlreadyExisted(
-                        src_peer_id,
-                        sink_peer_id,
-                    ) => {
-                        // TODO: here we assume that peers are stable,
-                        //       which might not be the case, e.g. Control
-                        //       Service creates multiple endpoints in quick
-                        //       succession.
-                        let this = room.peers_mut();
-                        let mut src_peer: Peer<Stable> =
-                            this.take_inner_peer(src_peer_id).unwrap();
-                        let mut sink_peer: Peer<Stable> =
-                            this.take_inner_peer(sink_peer_id).unwrap();
-
-                        src_peer.add_publisher(
-                            &mut sink_peer,
-                            this.get_tracks_counter(),
-                            &src,
+                    let mut register_peer_tasks = Vec::new();
+                    if src.has_traffic_callback() {
+                        register_peer_tasks.push(
+                            self.peers_traffic_watcher.register_peer(
+                                self.room_id.clone(),
+                                src_peer_id,
+                                src.is_force_relayed(),
+                            ),
                         );
-
-                        sink_peer.add_endpoint(&sink.into());
-                        src_peer.add_endpoint(&src.into());
-
-                        let src_peer = PeerStateMachine::from(src_peer);
-                        let sink_peer = PeerStateMachine::from(sink_peer);
-
-                        this.peer_metrics_service.update_peer_tracks(&src_peer);
-                        this.peer_metrics_service
-                            .update_peer_tracks(&sink_peer);
-
-                        this.add_peer(src_peer);
-                        this.add_peer(sink_peer);
-
-                        Box::new(future::ok(None).into_actor(room))
                     }
+                    if sink.has_traffic_callback() {
+                        register_peer_tasks.push(
+                            self.peers_traffic_watcher.register_peer(
+                                self.room_id.clone(),
+                                sink_peer_id,
+                                sink.is_force_relayed(),
+                            ),
+                        );
+                    }
+
+                    sink_peer.add_endpoint(&sink.into());
+                    src_peer.add_endpoint(&src.into());
+
+                    let src_peer = PeerStateMachine::from(src_peer);
+                    let sink_peer = PeerStateMachine::from(sink_peer);
+
+                    self.peer_metrics_service
+                        .borrow_mut()
+                        .update_peer_tracks(&src_peer);
+                    self.peer_metrics_service
+                        .borrow_mut()
+                        .update_peer_tracks(&sink_peer);
+
+                    self.peers.add_peer(src_peer);
+                    self.peers.add_peer(sink_peer);
+
+                    future::try_join_all(register_peer_tasks)
+                        .await
+                        .map_err(RoomError::PeerTrafficWatcherMailbox)?;
+
+                    Ok(Some(Updated(src_peer_id, sink_peer_id)))
                 }
-            },
-        ))
+            }
+        }
+    }
+
+    /// Creates and sets [`IceUser`], registers [`Peer`] in
+    /// [`PeerTrafficWatcher`].
+    async fn peer_post_construct(
+        &self,
+        peer_id: PeerId,
+        endpoint: &Endpoint,
+    ) -> Result<(), RoomError> {
+        let ice_user = self
+            .turn_service
+            .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
+            .await?;
+
+        self.peers
+            .map_peer_by_id_mut(peer_id, move |p| p.set_ice_user(ice_user))?;
+
+        if endpoint.has_traffic_callback() {
+            self.peers_traffic_watcher
+                .register_peer(
+                    self.room_id.clone(),
+                    peer_id,
+                    endpoint.is_force_relayed(),
+                )
+                .await
+                .map_err(RoomError::PeerTrafficWatcherMailbox)
+        } else {
+            Ok(())
+        }
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -632,46 +481,99 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     // TODO: remove in #91.
+    #[inline]
     pub fn remove_peers_related_to_member(
-        &mut self,
+        &self,
         member_id: &MemberId,
     ) -> HashMap<MemberId, HashSet<PeerId>> {
-        let mut peers_to_remove: HashMap<MemberId, HashSet<PeerId>> =
-            HashMap::new();
-
-        self.get_peers_by_member_id(member_id).for_each(|peer| {
-            self.get_peers_by_member_id(&peer.partner_member_id())
-                .filter(|partner_peer| {
-                    &partner_peer.partner_member_id() == member_id
-                })
-                .for_each(|partner_peer| {
-                    peers_to_remove
-                        .entry(partner_peer.member_id())
-                        .or_default()
-                        .insert(partner_peer.id());
-                });
-
-            peers_to_remove
-                .entry(peer.member_id())
-                .or_default()
-                .insert(peer.id());
-        });
-
-        peers_to_remove
-            .values()
-            .flat_map(HashSet::iter)
-            .for_each(|id| {
-                self.peers.remove(id);
-            });
-
-        peers_to_remove
+        self.peers.remove_peers_related_to_member(member_id)
     }
 
-    /// Starts renegotiation for a [`Peer`] with a provided [`PeerId`].
+    /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the
+    /// [`PeerMetricsService`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// If inserted `Peer` in [`WaitLocalSdp`] state isn't in this state.
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn sync_peer_spec(&self, peer_id: PeerId) -> Result<(), RoomError> {
+        self.peers.map_peer_by_id(peer_id, |peer| {
+            self.peer_metrics_service
+                .borrow_mut()
+                .update_peer_tracks(&peer);
+        })?;
+        Ok(())
+    }
+}
+
+/// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
+#[derive(Debug)]
+struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
+
+impl PeerRepository {
+    /// Returns empty [`PeerRepository`].
+    pub fn new() -> Self {
+        Self(RefCell::new(HashMap::new()))
+    }
+
+    /// Applies a function to the [`PeerStateMachine`] reference with provided
+    /// [`PeerId`] (if any found).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn map_peer_by_id<T>(
+        &self,
+        peer_id: PeerId,
+        f: impl FnOnce(&PeerStateMachine) -> T,
+    ) -> Result<T, RoomError> {
+        Ok(f(self
+            .0
+            .borrow()
+            .get(&peer_id)
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
+    }
+
+    /// Applies a function to the mutable [`PeerStateMachine`] reference with
+    /// provided [`PeerId`] (if any found).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn map_peer_by_id_mut<T>(
+        &self,
+        peer_id: PeerId,
+        f: impl FnOnce(&mut PeerStateMachine) -> T,
+    ) -> Result<T, RoomError> {
+        Ok(f(self
+            .0
+            .borrow_mut()
+            .get_mut(&peer_id)
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
+    }
+
+    /// Removes [`PeerStateMachine`] with a provided [`PeerId`].
+    ///
+    /// Returns removed [`PeerStateMachine`] if it existed.
+    pub fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
+        self.0.borrow_mut().remove(&peer_id)
+    }
+
+    /// Removes [`PeerStateMachine`] with a provided [`PeerId`] and returns
+    /// removed [`PeerStateMachine`] if it existed.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    pub fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
+        self.remove(peer_id)
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+    }
+
+    /// Returns owned [`Peer`] by its ID.
     ///
     /// # Errors
     ///
@@ -680,46 +582,52 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     ///
     /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
     /// requested state.
-    pub fn start_renegotiation(
-        &mut self,
+    pub fn take_inner_peer<S>(
+        &self,
         peer_id: PeerId,
-    ) -> Result<&mut Peer<WaitLocalSdp>, RoomError> {
-        let peer: Peer<Stable> = self.take_inner_peer(peer_id)?;
-
-        let renegotiating_peer =
-            peer.start_renegotiation(RenegotiationReason::TracksAdded);
-        let renegotiating_peer_id = renegotiating_peer.id();
-        self.peers
-            .insert(renegotiating_peer_id, renegotiating_peer.into());
-        match self.get_mut_peer_by_id(renegotiating_peer_id)? {
-            PeerStateMachine::WaitLocalSdp(peer) => Ok(peer),
-            _ => unreachable!(
-                "Peer with WaitLocalSdp state was inserted into the \
-                 PeerService store, but different state was gotten."
-            ),
+    ) -> Result<Peer<S>, RoomError>
+    where
+        Peer<S>: TryFrom<PeerStateMachine>,
+        <Peer<S> as TryFrom<PeerStateMachine>>::Error:
+            Into<(PeerError, PeerStateMachine)>,
+    {
+        match self.take(peer_id)?.try_into() {
+            Ok(peer) => Ok(peer),
+            Err(err) => {
+                let (err, peer) = err.into();
+                self.add_peer(peer);
+                Err(RoomError::from(err))
+            }
         }
     }
 
-    /// Adds new [`WebRtcPlayEndpoint`] to the [`Peer`] with a provided
-    /// [`PeerId`].
+    /// Stores [`Peer`] in [`Room`].
     ///
-    /// ## Panics
+    /// [`Room`]: crate::signalling::Room
+    pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
+        let peer = peer.into();
+        self.0.borrow_mut().insert(peer.id(), peer);
+    }
+
+    /// Lookups [`Peer`] of [`Member`] with ID `member_id` which
+    /// connected with `partner_member_id`.
     ///
-    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
-    /// [`Stable`] state.
-    pub fn add_sink(&mut self, src_peer_id: PeerId, sink: WebRtcPlayEndpoint) {
-        let mut src_peer: Peer<Stable> =
-            self.take_inner_peer(src_peer_id).unwrap();
-        let mut sink_peer: Peer<Stable> =
-            self.take_inner_peer(src_peer.partner_peer_id()).unwrap();
-        let src = sink.src();
+    /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
+    /// otherwise returns `None`.
+    pub fn get_peers_between_members(
+        &self,
+        member_id: &MemberId,
+        partner_member_id: &MemberId,
+    ) -> Option<(PeerId, PeerId)> {
+        for peer in self.0.borrow().values() {
+            if &peer.member_id() == member_id
+                && &peer.partner_member_id() == partner_member_id
+            {
+                return Some((peer.id(), peer.partner_peer_id()));
+            }
+        }
 
-        src_peer.add_publisher(&mut sink_peer, &mut self.tracks_count, &src);
-        src_peer.add_endpoint(&Endpoint::from(src));
-        sink_peer.add_endpoint(&Endpoint::from(sink));
-
-        self.add_peer(src_peer);
-        self.add_peer(sink_peer);
+        None
     }
 
     /// Deletes provided [`WebRtcPublishEndpoint`].
@@ -735,7 +643,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
     /// [`Stable`] state.
     pub fn delete_src_endpoint(
-        &mut self,
+        &self,
         src: &WebRtcPublishEndpoint,
     ) -> HashSet<(MemberId, PeerId)> {
         let mut affected_peers = HashSet::new();
@@ -759,7 +667,7 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
     /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
     /// [`Stable`] state.
     pub fn delete_sink_endpoint(
-        &mut self,
+        &self,
         sink_endpoint: &WebRtcPlayEndpoint,
     ) -> HashSet<(MemberId, PeerId)> {
         let mut affected_peers = HashSet::new();
@@ -783,9 +691,6 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
                 affected_peers.insert((sink_peer.member_id(), sink_peer_id));
                 affected_peers.insert((src_peer.member_id(), src_peer.id()));
             } else {
-                let sink_peer = sink_peer
-                    .start_renegotiation(RenegotiationReason::TracksRemoved);
-
                 affected_peers.insert((sink_peer.member_id(), sink_peer_id));
 
                 self.add_peer(sink_peer);
@@ -795,17 +700,68 @@ impl<A: Actor + PeerServiceOwner> PeersService<A> {
 
         affected_peers
     }
+
+    /// Removes all [`Peer`]s related to given [`Member`].
+    /// Note, that this function will also remove all partners [`Peer`]s.
+    ///
+    /// Returns [`HashMap`] with all removed [`Peer`]s:
+    /// key - [`Peer`]'s owner [`MemberId`],
+    /// value - removed [`Peer`]'s [`PeerId`].
+    // TODO: remove in #91.
+    pub fn remove_peers_related_to_member(
+        &self,
+        member_id: &MemberId,
+    ) -> HashMap<MemberId, HashSet<PeerId>> {
+        let mut peers_to_remove: HashMap<MemberId, HashSet<PeerId>> =
+            HashMap::new();
+
+        self.0
+            .borrow()
+            .values()
+            .filter(|p| &p.member_id() == member_id)
+            .for_each(|peer| {
+                self.0
+                    .borrow()
+                    .values()
+                    .filter(|p| p.member_id() == peer.partner_member_id())
+                    .filter(|partner_peer| {
+                        &partner_peer.partner_member_id() == member_id
+                    })
+                    .for_each(|partner_peer| {
+                        peers_to_remove
+                            .entry(partner_peer.member_id())
+                            .or_insert_with(HashSet::new)
+                            .insert(partner_peer.id());
+                    });
+
+                peers_to_remove
+                    .entry(peer.member_id())
+                    .or_insert_with(HashSet::new)
+                    .insert(peer.id());
+            });
+
+        peers_to_remove
+            .values()
+            .flat_map(|peer_ids| peer_ids.iter())
+            .for_each(|id| {
+                self.0.borrow_mut().remove(id);
+            });
+
+        peers_to_remove
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use actix::{Actor, Handler, Message, WrapFuture};
     use futures::{channel::mpsc, future, StreamExt as _};
     use tokio::time::timeout;
 
     use crate::{
         api::control::{
-            endpoints::webrtc_publish_endpoint::P2pMode, refs::SrcUri,
+            endpoints::webrtc_publish_endpoint::{
+                AudioSettings, P2pMode, VideoSettings,
+            },
+            refs::SrcUri,
         },
         signalling::{
             elements::Member, peers::traffic_watcher::MockPeerTrafficWatcher,
@@ -814,54 +770,6 @@ mod tests {
     };
 
     use super::*;
-
-    /// Mock for the [`PeersServiceOwner`] trait.
-    ///
-    /// In context of this [`Actor`] will be ran all [`ActFuture`]s received
-    /// from the [`PeerService`].
-    struct PeersServiceOwnerMock {
-        /// Actual [`PeersService`].
-        peers_service: PeersService<PeersServiceOwnerMock>,
-
-        /// All [`Member`]s which should be in the [`Room`].
-        ///
-        /// This is necessary so that [`Drop`] is not called on the created
-        /// [`Member`]s.
-        members: Vec<Member>,
-    }
-
-    impl PeersServiceOwnerMock {
-        /// Returns empty [`PeersServiceOwnerMock`] with provided
-        /// [`PeerService`].
-        pub fn new(peers: PeersService<PeersServiceOwnerMock>) -> Self {
-            Self {
-                peers_service: peers,
-                members: Vec::new(),
-            }
-        }
-    }
-
-    impl Actor for PeersServiceOwnerMock {
-        type Context = actix::Context<Self>;
-    }
-
-    impl PeerServiceOwner for PeersServiceOwnerMock {
-        /// Returns reference to the [`RoomId`] from the [`PeerService`].
-        fn id(&self) -> &RoomId {
-            &self.peers_service.room_id
-        }
-
-        /// Returns reference to the [`PeersServiceOwnerMock::peers_service`].
-        fn peers(&self) -> &PeersService<Self> {
-            &self.peers_service
-        }
-
-        /// Returns mutable reference to the
-        /// [`PeersServiceOwnerMcok::peers_service`].
-        fn peers_mut(&mut self) -> &mut PeersService<Self> {
-            &mut self.peers_service
-        }
-    }
 
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
@@ -881,86 +789,62 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
-        let peers: PeersService<PeersServiceOwnerMock> = PeersService::new(
+        let peers_service = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
         );
 
-        #[derive(Message)]
-        #[rtype(result = "Result<(), ()>")]
-        struct RunTest;
+        let publisher = Member::new(
+            "publisher".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let receiver = Member::new(
+            "receiver".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let publish = WebRtcPublishEndpoint::new(
+            "publish".to_string().into(),
+            P2pMode::Always,
+            publisher.downgrade(),
+            false,
+            AudioSettings::default(),
+            VideoSettings::default(),
+        );
+        let play = WebRtcPlayEndpoint::new(
+            "play-publisher".to_string().into(),
+            SrcUri::try_from("local://test/publisher/publish".to_string())
+                .unwrap(),
+            publish.downgrade(),
+            receiver.downgrade(),
+            false,
+        );
 
-        impl Handler<RunTest> for PeersServiceOwnerMock {
-            type Result = ActFuture<PeersServiceOwnerMock, Result<(), ()>>;
+        peers_service
+            .clone()
+            .connect_endpoints(publish, play)
+            .await
+            .unwrap();
 
-            fn handle(
-                &mut self,
-                _: RunTest,
-                _: &mut Self::Context,
-            ) -> Self::Result {
-                let publisher = Member::new(
-                    "publisher".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let receiver = Member::new(
-                    "receiver".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let publish = WebRtcPublishEndpoint::new(
-                    "publish".to_string().into(),
-                    P2pMode::Always,
-                    publisher.downgrade(),
-                    false,
-                );
-                let play = WebRtcPlayEndpoint::new(
-                    "play-publisher".to_string().into(),
-                    SrcUri::try_from(
-                        "local://test/publisher/publish".to_string(),
-                    )
-                    .unwrap(),
-                    publish.downgrade(),
-                    receiver.downgrade(),
-                    false,
-                );
-
-                self.members.push(publisher);
-                self.members.push(receiver);
-
-                let fut =
-                    PeersService::<PeersServiceOwnerMock>::connect_endpoints(
-                        publish, play,
-                    );
-
-                Box::new(fut.then(|res, this, _| {
-                    res.unwrap();
-
-                    assert!(this
-                        .peers_service
-                        .peer_metrics_service
-                        .is_peer_registered(PeerId(0)));
-                    assert!(this
-                        .peers_service
-                        .peer_metrics_service
-                        .is_peer_registered(PeerId(1)));
-
-                    async { Ok(()) }.into_actor(this)
-                }))
-            }
-        }
-
-        let runner = PeersServiceOwnerMock::new(peers).start();
-        runner.send(RunTest).await.unwrap().unwrap();
         register_peer_done.await.unwrap().unwrap();
+
+        assert!(peers_service
+            .peer_metrics_service
+            .borrow()
+            .is_peer_registered(PeerId(0)));
+        assert!(peers_service
+            .peer_metrics_service
+            .borrow()
+            .is_peer_registered(PeerId(1)));
     }
 
     /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
@@ -971,125 +855,109 @@ mod tests {
         mock.expect_register_room()
             .returning(|_, _| Box::pin(future::ok(())));
         mock.expect_unregister_room().returning(|_| {});
-        mock.expect_register_peer()
-            .returning(move |_, _, _| Box::pin(future::ok(())));
+        let (register_peer_tx, register_peer_rx) = mpsc::unbounded();
+        let register_peer_done = timeout(
+            Duration::from_secs(1),
+            register_peer_rx.take(4).collect::<Vec<_>>(),
+        );
+        mock.expect_register_peer().returning(move |_, _, _| {
+            register_peer_tx.unbounded_send(()).unwrap();
+            Box::pin(future::ok(()))
+        });
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
-        let peers: PeersService<PeersServiceOwnerMock> = PeersService::new(
+        let peers_service = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
         );
 
-        #[derive(Message)]
-        #[rtype(result = "Result<(), ()>")]
-        struct RunTest;
+        let publisher = Member::new(
+            "publisher".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let receiver = Member::new(
+            "receiver".into(),
+            "test".to_string(),
+            "test".into(),
+            Duration::from_secs(10),
+            Duration::from_secs(10),
+            Duration::from_secs(5),
+        );
+        let publish = WebRtcPublishEndpoint::new(
+            "publish".to_string().into(),
+            P2pMode::Always,
+            publisher.downgrade(),
+            false,
+            AudioSettings::default(),
+            VideoSettings::default(),
+        );
+        let play = WebRtcPlayEndpoint::new(
+            "play-publisher".to_string().into(),
+            SrcUri::try_from("local://test/publisher/publish".to_string())
+                .unwrap(),
+            publish.downgrade(),
+            receiver.downgrade(),
+            false,
+        );
 
-        impl Handler<RunTest> for PeersServiceOwnerMock {
-            type Result = ActFuture<PeersServiceOwnerMock, Result<(), ()>>;
+        peers_service
+            .clone()
+            .connect_endpoints(publish, play)
+            .await
+            .unwrap();
 
-            fn handle(
-                &mut self,
-                _: RunTest,
-                _: &mut Self::Context,
-            ) -> Self::Result {
-                let publisher = Member::new(
-                    "publisher".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let receiver = Member::new(
-                    "receiver".into(),
-                    "test".to_string(),
-                    "test".into(),
-                    Duration::from_secs(10),
-                    Duration::from_secs(10),
-                    Duration::from_secs(5),
-                );
-                let publish = WebRtcPublishEndpoint::new(
-                    "publish".to_string().into(),
-                    P2pMode::Always,
-                    publisher.downgrade(),
-                    false,
-                );
-                let play = WebRtcPlayEndpoint::new(
-                    "play-publisher".to_string().into(),
-                    SrcUri::try_from(
-                        "local://test/publisher/publish".to_string(),
-                    )
-                    .unwrap(),
-                    publish.downgrade(),
-                    receiver.downgrade(),
-                    false,
-                );
+        let first_peer_tracks_count = peers_service
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(0));
+        assert_eq!(first_peer_tracks_count, 2);
+        let second_peer_tracks_count = peers_service
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(1));
+        assert_eq!(second_peer_tracks_count, 2);
 
-                self.members.push(publisher.clone());
-                self.members.push(receiver.clone());
+        let publish = WebRtcPublishEndpoint::new(
+            "publish".to_string().into(),
+            P2pMode::Always,
+            receiver.downgrade(),
+            false,
+            AudioSettings::default(),
+            VideoSettings::default(),
+        );
+        let play = WebRtcPlayEndpoint::new(
+            "play-publisher".to_string().into(),
+            SrcUri::try_from("local://test/publisher/publish".to_string())
+                .unwrap(),
+            publish.downgrade(),
+            publisher.downgrade(),
+            false,
+        );
 
-                let fut =
-                    PeersService::<PeersServiceOwnerMock>::connect_endpoints(
-                        publish, play,
-                    );
+        peers_service
+            .clone()
+            .connect_endpoints(publish, play)
+            .await
+            .unwrap();
 
-                Box::new(fut.then(move |res, this, _| {
-                    res.unwrap();
+        let first_peer_tracks_count = peers_service
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(0));
+        assert_eq!(first_peer_tracks_count, 4);
+        let second_peer_tracks_count = peers_service
+            .peer_metrics_service
+            .borrow()
+            .peer_tracks_count(PeerId(1));
+        assert_eq!(second_peer_tracks_count, 4);
 
-                    let first_peer_tracks_count = this
-                        .peers_service
-                        .peer_metrics_service
-                        .peer_tracks_count(PeerId(0));
-                    assert_eq!(first_peer_tracks_count, 2);
-                    let second_peer_tracks_count = this
-                        .peers_service
-                        .peer_metrics_service
-                        .peer_tracks_count(PeerId(1));
-                    assert_eq!(second_peer_tracks_count, 2);
-
-                    let publish = WebRtcPublishEndpoint::new(
-                        "publish".to_string().into(),
-                        P2pMode::Always,
-                        receiver.downgrade(),
-                        false,
-                    );
-                    let play = WebRtcPlayEndpoint::new(
-                        "play-publisher".to_string().into(),
-                        SrcUri::try_from(
-                            "local://test/publisher/publish".to_string(),
-                        )
-                        .unwrap(),
-                        publish.downgrade(),
-                        publisher.downgrade(),
-                        false,
-                    );
-
-                    PeersService::<PeersServiceOwnerMock>::connect_endpoints(
-                        publish, play,
-                    )
-                    .then(|res, this, _| {
-                        res.unwrap();
-                        let first_peer_tracks_count = this
-                            .peers_service
-                            .peer_metrics_service
-                            .peer_tracks_count(PeerId(0));
-                        assert_eq!(first_peer_tracks_count, 4);
-                        let second_peer_tracks_count = this
-                            .peers_service
-                            .peer_metrics_service
-                            .peer_tracks_count(PeerId(1));
-                        assert_eq!(second_peer_tracks_count, 4);
-
-                        async { Ok(()) }.into_actor(this)
-                    })
-                }))
-            }
-        }
-
-        let runner = PeersServiceOwnerMock::new(peers).start();
-        runner.send(RunTest).await.unwrap().unwrap();
+        register_peer_done.await.unwrap();
     }
 }

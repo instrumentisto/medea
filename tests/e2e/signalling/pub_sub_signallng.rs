@@ -1,5 +1,5 @@
 use actix::{Context, System};
-use medea_client_api_proto::{Direction, Event};
+use medea_client_api_proto::{Direction, Event, NegotiationRole};
 
 use crate::signalling::TestMember;
 
@@ -30,7 +30,7 @@ fn pub_sub_video_call() {
                 let is_caller;
                 if let Event::PeerCreated {
                     peer_id,
-                    sdp_offer,
+                    negotiation_role,
                     tracks,
                     ice_servers,
                     force_relay,
@@ -51,7 +51,7 @@ fn pub_sub_video_call() {
                     );
                     assert_eq!(force_relay, &true);
 
-                    if sdp_offer.is_some() {
+                    if let NegotiationRole::Answerer(_) = negotiation_role {
                         is_caller = false;
                     } else {
                         is_caller = true;
@@ -97,13 +97,13 @@ fn pub_sub_video_call() {
 
         let deadline = Some(std::time::Duration::from_secs(5));
         TestMember::start(
-            format!("{}/caller/test", base_url),
+            format!("{}/responder/test", base_url),
             Some(Box::new(test_fn)),
             None,
             deadline,
         );
         TestMember::start(
-            format!("{}/responder/test", base_url),
+            format!("{}/caller/test", base_url),
             Some(Box::new(test_fn)),
             None,
             deadline,

@@ -96,6 +96,11 @@ pub enum TransceiverDirection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-recvonly
     Recvonly,
+
+    /// [`inactive` direction][1] of transceiver.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-inactive
+    Inactive,
 }
 
 impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
@@ -106,6 +111,7 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
         match direction {
             D::Sendonly => Self::Sendonly,
             D::Recvonly => Self::Recvonly,
+            D::Inactive => Self::Inactive,
         }
     }
 }

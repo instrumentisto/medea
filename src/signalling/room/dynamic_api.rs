@@ -101,13 +101,16 @@ impl Room {
                 HashMap<PeerId, HashSet<TrackId>>,
             > = HashMap::new();
             for (member_id, peer_id) in affected_peers {
-                if let Ok(peer) = self.peers.get_peer_by_id(peer_id) {
+                let removed_tracks_ids = self
+                    .peers
+                    .map_peer_by_id(peer_id, |peer| peer.removed_tracks_ids());
+                if let Ok(removed_tracks_ids) = removed_tracks_ids {
                     removed_tracks
                         .entry(member_id)
                         .or_default()
                         .entry(peer_id)
                         .or_default()
-                        .extend(peer.removed_tracks_ids());
+                        .extend(removed_tracks_ids);
                 } else {
                     removed_peers.entry(member_id).or_default().insert(peer_id);
                 };
@@ -191,6 +194,8 @@ impl Room {
             spec.p2p,
             member.downgrade(),
             spec.force_relay,
+            spec.audio_settings,
+            spec.video_settings,
         );
 
         debug!(
@@ -400,7 +405,7 @@ impl Handler<Delete> for Room {
                     endpoint_ids.push(endpoint_fid);
                 }
                 StatefulFid::Room(_) => {
-                    warn!("Found Fid<IsRoomId> while deleting __from__ Room.")
+                    warn!("Found Fid<IsRoomId> while deleting __from__ Room.");
                 }
             }
         }

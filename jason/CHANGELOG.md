@@ -44,6 +44,7 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+    - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
     - Library API:
@@ -58,8 +59,7 @@ All user visible changes to this project will be documented in this file. This p
         - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
-        - `TracksAdded` for adding new `Track`s to the already connected `PeerConnection` ([#105]);
-        - `TracksRemoved` for removing `Track`s from the already connected `PeerConnection` ([#109]).
+        - `TracksApplied` ([#105], [#109]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -83,6 +83,7 @@ All user visible changes to this project will be documented in this file. This p
 [#90]: /../../pull/90
 [#97]: /../../pull/97
 [#105]: /../../pull/105
+[#106]: /../../pull/106
 [#109]: /../../pull/109
 
 

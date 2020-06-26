@@ -25,8 +25,8 @@ All user visible changes to this project will be documented in this file. This p
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` and `PeerConnectionState` metrics ([#71], [#87]);
 - `RpcSettings` server message ([#75]);
 - `force_relay` field to `PeerCreated` event ([#79]);
-- `UpdateTracks` command and `TracksUpdated` event ([#81]);
-- `StatsUpdate` metric into `AddPeerConnectionMetrics` command ([#90]).
+- `UpdateTracks` command ([#81]);
+- `StatsUpdate` metric into `AddPeerConnectionMetrics` command ([#90]);
 - `RTCPeerConnection` stats ([#90]):
     - `RtcCodecStats`;
     - `RtcInboundRtpStreamStats`;
@@ -49,8 +49,9 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
-- `TracksAdded` event ([#105]);
-- `TrackRemoved` event ([#109]).
+- `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
+- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants  ([#81],[#105]);
+- Add `TrackUpdate::Removed` variant to the `TracksApplied` event ([#109]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -62,6 +63,8 @@ All user visible changes to this project will be documented in this file. This p
 [#90]: /../../pull/90
 [#102]: /../../pull/102
 [#105]: /../../pull/105
+[#106]: /../../pull/106
+[#109]: /../../pull/109
 
 
 

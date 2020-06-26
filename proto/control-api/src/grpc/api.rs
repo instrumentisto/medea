@@ -213,8 +213,51 @@ pub struct WebRtcPublishEndpoint {
     /// Option to relay all media through a TURN server forcibly.
     #[prost(bool, tag="5")]
     pub force_relay: bool,
+    /// Settings for the audio media type of this element.
+    #[prost(message, optional, tag="6")]
+    pub audio_settings: ::std::option::Option<web_rtc_publish_endpoint::AudioSettings>,
+    /// Settings for the video media type of this element.
+    #[prost(message, optional, tag="7")]
+    pub video_settings: ::std::option::Option<web_rtc_publish_endpoint::VideoSettings>,
 }
 pub mod web_rtc_publish_endpoint {
+    /// Audio media type settings of WebRtcPublishEndpoint.
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct AudioSettings {
+        /// Policy to publish audio media type with.
+        #[prost(enumeration="PublishPolicy", tag="1")]
+        pub publish_policy: i32,
+    }
+    /// Video media type settings of WebRtcPublishEndpoint.
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct VideoSettings {
+        /// Policy to publish video media type with.
+        #[prost(enumeration="PublishPolicy", tag="1")]
+        pub publish_policy: i32,
+    }
+    /// Policy of how the video or audio media type can be published in
+    /// WebRtcPublishEndpoint.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum PublishPolicy {
+        /// Media type MAY be published.
+        ///
+        /// Media server will try to initialize publishing, but won't produce any
+        /// errors if user application fails to (or chooses not to) acquire a
+        /// required media track. Media server will approve user requests to stop and
+        /// to restart publishing the specified media type.
+        Optional = 0,
+        /// Media type MUST be published.
+        ///
+        /// Media server will try to initialize publishing, and if a required media
+        /// track couldn't be acquired, then an error will be thrown. Media server
+        /// will deny all requests to stop publishing.
+        Required = 1,
+        /// Media type MUST not be published.
+        ///
+        /// Media server will not try to initialize publishing.
+        Disabled = 2,
+    }
     /// P2P mode of WebRTC interaction.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]

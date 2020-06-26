@@ -1,4 +1,7 @@
-//! [`futures::future::TryJoinAll`] for [`actix::ActorFuture`].
+//! [`TryJoinAll`] for [`ActorFuture`].
+//!
+//! [`actix::ActorFuture`]: actix::ActorFuture
+//! [`futures::future::TryJoinAll`]: futures::future::TryJoinAll
 
 use core::{
     mem,
@@ -19,8 +22,11 @@ use actix::{fut::ActorFuture, Actor};
 /// however, then the returned future will succeed with a [`Vec`] of all the
 /// successful results.
 ///
-/// This function is analog for the [`futures::future::try_join_all`], but for
-/// the [`actix::ActorFuture`].
+/// This function is analog for the [`try_join_all`], but for
+/// the [`ActorFuture`].
+///
+/// [`actix::ActorFuture`]: actix::ActorFuture
+/// [`futures::future::TryJoinAll`]: futures::future::TryJoinAll
 pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
 where
     I: IntoIterator<Item = F>,

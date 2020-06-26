@@ -104,7 +104,7 @@ impl PeersMetricsService {
     ///
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
-    pub fn check_peers(&mut self) {
+    pub fn check_peers(&self) {
         for peer in self
             .peers
             .values()
@@ -202,7 +202,7 @@ impl PeersMetricsService {
     /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
     /// TrackTrafficStarted`] to the [`Room`] if some
     /// [`MediaType`]/[`Direction`] was stopped.
-    pub fn add_stats(&mut self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
@@ -315,7 +315,7 @@ impl PeersMetricsService {
 
     /// Updates [`Peer`]s internal representation. Must be called each time
     /// [`Peer`] tracks set changes (some track was added or removed).
-    pub fn update_peer_tracks(&mut self, peer: &Peer) {
+    pub fn update_peer_tracks(&self, peer: &Peer) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
         }
@@ -452,13 +452,13 @@ impl From<&Peer> for PeerTracks {
         let mut audio_recv = 0;
         let mut video_recv = 0;
 
-        for sender in peer.senders().values() {
+        for sender in peer.senders().values().filter(|t| t.is_enabled()) {
             match sender.media_type {
                 MediaTypeProto::Audio(_) => audio_send += 1,
                 MediaTypeProto::Video(_) => video_send += 1,
             }
         }
-        for receiver in peer.receivers().values() {
+        for receiver in peer.receivers().values().filter(|t| t.is_enabled()) {
             match receiver.media_type {
                 MediaTypeProto::Audio(_) => audio_recv += 1,
                 MediaTypeProto::Video(_) => video_recv += 1,
@@ -861,13 +861,14 @@ mod tests {
     use super::PeersMetricsService;
 
     impl PeersMetricsService {
-        /// Returns `true` if `Peer` with a provided [`PeerId`] isn't registered
-        /// in the [`PeersMetricsService`].
+        /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
+        /// registered in the [`PeersMetricsService`].
+        #[inline]
         pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
             self.peers.contains_key(&peer_id)
         }
 
-        /// Returns count of the `MediaTrack` which are registerd in the
+        /// Returns count of the [`MediaTrack`] which are registered in the
         /// [`PeersMetricsService`].
         pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
             if let Some(peer) = self.peers.get(&peer_id) {
@@ -1033,7 +1034,7 @@ mod tests {
         /// Generates [`RtcStats`] and adds them to inner
         /// [`PeersMetricsService`] for `PeerId(1)`.
         pub fn add_stats(
-            &mut self,
+            &self,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
@@ -1136,7 +1137,7 @@ mod tests {
         }
 
         /// Calls [`PeerMetricsService::check_peers`].
-        pub fn check_peers(&mut self) {
+        pub fn check_peers(&self) {
             self.metrics.check_peers();
         }
 

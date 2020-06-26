@@ -617,23 +617,27 @@ impl Handler<RegisterPeer> for PeersTrafficWatcherImpl {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.stats.get_mut(&msg.room_id) {
-            debug!(
-                "Peer [id = {}] from a Room [id = {}] was registered in the \
-                 PeersTrafficWatcher with {:?} sources.",
-                msg.peer_id, msg.room_id, msg.flow_metrics_sources
-            );
-            room.peers.insert(
-                msg.peer_id,
-                PeerStat {
-                    peer_id: msg.peer_id,
-                    state: PeerState::New,
-                    init_task_handler: None,
-                    tracked_sources: msg.flow_metrics_sources,
-                    started_at: None,
-                    received_sources: HashMap::new(),
-                    traffic_flowing_timeout: self.traffic_report_ttl,
-                },
-            );
+            if let Some(peer) = room.peers.get_mut(&msg.peer_id) {
+                peer.tracked_sources.extend(msg.flow_metrics_sources);
+            } else {
+                debug!(
+                    "Peer [id = {}] from a Room [id = {}] was registered in \
+                     the PeersTrafficWatcher with {:?} sources.",
+                    msg.peer_id, msg.room_id, msg.flow_metrics_sources
+                );
+                room.peers.insert(
+                    msg.peer_id,
+                    PeerStat {
+                        peer_id: msg.peer_id,
+                        state: PeerState::New,
+                        init_task_handler: None,
+                        tracked_sources: msg.flow_metrics_sources,
+                        started_at: None,
+                        received_sources: HashMap::new(),
+                        traffic_flowing_timeout: self.traffic_report_ttl,
+                    },
+                );
+            }
         }
     }
 }
@@ -750,7 +754,7 @@ mod tests {
     async fn correct_stopped_at_when_init_timeout_stop() {
         let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(100),
-            ..Default::default()
+            max_lag: Duration::from_secs(999),
         })
         .await;
         helper
@@ -776,7 +780,6 @@ mod tests {
         let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_secs(999),
             max_lag: Duration::from_millis(50),
-            ..Default::default()
         })
         .await;
         helper
@@ -848,7 +851,6 @@ mod tests {
         let mut helper = Helper::new(&conf::Media {
             init_timeout: Duration::from_millis(30),
             max_lag: Duration::from_secs(999),
-            ..Default::default()
         })
         .await;
         helper
@@ -962,7 +964,6 @@ mod tests {
             let mut helper = Helper::new(&conf::Media {
                 init_timeout: Duration::from_secs(999),
                 max_lag: Duration::from_secs(999),
-                ..Default::default()
             })
             .await;
             helper

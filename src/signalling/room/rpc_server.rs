@@ -20,6 +20,7 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
+    media::PeerStateMachine,
     signalling::room::RoomError,
     utils::ResponseActAnyFuture,
 };
@@ -66,13 +67,15 @@ impl Room {
             | C::UpdateTracks { peer_id, .. } => peer_id,
         };
 
-        let peer = self
+        let peer_member_id = self
             .peers
-            .get_peer_by_id(peer_id)
+            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
             .map_err(|_| PeerNotFound(peer_id))?;
-        if peer.member_id() != command.member_id {
-            return Err(PeerBelongsToAnotherMember(peer_id, peer.member_id()));
+
+        if peer_member_id != command.member_id {
+            return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
         }
+
         Ok(())
     }
 }
@@ -222,23 +225,23 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut = self
             .members
             .connection_established(ctx, msg.member_id, msg.connection)
-            .then(|res, room, _| match res {
-                Ok(member) => {
-                    Box::new(room.init_member_connections(&member).map(
-                        move |res, room, _| {
-                            res?;
-                            if let Some(callback_url) = member.get_on_join() {
-                                room.callbacks.send_callback(
-                                    callback_url,
-                                    member.get_fid().into(),
-                                    OnJoinEvent,
-                                );
-                            };
-                            Ok(())
-                        },
-                    ))
-                }
-                Err(e) => Box::new(actix::fut::err(e.into())) as ActFuture<_>,
+            .then(|res, room, _| {
+                let member = actix_try!(res);
+                Box::new(
+                    room.init_member_connections(&member)
+                        .map(|res, _, _| res.map(|_| member)),
+                )
+            })
+            .map(|result, room, _| {
+                let member = result?;
+                if let Some(callback_url) = member.get_on_join() {
+                    room.callbacks.send_callback(
+                        callback_url,
+                        member.get_fid().into(),
+                        OnJoinEvent,
+                    );
+                };
+                Ok(())
             });
         Box::new(fut)
     }
