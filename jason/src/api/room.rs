@@ -210,7 +210,6 @@ impl RoomHandle {
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
             inner
-                .clone()
                 .toggle_mute(is_muted, kind)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
@@ -281,7 +280,7 @@ impl RoomHandle {
     pub fn join(&self, token: String) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         future_to_promise(async move {
-            inner?.inner_join(token).await?;
+            inner?.inner_join(token).await.map_err(JasonError::from)?;
             Ok(JsValue::undefined())
         })
     }
@@ -565,23 +564,23 @@ impl InnerRoom {
     pub async fn inner_join(
         self: Rc<Self>,
         token: String,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<RoomError>> {
         if !self.on_failed_local_stream.is_set() {
-            return Err(JasonError::from(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_failed_local_stream()")
+            return Err(tracerr::new!(RoomError::CallbackNotSet(
+                "Room.on_failed_local_stream()"
             )));
         }
 
         if !self.on_connection_loss.is_set() {
-            return Err(JasonError::from(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_connection_loss()")
+            return Err(tracerr::new!(RoomError::CallbackNotSet(
+                "Room.on_connection_loss()"
             )));
         }
 
         self.rpc
             .connect(token)
             .await
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         let mut connection_loss_stream = self.rpc.on_connection_loss();
         let weak_inner = Rc::downgrade(&self);
@@ -827,7 +826,7 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Result<(), Traced<RoomError>> {
-        let peer = match self
+        let peer = self
             .peers
             .create_peer(
                 peer_id,
@@ -835,14 +834,7 @@ impl EventHandler for InnerRoom {
                 self.peer_event_sender.clone(),
                 is_force_relayed,
             )
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-        {
-            Ok(peer) => peer,
-            Err(err) => {
-                JasonError::from(err).print();
-                return Ok(());
-            }
-        };
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         self.create_connections_from_tracks(&tracks);
         self.create_tracks_and_maybe_negotiate(
@@ -867,7 +859,7 @@ impl EventHandler for InnerRoom {
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.set_remote_answer(sdp_answer)
             .await
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Applies specified [`IceCandidate`] to a specified [`PeerConnection`].
@@ -887,7 +879,7 @@ impl EventHandler for InnerRoom {
             candidate.sdp_mid,
         )
         .await
-        .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disposes specified [`PeerConnection`]s.
