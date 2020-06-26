@@ -1,17 +1,19 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use futures::{
     channel::{mpsc, oneshot},
-    stream::{self, StreamExt as _},
+    stream::{self, BoxStream, StreamExt as _},
 };
-use medea_client_api_proto::{Command, Event, IceServer, PeerId};
+use medea_client_api_proto::{
+    Command, Event, NegotiationRole, PeerId, TrackUpdate,
+};
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{
-        MockPeerRepository, PeerConnection, PeerEvent, StableMuteState,
+        MockPeerRepository, PeerConnection, Repository, StableMuteState,
         TransceiverKind,
     },
     rpc::MockRpcClient,
@@ -65,9 +67,13 @@ fn get_test_room_and_exist_peer(
             tracks_patches,
         } => {
             event_tx
-                .unbounded_send(Event::TracksUpdated {
+                .unbounded_send(Event::TracksApplied {
                     peer_id,
-                    tracks_patches,
+                    updates: tracks_patches
+                        .into_iter()
+                        .map(TrackUpdate::Updated)
+                        .collect(),
+                    negotiation_role: None,
                 })
                 .unwrap();
         }
@@ -312,34 +318,10 @@ async fn join_unmute_and_mute_audio() {
     ));
 }
 
-fn get_test_room_and_new_peer(
-    event_rx: mpsc::UnboundedReceiver<Event>,
-) -> (Room, Rc<PeerConnection>) {
+fn get_test_room(events: BoxStream<'static, Event>) -> Room {
     let mut rpc = MockRpcClient::new();
-    let mut repo = Box::new(MockPeerRepository::new());
 
-    rpc.expect_subscribe()
-        .return_once(move || Box::pin(event_rx));
-    repo.expect_get_all().returning(|| Vec::new());
-    let (tx, _rx) = mpsc::unbounded();
-    let peer = PeerConnection::new(
-        PeerId(1),
-        tx,
-        Vec::new(),
-        Rc::new(MediaManager::default()),
-        false,
-    )
-    .unwrap();
-    let peer_clone = Rc::clone(&peer);
-    repo.expect_create_peer()
-        .withf(
-            move |id: &PeerId,
-                  _ice_servers: &Vec<IceServer>,
-                  _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
-                  _is_force_relay: &bool| { *id == PeerId(1) },
-        )
-        .return_once_st(move |_, _, _, _| Ok(peer_clone));
-    rpc.expect_send_command().return_const(());
+    rpc.expect_subscribe().return_once(move || events);
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
     rpc.expect_on_connection_loss()
@@ -347,8 +329,7 @@ fn get_test_room_and_new_peer(
     rpc.expect_on_reconnected()
         .return_once(|| stream::pending().boxed_local());
 
-    let room = Room::new(Rc::new(rpc), repo);
-    (room, peer)
+    Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())))
 }
 
 // TODO: Allow muting before Peer init (instrumentisto/medea#85).
@@ -414,9 +395,9 @@ fn get_test_room_and_new_peer(
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, _peer) = get_test_room_and_new_peer(event_rx);
-
+    let room = get_test_room(Box::pin(event_rx));
     let room_handle = room.new_handle();
+
     let (cb, test_result) = js_callback!(|err: JasonError| {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
@@ -439,7 +420,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            sdp_offer: None,
+            negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
             force_relay: false,
@@ -537,8 +518,7 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
 #[wasm_bindgen_test]
 async fn error_get_local_stream_on_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, _peer) = get_test_room_and_new_peer(event_rx);
-
+    let room = get_test_room(Box::pin(event_rx));
     let room_handle = room.new_handle();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
@@ -560,7 +540,7 @@ async fn error_get_local_stream_on_new_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            sdp_offer: None,
+            negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
             force_relay: false,
@@ -580,20 +560,9 @@ async fn error_get_local_stream_on_new_peer() {
 ///     1. Room::join returns error.
 #[wasm_bindgen_test]
 async fn error_join_room_without_on_failed_stream_callback() {
-    let (_, event_rx) = mpsc::unbounded();
-    let mut rpc = MockRpcClient::new();
-    rpc.expect_subscribe()
-        .return_once(move || Box::pin(event_rx));
-    rpc.expect_unsub().return_const(());
-    rpc.expect_set_close_reason().return_const(());
-    rpc.expect_on_connection_loss()
-        .return_once(|| stream::pending().boxed_local());
-    rpc.expect_on_reconnected()
-        .return_once(|| stream::pending().boxed_local());
-    let repo = Box::new(MockPeerRepository::new());
-    let room = Room::new(Rc::new(rpc), repo);
-
+    let room = get_test_room(stream::pending().boxed());
     let room_handle = room.new_handle();
+
     room_handle
         .on_connection_loss(js_sys::Function::new_no_args(""))
         .unwrap();
@@ -620,20 +589,9 @@ async fn error_join_room_without_on_failed_stream_callback() {
 ///     1. Room::join returns error.
 #[wasm_bindgen_test]
 async fn error_join_room_without_on_connection_loss_callback() {
-    let (_, event_rx) = mpsc::unbounded();
-    let mut rpc = MockRpcClient::new();
-    rpc.expect_subscribe()
-        .return_once(move || Box::pin(event_rx));
-    rpc.expect_unsub().return_const(());
-    rpc.expect_set_close_reason().return_const(());
-    rpc.expect_on_connection_loss()
-        .return_once(|| stream::pending().boxed_local());
-    rpc.expect_on_reconnected()
-        .return_once(|| stream::pending().boxed_local());
-    let repo = Box::new(MockPeerRepository::new());
-    let room = Room::new(Rc::new(rpc), repo);
-
+    let room = get_test_room(stream::pending().boxed());
     let room_handle = room.new_handle();
+
     room_handle
         .on_failed_local_stream(js_sys::Function::new_no_args(""))
         .unwrap();
@@ -653,15 +611,8 @@ async fn error_join_room_without_on_connection_loss_callback() {
 
 /// Tests for `RoomHandle.on_close` JS side callback.
 mod on_close_callback {
-    use std::rc::Rc;
-
-    use futures::channel::mpsc;
     use medea_client_api_proto::CloseReason as CloseByServerReason;
-    use medea_jason::{
-        api::Room,
-        peer::MockPeerRepository,
-        rpc::{ClientDisconnect, CloseReason, MockRpcClient},
-    };
+    use medea_jason::rpc::{ClientDisconnect, CloseReason};
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_test::*;
 
@@ -684,25 +635,6 @@ mod on_close_callback {
         fn get_is_err(reason: &JsValue) -> bool;
     }
 
-    /// Returns empty [`Room`] with mocks inside.
-    fn get_room() -> Room {
-        let mut rpc = MockRpcClient::new();
-        let repo = Box::new(MockPeerRepository::new());
-
-        let (_event_tx, event_rx) = mpsc::unbounded();
-        rpc.expect_subscribe()
-            .return_once(move || Box::pin(event_rx));
-        rpc.expect_send_command().return_const(());
-        rpc.expect_unsub().return_const(());
-        rpc.expect_set_close_reason().return_const(());
-        rpc.expect_on_connection_loss()
-            .return_once(|| stream::pending().boxed_local());
-        rpc.expect_on_reconnected()
-            .return_once(|| stream::pending().boxed_local());
-
-        Room::new(Rc::new(rpc), repo)
-    }
-
     /// Tests that JS side [`RoomHandle::on_close`] works.
     ///
     /// # Algorithm
@@ -714,7 +646,7 @@ mod on_close_callback {
     /// 3. Check that JS callback was called with this reason.
     #[wasm_bindgen_test]
     async fn closed_by_server() {
-        let room = get_room();
+        let room = get_test_room(stream::pending().boxed());
         let mut room_handle = room.new_handle();
 
         let (cb, test_result) = js_callback!(|closed: JsValue| {
@@ -742,7 +674,7 @@ mod on_close_callback {
     /// RoomUnexpectedlyDropped`.
     #[wasm_bindgen_test]
     async fn unexpected_room_drop() {
-        let room = get_room();
+        let room = get_test_room(stream::pending().boxed());
         let mut room_handle = room.new_handle();
 
         let (cb, test_result) = js_callback!(|closed: JsValue| {
@@ -767,7 +699,7 @@ mod on_close_callback {
     /// 3. Check that JS callback was called with this [`CloseReason`].
     #[wasm_bindgen_test]
     async fn normal_close_by_client() {
-        let room = get_room();
+        let room = get_test_room(stream::pending().boxed());
         let mut room_handle = room.new_handle();
 
         let (cb, test_result) = js_callback!(|closed: JsValue| {
@@ -798,7 +730,6 @@ mod rpc_close_reason_on_room_drop {
     /// with [`RpcClient`]'s close reason ([`ClientDisconnect`]).
     async fn get_client() -> (Room, oneshot::Receiver<ClientDisconnect>) {
         let mut rpc = MockRpcClient::new();
-        let repo = Box::new(MockPeerRepository::new());
 
         let (_event_tx, event_rx) = mpsc::unbounded();
         rpc.expect_subscribe()
@@ -813,7 +744,7 @@ mod rpc_close_reason_on_room_drop {
         rpc.expect_set_close_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
         });
-        let room = Room::new(Rc::new(rpc), repo);
+        let room = Room::new(Rc::new(rpc), Box::new(MockPeerRepository::new()));
         (room, test_rx)
     }
 
@@ -876,7 +807,6 @@ mod rpc_close_reason_on_room_drop {
 
 /// Tests for [`TrackPatch`] generation in [`Room`].
 mod patches_generation {
-    use std::collections::HashMap;
 
     use futures::StreamExt;
     use medea_client_api_proto::{

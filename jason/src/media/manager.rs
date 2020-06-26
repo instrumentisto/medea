@@ -5,12 +5,10 @@
 use std::{
     cell::RefCell,
     convert::TryFrom,
-    future::Future,
     rc::{Rc, Weak},
 };
 
 use derive_more::Display;
-use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -97,40 +95,37 @@ struct InnerMediaManager {
 
 impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
-    fn enumerate_devices() -> impl Future<Output = Result<Vec<InputDeviceInfo>>>
-    {
+    async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, EnumerateDevicesFailed,
         };
 
-        async {
-            let devices = window()
-                .navigator()
-                .media_devices()
-                .map_err(JsError::from)
-                .map_err(CouldNotGetMediaDevices)
-                .map_err(tracerr::from_and_wrap!())?;
-            let devices = JsFuture::from(
-                devices
-                    .enumerate_devices()
-                    .map_err(JsError::from)
-                    .map_err(EnumerateDevicesFailed)
-                    .map_err(tracerr::from_and_wrap!())?,
-            )
-            .await
+        let devices = window()
+            .navigator()
+            .media_devices()
             .map_err(JsError::from)
-            .map_err(EnumerateDevicesFailed)
+            .map_err(CouldNotGetMediaDevices)
             .map_err(tracerr::from_and_wrap!())?;
+        let devices = JsFuture::from(
+            devices
+                .enumerate_devices()
+                .map_err(JsError::from)
+                .map_err(EnumerateDevicesFailed)
+                .map_err(tracerr::from_and_wrap!())?,
+        )
+        .await
+        .map_err(JsError::from)
+        .map_err(EnumerateDevicesFailed)
+        .map_err(tracerr::from_and_wrap!())?;
 
-            Ok(js_sys::Array::from(&devices)
-                .values()
-                .into_iter()
-                .filter_map(|info| {
-                    let info = web_sys::MediaDeviceInfo::from(info.unwrap());
-                    InputDeviceInfo::try_from(info).ok()
-                })
-                .collect())
-        }
+        Ok(js_sys::Array::from(&devices)
+            .values()
+            .into_iter()
+            .filter_map(|info| {
+                let info = web_sys::MediaDeviceInfo::from(info.unwrap());
+                InputDeviceInfo::try_from(info).ok()
+            })
+            .collect())
     }
 
     /// Obtains [`MediaStream`] based on a provided [`MediaStreamSettings`].
@@ -149,59 +144,38 @@ impl InnerMediaManager {
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    fn get_stream(
+    async fn get_stream(
         &self,
         mut caps: MediaStreamSettings,
-    ) -> impl Future<Output = Result<(MediaStream, bool)>> {
+    ) -> Result<(MediaStream, bool)> {
         let original_caps = caps.clone();
 
         let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
         match caps {
-            None => {
-                future::ok((MediaStream::new(result, original_caps), false))
-                    .left_future()
-                    .left_future()
+            None => Ok((MediaStream::new(result, original_caps), false)),
+            Some(MultiSourceMediaStreamConstraints::Display(caps)) => {
+                let mut tracks = self.get_display_media(caps).await?;
+                result.append(&mut tracks);
+                Ok((MediaStream::new(result, original_caps), true))
             }
-            Some(MultiSourceMediaStreamConstraints::Display(caps)) => self
-                .get_display_media(caps)
-                .map_ok(|mut tracks| {
-                    result.append(&mut tracks);
-                    result
-                })
-                .map_ok(|result| {
-                    (MediaStream::new(result, original_caps), true)
-                })
-                .left_future()
-                .right_future(),
-            Some(MultiSourceMediaStreamConstraints::Device(caps)) => self
-                .get_user_media(caps)
-                .map_ok(|mut tracks| {
-                    result.append(&mut tracks);
-                    result
-                })
-                .map_ok(|result| {
-                    (MediaStream::new(result, original_caps), true)
-                })
-                .right_future()
-                .left_future(),
+            Some(MultiSourceMediaStreamConstraints::Device(caps)) => {
+                let mut tracks = self.get_user_media(caps).await?;
+                result.append(&mut tracks);
+                Ok((MediaStream::new(result, original_caps), true))
+            }
             Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
                 device_caps,
                 display_caps,
             )) => {
-                let get_user_media = self.get_user_media(device_caps);
-                let get_display_media = self.get_display_media(display_caps);
+                let mut get_user_media =
+                    self.get_user_media(device_caps).await?;
+                let mut get_display_media =
+                    self.get_display_media(display_caps).await?;
+                result.append(&mut get_user_media);
+                result.append(&mut get_display_media);
 
-                async move {
-                    let mut get_user_media = get_user_media.await?;
-                    let mut get_display_media = get_display_media.await?;
-                    result.append(&mut get_user_media);
-                    result.append(&mut get_display_media);
-
-                    Ok((MediaStream::new(result, original_caps), true))
-                }
-                .right_future()
-                .right_future()
+                Ok((MediaStream::new(result, original_caps), true))
             }
         }
     }
@@ -262,45 +236,41 @@ impl InnerMediaManager {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://tinyurl.com/rnxcavf
-    fn get_user_media(
+    async fn get_user_media(
         &self,
         caps: SysMediaStreamConstraints,
-    ) -> impl Future<Output = Result<Vec<MediaStreamTrack>>> {
+    ) -> Result<Vec<MediaStreamTrack>> {
         use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
 
-        let storage = Rc::clone(&self.tracks);
-
-        async move {
-            let media_devices = window()
-                .navigator()
-                .media_devices()
-                .map_err(JsError::from)
-                .map_err(CouldNotGetMediaDevices)
-                .map_err(tracerr::from_and_wrap!())?;
-
-            let stream = JsFuture::from(
-                media_devices
-                    .get_user_media_with_constraints(&caps)
-                    .map_err(JsError::from)
-                    .map_err(GetUserMediaFailed)
-                    .map_err(tracerr::from_and_wrap!())?,
-            )
-            .await
-            .map(SysMediaStream::from)
+        let media_devices = window()
+            .navigator()
+            .media_devices()
             .map_err(JsError::from)
-            .map_err(GetUserMediaFailed)
+            .map_err(CouldNotGetMediaDevices)
             .map_err(tracerr::from_and_wrap!())?;
 
-            let mut storage_mut = storage.borrow_mut();
-            let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
-                .unwrap()
-                .unwrap()
-                .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-                .inspect(|track| storage_mut.push(track.downgrade()))
-                .collect();
+        let stream = JsFuture::from(
+            media_devices
+                .get_user_media_with_constraints(&caps)
+                .map_err(JsError::from)
+                .map_err(GetUserMediaFailed)
+                .map_err(tracerr::from_and_wrap!())?,
+        )
+        .await
+        .map(SysMediaStream::from)
+        .map_err(JsError::from)
+        .map_err(GetUserMediaFailed)
+        .map_err(tracerr::from_and_wrap!())?;
 
-            Ok(tracks)
-        }
+        let mut storage = self.tracks.borrow_mut();
+        let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
+            .unwrap()
+            .unwrap()
+            .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+            .inspect(|track| storage.push(track.downgrade()))
+            .collect();
+
+        Ok(tracks)
     }
 
     /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call, saves
@@ -309,46 +279,42 @@ impl InnerMediaManager {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    fn get_display_media(
+    async fn get_display_media(
         &self,
         caps: SysMediaStreamConstraints,
-    ) -> impl Future<Output = Result<Vec<MediaStreamTrack>>> {
+    ) -> Result<Vec<MediaStreamTrack>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
         };
 
-        let storage = Rc::clone(&self.tracks);
-
-        async move {
-            let media_devices = window()
-                .navigator()
-                .media_devices()
-                .map_err(JsError::from)
-                .map_err(CouldNotGetMediaDevices)
-                .map_err(tracerr::from_and_wrap!())?;
-
-            let stream = JsFuture::from(
-                get_display_media(&media_devices, &caps)
-                    .map_err(JsError::from)
-                    .map_err(GetDisplayMediaFailed)
-                    .map_err(tracerr::from_and_wrap!())?,
-            )
-            .await
-            .map(SysMediaStream::from)
+        let media_devices = window()
+            .navigator()
+            .media_devices()
             .map_err(JsError::from)
-            .map_err(GetUserMediaFailed)
+            .map_err(CouldNotGetMediaDevices)
             .map_err(tracerr::from_and_wrap!())?;
 
-            let mut storage_mut = storage.borrow_mut();
-            let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
-                .unwrap()
-                .unwrap()
-                .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-                .inspect(|track| storage_mut.push(track.downgrade()))
-                .collect();
+        let stream = JsFuture::from(
+            get_display_media(&media_devices, &caps)
+                .map_err(JsError::from)
+                .map_err(GetDisplayMediaFailed)
+                .map_err(tracerr::from_and_wrap!())?,
+        )
+        .await
+        .map(SysMediaStream::from)
+        .map_err(JsError::from)
+        .map_err(GetUserMediaFailed)
+        .map_err(tracerr::from_and_wrap!())?;
 
-            Ok(tracks)
-        }
+        let mut storage = self.tracks.borrow_mut();
+        let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
+            .unwrap()
+            .unwrap()
+            .map(|tr| MediaStreamTrack::from(tr.unwrap()))
+            .inspect(|track| storage.push(track.downgrade()))
+            .collect();
+
+        Ok(tracks)
     }
 }
 
@@ -424,17 +390,15 @@ impl MediaManagerHandle {
     /// Returns [`MediaStream`](LocalMediaStream) object, built from provided
     /// [`MediaStreamSettings`].
     pub fn init_local_stream(&self, caps: &MediaStreamSettings) -> Promise {
-        match upgrade_or_detached!(self.0)
-            .map(|inner| inner.get_stream(caps.clone()))
-        {
-            Ok(stream) => future_to_promise(async {
-                stream
-                    .await
-                    .map(|(stream, _)| stream.into())
-                    .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|e| JasonError::from(e).into())
-            }),
-            Err(err) => future_to_promise(future::err(err)),
-        }
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        let caps = caps.clone();
+        future_to_promise(async move {
+            inner?
+                .get_stream(caps)
+                .await
+                .map(|(stream, _)| stream.into())
+                .map_err(tracerr::wrap!(=> MediaManagerError))
+                .map_err(|e| JasonError::from(e).into())
+        })
     }
 }

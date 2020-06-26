@@ -21,7 +21,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{New, Peer, PeerStateMachine},
+    media::{Peer, PeerError, PeerStateMachine, Stable},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -80,7 +80,7 @@ pub struct PeersService {
 }
 
 /// Simple ID counter.
-#[derive(Default, Debug, Clone, Display)]
+#[derive(Clone, Debug, Default, Display)]
 pub struct Counter<T: Copy> {
     count: Cell<T>,
 }
@@ -95,13 +95,23 @@ impl<T: Incrementable + Copy> Counter<T> {
 }
 
 /// Result of the [`PeersService::get_or_create_peers`] function.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum GetOrCreatePeersResult {
     /// Requested [`Peer`] pair was created.
     Created(PeerId, PeerId),
 
     /// Requested [`Peer`] pair already existed.
     AlreadyExisted(PeerId, PeerId),
+}
+
+/// Result of the [`PeersService::connect_endpoints`] function.
+#[derive(Clone, Copy, Debug)]
+pub enum ConnectEndpointsResult {
+    /// New [`Peer`] pair was created.
+    Created(PeerId, PeerId),
+
+    /// [`Peer`] pair was updated.
+    Updated(PeerId, PeerId),
 }
 
 impl PeersService {
@@ -229,13 +239,17 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
+    ///
+    /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
+    /// requested state.
     pub fn take_inner_peer<S>(
         &self,
         peer_id: PeerId,
     ) -> Result<Peer<S>, RoomError>
     where
         Peer<S>: TryFrom<PeerStateMachine>,
-        <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
+        <Peer<S> as TryFrom<PeerStateMachine>>::Error:
+            Into<(PeerError, PeerStateMachine)>,
     {
         self.peers.take_inner_peer(peer_id)
     }
@@ -331,7 +345,9 @@ impl PeersService {
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
         sink: WebRtcPlayEndpoint,
-    ) -> Result<Option<(PeerId, PeerId)>, RoomError> {
+    ) -> Result<Option<ConnectEndpointsResult>, RoomError> {
+        use ConnectEndpointsResult::{Created, Updated};
+
         debug!(
             "Connecting endpoints of Member [id = {}] with Member [id = {}]",
             src.owner().id(),
@@ -339,7 +355,7 @@ impl PeersService {
         );
         match self.get_or_create_peers(&src, &sink).await? {
             GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id) => {
-                Ok(Some((src_peer_id, sink_peer_id)))
+                Ok(Some(Created(src_peer_id, sink_peer_id)))
             }
             GetOrCreatePeersResult::AlreadyExisted(
                 src_peer_id,
@@ -355,9 +371,9 @@ impl PeersService {
                     //       which might not be the case, e.g. Control
                     //       Service creates multiple endpoints in quick
                     //       succession.
-                    let mut src_peer: Peer<New> =
+                    let mut src_peer: Peer<Stable> =
                         self.peers.take_inner_peer(src_peer_id).unwrap();
-                    let mut sink_peer: Peer<New> =
+                    let mut sink_peer: Peer<Stable> =
                         self.peers.take_inner_peer(sink_peer_id).unwrap();
 
                     src_peer.add_publisher(
@@ -406,7 +422,7 @@ impl PeersService {
                         .await
                         .map_err(RoomError::PeerTrafficWatcherMailbox)?;
 
-                    Ok(None)
+                    Ok(Some(Updated(src_peer_id, sink_peer_id)))
                 }
             }
         }
@@ -555,9 +571,16 @@ impl PeerRepository {
     ) -> Result<Peer<S>, RoomError>
     where
         Peer<S>: TryFrom<PeerStateMachine>,
-        <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
+        <Peer<S> as TryFrom<PeerStateMachine>>::Error:
+            Into<(PeerError, PeerStateMachine)>,
     {
-        self.take(peer_id)?.try_into().map_err(Into::into)
+        type Err<S> = <Peer<S> as TryFrom<PeerStateMachine>>::Error;
+
+        self.take(peer_id)?.try_into().map_err(|e: Err<S>| {
+            let (err, peer) = e.into();
+            self.add_peer(peer);
+            RoomError::from(err)
+        })
     }
 
     /// Stores [`Peer`] in [`Room`].

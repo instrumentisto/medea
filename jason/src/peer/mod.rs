@@ -81,7 +81,7 @@ pub enum PeerError {
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
-#[dispatchable]
+#[dispatchable(self: &Self, async_trait(?Send))]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
@@ -576,7 +576,7 @@ impl PeerConnection {
         local_stream: Option<MediaStreamSettings>,
     ) -> Result<String> {
         self.media_connections
-            .update_tracks(tracks)
+            .create_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream(local_stream)
@@ -588,8 +588,20 @@ impl PeerConnection {
             .create_and_set_offer()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
-
         Ok(offer)
+    }
+
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
+    /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
+    pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+        self.media_connections
+            .create_tracks(tracks)
+            .map_err(tracerr::map_from_and_wrap!())?;
+        Ok(())
     }
 
     /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
@@ -775,17 +787,20 @@ impl PeerConnection {
                 Direction::Recv { .. } => true,
             });
 
-        // update receivers
+        // create receivers
         self.media_connections
-            .update_tracks(recv)
+            .create_tracks(recv)
             .map_err(tracerr::map_from_and_wrap!())?;
 
+        // set offer, which will create transceivers and discover remote tracks
+        // in receivers
         self.set_remote_offer(offer)
             .await
             .map_err(tracerr::wrap!())?;
 
+        // create senders
         self.media_connections
-            .update_tracks(send)
+            .create_tracks(send)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream(local_constraints)

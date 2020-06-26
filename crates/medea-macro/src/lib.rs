@@ -216,9 +216,39 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// assert_eq!(foo.baz, 3);
 /// assert_eq!(bar, 3);
 /// ```
+/// ### Optional. You can change `self` type in handler functions.
+///
+/// All handler functions are take mutable reference to `Self`, you can spevify
+/// type manually if default does not suite your needs.
+///
+/// ```
+/// # use std::rc::Rc;
+/// # use medea_macro::dispatchable;
+/// #
+/// # #[dispatchable(Rc<Self>)]
+/// # enum Event {
+/// #     Variant,
+/// # }
+/// #
+/// # struct Foo;
+/// #
+/// # impl EventHandler for Foo {
+/// #    type Output = ();
+/// #
+/// #    fn on_variant(self: Rc<Self>) {
+/// #    }
+/// # }
+/// #
+///
+/// let foo = Rc::new(Foo);
+///
+/// Event::Variant.dispatch_with(foo);
+/// ```
 #[proc_macro_attribute]
-pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
-    dispatchable::derive(input).unwrap_or_else(|e| e.to_compile_error().into())
+pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
+    let enum_item = syn::parse_macro_input!(input as dispatchable::Item);
+    let args = syn::parse_macro_input!(args as dispatchable::Args);
+    dispatchable::expand(enum_item, &args)
 }
 
 decl_derive!([JsCaused, attributes(js)] =>

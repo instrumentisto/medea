@@ -5,14 +5,14 @@ use std::collections::HashMap;
 
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
-    TrackPatch,
+    CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
+    TrackId, TrackPatch, TrackUpdate,
 };
 
 use crate::{
     log::prelude::*,
     media::{
-        New, Peer, PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp,
+        Peer, PeerStateMachine, Stable, WaitLocalHaveRemote, WaitLocalSdp,
         WaitRemoteSdp,
     },
 };
@@ -24,8 +24,8 @@ impl CommandHandler for Room {
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
-    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
-    /// changed to [`WaitLocalHaveRemote`].
+    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`Stable`] and will
+    /// be changed to [`WaitLocalHaveRemote`].
     fn on_make_sdp_offer(
         &mut self,
         from_peer_id: PeerId,
@@ -39,7 +39,7 @@ impl CommandHandler for Room {
         from_peer.update_senders_statuses(senders_statuses);
 
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
+        let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
@@ -49,12 +49,20 @@ impl CommandHandler for Room {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
-        let event = Event::PeerCreated {
-            peer_id: to_peer.id(),
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-            ice_servers,
-            force_relay: to_peer.is_force_relayed(),
+        let event = if from_peer.is_known_to_remote() {
+            Event::TracksApplied {
+                peer_id: to_peer_id,
+                negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
+                updates: to_peer.get_updates(),
+            }
+        } else {
+            Event::PeerCreated {
+                peer_id: to_peer.id(),
+                negotiation_role: NegotiationRole::Answerer(sdp_offer),
+                tracks: to_peer.new_tracks(),
+                ice_servers,
+                force_relay: to_peer.is_force_relayed(),
+            }
         };
 
         self.peers.add_peer(from_peer);
@@ -73,8 +81,6 @@ impl CommandHandler for Room {
     /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
     /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
     /// be changed to [`Stable`].
-    ///
-    /// [`Stable`]: crate::media::peer::Stable
     fn on_make_sdp_answer(
         &mut self,
         from_peer_id: PeerId,
@@ -111,7 +117,7 @@ impl CommandHandler for Room {
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
-    /// Both [`Peer`]s may have any state except [`New`].
+    /// Both [`Peer`]s may have any state except [`Stable`].
     fn on_set_ice_candidate(
         &mut self,
         from_peer_id: PeerId,
@@ -150,7 +156,7 @@ impl CommandHandler for Room {
         Ok(Box::new(actix::fut::ok(())))
     }
 
-    /// Sends [`Event::TracksUpdated`] with data from the received
+    /// Sends [`Event::TracksApplied`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
     /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
@@ -167,9 +173,13 @@ impl CommandHandler for Room {
                 self.members
                     .send_event_to_member(
                         member_id,
-                        Event::TracksUpdated {
+                        Event::TracksApplied {
                             peer_id,
-                            tracks_patches,
+                            negotiation_role: None,
+                            updates: tracks_patches
+                                .into_iter()
+                                .map(TrackUpdate::Updated)
+                                .collect(),
                         },
                     )
                     .into_actor(self),

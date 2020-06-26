@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    ActorFuture as _, Context, ContextFutureSpawner as _, Handler, Message,
-    WrapFuture as _,
+    fut, ActorFuture as _, Context, ContextFutureSpawner as _, Handler,
+    Message, WrapFuture as _,
 };
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
@@ -23,9 +23,12 @@ use crate::{
         WebRtcPublishId,
     },
     log::prelude::*,
-    signalling::elements::{
-        endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-        member::MemberError,
+    signalling::{
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
+        },
+        room::ActFuture,
     },
 };
 
@@ -180,8 +183,7 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
-        ctx: &mut Context<Self>,
-    ) -> Result<(), RoomError> {
+    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
         let member = self.members.get_member(&member_id)?;
 
         let is_member_have_this_sink_id =
@@ -228,10 +230,10 @@ impl Room {
         member.insert_sink(sink);
 
         if self.members.member_has_connection(member_id) {
-            self.init_member_connections(&member, ctx);
+            Ok(Box::new(self.init_member_connections(&member)))
+        } else {
+            Ok(Box::new(actix::fut::ok(())))
         }
-
-        Ok(())
     }
 
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
@@ -404,32 +406,36 @@ pub struct CreateEndpoint {
 }
 
 impl Handler<CreateEndpoint> for Room {
-    type Result = Result<(), RoomError>;
+    type Result = ActFuture<Result<(), RoomError>>;
 
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
-                self.create_sink_endpoint(
+                match self.create_sink_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
-                    ctx,
-                )?;
+                ) {
+                    Ok(fut) => Box::new(fut),
+                    Err(e) => Box::new(fut::err(e)),
+                }
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
-                self.create_src_endpoint(
+                if let Err(e) = self.create_src_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     &endpoint,
-                )?;
+                ) {
+                    Box::new(fut::err(e))
+                } else {
+                    Box::new(fut::ok(()))
+                }
             }
         }
-
-        Ok(())
     }
 }
 

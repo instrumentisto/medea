@@ -17,6 +17,8 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68]).
+- `#[dispatchable]` macro:
+    - Optional attribute to specify `self` type for functions in `*Handler` trait ([#111]).
 
 ### Fixed
 
@@ -25,6 +27,7 @@ All user visible changes to this project will be documented in this file. This p
 [#66]: /../../pull/66
 [#68]: /../../pull/68
 [#91]: /../../pull/91
+[#111]: /../../pull/111
 
 
 

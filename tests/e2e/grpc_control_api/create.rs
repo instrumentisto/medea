@@ -8,7 +8,11 @@
 use medea::api::control::error_codes::ErrorCode;
 use medea_control_api_proto::grpc::api as proto;
 
-use crate::grpc_control_api::{take_member, take_room, take_webrtc_pub};
+use crate::{
+    enum_eq,
+    grpc_control_api::{take_member, take_room, take_webrtc_pub},
+    signalling::TestMember,
+};
 
 use super::{
     create_room_req, ControlClient, MemberBuilder, RoomBuilder,
@@ -208,6 +212,11 @@ mod member {
 }
 
 mod endpoint {
+    use std::time::Duration;
+
+    use futures::{channel::mpsc, StreamExt as _};
+    use medea_client_api_proto::{Event, TrackUpdate};
+    use tokio::time::timeout;
 
     use super::*;
 
@@ -363,5 +372,94 @@ mod endpoint {
         } else {
             panic!("should err")
         }
+    }
+
+    /// Checks that all needed [`Event`]s are sent when Control API adds
+    /// `Endpoint` to the already interconnected `Member`s.
+    #[actix_rt::test]
+    async fn create_endpoint_in_the_interconnected_members() {
+        const TEST_NAME: &str = "create_endpoint_in_the_interconnected_members";
+
+        let mut client = ControlClient::new().await;
+        let credentials = client.create(create_room_req(TEST_NAME)).await;
+
+        let (publisher_tx, mut rx) = mpsc::unbounded::<()>();
+        let publisher_done = timeout(Duration::from_secs(5), rx.next());
+        let (responder_tx, mut rx) = mpsc::unbounded::<()>();
+        let responder_done = timeout(Duration::from_secs(5), rx.next());
+        let (negotiation_finished_tx, mut rx) = mpsc::unbounded::<()>();
+        let negotiation_finished = timeout(Duration::from_secs(5), rx.next());
+
+        let _publisher = TestMember::connect(
+            credentials.get("publisher").unwrap(),
+            Some(Box::new(move |event, _, _| {
+                match event {
+                    Event::TracksApplied { updates, .. } => {
+                        if updates
+                            .iter()
+                            .any(|u| enum_eq!(TrackUpdate::Added, u))
+                        {
+                            publisher_tx.unbounded_send(()).unwrap();
+                        }
+                    }
+                    Event::SdpAnswerMade { .. } => {
+                        negotiation_finished_tx.unbounded_send(()).unwrap();
+                    }
+                    _ => (),
+                };
+            })),
+            None,
+            None,
+        )
+        .await;
+        let _responder = TestMember::connect(
+            credentials.get("responder").unwrap(),
+            Some(Box::new(move |event, _, events| {
+                if let Event::TracksApplied { updates, .. } = event {
+                    if updates.iter().any(|u| enum_eq!(TrackUpdate::Added, u)) {
+                        responder_tx.unbounded_send(()).unwrap();
+                        let sdp_answer_mades_count = events
+                            .iter()
+                            .filter(|e| {
+                                if let Event::SdpAnswerMade { .. } = e {
+                                    true
+                                } else {
+                                    false
+                                }
+                            })
+                            .count();
+                        if sdp_answer_mades_count == 2 {
+                            responder_tx.unbounded_send(()).unwrap();
+                        }
+                    }
+                };
+            })),
+            None,
+            None,
+        )
+        .await;
+
+        negotiation_finished.await.unwrap();
+
+        let create_publish_endpoint = WebRtcPublishEndpointBuilder::default()
+            .id("publish")
+            .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
+            .build()
+            .unwrap()
+            .build_request(format!("{}/responder", TEST_NAME));
+        client.create(create_publish_endpoint).await;
+
+        let create_play_endpoint = WebRtcPlayEndpointBuilder::default()
+            .id("play-receiver")
+            .src(format!("local://{}/responder/publish", TEST_NAME))
+            .build()
+            .unwrap()
+            .build_request(format!("{}/publisher", TEST_NAME));
+        client.create(create_play_endpoint).await;
+
+        let (publisher_res, responder_res) =
+            futures::future::join(publisher_done, responder_done).await;
+        publisher_res.unwrap().unwrap();
+        responder_res.unwrap().unwrap();
     }
 }
