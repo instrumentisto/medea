@@ -922,7 +922,7 @@ impl EventHandler for InnerRoom {
     /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
     /// [`TrackUpdate`]s.
     ///
-    /// Will start renegotiation process if `Some` [`NegotiationRole`] is
+    /// Will start negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
     fn on_tracks_applied(
         &mut self,

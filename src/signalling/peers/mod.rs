@@ -21,7 +21,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{peer::RenegotiationSubscriber, Peer, PeerError, PeerStateMachine},
+    media::{peer::NegotiationSubscriber, Peer, PeerError, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -78,9 +78,9 @@ pub struct PeersService {
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
     peer_stats_ttl: Duration,
 
-    /// Subscriber to the events which indicates that renegotiation process
+    /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
-    renegotiation_sub: Box<dyn RenegotiationSubscriber>,
+    negotiation_sub: Box<dyn NegotiationSubscriber>,
 }
 
 /// Simple ID counter.
@@ -127,7 +127,7 @@ impl PeersService {
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         media_conf: &conf::Media,
-        renegotiation_sub: Box<dyn RenegotiationSubscriber>,
+        negotiation_sub: Box<dyn NegotiationSubscriber>,
     ) -> Rc<Self> {
         Rc::new(Self {
             room_id: room_id.clone(),
@@ -141,7 +141,7 @@ impl PeersService {
                 peers_traffic_watcher,
             )),
             peer_stats_ttl: media_conf.max_lag,
-            renegotiation_sub,
+            negotiation_sub,
         })
     }
 
@@ -211,7 +211,7 @@ impl PeersService {
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
-            self.renegotiation_sub.box_clone(),
+            self.negotiation_sub.box_clone(),
         ));
         src_peer.add_endpoint(&src.clone().into());
 
@@ -221,7 +221,7 @@ impl PeersService {
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
-            self.renegotiation_sub.box_clone(),
+            self.negotiation_sub.box_clone(),
         ));
         sink_peer.add_endpoint(&sink.clone().into());
 
@@ -716,17 +716,15 @@ mod tests {
 
     use super::*;
 
-    /// Mock for the [`RenegotiationSubscriber`] trait.
+    /// Mock for the [`NegotiationSubscriber`] trait.
     ///
     /// You can subscribe to the [`Stream`] into which will be sent all
     /// [`PeerId`]s of [`Peer`] which are should be renegotiated.
     #[derive(Debug, Clone)]
-    struct RenegotiationSubMock(
-        Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>,
-    );
+    struct NegotiationSubMock(Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>);
 
-    impl RenegotiationSubMock {
-        /// Returns new empty [`RenegotiationSubMock`].
+    impl NegotiationSubMock {
+        /// Returns new empty [`NegotiationSubMock`].
         pub fn new() -> Self {
             Self(Rc::new(RefCell::new(Vec::new())))
         }
@@ -742,17 +740,17 @@ mod tests {
         }
     }
 
-    impl RenegotiationSubscriber for RenegotiationSubMock {
-        /// Sends [`PeerId`] to the [`RenegotiationSubMock::subscribe`]
+    impl NegotiationSubscriber for NegotiationSubMock {
+        /// Sends [`PeerId`] to the [`NegotiationSubMock::subscribe`]
         /// [`Stream`].
-        fn renegotiation_needed(&self, peer_id: PeerId) {
+        fn negotiation_needed(&self, peer_id: PeerId) {
             self.0.borrow().iter().for_each(|sender| {
                 let _ = sender.unbounded_send(peer_id);
             });
         }
 
-        /// Clones [`RenegotiationSubMock`].
-        fn box_clone(&self) -> Box<dyn RenegotiationSubscriber> {
+        /// Clones [`NegotiationSubMock`].
+        fn box_clone(&self) -> Box<dyn NegotiationSubscriber> {
             Box::new(self.clone())
         }
     }
@@ -775,15 +773,15 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
-        let renegotiation_sub = RenegotiationSubMock::new();
-        let renegotiations = renegotiation_sub.subscribe();
+        let negotiation_sub = NegotiationSubMock::new();
+        let negotiations = negotiation_sub.subscribe();
 
         let peers_service = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
-            Box::new(renegotiation_sub),
+            Box::new(negotiation_sub),
         );
 
         let publisher = Member::new(
@@ -842,10 +840,10 @@ mod tests {
             .borrow()
             .is_peer_registered(PeerId(1)));
 
-        let renegotiate_peer_ids: HashSet<_> =
-            renegotiations.take(2).collect().await;
-        assert!(renegotiate_peer_ids.contains(&PeerId(0)));
-        assert!(renegotiate_peer_ids.contains(&PeerId(1)));
+        let negotiate_peer_ids: HashSet<_> =
+            negotiations.take(2).collect().await;
+        assert!(negotiate_peer_ids.contains(&PeerId(0)));
+        assert!(negotiate_peer_ids.contains(&PeerId(1)));
     }
 
     /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
@@ -868,15 +866,15 @@ mod tests {
         mock.expect_traffic_flows().returning(|_, _, _| {});
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
-        let renegotiation_sub = RenegotiationSubMock::new();
-        let renegotiations = renegotiation_sub.subscribe();
+        let negotiation_sub = NegotiationSubMock::new();
+        let negotiations = negotiation_sub.subscribe();
 
         let peers_service = PeersService::new(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
-            Box::new(renegotiation_sub),
+            Box::new(negotiation_sub),
         );
 
         let publisher = Member::new(
@@ -977,9 +975,9 @@ mod tests {
 
         register_peer_done.await.unwrap();
 
-        let renegotiate_peer_ids: HashSet<_> =
-            renegotiations.take(4).collect().await;
-        assert!(renegotiate_peer_ids.contains(&PeerId(0)));
-        assert!(renegotiate_peer_ids.contains(&PeerId(1)));
+        let negotiate_peer_ids: HashSet<_> =
+            negotiations.take(4).collect().await;
+        assert!(negotiate_peer_ids.contains(&PeerId(0)));
+        assert!(negotiate_peer_ids.contains(&PeerId(1)));
     }
 }

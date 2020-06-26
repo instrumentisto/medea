@@ -578,7 +578,7 @@ impl RtcPeerConnection {
     /// description.
     ///
     /// Should be called after local tracks changes, which require
-    /// renegotiation.
+    /// negotiation.
     ///
     /// # Errors
     ///

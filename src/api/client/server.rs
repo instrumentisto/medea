@@ -168,7 +168,7 @@ mod test {
     use crate::{
         api::control,
         conf::Conf,
-        media::peer::tests::dummy_renegotiation_sub_mock,
+        media::peer::tests::dummy_negotiation_sub_mock,
         signalling::{peers::build_peers_traffic_watcher, Room},
         turn::new_turn_auth_service_mock,
         AppContext,
@@ -190,7 +190,7 @@ mod test {
             &room_spec,
             &app,
             traffic_watcher,
-            dummy_renegotiation_sub_mock(),
+            dummy_negotiation_sub_mock(),
         )
         .unwrap()
         .start();

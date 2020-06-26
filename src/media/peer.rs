@@ -37,7 +37,7 @@ use crate::{
 /// If [`Peer`] state currently is not [`Stable`] then we should just wait for
 /// [`Stable`] state before running this [`Job`].
 ///
-/// After all queued [`Job`]s are executed, renegotiation __should__ be
+/// After all queued [`Job`]s are executed, negotiation __should__ be
 /// performed.
 struct Job(Box<dyn FnOnce(&mut Peer<Stable>)>);
 
@@ -63,25 +63,25 @@ impl fmt::Debug for Job {
     }
 }
 
-/// Subscriber to the events which indicates that renegotiation process should
+/// Subscriber to the events which indicates that negotiation process should
 /// be started for the some [`Peer`].
 #[cfg_attr(test, mockall::automock)]
-pub trait RenegotiationSubscriber: fmt::Debug {
-    /// Starts renegotiation process for the [`Peer`] with a provided
+pub trait NegotiationSubscriber: fmt::Debug {
+    /// Starts negotiation process for the [`Peer`] with a provided
     /// [`PeerId`].
     ///
     /// Provided [`Peer`] and it's partner [`Peer`] should be in [`Stable`],
     /// otherwise nothing will be done.
-    fn renegotiation_needed(&self, peer_id: PeerId);
+    fn negotiation_needed(&self, peer_id: PeerId);
 
-    /// Returns clone of this [`RenegotiationSubscriber`].
-    fn box_clone(&self) -> Box<dyn RenegotiationSubscriber>;
+    /// Returns clone of this [`NegotiationSubscriber`].
+    fn box_clone(&self) -> Box<dyn NegotiationSubscriber>;
 }
 
 #[cfg(test)]
-impl fmt::Debug for MockRenegotiationSubscriber {
+impl fmt::Debug for MockNegotiationSubscriber {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("MockRenegotiationSubscriber").finish()
+        f.debug_struct("MockNegotiationSubscriber").finish()
     }
 }
 
@@ -314,16 +314,16 @@ pub struct Context {
     /// Queue of the [`Job`]s which are should be ran when this [`Peer`] will
     /// be [`Stable`].
     ///
-    /// [`Job`]s will be ran on [`Peer::renegotiation_finished`] and on
+    /// [`Job`]s will be ran on [`Peer::negotiation_finished`] and on
     /// [`Peer::run_scheduled_jobs`] actions.
     ///
-    /// When this [`Job`]s will be executed, renegotiation process should be
+    /// When this [`Job`]s will be executed, negotiation process should be
     /// started for this [`Peer`].
     jobs_queue: VecDeque<Job>,
 
-    /// Subscriber to the events which indicates that renegotiation process
+    /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
-    renegotiation_subscriber: Box<dyn RenegotiationSubscriber>,
+    negotiation_subscriber: Box<dyn NegotiationSubscriber>,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -494,7 +494,7 @@ impl<T> Peer<T> {
         self.context.is_known_to_remote
     }
 
-    /// Schedules [`Job`] which will be ran before renegotiation process start.
+    /// Schedules [`Job`] which will be ran before negotiation process start.
     fn schedule_job(&mut self, job: Job) {
         self.context.jobs_queue.push_back(job);
     }
@@ -531,7 +531,7 @@ impl<T> Peer<T> {
     /// `send` to `partner_peer`.
     ///
     /// Actually __nothing will be done__ after this function call. This action
-    /// will be ran only before renegotiation start.
+    /// will be ran only before negotiation start.
     ///
     /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
     /// and [`WebRtcPublishEndpoint::video_settings`].
@@ -619,7 +619,7 @@ impl Peer<WaitRemoteSdp> {
             context: self.context,
             state: Stable {},
         };
-        peer.renegotiation_finished();
+        peer.negotiation_finished();
 
         peer
     }
@@ -634,7 +634,7 @@ impl Peer<WaitLocalHaveRemote> {
             context: self.context,
             state: Stable {},
         };
-        peer.renegotiation_finished();
+        peer.negotiation_finished();
 
         peer
     }
@@ -650,7 +650,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
-        renegotiation_subscriber: Box<dyn RenegotiationSubscriber>,
+        negotiation_subscriber: Box<dyn NegotiationSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -667,7 +667,7 @@ impl Peer<Stable> {
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
             jobs_queue: VecDeque::new(),
-            renegotiation_subscriber,
+            negotiation_subscriber,
         };
 
         Self {
@@ -727,7 +727,7 @@ impl Peer<Stable> {
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
+    pub fn start_negotiation(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
@@ -752,8 +752,8 @@ impl Peer<Stable> {
             }
 
             self.context
-                .renegotiation_subscriber
-                .renegotiation_needed(self.id());
+                .negotiation_subscriber
+                .negotiation_needed(self.id());
 
             true
         }
@@ -765,8 +765,8 @@ impl Peer<Stable> {
     ///
     /// Runs all scheduled [`Job`]s of this [`Peer`].
     ///
-    /// Should be called when renegotiation was finished.
-    fn renegotiation_finished(&mut self) {
+    /// Should be called when negotiation was finished.
+    fn negotiation_finished(&mut self) {
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
         self.run_scheduled_jobs();
@@ -777,12 +777,12 @@ impl Peer<Stable> {
 pub mod tests {
     use super::*;
 
-    /// Returns dummy [`RenegotiationSubscriber`] mock which does nothing.
-    pub fn dummy_renegotiation_sub_mock() -> Box<dyn RenegotiationSubscriber> {
-        let mut mock = MockRenegotiationSubscriber::new();
-        mock.expect_renegotiation_needed().returning(|_| ());
+    /// Returns dummy [`NegotiationSubscriber`] mock which does nothing.
+    pub fn dummy_negotiation_sub_mock() -> Box<dyn NegotiationSubscriber> {
+        let mut mock = MockNegotiationSubscriber::new();
+        mock.expect_negotiation_needed().returning(|_| ());
         mock.expect_box_clone()
-            .returning(|| dummy_renegotiation_sub_mock());
+            .returning(|| dummy_negotiation_sub_mock());
 
         Box::new(mock)
     }
@@ -801,7 +801,7 @@ pub mod tests {
             Id(2),
             MemberId::from("partner-member"),
             false,
-            dummy_renegotiation_sub_mock(),
+            dummy_negotiation_sub_mock(),
         );
 
         let track_id_counter = Counter::default();
@@ -855,12 +855,12 @@ pub mod tests {
     #[test]
     fn scheduled_tasks_normally_ran() {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut renegotiation_sub = MockRenegotiationSubscriber::new();
-        renegotiation_sub.expect_renegotiation_needed().returning(
-            move |peer_id| {
+        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |peer_id| {
                 tx.send(peer_id).unwrap();
-            },
-        );
+            });
 
         let mut peer = Peer::new(
             PeerId(0),
@@ -868,7 +868,7 @@ pub mod tests {
             PeerId(1),
             MemberId("member-2".to_string()),
             false,
-            Box::new(renegotiation_sub),
+            Box::new(negotiation_sub),
         );
 
         peer.schedule_add_receiver(media_track(0));
@@ -887,12 +887,12 @@ pub mod tests {
     #[test]
     fn scheduled_tasks_will_be_ran_on_stable() {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut renegotiation_sub = MockRenegotiationSubscriber::new();
-        renegotiation_sub.expect_renegotiation_needed().returning(
-            move |peer_id| {
+        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |peer_id| {
                 tx.send(peer_id).unwrap();
-            },
-        );
+            });
 
         let peer = Peer::new(
             PeerId(0),
@@ -900,7 +900,7 @@ pub mod tests {
             PeerId(1),
             MemberId("member-2".to_string()),
             false,
-            Box::new(renegotiation_sub),
+            Box::new(negotiation_sub),
         );
 
         let mut peer = peer.start();
