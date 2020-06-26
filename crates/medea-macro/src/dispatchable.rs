@@ -1,14 +1,21 @@
 //! `#[dispatchable]` macro implementation.
+
+use std::fmt::Debug;
+
 use inflector::Inflector;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span, TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens};
-use std::fmt::Debug;
 use syn::{
     export::Formatter,
     parse::{Parse, ParseStream, Parser, Result},
     FnArg, ItemEnum, Pat, PatIdent, PatType, Token,
 };
+
+mod kw {
+    syn::custom_keyword!(async_trait);
+    syn::custom_keyword!(Send);
+}
 
 pub struct Item {
     orig_enum: ItemEnum,
@@ -228,11 +235,6 @@ impl Default for Args {
             async_trait: None,
         }
     }
-}
-
-mod kw {
-    syn::custom_keyword!(async_trait);
-    syn::custom_keyword!(Send);
 }
 
 impl Parse for Args {
