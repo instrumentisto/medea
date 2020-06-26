@@ -225,7 +225,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # use std::rc::Rc;
 /// # use medea_macro::dispatchable;
 /// #
-/// # #[dispatchable(Rc<Self>)]
+/// # #[dispatchable(self: Rc<Self>)]
 /// # enum Event {
 /// #     Variant,
 /// # }
