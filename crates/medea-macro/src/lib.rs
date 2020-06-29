@@ -254,6 +254,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// trait methods at the moment, that's why [`async_trait`] is used.
 ///
 /// ```
+/// use async_trait::async_trait;
 /// use medea_macro::dispatchable;
 ///
 /// #[dispatchable(async_trait(?Send))]
@@ -262,7 +263,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 ///
 /// struct Foo;
-/// #[async_trait::async_trait(?Send)]
+/// #[async_trait(?Send)]
 /// impl EventHandler for Foo {
 ///    type Output = ();
 ///

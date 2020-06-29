@@ -18,9 +18,11 @@ mod kw {
 /// helpers.
 #[derive(Debug)]
 pub struct Item {
-    /// Original enum that we will dispatch.
+    /// Original enum definition to be dispatched.
     orig_enum: ItemEnum,
-    /// `Handler` trait ident, basically `{}Handler` where `{}` is enum name.
+
+    /// `Handler` trait ident, basically `{}Handler` where `{}` is an enum
+    /// name.
     handler_trait_ident: Ident,
 }
 
@@ -372,94 +374,99 @@ mod to_handler_fn_name_spec {
         }
     }
 
-    #[test]
-    fn parse_args_empty() {
-        let args = Args::parse.parse2(quote! {}).unwrap();
-        assert_eq!(
-            args.dispatch_with_handler_arg(),
-            FnArg::parse.parse2(quote! {handler: &mut T}).unwrap()
-        );
-        assert!(args.async_trait.is_none());
-        assert_eq!(
-            FnArg::Typed(args.self_kind),
-            FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
-        );
-    }
+    mod parse_args {
+        use super::*;
 
-    #[test]
-    fn parse_args_self_ref() {
-        let args = Args::parse.parse2(quote! {self: &Self}).unwrap();
-        assert_eq!(
-            args.dispatch_with_handler_arg(),
-            FnArg::parse.parse2(quote! {handler: &T}).unwrap()
-        );
-        assert!(args.async_trait.is_none());
-        assert_eq!(
-            FnArg::Typed(args.self_kind),
-            FnArg::parse.parse2(quote! {self: &Self}).unwrap()
-        );
-    }
+        #[test]
+        fn empty() {
+            let args = Args::parse.parse2(quote! {}).unwrap();
+            assert_eq!(
+                args.dispatch_with_handler_arg(),
+                FnArg::parse.parse2(quote! {handler: &mut T}).unwrap()
+            );
+            assert!(args.async_trait.is_none());
+            assert_eq!(
+                FnArg::Typed(args.self_kind),
+                FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
+            );
+        }
 
-    #[test]
-    fn parse_args_self_rc() {
-        let args = Args::parse
-            .parse2(quote! {self: std::rc::Rc<Self>})
-            .unwrap();
-        assert_eq!(
-            args.dispatch_with_handler_arg(),
-            FnArg::parse
-                .parse2(quote! {handler: std::rc::Rc<T>})
-                .unwrap()
-        );
-        assert!(args.async_trait.is_none());
-        assert_eq!(
-            FnArg::Typed(args.self_kind),
-            FnArg::parse
+        #[test]
+        fn self_ref() {
+            let args = Args::parse.parse2(quote! {self: &Self}).unwrap();
+            assert_eq!(
+                args.dispatch_with_handler_arg(),
+                FnArg::parse.parse2(quote! {handler: &T}).unwrap()
+            );
+            assert!(args.async_trait.is_none());
+            assert_eq!(
+                FnArg::Typed(args.self_kind),
+                FnArg::parse.parse2(quote! {self: &Self}).unwrap()
+            );
+        }
+
+        #[test]
+        fn self_rc() {
+            let args = Args::parse
                 .parse2(quote! {self: std::rc::Rc<Self>})
-                .unwrap()
-        );
-    }
+                .unwrap();
+            assert_eq!(
+                args.dispatch_with_handler_arg(),
+                FnArg::parse
+                    .parse2(quote! {handler: std::rc::Rc<T>})
+                    .unwrap()
+            );
+            assert!(args.async_trait.is_none());
+            assert_eq!(
+                FnArg::Typed(args.self_kind),
+                FnArg::parse
+                    .parse2(quote! {self: std::rc::Rc<Self>})
+                    .unwrap()
+            );
+        }
 
-    #[test]
-    fn parse_args_async_trait_not_local() {
-        let args = Args::parse.parse2(quote! {async_trait}).unwrap();
-        assert_eq!(
-            args.dispatch_with_handler_arg(),
-            FnArg::parse.parse2(quote! {handler: &mut T}).unwrap()
-        );
-        assert!(!args.async_trait.unwrap().0);
-        assert_eq!(
-            FnArg::Typed(args.self_kind),
-            FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
-        );
-    }
+        #[test]
+        fn async_trait_not_local() {
+            let args = Args::parse.parse2(quote! {async_trait}).unwrap();
+            assert_eq!(
+                args.dispatch_with_handler_arg(),
+                FnArg::parse.parse2(quote! {handler: &mut T}).unwrap()
+            );
+            assert!(!args.async_trait.unwrap().0);
+            assert_eq!(
+                FnArg::Typed(args.self_kind),
+                FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
+            );
+        }
 
-    #[test]
-    fn parse_args_async_trait_local() {
-        let args = Args::parse.parse2(quote! {async_trait(?Send)}).unwrap();
-        assert_eq!(
-            args.dispatch_with_handler_arg(),
-            FnArg::parse.parse2(quote! {handler: &mut T}).unwrap()
-        );
-        assert!(args.async_trait.unwrap().0);
-        assert_eq!(
-            FnArg::Typed(args.self_kind),
-            FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
-        );
-    }
-    #[test]
-    fn parse_args_self_arc_and_async_trait_not_send() {
-        let args = Args::parse
-            .parse2(quote! {self: Arc<Self>, async_trait})
-            .unwrap();
-        assert_eq!(
-            args.dispatch_with_handler_arg(),
-            FnArg::parse.parse2(quote! {handler: Arc<T>}).unwrap()
-        );
-        assert!(!args.async_trait.unwrap().0);
-        assert_eq!(
-            FnArg::Typed(args.self_kind),
-            FnArg::parse.parse2(quote! {self: Arc<Self>}).unwrap()
-        );
+        #[test]
+        fn async_trait_local() {
+            let args = Args::parse.parse2(quote! {async_trait(?Send)}).unwrap();
+            assert_eq!(
+                args.dispatch_with_handler_arg(),
+                FnArg::parse.parse2(quote! {handler: &mut T}).unwrap()
+            );
+            assert!(args.async_trait.unwrap().0);
+            assert_eq!(
+                FnArg::Typed(args.self_kind),
+                FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
+            );
+        }
+
+        #[test]
+        fn self_arc_and_async_trait_not_send() {
+            let args = Args::parse
+                .parse2(quote! {self: Arc<Self>, async_trait})
+                .unwrap();
+            assert_eq!(
+                args.dispatch_with_handler_arg(),
+                FnArg::parse.parse2(quote! {handler: Arc<T>}).unwrap()
+            );
+            assert!(!args.async_trait.unwrap().0);
+            assert_eq!(
+                FnArg::Typed(args.self_kind),
+                FnArg::parse.parse2(quote! {self: Arc<Self>}).unwrap()
+            );
+        }
     }
 }
