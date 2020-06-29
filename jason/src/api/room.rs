@@ -255,16 +255,15 @@ impl RoomHandle {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
-    ) -> Result<(), JsValue> {
-        let inner = upgrade_or_detached!(self.0, JsValue)?;
+    ) -> Result<(), JasonError> {
+        let inner = upgrade_or_detached!(self.0, JasonError)?;
         while !inner
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
             inner
                 .toggle_mute(is_muted, kind)
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
         }
         Ok(())
     }
