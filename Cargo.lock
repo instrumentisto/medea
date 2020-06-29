@@ -1591,6 +1591,7 @@ name = "medea-macro"
 version = "0.2.0-dev"
 dependencies = [
  "Inflector",
+ "async-trait",
  "medea-jason",
  "proc-macro2",
  "quote",
