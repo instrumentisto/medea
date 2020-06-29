@@ -137,9 +137,9 @@ async function createMember(roomId, memberId) {
 
 const colorizedJson = {
   replacer: function(match, pIndent, pKey, pVal, pEnd) {
-    let key = '<span class=json__key>';
-    let val = '<span class=json__value>';
-    let str = '<span class=json__string>';
+    let key = '<span class="json__key">';
+    let val = '<span class="json__value">';
+    let str = '<span class="json__string">';
     let r = pIndent || '';
     if (pKey)
       r = r + key + pKey.replace(/[": ]/g, '') + '</span>: ';
@@ -159,8 +159,7 @@ const colorizedJson = {
 
 const controlDebugWindows = {
   createEndpoint: function() {
-    let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_create_endpoint');
 
     let publishEndpointSpecContainer = container.getElementsByClassName('webrtc-publish-endpoint-spec')[0];
     let playEndpointSpecContainer = container.getElementsByClassName('webrtc-play-endpoint-spec')[0];
@@ -188,15 +187,15 @@ const controlDebugWindows = {
       let endpointType = container.getElementsByClassName('control-debug__endpoint-type')[0].value;
       if (endpointType === 'WebRtcPublishEndpoint') {
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
-          let isForceRelay = container.getElementsByClassName('webrtc-publish-endpoint-spec__force-relay')[0].value === 'true';
+          let isForceRelay = document.getElementById('webrtc-publish-endpoint-spec__force-relay').checked;
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             p2p: p2pMode,
             force_relay: isForceRelay,
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
-          let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
-          let isForceRelay = container.getElementsByClassName('webrtc-play-endpoint-spec__force-relay')[0].value === 'true';
+          let source = 'local://' + container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
+          let isForceRelay = document.getElementById('webrtc-play-endpoint-spec__force-relay').checked;
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             src: source,
@@ -207,8 +206,7 @@ const controlDebugWindows = {
   },
 
   delete: function() {
-    let container = document.getElementsByClassName('control-debug__window_delete')[0];
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_delete');
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -220,9 +218,7 @@ const controlDebugWindows = {
   },
 
   createRoom: function() {
-    let container = document.getElementsByClassName('control-debug__window_create-room')[0];
-
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_create_room');
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -233,8 +229,7 @@ const controlDebugWindows = {
   },
 
   createMember: function() {
-    let container = document.getElementsByClassName('control-debug__window_create-member')[0];
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_create_member');
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -265,9 +260,8 @@ const controlDebugWindows = {
   },
 
   get: function() {
-    let container = document.getElementsByClassName('control-debug__window_get')[0];
+    let container = document.getElementById('control-debug__window_get');
     let resultContainer = container.getElementsByClassName('control-debug__json-result')[0];
-    bindCloseWindow(container);
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -281,9 +275,8 @@ const controlDebugWindows = {
   },
 
   callbacks: function() {
-    let container = document.getElementsByClassName('control-debug__window_callbacks')[0];
+    let container = document.getElementById('control-debug__window_callbacks');
     let resultContainer = container.getElementsByClassName('control-debug__table-result')[0];
-    bindCloseWindow(container);
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -294,32 +287,41 @@ const controlDebugWindows = {
       let callbacks = await controlApi.getCallbacks();
 
       let table = document.createElement("table");
+      table.className = "table";
 
+      let thead = document.createElement("thead");
       let header = document.createElement("tr");
       let eventHeader = document.createElement("th");
       eventHeader.innerHTML = 'Event';
+      eventHeader.scope = 'col';
       header.appendChild(eventHeader);
       let timeHeader = document.createElement("th");
       timeHeader.innerHTML = 'Time';
+      timeHeader.scope = 'col';
       header.appendChild(timeHeader);
       let elementHeader = document.createElement('th');
       elementHeader.innerHTML = 'FID';
+      elementHeader.scope = 'col';
       header.appendChild(elementHeader);
-      table.appendChild(header);
+      thead.appendChild(header);
+      table.appendChild(thead);
 
+      let tbody = document.createElement('tbody');
       for (callback of callbacks) {
         let row = document.createElement('tr');
-        let event = document.createElement('th');
+        let event = document.createElement('td');
         event.innerHTML = JSON.stringify(callback.event);
         row.appendChild(event);
-        let time = document.createElement('th');
+        let time = document.createElement('td');
         time.innerHTML = callback.at;
         row.appendChild(time);
-        let element = document.createElement('th');
+        let element = document.createElement('td');
         element.innerHTML = callback.fid;
         row.appendChild(element);
-        table.appendChild(row);
+        tbody.appendChild(row);
       }
+
+      table.appendChild(tbody);
 
       resultContainer.appendChild(table);
     })

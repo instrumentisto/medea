@@ -92,12 +92,6 @@
       border-radius: 3px;
     }
 
-    .control-debug__execute {
-      float: right;
-      margin-bottom: 10px;
-      margin-left: 10px;
-    }
-
     .window__content span {
       font-size: 10pt;
     }
@@ -226,77 +220,182 @@
       <video muted autoplay width="100%" height="100%"></video>
     </div>
   </div>
-    <div class="control text-center">
-      <button class="control__mute_audio btn btn-secondary">Mute audio</button>
-      <button class="control__mute_video btn btn-secondary">Mute video</button>
-       <button type="button"
-               class="btn btn-secondary"
-               data-toggle="modal"
-               data-target="#devices-settings">
-         Devices
-       </button>
-      <button class="control__close_app btn btn-danger">Dispose</button>
-    </div>
 
+  <div class="control text-center">
+    <button class="control__mute_audio btn btn-secondary">Mute audio</button>
+    <button class="control__mute_video btn btn-secondary">Mute video</button>
+     <button type="button"
+             class="btn btn-secondary"
+             data-toggle="modal"
+             data-target="#devices-settings">
+       Devices
+     </button>
+    <button class="control__close_app btn btn-danger">Dispose</button>
+  </div>
 
-  <div class="window control-debug__window_create-endpoint toggle-content">
-    <div class="window__title">
-      <span>Create Endpoint</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
-      <br>
-      <br>
-      <span>Endpoint type:</span>
-      <select class="control-debug__endpoint-type is-visible">
-        <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
-        <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
-      </select>
+  <div class="modal fade"
+       id="control-debug__window_create_endpoint"
+       tabindex="-1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Endpoint</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </div>
 
-      <br>
-      <br>
+        <div class="modal-body">
+          <b>Endpoint URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
 
-      <div class="webrtc-play-endpoint-spec toggle-content is-visible">
-        <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
-        <span>Is relay:</span>
-        <select class="webrtc-play-endpoint-spec__force-relay">
-          <option value="false">false</option>
-          <option value="true">true</option>
-        </select>
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Endpoint ID"
+                   class="form-control control-debug__id_endpoint">
+          </div>
+          <br>
+
+          <b>Endpoint type</b>
+          <br>
+          <select class="control-debug__endpoint-type is-visible custom-select">
+            <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
+            <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
+          </select>
+
+          <br>
+          <br>
+
+          <div class="webrtc-play-endpoint-spec toggle-content is-visible">
+            <b>Source URI</b>
+            <br>
+            <div class="input-group input-group">
+              <div class="input-group-prepend">
+                <span class="input-group-text">local://</span>
+              </div>
+
+              <input type="text"
+                     placeholder="room_id/member_id/source_id"
+                     class="webrtc-play-endpoint-spec__src form-control">
+            </div>
+            <br>
+
+            <div class="custom-control custom-switch">
+              <input type="checkbox"
+                     id="webrtc-play-endpoint-spec__force-relay"
+                     class="custom-control-input">
+              <label
+                for="webrtc-play-endpoint-spec__force-relay"
+                class="custom-control-label">
+                Force relay
+              </label>
+            </div>
+          </div>
+
+          <div class="webrtc-publish-endpoint-spec toggle-content">
+            <b>P2P mode:</b>
+            <br>
+            <select class="webrtc-publish-endpoint-spec__p2p custom-select">
+              <option value="Always">Always</option>
+              <option value="IfPossible">If possible</option>
+              <option value="Never">Never</option>
+            </select>
+
+            <br>
+            <br>
+            <div class="custom-control custom-switch">
+              <input type="checkbox"
+                     id="webrtc-publish-endpoint-spec__force-relay"
+                     class="custom-control-input">
+              <label
+                for="webrtc-publish-endpoint-spec__force-relay"
+                class="custom-control-label">
+                Force relay
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Create
+          </button>
+        </div>
       </div>
-
-      <div class="webrtc-publish-endpoint-spec toggle-content">
-        <span>P2P mode:</span>
-        <select class="webrtc-publish-endpoint-spec__p2p">
-          <option value="Always">Always</option>
-          <option value="IfPossible">If possible</option>
-          <option value="Never">Never</option>
-        </select>
-        <span>Is relay:</span>
-        <select class="webrtc-publish-endpoint-spec__force-relay">
-          <option value="false">false</option>
-          <option value="true">true</option>
-        </select>
-      </div>
-
-      <button class="control-debug__execute">Execute</button>
     </div>
   </div>
 
-  <div class="window control-debug__window_delete toggle-content">
-    <div class="window__title">
-      <span>Delete</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+  <div class="modal fade"
+       id="control-debug__window_delete"
+       tabindex="1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete element</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
-      <button class="control-debug__execute">Execute</button>
+        <div class="modal-body">
+				  <b>URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Endpoint ID"
+                   class="form-control control-debug__id_endpoint">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-danger">
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -319,43 +418,209 @@
     </div>
   </div>
 
-  <div class="window control-debug__window_create-room toggle-content">
-    <div class="window__title">
-      <span>Create room</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
+  <div class="modal fade"
+       id="control-debug__window_create_member"
+       tabindex="1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Member</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
-      <button class="control-debug__execute">Execute</button>
+
+        <div class="modal-body">
+				  <b>Member URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+          </div>
+          <br>
+          <b>Credentials</b>
+          <br>
+          <input class="member-spec__credentials form-control" placeholder="Credentials">
+
+          <br>
+          <b>Timeouts</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">IDLE</span>
+            </div>
+            <input type="text"
+                   class="form-control member-spec__idle-timeout"
+                   placeholder="10s">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">Reconnect</span>
+            </div>
+            <input type="text"
+                   class="form-control member-spec__reconnect-timeout"
+                   placeholder="10s">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">Ping</span>
+            </div>
+            <input type="text"
+                   class="form-control member-spec__ping-interval"
+                   placeholder="3s">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Create
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="window control-debug__window_get toggle-content">
-    <div class="window__title">
-      <span>Get</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+  <div class="modal fade"
+       id="control-debug__window_create_room"
+       tabindex="1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Room</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
-      <div class="control-debug__json-result"></div>
 
-      <button class="control-debug__execute">Execute</button>
+        <div class="modal-body">
+				  <b>Room URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Create
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="window control-debug__window_callbacks toggle-content">
-    <div class="window__title">
-      <span>Callbacks</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <div class="control-debug__table-result"></div>
+  <div class="modal fade"
+       id="control-debug__window_get"
+       tabindex="1"
+       role="document"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Get element</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
-      <button class="control-debug__execute">Execute</button>
+        <div class="modal-body">
+				  <b>URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Endpoint ID"
+                   class="form-control control-debug__id_endpoint">
+          </div>
+          <br>
+          <b>Result</b>
+          <br>
+          <pre class="control-debug__json-result"></pre>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Get
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade"
+       id="control-debug__window_callbacks"
+       tabindex="1"
+       role="document"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Callbacks</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
+
+        <div class="modal-body">
+          <b>Result</b>
+          <br>
+          <div class="control-debug__table-result"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Get
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -375,9 +640,43 @@
     <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member&#x25B8</span>
     <br>
     <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint&#x25B8</span>
+    <button type="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_create_room">
+      Create Room
+    </button>
+    <br>
+    <button type="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_create_member">
+      Create Member
+    </button>
+    <br>
+    <button type="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_create_endpoint">
+      Create endpoint
+    </button>
+    <br>
+    <button type="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_get">
+      Get element
+    </button>
+    <br>
+    <button type="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_callbacks">
+      Callbacks
+    </button>
     <br>
     <span class="control-debug-menu__item control-debug-menu__item_get">Get&#x25B8</span>
     <br>
+		<button type="button"
+						data-toggle="modal"
+						data-target="#control-debug__window_delete">
+			Delete
+		</button>
     <span class="control-debug-menu__item control-debug-menu__item_delete">Delete&#x25B8</span>
     <br>
     <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks&#x25B8</span>
@@ -459,7 +758,7 @@
        tabindex="-1"
        role="dialog"
        aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Devices settings</h5>
