@@ -5,9 +5,9 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 let roomId = window.location.hash.replace("#", "");
 
 async function createRoom(roomId, memberId) {
-  let isAudioEnabled = document.getElementById('call-settings-window__is-enabled_audio').checked;
-  let isVideoEnabled = document.getElementById('call-settings-window__is-enabled_video').checked;
-  let isPublish = document.getElementById('call-settings-window__is-publish').checked;
+  let isAudioEnabled = document.getElementById('connection-settings__publish_audio').checked;
+  let isVideoEnabled = document.getElementById('connection-settings__publish_video').checked;
+  let isPublish = document.getElementById('connection-settings__publish_is-enabled').checked;
   let audioPublishPolicy;
   let videoPublishPolicy;
   if (isAudioEnabled) {
@@ -57,8 +57,8 @@ async function createRoom(roomId, memberId) {
 }
 
 async function createMember(roomId, memberId) {
-  let isAudioEnabled = document.getElementById('call-settings-window__is-enabled_audio').checked;
-  let isVideoEnabled = document.getElementById('call-settings-window__is-enabled_video').checked;
+  let isAudioEnabled = document.getElementById('connection-settings__publish_audio').checked;
+  let isVideoEnabled = document.getElementById('connection-settings__publish_video').checked;
   let audioPublishPolicy;
   let videoPublishPolicy;
   if (isAudioEnabled) {
@@ -71,7 +71,7 @@ async function createMember(roomId, memberId) {
   } else {
     videoPublishPolicy = 'Disabled';
   }
-  let isPublish = document.getElementById('call-settings-window__is-publish').checked;
+  let isPublish = document.getElementById('connection-settings__publish_is-enabled').checked;
 
   let controlRoom = await axios.get(controlUrl + roomId);
   let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
@@ -331,15 +331,23 @@ window.onload = async function() {
   let jason = new rust.Jason();
   console.log(baseUrl);
 
+  $('.modal').on('show.bs.modal', function(event) {
+      var idx = $('.modal:visible').length;
+      $(this).css('z-index', 1040 + (10 * idx));
+  });
+  $('.modal').on('shown.bs.modal', function(event) {
+      var idx = ($('.modal:visible').length) -1; // raise backdrop after animation.
+      $('.modal-backdrop').not('.stacked').css('z-index', 1039 + (10 * idx));
+      $('.modal-backdrop').not('.stacked').addClass('stacked');
+  });
+
+  $('#connection-settings').modal('show');
+
+
+
   Object.values(controlDebugWindows).forEach(s => s());
 
   bindControlDebugMenu();
-
-  let callSettingsBtn = document.getElementsByClassName('call-settings-btn')[0];
-  let callSettingsWindow = document.getElementsByClassName('call-settings-window')[0]
-  callSettingsBtn.addEventListener('click', () => {
-    contentVisibility.toggle(callSettingsWindow);
-  });
 
   let room = newRoom();
   let isCallStarted = false;
@@ -510,8 +518,8 @@ window.onload = async function() {
         videos.firstChild.remove();
       }
       room = newRoom();
-      contentVisibility.show(connectBtnsDiv);
-      contentVisibility.hide(controlBtns);
+      $('#connection-settings').modal('show');
+      $('.control').hide();
       alert(
         `Call was ended.
         Reason: ${on_closed.reason()};
@@ -522,8 +530,8 @@ window.onload = async function() {
   }
 
   try {
-    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
-    let usernameInput = document.getElementsByClassName('connect__username')[0];
+    let joinCallerButton = document.getElementsByClassName('connection-settings__connect')[0];
+    let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
 
     audioSelect.addEventListener('change', async () => {
       try {
@@ -610,8 +618,8 @@ window.onload = async function() {
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
-        contentVisibility.hide(connectBtnsDiv);
-        contentVisibility.show(controlBtns);
+        $('#connection-settings').modal('hide');
+        $('.control').show();
 
         try {
           let username = usernameInput.value;

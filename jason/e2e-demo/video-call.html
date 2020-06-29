@@ -5,6 +5,11 @@
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+	<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+
   <style>
     body {
       font-family: "Source Sans Pro", Helvetica, sans-serif;
@@ -46,29 +51,22 @@
       padding: 5px;
     }
 
+    .control {
+      display: none;
+      position: absolute;
+      bottom: 100px;
+      left: 0;
+      right: 0;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
     .connect__join {
       font-size: 16px;
       margin-left: 5px;
     }
 
     .connect__device {
-      float: left;
-    }
-
-    .btn {
-      background: #49668C;
-      color: white;
-      cursor: pointer;
-      border-radius: 5px;
-      border: none;
-      padding: 7px;
-    }
-
-    .btn:hover {
-      background: #375577;
-    }
-
-    .control {
       float: left;
     }
 
@@ -219,7 +217,7 @@
     }
   </style>
 </head>
-<body>
+<body >
   <div class="remote-videos">
   </div>
 
@@ -227,51 +225,19 @@
     <div class="local-video video">
       <video muted autoplay width="100%" height="100%"></video>
     </div>
-    <div class="connect toggle-content is-visible">
-      <div>
-        <input class="connect__username" placeholder="username">
-        <button class="connect__join btn">Join</button>
-      </div>
-    </div>
-    <div class="control toggle-content">
-      <button class="control__mute_audio control__btn btn">Mute audio</button>
-      <button class="control__mute_video control__btn btn">Mute video</button>
-      <button class="control__close_app control__btn btn">Dispose</button>
-    </div>
-    <br>
-    <br>
-    <div class="foo">
-      <a class="call-settings-btn btn">Call settings&#x25BA</a>
-    </div>
   </div>
-
-  <div class="window call-settings-window toggle-content">
-    <div class="window__title">
-      <span>Call settings</span>
-      <span class="window__close">X</span>
+    <div class="control text-center">
+      <button class="control__mute_audio btn btn-secondary">Mute audio</button>
+      <button class="control__mute_video btn btn-secondary">Mute video</button>
+       <button type="button"
+               class="btn btn-secondary"
+               data-toggle="modal"
+               data-target="#devices-settings">
+         Devices
+       </button>
+      <button class="control__close_app btn btn-danger">Dispose</button>
     </div>
-    <div class="window__content">
-      <div class="connect__device">
-        <label>Audio:
-          <select class="connect__select-device_audio">
-          </select>
-        </label><br>
-        <label>Video:
-          <select class="connect__select-device_video">
-          </select>
-        </label>
-      </div>
-      <br>
-      <input type="checkbox" id="call-settings-window__is-enabled_audio" checked>
-      <label for="call-settings-window__is-enabled_audio">Audio</label>
 
-      <input type="checkbox" id="call-settings-window__is-enabled_video" checked>
-      <label for="call-settings-window__is-enabled_video">Video</label><br>
-
-      <input type="checkbox" id="call-settings-window__is-publish" checked>
-      <label for="call-settings-window__is-publish">Publish</label>
-    </div>
-  </div>
 
   <div class="window control-debug__window_create-endpoint toggle-content">
     <div class="window__title">
@@ -415,6 +381,108 @@
     <span class="control-debug-menu__item control-debug-menu__item_delete">Delete&#x25B8</span>
     <br>
     <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks&#x25B8</span>
+  </div>
+
+  <div class="modal fade"
+       id="connection-settings"
+       data-backdrop="static"
+       data-keydrop="true"
+       data-keyboard="false"
+       tabindex="-1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title" id="staticBackdropLabel">Connect to the Room</h5>
+				</div>
+        <div class="modal-body">
+          <form>
+            <div class="form-group">
+              <h5>Username</h5>
+              <input class="form-control connection-settings__username">
+              <br>
+
+              <h5>Publishing</h5>
+
+              <div class="custom-control custom-switch">
+                <input type="checkbox"
+                       id="connection-settings__publish_is-enabled"
+                       class="custom-control-input"
+                       checked>
+                <label for="connection-settings__publish_is-enabled"
+                       class="custom-control-label">
+                  Publish media
+                </label>
+              </div>
+
+              <div class="custom-control custom-switch">
+                <input type="checkbox"
+                       id="connection-settings__publish_audio"
+                       class="custom-control-input"
+                       checked>
+                <label for="connection-settings__publish_audio"
+                       class="custom-control-label">
+                  Publish audio
+                </label>
+              </div>
+
+              <div class="custom-control custom-switch">
+                <input type="checkbox"
+                       id="connection-settings__publish_video"
+                       class="custom-control-input"
+                       checked>
+                <label for="connection-settings__publish_video"
+                       class="custom-control-label">
+                  Publish video
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+				<div class="modal-footer">
+           <button type="button"
+                   class="btn btn-secondary"
+                   data-toggle="modal"
+                   data-target="#devices-settings">
+             Configure devices
+           </button>
+					<button type="button" class="btn btn-success
+            connection-settings__connect">Connect</button>
+				</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade"
+       id="devices-settings"
+       tabindex="-1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Devices settings</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <label for="connect__select-device_audio">Audio</label>
+          <select class="connect__select-device_audio custom-select">
+          </select><br><br>
+
+          <label for="connect__select-device_video">Video</label>
+          <select class="connect__select-device_video custom-select">
+          </select>
+        </div>
+
+      </div>
+    </div>
   </div>
 </body>
 </html>
