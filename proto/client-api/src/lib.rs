@@ -239,7 +239,7 @@ pub struct CloseDescription {
 }
 
 /// WebSocket message from Medea to Jason.
-#[dispatchable(self: &Self, async_trait(?Send))]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]

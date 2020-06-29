@@ -1,15 +1,20 @@
 //! `#[dispatchable]` macro implementation.
+
 use inflector::Inflector;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span, TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens};
-use std::fmt::Debug;
 use syn::{
-    export::Formatter,
     parse::{Parse, ParseStream, Parser, Result},
     FnArg, ItemEnum, Pat, PatIdent, PatType, Token,
 };
 
+mod kw {
+    syn::custom_keyword!(async_trait);
+    syn::custom_keyword!(Send);
+}
+
+#[derive(Debug)]
 pub struct Item {
     orig_enum: ItemEnum,
     handler_trait_ident: Ident,
@@ -46,6 +51,7 @@ impl Item {
         )
     }
 
+    /// Builds `*Handler` trait based on enum variants.
     fn handler_trait(&self, args: &Args) -> TokenStream2 {
         let self_kind = args.self_kind.clone();
         let maybe_async = args.maybe_async_token();
@@ -114,6 +120,9 @@ impl Item {
     }
 }
 
+/// [`async_trait`](https://crates.io/crates/async-trait) configuration.
+///
+/// `false` is `#[async_trait]`, and `true` is `#[async_trait(?Send)]`.
 #[derive(Debug, PartialEq)]
 struct IsLocal(bool);
 
@@ -131,9 +140,12 @@ impl Parse for IsLocal {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Args {
+    /// `self` type that will be consumed by handler trait functions.
     self_kind: PatType,
+    /// Whether to use [`async_trait`](https://crates.io/crates/async-trait)
+    /// or not.
     async_trait: Option<IsLocal>,
 }
 
@@ -204,18 +216,7 @@ impl Args {
     }
 }
 
-impl Debug for Args {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Args")
-            .field(
-                "self_kind",
-                &format!("{}", self.self_kind.to_token_stream()),
-            )
-            .field("async_trait", &self.async_trait)
-            .finish()
-    }
-}
-
+/// Defaults are: `Args {self_kind: "self: &mut Self", async_trait: None}`.
 impl Default for Args {
     fn default() -> Self {
         let self_kind = FnArg::parse.parse2(quote! {self: &mut Self}).unwrap();
@@ -228,11 +229,6 @@ impl Default for Args {
             async_trait: None,
         }
     }
-}
-
-mod kw {
-    syn::custom_keyword!(async_trait);
-    syn::custom_keyword!(Send);
 }
 
 impl Parse for Args {
@@ -348,9 +344,6 @@ pub fn expand(item: Item, args: &Args) -> TokenStream {
 
 #[cfg(test)]
 mod to_handler_fn_name_spec {
-    use quote::quote;
-    use syn::parse::{Parse, Parser};
-
     use super::*;
 
     #[test]
