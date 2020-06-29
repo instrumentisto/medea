@@ -219,8 +219,8 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ### Customize `self` type in handler functions (Optional).
 ///
-/// By default, all handler functions `&mut Self`, if this does not suit you,
-/// then you can specify type manually: `#[dispatchable(self: Rc<Self>)]`,
+/// By default, all handler functions take `&mut Self`, if this does not suit
+/// you, then you can specify type manually: `#[dispatchable(self: Rc<Self>)]`,
 /// `#[dispatchable(self: &Self)]`. You can use any type that is a valid `self`
 /// type. Currently those are:
 /// `self`, `&self`, `&mut self`, `self: Box<Self>`, `self: Rc<Self>`,
