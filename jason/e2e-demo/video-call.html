@@ -630,57 +630,81 @@
     <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
   </div>
 
-  <div class="control-debug-menu__toggle">
-    Dynamic Control API
-  </div>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand">Medea</a>
+		<button class="navbar-toggler"
+						type="button"
+						data-toggle="collapse"
+						data-target="#navbar"
+						aria-controls="navbarSupportedContent"
+						aria-expanded="false"
+						aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
 
-  <div class="control-debug-menu toggle-content">
-    <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room&#x25B8</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member&#x25B8</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint&#x25B8</span>
-    <button type="button"
-            data-toggle="modal"
-            data-target="#control-debug__window_create_room">
-      Create Room
-    </button>
-    <br>
-    <button type="button"
-            data-toggle="modal"
-            data-target="#control-debug__window_create_member">
-      Create Member
-    </button>
-    <br>
-    <button type="button"
-            data-toggle="modal"
-            data-target="#control-debug__window_create_endpoint">
-      Create endpoint
-    </button>
-    <br>
-    <button type="button"
+    <div class="collapse navbar-collapse" id="navbar">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle"
+             id="navbarDropdown"
+             role="button"
+             data-toggle="dropdown"
+             aria-haspopup="true"
+             aria-expanded="false">
+            Create
+          </a>
+          <div class="dropdown-menu">
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_room">
+              Room
+            </a>
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_member">
+              Member
+            </a>
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_endpoint">
+              Endpoint
+            </a>
+          </div>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+            role="button"
             data-toggle="modal"
             data-target="#control-debug__window_get">
-      Get element
-    </button>
-    <br>
-    <button type="button"
-            data-toggle="modal"
-            data-target="#control-debug__window_callbacks">
-      Callbacks
-    </button>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_get">Get&#x25B8</span>
-    <br>
-		<button type="button"
-						data-toggle="modal"
-						data-target="#control-debug__window_delete">
-			Delete
-		</button>
-    <span class="control-debug-menu__item control-debug-menu__item_delete">Delete&#x25B8</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks&#x25B8</span>
-  </div>
+            Get
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+             role="button"
+             data-toggle="modal"
+             data-target="#control-debug__window_delete">
+            Delete
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+             role="button"
+             data-toggle="modal"
+             data-target="#control-debug__window_callbacks">
+            Callbacks
+          </a>
+        </li>
+
+      </ul>
+    </div>
+	</nav>
 
   <div class="modal fade"
        id="connection-settings"

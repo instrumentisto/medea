@@ -349,8 +349,6 @@ window.onload = async function() {
 
   Object.values(controlDebugWindows).forEach(s => s());
 
-  bindControlDebugMenu();
-
   let room = newRoom();
   let isCallStarted = false;
   let localStream = null;
@@ -759,41 +757,4 @@ const controlApi = {
   }
 };
 
-function bindCloseWindow(container) {
-  container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-    contentVisibility.hide(container);
-  });
-}
 
-const debugMenuItems = [
-  'create-endpoint',
-  'create-member',
-  'create-room',
-  'delete',
-  'get',
-  'callbacks',
-];
-
-function bindControlDebugMenu() {
-  let menuToggle = document.getElementsByClassName('control-debug-menu__toggle')[0];
-  let menuContainer = document.getElementsByClassName('control-debug-menu')[0];
-  menuToggle.addEventListener('click', () => {
-    contentVisibility.toggle(menuContainer);
-  });
-
-  for (let i = 0; i < debugMenuItems.length; i++) {
-    let currentItem = debugMenuItems[i];
-    let currentMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_' + currentItem)[0];
-    currentMenuItem.addEventListener('click', () => {
-      for (let a = 0; a < debugMenuItems.length; a++) {
-        if (a === i) {
-          continue;
-        }
-        let hideContainer = document.getElementsByClassName('control-debug__window_' + debugMenuItems[a])[0];
-        contentVisibility.hide(hideContainer);
-      }
-      let currentContainer = document.getElementsByClassName('control-debug__window_' + currentItem)[0];
-      contentVisibility.show(currentContainer);
-    });
-  }
-}
