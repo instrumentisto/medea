@@ -215,6 +215,91 @@
   </style>
 </head>
 <body >
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand">Medea</a>
+		<button class="navbar-toggler"
+						type="button"
+						data-toggle="collapse"
+						data-target="#navbar"
+						aria-controls="navbarSupportedContent"
+						aria-expanded="false"
+						aria-label="Toggle navigation">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+
+    <div class="collapse navbar-collapse" id="navbar">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle"
+             id="navbarDropdown"
+             role="button"
+             data-toggle="dropdown"
+             aria-haspopup="true"
+             aria-expanded="false">
+            Create
+          </a>
+          <div class="dropdown-menu">
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_room">
+              Room
+            </a>
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_member">
+              Member
+            </a>
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_endpoint">
+              Endpoint
+            </a>
+          </div>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+            role="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_get">
+            Get
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+             role="button"
+             data-toggle="modal"
+             data-target="#control-debug__window_delete">
+            Delete
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+             role="button"
+             data-toggle="modal"
+             data-target="#control-debug__window_callbacks">
+            Callbacks
+          </a>
+        </li>
+      </ul>
+      <div class="dropdown ">
+        <button class="btn btn-light dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Patsy
+        </button>
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+          <a class="dropdown-item" role="button" id="enable-publishing-btn">Enable publishing</a>
+          <a class="dropdown-item" role="button">Delete Member from server</a>
+          <a class="dropdown-item" role="button">Delete Room from server</a>
+        </div>
+      </div>
+    </div>
+	</nav>
+
   <div class="remote-videos">
   </div>
 
@@ -632,82 +717,6 @@
     <span>Trying to reconnect with backoff...</span>
     <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
   </div>
-
-  <nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <a class="navbar-brand">Medea</a>
-		<button class="navbar-toggler"
-						type="button"
-						data-toggle="collapse"
-						data-target="#navbar"
-						aria-controls="navbarSupportedContent"
-						aria-expanded="false"
-						aria-label="Toggle navigation">
-			<span class="navbar-toggler-icon"></span>
-		</button>
-
-    <div class="collapse navbar-collapse" id="navbar">
-      <ul class="navbar-nav mr-auto">
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle"
-             id="navbarDropdown"
-             role="button"
-             data-toggle="dropdown"
-             aria-haspopup="true"
-             aria-expanded="false">
-            Create
-          </a>
-          <div class="dropdown-menu">
-            <a class="dropdown-item"
-               role="button"
-               data-toggle="modal"
-               data-target="#control-debug__window_create_room">
-              Room
-            </a>
-            <a class="dropdown-item"
-               role="button"
-               data-toggle="modal"
-               data-target="#control-debug__window_create_member">
-              Member
-            </a>
-            <a class="dropdown-item"
-               role="button"
-               data-toggle="modal"
-               data-target="#control-debug__window_create_endpoint">
-              Endpoint
-            </a>
-          </div>
-        </li>
-
-        <li class="nav-item">
-          <a class="nav-link"
-            role="button"
-            data-toggle="modal"
-            data-target="#control-debug__window_get">
-            Get
-          </a>
-        </li>
-
-        <li class="nav-item">
-          <a class="nav-link"
-             role="button"
-             data-toggle="modal"
-             data-target="#control-debug__window_delete">
-            Delete
-          </a>
-        </li>
-
-        <li class="nav-item">
-          <a class="nav-link"
-             role="button"
-             data-toggle="modal"
-             data-target="#control-debug__window_callbacks">
-            Callbacks
-          </a>
-        </li>
-
-      </ul>
-    </div>
-	</nav>
 
   <div class="modal fade"
        id="connection-settings"

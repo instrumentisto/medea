@@ -4,6 +4,12 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
 
+function getMemberId() {
+  let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
+
+  return usernameInput.value;
+}
+
 async function createRoom(roomId, memberId) {
   let isAudioEnabled = document.getElementById('connection-settings__publish_audio').checked;
   let isVideoEnabled = document.getElementById('connection-settings__publish_video').checked;
@@ -74,7 +80,7 @@ async function createMember(roomId, memberId) {
   let isPublish = document.getElementById('connection-settings__publish_is-enabled').checked;
 
   let controlRoom = await axios.get(controlUrl + roomId);
-  let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
+  let anotherMembers = Object.values(controlRoom.data.element.pipeline);
   let pipeline = {};
 
   let memberIds = [];
@@ -90,10 +96,12 @@ async function createMember(roomId, memberId) {
         publish_policy: videoPublishPolicy,
       },
     };
-
-    for (let i = 0; i < anotherMembers.length; i++) {
-      let memberId = anotherMembers[i];
-      memberIds.push(memberId);
+  }
+  for (let i = 0; i < anotherMembers.length; i++) {
+    let anotherMember = anotherMembers[i];
+    let memberId = anotherMember.id;
+    memberIds.push(memberId);
+    if (anotherMember.pipeline.hasOwnProperty('publish')) {
       pipeline["play-" + memberId] = {
         kind: 'WebRtcPlayEndpoint',
         src: 'local://' + roomId + '/' + memberId + "/publish",
@@ -328,6 +336,36 @@ const controlDebugWindows = {
   }
 };
 
+async function startPublishing() {
+  let memberId = getMemberId();
+  let roomSpec = await controlApi.get(roomId, '', '');
+  let anotherMembers = Object.values(roomSpec.element.pipeline);
+  let membersToConnect = [];
+  anotherMembers.forEach((anotherMember) => {
+    if (anotherMember.id != memberId) {
+      membersToConnect.push(anotherMember.id);
+    }
+  });
+
+  let publishEndpoint = {
+    kind: 'WebRtcPublishEndpoint',
+    p2p: 'Always',
+  };
+  let isSuccess = await controlApi.createEndpoint(roomId, memberId, 'publish', publishEndpoint);
+  if (!isSuccess) {
+    return;
+  }
+
+  membersToConnect.forEach(async (srcMemberId) => {
+    let endpoint = {
+      kind: 'WebRtcPlayEndpoint',
+      src: `local://${roomId}/${memberId}/publish`,
+      force_relay: false,
+    };
+    await controlApi.createEndpoint(roomId, srcMemberId, 'play-' + memberId, endpoint);
+  });
+}
+
 window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
@@ -344,6 +382,11 @@ window.onload = async function() {
   });
 
   $('#connection-settings').modal('show');
+
+  let startPublishingBtn = document.getElementById('enable-publishing-btn');
+  startPublishingBtn.addEventListener('click', async () => {
+    await startPublishing();
+  });
 
 
 
@@ -713,8 +756,12 @@ const controlApi = {
         url: controlUrl + roomId + '/' + memberId + '/' + endpointId,
         data: spec
       });
+
+      return true;
     } catch (e) {
       alert(JSON.stringify(e.response.data));
+
+      return false;
     }
   },
 
