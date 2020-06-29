@@ -213,6 +213,10 @@
       bottom: 0;
       width: 100%;
     }
+
+    .foo {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -229,20 +233,43 @@
         <button class="connect__join btn">Join</button>
       </div>
     </div>
-    <div class="connect__device">
-      <label>Audio:
-        <select class="connect__select-device_audio">
-        </select>
-      </label><br>
-      <label>Video:
-        <select class="connect__select-device_video">
-        </select>
-      </label>
-    </div>
     <div class="control toggle-content">
       <button class="control__mute_audio control__btn btn">Mute audio</button>
       <button class="control__mute_video control__btn btn">Mute video</button>
       <button class="control__close_app control__btn btn">Dispose</button>
+    </div>
+    <br>
+    <br>
+    <div class="foo">
+      <a class="call-settings-btn btn">Call settings&#x25BA</a>
+    </div>
+  </div>
+
+  <div class="window call-settings-window toggle-content">
+    <div class="window__title">
+      <span>Call settings</span>
+      <span class="window__close">X</span>
+    </div>
+    <div class="window__content">
+      <div class="connect__device">
+        <label>Audio:
+          <select class="connect__select-device_audio">
+          </select>
+        </label><br>
+        <label>Video:
+          <select class="connect__select-device_video">
+          </select>
+        </label>
+      </div>
+      <br>
+      <input type="checkbox" id="call-settings-window__is-enabled_audio" checked>
+      <label for="call-settings-window__is-enabled_audio">Audio</label>
+
+      <input type="checkbox" id="call-settings-window__is-enabled_video" checked>
+      <label for="call-settings-window__is-enabled_video">Video</label><br>
+
+      <input type="checkbox" id="call-settings-window__is-publish" checked>
+      <label for="call-settings-window__is-publish">Publish</label>
     </div>
   </div>
 
@@ -377,17 +404,17 @@
   </div>
 
   <div class="control-debug-menu toggle-content">
-    <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room</span>
+    <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room&#x25B8</span>
     <br>
-    <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member</span>
+    <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member&#x25B8</span>
     <br>
-    <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint</span>
+    <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint&#x25B8</span>
     <br>
-    <span class="control-debug-menu__item control-debug-menu__item_get">Get</span>
+    <span class="control-debug-menu__item control-debug-menu__item_get">Get&#x25B8</span>
     <br>
-    <span class="control-debug-menu__item control-debug-menu__item_delete">Delete</span>
+    <span class="control-debug-menu__item control-debug-menu__item_delete">Delete&#x25B8</span>
     <br>
-    <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks</span>
+    <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks&#x25B8</span>
   </div>
 </body>
 </html>

@@ -5,6 +5,37 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 let roomId = window.location.hash.replace("#", "");
 
 async function createRoom(roomId, memberId) {
+  let isAudioEnabled = document.getElementById('call-settings-window__is-enabled_audio').checked;
+  let isVideoEnabled = document.getElementById('call-settings-window__is-enabled_video').checked;
+  let isPublish = document.getElementById('call-settings-window__is-publish').checked;
+  let audioPublishPolicy;
+  let videoPublishPolicy;
+  if (isAudioEnabled) {
+    audioPublishPolicy = 'Optional';
+  } else {
+    audioPublishPolicy = 'Disabled';
+  }
+  if (isVideoEnabled) {
+    videoPublishPolicy = 'Optional';
+  } else {
+    videoPublishPolicy = 'Disabled';
+  }
+
+  let pipeline = {};
+  if (isPublish) {
+    pipeline["publish"] = {
+      kind: 'WebRtcPublishEndpoint',
+      p2p: 'Always',
+      force_relay: false,
+      audio_settings: {
+        publish_policy: audioPublishPolicy,
+      },
+      video_settings: {
+        publish_policy: videoPublishPolicy,
+      }
+    };
+  }
+
   let resp = await axios({
     method: 'post',
     url: controlUrl + roomId,
@@ -14,13 +45,7 @@ async function createRoom(roomId, memberId) {
         [memberId]: {
           kind: 'Member',
           credentials: 'test',
-          pipeline: {
-            publish: {
-              kind: 'WebRtcPublishEndpoint',
-              p2p: 'Always',
-              force_relay: false
-            },
-          },
+          pipeline: pipeline,
           on_join: "grpc://127.0.0.1:9099",
           on_leave: "grpc://127.0.0.1:9099"
         }
@@ -32,25 +57,48 @@ async function createRoom(roomId, memberId) {
 }
 
 async function createMember(roomId, memberId) {
+  let isAudioEnabled = document.getElementById('call-settings-window__is-enabled_audio').checked;
+  let isVideoEnabled = document.getElementById('call-settings-window__is-enabled_video').checked;
+  let audioPublishPolicy;
+  let videoPublishPolicy;
+  if (isAudioEnabled) {
+    audioPublishPolicy = 'Optional';
+  } else {
+    audioPublishPolicy = 'Disabled';
+  }
+  if (isVideoEnabled) {
+    videoPublishPolicy = 'Optional';
+  } else {
+    videoPublishPolicy = 'Disabled';
+  }
+  let isPublish = document.getElementById('call-settings-window__is-publish').checked;
+
   let controlRoom = await axios.get(controlUrl + roomId);
   let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
-  let pipeline = {
-    publish: {
-      kind: 'WebRtcPublishEndpoint',
-      p2p: 'Always',
-      force_relay: false
-    }
-  };
+  let pipeline = {};
 
   let memberIds = [];
+  if (isPublish) {
+    pipeline["publish"] = {
+      kind: 'WebRtcPublishEndpoint',
+      p2p: 'Always',
+      force_relay: false,
+      audio_settings: {
+        publish_policy: audioPublishPolicy,
+      },
+      video_settings: {
+        publish_policy: videoPublishPolicy,
+      },
+    };
 
-  for (let i = 0; i < anotherMembers.length; i++) {
-    let memberId = anotherMembers[i];
-    memberIds.push(memberId);
-    pipeline["play-" + memberId] = {
-      kind: 'WebRtcPlayEndpoint',
-      src: 'local://' + roomId + '/' + memberId + "/publish",
-      force_relay: false
+    for (let i = 0; i < anotherMembers.length; i++) {
+      let memberId = anotherMembers[i];
+      memberIds.push(memberId);
+      pipeline["play-" + memberId] = {
+        kind: 'WebRtcPlayEndpoint',
+        src: 'local://' + roomId + '/' + memberId + "/publish",
+        force_relay: false
+      }
     }
   }
 
@@ -286,6 +334,12 @@ window.onload = async function() {
   Object.values(controlDebugWindows).forEach(s => s());
 
   bindControlDebugMenu();
+
+  let callSettingsBtn = document.getElementsByClassName('call-settings-btn')[0];
+  let callSettingsWindow = document.getElementsByClassName('call-settings-window')[0]
+  callSettingsBtn.addEventListener('click', () => {
+    contentVisibility.toggle(callSettingsWindow);
+  });
 
   let room = newRoom();
   let isCallStarted = false;
