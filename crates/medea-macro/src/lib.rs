@@ -200,7 +200,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// #    }
 /// # }
 /// #
-///
+/// #
 /// let mut foo = Foo { bar: 0, baz: 0 };
 ///
 /// let bar = Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
@@ -217,69 +217,64 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// assert_eq!(bar, 3);
 /// ```
 ///
-/// ### Customize `self` type in handler functions (Optional).
+/// # Customize `self` type in handler functions (optional)
 ///
-/// By default, all handler functions take `&mut Self`, if this does not suit
-/// you, then you can specify type manually: `#[dispatchable(self: Rc<Self>)]`,
-/// `#[dispatchable(self: &Self)]`. You can use any type that is a valid `self`
-/// type. Currently those are:
-/// `self`, `&self`, `&mut self`, `self: Box<Self>`, `self: Rc<Self>`,
-/// `self: Arc<Self>`, or `self: Pin<P>` (where P is one of the previous types
-/// except `Self`).
+/// By default, all handler functions take `&mut Self`, if this doesn't suit
+/// your case, then you can specify the method receiver manually:
+/// `#[dispatchable(self: Rc<Self>)]`, `#[dispatchable(self: &Self)]`.
+///
+/// You can use any type that is a valid `self` receiver, e.g. `self`, `&self`,
+/// `&mut self`, `self: Box<Self>`, `self: Rc<Self>`, `self: Arc<Self>`, or
+/// `self: Pin<P>` (where P is one of the previous, except `Self`).
 ///
 /// ```
-///  use std::rc::Rc;
-///  use medea_macro::dispatchable;
+/// # use std::rc::Rc;
+/// use medea_macro::dispatchable;
 ///
-///  #[dispatchable(self: Rc<Self>)]
-///  enum Event {
-///      Variant,
-///  }
+/// #[dispatchable(self: Rc<Self>)]
+/// enum Event {
+///     Variant,
+/// }
 ///
-///  struct Foo;
+/// struct Foo;
+/// impl EventHandler for Foo {
+///    type Output = ();
 ///
-///  impl EventHandler for Foo {
-///     type Output = ();
-///
-///     fn on_variant(self: Rc<Self>) {
-///     }
-///  }
-///
+///    fn on_variant(self: Rc<Self>) {}
+/// }
 ///
 /// let foo = Rc::new(Foo);
 ///
 /// Event::Variant.dispatch_with(foo);
 /// ```
 ///
-/// ### Async handlers (Optional).
+/// # Async handlers (optional)
 ///
-/// It is possible to make handler functions `async`. Rust does not support
-/// `async` function in tratis at this moment, so we will need
-/// [`async-trait`](https://crates.io/crates/async-trait) crate help here.
+/// It's possible to make handler methods `async`. Rust doesn't support `async`
+/// trait methods at the moment, that's why [`async_trait`] is used.
 ///
 /// ```
-///  use medea_macro::dispatchable;
+/// use medea_macro::dispatchable;
 ///
-///  #[dispatchable(async_trait(?Send))]
-///  enum Event {
-///      Variant,
-///  }
+/// #[dispatchable(async_trait(?Send))]
+/// enum Event {
+///     Variant,
+/// }
 ///
-///  struct Foo;
+/// struct Foo;
+/// #[async_trait::async_trait(?Send)]
+/// impl EventHandler for Foo {
+///    type Output = ();
 ///
-///  #[async_trait::async_trait(?Send)]
-///  impl EventHandler for Foo {
-///     type Output = ();
-///
-///     async fn on_variant(&mut self) {
-///     }
-///  }
-///
+///    async fn on_variant(&mut self) {}
+/// }
 ///
 /// let mut foo = Foo;
 ///
 /// Event::Variant.dispatch_with(&mut foo);
 /// ```
+///
+/// [`async_trait`]: https://docs.rs/async-trait
 #[proc_macro_attribute]
 pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
     let enum_item = syn::parse_macro_input!(input as dispatchable::Item);

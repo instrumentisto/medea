@@ -18,8 +18,8 @@ All user visible changes to this project will be documented in this file. This p
 
 - `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68]).
 - `#[dispatchable]` macro:
-    - Optional attribute to specify `self` type for functions in `*Handler` trait (e.g. `#[dispatchable(self: &Self)]`) ([#112]);
-    - Optional attribute that enables [async_trait] integration (e.g. `#[dispatchable(async_trait(?Send))]`) ([#112]).
+    - Optional argument to specify `self` type for methods of `*Handler` trait (e.g. `#[dispatchable(self: &Self)]`) ([#112]);
+    - Optional argument that enables [async-trait] integration (e.g. `#[dispatchable(async_trait(?Send))]`) ([#112]).
 
 ### Fixed
 
@@ -48,5 +48,5 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+[async-trait]: https://docs.rs/async-trait
 [Semantic Versioning 2.0.0]: https://semver.org
-[async_trait]: https://crates.io/crates/async-trait

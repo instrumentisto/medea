@@ -120,9 +120,11 @@ impl Item {
     }
 }
 
-/// [`async_trait`](https://crates.io/crates/async-trait) configuration.
+/// [`async_trait`] configuration.
 ///
 /// `false` is `#[async_trait]`, and `true` is `#[async_trait(?Send)]`.
+///
+/// [`async_trait`]: https://docs.rs/async-trait
 #[derive(Debug, PartialEq)]
 struct IsLocal(bool);
 
