@@ -14,9 +14,13 @@ mod kw {
     syn::custom_keyword!(Send);
 }
 
+/// [`ItemEnum`] that `#[dispatchable]` macro is applied to, plus some misc
+/// helpers.
 #[derive(Debug)]
 pub struct Item {
+    /// Original enum that we will dispatch.
     orig_enum: ItemEnum,
+    /// `Handler` trait ident, basically `{}Handler` where `{}` is enum name.
     handler_trait_ident: Ident,
 }
 
@@ -35,6 +39,7 @@ impl Parse for Item {
 }
 
 impl Item {
+    /// Returns `*Handler` trait documentation.
     fn handler_trait_doc(&self) -> String {
         format!(
             "Handler of [`{0}`] variants.\n\nUsing [`{0}::dispatch_with`] \
@@ -44,14 +49,15 @@ impl Item {
         )
     }
 
-    fn handler_methods_doc(&self) -> String {
+    /// Returns `dispatch_with` function documentation.
+    fn dispatch_with_method_doc(&self) -> String {
         format!(
             "Dispatches [`{0}`] with given [`{0}Handler`].",
             self.orig_enum.ident
         )
     }
 
-    /// Builds `*Handler` trait based on enum variants.
+    /// Returns `*Handler` trait based on enum variants.
     fn handler_trait(&self, args: &Args) -> TokenStream2 {
         let self_kind = args.self_kind.clone();
         let maybe_async = args.maybe_async_token();
@@ -319,7 +325,7 @@ pub fn expand(item: Item, args: &Args) -> TokenStream {
         .collect();
 
     let handler_kind = args.dispatch_with_handler_arg();
-    let method_doc = item.handler_methods_doc();
+    let method_doc = item.dispatch_with_method_doc();
     let handler_trait = item.handler_trait(&args);
     let maybe_async = args.maybe_async_token();
     let maybe_await = args.maybe_await_token();
@@ -367,7 +373,7 @@ mod to_handler_fn_name_spec {
     }
 
     #[test]
-    fn test_args_parse() {
+    fn parse_args_empty() {
         let args = Args::parse.parse2(quote! {}).unwrap();
         assert_eq!(
             args.dispatch_with_handler_arg(),
@@ -378,7 +384,10 @@ mod to_handler_fn_name_spec {
             FnArg::Typed(args.self_kind),
             FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
         );
+    }
 
+    #[test]
+    fn parse_args_self_ref() {
         let args = Args::parse.parse2(quote! {self: &Self}).unwrap();
         assert_eq!(
             args.dispatch_with_handler_arg(),
@@ -389,10 +398,12 @@ mod to_handler_fn_name_spec {
             FnArg::Typed(args.self_kind),
             FnArg::parse.parse2(quote! {self: &Self}).unwrap()
         );
+    }
 
+    #[test]
+    fn parse_args_self_rc() {
         let args = Args::parse
-            .parse2(quote! {self:
-            std::rc::Rc<Self>})
+            .parse2(quote! {self: std::rc::Rc<Self>})
             .unwrap();
         assert_eq!(
             args.dispatch_with_handler_arg(),
@@ -407,7 +418,10 @@ mod to_handler_fn_name_spec {
                 .parse2(quote! {self: std::rc::Rc<Self>})
                 .unwrap()
         );
+    }
 
+    #[test]
+    fn parse_args_async_trait_not_local() {
         let args = Args::parse.parse2(quote! {async_trait}).unwrap();
         assert_eq!(
             args.dispatch_with_handler_arg(),
@@ -418,7 +432,10 @@ mod to_handler_fn_name_spec {
             FnArg::Typed(args.self_kind),
             FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
         );
+    }
 
+    #[test]
+    fn parse_args_async_trait_local() {
         let args = Args::parse.parse2(quote! {async_trait(?Send)}).unwrap();
         assert_eq!(
             args.dispatch_with_handler_arg(),
@@ -429,7 +446,9 @@ mod to_handler_fn_name_spec {
             FnArg::Typed(args.self_kind),
             FnArg::parse.parse2(quote! {self: &mut Self}).unwrap()
         );
-
+    }
+    #[test]
+    fn parse_args_self_arc_and_async_trait_not_send() {
         let args = Args::parse
             .parse2(quote! {self: Arc<Self>, async_trait})
             .unwrap();
