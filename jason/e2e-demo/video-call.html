@@ -51,14 +51,17 @@
       padding: 5px;
     }
 
-    .control {
-      display: none;
+    .bottom-btns {
       position: absolute;
       bottom: 100px;
       left: 0;
       right: 0;
       margin-left: auto;
       margin-right: auto;
+    }
+
+    .control {
+      display: none;
     }
 
     .connect__join {
@@ -221,7 +224,7 @@
     </div>
   </div>
 
-  <div class="control text-center">
+  <div class="bottom-btns control text-center">
     <button class="control__mute_audio btn btn-secondary">Mute audio</button>
     <button class="control__mute_video btn btn-secondary">Mute video</button>
      <button type="button"
@@ -708,9 +711,6 @@
 
   <div class="modal fade"
        id="connection-settings"
-       data-backdrop="static"
-       data-keydrop="true"
-       data-keyboard="false"
        tabindex="-1"
        role="dialog"
        aria-hidden="true">
@@ -718,6 +718,12 @@
       <div class="modal-content">
 				<div class="modal-header">
 					<h5 class="modal-title" id="staticBackdropLabel">Connect to the Room</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
 				</div>
         <div class="modal-body">
           <form>
@@ -776,6 +782,13 @@
       </div>
     </div>
   </div>
+ <button type="button"
+         class="bottom-btns text-center btn btn-success btn-lg"
+         id="connect-btn"
+         data-toggle="modal"
+         data-target="#connection-settings">
+  Connect
+ </button>
 
   <div class="modal fade"
        id="devices-settings"

@@ -519,6 +519,7 @@ window.onload = async function() {
       }
       room = newRoom();
       $('#connection-settings').modal('show');
+      $('#connect-btn').show();
       $('.control').hide();
       alert(
         `Call was ended.
@@ -620,6 +621,7 @@ window.onload = async function() {
       joinCallerButton.onclick = async function() {
         $('#connection-settings').modal('hide');
         $('.control').show();
+        $('#connect-btn').hide();
 
         try {
           let username = usernameInput.value;
