@@ -160,7 +160,9 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     #[inline]
     fn from(from: AudioSettings) -> Self {
         Self {
-            publish_policy: from.publish_policy as i32,
+            publish_policy: proto::web_rtc_publish_endpoint::PublishPolicy::from(
+                from.publish_policy,
+            ) as i32,
         }
     }
 }
@@ -191,7 +193,9 @@ impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
     #[inline]
     fn from(from: VideoSettings) -> Self {
         Self {
-            publish_policy: from.publish_policy as i32,
+            publish_policy: proto::web_rtc_publish_endpoint::PublishPolicy::from(
+                from.publish_policy,
+            ) as i32,
         }
     }
 }
