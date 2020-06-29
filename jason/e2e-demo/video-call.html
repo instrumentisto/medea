@@ -326,7 +326,7 @@
        tabindex="-1"
        role="dialog"
        aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Create Endpoint</h5>
@@ -366,8 +366,8 @@
 
           <b>Endpoint type</b>
           <br>
-          <select class="control-debug__endpoint-type is-visible custom-select">
-            <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
+          <select class="control-debug__endpoint-type is-visible custom-select" autocomplete="off">
+            <option value="WebRtcPlayEndpoint" selected>WebRtcPlayEndpoint</option>
             <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
           </select>
 
@@ -408,8 +408,28 @@
               <option value="IfPossible">If possible</option>
               <option value="Never">Never</option>
             </select>
+            <br>
 
             <br>
+            <b>Audio publish policy</b>
+            <br>
+            <select class="webrtc-publish-endpoint-spec__publish-policy_audio custom-select">
+              <option value="Optional">Optional</option>
+              <option value="Disabled">Disabled</option>
+              <option value="Required">Required</option>
+            </select>
+            <br>
+
+            <br>
+            <b>Video publish policy</b>
+            <br>
+            <select class="webrtc-publish-endpoint-spec__publish-policy_video custom-select">
+              <option value="Optional">Optional</option>
+              <option value="Disabled">Disabled</option>
+              <option value="Required">Required</option>
+            </select>
+            <br>
+
             <br>
             <div class="custom-control custom-switch">
               <input type="checkbox"

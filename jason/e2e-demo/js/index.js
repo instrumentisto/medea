@@ -196,10 +196,18 @@ const controlDebugWindows = {
       if (endpointType === 'WebRtcPublishEndpoint') {
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
           let isForceRelay = document.getElementById('webrtc-publish-endpoint-spec__force-relay').checked;
+          let audioPublishPolicy = document.getElementsByClassName('webrtc-publish-endpoint-spec__publish-policy_audio')[0].value;
+          let videoPublishPolicy = document.getElementsByClassName('webrtc-publish-endpoint-spec__publish-policy_video')[0].value;
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             p2p: p2pMode,
             force_relay: isForceRelay,
+            audio_settings: {
+              publish_policy: audioPublishPolicy,
+            },
+            video_settings: {
+              publish_policy: videoPublishPolicy,
+            },
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
           let source = 'local://' + container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
@@ -750,6 +758,7 @@ const controlApi = {
   },
 
   createEndpoint: async function(roomId, memberId, endpointId, spec) {
+    console.log(JSON.stringify(spec));
     try {
       await axios({
         method: 'post',
