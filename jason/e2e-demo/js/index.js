@@ -552,7 +552,7 @@ window.onload = async function() {
           connectionLossMsg.textContent = 'Trying to manually reconnect...';
           await reconnectHandle.reconnect_with_delay(0);
           $( connectionLossNotification ).toast('hide');
-          console.error("Reconnected!");
+          console.log("Reconnected!");
         } catch (e) {
           console.error("Failed to manually reconnect: " + e.message());
         } finally {
@@ -748,7 +748,6 @@ const controlApi = {
   },
 
   createEndpoint: async function(roomId, memberId, endpointId, spec) {
-    console.log(JSON.stringify(spec));
     try {
       await axios({
         method: 'post',
