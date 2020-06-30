@@ -21,6 +21,9 @@
                        document.location.host + "/control-api/";
     const userNameCookieName = "MEDEA_DEMO_USER_NAME";
     var isForceRelay = false;
+    let audioPublishPolicy = 'Optional';
+    let videoPublishPolicy = 'Optional';
+    let isPublishingEnabled = true;
 
     async function createRoom(roomId) {
       try {
@@ -37,37 +40,54 @@
       }
     }
 
-    async function addNewMember(roomId, memberId) {
-      let pipeline = {
-        publish: {
+    async function startPublishing(roomId, memberId) {
+      await axios({
+        method: 'post',
+        url: controlUrl + roomId + "/" + memberId + '/publish',
+        data: {
           kind: 'WebRtcPublishEndpoint',
           p2p: 'Always',
           force_relay: isForceRelay,
-        },
-      };
-
-      var otherMembers = Object.keys((await axios.get(controlUrl + roomId)).data.element.pipeline);
-      for (let i = 0; i < otherMembers.length; i++) {
-        let memberId = otherMembers[i];
-        pipeline["play-" + memberId] = {
-          kind: 'WebRtcPlayEndpoint',
-          src: 'local://' + roomId + '/' + memberId + "/publish",
-          force_relay: isForceRelay,
-        };
-      }
-
-      let resp = await axios({
-        method: 'post',
-        url: controlUrl + roomId + '/' + memberId,
-        data: {
-          kind: 'Member',
-          credentials: 'test',
-          pipeline: pipeline,
+          audio_settings: {
+            publish_policy: audioPublishPolicy,
+          },
+          video_settings: {
+            publish_policy: videoPublishPolicy,
+          },
         },
       });
+      await startPublishPlaying(roomId, memberId);
+    }
 
-      // Here we repeat get room request to reduce possibility of concurrency
-      // bugs, e.g. another user was added to the room since first request.
+    async function stopPublishing(roomId, memberId) {
+      await axios({
+        method: 'delete',
+        url: controlUrl + roomId + "/" + memberId + '/publish',
+      });
+      await stopPublishPlaying(roomId, memberId);
+    }
+
+    async function stopPublishPlaying(roomId, memberId) {
+      let controlRoom = await axios.get(controlUrl + roomId);
+      var otherMembers = Object.keys(controlRoom.data.element.pipeline);
+      var deleteRequests = [];
+      for (let i = 0; i < otherMembers.length; i++) {
+        let id = otherMembers[i];
+
+        if (id === memberId) {
+          continue;
+        }
+
+        let deleteRequest = axios({
+          method: 'delete',
+          url: controlUrl + roomId + "/" + id + '/play-' + memberId,
+        });
+        deleteRequests.push(deleteRequest);
+      }
+      await Promise.all(deleteRequests);
+    }
+
+    async function startPublishPlaying(roomId, memberId) {
       let controlRoom = await axios.get(controlUrl + roomId);
       var otherMembers = Object.keys(controlRoom.data.element.pipeline);
       var play_requests = [];
@@ -90,9 +110,59 @@
         play_requests.push(playRequest);
       }
       await Promise.all(play_requests);
+    }
+
+    async function addNewMember(roomId, memberId) {
+      let pipeline = {};
+      if (isPublishingEnabled) {
+        pipeline["publish"] = {
+          kind: 'WebRtcPublishEndpoint',
+          p2p: 'Always',
+          force_relay: isForceRelay,
+          audio_settings: {
+            publish_policy: audioPublishPolicy,
+          },
+          video_settings: {
+            publish_policy: videoPublishPolicy,
+          },
+        };
+      }
+      console.log(pipeline);
+
+      var otherMembers = Object.values((await axios.get(controlUrl + roomId)).data.element.pipeline);
+      for (let i = 0; i < otherMembers.length; i++) {
+        let member = otherMembers[i];
+        let memberId = member.id;
+        if (member.pipeline.hasOwnProperty('publish')) {
+          pipeline["play-" + memberId] = {
+            kind: 'WebRtcPlayEndpoint',
+            src: 'local://' + roomId + '/' + memberId + "/publish",
+            force_relay: isForceRelay,
+          };
+        }
+      }
+
+      let resp = await axios({
+        method: 'post',
+        url: controlUrl + roomId + '/' + memberId,
+        data: {
+          kind: 'Member',
+          credentials: 'test',
+          pipeline: pipeline,
+        },
+      });
+
+      if (!isPublishingEnabled) {
+        return resp.data.sids[memberId];
+      }
+
+      // Here we repeat get room request to reduce possibility of concurrency
+      // bugs, e.g. another user was added to the room since first request.
+      await startPublishPlaying(roomId, memberId);
 
       return resp.data.sids[memberId]
     }
+
 
     async function init_jason() {
       if (inited) {
@@ -161,6 +231,15 @@
         return constraints;
       }
 
+
+      function getPublishPolicy(isEnabled) {
+        if (isEnabled) {
+          return 'Optional';
+        } else {
+          return 'Disabled';
+        }
+      };
+
       let isCallStarted = false;
       let localStream = null;
       let isAudioMuted = false;
@@ -174,9 +253,49 @@
       let videoSelect = document.getElementById('connect__select-device_video');
       let localVideo = document.getElementById('local-video__video');
       let isForceRelayCheckbox = document.getElementById("is_force_relay");
+      let isAudioEnabledCheckbox = document.getElementById('is-audio-enabled');
+      let isVideoEnabledCheckbox = document.getElementById('is-video-enabled');
+      let isPublishingEnabledCheckbox = document.getElementById('is-publishing-enabled');
+      let usernameInput = document.getElementById('join__username');
+      let isPublishingEnabledListener = async (e) => {
+        isPublishingEnabled = isPublishingEnabledCheckbox.checked;
+        if (e.target.checked) {
+          isAudioEnabledCheckbox.disabled = false;
+          isVideoEnabledCheckbox.disabled = false;
+          if (isCallStarted) {
+            await startPublishing(roomId, usernameInput.value);
+            isAudioEnabledCheckbox.disabled = true;
+            isVideoEnabledCheckbox.disabled = true;
+            // TODO: just remove this line when delete-tracks will be merged
+            //       into master
+            isPublishingEnabledCheckbox.disabled = true;
+          }
+        } else {
+          if (isCallStarted) {
+            await stopPublishing(roomId, usernameInput.value);
+            isAudioEnabledCheckbox.disabled = false;
+            isVideoEnabledCheckbox.disabled = false;
+          }
+          if (!isCallStarted) {
+            isAudioEnabledCheckbox.disabled = true;
+            isVideoEnabledCheckbox.disabled = true;
+          }
+        }
+      }
+      isPublishingEnabledCheckbox.addEventListener('change', isPublishingEnabledListener);
+      await isPublishingEnabledListener({target: isPublishingEnabledCheckbox});
+      let isAudioEnabledListener = (e) => {
+        audioPublishPolicy = getPublishPolicy(e.target.checked);
+      };
+      isAudioEnabledCheckbox.addEventListener('change', isAudioEnabledListener);
+      isAudioEnabledListener({target: isAudioEnabledCheckbox});
+      let isVideoEnabledListener = (e) => {
+        videoPublishPolicy = getPublishPolicy(e.target.checked);
+      }
+      isVideoEnabledListener({target: isVideoEnabledCheckbox});
+      isVideoEnabledCheckbox.addEventListener('change', isVideoEnabledListener);
 
       let joinCallerButton = document.getElementById('join__join');
-      let usernameInput = document.getElementById('join__username');
 
       async function initLocalStream() {
         let constraints = await build_constraints(audioSelect, videoSelect);
@@ -359,6 +478,20 @@
           isForceRelay = isForceRelayCheckbox.checked;
           isForceRelayCheckbox.disabled = true;
 
+          if (isPublishingEnabled) {
+            // TODO: just remove this line when delete-tracks will be merged
+            //       into master
+            isPublishingEnabledCheckbox.disabled = true;
+            isAudioEnabledCheckbox.disabled = true;
+            isVideoEnabledCheckbox.disabled = true;
+          } else {
+            // TODO: just remove this line when delete-tracks will be merged
+            //       into master
+            isPublishingEnabledCheckbox.disabled = false;
+            isAudioEnabledCheckbox.disabled = false;
+            isVideoEnabledCheckbox.disabled = false;
+          }
+
           try {
             let username = usernameInput.value;
             try {
@@ -509,8 +642,49 @@
         </div>
 
         <div class="form-check form-check-inline">
-          <input class="form-check-input" type="checkbox" id="is_force_relay" value="true">
-          <label class="form-check-label" for="is_force_relay">Force TURN relay</label>
+          <div class="custom-control custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is_force_relay"
+                   value="true">
+            <label class="form-check-label custom-control-label"
+                   for="is_force_relay">
+              Force TURN relay
+            </label>
+          </div>
+
+          <div class="custom-control custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is-audio-enabled"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="is-audio-enabled">
+              Publish audio
+            </label>
+          </div>
+
+          <div class="custom-control custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is-video-enabled"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="is-video-enabled">
+              Publish video
+            </label>
+          </div>
+
+          <div class="custom-control custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is-publishing-enabled"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="is-publishing-enabled">
+              Publish media
+            </label>
+          </div>
         </div>
 
       </div>
