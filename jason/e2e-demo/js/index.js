@@ -4,9 +4,10 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
 
-function getMemberId() {
-  let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
+let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
+let usernameMenuButton = document.getElementById('username-menu-button');
 
+function getMemberId() {
   return usernameInput.value;
 }
 
@@ -176,12 +177,12 @@ const controlDebugWindows = {
     endpointTypeSelect.addEventListener('change', () => {
       switch (endpointTypeSelect.value) {
         case 'WebRtcPlayEndpoint':
-          contentVisibility.show(playEndpointSpecContainer);
-          contentVisibility.hide(publishEndpointSpecContainer);
+          $( playEndpointSpecContainer ).show();
+          $( publishEndpointSpecContainer ).hide();
           break;
         case 'WebRtcPublishEndpoint':
-          contentVisibility.show(publishEndpointSpecContainer);
-          contentVisibility.hide(playEndpointSpecContainer);
+          $( publishEndpointSpecContainer ).show();
+          $( playEndpointSpecContainer ).hide();
           break;
       }
     });
@@ -378,6 +379,9 @@ window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
   console.log(baseUrl);
+  usernameInput.addEventListener('change', (e) => {
+    usernameMenuButton.innerHTML = e.target.value;
+  });
 
   $('.modal').on('show.bs.modal', function(event) {
       var idx = $('.modal:visible').length;
@@ -537,7 +541,7 @@ window.onload = async function() {
 
     room.on_connection_loss( async (reconnectHandle) => {
       let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
-      contentVisibility.show(connectionLossNotification);
+      $( connectionLossNotification ).show();
 
       let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
       let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
@@ -547,7 +551,7 @@ window.onload = async function() {
         try {
           connectionLossMsg.textContent = 'Trying to manually reconnect...';
           await reconnectHandle.reconnect_with_delay(0);
-          contentVisibility.hide(connectionLossNotification);
+          $( connectionLossNotification ).hide();
           console.error("Reconnected!");
         } catch (e) {
           console.error("Failed to manually reconnect: " + e.message());
@@ -560,7 +564,7 @@ window.onload = async function() {
       } catch (e) {
         console.error('Error in reconnection with backoff:\n' + e.message());
       }
-      contentVisibility.hide(connectionLossNotification);
+      $( connectionLossNotification ).hide();
     });
 
     room.on_close(function (on_closed) {
@@ -583,7 +587,6 @@ window.onload = async function() {
 
   try {
     let joinCallerButton = document.getElementsByClassName('connection-settings__connect')[0];
-    let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
 
     audioSelect.addEventListener('change', async () => {
       try {
@@ -667,6 +670,7 @@ window.onload = async function() {
     });
 
     usernameInput.value = faker.name.firstName();
+    usernameMenuButton.innerHTML = usernameInput.value;
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
@@ -709,20 +713,6 @@ window.onload = async function() {
     bindJoinButtons(roomId);
   } catch (e) {
     console.log(e)
-  }
-};
-
-const contentVisibility = {
-  show: function(elem) {
-    elem.classList.add('is-visible');
-  },
-
-  hide: function(elem) {
-    elem.classList.remove('is-visible');
-  },
-
-  toggle: function(elem) {
-    elem.classList.toggle('is-visible');
   }
 };
 

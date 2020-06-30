@@ -64,96 +64,6 @@
       display: none;
     }
 
-    .connect__join {
-      font-size: 16px;
-      margin-left: 5px;
-    }
-
-    .connect__device {
-      float: left;
-    }
-
-    .control__btn {
-      font-size: 13pt;
-      margin-right: 10px;
-    }
-
-    .toggle-content {
-      display: none;
-    }
-
-    .toggle-content.is-visible {
-      display: block;
-    }
-
-    .window {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #FFFFFF;
-      border-radius: 3px;
-    }
-
-    .window__content span {
-      font-size: 10pt;
-    }
-
-    .window__content {
-      padding: 10px;
-    }
-
-    .window__close {
-      float: right;
-      cursor: pointer;
-    }
-
-    .window__title {
-      border-radius: 3px;
-      padding: 10px;
-      display: inherit;
-      background: #49668C;
-      color: #ffffff;
-    }
-
-    .control-debug-menu__toggle {
-      opacity: 0.5;
-      font-size: 10pt;
-      cursor: pointer;
-      position: absolute;
-      top: 0;
-    }
-
-    .control-debug-menu__toggle:hover {
-      opacity: 1;
-    }
-
-    .control-debug-menu__item {
-      cursor: pointer;
-      padding: 3px;
-      color: #242424;
-    }
-
-    .control-debug-menu__item:hover {
-      color: #616161;
-    }
-
-    .control-debug-menu {
-      position: absolute;
-      top: 30px;
-      background: #fff;
-      border-radius: 3px;
-      padding: 5px;
-      font-size: 11pt;
-    }
-
-    .control-debug__window_get>.window__content>.control-debug__json-result {
-      height: 300px;
-      overflow: scroll;
-      white-space: pre;
-      font-size: 11pt;
-    }
-
     .json__key {
       color: brown;
     }
@@ -164,20 +74,6 @@
 
     .json__string {
       color: olive;
-    }
-
-    .control-debug__table-result>table {
-      border-collapse: separate;
-      border-spacing: 10px;
-      font-size: 11pt;
-    }
-
-    .control-debug__table-result>table>tr {
-      font-weight: normal;
-    }
-
-    .control-debug__table-result>table>tr>th {
-      font-weight: normal;
     }
 
     .connection-loss-notification {
@@ -207,10 +103,6 @@
       left: 0;
       bottom: 0;
       width: 100%;
-    }
-
-    .foo {
-      margin-top: 10px;
     }
   </style>
 </head>
@@ -288,13 +180,15 @@
         </li>
       </ul>
       <div class="dropdown ">
-        <button class="btn btn-light dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Patsy
+        <button class="btn btn-light dropdown-toggle" type="button"
+                id="username-menu-button"
+                data-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="false">
+          Username
         </button>
-        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="username-menu-button">
           <a class="dropdown-item" role="button" id="enable-publishing-btn">Enable publishing</a>
-          <a class="dropdown-item" role="button">Delete Member from server</a>
-          <a class="dropdown-item" role="button">Delete Room from server</a>
         </div>
       </div>
     </div>
@@ -366,7 +260,7 @@
 
           <b>Endpoint type</b>
           <br>
-          <select class="control-debug__endpoint-type is-visible custom-select" autocomplete="off">
+          <select class="control-debug__endpoint-type custom-select" autocomplete="off">
             <option value="WebRtcPlayEndpoint" selected>WebRtcPlayEndpoint</option>
             <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
           </select>
@@ -374,7 +268,7 @@
           <br>
           <br>
 
-          <div class="webrtc-play-endpoint-spec toggle-content is-visible">
+          <div class="webrtc-play-endpoint-spec">
             <b>Source URI</b>
             <br>
             <div class="input-group input-group">
@@ -400,7 +294,7 @@
             </div>
           </div>
 
-          <div class="webrtc-publish-endpoint-spec toggle-content">
+          <div class="webrtc-publish-endpoint-spec" style="display: none;">
             <b>P2P mode:</b>
             <br>
             <select class="webrtc-publish-endpoint-spec__p2p custom-select">
@@ -504,25 +398,6 @@
           </button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="window control-debug__window_create-member toggle-content">
-    <div class="window__title">
-      <span>Create member</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="member-spec__credentials" placeholder="Credentials">
-      <br>
-      <input class="member-spec__idle-timeout" placeholder="IDLE timeout">
-      <input class="member-spec__reconnect-timeout" placeholder="Reconnect timeout">
-      <input class="member-spec__ping-interval" placeholder="Ping interval">
-
-
-      <button class="control-debug__execute">Execute</button>
     </div>
   </div>
 
@@ -732,7 +607,7 @@
     </div>
   </div>
 
-  <div class="connection-loss-notification toggle-content">
+  <div class="connection-loss-notification" style="display: none;">
     <span class="connection-loss-notification__msg">Connection lost.</span>
     <span>Trying to reconnect with backoff...</span>
     <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
