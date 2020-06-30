@@ -104,7 +104,7 @@
           data: {
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
-            force_relay: controlRoom.data.element.pipeline[id].pipeline.publish.force_relay,
+            force_relay: (controlRoom.data.element.pipeline[id].pipeline.publish || {force_relay: isForceRelay}).force_relay,
           }
         });
         play_requests.push(playRequest);
@@ -510,6 +510,7 @@
             await room.join(await addNewMember(roomId, username));
             connectionState.className = 'badge badge-success';
             connectionState.textContent = 'Connected';
+            isCallStarted = true;
 
           } catch (e) {
             logError("Join to room failed", e);
