@@ -3,7 +3,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    ops::Deref,
+    ops::Deref as _,
     rc::{Rc, Weak},
 };
 
