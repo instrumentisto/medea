@@ -541,7 +541,7 @@ window.onload = async function() {
 
     room.on_connection_loss( async (reconnectHandle) => {
       let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
-      $( connectionLossNotification ).show();
+      $( connectionLossNotification ).toast('show');
 
       let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
       let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
@@ -551,7 +551,7 @@ window.onload = async function() {
         try {
           connectionLossMsg.textContent = 'Trying to manually reconnect...';
           await reconnectHandle.reconnect_with_delay(0);
-          $( connectionLossNotification ).hide();
+          $( connectionLossNotification ).toast('hide');
           console.error("Reconnected!");
         } catch (e) {
           console.error("Failed to manually reconnect: " + e.message());
@@ -564,7 +564,7 @@ window.onload = async function() {
       } catch (e) {
         console.error('Error in reconnection with backoff:\n' + e.message());
       }
-      $( connectionLossNotification ).hide();
+      $( connectionLossNotification ).toast('hide');
     });
 
     room.on_close(function (on_closed) {

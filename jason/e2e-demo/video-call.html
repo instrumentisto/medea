@@ -77,25 +77,13 @@
     }
 
     .connection-loss-notification {
-      right: 50px;
-      top: 50px;
+      margin-top: 10px;
+      right: 10px;
       position: absolute;
-      background: #fff;
-      padding: 10px;
-      border-radius: 3px;
-      font-size: 11pt;
-    }
-
-    .connection-loss-notification__msg {
-      display: block;
     }
 
     .connection-loss-notification__manual-reconnect {
-      display: block;
-      color: #49668C;
-      text-align: center;
-      cursor: pointer;
-      margin-top: 5px;
+      width: 100%;
     }
 
     .footer {
@@ -607,10 +595,18 @@
     </div>
   </div>
 
-  <div class="connection-loss-notification" style="display: none;">
-    <span class="connection-loss-notification__msg">Connection lost.</span>
-    <span>Trying to reconnect with backoff...</span>
-    <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
+  <div class="toast connection-loss-notification"
+       role="alert"
+       aria-live="assertive"
+       aria-atomic="true"
+       data-autohide="false">
+    <div class="toast-header">
+      <strong class="mr-auto">Connection lost</strong>
+    </div>
+    <div class="toast-body">
+      <span class="connection-loss-notification__msg">Trying to reconnect with backoff...</span>
+      <button class="btn btn-success btn-sm connection-loss-notification__manual-reconnect">Reconnect now</a>
+    </div>
   </div>
 
   <div class="modal fade"
