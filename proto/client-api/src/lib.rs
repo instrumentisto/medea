@@ -10,21 +10,22 @@
 //!
 //! # Contribution guide
 //!
-//! Avoid using 64 bit types. Jason uses [wasm-bindgen] to interop with JS,
-//! and exposing 64 bit types to JS will make [wasm-bindgen] to use
+//! Avoid using 64 bit types. [`medea-jason`] uses [wasm-bindgen] to interop
+//! with JS, and exposing 64 bit types to JS will make [wasm-bindgen] to use
 //! [BigInt64Array][2] / [BigUint64Array][3] in its JS glue, which are not
-//! implemented or were implemented too recently in some UA's.
+//! implemented or were implemented too recently in some UAs.
 //!
-//! So its better to keep protocol 64-bit-types-clean to avoid breaking things
+//! So its better to keep protocol 64-bit-types-clean to avoid things breaking
 //! by accident.
 //!
+//! [`medea-jason`]: https://docs.rs/medea-jason
 //! [wasm-bindgen]: https://github.com/rustwasm/wasm-bindgen
 //! [2]: https://tinyurl.com/y8bacb93
 //! [3]: https://tinyurl.com/y4j3b4cs
 
 pub mod stats;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto as _};
 
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
@@ -454,7 +455,6 @@ impl Serialize for ClientMsg {
 }
 
 #[cfg(feature = "medea")]
-#[allow(clippy::cast_possible_truncation)]
 impl<'de> Deserialize<'de> for ClientMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -466,25 +466,34 @@ impl<'de> Deserialize<'de> for ClientMsg {
         let map = ev.as_object().ok_or_else(|| {
             D::Error::custom(format!(
                 "unable to deserialize ClientMsg [{:?}]",
-                &ev
+                &ev,
             ))
         })?;
 
         if let Some(v) = map.get("pong") {
-            let n = v.as_u64().ok_or_else(|| {
-                D::Error::custom(format!(
-                    "unable to deserialize ClientMsg::Pong [{:?}]",
-                    &ev
-                ))
-            })?;
+            let n = v
+                .as_u64()
+                .ok_or_else(|| {
+                    D::Error::custom(format!(
+                        "unable to deserialize ClientMsg::Pong [{:?}]",
+                        &ev,
+                    ))
+                })?
+                .try_into()
+                .map_err(|e| {
+                    D::Error::custom(format!(
+                        "ClientMsg::Pong overflows 32 bits: {}",
+                        e,
+                    ))
+                })?;
 
-            Ok(Self::Pong(n as u32))
+            Ok(Self::Pong(n))
         } else {
             let command =
                 serde_json::from_value::<Command>(ev).map_err(|e| {
                     D::Error::custom(format!(
                         "unable to deserialize ClientMsg::Command [{:?}]",
-                        e
+                        e,
                     ))
                 })?;
             Ok(Self::Command(command))
@@ -515,7 +524,6 @@ impl Serialize for ServerMsg {
 }
 
 #[cfg(feature = "jason")]
-#[allow(clippy::cast_possible_truncation)]
 impl<'de> Deserialize<'de> for ServerMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -527,19 +535,28 @@ impl<'de> Deserialize<'de> for ServerMsg {
         let map = ev.as_object().ok_or_else(|| {
             D::Error::custom(format!(
                 "unable to deserialize ServerMsg [{:?}]",
-                &ev
+                &ev,
             ))
         })?;
 
         if let Some(v) = map.get("ping") {
-            let n = v.as_u64().ok_or_else(|| {
-                D::Error::custom(format!(
-                    "unable to deserialize ServerMsg::Ping [{:?}]",
-                    &ev
-                ))
-            })?;
+            let n = v
+                .as_u64()
+                .ok_or_else(|| {
+                    D::Error::custom(format!(
+                        "unable to deserialize ServerMsg::Ping [{:?}]",
+                        &ev
+                    ))
+                })?
+                .try_into()
+                .map_err(|e| {
+                    D::Error::custom(format!(
+                        "ServerMsg::Ping overflows 32 bits: {}",
+                        e,
+                    ))
+                })?;
 
-            Ok(Self::Ping(n as u32))
+            Ok(Self::Ping(n))
         } else {
             let msg = serde_json::from_value::<Event>(ev.clone())
                 .map(Self::Event)
@@ -550,7 +567,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
                 .map_err(|e| {
                     D::Error::custom(format!(
                         "unable to deserialize ServerMsg [{:?}]",
-                        e
+                        e,
                     ))
                 })?;
             Ok(msg)

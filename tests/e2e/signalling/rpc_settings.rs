@@ -24,12 +24,12 @@ async fn rpc_settings_server_msg() {
             MemberBuilder::default()
                 .id("member")
                 .credentials("test")
-                .ping_interval(Some(Duration::from_secs(u64::from(
-                    PING_INTERVAL_SECS,
-                ))))
-                .idle_timeout(Some(Duration::from_secs(u64::from(
-                    IDLE_TIMEOUT_SECS,
-                ))))
+                .ping_interval(Some(Duration::from_secs(
+                    PING_INTERVAL_SECS.into(),
+                )))
+                .idle_timeout(Some(Duration::from_secs(
+                    IDLE_TIMEOUT_SECS.into(),
+                )))
                 .reconnect_timeout(Some(Duration::from_secs(0)))
                 .build()
                 .unwrap(),

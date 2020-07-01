@@ -16,7 +16,7 @@ All user visible changes to this project will be documented in this file. This p
         - `Pong` is now `Ping`.
     - Client messages:
         - `Ping` is now `Pong`.
-    - Use 32-bit types instead of 64-bit types ([#115]).
+    - Use 32-bit integer types instead of 64-bit ([#115]).
 
 ### Added
 

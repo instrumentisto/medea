@@ -238,8 +238,8 @@ pub enum RtcStatsType {
     /// objects.
     ///
     /// A remote candidate is [deleted][1] when the [RTCIceTransport] does an
-    /// ICE restart, and the candidate is no longer a member of any
-    /// non-deleted candidate pair.
+    /// ICE restart, and the candidate is no longer a member of any non-deleted
+    /// candidate pair.
     ///
     /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
     /// [1]: https://w3.org/TR/webrtc-stats/#dfn-deleted
