@@ -8,6 +8,7 @@ doc-valid-idents = [
     "IPv4", "IPv6", "JavaScript", "NaN", "NaNs",
     "OAuth", "OpenGL", "OpenSSH", "OpenSSL", "OpenStreetMap", "TrueType",
     "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
+    "BigInt64Array", "BigUint64Array",
     "DOMHighResTimeStamp",
     "getDisplayMedia", "getUserMedia", "gRPC",
     "MediaDeviceKind", "MediaDeviceInfo",

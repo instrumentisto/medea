@@ -31,7 +31,7 @@ use crate::{delay_for, get_test_unrequired_tracks, timeout};
 wasm_bindgen_test_configure!(run_in_browser);
 
 fn toggle_mute_tracks_updates(
-    tracks_ids: &[u64],
+    tracks_ids: &[u32],
     is_muted: bool,
 ) -> Vec<TrackPatch> {
     tracks_ids
@@ -43,8 +43,8 @@ fn toggle_mute_tracks_updates(
         .collect()
 }
 
-const AUDIO_TRACK_ID: u64 = 1;
-const VIDEO_TRACK_ID: u64 = 2;
+const AUDIO_TRACK_ID: u32 = 1;
+const VIDEO_TRACK_ID: u32 = 2;
 
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
