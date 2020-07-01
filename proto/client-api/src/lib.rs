@@ -12,14 +12,15 @@
 //!
 //! Avoid using 64 bit types. Jason uses [wasm-bindgen] to interop with JS,
 //! and exposing 64 bit types to JS will make [wasm-bindgen] to use
-//! [BigInt64Array][2] in its JS glue, which is not implemented or was
-//! implemented too recently in some UA's.
+//! [BigInt64Array][2] / [BigUint64Array][3] in its JS glue, which are not
+//! implemented or were implemented too recently in some UA's.
 //!
 //! So its better to keep protocol 64-bit-types-clean to avoid breaking things
 //! by accident.
 //!
 //! [wasm-bindgen]: https://github.com/rustwasm/wasm-bindgen
 //! [2]: https://tinyurl.com/y8bacb93
+//! [3]: https://tinyurl.com/y4j3b4cs
 
 pub mod stats;
 
