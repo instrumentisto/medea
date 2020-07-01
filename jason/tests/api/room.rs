@@ -826,8 +826,8 @@ mod patches_generation {
     /// `audio_track_muted_state_fn`'s output will be used as `is_muted` value
     /// for all audio [`Track`]s.
     async fn get_room_and_commands_receiver(
-        peers_count: u64,
-        audio_track_muted_state_fn: impl Fn(u64) -> bool,
+        peers_count: u32,
+        audio_track_muted_state_fn: impl Fn(u32) -> bool,
     ) -> (Room, mpsc::UnboundedReceiver<Command>) {
         let mut repo = Box::new(MockPeerRepository::new());
 

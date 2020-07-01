@@ -429,10 +429,16 @@ impl WebSocketRpcClient {
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
                     IdleTimeout(
-                        Duration::from_millis(settings.idle_timeout_ms).into(),
+                        Duration::from_millis(u64::from(
+                            settings.idle_timeout_ms,
+                        ))
+                        .into(),
                     ),
                     PingInterval(
-                        Duration::from_millis(settings.ping_interval_ms).into(),
+                        Duration::from_millis(u64::from(
+                            settings.ping_interval_ms,
+                        ))
+                        .into(),
                     ),
                 )
                 .map_err(tracerr::wrap!(=> RpcClientError))
@@ -452,10 +458,12 @@ impl WebSocketRpcClient {
         rpc_settings: RpcSettings,
     ) -> Result<(), Traced<RpcClientError>> {
         let idle_timeout = IdleTimeout(
-            Duration::from_millis(rpc_settings.idle_timeout_ms).into(),
+            Duration::from_millis(u64::from(rpc_settings.idle_timeout_ms))
+                .into(),
         );
         let ping_interval = PingInterval(
-            Duration::from_millis(rpc_settings.ping_interval_ms).into(),
+            Duration::from_millis(u64::from(rpc_settings.ping_interval_ms))
+                .into(),
         );
 
         let heartbeat =

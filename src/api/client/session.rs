@@ -66,7 +66,7 @@ pub struct WsSession {
     last_activity: Instant,
 
     /// Last number of [`ServerMsg::Ping`].
-    last_ping_num: u64,
+    last_ping_num: u32,
 
     /// Interval to send [`ServerMsg::Ping`]s to a client with.
     ping_interval: Duration,

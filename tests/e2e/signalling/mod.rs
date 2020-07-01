@@ -89,7 +89,7 @@ impl TestMember {
     }
 
     /// Sends pong to the server.
-    fn send_pong(&mut self, id: u64) {
+    fn send_pong(&mut self, id: u32) {
         executor::block_on(async move {
             let json = serde_json::to_string(&ClientMsg::Pong(id)).unwrap();
             self.sink.send(ws::Message::Text(json)).await.unwrap();

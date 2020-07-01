@@ -14,8 +14,8 @@ use crate::{
 #[actix_rt::test]
 async fn rpc_settings_server_msg() {
     const ROOM_ID: &str = "rpc_settings_server_msg";
-    const PING_INTERVAL_SECS: u64 = 111;
-    const IDLE_TIMEOUT_SECS: u64 = 222;
+    const PING_INTERVAL_SECS: u32 = 111;
+    const IDLE_TIMEOUT_SECS: u32 = 222;
 
     let mut control_client = ControlClient::new().await;
     let create_room = RoomBuilder::default()
@@ -24,8 +24,12 @@ async fn rpc_settings_server_msg() {
             MemberBuilder::default()
                 .id("member")
                 .credentials("test")
-                .ping_interval(Some(Duration::from_secs(PING_INTERVAL_SECS)))
-                .idle_timeout(Some(Duration::from_secs(IDLE_TIMEOUT_SECS)))
+                .ping_interval(Some(Duration::from_secs(u64::from(
+                    PING_INTERVAL_SECS,
+                ))))
+                .idle_timeout(Some(Duration::from_secs(u64::from(
+                    IDLE_TIMEOUT_SECS,
+                ))))
                 .reconnect_timeout(Some(Duration::from_secs(0)))
                 .build()
                 .unwrap(),
