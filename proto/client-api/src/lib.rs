@@ -7,10 +7,25 @@
 //! - `medea`: Enables [`Deserialize`] implementation for [`Command`]s, and
 //! [`Serialize`] implementation for [`Event`]s.
 //! - `extended-stats`: Enables unused RTC Stats DTOs.
+//!
+//! # Contribution guide
+//!
+//! Avoid using 64 bit types. [`medea-jason`] uses [wasm-bindgen] to interop
+//! with JS, and exposing 64 bit types to JS will make [wasm-bindgen] to use
+//! [BigInt64Array][2] / [BigUint64Array][3] in its JS glue, which are not
+//! implemented or were implemented too recently in some UAs.
+//!
+//! So its better to keep protocol 64-bit-types-clean to avoid things breaking
+//! by accident.
+//!
+//! [`medea-jason`]: https://docs.rs/medea-jason
+//! [wasm-bindgen]: https://github.com/rustwasm/wasm-bindgen
+//! [2]: https://tinyurl.com/y8bacb93
+//! [3]: https://tinyurl.com/y4j3b4cs
 
 pub mod stats;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto as _};
 
 use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
@@ -25,7 +40,7 @@ use self::stats::RtcStat;
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
-pub struct PeerId(pub u64);
+pub struct PeerId(pub u32);
 
 /// ID of `MediaTrack`.
 #[cfg_attr(
@@ -34,7 +49,7 @@ pub struct PeerId(pub u64);
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
-pub struct TrackId(pub u64);
+pub struct TrackId(pub u32);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -71,7 +86,7 @@ impl_incrementable!(TrackId);
 pub enum ServerMsg {
     /// `ping` message that `Media Server` is expected to send to `Client`
     /// periodically for probing its aliveness.
-    Ping(u64),
+    Ping(u32),
 
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
@@ -89,12 +104,12 @@ pub struct RpcSettings {
     /// doesn't receive [`ClientMsg::Pong`].
     ///
     /// Unit: millisecond.
-    pub idle_timeout_ms: u64,
+    pub idle_timeout_ms: u32,
 
     /// Interval that `Media Server` sends [`ServerMsg::Ping`] with.
     ///
     /// Unit: millisecond.
-    pub ping_interval_ms: u64,
+    pub ping_interval_ms: u32,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -103,7 +118,7 @@ pub struct RpcSettings {
 pub enum ClientMsg {
     /// `pong` message that `Client` answers with to `Media Server` in response
     /// to received [`ServerMsg::Ping`].
-    Pong(u64),
+    Pong(u32),
 
     /// Request of `Client` to change the state on `Media Server`.
     Command(Command),
@@ -451,17 +466,26 @@ impl<'de> Deserialize<'de> for ClientMsg {
         let map = ev.as_object().ok_or_else(|| {
             D::Error::custom(format!(
                 "unable to deserialize ClientMsg [{:?}]",
-                &ev
+                &ev,
             ))
         })?;
 
         if let Some(v) = map.get("pong") {
-            let n = v.as_u64().ok_or_else(|| {
-                D::Error::custom(format!(
-                    "unable to deserialize ClientMsg::Pong [{:?}]",
-                    &ev
-                ))
-            })?;
+            let n = v
+                .as_u64()
+                .ok_or_else(|| {
+                    D::Error::custom(format!(
+                        "unable to deserialize ClientMsg::Pong [{:?}]",
+                        &ev,
+                    ))
+                })?
+                .try_into()
+                .map_err(|e| {
+                    D::Error::custom(format!(
+                        "ClientMsg::Pong overflows 32 bits: {}",
+                        e,
+                    ))
+                })?;
 
             Ok(Self::Pong(n))
         } else {
@@ -469,7 +493,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
                 serde_json::from_value::<Command>(ev).map_err(|e| {
                     D::Error::custom(format!(
                         "unable to deserialize ClientMsg::Command [{:?}]",
-                        e
+                        e,
                     ))
                 })?;
             Ok(Self::Command(command))
@@ -511,17 +535,26 @@ impl<'de> Deserialize<'de> for ServerMsg {
         let map = ev.as_object().ok_or_else(|| {
             D::Error::custom(format!(
                 "unable to deserialize ServerMsg [{:?}]",
-                &ev
+                &ev,
             ))
         })?;
 
         if let Some(v) = map.get("ping") {
-            let n = v.as_u64().ok_or_else(|| {
-                D::Error::custom(format!(
-                    "unable to deserialize ServerMsg::Ping [{:?}]",
-                    &ev
-                ))
-            })?;
+            let n = v
+                .as_u64()
+                .ok_or_else(|| {
+                    D::Error::custom(format!(
+                        "unable to deserialize ServerMsg::Ping [{:?}]",
+                        &ev
+                    ))
+                })?
+                .try_into()
+                .map_err(|e| {
+                    D::Error::custom(format!(
+                        "ServerMsg::Ping overflows 32 bits: {}",
+                        e,
+                    ))
+                })?;
 
             Ok(Self::Ping(n))
         } else {
@@ -534,7 +567,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
                 .map_err(|e| {
                     D::Error::custom(format!(
                         "unable to deserialize ServerMsg [{:?}]",
-                        e
+                        e,
                     ))
                 })?;
             Ok(msg)
