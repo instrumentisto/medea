@@ -180,8 +180,6 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
-        console_error(format!("{:?}", other));
-
         if let Some((_, video_caps)) = &self.video {
             if other.get_video().is_none() {
                 if video_caps.is_required() {

@@ -508,17 +508,16 @@ window.onload = async function() {
     muteAudio.addEventListener('click', async () => {
       try {
         if (isAudioMuted) {
-          if (isCallStarted) {
-            await room.unmute_audio();
+          if (!isCallStarted) {
+            await initLocalStream();
           }
+          await room.unmute_audio();
           isAudioMuted = false;
           muteAudio.textContent = "Mute audio";
         } else {
-          if (isCallStarted) {
-            await room.mute_audio();
-            if (localStream && localStream.ptr > 0 ){
-              localStream.free_audio();
-            }
+          await room.mute_audio();
+          if (localStream && localStream.ptr > 0 ){
+            localStream.free_video();
           }
           isAudioMuted = true;
           muteAudio.textContent = "Unmute audio";
