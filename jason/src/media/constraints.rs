@@ -95,8 +95,18 @@ impl Default for VideoMediaStreamSettings {
 #[wasm_bindgen]
 #[derive(Clone, Debug, Default)]
 pub struct MediaStreamSettings {
+    /// [MediaStreamConstraints][1] for the audio media type.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
     audio: AudioMediaStreamSettings,
+
+    /// [MediaStreamConstraints][1] for the video media type.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
     video: VideoMediaStreamSettings,
+
+    /// `true` if this [`MediaStreamSettings`] was constrained by
+    /// [`MediaStreamSettings::constrain`] call.
     is_constrained: bool,
 }
 

@@ -179,6 +179,8 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
+        // use SimpleStreamRequest because JS-side doesn't care about
+        // MediaStreamSettings.
         if !other.is_constrained() {
             return Ok(());
         }
