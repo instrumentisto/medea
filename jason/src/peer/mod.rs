@@ -576,7 +576,7 @@ impl PeerConnection {
         local_stream: MediaStreamSettings,
     ) -> Result<String> {
         self.media_connections
-            .create_tracks(tracks)
+            .create_tracks(tracks, &local_stream)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream(local_stream)
@@ -597,9 +597,9 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+    pub async fn create_tracks(&self, tracks: Vec<Track>, local_settings: &MediaStreamSettings) -> Result<()> {
         self.media_connections
-            .create_tracks(tracks)
+            .create_tracks(tracks, local_settings)
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
@@ -645,6 +645,7 @@ impl PeerConnection {
                 .merge(local_constraints)
                 .map_err(tracerr::map_from_and_wrap!())?;
             let used_caps: MediaStreamSettings = (&required_caps).into();
+
             let (media_stream, is_new_stream) = self
                 .media_manager
                 .get_stream(used_caps)
@@ -784,7 +785,7 @@ impl PeerConnection {
 
         // create receivers
         self.media_connections
-            .create_tracks(recv)
+            .create_tracks(recv, &local_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         // set offer, which will create transceivers and discover remote tracks
@@ -795,7 +796,7 @@ impl PeerConnection {
 
         // create senders
         self.media_connections
-            .create_tracks(send)
+            .create_tracks(send, &local_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream(local_constraints)

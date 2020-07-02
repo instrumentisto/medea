@@ -17,6 +17,7 @@ use crate::{
 };
 
 use super::PeerMediaStream;
+use crate::utils::console_error;
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
@@ -96,6 +97,7 @@ impl StreamRequest {
 
 /// Subtype of [`StreamRequest`], which can have maximum one track of each kind
 /// and must have at least one track of any kind.
+#[derive(Debug)]
 pub struct SimpleStreamRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
     video: Option<(TrackId, VideoTrackConstraints)>,
@@ -133,25 +135,21 @@ impl SimpleStreamRequest {
             });
 
         if let Some((id, audio)) = &self.audio {
-            if audio.is_enabled() {
-                if let Some(track) = audio_tracks.into_iter().next() {
-                    if audio.satisfies(track.as_ref()) {
-                        result_stream.add_track(*id, track);
-                    } else {
-                        return Err(tracerr::new!(InvalidAudioTrack));
-                    }
+            if let Some(track) = audio_tracks.into_iter().next() {
+                if audio.satisfies(track.as_ref()) {
+                    result_stream.add_track(*id, track);
+                } else {
+                    return Err(tracerr::new!(InvalidAudioTrack));
                 }
             }
         }
 
         if let Some((id, video)) = &self.video {
-            if video.is_enabled() {
-                if let Some(track) = video_tracks.into_iter().next() {
-                    if video.satisfies(track.as_ref()) {
-                        result_stream.add_track(*id, track);
-                    } else {
-                        return Err(tracerr::new!(InvalidVideoTrack));
-                    }
+            if let Some(track) = video_tracks.into_iter().next() {
+                if video.satisfies(track.as_ref()) {
+                    result_stream.add_track(*id, track);
+                } else {
+                    return Err(tracerr::new!(InvalidVideoTrack));
                 }
             }
         }
@@ -182,6 +180,8 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
+        console_error(format!("{:?}", other));
+
         if let Some((_, video_caps)) = &self.video {
             if other.get_video().is_none() {
                 if video_caps.is_required() {
@@ -205,12 +205,12 @@ impl SimpleStreamRequest {
             }
         }
 
-        if let Some(other_audio) = other.get_audio().cloned() {
+        if let Some(other_audio) = other.take_audio() {
             if let Some((_, audio)) = self.audio.as_mut() {
                 audio.merge(other_audio);
             }
         }
-        if let Some(other_video) = other.get_video().cloned() {
+        if let Some(other_video) = other.take_video() {
             if let Some((_, video)) = self.video.as_mut() {
                 video.merge(other_video);
             }
@@ -257,10 +257,10 @@ impl From<&SimpleStreamRequest> for MediaStreamSettings {
         let mut constraints = Self::new();
 
         if let Some((_, audio)) = &request.audio {
-            constraints.update_audio(audio);
+            constraints.audio(audio.clone());
         }
         if let Some((_, video)) = &request.video {
-            constraints.update_video(video);
+            constraints.video(video.clone());
         }
 
         constraints

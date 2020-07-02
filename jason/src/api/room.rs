@@ -257,6 +257,7 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
+        inner.local_stream_settings.borrow_mut().toggle_enable(!is_muted, kind);
         while !inner
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
@@ -347,17 +348,17 @@ impl RoomHandle {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
-    // pub fn set_local_media_settings(
-    //     &self,
-    //     settings: &MediaStreamSettings,
-    // ) -> Promise {
-    //     let inner = upgrade_or_detached!(self.0, JasonError);
-    //     let settings = settings.clone();
-    //     future_to_promise(async move {
-    //         inner?.set_local_media_settings(settings).await;
-    //         Ok(JsValue::UNDEFINED)
-    //     })
-    // }
+    pub fn set_local_media_settings(
+        &self,
+        settings: &MediaStreamSettings,
+    ) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        let settings = settings.clone();
+        future_to_promise(async move {
+            inner?.set_local_media_settings(settings).await;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
 
     /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
@@ -640,12 +641,6 @@ impl InnerRoom {
         is_muted: bool,
         kind: TransceiverKind,
     ) -> Result<(), Traced<RoomError>> {
-        {
-            let mut local_stream_settings =
-                self.local_stream_settings.borrow_mut();
-            local_stream_settings.set_enabled(!is_muted, kind);
-        }
-
         let peer_mute_state_changed: Vec<_> = self
             .peers
             .get_all()
@@ -730,18 +725,23 @@ impl InnerRoom {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
-    // async fn set_local_media_settings(&self, settings: MediaStreamSettings) {
-    //     self.local_stream_settings.replace(Some(settings.clone()));
-    //     for peer in self.peers.get_all() {
-    //         if let Err(err) = peer
-    //             .update_local_stream(Some(settings.clone()))
-    //             .await
-    //             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-    //         {
-    //             self.on_failed_local_stream.call(JasonError::from(err));
-    //         }
-    //     }
-    // }
+    async fn set_local_media_settings(&self, mut settings: MediaStreamSettings) {
+        if let Some(video) = settings.take_video() {
+            self.local_stream_settings.borrow_mut().video(video);
+        }
+        if let Some(audio) = settings.take_audio() {
+            self.local_stream_settings.borrow_mut().audio(audio);
+        }
+        for peer in self.peers.get_all() {
+            if let Err(err) = peer
+                .update_local_stream(self.local_stream_settings.borrow().clone())
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+            {
+                self.on_failed_local_stream.call(JasonError::from(err));
+            }
+        }
+    }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
@@ -770,7 +770,7 @@ impl InnerRoom {
     ) -> Result<(), Traced<RoomError>> {
         match negotiation_role {
             None => {
-                peer.create_tracks(tracks)
+                peer.create_tracks(tracks, &self.local_stream_settings.borrow())
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
             }
@@ -778,7 +778,7 @@ impl InnerRoom {
                 let sdp_offer = peer
                     .get_offer(
                         tracks,
-                        self.local_stream_settings.clone().into_inner(),
+                        self.local_stream_settings.borrow().clone(),
                     )
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
@@ -797,7 +797,7 @@ impl InnerRoom {
                     .process_offer(
                         offer,
                         tracks,
-                        self.local_stream_settings.clone().into_inner(),
+                        self.local_stream_settings.borrow().clone(),
                     )
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;

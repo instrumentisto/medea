@@ -16,11 +16,7 @@ use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
-use crate::{
-    media::MediaStreamTrack,
-    peer::PeerEvent,
-    utils::{JsCaused, JsError},
-};
+use crate::{media::MediaStreamTrack, peer::PeerEvent, utils::{JsCaused, JsError}, MediaStreamSettings};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverKind},
@@ -253,6 +249,7 @@ impl MediaConnections {
     pub fn create_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
+        local_constraints: &MediaStreamSettings,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
@@ -262,11 +259,11 @@ impl MediaConnections {
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,
                         track_id: track.id,
+                        mute_state: (!local_constraints.is_enabled(&track.media_type)).into(),
                         caps: track.media_type.into(),
                         peer: &inner.peer,
                         peer_events_sender: inner.peer_events_sender.clone(),
                         mid,
-                        mute_state: track.is_muted.into(),
                         is_required,
                     }
                     .build()
