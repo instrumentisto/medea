@@ -162,6 +162,14 @@ impl PeersService {
         self.peers.map_peer_by_id(peer_id, f)
     }
 
+    /// Applies a function to the mutable [`PeerStateMachine`] reference with
+    /// provided [`PeerId`] (if any found).
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
+    #[inline]
     pub fn map_peer_by_id_mut<T>(
         &self,
         peer_id: PeerId,

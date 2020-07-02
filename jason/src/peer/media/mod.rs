@@ -16,7 +16,12 @@ use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
-use crate::{media::MediaStreamTrack, peer::PeerEvent, utils::{JsCaused, JsError}, MediaStreamSettings};
+use crate::{
+    media::MediaStreamTrack,
+    peer::PeerEvent,
+    utils::{JsCaused, JsError},
+    MediaStreamSettings,
+};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverKind},
@@ -256,14 +261,17 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
+                    let mute_state = StableMuteState::from(
+                        !local_constraints.is_enabled(&track.media_type),
+                    );
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,
                         track_id: track.id,
-                        mute_state: (!local_constraints.is_enabled(&track.media_type)).into(),
                         caps: track.media_type.into(),
                         peer: &inner.peer,
                         peer_events_sender: inner.peer_events_sender.clone(),
                         mid,
+                        mute_state,
                         is_required,
                     }
                     .build()

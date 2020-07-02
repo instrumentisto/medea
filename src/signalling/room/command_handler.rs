@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
     CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
-    TrackId, TrackPatch, TrackUpdate,
+    TrackId, TrackPatch,
 };
 
 use crate::{
@@ -165,10 +165,10 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        println!("UPDATE TRACKS: \n\n{:?}\n\n", tracks_patches);
         self.peers.map_peer_by_id_mut(peer_id, |peer| {
             peer.update_tracks(tracks_patches);
-        });
+        })?;
+
         Ok(self.send_tracks_applied(peer_id))
     }
 }

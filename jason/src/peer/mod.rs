@@ -597,7 +597,11 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub async fn create_tracks(&self, tracks: Vec<Track>, local_settings: &MediaStreamSettings) -> Result<()> {
+    pub async fn create_tracks(
+        &self,
+        tracks: Vec<Track>,
+        local_settings: &MediaStreamSettings,
+    ) -> Result<()> {
         self.media_connections
             .create_tracks(tracks, local_settings)
             .map_err(tracerr::map_from_and_wrap!())?;
@@ -644,7 +648,7 @@ impl PeerConnection {
             required_caps
                 .merge(local_constraints)
                 .map_err(tracerr::map_from_and_wrap!())?;
-            let used_caps: MediaStreamSettings = (&required_caps).into();
+            let used_caps = MediaStreamSettings::from(&required_caps);
 
             let (media_stream, is_new_stream) = self
                 .media_manager

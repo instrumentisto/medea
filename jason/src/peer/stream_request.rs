@@ -17,7 +17,6 @@ use crate::{
 };
 
 use super::PeerMediaStream;
-use crate::utils::console_error;
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].

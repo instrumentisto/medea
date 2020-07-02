@@ -1,4 +1,7 @@
-use medea_client_api_proto::{AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints, VideoSettings as ProtoVideoConstraints, MediaType};
+use medea_client_api_proto::{
+    AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
+    MediaType, VideoSettings as ProtoVideoConstraints,
+};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
@@ -7,8 +10,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::utils::get_property_by_name;
-use crate::peer::TransceiverKind;
+use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Helper to distinguish objects related to media captured from device and
 /// media captured from display.
@@ -43,9 +45,16 @@ impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
     }
 }
 
+/// [MediaStreamConstraints][1] for the audio media type.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[derive(Clone, Debug)]
-pub struct AudioMediaStreamSettings {
+struct AudioMediaStreamSettings {
+    /// Constraints applicable to video tracks.
     constraints: Option<AudioTrackConstraints>,
+
+    /// If `true` then audio is enabled and this constraints should be injected
+    /// into `Peer`.
     is_enabled: bool,
 }
 
@@ -58,9 +67,16 @@ impl Default for AudioMediaStreamSettings {
     }
 }
 
+/// [MediaStreamConstraints][1] for the video media type.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[derive(Clone, Debug)]
-pub struct VideoMediaStreamSettings {
+struct VideoMediaStreamSettings {
+    /// Constraints applicable to audio tracks.
     constraints: Option<VideoTrackConstraints>,
+
+    /// If `true` then video is enabled and this constraints should be injected
+    /// into `Peer`.
     is_enabled: bool,
 }
 
@@ -113,23 +129,49 @@ impl MediaStreamSettings {
 
 impl MediaStreamSettings {
     /// Returns only audio constraints.
+    ///
+    /// Returns `None` if audio is disabled in this [`MediaStreamSettings`].
     pub fn get_audio(&self) -> Option<&AudioTrackConstraints> {
-        self.audio.constraints.as_ref().filter(|_| self.audio.is_enabled)
+        self.audio
+            .constraints
+            .as_ref()
+            .filter(|_| self.audio.is_enabled)
     }
 
     /// Returns only video constraints.
+    ///
+    /// Returns `None` if video is disabled in this [`MediaStreamSettings`].
     pub fn get_video(&self) -> Option<&VideoTrackConstraints> {
-        self.video.constraints.as_ref().filter(|_| self.video.is_enabled)
+        self.video
+            .constraints
+            .as_ref()
+            .filter(|_| self.video.is_enabled)
     }
 
     /// Takes only audio constraints.
+    ///
+    /// Will remove [`AudioTrackConstraints`] even if audio currently is
+    /// disabled.
+    ///
+    /// Returns `None` if audio is disabled in this [`MediaStreamSettings`].
     pub fn take_audio(&mut self) -> Option<AudioTrackConstraints> {
-        self.audio.constraints.take().filter(|_| self.audio.is_enabled)
+        self.audio
+            .constraints
+            .take()
+            .filter(|_| self.audio.is_enabled)
     }
 
     /// Takes only video constraints.
+    ///
+    /// Will remove [`VideoTrackConstraints`] even if video currently is
+    /// disabled.
+    ///
+    /// Returns `None` if video is disabled in this [`MediaStreamSettings`].
     pub fn take_video(&mut self) -> Option<VideoTrackConstraints> {
-        self.video.constraints.take().filter(|_| self.video.is_enabled)
+        self.video
+            .constraints
+            .take()
+            .filter(|_| self.video.is_enabled)
     }
 
     /// Set [`VideoTrackConstraints`].
@@ -137,6 +179,10 @@ impl MediaStreamSettings {
         self.video.constraints.replace(constraints);
     }
 
+    /// Enabled/disables audio or video type in this [`MediaStreamSettings`].
+    ///
+    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
+    /// of media wouldn't be published.
     pub fn toggle_enable(&mut self, is_enabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
@@ -148,14 +194,12 @@ impl MediaStreamSettings {
         }
     }
 
+    /// Returns `true` if provided [`MediaType`] is enabled in this
+    /// [`MediaStreamSettings`].
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         match kind {
-            MediaType::Video(_) => {
-                self.video.is_enabled
-            }
-            MediaType::Audio(_) => {
-                self.audio.is_enabled
-            }
+            MediaType::Video(_) => self.video.is_enabled,
+            MediaType::Audio(_) => self.audio.is_enabled,
         }
     }
 }

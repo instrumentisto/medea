@@ -257,7 +257,10 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.local_stream_settings.borrow_mut().toggle_enable(!is_muted, kind);
+        inner
+            .local_stream_settings
+            .borrow_mut()
+            .toggle_enable(!is_muted, kind);
         while !inner
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
@@ -725,7 +728,10 @@ impl InnerRoom {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
-    async fn set_local_media_settings(&self, mut settings: MediaStreamSettings) {
+    async fn set_local_media_settings(
+        &self,
+        mut settings: MediaStreamSettings,
+    ) {
         if let Some(video) = settings.take_video() {
             self.local_stream_settings.borrow_mut().video(video);
         }
@@ -734,7 +740,9 @@ impl InnerRoom {
         }
         for peer in self.peers.get_all() {
             if let Err(err) = peer
-                .update_local_stream(self.local_stream_settings.borrow().clone())
+                .update_local_stream(
+                    self.local_stream_settings.borrow().clone(),
+                )
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
@@ -770,9 +778,12 @@ impl InnerRoom {
     ) -> Result<(), Traced<RoomError>> {
         match negotiation_role {
             None => {
-                peer.create_tracks(tracks, &self.local_stream_settings.borrow())
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
+                peer.create_tracks(
+                    tracks,
+                    &self.local_stream_settings.borrow(),
+                )
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
             }
             Some(NegotiationRole::Offerer) => {
                 let sdp_offer = peer
