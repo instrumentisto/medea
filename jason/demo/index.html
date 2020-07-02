@@ -155,7 +155,6 @@
           },
         };
       }
-      console.log(pipeline);
 
       var otherMembers = Object.values((await axios.get(controlUrl + roomId)).data.element.pipeline);
       for (let i = 0; i < otherMembers.length; i++) {
@@ -746,7 +745,7 @@
 
       </div>
       <div class="col-md-4">
-          <textarea class="form-control" id="logs-output" style="resize: none" rows="14"></textarea>
+          <textarea class="form-control" id="logs-output" style="resize: none" rows="14" autocomplete="off" disabled></textarea>
       </div>
     </div>
   </div>
