@@ -179,29 +179,29 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
+        if !other.is_constrained() {
+            return Ok(());
+        }
+
         if let Some((_, video_caps)) = &self.video {
-            if other.is_video_constrained() {
-                if other.get_video().is_none() {
-                    if video_caps.is_required() {
-                        return Err(tracerr::new!(
+            if other.get_video().is_none() {
+                if video_caps.is_required() {
+                    return Err(tracerr::new!(
                         StreamRequestError::ExpectedVideoTracks
                     ));
-                    } else {
-                        self.video.take();
-                    }
+                } else {
+                    self.video.take();
                 }
             }
         }
         if let Some((_, audio_caps)) = &self.audio {
-            if other.is_audio_constrained() {
-                if other.get_audio().is_none() {
-                    if audio_caps.is_required() {
-                        return Err(tracerr::new!(
+            if other.get_audio().is_none() {
+                if audio_caps.is_required() {
+                    return Err(tracerr::new!(
                         StreamRequestError::ExpectedAudioTracks
                     ));
-                    } else {
-                        self.audio.take();
-                    }
+                } else {
+                    self.audio.take();
                 }
             }
         }
