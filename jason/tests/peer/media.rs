@@ -10,10 +10,11 @@ use medea_jason::{
         MediaConnections, RtcPeerConnection, SimpleStreamRequest,
         StableMuteState,
     },
+    MediaStreamSettings,
 };
 use wasm_bindgen_test::*;
 
-use crate::get_test_unrequired_tracks;
+use crate::{get_media_stream_settings, get_test_unrequired_tracks};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -28,12 +29,14 @@ async fn get_test_media_connections(
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
-    let (audio_track, video_track) =
-        get_test_unrequired_tracks(!enabled_audio, !enabled_video);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let audio_track_id = audio_track.id;
     let video_track_id = video_track.id;
     media_connections
-        .create_tracks(vec![audio_track, video_track])
+        .create_tracks(
+            vec![audio_track, video_track],
+            &get_media_stream_settings(!enabled_audio, !enabled_video),
+        )
         .unwrap();
     let request = media_connections.get_stream_request().unwrap();
     let caps = SimpleStreamRequest::try_from(request).unwrap();
@@ -68,9 +71,12 @@ fn get_stream_request1() {
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     media_connections
-        .create_tracks(vec![audio_track, video_track])
+        .create_tracks(
+            vec![audio_track, video_track],
+            &MediaStreamSettings::default(),
+        )
         .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_some());
@@ -85,7 +91,9 @@ fn get_stream_request2() {
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
-    media_connections.create_tracks(Vec::new()).unwrap();
+    media_connections
+        .create_tracks(Vec::new(), &MediaStreamSettings::default())
+        .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());
 }

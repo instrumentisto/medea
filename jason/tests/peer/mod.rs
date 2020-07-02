@@ -23,10 +23,13 @@ use medea_jason::{
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
     },
+    MediaStreamSettings,
 };
 use wasm_bindgen_test::*;
 
-use crate::{delay_for, get_test_unrequired_tracks, timeout};
+use crate::{
+    delay_for, get_media_stream_settings, get_test_unrequired_tracks, timeout,
+};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -50,13 +53,16 @@ const VIDEO_TRACK_ID: u32 = 2;
 async fn mute_unmute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
 
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
+    peer.get_offer(
+        vec![audio_track, video_track],
+        MediaStreamSettings::default(),
+    )
+    .await
+    .unwrap();
 
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
@@ -76,12 +82,15 @@ async fn mute_unmute_audio() {
 async fn mute_unmute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
+    peer.get_offer(
+        vec![audio_track, video_track],
+        MediaStreamSettings::default(),
+    )
+    .await
+    .unwrap();
 
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
@@ -101,13 +110,16 @@ async fn mute_unmute_video() {
 async fn new_with_mute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks(true, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
 
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
+    peer.get_offer(
+        vec![audio_track, video_track],
+        get_media_stream_settings(true, false),
+    )
+    .await
+    .unwrap();
     assert!(!peer.is_send_audio_enabled());
 
     assert!(peer.is_send_video_enabled());
@@ -117,12 +129,15 @@ async fn new_with_mute_audio() {
 async fn new_with_mute_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, true);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
+    peer.get_offer(
+        vec![audio_track, video_track],
+        get_media_stream_settings(false, true),
+    )
+    .await
+    .unwrap();
 
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled());
@@ -145,9 +160,12 @@ async fn add_candidates_to_answerer_before_offer() {
 
     let pc2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
         .unwrap();
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let offer = pc1
-        .get_offer(vec![audio_track, video_track], None)
+        .get_offer(
+            vec![audio_track, video_track],
+            MediaStreamSettings::default(),
+        )
         .await
         .unwrap();
 
@@ -155,7 +173,9 @@ async fn add_candidates_to_answerer_before_offer() {
     // assert that pc2 has buffered candidates
     assert!(pc2.candidates_buffer_len() > 0);
     // then set its remote description
-    pc2.process_offer(offer, Vec::new(), None).await.unwrap();
+    pc2.process_offer(offer, Vec::new(), MediaStreamSettings::default())
+        .await
+        .unwrap();
 
     // and assert that buffer was flushed
     assert_eq!(pc2.candidates_buffer_len(), 0);
@@ -182,12 +202,18 @@ async fn add_candidates_to_offerer_before_answer() {
             .unwrap(),
     );
 
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let offer = pc1
-        .get_offer(vec![audio_track, video_track], None)
+        .get_offer(
+            vec![audio_track, video_track],
+            MediaStreamSettings::default(),
+        )
         .await
         .unwrap();
-    let answer = pc2.process_offer(offer, Vec::new(), None).await.unwrap();
+    let answer = pc2
+        .process_offer(offer, Vec::new(), MediaStreamSettings::default())
+        .await
+        .unwrap();
 
     handle_ice_candidates(rx2, &pc1, 1).await;
 
@@ -214,14 +240,21 @@ async fn normal_exchange_of_candidates() {
     .unwrap();
     let peer2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
         .unwrap();
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+        .get_offer(
+            vec![audio_track.clone(), video_track.clone()],
+            MediaStreamSettings::default(),
+        )
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track], None)
+        .process_offer(
+            offer,
+            vec![audio_track, video_track],
+            MediaStreamSettings::default(),
+        )
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
@@ -266,12 +299,15 @@ async fn handle_ice_candidates(
 async fn send_event_on_new_local_stream() {
     let (tx, mut rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, true);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let id = PeerId(1);
     let peer = PeerConnection::new(id, tx, Vec::new(), manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
+    peer.get_offer(
+        vec![audio_track, video_track],
+        get_media_stream_settings(false, true),
+    )
+    .await
+    .unwrap();
 
     while let Some(event) = rx.next().await {
         match event {
@@ -303,14 +339,21 @@ async fn ice_connection_state_changed_is_emitted() {
     .unwrap();
     let peer2 = PeerConnection::new(PeerId(2), tx2, Vec::new(), manager, false)
         .unwrap();
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+        .get_offer(
+            vec![audio_track.clone(), video_track.clone()],
+            MediaStreamSettings::default(),
+        )
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track], None)
+        .process_offer(
+            offer,
+            vec![audio_track, video_track],
+            MediaStreamSettings::default(),
+        )
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
@@ -409,11 +452,15 @@ impl InterconnectedPeers {
                 .unwrap();
 
         let offer = peer1
-            .get_offer(Self::get_peer1_tracks(), None)
+            .get_offer(Self::get_peer1_tracks(), MediaStreamSettings::default())
             .await
             .unwrap();
         let answer = peer2
-            .process_offer(offer, Self::get_peer2_tracks(), None)
+            .process_offer(
+                offer,
+                Self::get_peer2_tracks(),
+                MediaStreamSettings::default(),
+            )
             .await
             .unwrap();
         peer1.set_remote_answer(answer).await.unwrap();
@@ -515,7 +562,6 @@ impl InterconnectedPeers {
                 media_type: MediaType::Audio(AudioSettings {
                     is_required: true,
                 }),
-                is_muted: false,
             },
             Track {
                 id: TrackId(2),
@@ -526,7 +572,6 @@ impl InterconnectedPeers {
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
                 }),
-                is_muted: false,
             },
         ]
     }
@@ -543,7 +588,6 @@ impl InterconnectedPeers {
                 media_type: MediaType::Audio(AudioSettings {
                     is_required: true,
                 }),
-                is_muted: false,
             },
             Track {
                 id: TrackId(2),
@@ -554,7 +598,6 @@ impl InterconnectedPeers {
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
                 }),
-                is_muted: false,
             },
         ]
     }
@@ -763,12 +806,15 @@ mod peer_stats_caching {
 async fn reset_transition_timers() {
     let (tx, _) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks(false, false);
+    let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer =
         PeerConnection::new(PeerId(1), tx, Vec::new(), manager, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
+    peer.get_offer(
+        vec![audio_track, video_track],
+        MediaStreamSettings::default(),
+    )
+    .await
+    .unwrap();
 
     let all_unmuted = future::join_all(
         peer.get_senders(TransceiverKind::Audio)

@@ -734,9 +734,13 @@ impl InnerRoom {
     ) {
         if let Some(video) = settings.take_video() {
             self.local_stream_settings.borrow_mut().video(video);
+        } else {
+            self.local_stream_settings.borrow_mut().video_constrained();
         }
         if let Some(audio) = settings.take_audio() {
             self.local_stream_settings.borrow_mut().audio(audio);
+        } else {
+            self.local_stream_settings.borrow_mut().audio_constrained();
         }
         for peer in self.peers.get_all() {
             if let Err(err) = peer

@@ -85,7 +85,11 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::utils::{window, JasonError};
+use medea_jason::{
+    peer::TransceiverKind,
+    utils::{window, JasonError},
+    MediaStreamSettings,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -123,23 +127,26 @@ extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
 
-pub fn get_test_required_tracks(
-    is_audio_muted: bool,
-    is_video_muted: bool,
-) -> (Track, Track) {
-    get_test_tracks(is_audio_muted, is_video_muted, true, true)
+pub fn get_test_required_tracks() -> (Track, Track) {
+    get_test_tracks(true, true)
 }
 
-pub fn get_test_unrequired_tracks(
+pub fn get_test_unrequired_tracks() -> (Track, Track) {
+    get_test_tracks(false, false)
+}
+
+pub fn get_media_stream_settings(
     is_audio_muted: bool,
     is_video_muted: bool,
-) -> (Track, Track) {
-    get_test_tracks(is_audio_muted, is_video_muted, false, false)
+) -> MediaStreamSettings {
+    let mut settings = MediaStreamSettings::default();
+    settings.toggle_enable(!is_audio_muted, TransceiverKind::Audio);
+    settings.toggle_enable(!is_video_muted, TransceiverKind::Video);
+
+    settings
 }
 
 pub fn get_test_tracks(
-    is_audio_muted: bool,
-    is_video_muted: bool,
     is_audio_required: bool,
     is_video_required: bool,
 ) -> (Track, Track) {
@@ -153,7 +160,6 @@ pub fn get_test_tracks(
             media_type: MediaType::Audio(AudioSettings {
                 is_required: is_audio_required,
             }),
-            is_muted: is_audio_muted,
         },
         Track {
             id: TrackId(2),
@@ -164,7 +170,6 @@ pub fn get_test_tracks(
             media_type: MediaType::Video(VideoSettings {
                 is_required: is_video_required,
             }),
-            is_muted: is_video_muted,
         },
     )
 }
