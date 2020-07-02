@@ -102,6 +102,7 @@ impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
 impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     fn from(from: AudioSettings) -> Self {
         use proto::web_rtc_publish_endpoint::PublishPolicy;
+
         Self {
             publish_policy: PublishPolicy::from(from.publish_policy) as i32,
         }
