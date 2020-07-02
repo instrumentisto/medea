@@ -159,6 +159,8 @@ impl CommandHandler for Room {
     /// Sends [`Event::TracksApplied`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
+    /// Starts renegotiation process.
+    ///
     /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
     fn on_update_tracks(
         &mut self,
