@@ -10,7 +10,7 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, TrackUpdate, VideoSettings,
+    TrackId, TrackPatch, TrackUpdate, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -86,6 +86,7 @@ impl PeerError {
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(pub fn update_tracks(&mut self, track_patches: Vec<TrackPatch>))]
 #[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
@@ -227,6 +228,8 @@ enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
+
+    TrackPatch(TrackPatch),
 }
 
 impl TrackChange {
@@ -250,6 +253,7 @@ impl TrackChange {
                 },
                 track,
             ),
+            _ => return None,
         };
 
         Some(Track {
@@ -304,9 +308,17 @@ impl<T> Peer<T> {
             .map(|change| {
                 // TODO: remove this unwrap when new TrackChanges will be
                 //       implemented.
-                change.try_as_track(self.partner_peer_id()).unwrap()
+                if let Some(track) = change.try_as_track(self.partner_peer_id())
+                {
+                    TrackUpdate::Added(track)
+                } else {
+                    if let TrackChange::TrackPatch(patch) = change {
+                        TrackUpdate::Updated(patch.clone())
+                    } else {
+                        unreachable!()
+                    }
+                }
             })
-            .map(TrackUpdate::Added)
             .collect()
     }
 
@@ -383,6 +395,14 @@ impl<T> Peer<T> {
     /// for this [`Peer`] was sent to the client).
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
+    }
+
+    pub fn update_tracks(&mut self, track_patches: Vec<TrackPatch>) {
+        for track_patch in track_patches {
+            self.context
+                .pending_track_updates
+                .push(TrackChange::TrackPatch(track_patch));
+        }
     }
 
     /// Sets [`Self::is_known_to_remote`] to `true`.

@@ -210,7 +210,7 @@ impl InnerMediaManager {
                 .cloned();
 
             if let Some(track) = track {
-                caps.take_audio();
+                caps.disable_audio();
                 tracks.push(track);
             }
         }
@@ -222,7 +222,7 @@ impl InnerMediaManager {
                 .cloned();
 
             if let Some(track) = track {
-                caps.take_video();
+                caps.disable_video();
                 tracks.push(track);
             }
         }

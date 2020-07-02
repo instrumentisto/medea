@@ -165,27 +165,10 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(member_id) = self
-            .peers
-            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
-        {
-            Ok(Box::new(
-                self.members
-                    .send_event_to_member(
-                        member_id,
-                        Event::TracksApplied {
-                            peer_id,
-                            negotiation_role: None,
-                            updates: tracks_patches
-                                .into_iter()
-                                .map(TrackUpdate::Updated)
-                                .collect(),
-                        },
-                    )
-                    .into_actor(self),
-            ))
-        } else {
-            Ok(Box::new(actix::fut::ok(())))
-        }
+        println!("UPDATE TRACKS: \n\n{:?}\n\n", tracks_patches);
+        self.peers.map_peer_by_id_mut(peer_id, |peer| {
+            peer.update_tracks(tracks_patches);
+        });
+        Ok(self.send_tracks_applied(peer_id))
     }
 }

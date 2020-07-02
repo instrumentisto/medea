@@ -162,6 +162,14 @@ impl PeersService {
         self.peers.map_peer_by_id(peer_id, f)
     }
 
+    pub fn map_peer_by_id_mut<T>(
+        &self,
+        peer_id: PeerId,
+        f: impl FnOnce(&mut PeerStateMachine) -> T,
+    ) -> Result<T, RoomError> {
+        self.peers.map_peer_by_id_mut(peer_id, f)
+    }
+
     /// Creates interconnected [`Peer`]s for provided endpoints and saves them
     /// in [`PeerService`].
     ///

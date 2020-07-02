@@ -133,21 +133,25 @@ impl SimpleStreamRequest {
             });
 
         if let Some((id, audio)) = &self.audio {
-            if let Some(track) = audio_tracks.into_iter().next() {
-                if audio.satisfies(track.as_ref()) {
-                    result_stream.add_track(*id, track);
-                } else {
-                    return Err(tracerr::new!(InvalidAudioTrack));
+            if audio.is_enabled() {
+                if let Some(track) = audio_tracks.into_iter().next() {
+                    if audio.satisfies(track.as_ref()) {
+                        result_stream.add_track(*id, track);
+                    } else {
+                        return Err(tracerr::new!(InvalidAudioTrack));
+                    }
                 }
             }
         }
 
         if let Some((id, video)) = &self.video {
-            if let Some(track) = video_tracks.into_iter().next() {
-                if video.satisfies(track.as_ref()) {
-                    result_stream.add_track(*id, track);
-                } else {
-                    return Err(tracerr::new!(InvalidVideoTrack));
+            if video.is_enabled() {
+                if let Some(track) = video_tracks.into_iter().next() {
+                    if video.satisfies(track.as_ref()) {
+                        result_stream.add_track(*id, track);
+                    } else {
+                        return Err(tracerr::new!(InvalidVideoTrack));
+                    }
                 }
             }
         }
@@ -201,12 +205,12 @@ impl SimpleStreamRequest {
             }
         }
 
-        if let Some(other_audio) = other.take_audio() {
+        if let Some(other_audio) = other.get_audio().cloned() {
             if let Some((_, audio)) = self.audio.as_mut() {
                 audio.merge(other_audio);
             }
         }
-        if let Some(other_video) = other.take_video() {
+        if let Some(other_video) = other.get_video().cloned() {
             if let Some((_, video)) = self.video.as_mut() {
                 video.merge(other_video);
             }
@@ -253,10 +257,10 @@ impl From<&SimpleStreamRequest> for MediaStreamSettings {
         let mut constraints = Self::new();
 
         if let Some((_, audio)) = &request.audio {
-            constraints.audio(audio.clone());
+            constraints.update_audio(audio);
         }
         if let Some((_, video)) = &request.video {
-            constraints.video(video.clone());
+            constraints.update_video(video);
         }
 
         constraints

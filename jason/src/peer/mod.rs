@@ -573,7 +573,7 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
-        local_stream: Option<MediaStreamSettings>,
+        local_stream: MediaStreamSettings,
     ) -> Result<String> {
         self.media_connections
             .create_tracks(tracks)
@@ -635,21 +635,16 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-        local_constraints: Option<MediaStreamSettings>,
+        local_constraints: MediaStreamSettings,
     ) -> Result<()> {
         if let Some(request) = self.media_connections.get_stream_request() {
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            let used_caps: MediaStreamSettings = match local_constraints {
-                None => (&required_caps).into(),
-                Some(local_constraints) => {
-                    required_caps
-                        .merge(local_constraints)
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    (&required_caps).into()
-                }
-            };
+            required_caps
+                .merge(local_constraints)
+                .map_err(tracerr::map_from_and_wrap!())?;
+            let used_caps: MediaStreamSettings = (&required_caps).into();
             let (media_stream, is_new_stream) = self
                 .media_manager
                 .get_stream(used_caps)
@@ -778,7 +773,7 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-        local_constraints: Option<MediaStreamSettings>,
+        local_constraints: MediaStreamSettings,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
