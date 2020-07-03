@@ -3,8 +3,7 @@
 <head>
   <title>Chat</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js" integrity="sha384-6woDBwQr+eqsszpfCWmyJ2UTm+OSym/GuB2NAD8H3d+6xuEZzOMJ/6GEPDTPPCmi" crossorigin="anonymous"></script>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
   <script type="module">
@@ -16,11 +15,43 @@
       DisplayVideoTrackConstraints,
     } from './js/medea_jason.js';
 
-    let inited = false;
     const controlUrl = document.location.protocol + "//" +
                        document.location.host + "/control-api/";
     const userNameCookieName = "MEDEA_DEMO_USER_NAME";
-    var isForceRelay = false;
+
+    let chooseRoomDiv = document.getElementById('choose-room');
+    let videoCallDiv = document.getElementById('video-call');
+    let chooseRoomButton = document.getElementById('choose-room__join');
+    let roomIdInput = document.getElementById('choose-room__room-id');
+    let controlBtns = document.getElementById('control');
+    let audioSelect = document.getElementById('connect__select-device_audio');
+    let videoSelect = document.getElementById('connect__select-device_video');
+    let localVideo = document.getElementById('local-video__video');
+    let isForceRelayCheckbox = document.getElementById("is_force_relay");
+    let isAudioEnabledCheckbox = document.getElementById('is-audio-enabled');
+    let isVideoEnabledCheckbox = document.getElementById('is-video-enabled');
+    let isPublishingEnabledCheckbox = document.getElementById('is-publishing-enabled');
+    let usernameInput = document.getElementById('join__username');
+    let muteAudioBtn = document.getElementById('control__mute_audio');
+    let muteVideoBtn = document.getElementById('control__mute_video');
+    let joinCallerButton = document.getElementById('join__join');
+    let connectionState = document.getElementById('connection-state__state');
+    let videoDiv = document.getElementById("remote-videos");
+    let connectBtnsDiv = document.getElementById("join__join");
+    let logsTextArea = document.getElementById("logs-output");
+
+    let jason = null;
+    let room = null;
+
+    let isForceRelay = false;
+    let localStream = null;
+    let audioPublishPolicy = 'Optional';
+    let videoPublishPolicy = 'Optional';
+    let isCallStarted = false;
+    let isJoinedRoom = false;
+    let isAudioMuted = false;
+    let isVideoMuted = false;
+    let isPublishingEnabled = true;
 
     async function createRoom(roomId) {
       try {
@@ -37,37 +68,54 @@
       }
     }
 
-    async function addNewMember(roomId, memberId) {
-      let pipeline = {
-        publish: {
+    async function startPublishing(roomId, memberId) {
+      await axios({
+        method: 'post',
+        url: controlUrl + roomId + "/" + memberId + '/publish',
+        data: {
           kind: 'WebRtcPublishEndpoint',
           p2p: 'Always',
           force_relay: isForceRelay,
-        },
-      };
-
-      var otherMembers = Object.keys((await axios.get(controlUrl + roomId)).data.element.pipeline);
-      for (let i = 0; i < otherMembers.length; i++) {
-        let memberId = otherMembers[i];
-        pipeline["play-" + memberId] = {
-          kind: 'WebRtcPlayEndpoint',
-          src: 'local://' + roomId + '/' + memberId + "/publish",
-          force_relay: isForceRelay,
-        };
-      }
-
-      let resp = await axios({
-        method: 'post',
-        url: controlUrl + roomId + '/' + memberId,
-        data: {
-          kind: 'Member',
-          credentials: 'test',
-          pipeline: pipeline,
+          audio_settings: {
+            publish_policy: audioPublishPolicy,
+          },
+          video_settings: {
+            publish_policy: videoPublishPolicy,
+          },
         },
       });
+      await startPublishPlaying(roomId, memberId);
+    }
 
-      // Here we repeat get room request to reduce possibility of concurrency
-      // bugs, e.g. another user was added to the room since first request.
+    async function stopPublishing(roomId, memberId) {
+      await axios({
+        method: 'delete',
+        url: controlUrl + roomId + "/" + memberId + '/publish',
+      });
+      await stopPublishPlaying(roomId, memberId);
+    }
+
+    async function stopPublishPlaying(roomId, memberId) {
+      let controlRoom = await axios.get(controlUrl + roomId);
+      var otherMembers = Object.keys(controlRoom.data.element.pipeline);
+      var deleteRequests = [];
+      for (let i = 0; i < otherMembers.length; i++) {
+        let id = otherMembers[i];
+
+        if (id === memberId) {
+          continue;
+        }
+
+        let deleteRequest = axios({
+          method: 'delete',
+          url: controlUrl + roomId + "/" + id + '/play-' + memberId,
+        });
+        deleteRequests.push(deleteRequest);
+      }
+      await Promise.all(deleteRequests);
+    }
+
+    async function startPublishPlaying(roomId, memberId) {
       let controlRoom = await axios.get(controlUrl + roomId);
       var otherMembers = Object.keys(controlRoom.data.element.pipeline);
       var play_requests = [];
@@ -84,138 +132,317 @@
           data: {
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
-            force_relay: controlRoom.data.element.pipeline[id].pipeline.publish.force_relay,
+            force_relay: (controlRoom.data.element.pipeline[id].pipeline.publish || {force_relay: isForceRelay}).force_relay,
           }
         });
         play_requests.push(playRequest);
       }
       await Promise.all(play_requests);
+    }
+
+    async function addNewMember(roomId, memberId) {
+      let pipeline = {};
+      if (isPublishingEnabled) {
+        pipeline["publish"] = {
+          kind: 'WebRtcPublishEndpoint',
+          p2p: 'Always',
+          force_relay: isForceRelay,
+          audio_settings: {
+            publish_policy: audioPublishPolicy,
+          },
+          video_settings: {
+            publish_policy: videoPublishPolicy,
+          },
+        };
+      }
+
+      var otherMembers = Object.values((await axios.get(controlUrl + roomId)).data.element.pipeline);
+      for (let i = 0; i < otherMembers.length; i++) {
+        let member = otherMembers[i];
+        let memberId = member.id;
+        if (member.pipeline.hasOwnProperty('publish')) {
+          pipeline["play-" + memberId] = {
+            kind: 'WebRtcPlayEndpoint',
+            src: 'local://' + roomId + '/' + memberId + "/publish",
+            force_relay: isForceRelay,
+          };
+        }
+      }
+
+      let resp = await axios({
+        method: 'post',
+        url: controlUrl + roomId + '/' + memberId,
+        data: {
+          kind: 'Member',
+          credentials: 'test',
+          pipeline: pipeline,
+        },
+      });
+
+      if (!isPublishingEnabled) {
+        return resp.data.sids[memberId];
+      }
+
+      // Here we repeat get room request to reduce possibility of concurrency
+      // bugs, e.g. another user was added to the room since first request.
+      await startPublishPlaying(roomId, memberId);
 
       return resp.data.sids[memberId]
     }
 
-    async function init_jason() {
-      if (inited) {
-        throw Error("Already init");
-      }
-      await init();
-      inited = true;
-      const jason = new Jason();
+    async function updateLocalVideo(stream) {
+      localVideo.srcObject = stream.get_media_stream();
+      localVideo.oncanplay = async () => {
+        await localVideo.play();
+      };
+    }
 
-      async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-        const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-        const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
+    async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
+      const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
+      const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
 
-        const device_infos = await jason.media_manager().enumerate_devices();
-        console.log('Available input and output devices:', device_infos);
+      const device_infos = await jason.media_manager().enumerate_devices();
+      console.log('Available input and output devices:', device_infos);
 
-        for (const device_info of device_infos) {
-          const option = document.createElement('option');
-          option.value = device_info.device_id();
-          if (device_info.kind() === 'audio') {
-            option.text = device_info.label()
-              || `Microphone ${audio_select.length + 1}`;
-            option.selected = option.text === current_audio;
-            audio_select.append(option);
-          } else if (device_info.kind() === 'video') {
-            option.text = device_info.label()
-              || `Camera ${video_select.length + 1}`;
-            option.selected = option.text === current_video;
-            video_select.append(option);
-          }
-        }
-
+      for (const device_info of device_infos) {
         const option = document.createElement('option');
-        option.value = "screen";
-        option.text = "screen";
-        video_select.append(option);
+        option.value = device_info.device_id();
+        if (device_info.kind() === 'audio') {
+          option.text = device_info.label()
+            || `Microphone ${audio_select.length + 1}`;
+          option.selected = option.text === current_audio;
+          audio_select.append(option);
+        } else if (device_info.kind() === 'video') {
+          option.text = device_info.label()
+            || `Camera ${video_select.length + 1}`;
+          option.selected = option.text === current_video;
+          video_select.append(option);
+        }
       }
 
-      async function build_constraints(audio_select, video_select) {
-        let constraints = new MediaStreamSettings();
-        if (audio_select != null) {
-          let audio = new AudioTrackConstraints();
-          let audioSource = audio_select.options[audio_select.selectedIndex];
-          if (audioSource) {
-            audio.device_id(audioSource.value);
-          }
-          constraints.audio(audio);
-        }
+      const option = document.createElement('option');
+      option.value = "screen";
+      option.text = "screen";
+      video_select.append(option);
+    }
 
-        if (video_select != null) {
-          let videoSource = video_select.options[video_select.selectedIndex];
-          if (videoSource) {
-            if (videoSource.value === "screen") {
-              let video = new DisplayVideoTrackConstraints();
-              constraints.display_video(video);
-            } else {
-              let video = new DeviceVideoTrackConstraints();
-              video.device_id(videoSource.value);
-              constraints.device_video(video);
-            }
+    async function build_constraints(audio_select, video_select) {
+      let constraints = new MediaStreamSettings();
+      if (audio_select != null) {
+        let audio = new AudioTrackConstraints();
+        let audioSource = audio_select.options[audio_select.selectedIndex];
+        if (audioSource) {
+          audio.device_id(audioSource.value);
+        }
+        constraints.audio(audio);
+      }
+
+      if (video_select != null) {
+        let videoSource = video_select.options[video_select.selectedIndex];
+        if (videoSource) {
+          if (videoSource.value === "screen") {
+            let video = new DisplayVideoTrackConstraints();
+            constraints.display_video(video);
           } else {
-            constraints.device_video(new DeviceVideoTrackConstraints());
+            let video = new DeviceVideoTrackConstraints();
+            video.device_id(videoSource.value);
+            constraints.device_video(video);
           }
+        } else {
+          constraints.device_video(new DeviceVideoTrackConstraints());
         }
-
-        return constraints;
       }
 
-      let isCallStarted = false;
-      let localStream = null;
-      let isAudioMuted = false;
-      let isVideoMuted = false;
-      let chooseRoomDiv = document.getElementById('choose-room');
-      let videoCallDiv = document.getElementById('video-call');
-      let chooseRoomButton = document.getElementById('choose-room__join');
-      let roomIdInput = document.getElementById('choose-room__room-id');
-      let controlBtns = document.getElementById('control');
-      let audioSelect = document.getElementById('connect__select-device_audio');
-      let videoSelect = document.getElementById('connect__select-device_video');
-      let localVideo = document.getElementById('local-video__video');
-      let isForceRelayCheckbox = document.getElementById("is_force_relay");
+      return constraints;
+    }
 
-      let joinCallerButton = document.getElementById('join__join');
-      let usernameInput = document.getElementById('join__username');
-
-      async function initLocalStream() {
-        let constraints = await build_constraints(audioSelect, videoSelect);
-        try {
-          localStream = await jason.media_manager().init_local_stream(constraints)
-        } catch (e) {
-          let origError = e.source();
-          if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
-            if (origError.message.includes("audio")) {
-              constraints = await build_constraints(null, videoSelect);
-              localStream = await jason.media_manager().init_local_stream(constraints);
-              alert("unable to get audio, will try to enter room with video only");
-            } else if (origError.message.includes("video")) {
-              constraints = await build_constraints(audioSelect, null);
-              localStream = await jason.media_manager().init_local_stream(constraints);
-              alert("unable to get video, will try to enter room with audio only");
-            } else {
-              throw e;
-            }
+    async function initLocalStream() {
+      let constraints = await build_constraints(audioSelect, videoSelect);
+      try {
+        localStream = await jason
+          .media_manager()
+          .init_local_stream(constraints)
+      } catch (e) {
+        let origError = e.source();
+        if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
+          if (origError.message.includes("audio")) {
+            constraints = await build_constraints(null, videoSelect);
+            localStream = await jason
+              .media_manager()
+              .init_local_stream(constraints);
+            alert("unable to get audio, will try to enter room with video only");
+          } else if (origError.message.includes("video")) {
+            constraints = await build_constraints(audioSelect, null);
+            localStream = await jason
+              .media_manager()
+              .init_local_stream(constraints);
+            alert("unable to get video, will try to enter room with audio only");
           } else {
             throw e;
           }
+        } else {
+          throw e;
         }
-        await updateLocalVideo(localStream);
-
-        return constraints;
       }
+      await updateLocalVideo(localStream);
+
+      return constraints;
+    }
+
+    async function isAudioEnabledListener(e) {
+      audioPublishPolicy = getPublishPolicy(e.target.checked);
+
+      let constraints;
+      if (e.target.checked) {
+        constraints = await build_constraints(
+          audioSelect,
+          isVideoEnabledCheckbox.checked ? videoSelect : null
+        );
+      } else {
+        constraints = await build_constraints(
+          null,
+          isVideoEnabledCheckbox.checked ? videoSelect : null
+        );
+      }
+      if (localStream.ptr > 0) {
+        localStream.free();
+      }
+      localStream = await jason
+        .media_manager()
+        .init_local_stream(constraints);
+      await updateLocalVideo(localStream);
+      await room.set_local_media_settings(constraints);
+    }
+
+    async function isVideoEnabledListener(e) {
+      videoPublishPolicy = getPublishPolicy(e.target.checked);
+
+      let constraints;
+      if (e.target.checked) {
+        constraints = await build_constraints(
+          isAudioEnabledCheckbox.checked ? audioSelect : null,
+          videoSelect
+        );
+      } else {
+        constraints = await build_constraints(
+          isAudioEnabledCheckbox.checked ? audioSelect : null, null
+        );
+      }
+      if (localStream.ptr > 0) {
+        localStream.free();
+      }
+      localStream = await jason
+        .media_manager()
+        .init_local_stream(constraints);
+      await updateLocalVideo(localStream);
+      await room.set_local_media_settings(constraints);
+    }
+
+    function bindJoinButtons(roomId) {
+      joinCallerButton.onclick = async function () {
+        connectBtnsDiv.style.display = 'none';
+        controlBtns.style.display = 'block';
+
+        setCookie(userNameCookieName, usernameInput.value, 365);
+
+        isForceRelay = isForceRelayCheckbox.checked;
+        isForceRelayCheckbox.disabled = true;
+
+        if (isPublishingEnabled) {
+          // TODO: Remove when delete-tracks will be merged.
+          isPublishingEnabledCheckbox.disabled = true;
+          isAudioEnabledCheckbox.disabled = true;
+          isVideoEnabledCheckbox.disabled = true;
+        } else {
+          // TODO: Remove when delete-tracks will be merged.
+          isPublishingEnabledCheckbox.disabled = false;
+          isAudioEnabledCheckbox.disabled = false;
+          isVideoEnabledCheckbox.disabled = false;
+        }
+
+        try {
+          let username = usernameInput.value;
+          try {
+            await axios.get(controlUrl + roomId);
+          } catch (e) {
+            if (e.response.status === 400) {
+              console.log("Room not found. Creating new room...");
+              await createRoom(roomId)
+            } else {
+              throw e;
+            }
+          }
+
+          await axios.delete(controlUrl + roomId + '/' + username);
+          console.log("Creating new member.");
+          await room.join(await addNewMember(roomId, username));
+          connectionState.className = 'badge badge-success';
+          connectionState.textContent = 'Connected';
+          isJoinedRoom = true;
+
+        } catch (e) {
+          logError("Join to room failed", e);
+        }
+      };
+    }
+
+    function getPublishPolicy(isEnabled) {
+      if (isEnabled) {
+        return 'Optional';
+      } else {
+        return 'Disabled';
+      }
+    }
+
+    async function init_jason() {
+      await init();
+
+      jason = new Jason();
+      room = await jason.init_room();
 
       let userNameFromCookies = getCookie(userNameCookieName);
       if (userNameFromCookies) {
         usernameInput.value = userNameFromCookies;
       }
 
-      let room = await jason.init_room();
+      isAudioEnabledCheckbox.addEventListener('change', isAudioEnabledListener);
+      isVideoEnabledCheckbox.addEventListener('change', isVideoEnabledListener);
 
-      const updateLocalVideo = async (stream) => {
-        localVideo.srcObject = stream.get_media_stream();
-        await localVideo.play();
-      };
+      isPublishingEnabledCheckbox.addEventListener('change', async () => {
+          isPublishingEnabled = isPublishingEnabledCheckbox.checked;
+          if (isPublishingEnabledCheckbox.checked) {
+            isAudioEnabledCheckbox.disabled = false;
+            isVideoEnabledCheckbox.disabled = false;
+            if (isJoinedRoom) {
+              await startPublishing(roomId, usernameInput.value);
+              isAudioEnabledCheckbox.disabled = true;
+              isVideoEnabledCheckbox.disabled = true;
+              isPublishingEnabledCheckbox.disabled = true;
+            } else {
+              isAudioEnabledCheckbox.checked = true;
+              isVideoEnabledCheckbox.checked = true;
+
+              await isAudioEnabledListener({target: isAudioEnabledCheckbox});
+              await isVideoEnabledListener({target: isVideoEnabledCheckbox});
+            }
+          } else {
+            if (isJoinedRoom) {
+              await stopPublishing(roomId, usernameInput.value);
+              isAudioEnabledCheckbox.disabled = false;
+              isVideoEnabledCheckbox.disabled = false;
+            } else {
+              isAudioEnabledCheckbox.checked = false;
+              isVideoEnabledCheckbox.checked = false;
+
+              await isAudioEnabledListener({target: isAudioEnabledCheckbox});
+              await isVideoEnabledListener({target: isVideoEnabledCheckbox});
+
+              isAudioEnabledCheckbox.disabled = true;
+              isVideoEnabledCheckbox.disabled = true;
+            }
+          }
+        }
+      );
 
       audioSelect.addEventListener('change', async () => {
         try {
@@ -252,9 +479,9 @@
       });
 
       room.on_new_connection((connection) => {
+        logsTextArea.value +=  "new connection established" + '\r\n';
         isCallStarted = true;
         connection.on_remote_stream(async (stream) => {
-          let videoDiv = document.getElementById("remote-videos");
           let video = document.createElement("video");
           video.srcObject = stream.get_media_stream();
           video.controls = "true";
@@ -276,7 +503,6 @@
         stream.free();
       });
 
-      let connectionState = document.getElementById('connection-state__state');
       room.on_connection_loss(async (reconnectHandle) => {
         connectionState.className = 'badge badge-warning';
         connectionState.textContent = 'Reconnecting';
@@ -301,17 +527,14 @@
         );
       });
 
-      let muteAudio = document.getElementById('control__mute_audio');
-      let muteVideo = document.getElementById('control__mute_video');
-
-      muteAudio.addEventListener('click', async () => {
+      muteAudioBtn.addEventListener('click', async () => {
         try {
           if (isAudioMuted) {
             if (isCallStarted) {
               await room.unmute_audio();
             }
             isAudioMuted = false;
-            muteAudio.textContent = "Mute audio";
+            muteAudioBtn.textContent = "Mute audio";
           } else {
             if (isCallStarted) {
               await room.mute_audio();
@@ -320,13 +543,13 @@
               }
             }
             isAudioMuted = true;
-            muteAudio.textContent = "Unmute audio";
+            muteAudioBtn.textContent = "Unmute audio";
           }
         } catch (e) {
           console.error(e.message());
         }
       });
-      muteVideo.addEventListener('click', async () => {
+      muteVideoBtn.addEventListener('click', async () => {
         try {
           if (isVideoMuted) {
             if (!isCallStarted) {
@@ -334,55 +557,19 @@
             }
             await room.unmute_video();
             isVideoMuted = false;
-            muteVideo.textContent = "Mute video";
+            muteVideoBtn.textContent = "Mute video";
           } else {
             await room.mute_video();
             if (localStream && localStream.ptr > 0 ){
               localStream.free_video();
             }
             isVideoMuted = true;
-            muteVideo.textContent = "Unmute video";
+            muteVideoBtn.textContent = "Unmute video";
           }
         } catch (e) {
           console.error(e.message());
         }
       });
-
-      let bindJoinButtons = function (roomId) {
-        joinCallerButton.onclick = async function () {
-          let connectBtnsDiv = document.getElementById("join__join");
-          connectBtnsDiv.style.display = 'none';
-          controlBtns.style.display = 'block';
-
-          setCookie(userNameCookieName, usernameInput.value, 365);
-
-          isForceRelay = isForceRelayCheckbox.checked;
-          isForceRelayCheckbox.disabled = true;
-
-          try {
-            let username = usernameInput.value;
-            try {
-              await axios.get(controlUrl + roomId);
-            } catch (e) {
-              if (e.response.status === 400) {
-                console.log("Room not found. Creating new room...");
-                await createRoom(roomId)
-              } else {
-                throw e;
-              }
-            }
-
-            await axios.delete(controlUrl + roomId + '/' + username);
-            console.log("Creating new member.");
-            await room.join(await addNewMember(roomId, username));
-            connectionState.className = 'badge badge-success';
-            connectionState.textContent = 'Connected';
-
-          } catch (e) {
-            logError("Join to room failed", e);
-          }
-        };
-      };
 
       let roomId = window.location.hash.replace("#", "");
 
@@ -471,11 +658,11 @@
     <div id="remote-videos" class="row">
     </div>
 
-    <div class="row">
-      <div class="col-md-3">
+    <div class="row h-25 w-75">
+      <div class="col-md-4">
         <video id="local-video__video" muted autoplay width="100%" height="100%"></video>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
 
         <div class="input-group mb-3">
           <input id="join__username" type="text" class="form-control" placeholder="Username" aria-label="Username" aria-describedby="basic-addon2">
@@ -503,16 +690,62 @@
           <button class="btn btn-info" id="control__mute_video">Mute video</button>
         </div>
 
-        <div>
-          <span>Connection state: </span>
+        <div class="mb-3">
+          <label for="connection-state__state">Connection state: </label>
           <span id="connection-state__state" class="badge badge-danger">Closed</span>
         </div>
 
-        <div class="form-check form-check-inline">
-          <input class="form-check-input" type="checkbox" id="is_force_relay" value="true">
-          <label class="form-check-label" for="is_force_relay">Force TURN relay</label>
+        <div class="form-check form-check-inline mb-3">
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is-audio-enabled"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="is-audio-enabled">
+              Publish audio
+            </label>
+          </div>
+
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is-video-enabled"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="is-video-enabled">
+              Publish video
+            </label>
+          </div>
+
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is-publishing-enabled"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="is-publishing-enabled">
+              Publish media
+            </label>
+          </div>
         </div>
 
+        <div class="form-check mb-3">
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="is_force_relay"
+                   value="true">
+            <label class="form-check-label custom-control-label"
+                   for="is_force_relay">
+              Force TURN relay
+            </label>
+          </div>
+        </div>
+
+      </div>
+      <div class="col-md-4">
+          <textarea class="form-control" id="logs-output" style="resize: none" rows="14" autocomplete="off" disabled></textarea>
       </div>
     </div>
   </div>
