@@ -1,6 +1,6 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
-use std::{cell::RefCell, future::Future, rc::Rc, time::Duration};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
@@ -301,29 +301,27 @@ impl Sender {
     /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
     /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
     /// the `desired_state`.
-    pub fn when_mute_state_stable(
-        &self,
+    pub async fn when_mute_state_stable(
+        self: Rc<Self>,
         desired_state: StableMuteState,
-    ) -> impl Future<Output = Result<()>> {
+    ) -> Result<()> {
         let mut mute_states = self.mute_state.subscribe();
-        async move {
-            while let Some(state) = mute_states.next().await {
-                match state {
-                    MuteState::Transition(_) => continue,
-                    MuteState::Stable(s) => {
-                        return if s == desired_state {
-                            Ok(())
-                        } else {
-                            Err(tracerr::new!(
+        while let Some(state) = mute_states.next().await {
+            match state {
+                MuteState::Transition(_) => continue,
+                MuteState::Stable(s) => {
+                    return if s == desired_state {
+                        Ok(())
+                    } else {
+                        Err(tracerr::new!(
                                 MediaConnectionsError::
                                 MuteStateTransitsIntoOppositeState
                             ))
-                        }
                     }
                 }
             }
-            Ok(())
         }
+        Ok(())
     }
 
     /// Updates this [`Sender`]s tracks based on the provided

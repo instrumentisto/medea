@@ -1509,6 +1509,7 @@ dependencies = [
 name = "medea-client-api-proto"
 version = "0.2.0-dev"
 dependencies = [
+ "async-trait",
  "derive_more",
  "medea-macro",
  "serde 1.0.114",
@@ -1569,6 +1570,7 @@ dependencies = [
 name = "medea-jason"
 version = "0.2.0-dev"
 dependencies = [
+ "async-trait",
  "console_error_panic_hook",
  "derive_more",
  "downcast",

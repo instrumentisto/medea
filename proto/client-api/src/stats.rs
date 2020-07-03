@@ -237,8 +237,8 @@ pub enum RtcStatsType {
     /// ICE remote candidate statistics related to the [RTCIceTransport]
     /// objects.
     ///
-    /// A remote candidate is [deleted] when the [RTCIceTransport] does an ICE
-    /// restart, and the candidate is no longer a member of any non-deleted
+    /// A remote candidate is [deleted][1] when the [RTCIceTransport] does an
+    /// ICE restart, and the candidate is no longer a member of any non-deleted
     /// candidate pair.
     ///
     /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
@@ -1385,7 +1385,7 @@ pub enum MediaSourceKind {
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSourceStat {
-    /// Value of the [MediaStreamTrack]'s ID attribute.
+    /// Value of the [MediaStreamTrack][1]'s ID attribute.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub track_identifier: Option<String>,
