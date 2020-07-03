@@ -57,7 +57,7 @@ Delete single `Endpoint` element.
 
 ### `GET /callbacks`
 
-Returns list of all `Callbacks` that Control API mock server received from Medea.
+Returns list of all `Callbacks` that Control API mock server received from [Medea].
 
 
 ### `GET /subscribe/{room_id}`
@@ -68,12 +68,12 @@ This way you can be notified whenever `Room` state is being updated using curren
 Control API mock server. This may be useful in case you are implementing `caller-responder` scenario,
 meaning that `caller` initiates a call, and `responder` is being notified about that.
 
-Currently it supports to kinds of events: `created` and `deleted`, that have following format:
+Currently it supports to kinds of events: `Created` and `Deleted`, that have following format:
 
-#### 1. `created`
+#### 1. `Created` event:
 ```json
 {
-  "method": "created",
+  "method": "Created",
   "fid": "room_id/member_id",
   "element": {
     "kind":"Member",
@@ -81,10 +81,10 @@ Currently it supports to kinds of events: `created` and `deleted`, that have fol
   } 
 }
 ```
-#### 2. `deleted`
+#### 2. `Deleted` event:
 ```json
 {
-  "method": "deleted",
+  "method": "Deleted",
   "fid": "room_id/member_id"
 }
 ```

@@ -9,7 +9,7 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use serde::Serialize;
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::{
     api::{AppContext, Element, Subscribers},
@@ -45,33 +45,34 @@ pub async fn create_ws(
 #[rtype(result = "()")]
 pub struct Notification(Value);
 
+/// [`Notification`] serialization helper.
+#[derive(Serialize)]
+#[serde(tag = "method")]
+enum NotificationVariants<'a> {
+    Created { fid: String, element: &'a Element },
+    Deleted { fid: String },
+}
+
 impl Notification {
     /// Builds `method: created` [`Notification`].
     pub fn created(fid: Fid, element: &Element) -> Notification {
-        let mut obj = Map::with_capacity(3);
-        obj.insert(
-            String::from("method"),
-            Value::String(String::from("created")),
-        );
-        obj.insert(String::from("fid"), Value::String(fid.into()));
-        obj.insert(
-            String::from("element"),
-            serde_json::to_value(&element).unwrap(),
-        );
-
-        Self(Value::Object(obj))
+        Self(
+            serde_json::to_value(NotificationVariants::Created {
+                fid: fid.into(),
+                element,
+            })
+            .unwrap(),
+        )
     }
 
     /// Builds `method: deleted` [`Notification`].
     pub fn deleted(fid: Fid) -> Notification {
-        let mut obj = Map::with_capacity(3);
-        obj.insert(
-            String::from("method"),
-            Value::String(String::from("deleted")),
-        );
-        obj.insert(String::from("fid"), Value::String(fid.into()));
-
-        Self(Value::Object(obj))
+        Self(
+            serde_json::to_value(NotificationVariants::Deleted {
+                fid: fid.into(),
+            })
+            .unwrap(),
+        )
     }
 }
 
