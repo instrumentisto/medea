@@ -73,9 +73,6 @@ pub trait NegotiationSubscriber: fmt::Debug {
     /// Provided [`Peer`] and it's partner [`Peer`] should be in [`Stable`],
     /// otherwise nothing will be done.
     fn negotiation_needed(&self, peer_id: PeerId);
-
-    /// Returns clone of this [`NegotiationSubscriber`].
-    fn box_clone(&self) -> Box<dyn NegotiationSubscriber>;
 }
 
 #[cfg(test)]
@@ -323,7 +320,7 @@ pub struct Context {
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
-    negotiation_subscriber: Box<dyn NegotiationSubscriber>,
+    negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -650,7 +647,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
-        negotiation_subscriber: Box<dyn NegotiationSubscriber>,
+        negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -778,13 +775,11 @@ pub mod tests {
     use super::*;
 
     /// Returns dummy [`NegotiationSubscriber`] mock which does nothing.
-    pub fn dummy_negotiation_sub_mock() -> Box<dyn NegotiationSubscriber> {
+    pub fn dummy_negotiation_sub_mock() -> Rc<dyn NegotiationSubscriber> {
         let mut mock = MockNegotiationSubscriber::new();
         mock.expect_negotiation_needed().returning(|_| ());
-        mock.expect_box_clone()
-            .returning(|| dummy_negotiation_sub_mock());
 
-        Box::new(mock)
+        Rc::new(mock)
     }
 
     /// Returns [`PeerStateMachine`] with provided count of the `MediaTrack`s
@@ -868,7 +863,7 @@ pub mod tests {
             PeerId(1),
             MemberId("member-2".to_string()),
             false,
-            Box::new(negotiation_sub),
+            Rc::new(negotiation_sub),
         );
 
         peer.schedule_add_receiver(media_track(0));
@@ -900,7 +895,7 @@ pub mod tests {
             PeerId(1),
             MemberId("member-2".to_string()),
             false,
-            Box::new(negotiation_sub),
+            Rc::new(negotiation_sub),
         );
 
         let mut peer = peer.start();

@@ -321,7 +321,11 @@ mod test {
         api::control::{pipeline::Pipeline, MemberSpec, RoomId, RoomSpec},
         conf::{self, Conf},
         media::peer::tests::dummy_negotiation_sub_mock,
-        signalling::peers::build_peers_traffic_watcher,
+        signalling::{
+            participants::ParticipantService,
+            peers::{build_peers_traffic_watcher, PeersService},
+            room::State,
+        },
         AppContext,
     };
 
@@ -332,18 +336,24 @@ mod test {
             id: RoomId::from("test"),
             pipeline: Pipeline::new(HashMap::new()),
         };
-        let ctx = AppContext::new(
+        let context = AppContext::new(
             Conf::default(),
             crate::turn::new_turn_auth_service_mock(),
         );
 
-        Room::new(
-            &room_spec,
-            &ctx,
-            build_peers_traffic_watcher(&conf::Media::default()),
-            dummy_negotiation_sub_mock(),
-        )
-        .unwrap()
+        Room {
+            id: room_spec.id().clone(),
+            peers: PeersService::new(
+                room_spec.id().clone(),
+                context.turn_service.clone(),
+                build_peers_traffic_watcher(&conf::Media::default()),
+                &context.config.media,
+                dummy_negotiation_sub_mock(),
+            ),
+            members: ParticipantService::new(&room_spec, &context).unwrap(),
+            state: State::Started,
+            callbacks: context.callbacks.clone(),
+        }
     }
 
     #[actix_rt::test]

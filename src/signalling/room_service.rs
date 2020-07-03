@@ -652,7 +652,6 @@ mod room_service_specs {
             RootElement,
         },
         conf::{self, Conf},
-        media::peer::tests::dummy_negotiation_sub_mock,
     };
 
     use super::*;
@@ -752,14 +751,12 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(
+        let room = Room::start(
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
-            dummy_negotiation_sub_mock(),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -802,14 +799,12 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".into();
-        let room = Room::new(
+        let room = Room::start(
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
-            dummy_negotiation_sub_mock(),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -871,14 +866,12 @@ mod room_service_specs {
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
-            dummy_negotiation_sub_mock(),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -894,14 +887,12 @@ mod room_service_specs {
             "caller".to_string().into(),
         ));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
-            dummy_negotiation_sub_mock(),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -918,14 +909,12 @@ mod room_service_specs {
             "publish".to_string().into(),
         ));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
-            dummy_negotiation_sub_mock(),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));

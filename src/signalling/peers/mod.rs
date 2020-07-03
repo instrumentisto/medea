@@ -80,7 +80,7 @@ pub struct PeersService {
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
-    negotiation_sub: Box<dyn NegotiationSubscriber>,
+    negotiation_sub: Rc<dyn NegotiationSubscriber>,
 }
 
 /// Simple ID counter.
@@ -127,7 +127,7 @@ impl PeersService {
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         media_conf: &conf::Media,
-        negotiation_sub: Box<dyn NegotiationSubscriber>,
+        negotiation_sub: Rc<dyn NegotiationSubscriber>,
     ) -> Rc<Self> {
         Rc::new(Self {
             room_id: room_id.clone(),
@@ -211,7 +211,7 @@ impl PeersService {
             sink_peer_id,
             sink_member_id.clone(),
             src.is_force_relayed(),
-            self.negotiation_sub.box_clone(),
+            Rc::clone(&self.negotiation_sub),
         ));
         src_peer.add_endpoint(&src.clone().into());
 
@@ -221,7 +221,7 @@ impl PeersService {
             src_peer_id,
             src_member_id,
             sink.is_force_relayed(),
-            self.negotiation_sub.box_clone(),
+            Rc::clone(&self.negotiation_sub),
         ));
         sink_peer.add_endpoint(&sink.clone().into());
 
@@ -748,11 +748,6 @@ mod tests {
                 let _ = sender.unbounded_send(peer_id);
             });
         }
-
-        /// Clones [`NegotiationSubMock`].
-        fn box_clone(&self) -> Box<dyn NegotiationSubscriber> {
-            Box::new(self.clone())
-        }
     }
 
     /// Checks that newly created [`Peer`] will be created in the
@@ -781,7 +776,7 @@ mod tests {
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
-            Box::new(negotiation_sub),
+            Rc::new(negotiation_sub),
         );
 
         let publisher = Member::new(
@@ -874,7 +869,7 @@ mod tests {
             new_turn_auth_service_mock(),
             Arc::new(mock),
             &conf::Media::default(),
-            Box::new(negotiation_sub),
+            Rc::new(negotiation_sub),
         );
 
         let publisher = Member::new(

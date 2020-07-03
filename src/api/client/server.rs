@@ -168,7 +168,6 @@ mod test {
     use crate::{
         api::control,
         conf::Conf,
-        media::peer::tests::dummy_negotiation_sub_mock,
         signalling::{peers::build_peers_traffic_watcher, Room},
         turn::new_turn_auth_service_mock,
         AppContext,
@@ -186,14 +185,8 @@ mod test {
         let app = AppContext::new(conf, new_turn_auth_service_mock());
 
         let room_id = room_spec.id.clone();
-        let client_room = Room::new(
-            &room_spec,
-            &app,
-            traffic_watcher,
-            dummy_negotiation_sub_mock(),
-        )
-        .unwrap()
-        .start();
+        let client_room =
+            Room::start(&room_spec, &app, traffic_watcher).unwrap();
         let room_hash_map = hashmap! {
             room_id => client_room,
         };

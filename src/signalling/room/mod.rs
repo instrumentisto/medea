@@ -145,33 +145,6 @@ pub struct Room {
 }
 
 impl Room {
-    /// Creates new instance of [`Room`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::BadRoomSpec`] if [`RoomSpec`] transformation
-    /// fails.
-    pub fn new(
-        room_spec: &RoomSpec,
-        context: &AppContext,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-        negotiation_sub: Box<dyn NegotiationSubscriber>,
-    ) -> Result<Self, RoomError> {
-        Ok(Self {
-            id: room_spec.id().clone(),
-            peers: PeersService::new(
-                room_spec.id().clone(),
-                context.turn_service.clone(),
-                peers_traffic_watcher,
-                &context.config.media,
-                negotiation_sub,
-            ),
-            members: ParticipantService::new(room_spec, context)?,
-            state: State::Started,
-            callbacks: context.callbacks.clone(),
-        })
-    }
-
     /// Starts new instance of [`Room`].
     ///
     /// Returns [`Addr`] to the newly created [`Room`] [`Actor`].
@@ -189,12 +162,20 @@ impl Room {
         let (_, rx) = actix::dev::channel::channel(16);
 
         let ctx = Context::with_receiver(rx);
-        let this = Room::new(
-            room_spec,
-            context,
-            peers_traffic_watcher,
-            Box::new(CloneableWeakAddr::from(ctx.address().downgrade())),
-        )?;
+        let this = Self {
+            id: room_spec.id().clone(),
+            peers: PeersService::new(
+                room_spec.id().clone(),
+                context.turn_service.clone(),
+                peers_traffic_watcher,
+                &context.config.media,
+                Rc::new(ctx.address().downgrade())
+                    as Rc<dyn NegotiationSubscriber>,
+            ),
+            members: ParticipantService::new(room_spec, context)?,
+            state: State::Started,
+            callbacks: context.callbacks.clone(),
+        };
 
         Ok(ctx.run(this))
     }
@@ -482,55 +463,15 @@ impl Handler<NegotiationNeeded> for Room {
     }
 }
 
-/// Wrapper around [`WeakAddr`] which implements [`Clone`].
-///
-/// Clone of this object can throw `panic` so be careful.
-///
-/// This wrapper will be removed when [this PR][1] will be released.
-///
-/// [1]: https://github.com/actix/actix/pull/385
-// TODO: Remove this and use WeakAddr when
-//       https://github.com/actix/actix/pull/385 will be released.
-#[derive(From, Debug)]
-pub struct CloneableWeakAddr<T: Actor>(WeakAddr<T>);
-
-impl<T> Clone for CloneableWeakAddr<T>
-where
-    T: Actor,
-{
-    /// Tries to update underlying [`WeakAddr`], clones [`Addr`], downgrades it
-    /// and returns.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if upgrading of the [`WeakAddr`] is fails.
-    fn clone(&self) -> Self {
-        if let Some(addr) = self.0.upgrade() {
-            addr.downgrade().into()
-        } else {
-            panic!("Failed to clone CloneableWeakAddr!")
-        }
-    }
-}
-
-impl NegotiationSubscriber for CloneableWeakAddr<Room> {
+impl NegotiationSubscriber for WeakAddr<Room> {
     /// Upgrades [`CloneableWeakAddr`] and if it successful then sends to the
     /// upgraded [`Addr`] [`NegotiationNeeded`] [`Message`].
     ///
     /// If [`CloneableWeakAddr`] upgrade fails then nothing will be done.
     fn negotiation_needed(&self, peer_id: PeerId) {
-        if let Some(addr) = self.0.upgrade() {
+        if let Some(addr) = self.upgrade() {
             addr.do_send(NegotiationNeeded(peer_id));
         }
-    }
-
-    /// Clones [`CloneableWeakAddr`] and returns it as boxed
-    /// [`NegotiationSubscriber`].
-    ///
-    /// This function can __panic__. See [`Clone`] implementation of the
-    /// [`CloneableWeakAddr`] for more info.
-    fn box_clone(&self) -> Box<dyn NegotiationSubscriber> {
-        Box::new(self.clone())
     }
 }
 

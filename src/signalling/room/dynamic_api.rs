@@ -229,6 +229,8 @@ impl Room {
 
         member.insert_sink(sink);
 
+        // TODO: answer here, everything else is a background task
+
         if self.members.member_has_connection(member_id) {
             Ok(Box::new(self.init_member_connections(&member)))
         } else {
