@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    mute_state::{MuteState, StableMuteState},
+    publish_state::{PublishState, StablePublishState},
     MediaConnectionsError, Result,
 };
 
@@ -31,7 +31,7 @@ pub struct SenderBuilder<'a> {
     pub peer: &'a RtcPeerConnection,
     pub peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     pub mid: Option<String>,
-    pub mute_state: StableMuteState,
+    pub publish_state: StablePublishState,
     pub is_required: bool,
 }
 
@@ -53,16 +53,16 @@ impl<'a> SenderBuilder<'a> {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let mute_state = ObservableCell::new(self.mute_state.into());
+        let publish_state = ObservableCell::new(self.publish_state.into());
         // we dont care about initial state, cause transceiver is inactive atm
-        let mut mute_state_changes = mute_state.subscribe().skip(1);
+        let mut publish_state_changes = publish_state.subscribe().skip(1);
         let this = Rc::new(Sender {
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
             transceiver,
-            mute_state,
-            mute_timeout_handle: RefCell::new(None),
+            publish_state,
+            publish_transition_timeout_handle: RefCell::new(None),
             is_required: self.is_required,
             transceiver_direction: RefCell::new(TransceiverDirection::Inactive),
         });
@@ -71,19 +71,19 @@ impl<'a> SenderBuilder<'a> {
         let peer_events_sender = self.peer_events_sender;
         let peer_id = self.peer_id;
         spawn_local(async move {
-            while let Some(mute_state) = mute_state_changes.next().await {
+            while let Some(publish_state) = publish_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    match mute_state {
-                        MuteState::Stable(stable) => {
+                    match publish_state {
+                        PublishState::Stable(stable) => {
                             match stable {
-                                StableMuteState::NotMuted => {
+                                StablePublishState::Enabled => {
                                     let _ = peer_events_sender.unbounded_send(
                                         PeerEvent::NewLocalStreamRequired {
                                             peer_id,
                                         },
                                     );
                                 }
-                                StableMuteState::Muted => {
+                                StablePublishState::Disabled => {
                                     // cannot fail
                                     this.track.borrow_mut().take();
                                     let _ = JsFuture::from(
@@ -95,16 +95,16 @@ impl<'a> SenderBuilder<'a> {
                                 }
                             }
                         }
-                        MuteState::Transition(_) => {
+                        PublishState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {
                                 let mut transitions =
-                                    this.mute_state.subscribe().skip(1);
+                                    this.publish_state.subscribe().skip(1);
                                 let (timeout, timeout_handle) =
                                     resettable_delay_for(
                                         Sender::MUTE_TRANSITION_TIMEOUT,
                                     );
-                                this.mute_timeout_handle
+                                this.publish_transition_timeout_handle
                                     .borrow_mut()
                                     .replace(timeout_handle);
                                 match future::select(
@@ -118,10 +118,10 @@ impl<'a> SenderBuilder<'a> {
                                         if let Some(this) = weak_this.upgrade()
                                         {
                                             let stable = this
-                                                .mute_state
+                                                .publish_state
                                                 .get()
                                                 .cancel_transition();
-                                            this.mute_state.set(stable);
+                                            this.publish_state.set(stable);
                                         }
                                     }
                                 }
@@ -145,8 +145,9 @@ pub struct Sender {
     pub(super) caps: TrackConstraints,
     pub(super) track: RefCell<Option<MediaStreamTrack>>,
     pub(super) transceiver: RtcRtpTransceiver,
-    pub(super) mute_state: ObservableCell<MuteState>,
-    pub(super) mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+    pub(super) publish_state: ObservableCell<PublishState>,
+    pub(super) publish_transition_timeout_handle:
+        RefCell<Option<ResettableDelayHandle>>,
     pub(super) is_required: bool,
     pub(super) transceiver_direction: RefCell<TransceiverDirection>,
 }
@@ -163,16 +164,16 @@ impl Sender {
         self.caps.is_required()
     }
 
-    /// Stops mute/unmute timeout of this [`Sender`].
-    pub fn stop_mute_state_transition_timeout(&self) {
-        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+    /// Stops enable/disable timeout of this [`Sender`].
+    pub fn stop_publish_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.publish_transition_timeout_handle.borrow() {
             timer.stop();
         }
     }
 
     /// Resets mute/unmute timeout of this [`Sender`].
-    pub fn reset_mute_state_transition_timeout(&self) {
-        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+    pub fn reset_publish_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.publish_transition_timeout_handle.borrow() {
             timer.reset();
         }
     }
@@ -198,9 +199,9 @@ impl Sender {
         TransceiverKind::from(&self.caps)
     }
 
-    /// Returns [`MuteState`] of this [`Sender`].
-    pub fn mute_state(&self) -> MuteState {
-        self.mute_state.get()
+    /// Returns [`PublishState`] of this [`Sender`].
+    pub fn publish_state(&self) -> PublishState {
+        self.publish_state.get()
     }
 
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
@@ -219,9 +220,9 @@ impl Sender {
             }
         }
 
-        // no-op if transceiver is not NotMuted
-        if let MuteState::Stable(StableMuteState::NotMuted) =
-            sender.mute_state()
+        // no-op if transceiver is not Enabled
+        if let PublishState::Stable(StablePublishState::Enabled) =
+            sender.publish_state()
         {
             JsFuture::from(
                 sender
@@ -252,70 +253,71 @@ impl Sender {
         *self.transceiver_direction.borrow_mut() = direction;
     }
 
-    /// Checks whether [`Sender`] is in [`MuteState::Muted`].
-    pub fn is_muted(&self) -> bool {
-        self.mute_state.get() == StableMuteState::Muted.into()
+    /// Checks whether [`Sender`] is in [`PublishState::Disabled`].
+    pub fn is_disabled(&self) -> bool {
+        self.publish_state.get() == StablePublishState::Disabled.into()
     }
 
-    /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
-    pub fn is_not_muted(&self) -> bool {
-        self.mute_state.get() == StableMuteState::NotMuted.into()
+    /// Checks whether [`Sender`] is in [`PublishState::Enabled`].
+    pub fn is_enabled(&self) -> bool {
+        self.publish_state.get() == StablePublishState::Enabled.into()
     }
 
-    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    /// Sets current [`PublishState`] to [`PublishState::Transition`].
     ///
     /// # Errors
     ///
     /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
-    /// required for the call and can't be muted.
-    pub fn mute_state_transition_to(
+    /// required for the call and can't be disabled.
+    pub fn publish_state_transition_to(
         &self,
-        desired_state: StableMuteState,
+        desired_state: StablePublishState,
     ) -> Result<()> {
         if self.is_required {
             Err(tracerr::new!(
                 MediaConnectionsError::CannotDisableRequiredSender
             ))
         } else {
-            let current_mute_state = self.mute_state.get();
-            self.mute_state
-                .set(current_mute_state.transition_to(desired_state));
+            let current_publish_state = self.publish_state.get();
+            self.publish_state
+                .set(current_publish_state.transition_to(desired_state));
             Ok(())
         }
     }
 
-    /// Cancels [`MuteState`] transition.
+    /// Cancels [`PublishState`] transition.
     pub fn cancel_transition(&self) {
-        let mute_state = self.mute_state.get();
-        self.mute_state.set(mute_state.cancel_transition());
+        let publish_state = self.publish_state.get();
+        self.publish_state.set(publish_state.cancel_transition());
     }
 
-    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    /// Returns [`Future`] which will be resolved when [`PublishState`] of this
+    /// [`Sender`] will be [`PublishState::Stable`] or the [`Sender`] is
+    /// dropped.
     ///
-    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
-    /// or the [`Sender`] is dropped.
+    /// Succeeds if [`Sender`]'s [`PublishState`] transits into the
+    /// `desired_state` or the [`Sender`] is dropped.
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// [`MediaConnectionsError::PublishStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`PublishState`] transits into the opposite to
     /// the `desired_state`.
-    pub async fn when_mute_state_stable(
+    pub async fn when_publish_state_stable(
         self: Rc<Self>,
-        desired_state: StableMuteState,
+        desired_state: StablePublishState,
     ) -> Result<()> {
-        let mut mute_states = self.mute_state.subscribe();
-        while let Some(state) = mute_states.next().await {
+        let mut publish_states = self.publish_state.subscribe();
+        while let Some(state) = publish_states.next().await {
             match state {
-                MuteState::Transition(_) => continue,
-                MuteState::Stable(s) => {
+                PublishState::Transition(_) => continue,
+                PublishState::Stable(s) => {
                     return if s == desired_state {
                         Ok(())
                     } else {
                         Err(tracerr::new!(
                                 MediaConnectionsError::
-                                MuteStateTransitsIntoOppositeState
+                                PublishStateTransitsIntoOppositeState
                             ))
                     }
                 }
@@ -331,22 +333,23 @@ impl Sender {
             return;
         }
 
-        if let Some(is_muted) = track.is_muted {
-            let new_mute_state = StableMuteState::from(is_muted);
-            let current_mute_state = self.mute_state.get();
+        if let Some(is_enabled) = track.is_enabled {
+            let new_publish_state = StablePublishState::from(is_enabled);
+            let current_publish_state = self.publish_state.get();
 
-            let mute_state_update: MuteState = match current_mute_state {
-                MuteState::Stable(_) => new_mute_state.into(),
-                MuteState::Transition(t) => {
-                    if t.intended() == new_mute_state {
-                        new_mute_state.into()
+            let publish_state_update: PublishState = match current_publish_state
+            {
+                PublishState::Stable(_) => new_publish_state.into(),
+                PublishState::Transition(t) => {
+                    if t.intended() == new_publish_state {
+                        new_publish_state.into()
                     } else {
-                        t.set_inner(new_mute_state).into()
+                        t.set_inner(new_publish_state).into()
                     }
                 }
             };
 
-            self.mute_state.set(mute_state_update);
+            self.publish_state.set(publish_state_update);
         }
     }
 }

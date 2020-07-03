@@ -363,7 +363,7 @@ impl Track {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct TrackPatch {
     pub id: TrackId,
-    pub is_muted: Option<bool>,
+    pub is_enabled: Option<bool>,
 }
 
 /// Representation of [RTCIceServer][1] (item of `iceServers` field

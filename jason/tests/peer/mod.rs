@@ -21,7 +21,8 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::MediaManager,
     peer::{
-        PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
+        PeerConnection, PeerEvent, RtcStats, StablePublishState,
+        TransceiverKind,
     },
     MediaStreamSettings,
 };
@@ -33,15 +34,15 @@ use crate::{
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-fn toggle_mute_tracks_updates(
+fn toggle_disable_tracks_updates(
     tracks_ids: &[u32],
-    is_muted: bool,
+    is_disabled: bool,
 ) -> Vec<TrackPatch> {
     tracks_ids
         .into_iter()
         .map(|track_id| TrackPatch {
             id: TrackId(*track_id),
-            is_muted: Some(is_muted),
+            is_enabled: Some(!is_disabled),
         })
         .collect()
 }
@@ -50,7 +51,7 @@ const AUDIO_TRACK_ID: u32 = 1;
 const VIDEO_TRACK_ID: u32 = 2;
 
 #[wasm_bindgen_test]
-async fn mute_unmute_audio() {
+async fn disable_enable_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -67,19 +68,22 @@ async fn mute_unmute_audio() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], true))
+    peer.update_senders(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], false))
-        .unwrap();
+    peer.update_senders(toggle_disable_tracks_updates(
+        &[AUDIO_TRACK_ID],
+        false,
+    ))
+    .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 }
 
 #[wasm_bindgen_test]
-async fn mute_unmute_video() {
+async fn disable_enable_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -95,19 +99,22 @@ async fn mute_unmute_video() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], true))
+    peer.update_senders(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], true))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], false))
-        .unwrap();
+    peer.update_senders(toggle_disable_tracks_updates(
+        &[VIDEO_TRACK_ID],
+        false,
+    ))
+    .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 }
 
 #[wasm_bindgen_test]
-async fn new_with_mute_audio() {
+async fn new_with_disable_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -126,7 +133,7 @@ async fn new_with_mute_audio() {
 }
 
 #[wasm_bindgen_test]
-async fn new_with_mute_video() {
+async fn new_with_disable_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -816,14 +823,15 @@ async fn reset_transition_timers() {
     .await
     .unwrap();
 
-    let all_unmuted = future::join_all(
+    let all_enabled = future::join_all(
         peer.get_senders(TransceiverKind::Audio)
             .into_iter()
             .chain(peer.get_senders(TransceiverKind::Video).into_iter())
             .map(|s| {
-                s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+                s.publish_state_transition_to(StablePublishState::Disabled)
+                    .unwrap();
 
-                s.when_mute_state_stable(StableMuteState::NotMuted)
+                s.when_publish_state_stable(StablePublishState::Enabled)
             }),
     )
     .map(|_| ())
@@ -831,11 +839,11 @@ async fn reset_transition_timers() {
 
     delay_for(400).await;
     peer.stop_state_transitions_timers();
-    timeout(600, all_unmuted.clone()).await.unwrap_err();
+    timeout(600, all_enabled.clone()).await.unwrap_err();
 
     peer.stop_state_transitions_timers();
     delay_for(30).await;
     peer.reset_state_transitions_timers();
 
-    timeout(600, all_unmuted).await.unwrap();
+    timeout(600, all_enabled).await.unwrap();
 }

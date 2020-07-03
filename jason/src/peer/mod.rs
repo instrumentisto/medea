@@ -44,8 +44,8 @@ pub use self::{
         TransceiverDirection, TransceiverKind,
     },
     media::{
-        MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Sender, StableMuteState,
+        MediaConnections, MediaConnectionsError, PublishState,
+        PublishStateTransition, Sender, StablePublishState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -317,7 +317,7 @@ impl PeerConnection {
     /// In some cases you might want to stop expiry timers, e.g. when
     /// connection to Medea is temporary lost.
     ///
-    /// This currently affects only [`Senders`] mute/unmute transitions.
+    /// This currently affects only [`Senders`] enable/disable transitions.
     pub fn stop_state_transitions_timers(&self) {
         self.media_connections.stop_state_transitions_timers()
     }
@@ -331,7 +331,7 @@ impl PeerConnection {
     /// In some cases you might want to stop expiry timers, e.g. when
     /// connection to Medea is temporary lost.
     ///
-    /// This currently affects only [`Senders`] mute/unmute transitions.
+    /// This currently affects only [`Senders`] enable/disable transitions.
     pub fn reset_state_transitions_timers(&self) {
         self.media_connections.reset_state_transitions_timers();
     }
@@ -398,15 +398,15 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`Sender`]s of this [`PeerConnection`] is in
-    /// the provided `mute_state`.
+    /// the provided `publish_state`.
     #[inline]
-    pub fn is_all_senders_in_mute_state(
+    pub fn is_all_senders_in_publish_state(
         &self,
         kind: TransceiverKind,
-        mute_state: StableMuteState,
+        publish_state: StablePublishState,
     ) -> bool {
         self.media_connections
-            .is_all_senders_in_mute_state(kind, mute_state)
+            .is_all_senders_in_publish_state(kind, publish_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].

@@ -511,11 +511,11 @@ window.onload = async function() {
           if (!isCallStarted) {
             await initLocalStream();
           }
-          await room.unmute_audio();
+          await room.enable_audio();
           isAudioMuted = false;
           muteAudio.textContent = "Mute audio";
         } else {
-          await room.mute_audio();
+          await room.disable_audio();
           if (localStream && localStream.ptr > 0 ){
             localStream.free_video();
           }
@@ -532,11 +532,11 @@ window.onload = async function() {
           if (!isCallStarted) {
             await initLocalStream();
           }
-          await room.unmute_video();
+          await room.enable_video();
           isVideoMuted = false;
           muteVideo.textContent = "Mute video";
         } else {
-          await room.mute_video();
+          await room.disable_video();
           if (localStream && localStream.ptr > 0 ){
             localStream.free_video();
           }

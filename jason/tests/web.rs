@@ -136,12 +136,12 @@ pub fn get_test_unrequired_tracks() -> (Track, Track) {
 }
 
 pub fn get_media_stream_settings(
-    is_audio_muted: bool,
-    is_video_muted: bool,
+    is_audio_disabled: bool,
+    is_video_disabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.toggle_enable(!is_audio_muted, TransceiverKind::Audio);
-    settings.toggle_enable(!is_video_muted, TransceiverKind::Video);
+    settings.toggle_media_publish(!is_audio_disabled, TransceiverKind::Audio);
+    settings.toggle_media_publish(!is_video_disabled, TransceiverKind::Video);
 
     settings
 }

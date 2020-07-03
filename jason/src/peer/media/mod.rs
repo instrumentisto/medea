@@ -1,6 +1,6 @@
 //! [`crate::peer::PeerConnection`] media management.
 
-mod mute_state;
+mod publish_state;
 mod receiver;
 mod sender;
 
@@ -32,7 +32,7 @@ use super::{
 use self::sender::SenderBuilder;
 
 pub use self::{
-    mute_state::{MuteState, MuteStateTransition, StableMuteState},
+    publish_state::{PublishState, PublishStateTransition, StablePublishState},
     receiver::Receiver,
     sender::Sender,
 };
@@ -67,31 +67,31 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// Occurs when [`MuteState`] of [`Sender`] was dropped.
-    #[display(fmt = "MuteState of Sender was dropped.")]
-    MuteStateDropped,
+    /// Occurs when [`PublishState`] of [`Sender`] was dropped.
+    #[display(fmt = "PublishState of Sender was dropped.")]
+    PublishStateDropped,
 
-    /// Occurs when [`MuteState`] of [`Sender`] transits into opposite to
-    /// expected [`MuteState`].
-    #[display(fmt = "MuteState of Sender transits into opposite to expected \
-                     MuteState")]
-    MuteStateTransitsIntoOppositeState,
+    /// Occurs when [`PublishState`] of [`Sender`] transits into opposite to
+    /// expected [`PublishState`].
+    #[display(fmt = "PublishState of Sender transits into opposite to \
+                     expected PublishState")]
+    PublishStateTransitsIntoOppositeState,
 
     /// Invalid [`medea_client_api_proto::TrackPatch`] for
     /// [`MediaStreamTrack`].
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
 
-    /// Some [`Sender`] can't be muted because it required.
-    #[display(fmt = "MuteState of Sender can't be transited into muted \
-                     state, because this Sender is required.")]
+    /// Some [`Sender`] can't be disabled because it required.
+    #[display(fmt = "PublishState of Sender can't be transited into \
+                     disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
 }
 
 impl From<DroppedError> for MediaConnectionsError {
     #[inline]
     fn from(_: DroppedError) -> Self {
-        Self::MuteStateDropped
+        Self::PublishStateDropped
     }
 }
 
@@ -158,14 +158,14 @@ impl MediaConnections {
     }
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
-    /// in provided [`MuteState`].
-    pub fn is_all_senders_in_mute_state(
+    /// in provided [`PublishState`].
+    pub fn is_all_senders_in_publish_state(
         &self,
         kind: TransceiverKind,
-        mute_state: StableMuteState,
+        publish_state: StablePublishState,
     ) -> bool {
         for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.mute_state() != mute_state.into() {
+            if sender.publish_state() != publish_state.into() {
                 return false;
             }
         }
@@ -178,7 +178,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .find(|s| s.is_muted())
+            .find(|s| s.is_disabled())
             .is_none()
     }
 
@@ -188,7 +188,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .find(|s| s.is_muted())
+            .find(|s| s.is_disabled())
             .is_none()
     }
 
@@ -261,8 +261,8 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let mute_state = StableMuteState::from(
-                        !local_constraints.is_enabled(&track.media_type),
+                    let publish_state = StablePublishState::from(
+                        local_constraints.is_enabled(&track.media_type),
                     );
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,
@@ -271,7 +271,7 @@ impl MediaConnections {
                         peer: &inner.peer,
                         peer_events_sender: inner.peer_events_sender.clone(),
                         mid,
-                        mute_state,
+                        publish_state,
                         is_required,
                     }
                     .build()
@@ -317,8 +317,8 @@ impl MediaConnections {
     pub fn get_stream_request(&self) -> Option<StreamRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            if let MuteState::Stable(StableMuteState::NotMuted) =
-                sender.mute_state.get()
+            if let PublishState::Stable(StablePublishState::Enabled) =
+                sender.publish_state.get()
             {
                 stream_request
                     .get_or_insert_with(StreamRequest::default)
@@ -359,8 +359,8 @@ impl MediaConnections {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         for sender in inner.senders.values() {
-            // skip senders that are not NotMuted
-            if !sender.is_not_muted() {
+            // skip senders that are not enabled
+            if !sender.is_enabled() {
                 continue;
             }
 
@@ -427,7 +427,7 @@ impl MediaConnections {
             .borrow()
             .senders
             .values()
-            .for_each(|sender| sender.stop_mute_state_transition_timeout());
+            .for_each(|sender| sender.stop_publish_state_transition_timeout());
     }
 
     /// Resets all [`Sender`]s state transitions expiry timers.
@@ -436,6 +436,6 @@ impl MediaConnections {
             .borrow()
             .senders
             .values()
-            .for_each(|sender| sender.reset_mute_state_transition_timeout());
+            .for_each(|sender| sender.reset_publish_state_transition_timeout());
     }
 }

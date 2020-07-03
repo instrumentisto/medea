@@ -8,7 +8,7 @@ use medea_jason::{
     media::MediaManager,
     peer::{
         MediaConnections, RtcPeerConnection, SimpleStreamRequest,
-        StableMuteState,
+        StablePublishState,
     },
     MediaStreamSettings,
 };
@@ -51,12 +51,12 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .mute_state_transition_to(StableMuteState::from(!enabled_audio))
+        .publish_state_transition_to(StablePublishState::from(enabled_audio))
         .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .mute_state_transition_to(StableMuteState::from(!enabled_video))
+        .publish_state_transition_to(StablePublishState::from(enabled_video))
         .unwrap();
 
     (media_connections, audio_track_id, video_track_id)
@@ -117,56 +117,56 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_muted());
-    assert!(!video_track.is_muted());
+    assert!(!audio_track.is_disabled());
+    assert!(!video_track.is_disabled());
 
     audio_track
-        .mute_state_transition_to(StableMuteState::Muted)
+        .publish_state_transition_to(StablePublishState::Disabled)
         .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: audio_track_id,
-            is_muted: Some(true),
+            is_enabled: Some(false),
         }])
         .unwrap();
-    assert!(audio_track.is_muted());
-    assert!(!video_track.is_muted());
+    assert!(audio_track.is_disabled());
+    assert!(!video_track.is_disabled());
 
     video_track
-        .mute_state_transition_to(StableMuteState::Muted)
+        .publish_state_transition_to(StablePublishState::Disabled)
         .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: video_track_id,
-            is_muted: Some(true),
+            is_enabled: Some(false),
         }])
         .unwrap();
-    assert!(audio_track.is_muted());
-    assert!(video_track.is_muted());
+    assert!(audio_track.is_disabled());
+    assert!(video_track.is_disabled());
 
     audio_track
-        .mute_state_transition_to(StableMuteState::NotMuted)
+        .publish_state_transition_to(StablePublishState::Enabled)
         .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: audio_track_id,
-            is_muted: Some(false),
+            is_enabled: Some(true),
         }])
         .unwrap();
-    assert!(!audio_track.is_muted());
-    assert!(video_track.is_muted());
+    assert!(!audio_track.is_disabled());
+    assert!(video_track.is_disabled());
 
     video_track
-        .mute_state_transition_to(StableMuteState::NotMuted)
+        .publish_state_transition_to(StablePublishState::Enabled)
         .unwrap();
     media_connections
         .update_senders(vec![TrackPatch {
             id: video_track_id,
-            is_muted: Some(false),
+            is_enabled: Some(true),
         }])
         .unwrap();
-    assert!(!audio_track.is_muted());
-    assert!(!video_track.is_muted());
+    assert!(!audio_track.is_disabled());
+    assert!(!video_track.is_disabled());
 }
 
 #[wasm_bindgen_test]
@@ -179,8 +179,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(audio_track.is_muted());
-    assert!(!video_track.is_muted());
+    assert!(audio_track.is_disabled());
+    assert!(!video_track.is_disabled());
 }
 
 #[wasm_bindgen_test]
@@ -193,8 +193,8 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_muted());
-    assert!(video_track.is_muted());
+    assert!(!audio_track.is_disabled());
+    assert!(video_track.is_disabled());
 }
 
 /// Tests for [`Sender::update`] function.
@@ -220,49 +220,49 @@ mod sender_patch {
         let (sender, track_id) = get_sender().await;
         sender.update(&TrackPatch {
             id: TrackId(track_id.0 + 100),
-            is_muted: Some(true),
+            is_enabled: Some(false),
         });
 
-        assert!(!sender.is_muted());
+        assert!(!sender.is_disabled());
     }
 
     #[wasm_bindgen_test]
-    async fn mute() {
+    async fn disable() {
         let (sender, track_id) = get_sender().await;
         sender.update(&TrackPatch {
             id: track_id,
-            is_muted: Some(true),
+            is_enabled: Some(false),
         });
 
-        assert!(sender.is_muted());
+        assert!(sender.is_disabled());
     }
 
     #[wasm_bindgen_test]
-    async fn unmute_unmuted() {
+    async fn enable_enabled() {
         let (sender, track_id) = get_sender().await;
         sender.update(&TrackPatch {
             id: track_id,
-            is_muted: Some(false),
+            is_enabled: Some(true),
         });
 
-        assert!(!sender.is_muted());
+        assert!(!sender.is_disabled());
     }
 
     #[wasm_bindgen_test]
-    async fn mute_muted() {
+    async fn disable_disabled() {
         let (sender, track_id) = get_sender().await;
         sender.update(&TrackPatch {
             id: track_id,
-            is_muted: Some(true),
+            is_enabled: Some(false),
         });
-        assert!(sender.is_muted());
+        assert!(sender.is_disabled());
 
         sender.update(&TrackPatch {
             id: track_id,
-            is_muted: Some(true),
+            is_enabled: Some(false),
         });
 
-        assert!(sender.is_muted());
+        assert!(sender.is_disabled());
     }
 
     #[wasm_bindgen_test]
@@ -270,9 +270,9 @@ mod sender_patch {
         let (sender, track_id) = get_sender().await;
         sender.update(&TrackPatch {
             id: track_id,
-            is_muted: None,
+            is_enabled: None,
         });
 
-        assert!(!sender.is_muted());
+        assert!(!sender.is_disabled());
     }
 }

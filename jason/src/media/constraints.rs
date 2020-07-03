@@ -208,7 +208,11 @@ impl MediaStreamSettings {
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media wouldn't be published.
-    pub fn toggle_enable(&mut self, is_enabled: bool, kind: TransceiverKind) {
+    pub fn toggle_media_publish(
+        &mut self,
+        is_enabled: bool,
+        kind: TransceiverKind,
+    ) {
         match kind {
             TransceiverKind::Audio => {
                 self.audio.is_enabled = is_enabled;
