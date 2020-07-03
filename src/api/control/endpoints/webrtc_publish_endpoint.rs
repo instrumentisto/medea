@@ -75,11 +75,6 @@ pub struct WebRtcPublishEndpoint {
 /// [`WebRtcPublishEndpoint`].
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, SmartDefault)]
 pub enum PublishPolicy {
-    /// Media type __must__ not be published.
-    ///
-    /// Media server will not try to initialize publishing.
-    Disabled,
-
     /// Specified media type __may__ be published.
     ///
     /// Media server will try to initialize publishing, but won't produce any
@@ -95,6 +90,11 @@ pub enum PublishPolicy {
     /// could not be acquired, then an error will be thrown. Media server will
     /// deny all requests to stop publishing.
     Required,
+
+    /// Media type __must__ not be published.
+    ///
+    /// Media server will not try to initialize publishing.
+    Disabled,
 }
 
 impl PublishPolicy {
@@ -159,8 +159,9 @@ impl From<&proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
 impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
     #[inline]
     fn from(from: AudioSettings) -> Self {
+        use proto::web_rtc_publish_endpoint::PublishPolicy;
         Self {
-            publish_policy: from.publish_policy as i32,
+            publish_policy: PublishPolicy::from(from.publish_policy).into(),
         }
     }
 }
@@ -190,8 +191,9 @@ impl From<&proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
     #[inline]
     fn from(from: VideoSettings) -> Self {
+        use proto::web_rtc_publish_endpoint::PublishPolicy;
         Self {
-            publish_policy: from.publish_policy as i32,
+            publish_policy: PublishPolicy::from(from.publish_policy).into(),
         }
     }
 }

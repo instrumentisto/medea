@@ -4,7 +4,45 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
 
+let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
+let usernameMenuButton = document.getElementById('username-menu-button');
+
+function getMemberId() {
+  return usernameInput.value;
+}
+
 async function createRoom(roomId, memberId) {
+  let isAudioEnabled = document.getElementById('connection-settings__publish_audio').checked;
+  let isVideoEnabled = document.getElementById('connection-settings__publish_video').checked;
+  let isPublish = document.getElementById('connection-settings__publish_is-enabled').checked;
+  let audioPublishPolicy;
+  let videoPublishPolicy;
+  if (isAudioEnabled) {
+    audioPublishPolicy = 'Optional';
+  } else {
+    audioPublishPolicy = 'Disabled';
+  }
+  if (isVideoEnabled) {
+    videoPublishPolicy = 'Optional';
+  } else {
+    videoPublishPolicy = 'Disabled';
+  }
+
+  let pipeline = {};
+  if (isPublish) {
+    pipeline["publish"] = {
+      kind: 'WebRtcPublishEndpoint',
+      p2p: 'Always',
+      force_relay: false,
+      audio_settings: {
+        publish_policy: audioPublishPolicy,
+      },
+      video_settings: {
+        publish_policy: videoPublishPolicy,
+      }
+    };
+  }
+
   let resp = await axios({
     method: 'post',
     url: controlUrl + roomId,
@@ -14,13 +52,7 @@ async function createRoom(roomId, memberId) {
         [memberId]: {
           kind: 'Member',
           credentials: 'test',
-          pipeline: {
-            publish: {
-              kind: 'WebRtcPublishEndpoint',
-              p2p: 'Always',
-              force_relay: false
-            },
-          },
+          pipeline: pipeline,
           on_join: "grpc://127.0.0.1:9099",
           on_leave: "grpc://127.0.0.1:9099"
         }
@@ -32,25 +64,50 @@ async function createRoom(roomId, memberId) {
 }
 
 async function createMember(roomId, memberId) {
+  let isAudioEnabled = document.getElementById('connection-settings__publish_audio').checked;
+  let isVideoEnabled = document.getElementById('connection-settings__publish_video').checked;
+  let audioPublishPolicy;
+  let videoPublishPolicy;
+  if (isAudioEnabled) {
+    audioPublishPolicy = 'Optional';
+  } else {
+    audioPublishPolicy = 'Disabled';
+  }
+  if (isVideoEnabled) {
+    videoPublishPolicy = 'Optional';
+  } else {
+    videoPublishPolicy = 'Disabled';
+  }
+  let isPublish = document.getElementById('connection-settings__publish_is-enabled').checked;
+
   let controlRoom = await axios.get(controlUrl + roomId);
-  let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
-  let pipeline = {
-    publish: {
-      kind: 'WebRtcPublishEndpoint',
-      p2p: 'Always',
-      force_relay: false
-    }
-  };
+  let anotherMembers = Object.values(controlRoom.data.element.pipeline);
+  let pipeline = {};
 
   let memberIds = [];
-
+  if (isPublish) {
+    pipeline["publish"] = {
+      kind: 'WebRtcPublishEndpoint',
+      p2p: 'Always',
+      force_relay: false,
+      audio_settings: {
+        publish_policy: audioPublishPolicy,
+      },
+      video_settings: {
+        publish_policy: videoPublishPolicy,
+      },
+    };
+  }
   for (let i = 0; i < anotherMembers.length; i++) {
-    let memberId = anotherMembers[i];
+    let anotherMember = anotherMembers[i];
+    let memberId = anotherMember.id;
     memberIds.push(memberId);
-    pipeline["play-" + memberId] = {
-      kind: 'WebRtcPlayEndpoint',
-      src: 'local://' + roomId + '/' + memberId + "/publish",
-      force_relay: false
+    if (anotherMember.pipeline.hasOwnProperty('publish')) {
+      pipeline["play-" + memberId] = {
+        kind: 'WebRtcPlayEndpoint',
+        src: 'local://' + roomId + '/' + memberId + "/publish",
+        force_relay: false
+      }
     }
   }
 
@@ -89,9 +146,9 @@ async function createMember(roomId, memberId) {
 
 const colorizedJson = {
   replacer: function(match, pIndent, pKey, pVal, pEnd) {
-    let key = '<span class=json__key>';
-    let val = '<span class=json__value>';
-    let str = '<span class=json__string>';
+    let key = '<span class="json__key">';
+    let val = '<span class="json__value">';
+    let str = '<span class="json__string">';
     let r = pIndent || '';
     if (pKey)
       r = r + key + pKey.replace(/[": ]/g, '') + '</span>: ';
@@ -111,8 +168,7 @@ const colorizedJson = {
 
 const controlDebugWindows = {
   createEndpoint: function() {
-    let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_create_endpoint');
 
     let publishEndpointSpecContainer = container.getElementsByClassName('webrtc-publish-endpoint-spec')[0];
     let playEndpointSpecContainer = container.getElementsByClassName('webrtc-play-endpoint-spec')[0];
@@ -121,12 +177,12 @@ const controlDebugWindows = {
     endpointTypeSelect.addEventListener('change', () => {
       switch (endpointTypeSelect.value) {
         case 'WebRtcPlayEndpoint':
-          contentVisibility.show(playEndpointSpecContainer);
-          contentVisibility.hide(publishEndpointSpecContainer);
+          $( playEndpointSpecContainer ).show();
+          $( publishEndpointSpecContainer ).hide();
           break;
         case 'WebRtcPublishEndpoint':
-          contentVisibility.show(publishEndpointSpecContainer);
-          contentVisibility.hide(playEndpointSpecContainer);
+          $( publishEndpointSpecContainer ).show();
+          $( playEndpointSpecContainer ).hide();
           break;
       }
     });
@@ -140,15 +196,23 @@ const controlDebugWindows = {
       let endpointType = container.getElementsByClassName('control-debug__endpoint-type')[0].value;
       if (endpointType === 'WebRtcPublishEndpoint') {
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
-          let isForceRelay = container.getElementsByClassName('webrtc-publish-endpoint-spec__force-relay')[0].value === 'true';
+          let isForceRelay = document.getElementById('webrtc-publish-endpoint-spec__force-relay').checked;
+          let audioPublishPolicy = document.getElementsByClassName('webrtc-publish-endpoint-spec__publish-policy_audio')[0].value;
+          let videoPublishPolicy = document.getElementsByClassName('webrtc-publish-endpoint-spec__publish-policy_video')[0].value;
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             p2p: p2pMode,
             force_relay: isForceRelay,
+            audio_settings: {
+              publish_policy: audioPublishPolicy,
+            },
+            video_settings: {
+              publish_policy: videoPublishPolicy,
+            },
           });
       } else if (endpointType === 'WebRtcPlayEndpoint') {
-          let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
-          let isForceRelay = container.getElementsByClassName('webrtc-play-endpoint-spec__force-relay')[0].value === 'true';
+          let source = 'local://' + container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
+          let isForceRelay = document.getElementById('webrtc-play-endpoint-spec__force-relay').checked;
           await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
             src: source,
@@ -159,8 +223,7 @@ const controlDebugWindows = {
   },
 
   delete: function() {
-    let container = document.getElementsByClassName('control-debug__window_delete')[0];
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_delete');
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -172,9 +235,7 @@ const controlDebugWindows = {
   },
 
   createRoom: function() {
-    let container = document.getElementsByClassName('control-debug__window_create-room')[0];
-
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_create_room');
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -185,8 +246,7 @@ const controlDebugWindows = {
   },
 
   createMember: function() {
-    let container = document.getElementsByClassName('control-debug__window_create-member')[0];
-    bindCloseWindow(container);
+    let container = document.getElementById('control-debug__window_create_member');
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -217,9 +277,8 @@ const controlDebugWindows = {
   },
 
   get: function() {
-    let container = document.getElementsByClassName('control-debug__window_get')[0];
+    let container = document.getElementById('control-debug__window_get');
     let resultContainer = container.getElementsByClassName('control-debug__json-result')[0];
-    bindCloseWindow(container);
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -233,9 +292,8 @@ const controlDebugWindows = {
   },
 
   callbacks: function() {
-    let container = document.getElementsByClassName('control-debug__window_callbacks')[0];
+    let container = document.getElementById('control-debug__window_callbacks');
     let resultContainer = container.getElementsByClassName('control-debug__table-result')[0];
-    bindCloseWindow(container);
 
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
@@ -246,46 +304,105 @@ const controlDebugWindows = {
       let callbacks = await controlApi.getCallbacks();
 
       let table = document.createElement("table");
+      table.className = "table";
 
+      let thead = document.createElement("thead");
       let header = document.createElement("tr");
       let eventHeader = document.createElement("th");
       eventHeader.innerHTML = 'Event';
+      eventHeader.scope = 'col';
       header.appendChild(eventHeader);
       let timeHeader = document.createElement("th");
       timeHeader.innerHTML = 'Time';
+      timeHeader.scope = 'col';
       header.appendChild(timeHeader);
       let elementHeader = document.createElement('th');
       elementHeader.innerHTML = 'FID';
+      elementHeader.scope = 'col';
       header.appendChild(elementHeader);
-      table.appendChild(header);
+      thead.appendChild(header);
+      table.appendChild(thead);
 
+      let tbody = document.createElement('tbody');
       for (callback of callbacks) {
         let row = document.createElement('tr');
-        let event = document.createElement('th');
+        let event = document.createElement('td');
         event.innerHTML = JSON.stringify(callback.event);
         row.appendChild(event);
-        let time = document.createElement('th');
+        let time = document.createElement('td');
         time.innerHTML = callback.at;
         row.appendChild(time);
-        let element = document.createElement('th');
+        let element = document.createElement('td');
         element.innerHTML = callback.fid;
         row.appendChild(element);
-        table.appendChild(row);
+        tbody.appendChild(row);
       }
+
+      table.appendChild(tbody);
 
       resultContainer.appendChild(table);
     })
   }
 };
 
+async function startPublishing() {
+  let memberId = getMemberId();
+  let roomSpec = await controlApi.get(roomId, '', '');
+  let anotherMembers = Object.values(roomSpec.element.pipeline);
+  let membersToConnect = [];
+  anotherMembers.forEach((anotherMember) => {
+    if (anotherMember.id != memberId) {
+      membersToConnect.push(anotherMember.id);
+    }
+  });
+
+  let publishEndpoint = {
+    kind: 'WebRtcPublishEndpoint',
+    p2p: 'Always',
+  };
+  let isSuccess = await controlApi.createEndpoint(roomId, memberId, 'publish', publishEndpoint);
+  if (!isSuccess) {
+    return;
+  }
+
+  membersToConnect.forEach(async (srcMemberId) => {
+    let endpoint = {
+      kind: 'WebRtcPlayEndpoint',
+      src: `local://${roomId}/${memberId}/publish`,
+      force_relay: false,
+    };
+    await controlApi.createEndpoint(roomId, srcMemberId, 'play-' + memberId, endpoint);
+  });
+}
+
 window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
   console.log(baseUrl);
+  usernameInput.addEventListener('change', (e) => {
+    usernameMenuButton.innerHTML = e.target.value;
+  });
+
+  $('.modal').on('show.bs.modal', function(event) {
+      var idx = $('.modal:visible').length;
+      $(this).css('z-index', 1040 + (10 * idx));
+  });
+  $('.modal').on('shown.bs.modal', function(event) {
+      var idx = ($('.modal:visible').length) -1; // raise backdrop after animation.
+      $('.modal-backdrop').not('.stacked').css('z-index', 1039 + (10 * idx));
+      $('.modal-backdrop').not('.stacked').addClass('stacked');
+  });
+
+  $('#connection-settings').modal('show');
+
+  let startPublishingBtn = document.getElementById('enable-publishing-btn');
+  startPublishingBtn.addEventListener('click', async () => {
+    await startPublishing();
+  });
+
+
 
   Object.values(controlDebugWindows).forEach(s => s());
-
-  bindControlDebugMenu();
 
   let room = newRoom();
   let isCallStarted = false;
@@ -424,7 +541,7 @@ window.onload = async function() {
 
     room.on_connection_loss( async (reconnectHandle) => {
       let connectionLossNotification = document.getElementsByClassName('connection-loss-notification')[0];
-      contentVisibility.show(connectionLossNotification);
+      $( connectionLossNotification ).toast('show');
 
       let manualReconnectBtn = document.getElementsByClassName('connection-loss-notification__manual-reconnect')[0];
       let connectionLossMsg = document.getElementsByClassName('connection-loss-notification__msg')[0];
@@ -434,8 +551,8 @@ window.onload = async function() {
         try {
           connectionLossMsg.textContent = 'Trying to manually reconnect...';
           await reconnectHandle.reconnect_with_delay(0);
-          contentVisibility.hide(connectionLossNotification);
-          console.error("Reconnected!");
+          $( connectionLossNotification ).toast('hide');
+          console.log("Reconnected!");
         } catch (e) {
           console.error("Failed to manually reconnect: " + e.message());
         } finally {
@@ -447,7 +564,7 @@ window.onload = async function() {
       } catch (e) {
         console.error('Error in reconnection with backoff:\n' + e.message());
       }
-      contentVisibility.hide(connectionLossNotification);
+      $( connectionLossNotification ).toast('hide');
     });
 
     room.on_close(function (on_closed) {
@@ -456,8 +573,9 @@ window.onload = async function() {
         videos.firstChild.remove();
       }
       room = newRoom();
-      contentVisibility.show(connectBtnsDiv);
-      contentVisibility.hide(controlBtns);
+      $('#connection-settings').modal('show');
+      $('#connect-btn').show();
+      $('.control').hide();
       alert(
         `Call was ended.
         Reason: ${on_closed.reason()};
@@ -468,8 +586,7 @@ window.onload = async function() {
   }
 
   try {
-    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
-    let usernameInput = document.getElementsByClassName('connect__username')[0];
+    let joinCallerButton = document.getElementsByClassName('connection-settings__connect')[0];
 
     audioSelect.addEventListener('change', async () => {
       try {
@@ -552,11 +669,13 @@ window.onload = async function() {
     });
 
     usernameInput.value = faker.name.firstName();
+    usernameMenuButton.innerHTML = usernameInput.value;
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
-        contentVisibility.hide(connectBtnsDiv);
-        contentVisibility.show(controlBtns);
+        $('#connection-settings').modal('hide');
+        $('.control').show();
+        $('#connect-btn').hide();
 
         try {
           let username = usernameInput.value;
@@ -593,20 +712,6 @@ window.onload = async function() {
     bindJoinButtons(roomId);
   } catch (e) {
     console.log(e)
-  }
-};
-
-const contentVisibility = {
-  show: function(elem) {
-    elem.classList.add('is-visible');
-  },
-
-  hide: function(elem) {
-    elem.classList.remove('is-visible');
-  },
-
-  toggle: function(elem) {
-    elem.classList.toggle('is-visible');
   }
 };
 
@@ -648,8 +753,12 @@ const controlApi = {
         url: controlUrl + roomId + '/' + memberId + '/' + endpointId,
         data: spec
       });
+
+      return true;
     } catch (e) {
       alert(JSON.stringify(e.response.data));
+
+      return false;
     }
   },
 
@@ -694,41 +803,4 @@ const controlApi = {
   }
 };
 
-function bindCloseWindow(container) {
-  container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-    contentVisibility.hide(container);
-  });
-}
 
-const debugMenuItems = [
-  'create-endpoint',
-  'create-member',
-  'create-room',
-  'delete',
-  'get',
-  'callbacks',
-];
-
-function bindControlDebugMenu() {
-  let menuToggle = document.getElementsByClassName('control-debug-menu__toggle')[0];
-  let menuContainer = document.getElementsByClassName('control-debug-menu')[0];
-  menuToggle.addEventListener('click', () => {
-    contentVisibility.toggle(menuContainer);
-  });
-
-  for (let i = 0; i < debugMenuItems.length; i++) {
-    let currentItem = debugMenuItems[i];
-    let currentMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_' + currentItem)[0];
-    currentMenuItem.addEventListener('click', () => {
-      for (let a = 0; a < debugMenuItems.length; a++) {
-        if (a === i) {
-          continue;
-        }
-        let hideContainer = document.getElementsByClassName('control-debug__window_' + debugMenuItems[a])[0];
-        contentVisibility.hide(hideContainer);
-      }
-      let currentContainer = document.getElementsByClassName('control-debug__window_' + currentItem)[0];
-      contentVisibility.show(currentContainer);
-    });
-  }
-}
