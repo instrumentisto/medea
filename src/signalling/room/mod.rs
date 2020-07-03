@@ -464,7 +464,7 @@ impl Handler<NegotiationNeeded> for Room {
 }
 
 impl NegotiationSubscriber for WeakAddr<Room> {
-    /// Upgrades [`CloneableWeakAddr`] and if it successful then sends to the
+    /// Upgrades [`WeakAddr`] and if it successful then sends to the
     /// upgraded [`Addr`] [`NegotiationNeeded`] [`Message`].
     ///
     /// If [`CloneableWeakAddr`] upgrade fails then nothing will be done.
