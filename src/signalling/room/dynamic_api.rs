@@ -34,6 +34,7 @@ use crate::{
 };
 
 use super::{Room, RoomError};
+use crate::signalling::peers::PeerChange;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -81,7 +82,7 @@ impl Room {
     ) {
         if let Some(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
-            let affected_peers =
+            let changeset =
                 if let Some(sink_endpoint) = member.take_sink(&play_id) {
                     self.peers.delete_sink_endpoint(&sink_endpoint)
                 } else {
@@ -94,10 +95,38 @@ impl Room {
                     }
                 };
 
-            let futs: Vec<_> = affected_peers
-                .into_iter()
-                .map(|peer_id| self.send_tracks_applied(peer_id))
-                .collect();
+            let futs = {
+                let mut removed_peers: HashMap<_, HashSet<_>> = HashMap::new();
+                let mut discard_updates = HashSet::new();
+                let mut updated_peers = HashSet::new();
+                for change in changeset {
+                    match change {
+                        PeerChange::Removed(member_id, peer_id) => {
+                            removed_peers
+                                .entry(member_id)
+                                .or_default()
+                                .insert(peer_id);
+                            discard_updates.insert(peer_id);
+                        }
+                        PeerChange::Updated(peer_id) => {
+                            updated_peers.insert(peer_id);
+                        }
+                    }
+                }
+
+                let mut futs: Vec<_> = updated_peers
+                    .into_iter()
+                    .filter(|peer_id| !discard_updates.contains(peer_id))
+                    .map(|peer_id| self.send_tracks_applied(peer_id))
+                    .collect();
+                futs.extend(removed_peers.into_iter().map(
+                    |(member_id, peer_ids)| {
+                        self.send_peers_removed(member_id, peer_ids)
+                    },
+                ));
+
+                futs
+            };
 
             ctx.spawn(actix_try_join_all(futs).map(|res, this, ctx| {
                 if let Err(e) = res {

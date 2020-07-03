@@ -115,6 +115,17 @@ pub enum ConnectEndpointsResult {
     Updated(PeerId, PeerId),
 }
 
+/// All changes which are can be performed on [`Peer`].
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum PeerChange {
+    /// [`Peer`] was removed from the [`PeersService`].
+    Removed(MemberId, PeerId),
+
+    /// [`Peer`] was updated and renegotiation for this [`Peer`] should be
+    /// performed.
+    Updated(PeerId),
+}
+
 impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
@@ -299,7 +310,7 @@ impl PeersService {
 
     /// Deletes provided [`WebRtcPlayEndpoint`].
     ///
-    /// Returns [`PeerId`] which was affected by this action.
+    /// Returns [`PeerChange`]s which are was performed by this function.
     ///
     /// ## Panics
     ///
@@ -309,13 +320,13 @@ impl PeersService {
     pub fn delete_sink_endpoint(
         &self,
         sink: &WebRtcPlayEndpoint,
-    ) -> HashSet<PeerId> {
+    ) -> HashSet<PeerChange> {
         self.peers.delete_sink_endpoint(sink)
     }
 
     /// Deletes provided [`WebRtcPublishEndpoint`].
     ///
-    /// Returns [`PeerId`] which was affected by this action.
+    /// Returns [`PeerChange`]s which are was performed by this function.
     ///
     /// ## Panics
     ///
@@ -325,7 +336,7 @@ impl PeersService {
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> HashSet<PeerId> {
+    ) -> HashSet<PeerChange> {
         self.peers.delete_src_endpoint(src)
     }
 
@@ -520,6 +531,13 @@ impl PeersService {
         })?;
         Ok(())
     }
+
+    /// Returns `true` if [`Peer`] with a provided [`PeerId`] exists in this
+    /// [`PeerRepository`].
+    #[inline]
+    pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
+        self.peers.is_peer_exists(peer_id)
+    }
 }
 
 /// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
@@ -647,8 +665,7 @@ impl PeerRepository {
 
     /// Deletes provided [`WebRtcPublishEndpoint`].
     ///
-    /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
-    /// action.
+    /// Returns [`PeerId`] which was affected by this action.
     ///
     /// ## Panics
     ///
@@ -657,7 +674,7 @@ impl PeerRepository {
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> HashSet<PeerId> {
+    ) -> HashSet<PeerChange> {
         let mut affected_peers = HashSet::new();
         for sink in src.sinks() {
             affected_peers.extend(self.delete_sink_endpoint(&sink));
@@ -668,11 +685,7 @@ impl PeerRepository {
 
     /// Deletes provided [`WebRtcPlayEndpoint`].
     ///
-    /// Returns [`MemberId`] and [`PeerId`] pairs which was affected by this
-    /// action.
-    ///
-    /// Starts renegotiation in [`PeerService`] or fully deletes [`Peer`]s if it
-    /// needed.
+    /// Returns [`PeerId`] which was affected by this action.
     ///
     /// ## Panics
     ///
@@ -681,8 +694,8 @@ impl PeerRepository {
     pub fn delete_sink_endpoint(
         &self,
         sink_endpoint: &WebRtcPlayEndpoint,
-    ) -> HashSet<PeerId> {
-        let mut affected_peers = HashSet::new();
+    ) -> HashSet<PeerChange> {
+        let mut changes = HashSet::new();
 
         if let Some(sink_peer_id) = sink_endpoint.peer_id() {
             let mut sink_peer: Peer<Stable> =
@@ -700,17 +713,23 @@ impl PeerRepository {
                 let member = sink_endpoint.owner();
                 member.peers_removed(&hashset![sink_peer_id]);
 
-                affected_peers.insert(sink_peer_id);
-                affected_peers.insert(src_peer.id());
+                changes.insert(PeerChange::Removed(
+                    sink_peer.member_id(),
+                    sink_peer_id,
+                ));
+                changes.insert(PeerChange::Removed(
+                    src_peer.member_id(),
+                    src_peer.id(),
+                ));
             } else {
-                affected_peers.insert(sink_peer_id);
+                changes.insert(PeerChange::Updated(sink_peer_id));
 
                 self.add_peer(sink_peer);
                 self.add_peer(src_peer);
             }
         }
 
-        affected_peers
+        changes
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -760,6 +779,13 @@ impl PeerRepository {
             });
 
         peers_to_remove
+    }
+
+    /// Returns `true` if [`Peer`] with a provided [`PeerId`] exists in this
+    /// [`PeerRepository`].
+    #[inline]
+    pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
+        self.0.borrow().contains_key(&peer_id)
     }
 }
 
