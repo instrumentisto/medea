@@ -559,8 +559,8 @@ mod on_connection_loss {
     use super::*;
 
     async fn helper(
-        idle_timeout_ms: Option<u64>,
-        ping_interval_ms: Option<u64>,
+        idle_timeout_ms: Option<u32>,
+        ping_interval_ms: Option<u32>,
         transport_changes: Option<TransportState>,
     ) -> WebSocketRpcClient {
         let ws = WebSocketRpcClient::new(Box::new(move |_| {
@@ -569,9 +569,9 @@ mod on_connection_loss {
                 transport.expect_on_message().times(3).returning(move || {
                     on_message_mock(RpcSettings {
                         idle_timeout_ms: idle_timeout_ms
-                            .unwrap_or(u64::max_value()),
+                            .unwrap_or(u32::max_value()),
                         ping_interval_ms: ping_interval_ms
-                            .unwrap_or(u64::max_value()),
+                            .unwrap_or(u32::max_value()),
                     })
                 });
                 transport.expect_set_close_reason().return_once(|_| ());

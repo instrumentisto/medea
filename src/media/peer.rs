@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-/// [`Peer`] doesnt have remote [SDP] and is waiting for local [SDP].
+/// [`Peer`] doesn't have remote [SDP] and is waiting for local [SDP].
 ///
 /// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
@@ -50,8 +50,7 @@ pub struct WaitLocalHaveRemote;
 #[derive(Debug, PartialEq)]
 pub struct WaitRemoteSdp;
 
-/// There is no negotiation happening atm. It may have ended or haven't started
-/// yet.
+/// No negotiation happening atm. It may have been ended or haven't yet started.
 #[derive(Debug, PartialEq)]
 pub struct Stable;
 
@@ -209,13 +208,14 @@ pub struct Context {
     /// All [`MediaTrack`]s with a `Send` direction.
     senders: HashMap<TrackId, Rc<MediaTrack>>,
 
-    /// If `true` then this [`Peer`] must be forcibly connected through TURN.
+    /// Indicator whether this [`Peer`] must be forcibly connected through
+    /// TURN.
     is_force_relayed: bool,
 
     /// Weak references to the [`Endpoint`]s related to this [`Peer`].
     endpoints: Vec<WeakEndpoint>,
 
-    /// Is this `Peer` was created on remote.
+    /// Indicator whether this [`Peer`] was created on remote.
     is_known_to_remote: bool,
 
     /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -331,7 +331,7 @@ impl<T> Peer<T> {
             .collect()
     }
 
-    /// Checks if this [`Peer`] has any send tracks.
+    /// Indicates whether this [`Peer`] has any send tracks.
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
@@ -391,7 +391,7 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
-    /// If `true` then this [`Peer`] is known to client (`Event::PeerCreated`
+    /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
     /// for this [`Peer`] was sent to the client).
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
@@ -417,6 +417,7 @@ impl<T> Peer<T> {
 impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
     /// state.
+    #[inline]
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
@@ -435,8 +436,7 @@ impl Peer<WaitLocalSdp> {
     /// Errors with [`PeerError::MidsMismatch`] if [`Peer`] is sending
     /// [`MediaTrack`] without providing its [mid].
     ///
-    /// [mid]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
+    /// [mid]: https://developer.mozilla.org/docs/Web/API/RTCRtpTransceiver/mid
     pub fn set_mids(
         &mut self,
         mut mids: HashMap<TrackId, Mid>,

@@ -321,11 +321,11 @@ impl Member {
         this.srcs
             .values()
             .flat_map(|src| src.sinks().into_iter().map(|s| s.owner()))
-            .chain(this.sinks.values().map(|sink| sink.src().owner()))
-            .map(|m| (m.id(), m))
+            .chain(this.sinks.values().map(|s| s.src().owner()))
+            .map(|member| (member.id(), member))
             .collect::<HashMap<_, _>>()
             .into_iter()
-            .map(|x| x.1)
+            .map(|(_, member)| member)
             .collect()
     }
 

@@ -16,6 +16,7 @@ All user visible changes to this project will be documented in this file. This p
         - `Pong` is now `Ping`.
     - Client messages:
         - `Ping` is now `Pong`.
+    - Use 32-bit integer types instead of 64-bit ([#115]).
 
 ### Added
 
@@ -50,7 +51,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
 - `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
-- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants  ([#81],[#105]);
+- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]);
 - Add `TrackUpdate::Removed` variant to the `TracksApplied` event ([#109]).
 
 [#28]: /../../pull/28
@@ -65,6 +66,7 @@ All user visible changes to this project will be documented in this file. This p
 [#105]: /../../pull/105
 [#106]: /../../pull/106
 [#109]: /../../pull/109
+[#115]: /../../pull/115
 
 
 

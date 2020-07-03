@@ -3,7 +3,7 @@
 //! [`actix::ActorFuture`]: actix::ActorFuture
 //! [`futures::future::TryJoinAll`]: futures::future::TryJoinAll
 
-use core::{
+use std::{
     mem,
     pin::Pin,
     task::{Context, Poll},

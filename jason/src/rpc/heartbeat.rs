@@ -50,7 +50,7 @@ struct Inner {
     idle_watchdog_task: Option<TaskHandle>,
 
     /// Number of last received [`ServerMsg::Ping`].
-    last_ping_num: u64,
+    last_ping_num: u32,
 
     /// [`mpsc::UnboundedSender`]s for a [`Heartbeat::on_idle`].
     on_idle_subs: Vec<mpsc::UnboundedSender<()>>,
@@ -60,7 +60,7 @@ impl Inner {
     /// Sends [`ClientMsg::Pong`] to a server.
     ///
     /// If some error happen then it will be printed with [`console_error`].
-    fn send_pong(&self, n: u64) {
+    fn send_pong(&self, n: u32) {
         self.transport
             .send(&ClientMsg::Pong(n))
             .map_err(tracerr::wrap!(=> TransportError))

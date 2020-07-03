@@ -81,7 +81,7 @@ pub enum PeerError {
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
-#[dispatchable]
+#[dispatchable(self: &Self, async_trait(?Send))]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
@@ -588,7 +588,6 @@ impl PeerConnection {
             .create_and_set_offer()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
-
         Ok(offer)
     }
 
@@ -597,13 +596,11 @@ impl PeerConnection {
     /// # Errors
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
-    /// new [`Sender`] cause transceiver with specified `mid` does not
-    /// exist.
+    /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
     pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
         self.media_connections
             .create_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?;
-
         Ok(())
     }
 

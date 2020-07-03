@@ -89,7 +89,7 @@ impl TestMember {
     }
 
     /// Sends pong to the server.
-    fn send_pong(&mut self, id: u64) {
+    fn send_pong(&mut self, id: u32) {
         executor::block_on(async move {
             let json = serde_json::to_string(&ClientMsg::Pong(id)).unwrap();
             self.sink.send(ws::Message::Text(json)).await.unwrap();
@@ -149,7 +149,7 @@ impl TestMember {
     /// [`TrackId`] was found.
     pub fn get_mid(&mut self, track_id: TrackId) -> Mid {
         if let Some(mid) = self.known_tracks_mids.get(&track_id) {
-            return mid.clone();
+            mid.clone()
         } else {
             self.last_mid += 1;
             let last_mid = self.last_mid;

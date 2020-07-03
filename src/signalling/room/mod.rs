@@ -350,7 +350,7 @@ impl Room {
                             if let Err(e) = res {
                                 error!(
                                     "Failed to connect Endpoints because: {:?}",
-                                    e
+                                    e,
                                 );
                             }
                         },
