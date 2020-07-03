@@ -3,8 +3,13 @@
 <head>
   <title>Chat</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js" integrity="sha384-6woDBwQr+eqsszpfCWmyJ2UTm+OSym/GuB2NAD8H3d+6xuEZzOMJ/6GEPDTPPCmi" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js" integrity="sha384-PlFzuf6GOlJNxLuosezJ/jwndIVZ2hWI/AmvYQtBzstOdLtcUe6DPSI4LsqwiN1y" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+
   <style>
     body {
       font-family: "Source Sans Pro", Helvetica, sans-serif;
@@ -46,117 +51,17 @@
       padding: 5px;
     }
 
-    .connect__join {
-      font-size: 16px;
-      margin-left: 5px;
-    }
-
-    .connect__device {
-      float: left;
-    }
-
-    .btn {
-      background: #49668C;
-      color: white;
-      cursor: pointer;
-      border-radius: 5px;
-      border: none;
-      padding: 7px;
-    }
-
-    .btn:hover {
-      background: #375577;
+    .bottom-btns {
+      position: absolute;
+      bottom: 100px;
+      left: 0;
+      right: 0;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .control {
-      float: left;
-    }
-
-    .control__btn {
-      font-size: 13pt;
-      margin-right: 10px;
-    }
-
-    .toggle-content {
       display: none;
-    }
-
-    .toggle-content.is-visible {
-      display: block;
-    }
-
-    .window {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #FFFFFF;
-      border-radius: 3px;
-    }
-
-    .control-debug__execute {
-      float: right;
-      margin-bottom: 10px;
-      margin-left: 10px;
-    }
-
-    .window__content span {
-      font-size: 10pt;
-    }
-
-    .window__content {
-      padding: 10px;
-    }
-
-    .window__close {
-      float: right;
-      cursor: pointer;
-    }
-
-    .window__title {
-      border-radius: 3px;
-      padding: 10px;
-      display: inherit;
-      background: #49668C;
-      color: #ffffff;
-    }
-
-    .control-debug-menu__toggle {
-      opacity: 0.5;
-      font-size: 10pt;
-      cursor: pointer;
-      position: absolute;
-      top: 0;
-    }
-
-    .control-debug-menu__toggle:hover {
-      opacity: 1;
-    }
-
-    .control-debug-menu__item {
-      cursor: pointer;
-      padding: 3px;
-      color: #242424;
-    }
-
-    .control-debug-menu__item:hover {
-      color: #616161;
-    }
-
-    .control-debug-menu {
-      position: absolute;
-      top: 30px;
-      background: #fff;
-      border-radius: 3px;
-      padding: 5px;
-      font-size: 11pt;
-    }
-
-    .control-debug__window_get>.window__content>.control-debug__json-result {
-      height: 300px;
-      overflow: scroll;
-      white-space: pre;
-      font-size: 11pt;
     }
 
     .json__key {
@@ -171,40 +76,14 @@
       color: olive;
     }
 
-    .control-debug__table-result>table {
-      border-collapse: separate;
-      border-spacing: 10px;
-      font-size: 11pt;
-    }
-
-    .control-debug__table-result>table>tr {
-      font-weight: normal;
-    }
-
-    .control-debug__table-result>table>tr>th {
-      font-weight: normal;
-    }
-
     .connection-loss-notification {
-      right: 50px;
-      top: 50px;
+      margin-top: 10px;
+      right: 10px;
       position: absolute;
-      background: #fff;
-      padding: 10px;
-      border-radius: 3px;
-      font-size: 11pt;
-    }
-
-    .connection-loss-notification__msg {
-      display: block;
     }
 
     .connection-loss-notification__manual-reconnect {
-      display: block;
-      color: #49668C;
-      text-align: center;
-      cursor: pointer;
-      margin-top: 5px;
+      width: 100%;
     }
 
     .footer {
@@ -215,7 +94,94 @@
     }
   </style>
 </head>
-<body>
+<body >
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand">Medea</a>
+    <button class="navbar-toggler"
+            type="button"
+            data-toggle="collapse"
+            data-target="#navbar"
+            aria-controls="navbarSupportedContent"
+            aria-expanded="false"
+            aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbar">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle"
+             id="navbarDropdown"
+             role="button"
+             data-toggle="dropdown"
+             aria-haspopup="true"
+             aria-expanded="false">
+            Create
+          </a>
+          <div class="dropdown-menu">
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_room">
+              Room
+            </a>
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_member">
+              Member
+            </a>
+            <a class="dropdown-item"
+               role="button"
+               data-toggle="modal"
+               data-target="#control-debug__window_create_endpoint">
+              Endpoint
+            </a>
+          </div>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+            role="button"
+            data-toggle="modal"
+            data-target="#control-debug__window_get">
+            Get
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+             role="button"
+             data-toggle="modal"
+             data-target="#control-debug__window_delete">
+            Delete
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link"
+             role="button"
+             data-toggle="modal"
+             data-target="#control-debug__window_callbacks">
+            Callbacks
+          </a>
+        </li>
+      </ul>
+      <div class="dropdown ">
+        <button class="btn btn-light dropdown-toggle" type="button"
+                id="username-menu-button"
+                data-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="false">
+          Username
+        </button>
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="username-menu-button">
+          <a class="dropdown-item" role="button" id="enable-publishing-btn">Enable publishing</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
   <div class="remote-videos">
   </div>
 
@@ -223,171 +189,538 @@
     <div class="local-video video">
       <video muted autoplay width="100%" height="100%"></video>
     </div>
-    <div class="connect toggle-content is-visible">
-      <div>
-        <input class="connect__username" placeholder="username">
-        <button class="connect__join btn">Join</button>
+  </div>
+
+  <div class="bottom-btns control text-center">
+    <button class="control__mute_audio btn btn-secondary">Mute audio</button>
+    <button class="control__mute_video btn btn-secondary">Mute video</button>
+     <button type="button"
+             class="btn btn-secondary"
+             data-toggle="modal"
+             data-target="#devices-settings">
+       Devices
+     </button>
+    <button class="control__close_app btn btn-danger">Dispose</button>
+  </div>
+
+  <div class="modal fade"
+       id="control-debug__window_create_endpoint"
+       tabindex="-1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Endpoint</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </div>
+
+        <div class="modal-body">
+          <b>Endpoint URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Endpoint ID"
+                   class="form-control control-debug__id_endpoint">
+          </div>
+          <br>
+
+          <b>Endpoint type</b>
+          <br>
+          <select class="control-debug__endpoint-type custom-select" autocomplete="off">
+            <option value="WebRtcPlayEndpoint" selected>WebRtcPlayEndpoint</option>
+            <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
+          </select>
+
+          <br>
+          <br>
+
+          <div class="webrtc-play-endpoint-spec">
+            <b>Source URI</b>
+            <br>
+            <div class="input-group input-group">
+              <div class="input-group-prepend">
+                <span class="input-group-text">local://</span>
+              </div>
+
+              <input type="text"
+                     placeholder="room_id/member_id/source_id"
+                     class="webrtc-play-endpoint-spec__src form-control">
+            </div>
+            <br>
+
+            <div class="custom-control custom-switch">
+              <input type="checkbox"
+                     id="webrtc-play-endpoint-spec__force-relay"
+                     class="custom-control-input">
+              <label
+                for="webrtc-play-endpoint-spec__force-relay"
+                class="custom-control-label">
+                Force relay
+              </label>
+            </div>
+          </div>
+
+          <div class="webrtc-publish-endpoint-spec" style="display: none;">
+            <b>P2P mode:</b>
+            <br>
+            <select class="webrtc-publish-endpoint-spec__p2p custom-select">
+              <option value="Always">Always</option>
+              <option value="IfPossible">If possible</option>
+              <option value="Never">Never</option>
+            </select>
+            <br>
+
+            <br>
+            <b>Audio publish policy</b>
+            <br>
+            <select class="webrtc-publish-endpoint-spec__publish-policy_audio custom-select">
+              <option value="Optional">Optional</option>
+              <option value="Disabled">Disabled</option>
+              <option value="Required">Required</option>
+            </select>
+            <br>
+
+            <br>
+            <b>Video publish policy</b>
+            <br>
+            <select class="webrtc-publish-endpoint-spec__publish-policy_video custom-select">
+              <option value="Optional">Optional</option>
+              <option value="Disabled">Disabled</option>
+              <option value="Required">Required</option>
+            </select>
+            <br>
+
+            <br>
+            <div class="custom-control custom-switch">
+              <input type="checkbox"
+                     id="webrtc-publish-endpoint-spec__force-relay"
+                     class="custom-control-input">
+              <label
+                for="webrtc-publish-endpoint-spec__force-relay"
+                class="custom-control-label">
+                Force relay
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Create
+          </button>
+        </div>
       </div>
     </div>
-    <div class="connect__device">
-      <label>Audio:
-        <select class="connect__select-device_audio">
-        </select>
-      </label><br>
-      <label>Video:
-        <select class="connect__select-device_video">
-        </select>
-      </label>
-    </div>
-    <div class="control toggle-content">
-      <button class="control__mute_audio control__btn btn">Mute audio</button>
-      <button class="control__mute_video control__btn btn">Mute video</button>
-      <button class="control__close_app control__btn btn">Dispose</button>
-    </div>
   </div>
 
-  <div class="window control-debug__window_create-endpoint toggle-content">
-    <div class="window__title">
-      <span>Create Endpoint</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
-      <br>
-      <br>
-      <span>Endpoint type:</span>
-      <select class="control-debug__endpoint-type is-visible">
-        <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
-        <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
-      </select>
+  <div class="modal fade"
+       id="control-debug__window_delete"
+       tabindex="1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete element</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
-      <br>
-      <br>
+        <div class="modal-body">
+          <b>URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
 
-      <div class="webrtc-play-endpoint-spec toggle-content is-visible">
-        <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
-        <span>Is relay:</span>
-        <select class="webrtc-play-endpoint-spec__force-relay">
-          <option value="false">false</option>
-          <option value="true">true</option>
-        </select>
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Endpoint ID"
+                   class="form-control control-debug__id_endpoint">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-danger">
+            Delete
+          </button>
+        </div>
       </div>
+    </div>
+  </div>
 
-      <div class="webrtc-publish-endpoint-spec toggle-content">
-        <span>P2P mode:</span>
-        <select class="webrtc-publish-endpoint-spec__p2p">
-          <option value="Always">Always</option>
-          <option value="IfPossible">If possible</option>
-          <option value="Never">Never</option>
-        </select>
-        <span>Is relay:</span>
-        <select class="webrtc-publish-endpoint-spec__force-relay">
-          <option value="false">false</option>
-          <option value="true">true</option>
-        </select>
+  <div class="modal fade"
+       id="control-debug__window_create_member"
+       tabindex="1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Member</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
+
+
+        <div class="modal-body">
+          <b>Member URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+          </div>
+          <br>
+          <b>Credentials</b>
+          <br>
+          <input class="member-spec__credentials form-control" placeholder="Credentials">
+
+          <br>
+          <b>Timeouts</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">IDLE</span>
+            </div>
+            <input type="text"
+                   class="form-control member-spec__idle-timeout"
+                   placeholder="10s">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">Reconnect</span>
+            </div>
+            <input type="text"
+                   class="form-control member-spec__reconnect-timeout"
+                   placeholder="10s">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">Ping</span>
+            </div>
+            <input type="text"
+                   class="form-control member-spec__ping-interval"
+                   placeholder="3s">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Create
+          </button>
+        </div>
       </div>
-
-      <button class="control-debug__execute">Execute</button>
     </div>
   </div>
 
-  <div class="window control-debug__window_delete toggle-content">
-    <div class="window__title">
-      <span>Delete</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
-
-      <button class="control-debug__execute">Execute</button>
-    </div>
-  </div>
-
-  <div class="window control-debug__window_create-member toggle-content">
-    <div class="window__title">
-      <span>Create member</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="member-spec__credentials" placeholder="Credentials">
-      <br>
-      <input class="member-spec__idle-timeout" placeholder="IDLE timeout">
-      <input class="member-spec__reconnect-timeout" placeholder="Reconnect timeout">
-      <input class="member-spec__ping-interval" placeholder="Ping interval">
+  <div class="modal fade"
+       id="control-debug__window_create_room"
+       tabindex="1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create Room</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
 
-      <button class="control-debug__execute">Execute</button>
-    </div>
-  </div>
+        <div class="modal-body">
+          <b>Room URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
+          </div>
+        </div>
 
-  <div class="window control-debug__window_create-room toggle-content">
-    <div class="window__title">
-      <span>Create room</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-
-      <button class="control-debug__execute">Execute</button>
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Create
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="window control-debug__window_get toggle-content">
-    <div class="window__title">
-      <span>Get</span>
-      <span class="window__close">X</span>
-    </div>
-    <div class="window__content">
-      <input class="control-debug__id_room" placeholder="Room ID">
-      <input class="control-debug__id_member" placeholder="Member ID">
-      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+  <div class="modal fade"
+       id="control-debug__window_get"
+       tabindex="1"
+       role="document"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Get element</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
 
-      <div class="control-debug__json-result"></div>
+        <div class="modal-body">
+          <b>URI</b>
+          <br>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">local://</span>
+            </div>
+            <input type="text"
+                   placeholder="Room ID"
+                   class="form-control control-debug__id_room">
 
-      <button class="control-debug__execute">Execute</button>
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Member ID"
+                   class="form-control control-debug__id_member">
+
+            <div class="input-group-prepend">
+              <span class="input-group-text">/</span>
+            </div>
+            <input type="text"
+                   placeholder="Endpoint ID"
+                   class="form-control control-debug__id_endpoint">
+          </div>
+          <br>
+          <b>Result</b>
+          <br>
+          <pre class="control-debug__json-result"></pre>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Get
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="window control-debug__window_callbacks toggle-content">
-    <div class="window__title">
-      <span>Callbacks</span>
-      <span class="window__close">X</span>
+  <div class="modal fade"
+       id="control-debug__window_callbacks"
+       tabindex="1"
+       role="document"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Callbacks</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </div>
+
+        <div class="modal-body">
+          <b>Result</b>
+          <br>
+          <div class="control-debug__table-result"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button"
+                  class="control-debug__execute btn btn-success">
+            Get
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="window__content">
-      <div class="control-debug__table-result"></div>
+  </div>
 
-      <button class="control-debug__execute">Execute</button>
+  <div class="toast connection-loss-notification"
+       role="alert"
+       aria-live="assertive"
+       aria-atomic="true"
+       data-autohide="false">
+    <div class="toast-header">
+      <strong class="mr-auto">Connection lost</strong>
+    </div>
+    <div class="toast-body">
+      <span class="connection-loss-notification__msg">Trying to reconnect with backoff...</span>
+      <button class="btn btn-success btn-sm connection-loss-notification__manual-reconnect">Reconnect now</a>
     </div>
   </div>
 
-  <div class="connection-loss-notification toggle-content">
-    <span class="connection-loss-notification__msg">Connection lost.</span>
-    <span>Trying to reconnect with backoff...</span>
-    <a class="connection-loss-notification__manual-reconnect">Reconnect now</a>
+  <div class="modal fade"
+       id="connection-settings"
+       tabindex="-1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="staticBackdropLabel">Connect to the Room</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form>
+            <div class="form-group">
+              <h5>Username</h5>
+              <input class="form-control connection-settings__username">
+              <br>
+
+              <h5>Publishing</h5>
+
+              <div class="custom-control custom-switch">
+                <input type="checkbox"
+                       id="connection-settings__publish_is-enabled"
+                       class="custom-control-input"
+                       checked>
+                <label for="connection-settings__publish_is-enabled"
+                       class="custom-control-label">
+                  Publish media
+                </label>
+              </div>
+
+              <div class="custom-control custom-switch">
+                <input type="checkbox"
+                       id="connection-settings__publish_audio"
+                       class="custom-control-input"
+                       checked>
+                <label for="connection-settings__publish_audio"
+                       class="custom-control-label">
+                  Publish audio
+                </label>
+              </div>
+
+              <div class="custom-control custom-switch">
+                <input type="checkbox"
+                       id="connection-settings__publish_video"
+                       class="custom-control-input"
+                       checked>
+                <label for="connection-settings__publish_video"
+                       class="custom-control-label">
+                  Publish video
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+           <button type="button"
+                   class="btn btn-secondary"
+                   data-toggle="modal"
+                   data-target="#devices-settings">
+             Configure devices
+           </button>
+          <button type="button" class="btn btn-success
+            connection-settings__connect">Connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-btns text-center">
+   <button type="button"
+           class="btn btn-success btn-lg"
+           id="connect-btn"
+           data-toggle="modal"
+           data-target="#connection-settings">
+    Connect
+   </button>
   </div>
 
-  <div class="control-debug-menu__toggle">
-    Dynamic Control API
-  </div>
+  <div class="modal fade"
+       id="devices-settings"
+       tabindex="-1"
+       role="dialog"
+       aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Devices settings</h5>
+          <button type="button"
+                  class="close"
+                  data-dismiss="modal"
+                  aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
 
-  <div class="control-debug-menu toggle-content">
-    <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_get">Get</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_delete">Delete</span>
-    <br>
-    <span class="control-debug-menu__item control-debug-menu__item_callbacks">Callbacks</span>
+        <div class="modal-body">
+          <label for="connect__select-device_audio">Audio</label>
+          <select class="connect__select-device_audio custom-select">
+          </select><br><br>
+
+          <label for="connect__select-device_video">Video</label>
+          <select class="connect__select-device_video custom-select">
+          </select>
+        </div>
+
+      </div>
+    </div>
   </div>
 </body>
 </html>
