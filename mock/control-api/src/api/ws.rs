@@ -41,7 +41,7 @@ pub async fn create_ws(
 }
 
 /// Notification that some mutating operation was performed to some `Room`.
-#[derive(Clone, Message, Serialize)]
+#[derive(Clone, Debug, Message, Serialize)]
 #[rtype(result = "()")]
 pub struct Notification(Value);
 
@@ -49,27 +49,27 @@ pub struct Notification(Value);
 #[derive(Serialize)]
 #[serde(tag = "method")]
 enum NotificationVariants<'a> {
-    Created { fid: String, element: &'a Element },
-    Deleted { fid: String },
+    Created { fid: &'a str, element: &'a Element },
+    Deleted { fid: &'a str },
 }
 
 impl Notification {
-    /// Builds `method: created` [`Notification`].
-    pub fn created(fid: Fid, element: &Element) -> Notification {
+    /// Builds `method: Created` [`Notification`].
+    pub fn created(fid: &Fid, element: &Element) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Created {
-                fid: fid.into(),
+                fid: fid.as_ref(),
                 element,
             })
             .unwrap(),
         )
     }
 
-    /// Builds `method: deleted` [`Notification`].
-    pub fn deleted(fid: Fid) -> Notification {
+    /// Builds `method: Deleted` [`Notification`].
+    pub fn deleted(fid: &Fid) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Deleted {
-                fid: fid.into(),
+                fid: fid.as_ref(),
             })
             .unwrap(),
         )

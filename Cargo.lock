@@ -1527,6 +1527,7 @@ dependencies = [
  "actix-web",
  "actix-web-actors",
  "clap",
+ "derive_more",
  "dotenv",
  "humantime-serde",
  "medea-control-api-proto",

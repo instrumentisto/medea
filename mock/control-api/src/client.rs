@@ -9,6 +9,7 @@ use std::{
 };
 
 use actix::Recipient;
+use derive_more::{AsRef, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use proto::control_api_client::ControlApiClient;
 use tonic::{transport::Channel, Status};
@@ -16,7 +17,8 @@ use tonic::{transport::Channel, Status};
 use crate::api::{ws::Notification, Element, Subscribers};
 
 /// Fid to `Room` element.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, AsRef, From, Into)]
+#[as_ref(forward)]
 pub struct Fid(String);
 
 impl Fid {
@@ -35,12 +37,6 @@ impl From<()> for Fid {
     }
 }
 
-impl From<String> for Fid {
-    fn from(path: String) -> Self {
-        Self(path)
-    }
-}
-
 impl From<(String, String)> for Fid {
     fn from(path: (String, String)) -> Self {
         Self(format!("{}/{}", path.0, path.1))
@@ -50,12 +46,6 @@ impl From<(String, String)> for Fid {
 impl From<(String, String, String)> for Fid {
     fn from(path: (String, String, String)) -> Self {
         Self(format!("{}/{}/{}", path.0, path.1, path.2))
-    }
-}
-
-impl Into<String> for Fid {
-    fn into(self) -> String {
-        self.0
     }
 }
 
@@ -116,8 +106,13 @@ impl ControlClient {
     ) -> Result<proto::CreateResponse, Status> {
         use proto::create_request::El;
 
-        let room_id = fid.room_id().to_owned();
-        let notification = Notification::created(fid.clone(), &element);
+        let room_id = if fid.0.is_empty() {
+            id.clone()
+        } else {
+            fid.room_id().to_owned()
+        };
+
+        let notification = Notification::created(&fid, &element);
         let el = match element {
             Element::Room(room) => El::Room(room.into_proto(id)),
             Element::Member(member) => El::Member(member.into_proto(id)),
@@ -172,7 +167,7 @@ impl ControlClient {
             if let Some(subs) =
                 self.subscribers.lock().unwrap().get(fid.room_id())
             {
-                let notification = Notification::deleted(fid);
+                let notification = Notification::deleted(&fid);
                 for sub in subs {
                     let _ = sub.do_send(notification.clone());
                 }

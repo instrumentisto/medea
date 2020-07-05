@@ -16,6 +16,7 @@ actix-rt = "1.0"
 actix-web = "2.0"
 actix-web-actors = "2.0"
 clap = "2.33"
+derive_more = "0.99"
 dotenv = "0.15"
 humantime-serde = "1.0"
 medea-control-api-proto = { path = "../../proto/control-api" }
