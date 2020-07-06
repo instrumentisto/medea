@@ -10,14 +10,11 @@ use futures::{
     stream::{self, BoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, TrackId, TrackUpdate,
+    Command, Event, NegotiationRole, PeerId, Track, TrackId, TrackUpdate,
 };
 use medea_jason::{
     api::Room,
-    media::{
-        AudioTrackConstraints, LocalStreamConstraints, MediaManager,
-        MediaStreamSettings,
-    },
+    media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{
         MockPeerRepository, PeerConnection, Repository, StableMuteState,
         TransceiverKind,
@@ -37,30 +34,48 @@ use crate::{
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
+fn get_test_room(
+    events: BoxStream<'static, Event>,
+) -> (Room, UnboundedReceiver<Command>) {
+    let (tx, rx) = mpsc::unbounded();
     let mut rpc = MockRpcClient::new();
-    let mut repo = Box::new(MockPeerRepository::new());
-    let (tx, _rx) = mpsc::unbounded();
-    let local_stream_settings = LocalStreamConstraints::default();
-    let peer = PeerConnection::new(
-        PeerId(1),
-        tx,
-        Vec::new(),
-        Rc::new(MediaManager::default()),
-        false,
-        local_stream_settings.clone(),
+
+    rpc.expect_subscribe().return_once(move || events);
+    rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_send_command().returning(move |command| {
+        tx.unbounded_send(command).unwrap();
+    });
+
+    (
+        Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default()))),
+        rx,
     )
-    .unwrap();
+}
+
+async fn get_test_room_and_exist_peer(
+    audio_track: Track,
+    video_track: Track,
+) -> (Room, Rc<PeerConnection>) {
+    let mut rpc = MockRpcClient::new();
 
     let (event_tx, event_rx) = mpsc::unbounded();
-    let peer_clone = Rc::clone(&peer);
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
-    repo.expect_get_all()
-        .returning_st(move || vec![Rc::clone(&peer_clone)]);
-    let peer_clone = Rc::clone(&peer);
-    repo.expect_get()
-        .returning_st(move |_| Some(Rc::clone(&peer_clone)));
     rpc.expect_unsub().return_const(());
     rpc.expect_on_connection_loss()
         .return_once(|| stream::pending().boxed_local());
@@ -86,18 +101,21 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         _ => (),
     });
 
-    let room = Room::new_with_cons(Rc::new(rpc), repo, local_stream_settings);
+    let room =
+        Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())));
+
+    // wait until Event::PeerCreated is handled
+    delay_for(200).await;
+    let peer = room.get_peer_by_id(PeerId(1)).unwrap();
     (room, peer)
 }
 
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
     let handle = room.new_handle();
     assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
     assert!(!peer.is_send_audio_enabled());
@@ -107,12 +125,9 @@ async fn mute_unmute_audio() {
 
 #[wasm_bindgen_test]
 async fn mute_unmute_video() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     let handle = room.new_handle();
     assert!(JsFuture::from(handle.mute_video()).await.is_ok());
@@ -134,12 +149,9 @@ async fn mute_unmute_video() {
 ///    is in [`MuteState::Muted`].
 #[wasm_bindgen_test]
 async fn join_two_audio_mutes() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     let handle = room.new_handle();
     let (first, second) = futures::future::join(
@@ -169,12 +181,9 @@ async fn join_two_audio_mutes() {
 ///    is in [`MuteState::Muted`].
 #[wasm_bindgen_test]
 async fn join_two_video_mutes() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     let handle = room.new_handle();
     let (first, second) = futures::future::join(
@@ -206,12 +215,9 @@ async fn join_two_video_mutes() {
 ///    is stayed in [`MuteState::NotMuted`].
 #[wasm_bindgen_test]
 async fn join_mute_and_unmute_audio() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
@@ -248,12 +254,9 @@ async fn join_mute_and_unmute_audio() {
 ///    is stayed in [`MuteState::NotMuted`].
 #[wasm_bindgen_test]
 async fn join_mute_and_unmute_video() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
@@ -290,12 +293,9 @@ async fn join_mute_and_unmute_video() {
 ///    is in [`MuteState::NotMuted`].
 #[wasm_bindgen_test]
 async fn join_unmute_and_mute_audio() {
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
@@ -324,29 +324,6 @@ async fn join_unmute_and_mute_audio() {
     ));
 }
 
-fn get_test_room(
-    events: BoxStream<'static, Event>,
-) -> (Room, UnboundedReceiver<Command>) {
-    let (tx, rx) = mpsc::unbounded();
-    let mut rpc = MockRpcClient::new();
-
-    rpc.expect_subscribe().return_once(move || events);
-    rpc.expect_unsub().return_const(());
-    rpc.expect_set_close_reason().return_const(());
-    rpc.expect_on_connection_loss()
-        .return_once(|| stream::pending().boxed_local());
-    rpc.expect_on_reconnected()
-        .return_once(|| stream::pending().boxed_local());
-    rpc.expect_send_command().returning(move |command| {
-        tx.unbounded_send(command).unwrap();
-    });
-
-    (
-        Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default()))),
-        rx,
-    )
-}
-
 #[wasm_bindgen_test]
 async fn mute_audio_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
@@ -367,7 +344,7 @@ async fn mute_audio_room_before_init_peer() {
         })
         .unwrap();
 
-    delay_for(500).await;
+    delay_for(200).await;
     match commands_rx.next().await.unwrap() {
         Command::MakeSdpOffer {
             peer_id,
@@ -411,7 +388,7 @@ async fn mute_video_room_before_init_peer() {
         })
         .unwrap();
 
-    delay_for(500).await;
+    delay_for(200).await;
     match commands_rx.next().await.unwrap() {
         Command::MakeSdpOffer {
             peer_id,
@@ -499,11 +476,9 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
              single video track"
         );
     });
-    let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_required_tracks();
-    peer.get_offer(vec![audio_track, video_track])
-        .await
-        .unwrap();
+    let (room, _peer) =
+        get_test_room_and_exist_peer(audio_track, video_track).await;
 
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
@@ -528,12 +503,10 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         let closure = wasm_bindgen::closure::Closure::once_into_js(move || {
             test_tx.send(()).unwrap();
         });
-        let (room, peer) = get_test_room_and_exist_peer();
         let (audio_track, video_track) =
             get_test_tracks(audio_required, video_required);
-        peer.get_offer(vec![audio_track, video_track])
-            .await
-            .unwrap();
+        let (room, _peer) =
+            get_test_room_and_exist_peer(audio_track, video_track).await;
 
         let mut constraints = MediaStreamSettings::new();
         if add_audio {

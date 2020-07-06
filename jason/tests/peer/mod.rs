@@ -19,7 +19,7 @@ use medea_client_api_proto::{
     TrackId, TrackPatch, VideoSettings,
 };
 use medea_jason::{
-    media::MediaManager,
+    media::{LocalStreamConstraints, MediaManager},
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
     },
@@ -29,7 +29,6 @@ use wasm_bindgen_test::*;
 use crate::{
     delay_for, get_media_stream_settings, get_test_unrequired_tracks, timeout,
 };
-use medea_jason::media::LocalStreamConstraints;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

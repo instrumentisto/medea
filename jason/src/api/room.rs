@@ -412,21 +412,8 @@ pub struct Room(Rc<InnerRoom>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
-    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
-        Self::new_with_cons(rpc, peers, LocalStreamConstraints::default())
-    }
-
-    /// Create new [`Room`] and associates it with a provided [`RpcClient`].
-    ///
-    /// Provided [`LocalStreamConstraints`] will be used as
-    /// `local_stream_settings` for this [`Room`]. If you wanna use default
-    /// [`LocalStreamConstraints`] use [`Room::new`].
     #[allow(clippy::mut_mut)]
-    pub fn new_with_cons(
-        rpc: Rc<dyn RpcClient>,
-        peers: Box<dyn PeerRepository>,
-        local_stream_settings: LocalStreamConstraints,
-    ) -> Self {
+    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
             PeerEvent(PeerEvent),
@@ -449,8 +436,12 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room =
-            Rc::new(InnerRoom::new(rpc, peers, tx, local_stream_settings));
+        let room = Rc::new(InnerRoom::new(
+            rpc,
+            peers,
+            tx,
+            LocalStreamConstraints::default(),
+        ));
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
