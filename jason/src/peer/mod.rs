@@ -600,10 +600,10 @@ impl PeerConnection {
     pub async fn create_tracks(
         &self,
         tracks: Vec<Track>,
-        local_settings: &MediaStreamSettings,
+        local_settings: MediaStreamSettings,
     ) -> Result<()> {
         self.media_connections
-            .create_tracks(tracks, local_settings)
+            .create_tracks(tracks, &local_settings)
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }

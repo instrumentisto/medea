@@ -257,7 +257,10 @@
     }
 
     async function initLocalStream() {
-      let constraints = await build_constraints(audioSelect, videoSelect);
+      let constraints = await build_constraints(
+        isAudioMuted ? null : audioSelect,
+        isVideoMuted ? null : videoSelect
+      );
       try {
         localStream = await jason
           .media_manager()
@@ -530,16 +533,16 @@
       muteAudioBtn.addEventListener('click', async () => {
         try {
           if (isAudioMuted) {
-            if (!isCallStarted) {
-              await initLocalStream();
-            }
             await room.unmute_audio();
             isAudioMuted = false;
             muteAudioBtn.textContent = "Mute audio";
+            if (!isCallStarted) {
+              await initLocalStream();
+            }
           } else {
             await room.mute_audio();
             if (localStream && localStream.ptr > 0 ){
-              localStream.free_video();
+              localStream.free_audio();
             }
             isAudioMuted = true;
             muteAudioBtn.textContent = "Unmute audio";
@@ -551,12 +554,12 @@
       muteVideoBtn.addEventListener('click', async () => {
         try {
           if (isVideoMuted) {
-            if (!isCallStarted) {
-              await initLocalStream();
-            }
             await room.unmute_video();
             isVideoMuted = false;
             muteVideoBtn.textContent = "Mute video";
+            if (!isCallStarted) {
+              await initLocalStream();
+            }
           } else {
             await room.mute_video();
             if (localStream && localStream.ptr > 0 ){

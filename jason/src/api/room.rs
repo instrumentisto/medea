@@ -257,10 +257,6 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner
-            .local_stream_settings
-            .borrow_mut()
-            .toggle_enable(!is_muted, kind);
         while !inner
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
@@ -269,6 +265,10 @@ impl RoomHandle {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
         }
+        inner
+            .local_stream_settings
+            .borrow_mut()
+            .toggle_enable(!is_muted, kind);
         Ok(())
     }
 }
@@ -520,6 +520,17 @@ impl Room {
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
     }
+
+    /// Returns [`PeerConnection`] stored in repository by its ID.
+    ///
+    /// Used to inspect [`Room`]s inner state in integration tests.
+    #[cfg(feature = "mockable")]
+    pub fn get_peer_by_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<Rc<PeerConnection>> {
+        self.0.peers.get(peer_id)
+    }
 }
 
 /// Actual data of a [`Room`].
@@ -731,10 +742,10 @@ impl InnerRoom {
     async fn set_local_media_settings(&self, settings: MediaStreamSettings) {
         self.local_stream_settings.borrow_mut().constrain(settings);
         for peer in self.peers.get_all() {
+            let local_stream_settings =
+                self.local_stream_settings.borrow().clone();
             if let Err(err) = peer
-                .update_local_stream(
-                    self.local_stream_settings.borrow().clone(),
-                )
+                .update_local_stream(local_stream_settings)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
@@ -768,21 +779,16 @@ impl InnerRoom {
         tracks: Vec<Track>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<RoomError>> {
+        let local_stream_settings = self.local_stream_settings.borrow().clone();
         match negotiation_role {
             None => {
-                peer.create_tracks(
-                    tracks,
-                    &self.local_stream_settings.borrow(),
-                )
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?;
+                peer.create_tracks(tracks, local_stream_settings)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
             }
             Some(NegotiationRole::Offerer) => {
                 let sdp_offer = peer
-                    .get_offer(
-                        tracks,
-                        self.local_stream_settings.borrow().clone(),
-                    )
+                    .get_offer(tracks, local_stream_settings)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
                 let mids =
@@ -797,11 +803,7 @@ impl InnerRoom {
             }
             Some(NegotiationRole::Answerer(offer)) => {
                 let sdp_answer = peer
-                    .process_offer(
-                        offer,
-                        tracks,
-                        self.local_stream_settings.borrow().clone(),
-                    )
+                    .process_offer(offer, tracks, local_stream_settings)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
                 let senders_statuses = peer.get_senders_statuses();

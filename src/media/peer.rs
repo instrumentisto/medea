@@ -87,7 +87,7 @@ impl PeerError {
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
-    pub fn update_tracks(&mut self, track_patches: Vec<TrackPatch>)
+    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>)
 )]
 #[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
@@ -231,10 +231,7 @@ enum TrackChange {
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
 
-    /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
-    ///
-    /// Remote [`Peer`] should know about [`MediaTrack`] for which this
-    /// [`TrackPatch`] is.
+    /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(TrackPatch),
 }
 
@@ -399,7 +396,7 @@ impl<T> Peer<T> {
     ///
     /// Patches will be applied on client side when renegotiation will be
     /// started for this [`Peer`].
-    pub fn update_tracks(&mut self, track_patches: Vec<TrackPatch>) {
+    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>) {
         for track_patch in track_patches {
             self.context
                 .pending_track_updates
