@@ -260,7 +260,6 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.local_stream_settings.toggle_enable(!is_muted, kind);
         while !inner
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
@@ -269,6 +268,7 @@ impl RoomHandle {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
         }
+        inner.local_stream_settings.toggle_enable(!is_muted, kind);
         Ok(())
     }
 }
@@ -533,6 +533,17 @@ impl Room {
     #[inline]
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
+    }
+
+    /// Returns [`PeerConnection`] stored in repository by its ID.
+    ///
+    /// Used to inspect [`Room`]s inner state in integration tests.
+    #[cfg(feature = "mockable")]
+    pub fn get_peer_by_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<Rc<PeerConnection>> {
+        self.0.peers.get(peer_id)
     }
 }
 

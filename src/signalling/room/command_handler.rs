@@ -168,7 +168,7 @@ impl CommandHandler for Room {
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
         self.peers.map_peer_by_id_mut(peer_id, |peer| {
-            peer.update_tracks(tracks_patches);
+            peer.apply_track_changes(tracks_patches);
         })?;
 
         Ok(self.send_tracks_applied(peer_id))
