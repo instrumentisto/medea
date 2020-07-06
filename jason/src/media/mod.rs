@@ -9,12 +9,11 @@ mod stream;
 
 #[doc(inline)]
 pub use self::{
-    constraints::LocalStreamConstraints,
     constraints::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
-        DisplayVideoTrackConstraints, MediaStreamSettings,
-        MultiSourceMediaStreamConstraints, TrackConstraints,
-        VideoTrackConstraints,
+        DisplayVideoTrackConstraints, LocalStreamConstraints,
+        MediaStreamSettings, MultiSourceMediaStreamConstraints,
+        TrackConstraints, VideoTrackConstraints,
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
