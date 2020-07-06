@@ -57,20 +57,19 @@ Delete single `Endpoint` element.
 
 ### `GET /callbacks`
 
-Returns list of all `Callbacks` that Control API mock server received from [Medea].
+Get list of all `Callback`s that [Control API] mock server received from [Medea].
 
 
 ### `GET /subscribe/{room_id}`
 
-Establish `WebSocket` connection, subscribing to all mutations applied to selected `Room`. 
+Establish [WebSocket] connection, subscribing to all mutations applied to the selected `Room`. 
 
-This way you can be notified whenever `Room` state is being updated using current instance of 
-Control API mock server. This may be useful in case you are implementing `caller-responder` scenario,
-meaning that `caller` initiates a call, and `responder` is being notified about that.
+This way you can be notified whenever the `Room` state is being updated using current instance of [Control API] mock server. This may be useful in case you are implementing `caller-responder` scenario, meaning that `caller` initiates a call, and `responder` is being notified about that.
 
-Currently it supports to kinds of events: `Created` and `Deleted`, that have following format:
+Currently, it supports two kinds of events (`Created` and `Deleted`) with the following format:
 
-#### 1. `Created` event:
+#### 1. `Created` event
+
 ```json
 {
   "method": "Created",
@@ -81,7 +80,9 @@ Currently it supports to kinds of events: `Created` and `Deleted`, that have fol
   } 
 }
 ```
-#### 2. `Deleted` event:
+
+#### 2. `Deleted` event
+
 ```json
 {
   "method": "Deleted",
@@ -93,6 +94,6 @@ Currently it supports to kinds of events: `Created` and `Deleted`, that have fol
 
 
 
-
 [Medea]: https://github.com/instrumentisto/medea
 [Control API]: https://github.com/instrumentisto/medea/blob/master/docs/rfc/0001-control-api.md
+[WebSocket]: https://en.wikipedia.org/wiki/WebSocket

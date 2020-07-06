@@ -1,3 +1,8 @@
+//! [WebSocket] [Control API] mock server implementation.
+//!
+//! [Control API]: https://tinyurl.com/yxsqplq7
+//! [WebSocket]: https://en.wikipedia.org/wiki/WebSocket
+
 use std::{sync::Arc, time::Duration};
 
 use actix::{
@@ -17,12 +22,14 @@ use crate::{
     prelude::*,
 };
 
-/// Handles HTTP upgrade request, tries to perform handshake and establish
-/// WebSocket connection.
+/// Handles HTTP upgrade request trying to perform handshake and establish
+/// [WebSocket] connection.
 ///
 /// # Errors
 ///
 /// Errors if handshake fails for any underlying reason.
+///
+/// [WebSocket]: https://en.wikipedia.org/wiki/WebSocket
 pub async fn create_ws(
     request: HttpRequest,
     path: Path<String>,
@@ -40,7 +47,7 @@ pub async fn create_ws(
     )
 }
 
-/// Notification that some mutating operation was performed to some `Room`.
+/// Notification about a some mutating operation being performed to some `Room`.
 #[derive(Clone, Debug, Message, Serialize)]
 #[rtype(result = "()")]
 pub struct Notification(Value);
@@ -76,10 +83,12 @@ impl Notification {
     }
 }
 
-/// WebSocket connection with [`Notification`] subscriber.
+/// [WebSocket] connection with a [`Notification`] subscriber.
+///
+/// [WebSocket]: https://en.wikipedia.org/wiki/WebSocket
 #[derive(Default)]
 struct WsSession {
-    /// `Room` id that this `WsSession` is subscribed to.
+    /// `Room` id that this [`WsSession`] is subscribed to.
     room_id: String,
     /// Map of subscribers to [`Notification`]s.
     subscribers: Subscribers,
@@ -90,7 +99,7 @@ struct WsSession {
 impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
-    /// Adds session to sessions map and schedules ping task.
+    /// Adds [`WsSession`] to [`WsSession`]s map and schedules `Ping` task.
     fn started(&mut self, ctx: &mut Self::Context) {
         let this = ctx.address().recipient();
 
@@ -110,7 +119,7 @@ impl Actor for WsSession {
         );
     }
 
-    /// Removes session from sessions map.
+    /// Removes [`WsSession`] from [`WsSession`]s map.
     fn stopped(&mut self, ctx: &mut Self::Context) {
         let recipient = ctx.address().recipient();
         if let Some(subs) =
@@ -148,7 +157,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 _ => error!("Unsupported client message: {:?}", msg),
             },
             Err(err) => {
-                error!("Ws StreamHandler error {}", err);
+                error!("WS StreamHandler error {}", err);
             }
         };
     }

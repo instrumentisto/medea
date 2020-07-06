@@ -62,6 +62,7 @@ fn id_request(ids: Vec<String>) -> proto::IdRequest {
 pub struct ControlClient {
     /// Map of subscribers to [`Notification`]s.
     subscribers: Subscribers,
+
     /// [`tonic`] gRPC client for Medea Control API.
     grpc_client: ControlApiClient<Channel>,
 }
