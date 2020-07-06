@@ -29,7 +29,10 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    media::{MediaManager, MediaManagerError, MediaStream, MediaStreamTrack},
+    media::{
+        LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
+        MediaStreamTrack,
+    },
     utils::{console_error, JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
@@ -215,6 +218,9 @@ pub struct PeerConnection {
     /// Stores precomputed hashes, since we don't need access to actual stats
     /// values.
     sent_stats_cache: RefCell<HashMap<StatId, u64>>,
+
+    /// Local media stream constraints used in this [`PeerConnection`].
+    local_stream_constraints: LocalStreamConstraints,
 }
 
 impl PeerConnection {
@@ -238,6 +244,7 @@ impl PeerConnection {
         ice_servers: I,
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
+        local_stream_constraints: LocalStreamConstraints,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
@@ -258,6 +265,7 @@ impl PeerConnection {
             sent_stats_cache: RefCell::new(HashMap::new()),
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
+            local_stream_constraints,
         };
 
         // Bind to `icecandidate` event.
@@ -570,18 +578,12 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(
-        &self,
-        tracks: Vec<Track>,
-        local_stream: MediaStreamSettings,
-    ) -> Result<String> {
+    pub async fn get_offer(&self, tracks: Vec<Track>) -> Result<String> {
         self.media_connections
-            .create_tracks(tracks, &local_stream)
+            .create_tracks(tracks, &self.local_stream_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream(local_stream)
-            .await
-            .map_err(tracerr::wrap!())?;
+        self.update_local_stream().await.map_err(tracerr::wrap!())?;
 
         let offer = self
             .peer
@@ -597,13 +599,9 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub async fn create_tracks(
-        &self,
-        tracks: Vec<Track>,
-        local_settings: &MediaStreamSettings,
-    ) -> Result<()> {
+    pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
         self.media_connections
-            .create_tracks(tracks, local_settings)
+            .create_tracks(tracks, &self.local_stream_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
@@ -637,16 +635,13 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub async fn update_local_stream(
-        &self,
-        local_constraints: MediaStreamSettings,
-    ) -> Result<()> {
+    pub async fn update_local_stream(&self) -> Result<()> {
         if let Some(request) = self.media_connections.get_stream_request() {
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
             required_caps
-                .merge(local_constraints)
+                .merge(self.local_stream_constraints.inner())
                 .map_err(tracerr::map_from_and_wrap!())?;
             let used_caps = MediaStreamSettings::from(&required_caps);
 
@@ -778,7 +773,6 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-        local_constraints: MediaStreamSettings,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
@@ -789,7 +783,7 @@ impl PeerConnection {
 
         // create receivers
         self.media_connections
-            .create_tracks(recv, &local_constraints)
+            .create_tracks(recv, &self.local_stream_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         // set offer, which will create transceivers and discover remote tracks
@@ -800,12 +794,10 @@ impl PeerConnection {
 
         // create senders
         self.media_connections
-            .create_tracks(send, &local_constraints)
+            .create_tracks(send, &self.local_stream_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream(local_constraints)
-            .await
-            .map_err(tracerr::wrap!())?;
+        self.update_local_stream().await.map_err(tracerr::wrap!())?;
 
         let answer = self
             .peer

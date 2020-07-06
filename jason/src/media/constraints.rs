@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
     MediaType, VideoSettings as ProtoVideoConstraints,
@@ -11,6 +13,61 @@ use web_sys::{
 };
 
 use crate::{peer::TransceiverKind, utils::get_property_by_name};
+
+/// Local media stream for injecting into new created [`PeerConnection`]s.
+#[derive(Clone)]
+pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
+
+impl Default for LocalStreamConstraints {
+    fn default() -> Self {
+        Self(Rc::new(RefCell::new(MediaStreamSettings::default())))
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl From<MediaStreamSettings> for LocalStreamConstraints {
+    fn from(from: MediaStreamSettings) -> Self {
+        Self(Rc::new(RefCell::new(from)))
+    }
+}
+
+impl LocalStreamConstraints {
+    /// Returns new [`LocalStreamConstraints`] with the default values.
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Constrains underlying [`MediaStreamSettings`] with a provided
+    /// [`MediaStreamSettings`].
+    #[inline]
+    pub fn constrain(&self, other: MediaStreamSettings) {
+        self.0.borrow_mut().constrain(other);
+    }
+
+    /// Clones underlying [`MediaStreamSettings`].
+    #[inline]
+    pub fn inner(&self) -> MediaStreamSettings {
+        self.0.borrow().clone()
+    }
+
+    /// Enabled/disables audio or video type in underlying
+    /// [`MediaStreamSettings`].
+    ///
+    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
+    /// of media wouldn't be published.
+    #[inline]
+    pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
+        self.0.borrow_mut().toggle_enable(is_enabled, kind)
+    }
+
+    /// Returns `true` if provided [`MediaType`] is enabled in underlying
+    /// [`MediaStreamSettings`].
+    #[inline]
+    pub fn is_enabled(&self, kind: &MediaType) -> bool {
+        self.0.borrow().is_enabled(kind)
+    }
+}
 
 /// Helper to distinguish objects related to media captured from device and
 /// media captured from display.

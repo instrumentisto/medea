@@ -10,11 +10,11 @@ use medea_jason::{
         MediaConnections, RtcPeerConnection, SimpleStreamRequest,
         StableMuteState,
     },
-    MediaStreamSettings,
 };
 use wasm_bindgen_test::*;
 
 use crate::{get_media_stream_settings, get_test_unrequired_tracks};
+use medea_jason::media::LocalStreamConstraints;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -35,7 +35,7 @@ async fn get_test_media_connections(
     media_connections
         .create_tracks(
             vec![audio_track, video_track],
-            &get_media_stream_settings(!enabled_audio, !enabled_video),
+            &get_media_stream_settings(!enabled_audio, !enabled_video).into(),
         )
         .unwrap();
     let request = media_connections.get_stream_request().unwrap();
@@ -75,7 +75,7 @@ fn get_stream_request1() {
     media_connections
         .create_tracks(
             vec![audio_track, video_track],
-            &MediaStreamSettings::default(),
+            &LocalStreamConstraints::default(),
         )
         .unwrap();
     let request = media_connections.get_stream_request();
@@ -92,7 +92,7 @@ fn get_stream_request2() {
         tx,
     );
     media_connections
-        .create_tracks(Vec::new(), &MediaStreamSettings::default())
+        .create_tracks(Vec::new(), &LocalStreamConstraints::default())
         .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());

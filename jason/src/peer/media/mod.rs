@@ -17,10 +17,9 @@ use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::MediaStreamTrack,
+    media::{LocalStreamConstraints, MediaStreamTrack},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
-    MediaStreamSettings,
 };
 
 use super::{
@@ -254,7 +253,7 @@ impl MediaConnections {
     pub fn create_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
-        local_constraints: &MediaStreamSettings,
+        local_constraints: &LocalStreamConstraints,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {

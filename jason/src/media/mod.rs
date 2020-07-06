@@ -9,6 +9,7 @@ mod stream;
 
 #[doc(inline)]
 pub use self::{
+    constraints::LocalStreamConstraints,
     constraints::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, MediaStreamSettings,

@@ -11,7 +11,10 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     api::Room,
-    media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
+    media::{
+        AudioTrackConstraints, LocalStreamConstraints, MediaManager,
+        MediaStreamSettings,
+    },
     peer::{
         MockPeerRepository, PeerConnection, Repository, StableMuteState,
         TransceiverKind,
@@ -36,12 +39,14 @@ fn get_test_room_and_exist_peer(
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
     let (tx, _rx) = mpsc::unbounded();
+    let local_stream_settings = LocalStreamConstraints::default();
     let peer = PeerConnection::new(
         PeerId(1),
         tx,
         Vec::new(),
         Rc::new(MediaManager::default()),
         false,
+        local_stream_settings.clone(),
     )
     .unwrap();
 
@@ -80,7 +85,7 @@ fn get_test_room_and_exist_peer(
         _ => (),
     });
 
-    let room = Room::new(Rc::new(rpc), repo);
+    let room = Room::new_with_cons(Rc::new(rpc), repo, local_stream_settings);
     (room, peer)
 }
 
@@ -89,12 +94,9 @@ async fn mute_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
     let handle = room.new_handle();
     assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
     assert!(!peer.is_send_audio_enabled());
@@ -107,12 +109,9 @@ async fn mute_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     let handle = room.new_handle();
     assert!(JsFuture::from(handle.mute_video()).await.is_ok());
@@ -137,12 +136,9 @@ async fn join_two_audio_mutes() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     let handle = room.new_handle();
     let (first, second) = futures::future::join(
@@ -175,12 +171,9 @@ async fn join_two_video_mutes() {
     let (room, peer) = get_test_room_and_exist_peer(6);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     let handle = room.new_handle();
     let (first, second) = futures::future::join(
@@ -215,12 +208,9 @@ async fn join_mute_and_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(5);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
@@ -260,12 +250,9 @@ async fn join_mute_and_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer(5);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
@@ -305,12 +292,9 @@ async fn join_unmute_and_mute_audio() {
     let (room, peer) = get_test_room_and_exist_peer(7);
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
@@ -471,12 +455,9 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
     let (audio_track, video_track) = get_test_required_tracks();
-    peer.get_offer(
-        vec![audio_track, video_track],
-        MediaStreamSettings::default(),
-    )
-    .await
-    .unwrap();
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
 
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
@@ -504,12 +485,9 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         let (room, peer) = get_test_room_and_exist_peer(1);
         let (audio_track, video_track) =
             get_test_tracks(audio_required, video_required);
-        peer.get_offer(
-            vec![audio_track, video_track],
-            MediaStreamSettings::default(),
-        )
-        .await
-        .unwrap();
+        peer.get_offer(vec![audio_track, video_track])
+            .await
+            .unwrap();
 
         let mut constraints = MediaStreamSettings::new();
         if add_audio {
@@ -886,21 +864,22 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
+            let mut local_stream = MediaStreamSettings::new();
+            local_stream.toggle_enable(
+                !(audio_track_muted_state_fn)(i),
+                TransceiverKind::Audio,
+            );
             let peer = PeerConnection::new(
                 peer_id,
                 tx,
                 Vec::new(),
                 Rc::new(MediaManager::default()),
                 false,
+                local_stream.into(),
             )
             .unwrap();
 
-            let mut local_stream = MediaStreamSettings::new();
-            local_stream.toggle_enable(
-                !(audio_track_muted_state_fn)(i),
-                TransceiverKind::Audio,
-            );
-            peer.get_offer(tracks, local_stream).await.unwrap();
+            peer.get_offer(tracks).await.unwrap();
 
             peers.insert(peer_id, peer);
         }
