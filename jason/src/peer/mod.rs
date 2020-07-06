@@ -599,7 +599,7 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub async fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+    pub fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
         self.media_connections
             .create_tracks(tracks, &self.local_stream_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;

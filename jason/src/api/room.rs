@@ -795,7 +795,6 @@ impl InnerRoom {
         match negotiation_role {
             None => {
                 peer.create_tracks(tracks)
-                    .await
                     .map_err(tracerr::map_from_and_wrap!())?;
             }
             Some(NegotiationRole::Offerer) => {
