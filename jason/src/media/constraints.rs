@@ -15,16 +15,9 @@ use web_sys::{
 use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
 
-impl Default for LocalStreamConstraints {
-    fn default() -> Self {
-        Self(Rc::new(RefCell::new(MediaStreamSettings::default())))
-    }
-}
-
-#[cfg(feature = "mockable")]
 impl From<MediaStreamSettings> for LocalStreamConstraints {
     fn from(from: MediaStreamSettings) -> Self {
         Self(Rc::new(RefCell::new(from)))
