@@ -179,12 +179,6 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let mut other = other.into();
 
-        // use SimpleStreamRequest because JS-side doesn't care about
-        // MediaStreamSettings.
-        if !other.is_constrained() {
-            return Ok(());
-        }
-
         if let Some((_, video_caps)) = &self.video {
             if other.get_video().is_none() {
                 if video_caps.is_required() {
