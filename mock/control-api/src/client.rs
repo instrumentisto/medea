@@ -3,25 +3,37 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
+use actix::Recipient;
+use derive_more::{AsRef, From, Into};
 use medea_control_api_proto::grpc::api as proto;
 use proto::control_api_client::ControlApiClient;
 use tonic::{transport::Channel, Status};
 
-use crate::api::Element;
+use crate::api::{ws::Notification, Element, Subscribers};
 
 /// Fid to `Room` element.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, AsRef, From, Into)]
+#[as_ref(forward)]
 pub struct Fid(String);
+
+impl Fid {
+    /// Return `Room` id from this [`Fid`].
+    fn room_id(&self) -> &str {
+        match self.0.find('/') {
+            None => self.0.as_str(),
+            Some(i) => &self.0[..i],
+        }
+    }
+}
 
 impl From<()> for Fid {
     fn from(_: ()) -> Self {
         Self(String::new())
-    }
-}
-
-impl From<String> for Fid {
-    fn from(path: String) -> Self {
-        Self(path)
     }
 }
 
@@ -37,12 +49,6 @@ impl From<(String, String, String)> for Fid {
     }
 }
 
-impl Into<String> for Fid {
-    fn into(self) -> String {
-        self.0
-    }
-}
-
 /// Returns new [`proto::IdRequest`] with provided FIDs.
 fn id_request(ids: Vec<String>) -> proto::IdRequest {
     proto::IdRequest { fid: ids }
@@ -54,6 +60,9 @@ fn id_request(ids: Vec<String>) -> proto::IdRequest {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone)]
 pub struct ControlClient {
+    /// Map of subscribers to [`Notification`]s.
+    subscribers: Subscribers,
+
     /// [`tonic`] gRPC client for Medea Control API.
     grpc_client: ControlApiClient<Channel>,
 }
@@ -71,9 +80,11 @@ impl ControlClient {
     /// Errors if unable to resolve the provided `medea_addr`.
     pub async fn new(
         medea_addr: String,
+        subscribers: Arc<Mutex<HashMap<String, Vec<Recipient<Notification>>>>>,
     ) -> Result<Self, tonic::transport::Error> {
         let client = ControlApiClient::connect(medea_addr).await?;
         Ok(Self {
+            subscribers,
             grpc_client: client,
         })
     }
@@ -96,6 +107,13 @@ impl ControlClient {
     ) -> Result<proto::CreateResponse, Status> {
         use proto::create_request::El;
 
+        let room_id = if fid.0.is_empty() {
+            id.clone()
+        } else {
+            fid.room_id().to_owned()
+        };
+
+        let notification = Notification::created(&fid, &element);
         let el = match element {
             Element::Room(room) => El::Room(room.into_proto(id)),
             Element::Member(member) => El::Member(member.into_proto(id)),
@@ -111,10 +129,17 @@ impl ControlClient {
             el: Some(el),
         };
 
-        self.get_client()
-            .create(tonic::Request::new(req))
-            .await
-            .map(tonic::Response::into_inner)
+        let response = self.get_client().create(tonic::Request::new(req)).await;
+
+        if response.is_ok() {
+            if let Some(subs) = self.subscribers.lock().unwrap().get(&room_id) {
+                for sub in subs {
+                    let _ = sub.do_send(notification.clone());
+                }
+            };
+        }
+
+        response.map(tonic::Response::into_inner)
     }
 
     /// Gets element from Control API by FID.
@@ -136,10 +161,19 @@ impl ControlClient {
     ///
     /// Errors if gRPC request fails.
     pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
-        let req = id_request(vec![fid.into()]);
-        self.get_client()
-            .delete(tonic::Request::new(req))
-            .await
-            .map(tonic::Response::into_inner)
+        let req = id_request(vec![fid.clone().into()]);
+        let response = self.get_client().delete(tonic::Request::new(req)).await;
+
+        if response.is_ok() {
+            if let Some(subs) =
+                self.subscribers.lock().unwrap().get(fid.room_id())
+            {
+                let notification = Notification::deleted(&fid);
+                for sub in subs {
+                    let _ = sub.do_send(notification.clone());
+                }
+            };
+        }
+        response.map(tonic::Response::into_inner)
     }
 }
