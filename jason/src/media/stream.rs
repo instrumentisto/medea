@@ -4,13 +4,15 @@
 
 use std::rc::{Rc, Weak};
 
-use derive_more::AsRef;
+use derive_more::{AsRef, Display};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
 use crate::MediaStreamSettings;
+use futures::Stream;
+use medea_client_api_proto::TrackId;
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -100,18 +102,21 @@ impl WeakMediaStreamTrack {
 /// left.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+// TODO: remove pub on field
 #[derive(Clone)]
-pub struct MediaStreamTrack(Rc<SysMediaStreamTrack>);
+pub struct MediaStreamTrack(pub Rc<SysMediaStreamTrack>);
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Display, Eq, PartialEq)]
 pub enum TrackKind {
     /// Audio track.
+    #[display(fmt = "audio")]
     Audio,
 
     /// Video track.
+    #[display(fmt = "video")]
     Video,
 }
 

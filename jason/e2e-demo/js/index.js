@@ -517,6 +517,14 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
+        stream.on_track_added((meta) => {
+          if (meta.kind() == 'audio') {
+            let audio = document.createElement('audio');
+            audio.srcObject = stream.get_media_stream();
+            //audio.style.display = 'none';
+            document.body.appendChild(audio);
+          }
+        });
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
         video.controls = "true";

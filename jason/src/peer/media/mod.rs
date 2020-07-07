@@ -9,7 +9,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, StreamExt};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, Track, TrackId};
@@ -35,6 +35,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -113,6 +114,8 @@ struct InnerMediaConnections {
 
     /// [`TrackId`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
+
+    mute_state_senders: Vec<mpsc::UnboundedSender<StableMuteState>>,
 }
 
 impl InnerMediaConnections {
@@ -143,6 +146,7 @@ impl MediaConnections {
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
+            mute_state_senders: Vec::new(),
         }))
     }
 
@@ -285,11 +289,30 @@ impl MediaConnections {
                         &inner.peer,
                         mid,
                     );
+                    let mut mute_state_stream = recv.on_mute_state_update();
+                    let mute_state_senders = inner.mute_state_senders.clone();
+                    spawn_local(async move {
+                        if let Some(mute_state_update) =
+                            mute_state_stream.next().await
+                        {
+                            for mute_state_sender in mute_state_senders {
+                                mute_state_sender
+                                    .unbounded_send(mute_state_update);
+                            }
+                        }
+                    });
                     inner.receivers.insert(track.id, recv);
                 }
             }
         }
         Ok(())
+    }
+
+    pub fn on_mute_state_update(&self) -> LocalBoxStream<StableMuteState> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().mute_state_senders.push(tx);
+
+        Box::pin(rx)
     }
 
     /// Updates [`Sender`]s of this [`super::PeerConnection`] with
@@ -299,15 +322,19 @@ impl MediaConnections {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
-    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn update_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
-            let sender =
-                self.get_sender_by_id(track_proto.id).ok_or_else(|| {
-                    tracerr::new!(MediaConnectionsError::InvalidTrackPatch(
-                        track_proto.id
-                    ))
-                })?;
-            sender.update(&track_proto);
+            if let Some(sender) = self.get_sender_by_id(track_proto.id) {
+                sender.update(&track_proto);
+            } else if let Some(receiver) =
+                self.0.borrow().receivers.get(&track_proto.id)
+            {
+                receiver.update(&track_proto);
+            } else {
+                return Err(tracerr::new!(
+                    MediaConnectionsError::InvalidTrackPatch(track_proto.id)
+                ));
+            }
         }
         Ok(())
     }

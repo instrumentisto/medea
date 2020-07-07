@@ -14,7 +14,7 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     media::{MediaStreamTrack, TrackKind},
-    utils::HandlerDetachedError,
+    utils::{console_error, Callback, EventListener, HandlerDetachedError},
 };
 
 /// Actual data of a [`PeerMediaStream`].
@@ -32,6 +32,62 @@ struct InnerStream {
 
     /// List of video tracks.
     video_tracks: HashMap<TrackId, MediaStreamTrack>,
+
+    on_track_added: Callback<OnTrackAddedMetadata>,
+
+    on_track_stopped: Callback<OnTrackRemovedMetadata>,
+}
+
+#[wasm_bindgen]
+struct OnTrackRemovedMetadata {
+    kind: TrackKind,
+    track_id: TrackId,
+    is_last: bool,
+}
+
+#[wasm_bindgen]
+impl OnTrackRemovedMetadata {
+    pub fn kind(&self) -> String {
+        self.kind.to_string()
+    }
+
+    pub fn track_id(&self) -> u32 {
+        self.track_id.0
+    }
+
+    pub fn is_last(&self) -> bool {
+        self.is_last
+    }
+}
+
+#[wasm_bindgen]
+struct OnTrackAddedMetadata {
+    kind: TrackKind,
+    track_id: TrackId,
+    is_first: bool,
+}
+
+#[wasm_bindgen]
+impl OnTrackAddedMetadata {
+    pub fn kind(&self) -> String {
+        self.kind.to_string()
+    }
+
+    pub fn is_audio(&self) -> bool {
+        self.kind == TrackKind::Audio
+    }
+
+    pub fn is_video(&self) -> bool {
+        self.kind == TrackKind::Video
+    }
+
+    pub fn track_id(&self) -> u32 {
+        self.track_id.0
+    }
+
+    pub fn is_first(&self) -> bool {
+        self.is_first
+    }
 }
 
 impl InnerStream {
@@ -41,20 +97,34 @@ impl InnerStream {
             stream: SysMediaStream::new().unwrap(),
             audio_tracks: HashMap::new(),
             video_tracks: HashMap::new(),
+            on_track_added: Callback::default(),
+            on_track_stopped: Callback::default(),
         }
     }
 
     /// Adds provided [`MediaStreamTrack`] to a stream.
     fn add_track(&mut self, track_id: TrackId, track: MediaStreamTrack) {
         self.stream.add_track(track.as_ref());
+
+        let is_first;
+        let track_kind = track.kind();
         match track.kind() {
             TrackKind::Audio => {
+                is_first = self.audio_tracks.is_empty();
                 self.audio_tracks.insert(track_id, track);
             }
             TrackKind::Video => {
+                is_first = self.video_tracks.is_empty();
                 self.video_tracks.insert(track_id, track);
             }
-        }
+        };
+
+        let on_track_added_metadata = OnTrackAddedMetadata {
+            track_id,
+            kind: track_kind,
+            is_first,
+        };
+        self.on_track_added.call(on_track_added_metadata);
     }
 }
 
@@ -132,5 +202,33 @@ impl RemoteMediaStream {
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| Clone::clone(&inner.borrow().stream))
+    }
+
+    pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow().on_track_added.set_func(f);
+            {
+                let inner = inner.borrow();
+                inner
+                    .audio_tracks
+                    .iter()
+                    .enumerate()
+                    .chain(inner.video_tracks.iter().enumerate())
+                    .for_each(|(num, (track_id, track))| {
+                        let is_first = num == 0;
+                        inner.on_track_added.call(OnTrackAddedMetadata {
+                            track_id: *track_id,
+                            kind: track.kind(),
+                            is_first,
+                        });
+                    });
+            }
+        })
+    }
+
+    pub fn on_track_stopped(&self, f: js_sys::Function) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow().on_track_stopped.set_func(f);
+        })
     }
 }
