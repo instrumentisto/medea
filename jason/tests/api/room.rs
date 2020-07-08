@@ -60,6 +60,7 @@ fn get_test_room(
 async fn get_test_room_and_exist_peer(
     audio_track: Track,
     video_track: Track,
+    media_stream_settings: Option<MediaStreamSettings>,
 ) -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
 
@@ -95,12 +96,14 @@ async fn get_test_room_and_exist_peer(
 
     let room =
         Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())));
-    JsFuture::from(
-        room.new_handle()
-            .set_local_media_settings(&media_stream_settings(true, true)),
-    )
-    .await
-    .unwrap();
+    if let Some(media_stream_settings) = &media_stream_settings {
+        JsFuture::from(
+            room.new_handle()
+                .set_local_media_settings(&media_stream_settings),
+        )
+        .await
+        .unwrap();
+    }
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
@@ -120,8 +123,12 @@ async fn get_test_room_and_exist_peer(
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     let handle = room.new_handle();
     assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
@@ -133,8 +140,12 @@ async fn mute_unmute_audio() {
 #[wasm_bindgen_test]
 async fn mute_unmute_video() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     let handle = room.new_handle();
     assert!(JsFuture::from(handle.mute_video()).await.is_ok());
@@ -157,8 +168,12 @@ async fn mute_unmute_video() {
 #[wasm_bindgen_test]
 async fn join_two_audio_mutes() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     let handle = room.new_handle();
     let (first, second) = futures::future::join(
@@ -189,8 +204,12 @@ async fn join_two_audio_mutes() {
 #[wasm_bindgen_test]
 async fn join_two_video_mutes() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     let handle = room.new_handle();
     let (first, second) = futures::future::join(
@@ -223,8 +242,12 @@ async fn join_two_video_mutes() {
 #[wasm_bindgen_test]
 async fn join_mute_and_unmute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
@@ -262,8 +285,12 @@ async fn join_mute_and_unmute_audio() {
 #[wasm_bindgen_test]
 async fn join_mute_and_unmute_video() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Video,
@@ -301,8 +328,12 @@ async fn join_mute_and_unmute_video() {
 #[wasm_bindgen_test]
 async fn join_unmute_and_mute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
 
     assert!(peer.is_all_senders_in_mute_state(
         TransceiverKind::Audio,
@@ -497,7 +528,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     });
     let (audio_track, video_track) = get_test_required_tracks();
     let (room, _peer) =
-        get_test_room_and_exist_peer(audio_track, video_track).await;
+        get_test_room_and_exist_peer(audio_track, video_track, None).await;
 
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
@@ -525,7 +556,7 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         let (audio_track, video_track) =
             get_test_tracks(audio_required, video_required);
         let (room, _peer) =
-            get_test_room_and_exist_peer(audio_track, video_track).await;
+            get_test_room_and_exist_peer(audio_track, video_track, None).await;
 
         let mut constraints = MediaStreamSettings::new();
         if add_audio {
