@@ -31,7 +31,6 @@ use crate::{
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, MockNavigator,
 };
-use medea_jason::utils::console_error;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -443,7 +442,7 @@ async fn mute_video_room_before_init_peer() {
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, rx) = get_test_room(Box::pin(event_rx));
+    let (room, _rx) = get_test_room(Box::pin(event_rx));
     let room_handle = room.new_handle();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {

@@ -207,7 +207,7 @@ fn local_constraints(
     is_audio_enabled: bool,
     is_video_enabled: bool,
 ) -> LocalStreamConstraints {
-    let mut constraints = LocalStreamConstraints::new();
+    let constraints = LocalStreamConstraints::new();
     constraints
         .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
 

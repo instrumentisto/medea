@@ -263,15 +263,13 @@ impl MediaConnections {
                     let mute_state;
                     if local_constraints.is_enabled(&track.media_type) {
                         mute_state = StableMuteState::NotMuted;
+                    } else if is_required {
+                        use MediaConnectionsError as Error;
+                        return Err(tracerr::new!(
+                            Error::CannotDisableRequiredSender
+                        ));
                     } else {
-                        if is_required {
-                            use MediaConnectionsError as Error;
-                            return Err(tracerr::new!(
-                                Error::CannotDisableRequiredSender
-                            ));
-                        } else {
-                            mute_state = StableMuteState::Muted;
-                        }
+                        mute_state = StableMuteState::Muted;
                     }
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,

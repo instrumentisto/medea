@@ -10,14 +10,12 @@ use medea_jason::{
         MediaConnections, RtcPeerConnection, SimpleStreamRequest,
         StableMuteState,
     },
-    AudioTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen_test::*;
 
 use crate::{
     get_media_stream_settings, get_test_unrequired_tracks, local_constraints,
 };
-use medea_jason::media::VideoTrackConstraints;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

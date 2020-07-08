@@ -238,18 +238,24 @@ impl MediaStreamSettings {
         }
     }
 
+    /// Sets underlying [`AudioMediaStreamSettings::is_enabled`] to a provided
+    /// [`bool`].
     pub fn toggle_publish_audio(&mut self, is_enabled: bool) {
         self.audio.is_enabled = is_enabled;
     }
 
+    /// Sets underlying [`VideoMediaStreamSettings::is_enabled`] to a provided
+    /// [`bool`].
     pub fn toggle_publish_video(&mut self, is_enabled: bool) {
         self.video.is_enabled = is_enabled;
     }
 
+    /// Returns `true` if audio is enabled in this [`MediaStreamSettings`].
     pub fn is_audio_enabled(&self) -> bool {
         self.audio.is_enabled
     }
 
+    /// Returns `true` if video is enabled in this [`MediaStreamSettings`].
     pub fn is_video_enabled(&self) -> bool {
         self.video.is_enabled
     }

@@ -606,15 +606,15 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Updates local [MediaStream][1] being used in [PeerConnection]
-    /// [Sender]s.
+    /// Updates local [MediaStream][1] being used in [`PeerConnection`]
+    /// [`Sender`]s.
     ///
-    /// First of all make sure that [PeerConnection] [Sender]s are up to date
-    /// (you set those with [PeerConnection::create_tracks]). If there are no
-    /// senders configured in this [PeerConnection], then this method is
-    /// no-op.
+    /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
+    /// date (you set those with [`PeerConnection::create_tracks`]). If
+    /// there are no senders configured in this [`PeerConnection`], then
+    /// this method is no-op.
     ///
-    /// Secondly, make sure that configured [LocalStreamConstraints] are up to
+    /// Secondly, make sure that configured [`LocalStreamConstraints`] are up to
     /// date.
     ///
     /// This function requests local stream from [`MediaManager`]. If stream
@@ -622,9 +622,9 @@ impl PeerConnection {
     /// will emit [`PeerEvent::NewLocalStream`] event.
     ///
     /// Constraints being used when requesting stream from [`MediaManager`] are
-    /// a result of merging constraints received from this [PeerConnection]
-    /// [Sender]s, which are configured by server during signalling, and
-    /// [LocalStreamConstraints], that are optionally configured by JS-side.
+    /// a result of merging constraints received from this [`PeerConnection`]
+    /// [`Sender`]s, which are configured by server during signalling, and
+    /// [`LocalStreamConstraints`], that are optionally configured by JS-side.
     ///
     /// # Errors
     ///
