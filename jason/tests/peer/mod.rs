@@ -27,7 +27,7 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_media_stream_settings, get_test_unrequired_tracks, timeout,
+    delay_for, get_media_stream_settings, get_test_unrequired_tracks, timeout, local_constraints,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -59,7 +59,7 @@ async fn mute_unmute_audio() {
         Vec::new(),
         manager,
         false,
-        LocalStreamConstraints::default(),
+        local_constraints(true, true),
     )
     .unwrap();
 
@@ -92,7 +92,7 @@ async fn mute_unmute_video() {
         Vec::new(),
         manager,
         false,
-        LocalStreamConstraints::default(),
+        local_constraints(true, true),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -466,7 +466,7 @@ impl InterconnectedPeers {
             Vec::new(),
             Rc::clone(&manager),
             false,
-            LocalStreamConstraints::default(),
+            local_constraints(true, true),
         )
         .unwrap();
         let peer2 = PeerConnection::new(
@@ -475,7 +475,7 @@ impl InterconnectedPeers {
             Vec::new(),
             manager,
             false,
-            LocalStreamConstraints::default(),
+            local_constraints(true, true),
         )
         .unwrap();
 
@@ -852,7 +852,7 @@ async fn reset_transition_timers() {
         Vec::new(),
         manager,
         false,
-        LocalStreamConstraints::default(),
+        local_constraints(true, true),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])

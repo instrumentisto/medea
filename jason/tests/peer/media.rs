@@ -4,16 +4,14 @@ use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{PeerId, TrackId, TrackPatch};
-use medea_jason::{
-    media::{LocalStreamConstraints, MediaManager},
-    peer::{
-        MediaConnections, RtcPeerConnection, SimpleStreamRequest,
-        StableMuteState,
-    },
-};
+use medea_jason::{media::{LocalStreamConstraints, MediaManager}, peer::{
+    MediaConnections, RtcPeerConnection, SimpleStreamRequest,
+    StableMuteState,
+}, MediaStreamSettings, AudioTrackConstraints};
 use wasm_bindgen_test::*;
 
-use crate::{get_media_stream_settings, get_test_unrequired_tracks};
+use crate::{get_media_stream_settings, get_test_unrequired_tracks, local_constraints};
+use medea_jason::media::VideoTrackConstraints;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -74,7 +72,7 @@ fn get_stream_request1() {
     media_connections
         .create_tracks(
             vec![audio_track, video_track],
-            &LocalStreamConstraints::default(),
+            &local_constraints(true, true),
         )
         .unwrap();
     let request = media_connections.get_stream_request();

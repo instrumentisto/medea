@@ -5,12 +5,7 @@ use medea_client_api_proto::{
     MediaType, VideoSettings as ProtoVideoConstraints,
 };
 use wasm_bindgen::prelude::*;
-use web_sys::{
-    ConstrainDomStringParameters,
-    MediaStreamConstraints as SysMediaStreamConstraints,
-    MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
-    MediaTrackConstraints as SysMediaTrackConstraints,
-};
+use web_sys::{ConstrainDomStringParameters, MediaStreamConstraints as SysMediaStreamConstraints, MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState, MediaTrackConstraints as SysMediaTrackConstraints};
 
 use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
@@ -33,7 +28,6 @@ impl LocalStreamConstraints {
 
     /// Constrains underlying [`MediaStreamSettings`] with a provided
     /// [`MediaStreamSettings`].
-    #[inline]
     pub fn constrain(&self, other: MediaStreamSettings) {
         let mut inner = self.0.borrow_mut();
         if let Some(settings) = inner.as_mut() {
@@ -41,7 +35,7 @@ impl LocalStreamConstraints {
         } else {
             let mut settings = MediaStreamSettings::new();
             settings.constrain(other);
-            inner.replace(settings);
+            *inner = Some(settings);
         }
     }
 
@@ -754,5 +748,11 @@ impl From<DisplayVideoTrackConstraints> for VideoTrackConstraints {
             is_required: true,
             constraints: Some(StreamSource::Display(constraints)),
         }
+    }
+}
+
+impl From<MediaStreamSettings> for LocalStreamConstraints {
+    fn from(from: MediaStreamSettings) -> Self {
+        Self(Rc::new(RefCell::new(Some(from))))
     }
 }

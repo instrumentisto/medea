@@ -101,8 +101,8 @@ async fn both_constraints_satisfies() {
     let (stream, _) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
 
-    let video_constraints = constraints.get_video().clone().unwrap();
-    let audio_constraints = constraints.get_audio().clone().unwrap();
+    let video_constraints = constraints.get_video().clone();
+    let audio_constraints = constraints.get_audio().clone();
 
     let tracks = stream.into_tracks();
     assert_eq!(tracks.len(), 2);
