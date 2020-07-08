@@ -27,7 +27,8 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_media_stream_settings, get_test_unrequired_tracks, timeout, local_constraints,
+    delay_for, get_media_stream_settings, get_test_unrequired_tracks,
+    local_constraints, timeout,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);

@@ -657,12 +657,9 @@ impl PeerConnection {
             if let Some(local_constraints) =
                 self.local_stream_constraints.inner()
             {
-                console_error(format!("{:?}", required_caps));
-                console_error(format!("{:?}", local_constraints));
                 required_caps
                     .merge(local_constraints)
                     .map_err(tracerr::map_from_and_wrap!())?;
-                console_error(format!("{:?}", required_caps));
             }
 
             let used_caps = MediaStreamSettings::from(&required_caps);

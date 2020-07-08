@@ -753,7 +753,6 @@ impl InnerRoom {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
-                console_error("ERror");
                 self.on_failed_local_stream.call(JasonError::from(err));
             }
         }

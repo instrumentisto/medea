@@ -85,11 +85,15 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::{peer::TransceiverKind, utils::{window, JasonError}, MediaStreamSettings, AudioTrackConstraints};
+use medea_jason::{
+    media::{LocalStreamConstraints, VideoTrackConstraints},
+    peer::TransceiverKind,
+    utils::{window, JasonError},
+    AudioTrackConstraints, MediaStreamSettings,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
-use medea_jason::media::{LocalStreamConstraints, VideoTrackConstraints};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -184,7 +188,10 @@ pub async fn delay_for(delay_ms: i32) {
     .unwrap();
 }
 
-fn media_stream_settings(is_audio_enabled: bool, is_video_enabled: bool) -> MediaStreamSettings {
+fn media_stream_settings(
+    is_audio_enabled: bool,
+    is_video_enabled: bool,
+) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::new();
     if is_audio_enabled {
         settings.audio(AudioTrackConstraints::default());
@@ -196,13 +203,16 @@ fn media_stream_settings(is_audio_enabled: bool, is_video_enabled: bool) -> Medi
     settings
 }
 
-fn local_constraints(is_audio_enabled: bool, is_video_enabled: bool) -> LocalStreamConstraints {
+fn local_constraints(
+    is_audio_enabled: bool,
+    is_video_enabled: bool,
+) -> LocalStreamConstraints {
     let mut constraints = LocalStreamConstraints::new();
-    constraints.constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
+    constraints
+        .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
 
     constraints
 }
-
 
 /// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
 ///

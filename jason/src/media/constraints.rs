@@ -5,7 +5,12 @@ use medea_client_api_proto::{
     MediaType, VideoSettings as ProtoVideoConstraints,
 };
 use wasm_bindgen::prelude::*;
-use web_sys::{ConstrainDomStringParameters, MediaStreamConstraints as SysMediaStreamConstraints, MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState, MediaTrackConstraints as SysMediaTrackConstraints};
+use web_sys::{
+    ConstrainDomStringParameters,
+    MediaStreamConstraints as SysMediaStreamConstraints,
+    MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
+    MediaTrackConstraints as SysMediaTrackConstraints,
+};
 
 use crate::{peer::TransceiverKind, utils::get_property_by_name};
 

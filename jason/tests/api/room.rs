@@ -26,7 +26,11 @@ use medea_jason::{
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
-use crate::{delay_for, get_test_required_tracks, get_test_tracks, get_test_unrequired_tracks, timeout, wait_and_check_test_result, MockNavigator, media_stream_settings};
+use crate::{
+    delay_for, get_test_required_tracks, get_test_tracks,
+    get_test_unrequired_tracks, media_stream_settings, timeout,
+    wait_and_check_test_result, MockNavigator,
+};
 use medea_jason::utils::console_error;
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -92,7 +96,12 @@ async fn get_test_room_and_exist_peer(
 
     let room =
         Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())));
-    JsFuture::from(room.new_handle().set_local_media_settings(&media_stream_settings(true, true))).await.unwrap();
+    JsFuture::from(
+        room.new_handle()
+            .set_local_media_settings(&media_stream_settings(true, true)),
+    )
+    .await
+    .unwrap();
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
@@ -109,7 +118,7 @@ async fn get_test_room_and_exist_peer(
     (room, peer)
 }
 
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn mute_unmute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let (room, peer) =
@@ -122,7 +131,7 @@ async fn mute_unmute_audio() {
     assert!(peer.is_send_audio_enabled());
 }
 
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn mute_unmute_video() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let (room, peer) =
@@ -146,7 +155,7 @@ async fn mute_unmute_video() {
 ///
 /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
 ///    is in [`MuteState::Muted`].
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn join_two_audio_mutes() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let (room, peer) =
@@ -178,7 +187,7 @@ async fn join_two_audio_mutes() {
 ///
 /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
 ///    is in [`MuteState::Muted`].
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn join_two_video_mutes() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let (room, peer) =
@@ -212,7 +221,7 @@ async fn join_two_video_mutes() {
 ///
 /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
 ///    is stayed in [`MuteState::NotMuted`].
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn join_mute_and_unmute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let (room, peer) =
@@ -327,7 +336,12 @@ async fn join_unmute_and_mute_audio() {
 async fn mute_audio_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
     let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
-    JsFuture::from(room.new_handle().set_local_media_settings(&media_stream_settings(true, true))).await.unwrap();
+    JsFuture::from(
+        room.new_handle()
+            .set_local_media_settings(&media_stream_settings(true, true)),
+    )
+    .await
+    .unwrap();
 
     JsFuture::from(room.new_handle().mute_audio())
         .await
@@ -372,7 +386,12 @@ async fn mute_audio_room_before_init_peer() {
 async fn mute_video_room_before_init_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
     let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
-    JsFuture::from(room.new_handle().set_local_media_settings(&media_stream_settings(true, true))).await.unwrap();
+    JsFuture::from(
+        room.new_handle()
+            .set_local_media_settings(&media_stream_settings(true, true)),
+    )
+    .await
+    .unwrap();
 
     JsFuture::from(room.new_handle().mute_video())
         .await
@@ -431,8 +450,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
             err.message(),
-            "Invalid local stream: provided MediaStream was expected to have \
-             single video track"
+            "Invalid local stream: MuteState of Sender can\'t be transited \
+             into muted state, because this Sender is required."
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -467,7 +486,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 ///     4. Invoke `room_handle.set_local_media_settings` with only one track.
 /// Assertions:
 ///     1. `on_failed_local_stream` was invoked.
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (cb, test_result) = js_callback!(|err: JasonError| {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
@@ -540,12 +559,17 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
     helper(true, true, false, false).await.unwrap();
 }
 
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn error_get_local_stream_on_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
     let (room, _) = get_test_room(Box::pin(event_rx));
     let room_handle = room.new_handle();
-    JsFuture::from(room_handle.set_local_media_settings(&media_stream_settings(true, true))).await.unwrap();
+    JsFuture::from(
+        room_handle
+            .set_local_media_settings(&media_stream_settings(true, true)),
+    )
+    .await
+    .unwrap();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
         cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
