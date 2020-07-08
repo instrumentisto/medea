@@ -655,7 +655,7 @@ impl PeerConnection {
                 .map_err(tracerr::from_and_wrap!())?;
 
             if let Some(local_constraints) =
-                self.local_stream_constraints.inner()
+                self.local_stream_constraints.get_media_stream_settings()
             {
                 required_caps
                     .merge(local_constraints)

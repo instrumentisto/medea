@@ -59,8 +59,10 @@ impl LocalStreamConstraints {
     }
 
     /// Clones underlying [`MediaStreamSettings`].
+    ///
+    /// Returns `None` if [`LocalStreamConstraints`] currently is unconstrained.
     #[inline]
-    pub fn inner(&self) -> Option<MediaStreamSettings> {
+    pub fn get_media_stream_settings(&self) -> Option<MediaStreamSettings> {
         let inner = self.0.borrow();
         if inner.is_constrained {
             Some(inner.settings.clone())
@@ -81,6 +83,8 @@ impl LocalStreamConstraints {
 
     /// Returns `true` if provided [`MediaType`] is enabled in underlying
     /// [`MediaStreamSettings`].
+    ///
+    /// Returns `true` if [`LocalStreamConstraints`] is constrained.
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         let inner = self.0.borrow();
