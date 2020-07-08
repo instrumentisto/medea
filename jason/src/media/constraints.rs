@@ -16,12 +16,26 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
-pub struct LocalStreamConstraints(Rc<RefCell<Option<MediaStreamSettings>>>);
+pub struct LocalStreamConstraints(Rc<RefCell<InnerLocalStreamConstraints>>);
+
+/// Inner of the [`LocalStreamConstraints`].
+#[derive(Clone, Debug, Default)]
+struct InnerLocalStreamConstraints {
+    /// Indicates that JS-side constraints this [`LocalStreamConstraints`].
+    is_constrained: bool,
+
+    /// If this [`LocalStreamConstraints`] is unconstrained then default
+    /// [`MediaStreamSettings`] will be used.
+    settings: MediaStreamSettings,
+}
 
 #[cfg(feature = "mockable")]
 impl From<MediaStreamSettings> for LocalStreamConstraints {
     fn from(from: MediaStreamSettings) -> Self {
-        Self(Rc::new(RefCell::new(Some(from))))
+        Self(Rc::new(RefCell::new(InnerLocalStreamConstraints {
+            is_constrained: true,
+            settings: from,
+        })))
     }
 }
 
@@ -36,39 +50,42 @@ impl LocalStreamConstraints {
     /// [`MediaStreamSettings`].
     pub fn constrain(&self, other: MediaStreamSettings) {
         let mut inner = self.0.borrow_mut();
-        if let Some(settings) = inner.as_mut() {
-            settings.constrain(other);
+        if inner.is_constrained {
+            inner.settings.constrain(other);
         } else {
-            *inner = Some(other)
+            inner.is_constrained = true;
+            inner.settings = other;
         }
     }
 
     /// Clones underlying [`MediaStreamSettings`].
     #[inline]
     pub fn inner(&self) -> Option<MediaStreamSettings> {
-        self.0.borrow().clone()
+        let inner = self.0.borrow();
+        if inner.is_constrained {
+            Some(inner.settings.clone())
+        } else {
+            None
+        }
     }
 
     /// Enabled/disables audio or video type in underlying
     /// [`MediaStreamSettings`].
     ///
-    /// Don't do anything if no [`MediaStreamSettings`] was set.
-    ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media wouldn't be published.
     #[inline]
     pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
-        if let Some(settings) = self.0.borrow_mut().as_mut() {
-            settings.toggle_enable(is_enabled, kind);
-        }
+        self.0.borrow_mut().settings.toggle_enable(is_enabled, kind);
     }
 
     /// Returns `true` if provided [`MediaType`] is enabled in underlying
     /// [`MediaStreamSettings`].
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
-        if let Some(settings) = self.0.borrow_mut().as_mut() {
-            settings.is_enabled(kind)
+        let inner = self.0.borrow();
+        if inner.is_constrained {
+            inner.settings.is_enabled(kind)
         } else {
             true
         }
