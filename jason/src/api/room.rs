@@ -260,15 +260,18 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
+        inner.local_stream_settings.toggle_enable(!is_muted, kind);
         while !inner
             .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
         {
             inner
                 .toggle_mute(is_muted, kind)
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+                .map_err::<Traced<RoomError>, _>(|e| {
+                    inner.local_stream_settings.toggle_enable(is_muted, kind);
+                    tracerr::new!(e)
+                })?;
         }
-        inner.local_stream_settings.toggle_enable(!is_muted, kind);
         Ok(())
     }
 }
