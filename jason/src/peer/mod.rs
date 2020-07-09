@@ -55,6 +55,8 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
+use crate::media::TrackKind;
+use futures::stream::LocalBoxStream;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -314,6 +316,12 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(Rc::new(peer))
+    }
+
+    pub fn on_mute_state_update(
+        &self,
+    ) -> LocalBoxStream<'static, (TrackKind, StableMuteState)> {
+        self.media_connections.on_mute_state_update()
     }
 
     /// Stops inner state transitions expiry timers.

@@ -5,7 +5,7 @@ use proto::{PeerId, TrackId};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
+    media::{MediaStreamTrack, TrackConstraints, TrackKind},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         StableMuteState,

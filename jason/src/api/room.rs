@@ -636,12 +636,19 @@ impl InnerRoom {
     /// [`Track`]s.
     // TODO: creates connections based on remote peer_ids atm, should create
     //       connections based on remote member_ids
-    fn create_connections_from_tracks(&self, tracks: &[Track]) {
-        fn create_connection(room: &InnerRoom, peer_id: &PeerId, track_id: TrackId) {
+    fn create_connections_from_tracks(
+        &self,
+        tracks: &[Track],
+        peer: &Rc<PeerConnection>,
+    ) {
+        fn create_connection(
+            room: &InnerRoom,
+            peer_id: &PeerId,
+            peer: &Rc<PeerConnection>,
+        ) {
             let is_new = !room.connections.borrow().contains_key(peer_id);
-            let peer = room.peers.get(*peer_id).unwrap();
             if is_new {
-                let con = Connection::new();
+                let con = Connection::new(peer.on_mute_state_update());
                 room.on_new_connection.call(con.new_handle());
                 room.connections.borrow_mut().insert(*peer_id, con);
             }
@@ -651,11 +658,11 @@ impl InnerRoom {
             match &track.direction {
                 Direction::Send { ref receivers, .. } => {
                     for receiver in receivers {
-                        create_connection(self, receiver, track.id);
+                        create_connection(self, receiver, peer);
                     }
                 }
                 Direction::Recv { ref sender, .. } => {
-                    create_connection(self, sender, track.id);
+                    create_connection(self, sender, peer);
                 }
             }
         }
@@ -859,7 +866,7 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.create_connections_from_tracks(&tracks);
+        self.create_connections_from_tracks(&tracks, &peer);
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,

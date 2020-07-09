@@ -33,61 +33,11 @@ struct InnerStream {
     /// List of video tracks.
     video_tracks: HashMap<TrackId, MediaStreamTrack>,
 
-    on_track_added: Callback<OnTrackAddedMetadata>,
+    on_track_added: Callback<TrackKind>,
 
-    on_track_stopped: Callback<OnTrackRemovedMetadata>,
-}
+    on_track_started: Callback<TrackKind>,
 
-#[wasm_bindgen]
-struct OnTrackRemovedMetadata {
-    kind: TrackKind,
-    track_id: TrackId,
-    is_last: bool,
-}
-
-#[wasm_bindgen]
-impl OnTrackRemovedMetadata {
-    pub fn kind(&self) -> String {
-        self.kind.to_string()
-    }
-
-    pub fn track_id(&self) -> u32 {
-        self.track_id.0
-    }
-
-    pub fn is_last(&self) -> bool {
-        self.is_last
-    }
-}
-
-#[wasm_bindgen]
-struct OnTrackAddedMetadata {
-    kind: TrackKind,
-    track_id: TrackId,
-    is_first: bool,
-}
-
-#[wasm_bindgen]
-impl OnTrackAddedMetadata {
-    pub fn kind(&self) -> String {
-        self.kind.to_string()
-    }
-
-    pub fn is_audio(&self) -> bool {
-        self.kind == TrackKind::Audio
-    }
-
-    pub fn is_video(&self) -> bool {
-        self.kind == TrackKind::Video
-    }
-
-    pub fn track_id(&self) -> u32 {
-        self.track_id.0
-    }
-
-    pub fn is_first(&self) -> bool {
-        self.is_first
-    }
+    on_track_stopped: Callback<TrackKind>,
 }
 
 impl InnerStream {
@@ -98,6 +48,7 @@ impl InnerStream {
             audio_tracks: HashMap::new(),
             video_tracks: HashMap::new(),
             on_track_added: Callback::default(),
+            on_track_started: Callback::default(),
             on_track_stopped: Callback::default(),
         }
     }
@@ -119,12 +70,7 @@ impl InnerStream {
             }
         };
 
-        let on_track_added_metadata = OnTrackAddedMetadata {
-            track_id,
-            kind: track_kind,
-            is_first,
-        };
-        self.on_track_added.call(on_track_added_metadata);
+        self.on_track_added.call(track_kind);
     }
 }
 
@@ -185,6 +131,16 @@ impl PeerMediaStream {
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.borrow().stream)
     }
+
+    pub fn track_stopped(&self, kind: TrackKind) {
+        console_error("Track stopped");
+        self.0.borrow().on_track_stopped.call(kind);
+    }
+
+    pub fn track_started(&self, kind: TrackKind) {
+        console_error("Track started");
+        self.0.borrow().on_track_started.call(kind);
+    }
 }
 
 /// JS side handle to [`PeerMediaStream`].
@@ -216,13 +172,15 @@ impl RemoteMediaStream {
                     .chain(inner.video_tracks.iter().enumerate())
                     .for_each(|(num, (track_id, track))| {
                         let is_first = num == 0;
-                        inner.on_track_added.call(OnTrackAddedMetadata {
-                            track_id: *track_id,
-                            kind: track.kind(),
-                            is_first,
-                        });
+                        inner.on_track_added.call(track.kind());
                     });
             }
+        })
+    }
+
+    pub fn on_track_started(&self, f: js_sys::Function) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.borrow().on_track_started.set_func(f);
         })
     }
 

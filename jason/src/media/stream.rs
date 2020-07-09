@@ -12,7 +12,7 @@ use web_sys::{
 
 use crate::MediaStreamSettings;
 use futures::Stream;
-use medea_client_api_proto::TrackId;
+use medea_client_api_proto::{MediaType, TrackId};
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -118,6 +118,21 @@ pub enum TrackKind {
     /// Video track.
     #[display(fmt = "video")]
     Video,
+}
+
+impl From<TrackKind> for JsValue {
+    fn from(from: TrackKind) -> Self {
+        JsValue::from(from.to_string())
+    }
+}
+
+impl From<&MediaType> for TrackKind {
+    fn from(from: &MediaType) -> Self {
+        match from {
+            MediaType::Audio(_) => Self::Audio,
+            MediaType::Video(_) => Self::Video,
+        }
+    }
 }
 
 impl<T> From<T> for MediaStreamTrack

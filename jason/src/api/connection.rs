@@ -9,10 +9,15 @@ use medea_client_api_proto::TrackId;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    media::MediaStreamTrack,
-    peer::{PeerMediaStream, RemoteMediaStream},
-    utils::{Callback, HandlerDetachedError},
+    media::{MediaStreamTrack, TrackKind},
+    peer::{PeerMediaStream, RemoteMediaStream, StableMuteState},
+    utils::{console_error, Callback, HandlerDetachedError},
 };
+use futures::{
+    stream::{BoxStream, LocalBoxStream},
+    StreamExt,
+};
+use wasm_bindgen_futures::spawn_local;
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
@@ -47,11 +52,37 @@ pub(crate) struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub(crate) fn new() -> Self {
-        Self(Rc::new(InnerConnection {
+    pub(crate) fn new(
+        mut mute_stream: LocalBoxStream<'static, (TrackKind, StableMuteState)>,
+    ) -> Self {
+        let inner = Rc::new(InnerConnection {
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback::default(),
-        }))
+        });
+        let weak_inner = Rc::downgrade(&inner);
+
+        spawn_local(async move {
+            while let Some((kind, mute_state)) = mute_stream.next().await {
+                let inner = if let Some(inner) = weak_inner.upgrade() {
+                    inner
+                } else {
+                    break;
+                };
+                let stream = inner.remote_stream.borrow();
+                if let Some(stream) = stream.as_ref() {
+                    match mute_state {
+                        StableMuteState::Muted => {
+                            stream.track_stopped(kind);
+                        }
+                        StableMuteState::NotMuted => {
+                            stream.track_started(kind);
+                        }
+                    }
+                }
+            }
+        });
+
+        Self(inner)
     }
 
     /// Adds provided [`MediaStreamTrack`] to remote stream of this

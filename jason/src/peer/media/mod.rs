@@ -35,6 +35,8 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use crate::{media::TrackKind, utils::console_error};
+use futures::stream::LocalBoxStream;
 use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [`MediaConnections`] storage.
@@ -115,7 +117,8 @@ struct InnerMediaConnections {
     /// [`TrackId`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 
-    mute_state_senders: Vec<mpsc::UnboundedSender<StableMuteState>>,
+    mute_state_senders:
+        Rc<RefCell<Vec<mpsc::UnboundedSender<(TrackKind, StableMuteState)>>>>,
 }
 
 impl InnerMediaConnections {
@@ -146,7 +149,7 @@ impl MediaConnections {
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            mute_state_senders: Vec::new(),
+            mute_state_senders: Rc::new(RefCell::new(Vec::new())),
         }))
     }
 
@@ -282,6 +285,7 @@ impl MediaConnections {
                     inner.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
+                    let track_kind = TrackKind::from(&track.media_type);
                     let recv = Receiver::new(
                         track.id,
                         &(track.media_type.into()),
@@ -292,12 +296,18 @@ impl MediaConnections {
                     let mut mute_state_stream = recv.on_mute_state_update();
                     let mute_state_senders = inner.mute_state_senders.clone();
                     spawn_local(async move {
-                        if let Some(mute_state_update) =
+                        while let Some(mute_state_update) =
                             mute_state_stream.next().await
                         {
-                            for mute_state_sender in mute_state_senders {
+                            for mute_state_sender in
+                                mute_state_senders.borrow().iter()
+                            {
                                 mute_state_sender
-                                    .unbounded_send(mute_state_update);
+                                    .unbounded_send((
+                                        track_kind,
+                                        mute_state_update,
+                                    ))
+                                    .unwrap();
                             }
                         }
                     });
@@ -308,9 +318,11 @@ impl MediaConnections {
         Ok(())
     }
 
-    pub fn on_mute_state_update(&self) -> LocalBoxStream<StableMuteState> {
+    pub fn on_mute_state_update(
+        &self,
+    ) -> LocalBoxStream<'static, (TrackKind, StableMuteState)> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().mute_state_senders.push(tx);
+        self.0.borrow_mut().mute_state_senders.borrow_mut().push(tx);
 
         Box::pin(rx)
     }
