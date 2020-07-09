@@ -264,8 +264,10 @@ impl MediaStreamSettings {
     /// Constrains this [`MediaStreamSettings`] with a provided
     /// [`MediaStreamSettings`].
     fn constrain(&mut self, other: Self) {
-        self.audio.is_enabled = other.audio.is_enabled;
-        self.video.is_enabled = other.video.is_enabled;
+        // `&=` cause we should not unmute muted Room, but we can mute not muted
+        // room.
+        self.audio.is_enabled &= other.audio.is_enabled;
+        self.video.is_enabled &= other.video.is_enabled;
 
         self.audio.constraints = other.audio.constraints;
         self.video.constraints = other.video.constraints;
