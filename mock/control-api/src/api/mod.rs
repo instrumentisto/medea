@@ -5,10 +5,14 @@
 pub mod endpoint;
 pub mod member;
 pub mod room;
+pub mod ws;
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-use actix::Addr;
+use actix::{Addr, Recipient};
 use actix_cors::Cors;
 use actix_web::{
     middleware,
@@ -20,6 +24,7 @@ use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    api::ws::Notification,
     callback::server::{GetCallbackItems, GrpcCallbackServer},
     client::{ControlClient, Fid},
     prelude::*,
@@ -31,13 +36,20 @@ use self::{
     room::Room,
 };
 
+/// Map of subscribers to [`Notification`]s.
+pub type Subscribers =
+    Arc<Mutex<HashMap<String, Vec<Recipient<Notification>>>>>;
+
 /// Context of [`actix_web`] server.
-pub struct Context {
+pub struct AppContext {
     /// Client for [Medea]'s [Control API].
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Medea]: https://github.com/instrumentisto/medea
     client: ControlClient,
+
+    /// Map of subscribers to [`Notification`]s.
+    subscribers: Subscribers,
 
     /// gRPC server which receives Control API callbacks.
     callback_server: Addr<GrpcCallbackServer>,
@@ -51,16 +63,24 @@ pub async fn run(
     callback_server_addr: Addr<GrpcCallbackServer>,
 ) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
-    let client = ControlClient::new(medea_addr).await.unwrap();
+    let subscribers = Arc::new(Mutex::new(HashMap::new()));
+    let client = ControlClient::new(medea_addr, Arc::clone(&subscribers))
+        .await
+        .unwrap();
     HttpServer::new(move || {
         debug!("Running HTTP server...");
         App::new()
             .wrap(Cors::new().finish())
-            .data(Context {
+            .data(AppContext {
                 client: client.clone(),
+                subscribers: Arc::clone(&subscribers),
                 callback_server: callback_server_addr.clone(),
             })
             .wrap(middleware::Logger::default())
+            .service(
+                web::resource("/subscribe/{id}")
+                    .route(web::get().to(ws::create_ws)),
+            )
             .service(
                 web::resource("/control-api/{a}")
                     .route(web::post().to(create::create1))
@@ -108,7 +128,7 @@ macro_rules! gen_request_macro {
             ($name:tt, $uri_tuple:ty) => {
                 pub async fn $name(
                     path: actix_web::web::Path<$uri_tuple>,
-                    state: Data<Context>,
+                    state: Data<AppContext>,
                 ) -> Result<HttpResponse, ()> {
                     state
                         .client
@@ -129,7 +149,9 @@ macro_rules! gen_request_macro {
 ///
 /// Errors if unable to send message to [`GrpcCallbackServer`] actor.
 #[allow(clippy::needless_pass_by_value)]
-pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
+pub async fn get_callbacks(
+    state: Data<AppContext>,
+) -> Result<HttpResponse, ()> {
     state
         .callback_server
         .send(GetCallbackItems)
@@ -143,7 +165,7 @@ pub async fn get_callbacks(state: Data<Context>) -> Result<HttpResponse, ()> {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod delete {
-    use super::{error, Context, Data, HttpResponse, Response};
+    use super::{error, AppContext, Data, HttpResponse, Response};
 
     gen_request_macro!(delete, Response);
 
@@ -157,7 +179,7 @@ mod delete {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod get {
-    use super::{error, Context, Data, HttpResponse, SingleGetResponse};
+    use super::{error, AppContext, Data, HttpResponse, SingleGetResponse};
 
     gen_request_macro!(get, SingleGetResponse);
 
@@ -172,12 +194,13 @@ mod get {
 #[allow(clippy::needless_pass_by_value)]
 mod create {
     use super::{
-        error, Context, CreateResponse, Data, Element, Fid, HttpResponse, Json,
+        error, AppContext, CreateResponse, Data, Element, Fid, HttpResponse,
+        Json,
     };
 
     pub async fn create1(
         path: actix_web::web::Path<String>,
-        state: Data<Context>,
+        state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
         state
@@ -190,7 +213,7 @@ mod create {
 
     pub async fn create2(
         path: actix_web::web::Path<(String, String)>,
-        state: Data<Context>,
+        state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
         let uri = path.into_inner();
@@ -204,7 +227,7 @@ mod create {
 
     pub async fn create3(
         path: actix_web::web::Path<(String, String, String)>,
-        state: Data<Context>,
+        state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
         let uri = path.into_inner();
