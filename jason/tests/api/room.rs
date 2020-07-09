@@ -115,7 +115,7 @@ async fn get_test_room_and_exist_peer(
         .unwrap();
 
     // wait until Event::PeerCreated is handled
-    delay_for(500).await;
+    delay_for(200).await;
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
     (room, peer)
 }

@@ -654,13 +654,9 @@ impl PeerConnection {
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            if let Some(local_constraints) =
-                self.local_stream_constraints.inner()
-            {
-                required_caps
-                    .merge(local_constraints)
-                    .map_err(tracerr::map_from_and_wrap!())?;
-            }
+            required_caps
+                .merge(self.local_stream_constraints.inner())
+                .map_err(tracerr::map_from_and_wrap!())?;
 
             let used_caps = MediaStreamSettings::from(&required_caps);
 

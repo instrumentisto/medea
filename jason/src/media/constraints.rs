@@ -16,12 +16,12 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
-pub struct LocalStreamConstraints(Rc<RefCell<Option<MediaStreamSettings>>>);
+pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
 
 #[cfg(feature = "mockable")]
 impl From<MediaStreamSettings> for LocalStreamConstraints {
     fn from(from: MediaStreamSettings) -> Self {
-        Self(Rc::new(RefCell::new(Some(from))))
+        Self(Rc::new(RefCell::new(from)))
     }
 }
 
@@ -35,17 +35,12 @@ impl LocalStreamConstraints {
     /// Constrains underlying [`MediaStreamSettings`] with a provided
     /// [`MediaStreamSettings`].
     pub fn constrain(&self, other: MediaStreamSettings) {
-        let mut inner = self.0.borrow_mut();
-        if let Some(settings) = inner.as_mut() {
-            settings.constrain(other);
-        } else {
-            *inner = Some(other)
-        }
+        self.0.borrow_mut().constrain(other)
     }
 
     /// Clones underlying [`MediaStreamSettings`].
     #[inline]
-    pub fn inner(&self) -> Option<MediaStreamSettings> {
+    pub fn inner(&self) -> MediaStreamSettings {
         self.0.borrow().clone()
     }
 
@@ -58,20 +53,14 @@ impl LocalStreamConstraints {
     /// of media wouldn't be published.
     #[inline]
     pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
-        if let Some(settings) = self.0.borrow_mut().as_mut() {
-            settings.toggle_enable(is_enabled, kind);
-        }
+        self.0.borrow_mut().toggle_enable(is_enabled, kind);
     }
 
     /// Returns `true` if provided [`MediaType`] is enabled in underlying
     /// [`MediaStreamSettings`].
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
-        if let Some(settings) = self.0.borrow_mut().as_mut() {
-            settings.is_enabled(kind)
-        } else {
-            true
-        }
+        self.0.borrow_mut().is_enabled(kind)
     }
 }
 
@@ -111,7 +100,7 @@ impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
 /// [MediaStreamConstraints][1] for the audio media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 struct AudioMediaStreamSettings {
     /// Constraints applicable to video tracks.
     constraints: AudioTrackConstraints,
@@ -121,10 +110,19 @@ struct AudioMediaStreamSettings {
     is_enabled: bool,
 }
 
+impl Default for AudioMediaStreamSettings {
+    fn default() -> Self {
+        Self {
+            constraints: AudioTrackConstraints::default(),
+            is_enabled: true,
+        }
+    }
+}
+
 /// [MediaStreamConstraints][1] for the video media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 struct VideoMediaStreamSettings {
     /// Constraints applicable to audio tracks.
     constraints: VideoTrackConstraints,
@@ -132,6 +130,15 @@ struct VideoMediaStreamSettings {
     /// If `true` then video is enabled and this constraints should be injected
     /// into `Peer`.
     is_enabled: bool,
+}
+
+impl Default for VideoMediaStreamSettings {
+    fn default() -> Self {
+        Self {
+            constraints: VideoTrackConstraints::default(),
+            is_enabled: true,
+        }
+    }
 }
 
 /// [MediaStreamConstraints][1] wrapper.
@@ -156,7 +163,16 @@ impl MediaStreamSettings {
     /// Creates new [`MediaStreamConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            audio: AudioMediaStreamSettings {
+                constraints: AudioTrackConstraints::default(),
+                is_enabled: false,
+            },
+            video: VideoMediaStreamSettings {
+                constraints: VideoTrackConstraints::default(),
+                is_enabled: false,
+            },
+        }
     }
 
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
@@ -199,13 +215,6 @@ impl MediaStreamSettings {
         self.video.constraints = constraints;
     }
 
-    /// Constrains this [`MediaStreamSettings`] with a provided
-    /// [`MediaStreamSettings`].
-    pub fn constrain(&mut self, other: Self) {
-        self.audio.constraints = other.audio.constraints;
-        self.video.constraints = other.video.constraints;
-    }
-
     /// Enabled/disables audio or video type in this [`MediaStreamSettings`].
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
@@ -213,10 +222,10 @@ impl MediaStreamSettings {
     pub fn toggle_enable(&mut self, is_enabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
-                self.audio.is_enabled = is_enabled;
+                self.toggle_publish_audio(is_enabled);
             }
             TransceiverKind::Video => {
-                self.video.is_enabled = is_enabled;
+                self.toggle_publish_video(is_enabled);
             }
         }
     }
@@ -251,10 +260,20 @@ impl MediaStreamSettings {
             MediaType::Audio(_) => self.audio.is_enabled,
         }
     }
+
+    /// Constrains this [`MediaStreamSettings`] with a provided
+    /// [`MediaStreamSettings`].
+    fn constrain(&mut self, other: Self) {
+        self.audio.is_enabled = other.audio.is_enabled;
+        self.video.is_enabled = other.video.is_enabled;
+
+        self.audio.constraints = other.audio.constraints;
+        self.video.constraints = other.video.constraints;
+    }
 }
 
 // TODO: DisplayMediaStreamConstraints should be used when it will be
-//       implemented.
+//       implemented by UA's.
 
 /// Wrapper around [MediaStreamConstraints][1] that specifies concrete media
 /// source (device or display), and allows to group two requests with different
@@ -292,9 +311,10 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
     fn from(constraints: MediaStreamSettings) -> Self {
         use MultiSourceMediaStreamConstraints as C;
 
+        let (audio, video) = (constraints.audio, constraints.video);
         let mut sys_constraints = SysMediaStreamConstraints::new();
-        let video = if constraints.video.is_enabled {
-            match constraints.get_video().constraints.clone() {
+        let video = if video.is_enabled {
+            match video.constraints.constraints {
                 Some(StreamSource::Device(device)) => {
                     sys_constraints
                         .video(&SysMediaTrackConstraints::from(device).into());
@@ -316,24 +336,20 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
             None
         };
 
-        if constraints.is_audio_enabled() {
+        if audio.is_enabled {
             match video {
                 Some(StreamSource::Device(mut caps)) => {
                     caps.audio(
-                        &SysMediaTrackConstraints::from(
-                            constraints.get_audio().clone(),
-                        )
-                        .into(),
+                        &SysMediaTrackConstraints::from(audio.constraints)
+                            .into(),
                     );
                     Some(C::Device(caps))
                 }
                 Some(StreamSource::Display(caps)) => {
                     let mut audio_caps = SysMediaStreamConstraints::new();
                     audio_caps.audio(
-                        &SysMediaTrackConstraints::from(
-                            constraints.get_audio().clone(),
-                        )
-                        .into(),
+                        &SysMediaTrackConstraints::from(audio.constraints)
+                            .into(),
                     );
 
                     Some(C::DeviceAndDisplay(audio_caps, caps))
@@ -341,10 +357,8 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
                 None => {
                     let mut audio_caps = SysMediaStreamConstraints::new();
                     audio_caps.audio(
-                        &SysMediaTrackConstraints::from(
-                            constraints.get_audio().clone(),
-                        )
-                        .into(),
+                        &SysMediaTrackConstraints::from(audio.constraints)
+                            .into(),
                     );
                     Some(C::Device(audio_caps))
                 }
