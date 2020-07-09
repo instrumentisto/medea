@@ -517,6 +517,12 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
+        stream.on_track_started((kind) => {
+          console.log(`started: ${kind}`);
+        });
+        stream.on_track_stopped((kind) => {
+          console.log(`stopped: ${kind}`);
+        });
         stream.on_track_added((meta) => {
           if (meta.kind() == 'audio') {
             let audio = document.createElement('audio');

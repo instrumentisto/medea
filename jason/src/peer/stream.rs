@@ -133,12 +133,10 @@ impl PeerMediaStream {
     }
 
     pub fn track_stopped(&self, kind: TrackKind) {
-        console_error("Track stopped");
         self.0.borrow().on_track_stopped.call(kind);
     }
 
     pub fn track_started(&self, kind: TrackKind) {
-        console_error("Track started");
         self.0.borrow().on_track_started.call(kind);
     }
 }
