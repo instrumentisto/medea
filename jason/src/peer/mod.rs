@@ -614,11 +614,25 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
-    /// if it has all required tracks.
-    /// Requests local stream from [`MediaManager`] if no stream was provided.
-    /// Will produce [`PeerEvent::NewLocalStream`] if new stream was received
-    /// from [`MediaManager`].
+    /// Updates local [MediaStream][1] being used in [`PeerConnection`]
+    /// [`Sender`]s.
+    ///
+    /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
+    /// date (you set those with [`PeerConnection::create_tracks`]). If
+    /// there are no senders configured in this [`PeerConnection`], then
+    /// this method is no-op.
+    ///
+    /// Secondly, make sure that configured [`LocalStreamConstraints`] are up to
+    /// date.
+    ///
+    /// This function requests local stream from [`MediaManager`]. If stream
+    /// returned from [`MediaManager`] is considered new, then this function
+    /// will emit [`PeerEvent::NewLocalStream`] event.
+    ///
+    /// Constraints being used when requesting stream from [`MediaManager`] are
+    /// a result of merging constraints received from this [`PeerConnection`]
+    /// [`Sender`]s, which are configured by server during signalling, and
+    /// [`LocalStreamConstraints`], that are optionally configured by JS-side.
     ///
     /// # Errors
     ///
@@ -651,6 +665,7 @@ impl PeerConnection {
             required_caps
                 .merge(self.local_stream_constraints.inner())
                 .map_err(tracerr::map_from_and_wrap!())?;
+
             let used_caps = MediaStreamSettings::from(&required_caps);
 
             let (media_stream, is_new_stream) = self

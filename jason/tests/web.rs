@@ -86,9 +86,10 @@ use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
 use medea_jason::{
+    media::{LocalStreamConstraints, VideoTrackConstraints},
     peer::TransceiverKind,
     utils::{window, JasonError},
-    MediaStreamSettings,
+    AudioTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -187,6 +188,32 @@ pub async fn delay_for(delay_ms: i32) {
     .unwrap();
 }
 
+fn media_stream_settings(
+    is_audio_enabled: bool,
+    is_video_enabled: bool,
+) -> MediaStreamSettings {
+    let mut settings = MediaStreamSettings::new();
+    if is_audio_enabled {
+        settings.audio(AudioTrackConstraints::default());
+    }
+    if is_video_enabled {
+        settings.video(VideoTrackConstraints::default());
+    }
+
+    settings
+}
+
+fn local_constraints(
+    is_audio_enabled: bool,
+    is_video_enabled: bool,
+) -> LocalStreamConstraints {
+    let constraints = LocalStreamConstraints::new();
+    constraints
+        .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
+
+    constraints
+}
+
 /// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
 ///
 /// Also it will check result of test and will panic if some error will be
@@ -196,7 +223,7 @@ async fn wait_and_check_test_result(
     finally: impl FnOnce(),
 ) {
     let result =
-        futures::future::select(Box::pin(rx), Box::pin(delay_for(500))).await;
+        futures::future::select(Box::pin(rx), Box::pin(delay_for(5000))).await;
     finally();
     match result {
         Either::Left((oneshot_fut_result, _)) => {
