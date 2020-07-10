@@ -150,6 +150,66 @@ impl PeerError {
     }
 }
 
+pub struct PeerChangesScheduler<'a> {
+    context: &'a mut Context,
+}
+
+impl<'a> PeerChangesScheduler<'a> {
+    /// Schedules [`Task`] which will be ran before negotiation process start.
+    fn schedule_task(&mut self, job: Task) {
+        self.context.jobs_queue.push_back(job);
+    }
+
+    pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_task(Task::new(TrackChange::AddRecvTrack(track)));
+    }
+
+    pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_task(Task::new(TrackChange::AddSendTrack(track)));
+    }
+
+    pub fn patch_tracks(&mut self, patches: Vec<TrackPatch>) {
+        for patch in patches {
+            self.schedule_task(Task::new(TrackChange::TrackPatch(patch)));
+        }
+    }
+
+    pub fn add_publisher(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        partner_peer: &mut PeerStateMachine,
+        tracks_counter: &Counter<TrackId>,
+    ) {
+        let audio_settings = src.audio_settings();
+        if audio_settings.publish_policy != PublishPolicy::Disabled {
+            let track_audio = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Audio(AudioSettings {
+                    is_required: audio_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_audio));
+            partner_peer
+                .as_changes_scheduler()
+                .add_receiver(track_audio);
+        }
+
+        let video_settings = src.video_settings();
+        if video_settings.publish_policy != PublishPolicy::Disabled {
+            let track_video = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: video_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_video));
+            partner_peer
+                .as_changes_scheduler()
+                .add_receiver(track_video);
+        }
+    }
+}
+
 /// Implementation of ['Peer'] state machine.
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
@@ -160,12 +220,6 @@ impl PeerError {
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
-#[enum_delegate(
-    pub fn schedule_apply_track_changes(
-        &mut self,
-        track_patches: Vec<TrackPatch>
-    )
-)]
 #[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
@@ -179,15 +233,7 @@ impl PeerError {
         senders_statuses: HashMap<TrackId, bool>,
     )
 )]
-#[enum_delegate(
-    pub fn add_publisher(
-        &mut self,
-        src: &WebRtcPublishEndpoint,
-        partner_peer: &mut PeerStateMachine,
-        tracks_counter: &Counter<TrackId>,
-    )
-)]
-#[enum_delegate(fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>))]
+#[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -537,79 +583,10 @@ impl<T> Peer<T> {
         self.context.is_known_to_remote
     }
 
-    /// Stores provided [`TrackPatch`]s in the `pending_track_updates`.
-    ///
-    /// Patches will be applied on client side when renegotiation will be
-    /// started for this [`Peer`].
-    pub fn schedule_apply_track_changes(
-        &mut self,
-        track_patches: Vec<TrackPatch>,
-    ) {
-        for track_patch in track_patches {
-            self.schedule_task(Task::new(TrackChange::TrackPatch(track_patch)));
+    pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler {
+        PeerChangesScheduler {
+            context: &mut self.context,
         }
-    }
-
-    /// Schedules `send` tracks adding to `self` and `recv` tracks for this
-    /// `send` to `partner_peer`.
-    ///
-    /// Actually __nothing will be done__ after this function call. This action
-    /// will be ran only before negotiation start.
-    ///
-    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
-    /// and [`WebRtcPublishEndpoint::video_settings`].
-    pub fn add_publisher(
-        &mut self,
-        src: &WebRtcPublishEndpoint,
-        partner_peer: &mut PeerStateMachine,
-        tracks_counter: &Counter<TrackId>,
-    ) {
-        let audio_settings = src.audio_settings();
-        if audio_settings.publish_policy != PublishPolicy::Disabled {
-            let track_audio = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Audio(AudioSettings {
-                    is_required: audio_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.schedule_add_sender(Rc::clone(&track_audio));
-            partner_peer.schedule_add_receiver(track_audio);
-        }
-
-        let video_settings = src.video_settings();
-        if video_settings.publish_policy != PublishPolicy::Disabled {
-            let track_video = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Video(VideoSettings {
-                    is_required: video_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.schedule_add_sender(Rc::clone(&track_video));
-            partner_peer.schedule_add_receiver(track_video);
-        }
-    }
-
-    /// Schedules [`Task`] which will be ran before negotiation process start.
-    fn schedule_task(&mut self, job: Task) {
-        self.context.jobs_queue.push_back(job);
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
-    /// be ran.
-    fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_task(Task::new(TrackChange::AddSendTrack(track)));
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
-    /// be ran.
-    fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_task(Task::new(TrackChange::AddRecvTrack(track)));
     }
 }
 

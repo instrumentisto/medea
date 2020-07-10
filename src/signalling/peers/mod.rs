@@ -225,7 +225,11 @@ impl PeersService {
         ));
         sink_peer.add_endpoint(&sink.clone().into());
 
-        src_peer.add_publisher(&src, &mut sink_peer, &self.tracks_count);
+        src_peer.as_changes_scheduler().add_publisher(
+            &src,
+            &mut sink_peer,
+            &self.tracks_count,
+        );
 
         self.peer_metrics_service
             .borrow_mut()
@@ -401,7 +405,7 @@ impl PeersService {
                     let mut src_peer = self.peers.take(src_peer_id)?;
                     let mut sink_peer = self.peers.take(sink_peer_id)?;
 
-                    src_peer.add_publisher(
+                    src_peer.as_changes_scheduler().add_publisher(
                         &src,
                         &mut sink_peer,
                         &self.tracks_count,
