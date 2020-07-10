@@ -15,7 +15,7 @@ use crate::{
     peer::{
         MuteStateUpdate, PeerMediaStream, RemoteMediaStream, StableMuteState,
     },
-    utils::{Callback, HandlerDetachedError},
+    utils::{yield_now, Callback, HandlerDetachedError},
 };
 
 /// Actual data of a connection with a specific remote [`Member`].
@@ -65,20 +65,35 @@ impl Connection {
 
         spawn_local(async move {
             while let Some(mute_state_update) = mute_stream.next().await {
-                let inner = if let Some(inner) = weak_inner.upgrade() {
-                    inner
-                } else {
-                    break;
-                };
-                let stream = inner.remote_stream.borrow();
-                if let Some(stream) = stream.as_ref() {
-                    match mute_state_update.new_mute_state {
-                        StableMuteState::Muted => {
-                            stream.track_stopped(mute_state_update.kind);
+                loop {
+                    let is_finished = async {
+                        yield_now().await;
+                        let inner = if let Some(inner) = weak_inner.upgrade() {
+                            inner
+                        } else {
+                            return false;
+                        };
+                        let stream = inner.remote_stream.borrow();
+                        if let Some(stream) = stream.as_ref() {
+                            match mute_state_update.new_mute_state {
+                                StableMuteState::Muted => {
+                                    stream
+                                        .track_stopped(mute_state_update.kind);
+                                }
+                                StableMuteState::NotMuted => {
+                                    stream
+                                        .track_started(mute_state_update.kind);
+                                }
+                            }
+                        } else {
+                            return false;
                         }
-                        StableMuteState::NotMuted => {
-                            stream.track_started(mute_state_update.kind);
-                        }
+
+                        true
+                    };
+
+                    if is_finished.await {
+                        break;
                     }
                 }
             }

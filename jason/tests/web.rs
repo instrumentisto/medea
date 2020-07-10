@@ -95,6 +95,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
+pub use medea_jason::utils::yield_now;
+
 wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen(module = "/tests/mock_navigator.js")]
@@ -253,11 +255,6 @@ where
         Either::Left((res, _)) => Ok(res),
         Either::Right((_, _)) => Err("Future timed out.".to_string()),
     }
-}
-
-/// Async [`std::thread::yield_now`].
-pub async fn yield_now() {
-    delay_for(0).await;
 }
 
 // TODO: Might be extended to proc macro at some point.
