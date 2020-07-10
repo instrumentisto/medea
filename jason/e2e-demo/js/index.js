@@ -523,13 +523,8 @@ window.onload = async function() {
         stream.on_track_stopped((kind) => {
           console.log(`stopped: ${kind}`);
         });
-        stream.on_track_added((meta) => {
-          if (meta.kind() == 'audio') {
-            let audio = document.createElement('audio');
-            audio.srcObject = stream.get_media_stream();
-            //audio.style.display = 'none';
-            document.body.appendChild(audio);
-          }
+        stream.on_track_added((kind) => {
+          console.log(`added: ${kind}`);
         });
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");

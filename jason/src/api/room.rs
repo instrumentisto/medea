@@ -637,26 +637,26 @@ impl InnerRoom {
     ) {
         fn create_connection(
             room: &InnerRoom,
-            peer_id: &PeerId,
+            peer_id: PeerId,
             peer: &Rc<PeerConnection>,
         ) {
-            let is_new = !room.connections.borrow().contains_key(peer_id);
+            let is_new = !room.connections.borrow().contains_key(&peer_id);
             if is_new {
                 let con = Connection::new(peer.on_mute_state_update());
                 room.on_new_connection.call(con.new_handle());
-                room.connections.borrow_mut().insert(*peer_id, con);
+                room.connections.borrow_mut().insert(peer_id, con);
             }
         }
 
         for track in tracks {
             match &track.direction {
-                Direction::Send { ref receivers, .. } => {
+                Direction::Send { receivers, .. } => {
                     for receiver in receivers {
-                        create_connection(self, receiver, peer);
+                        create_connection(self, *receiver, peer);
                     }
                 }
-                Direction::Recv { ref sender, .. } => {
-                    create_connection(self, sender, peer);
+                Direction::Recv { sender, .. } => {
+                    create_connection(self, *sender, peer);
                 }
             }
         }

@@ -5,19 +5,18 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use futures::{stream::LocalBoxStream, StreamExt};
 use medea_client_api_proto::TrackId;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{MediaStreamTrack, TrackKind},
-    peer::{PeerMediaStream, RemoteMediaStream, StableMuteState},
-    utils::{console_error, Callback, HandlerDetachedError},
+    media::MediaStreamTrack,
+    peer::{
+        MuteStateUpdate, PeerMediaStream, RemoteMediaStream, StableMuteState,
+    },
+    utils::{Callback, HandlerDetachedError},
 };
-use futures::{
-    stream::{BoxStream, LocalBoxStream},
-    StreamExt,
-};
-use wasm_bindgen_futures::spawn_local;
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
@@ -51,9 +50,12 @@ pub(crate) struct Connection(Rc<InnerConnection>);
 
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
+    ///
+    /// Spawns [`Future`] which will poll provided [`LocalBoxStream`] and notify
+    /// [`RemoteMediaStream`] about [`StableMuteState`] changes.
     #[inline]
     pub(crate) fn new(
-        mut mute_stream: LocalBoxStream<'static, (TrackKind, StableMuteState)>,
+        mut mute_stream: LocalBoxStream<'static, MuteStateUpdate>,
     ) -> Self {
         let inner = Rc::new(InnerConnection {
             remote_stream: RefCell::new(None),
@@ -62,7 +64,7 @@ impl Connection {
         let weak_inner = Rc::downgrade(&inner);
 
         spawn_local(async move {
-            while let Some((kind, mute_state)) = mute_stream.next().await {
+            while let Some(mute_state_update) = mute_stream.next().await {
                 let inner = if let Some(inner) = weak_inner.upgrade() {
                     inner
                 } else {
@@ -70,12 +72,12 @@ impl Connection {
                 };
                 let stream = inner.remote_stream.borrow();
                 if let Some(stream) = stream.as_ref() {
-                    match mute_state {
+                    match mute_state_update.new_mute_state {
                         StableMuteState::Muted => {
-                            stream.track_stopped(kind);
+                            stream.track_stopped(mute_state_update.kind);
                         }
                         StableMuteState::NotMuted => {
-                            stream.track_started(kind);
+                            stream.track_started(mute_state_update.kind);
                         }
                     }
                 }

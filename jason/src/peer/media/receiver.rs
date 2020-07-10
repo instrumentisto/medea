@@ -1,21 +1,19 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
+use futures::stream::LocalBoxStream;
 use medea_client_api_proto as proto;
+use medea_client_api_proto::TrackPatch;
+use medea_reactive::ObservableCell;
 use proto::{PeerId, TrackId};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints, TrackKind},
+    media::{MediaStreamTrack, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         StableMuteState,
     },
-    utils::console_error,
 };
-use futures::{stream::LocalBoxStream, Stream, StreamExt};
-use medea_client_api_proto::TrackPatch;
-use medea_reactive::ObservableCell;
-use wasm_bindgen_futures::spawn_local;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -64,12 +62,15 @@ impl Receiver {
         }
     }
 
+    /// Updates [`Receiver`] with a provided [`TrackPatch`].
     pub fn update(&self, track_patch: &TrackPatch) {
         if let Some(is_muted) = track_patch.is_muted {
             self.mute_state.set(is_muted.into());
         }
     }
 
+    /// Returns [`LocalBoxStream`] to which all [`StableMuteState`] updates of
+    /// this [`Receiver`] will be sent.
     pub fn on_mute_state_update(
         &self,
     ) -> LocalBoxStream<'static, StableMuteState> {

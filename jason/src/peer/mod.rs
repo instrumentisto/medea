@@ -19,7 +19,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, stream::LocalBoxStream};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
     PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
@@ -48,15 +48,13 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Sender, StableMuteState,
+        MuteStateTransition, MuteStateUpdate, Sender, StableMuteState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
-use crate::media::TrackKind;
-use futures::stream::LocalBoxStream;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -318,9 +316,11 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
+    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
+    /// [`StableMuteState`] will be sent.
     pub fn on_mute_state_update(
         &self,
-    ) -> LocalBoxStream<'static, (TrackKind, StableMuteState)> {
+    ) -> LocalBoxStream<'static, MuteStateUpdate> {
         self.media_connections.on_mute_state_update()
     }
 

@@ -9,15 +9,16 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, future, StreamExt};
+use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{LocalStreamConstraints, MediaStreamTrack},
+    media::{LocalStreamConstraints, MediaStreamTrack, TrackKind},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
@@ -35,9 +36,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::{media::TrackKind, utils::console_error};
-use futures::stream::LocalBoxStream;
-use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -99,6 +97,17 @@ impl From<DroppedError> for MediaConnectionsError {
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
+/// Metadata which will be sent into [`MediaConnections::on_mute_state_update`]
+/// [`LocalBoxStream`].
+#[derive(Clone)]
+pub struct MuteStateUpdate {
+    /// [`TrackKind`] of `MediaTrack` which was muted or unmuted.
+    pub kind: TrackKind,
+
+    /// Updated [`StableMuteState`].
+    pub new_mute_state: StableMuteState,
+}
+
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
     /// [`PeerId`] of peer that owns this [`MediaConnections`].
@@ -117,8 +126,10 @@ struct InnerMediaConnections {
     /// [`TrackId`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 
-    mute_state_senders:
-        Rc<RefCell<Vec<mpsc::UnboundedSender<(TrackKind, StableMuteState)>>>>,
+    /// All [`mpsc::UnboundedSender`]s of the [`Receiver`] [`StableMuteState`]
+    /// updates.
+    recv_mute_state_senders:
+        Rc<RefCell<Vec<mpsc::UnboundedSender<MuteStateUpdate>>>>,
 }
 
 impl InnerMediaConnections {
@@ -149,7 +160,7 @@ impl MediaConnections {
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            mute_state_senders: Rc::new(RefCell::new(Vec::new())),
+            recv_mute_state_senders: Rc::default(),
         }))
     }
 
@@ -302,7 +313,8 @@ impl MediaConnections {
                         mid,
                     );
                     let mut mute_state_stream = recv.on_mute_state_update();
-                    let mute_state_senders = inner.mute_state_senders.clone();
+                    let mute_state_senders =
+                        inner.recv_mute_state_senders.clone();
                     spawn_local(async move {
                         while let Some(mute_state_update) =
                             mute_state_stream.next().await
@@ -311,10 +323,10 @@ impl MediaConnections {
                                 mute_state_senders.borrow().iter()
                             {
                                 mute_state_sender
-                                    .unbounded_send((
-                                        track_kind,
-                                        mute_state_update,
-                                    ))
+                                    .unbounded_send(MuteStateUpdate {
+                                        new_mute_state: mute_state_update,
+                                        kind: track_kind,
+                                    })
                                     .unwrap();
                             }
                         }
@@ -326,17 +338,23 @@ impl MediaConnections {
         Ok(())
     }
 
+    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
+    /// [`StableMuteState`] will be sent.
     pub fn on_mute_state_update(
         &self,
-    ) -> LocalBoxStream<'static, (TrackKind, StableMuteState)> {
+    ) -> LocalBoxStream<'static, MuteStateUpdate> {
         let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().mute_state_senders.borrow_mut().push(tx);
+        self.0
+            .borrow_mut()
+            .recv_mute_state_senders
+            .borrow_mut()
+            .push(tx);
 
         Box::pin(rx)
     }
 
-    /// Updates [`Sender`]s of this [`super::PeerConnection`] with
-    /// [`proto::TrackPatch`].
+    /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
+    /// with [`proto::TrackPatch`].
     ///
     /// # Errors
     ///
