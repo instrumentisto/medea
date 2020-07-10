@@ -9,13 +9,13 @@ mod rpc_server;
 use std::{rc::Rc, sync::Arc};
 
 use actix::{
-    fut, Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
-    MailboxError, Message, WeakAddr, WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
+    MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Event, NegotiationRole, PeerId};
+use medea_client_api_proto::{Event, PeerId};
 
 use crate::{
     api::control::{
@@ -28,9 +28,7 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{
-        peer::NegotiationSubscriber, Peer, PeerError, PeerStateMachine, Stable,
-    },
+    media::{peer::NegotiationSubscriber, PeerError},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
@@ -145,7 +143,7 @@ pub struct Room {
 }
 
 impl Room {
-    /// Starts new instance of [`Room`].
+    /// Creates and starts [`Room`] [`Actor`] on current thread.
     ///
     /// Returns [`Addr`] to the newly created [`Room`] [`Actor`].
     ///
@@ -183,36 +181,6 @@ impl Room {
     /// Returns [`RoomId`] of this [`Room`].
     pub fn id(&self) -> &RoomId {
         &self.id
-    }
-
-    /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
-    /// will be changed to [`WaitLocalSdp`] state.
-    fn send_peer_created(
-        &mut self,
-        peer_id: PeerId,
-    ) -> ActFuture<Result<(), RoomError>> {
-        let peer: Peer<Stable> =
-            actix_try!(self.peers.take_inner_peer(peer_id));
-
-        let peer = peer.start();
-        let member_id = peer.member_id();
-        let ice_servers = peer
-            .ice_servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()));
-        let ice_servers = actix_try!(ice_servers);
-        let peer_created = Event::PeerCreated {
-            peer_id: peer.id(),
-            negotiation_role: NegotiationRole::Offerer,
-            tracks: peer.new_tracks(),
-            ice_servers,
-            force_relay: peer.is_force_relayed(),
-        };
-        self.peers.add_peer(peer);
-        Box::new(
-            self.members
-                .send_event_to_member(member_id, peer_created)
-                .into_actor(self),
-        )
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
@@ -285,7 +253,7 @@ impl Room {
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
     /// the connected [`Member`].
     ///
-    /// Will start negotiation with `MediaTrack`s adding if some not
+    /// Will start (re)negotiation with `MediaTrack`s adding if some not
     /// interconnected `Endpoint`s will be found and if [`Peer`]s pair is
     /// already exists.
     fn init_member_connections(
@@ -383,95 +351,6 @@ impl Room {
                 }
             },
         ))
-    }
-}
-
-/// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
-/// be renegotiated.
-///
-/// If provided [`Peer`] or it's partner [`Peer`] will be not [`Stable`] then
-/// nothing should be done.
-#[derive(Message, Clone, Debug, Copy)]
-#[rtype(result = "Result<(), RoomError>")]
-pub struct NegotiationNeeded(pub PeerId);
-
-impl Handler<NegotiationNeeded> for Room {
-    type Result = ActFuture<Result<(), RoomError>>;
-
-    /// Starts negotiation for the [`Peer`] with provided [`PeerId`].
-    ///
-    /// Sends [`Event::PeerCreated`] if this [`Peer`] unknown for the remote
-    /// side.
-    ///
-    /// Sends [`Event::TrackApplied`] if this [`Peer`] known for the remote
-    /// side.
-    ///
-    /// If this [`Peer`] or it's partner not [`Stable`] then nothing will be
-    /// done.
-    fn handle(
-        &mut self,
-        msg: NegotiationNeeded,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        actix_try!(self.peers.update_peer_tracks(msg.0));
-
-        let peer: Peer<Stable> =
-            if let Ok(peer) = self.peers.take_inner_peer(msg.0) {
-                peer
-            } else {
-                return Box::new(fut::ok(()));
-            };
-        let is_partner_stable = match self
-            .peers
-            .map_peer_by_id(peer.partner_peer_id(), PeerStateMachine::is_stable)
-        {
-            Ok(r) => r,
-            Err(e) => {
-                self.peers.add_peer(peer);
-
-                return Box::new(fut::err(e));
-            }
-        };
-
-        if is_partner_stable {
-            if peer.is_known_to_remote() {
-                let peer = peer.start_negotiation();
-                let event = Event::TracksApplied {
-                    updates: peer.get_updates(),
-                    negotiation_role: Some(NegotiationRole::Offerer),
-                    peer_id: peer.id(),
-                };
-
-                let peer_member_id = peer.member_id();
-                self.peers.add_peer(peer);
-
-                Box::new(
-                    self.members
-                        .send_event_to_member(peer_member_id, event)
-                        .into_actor(self),
-                )
-            } else {
-                let peer_id = peer.id();
-                self.peers.add_peer(peer);
-                self.send_peer_created(peer_id)
-            }
-        } else {
-            self.peers.add_peer(peer);
-
-            Box::new(fut::ok(()))
-        }
-    }
-}
-
-impl NegotiationSubscriber for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] and if it successful then sends to the
-    /// upgraded [`Addr`] [`NegotiationNeeded`] [`Message`].
-    ///
-    /// If [`CloneableWeakAddr`] upgrade fails then nothing will be done.
-    fn negotiation_needed(&self, peer_id: PeerId) {
-        if let Some(addr) = self.upgrade() {
-            addr.do_send(NegotiationNeeded(peer_id));
-        }
     }
 }
 

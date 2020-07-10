@@ -1,5 +1,7 @@
 //! Signalling API E2E tests.
 
+//TODO: renegotiations synchronization test.
+
 mod command_validation;
 mod pub_sub_signallng;
 mod rpc_settings;

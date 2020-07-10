@@ -2,6 +2,8 @@
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
+// TODO: Extend docs. Scheduling and committing changes, negotiation_needed
+//       event: all that should be explained in details.
 #![allow(clippy::use_self)]
 
 use std::{
@@ -32,36 +34,7 @@ use crate::{
     },
 };
 
-/// Job which will be ran on this [`Peer`] when it will be in [`Stable`] state.
-///
-/// If [`Peer`] state currently is not [`Stable`] then we should just wait for
-/// [`Stable`] state before running this [`Job`].
-///
-/// After all queued [`Job`]s are executed, negotiation __should__ be
-/// performed.
-struct Job(Box<dyn FnOnce(&mut Peer<Stable>)>);
-
-impl Job {
-    /// Returns new [`Job`] with provided [`FnOnce`] which will be ran on
-    /// [`Job::run`] call.
-    pub fn new<F>(f: F) -> Self
-    where
-        F: FnOnce(&mut Peer<Stable>) + 'static,
-    {
-        Self(Box::new(f))
-    }
-
-    /// Calls [`Job`]'s [`FnOnce`] with provided [`Peer`] as parameter.
-    pub fn run(self, peer: &mut Peer<Stable>) {
-        (self.0)(peer);
-    }
-}
-
-impl fmt::Debug for Job {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Job").finish()
-    }
-}
+use self::peer_mutation_task::Task;
 
 /// Subscriber to the events which indicates that negotiation process should
 /// be started for the some [`Peer`].
@@ -154,8 +127,6 @@ impl PeerError {
         senders_statuses: HashMap<TrackId, bool>,
     )
 )]
-#[enum_delegate(pub fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>))]
-#[enum_delegate(pub fn schedule_add_sender(&mut self, track: Rc<MediaTrack>))]
 #[enum_delegate(
     pub fn add_publisher(
         &mut self,
@@ -164,6 +135,7 @@ impl PeerError {
         tracks_counter: &Counter<TrackId>,
     )
 )]
+#[enum_delegate(fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -173,16 +145,16 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
-    /// Runs [`Job`]s which are scheduled for this [`PeerStateMachine`].
+    /// Runs [`Task`]s which are scheduled for this [`PeerStateMachine`].
     ///
-    /// [`Job`]s will be ran __only if [`Peer`] is in [`Stable`]__ state.
+    /// [`Task`]s will be ran __only if [`Peer`] is in [`Stable`]__ state.
     ///
-    /// Returns `true` if at least one [`Job`] was ran.
+    /// Returns `true` if at least one [`Task`] was ran.
     ///
     /// Returns `false` if nothing was done.
-    pub fn run_scheduled_jobs(&mut self) -> bool {
+    pub fn commit_scheduled_changes(&mut self) -> bool {
         if let PeerStateMachine::Stable(stable_peer) = self {
-            stable_peer.run_scheduled_jobs()
+            stable_peer.commit_scheduled_changes()
         } else {
             false
         }
@@ -308,15 +280,15 @@ pub struct Context {
     /// Tracks changes, that remote [`Peer`] is not aware of.
     pending_track_updates: Vec<TrackChange>,
 
-    /// Queue of the [`Job`]s which are should be ran when this [`Peer`] will
+    /// Queue of the [`Task`]s which are should be ran when this [`Peer`] will
     /// be [`Stable`].
     ///
-    /// [`Job`]s will be ran on [`Peer::negotiation_finished`] and on
-    /// [`Peer::run_scheduled_jobs`] actions.
+    /// [`Task`]s will be ran on [`Peer::negotiation_finished`] and on
+    /// [`Peer::commit_scheduled_changes`] actions.
     ///
-    /// When this [`Job`]s will be executed, negotiation process should be
+    /// When this [`Task`]s will be executed, negotiation process should be
     /// started for this [`Peer`].
-    jobs_queue: VecDeque<Job>,
+    jobs_queue: VecDeque<Task>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
@@ -491,39 +463,6 @@ impl<T> Peer<T> {
         self.context.is_known_to_remote
     }
 
-    /// Schedules [`Job`] which will be ran before negotiation process start.
-    fn schedule_job(&mut self, job: Job) {
-        self.context.jobs_queue.push_back(job);
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
-    /// be ran.
-    fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_job(Job::new(move |peer| {
-            peer.context
-                .pending_track_updates
-                .push(TrackChange::AddSendTrack(Rc::clone(&track)));
-            peer.context.senders.insert(track.id, track);
-        }))
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Job`] will
-    /// be ran.
-    fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_job(Job::new(move |peer| {
-            peer.context
-                .pending_track_updates
-                .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
-            peer.context.receivers.insert(track.id, track);
-        }));
-    }
-
     /// Schedules `send` tracks adding to `self` and `recv` tracks for this
     /// `send` to `partner_peer`.
     ///
@@ -561,6 +500,39 @@ impl<T> Peer<T> {
             self.schedule_add_sender(Rc::clone(&track_video));
             partner_peer.schedule_add_receiver(track_video);
         }
+    }
+
+    /// Schedules [`Task`] which will be ran before negotiation process start.
+    fn schedule_task(&mut self, job: Task) {
+        self.context.jobs_queue.push_back(job);
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
+    /// be ran.
+    fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_task(Task::new(move |peer| {
+            peer.context
+                .pending_track_updates
+                .push(TrackChange::AddSendTrack(Rc::clone(&track)));
+            peer.context.senders.insert(track.id, track);
+        }))
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
+    /// be ran.
+    fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_task(Task::new(move |peer| {
+            peer.context
+                .pending_track_updates
+                .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
+            peer.context.receivers.insert(track.id, track);
+        }));
     }
 }
 
@@ -735,12 +707,12 @@ impl Peer<Stable> {
         }
     }
 
-    /// Runs [`Job`]s which are scheduled for this [`Peer`].
+    /// Runs [`Task`]s which are scheduled for this [`Peer`].
     ///
-    /// Returns `true` if at least one [`Job`] was ran.
+    /// Returns `true` if at least one [`Task`] was ran.
     ///
     /// Returns `false` if nothing was done.
-    fn run_scheduled_jobs(&mut self) -> bool {
+    fn commit_scheduled_changes(&mut self) -> bool {
         if self.context.jobs_queue.is_empty() {
             false
         } else {
@@ -760,13 +732,54 @@ impl Peer<Stable> {
     ///
     /// Resets [`Context::pending_track_updates`] buffer.
     ///
-    /// Runs all scheduled [`Job`]s of this [`Peer`].
+    /// Runs all scheduled [`Task`]s of this [`Peer`].
     ///
     /// Should be called when negotiation was finished.
     fn negotiation_finished(&mut self) {
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
-        self.run_scheduled_jobs();
+        self.commit_scheduled_changes();
+    }
+}
+
+mod peer_mutation_task {
+    use std::fmt;
+
+    use super::{Peer, Stable};
+
+    // TODO: Все что мы делаем в этих тасках уже выражено в TrackChange'ах. Есть
+    //       ли смысл хранить fn'ы, если мы их можем типизировать?
+
+    /// Job which will be ran on this [`Peer`] when it will be in [`Stable`]
+    /// state.
+    ///
+    /// If [`Peer`] state currently is not [`Stable`] then we should just wait
+    /// for [`Stable`] state before running this [`Task`].
+    ///
+    /// After all queued [`Task`]s are executed, negotiation __should__ be
+    /// performed.
+    pub(super) struct Task(Box<dyn FnOnce(&mut Peer<Stable>)>);
+
+    impl Task {
+        /// Returns new [`Task`] with provided [`FnOnce`] which will be ran on
+        /// [`Task::run`] call.
+        pub fn new<F>(f: F) -> Self
+        where
+            F: FnOnce(&mut Peer<Stable>) + 'static,
+        {
+            Self(Box::new(f))
+        }
+
+        /// Calls [`Task`]'s [`FnOnce`] with provided [`Peer`] as parameter.
+        pub fn run(self, peer: &mut Peer<Stable>) {
+            (self.0)(peer);
+        }
+    }
+
+    impl fmt::Debug for Task {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_tuple("Job").finish()
+        }
     }
 }
 
@@ -840,7 +853,7 @@ pub mod tests {
         peer.into()
     }
 
-    fn media_track(track_id: u64) -> Rc<MediaTrack> {
+    fn media_track(track_id: u32) -> Rc<MediaTrack> {
         Rc::new(MediaTrack::new(
             TrackId(track_id),
             MediaType::Video(VideoSettings { is_required: true }),
@@ -872,7 +885,7 @@ pub mod tests {
         assert!(peer.context.senders.is_empty());
         assert!(peer.context.receivers.is_empty());
 
-        assert!(peer.run_scheduled_jobs());
+        assert!(peer.commit_scheduled_changes());
         assert_eq!(rx.recv().unwrap(), PeerId(0));
 
         assert_eq!(peer.context.senders.len(), 1);

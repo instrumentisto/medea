@@ -356,7 +356,7 @@ impl PeersService {
     /// exist in [`PeerRepository`].
     pub fn run_scheduled_jobs(&self, peer_id: PeerId) -> Result<(), RoomError> {
         self.peers.map_peer_by_id_mut(peer_id, |peer| {
-            peer.run_scheduled_jobs();
+            peer.commit_scheduled_changes();
         })?;
 
         Ok(())

@@ -240,6 +240,8 @@ impl Room {
                                      {}. Room [id = {}] will be stopped.",
                                     e, this.id,
                                 );
+                                // TODO: disconnect this member with error,
+                                //       on_leave callback fires.
                                 this.close_gracefully(ctx)
                             } else {
                                 Box::new(fut::ready(()))
