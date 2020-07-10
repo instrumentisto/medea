@@ -531,7 +531,7 @@ impl Room {
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     ///
-    /// Used to inspect [`Room`]s inner state in integration tests.
+    /// Used to inspect [`Room`]'s inner state in integration tests.
     #[cfg(feature = "mockable")]
     pub fn get_peer_by_id(
         &self,
