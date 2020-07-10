@@ -517,15 +517,6 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
-        stream.on_track_started((kind) => {
-          console.log(`started: ${kind}`);
-        });
-        stream.on_track_stopped((kind) => {
-          console.log(`stopped: ${kind}`);
-        });
-        stream.on_track_added((kind) => {
-          console.log(`added: ${kind}`);
-        });
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
         video.controls = "true";
@@ -534,6 +525,52 @@ window.onload = async function() {
         innerVideoDiv.className = "video";
         innerVideoDiv.appendChild(video);
         videoDiv.appendChild(innerVideoDiv);
+        let isAudioStarted = false;
+        let isVideoStarted = false;
+        video.poster = 'https://image.flaticon.com/icons/svg/813/813734.svg';
+        video.style.background = '#f5f5f5';
+
+        stream.on_track_started((kind) => {
+          if (kind === 'audio') {
+            isAudioStarted = true;
+          }
+          if (kind === 'video') {
+            isVideoStarted = true;
+          }
+          if (isAudioStarted && !isVideoStarted) {
+            video.srcObject = stream.get_audio_stream();
+          } else if (isVideoStarted && !isAudioStarted) {
+            video.srcObject = stream.get_video_stream();
+          } else if (isVideoStarted && isAudioStarted) {
+            video.srcObject = stream.get_media_stream();
+          } else {
+            video.srcObject = null;
+          }
+          video.controls = false;
+          video.controls = true;
+        });
+        stream.on_track_stopped((kind) => {
+          if (kind === 'audio') {
+            isAudioStarted = false;
+          }
+          if (kind === 'video') {
+            isVideoStarted = false;
+          }
+          if (isAudioStarted && !isVideoStarted) {
+            video.srcObject = stream.get_audio_stream();
+          } else if (isVideoStarted && !isAudioStarted) {
+            video.srcObject = stream.get_video_stream();
+          } else if (isVideoStarted && isAudioStarted) {
+            video.srcObject = stream.get_media_stream();
+          } else {
+            video.srcObject = null;
+          }
+          video.controls = false;
+          video.controls = true;
+        });
+        stream.on_track_added((kind) => {
+          console.log(`added: ${kind}`);
+        });
 
         video.oncanplay = async () => {
           await video.play();

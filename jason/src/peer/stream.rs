@@ -166,6 +166,30 @@ impl RemoteMediaStream {
             .map(|inner| Clone::clone(&inner.borrow().stream))
     }
 
+    pub fn get_audio_stream(&self) -> Result<SysMediaStream, JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| {
+                let stream = SysMediaStream::new().unwrap();
+                for audio_track in inner.borrow().audio_tracks.values() {
+                    stream.add_track(audio_track.as_ref());
+                }
+
+                stream
+            })
+    }
+
+    pub fn get_video_stream(&self) -> Result<SysMediaStream, JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| {
+                let stream = SysMediaStream::new().unwrap();
+                for video_track in inner.borrow().video_tracks.values() {
+                    stream.add_track(video_track.as_ref());
+                }
+
+                stream
+            })
+    }
+
     /// Sets callback, which will be invoked on new `MediaTrack` adding.
     pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
