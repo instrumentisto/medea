@@ -231,20 +231,19 @@ impl Room {
 
         Ok(Box::new(fut::ready(()).map(
             move |_, this: &mut Self, ctx| {
-                if this.members.member_has_connection(&member.id()) {
-                    ctx.spawn(this.init_member_connections(&member).then(
-                        |res, this, ctx| {
+                let member_id = member.id();
+                if this.members.member_has_connection(&member_id) {
+                    ctx.spawn(this.init_member_connections(&member).map(
+                        move |res, this, ctx| {
                             if let Err(e) = res {
                                 error!(
                                     "Failed to interconnect Members, because \
-                                     {}. Room [id = {}] will be stopped.",
-                                    e, this.id,
+                                     {}. Connection with Member [id = {}, \
+                                     room_id: {}] will be stopped.",
+                                    e, member_id, this.id,
                                 );
-                                // TODO: disconnect this member with error,
-                                //       on_leave callback fires.
-                                this.close_gracefully(ctx)
-                            } else {
-                                Box::new(fut::ready(()))
+                                this.members
+                                    .close_member_connection(&member_id, ctx);
                             }
                         },
                     ));

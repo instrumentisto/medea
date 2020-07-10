@@ -1,5 +1,51 @@
 //! Remote [`RTCPeerConnection`][1] representation.
 //!
+//! Some changes requires (re)negotiation, and they should be firstly scheduled.
+//! And if (re)negotiation process currently is in progress, new (re)negotiation
+//! can't be done and should wait until going (re)negotiation doesn't finished.
+//!
+//! When you're scheduled some [`TrackChange`], you should try to run they with
+//! [`PeerStateMachine::commit_scheduled_tasks`]. If [`Peer`] currently is not
+//! in [`Stable`] state then nothing will be done. And only when [`Peer`] will
+//! be transferred into [`Stable`] state, then scheduled [`Task`]s will be
+//! executed and new (re)negotiation process will be started automatically by
+//! calling [`NegotiationSubscriber::negotiation_needed`].
+//!
+//! All functions of the [`Peer`]/[`PeerStateMachine`] which are named as
+//! `schedule_*` requires (re)negotiation and will be ran only by calling
+//! [`PeerStateMachine::commit_scheduled_tasks`] or on [`Peer`] transferring to
+//! the [`Stable`] state.
+//!
+//! # How to perform update which requires (re)negotiation
+//!
+//! If you wanna perform update which requires (re)negotiation:
+//!
+//! 1. Schedule this change (call [`PeerStateMachine::schedule_add_receiver`]
+//!    for example)
+//!
+//! 2. Optionally, you can schedule as many changes as you want
+//!
+//! 3. Call [`PeerStateMachine::commit_scheduled_tasks`]
+//!
+//! Even if [`Peer`] not in [`Stable`] state, you can don't care about it.
+//! [`Peer`] will automatically run all scheduled [`Task`]s and start
+//! (re)negotiation process by itself when will be transferred into [`Stable`]
+//! state.
+//!
+//! # Implementing [`Peer`] update which requires (re)negotiation
+//!
+//! 1. All changes which are requires (re)negotiation - should be done by adding
+//!    new variant into [`TrackChange`]
+//!
+//! 2. Implement your changing logic in the [`TrackChangeHandler`]
+//!    implementation
+//!
+//! 3. Create function named by `schedule_*` pattern which will schedule your
+//!    change by adding it into [`Context::scheduled_tasks`]
+//!
+//! 4. Add docs which are explains that this change requires
+//!    [`PeerStateMachine::commit_scheduled_tasks`]
+//!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 // TODO: Extend docs. Scheduling and committing changes, negotiation_needed
@@ -19,7 +65,7 @@ use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, PeerId,
     Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
 };
-use medea_macro::enum_delegate;
+use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::{
@@ -115,7 +161,10 @@ impl PeerError {
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
-    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>)
+    pub fn schedule_apply_track_changes(
+        &mut self,
+        track_patches: Vec<TrackPatch>
+    )
 )]
 #[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
@@ -299,7 +348,8 @@ pub struct Context {
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
-#[derive(Debug)]
+#[dispatchable]
+#[derive(Clone, Debug)]
 enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
@@ -349,6 +399,23 @@ impl TrackChange {
             }
         }
     }
+}
+
+impl TrackChangeHandler for Peer<Stable> {
+    type Output = ();
+
+    /// Inserts provided [`MediaTrack`] into [`Context::senders`].
+    fn on_add_send_track(&mut self, track: Rc<MediaTrack>) {
+        self.context.senders.insert(track.id, track);
+    }
+
+    /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
+    fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) {
+        self.context.receivers.insert(track.id, track);
+    }
+
+    /// Does nothing.
+    fn on_track_patch(&mut self, _: TrackPatch) {}
 }
 
 /// [RTCPeerConnection] representation.
@@ -474,11 +541,12 @@ impl<T> Peer<T> {
     ///
     /// Patches will be applied on client side when renegotiation will be
     /// started for this [`Peer`].
-    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>) {
+    pub fn schedule_apply_track_changes(
+        &mut self,
+        track_patches: Vec<TrackPatch>,
+    ) {
         for track_patch in track_patches {
-            self.context
-                .pending_track_updates
-                .push(TrackChange::TrackPatch(track_patch));
+            self.schedule_task(Task::new(TrackChange::TrackPatch(track_patch)));
         }
     }
 
@@ -532,12 +600,7 @@ impl<T> Peer<T> {
     /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
     /// be ran.
     fn schedule_add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_task(Task::new(move |peer| {
-            peer.context
-                .pending_track_updates
-                .push(TrackChange::AddSendTrack(Rc::clone(&track)));
-            peer.context.senders.insert(track.id, track);
-        }))
+        self.schedule_task(Task::new(TrackChange::AddSendTrack(track)));
     }
 
     /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
@@ -546,12 +609,7 @@ impl<T> Peer<T> {
     /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
     /// be ran.
     fn schedule_add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_task(Task::new(move |peer| {
-            peer.context
-                .pending_track_updates
-                .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
-            peer.context.receivers.insert(track.id, track);
-        }));
+        self.schedule_task(Task::new(TrackChange::AddRecvTrack(track)));
     }
 }
 
@@ -764,10 +822,9 @@ impl Peer<Stable> {
 mod peer_mutation_task {
     use std::fmt;
 
-    use super::{Peer, Stable};
+    use crate::media::peer::TrackChange;
 
-    // TODO: Все что мы делаем в этих тасках уже выражено в TrackChange'ах. Есть
-    //       ли смысл хранить fn'ы, если мы их можем типизировать?
+    use super::{Peer, Stable};
 
     /// Job which will be ran on this [`Peer`] when it will be in [`Stable`]
     /// state.
@@ -777,21 +834,19 @@ mod peer_mutation_task {
     ///
     /// After all queued [`Task`]s are executed, negotiation __should__ be
     /// performed.
-    pub(super) struct Task(Box<dyn FnOnce(&mut Peer<Stable>)>);
+    pub(super) struct Task(TrackChange);
 
     impl Task {
         /// Returns new [`Task`] with provided [`FnOnce`] which will be ran on
         /// [`Task::run`] call.
-        pub fn new<F>(f: F) -> Self
-        where
-            F: FnOnce(&mut Peer<Stable>) + 'static,
-        {
-            Self(Box::new(f))
+        pub fn new(change: TrackChange) -> Self {
+            Self(change)
         }
 
         /// Calls [`Task`]'s [`FnOnce`] with provided [`Peer`] as parameter.
         pub fn run(self, peer: &mut Peer<Stable>) {
-            (self.0)(peer);
+            peer.context.pending_track_updates.push(self.0.clone());
+            self.0.dispatch_with(peer);
         }
     }
 
