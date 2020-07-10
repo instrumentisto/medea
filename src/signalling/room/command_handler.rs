@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
     CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
-    TrackId, TrackPatch, TrackUpdate,
+    TrackId, TrackPatch,
 };
 
 use crate::{
@@ -159,33 +159,18 @@ impl CommandHandler for Room {
     /// Sends [`Event::TracksApplied`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
+    /// Starts renegotiation process.
+    ///
     /// [`Command::UpdateTracks`]: medea_client_api_proto::Command::UpdateTracks
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        if let Ok(member_id) = self
-            .peers
-            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
-        {
-            Ok(Box::new(
-                self.members
-                    .send_event_to_member(
-                        member_id,
-                        Event::TracksApplied {
-                            peer_id,
-                            negotiation_role: None,
-                            updates: tracks_patches
-                                .into_iter()
-                                .map(TrackUpdate::Updated)
-                                .collect(),
-                        },
-                    )
-                    .into_actor(self),
-            ))
-        } else {
-            Ok(Box::new(actix::fut::ok(())))
-        }
+        self.peers.map_peer_by_id_mut(peer_id, |peer| {
+            peer.apply_track_changes(tracks_patches);
+        })?;
+
+        Ok(self.send_tracks_applied(peer_id))
     }
 }
