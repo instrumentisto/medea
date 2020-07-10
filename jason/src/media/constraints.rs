@@ -182,7 +182,6 @@ impl MediaStreamSettings {
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    #[inline]
     pub fn audio(&mut self, constraints: AudioTrackConstraints) {
         self.audio.is_enabled = true;
         self.audio.constraints = constraints;
@@ -190,7 +189,6 @@ impl MediaStreamSettings {
 
     /// Set constraints that will be used to obtain local video sourced from
     /// media device.
-    #[inline]
     pub fn device_video(&mut self, constraints: DeviceVideoTrackConstraints) {
         self.video.is_enabled = true;
         self.video.constraints = constraints.into();
@@ -198,7 +196,6 @@ impl MediaStreamSettings {
 
     /// Set constraints that will be used to capture local video from user
     /// display.
-    #[inline]
     pub fn display_video(&mut self, constraints: DisplayVideoTrackConstraints) {
         self.video.is_enabled = true;
         self.video.constraints = constraints.into();
