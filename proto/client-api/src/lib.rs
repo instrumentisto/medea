@@ -348,7 +348,6 @@ pub struct Track {
     pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
-    pub is_muted: bool,
 }
 
 impl Track {

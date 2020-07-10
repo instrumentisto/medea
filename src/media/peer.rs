@@ -17,7 +17,7 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, PeerId as Id, PeerId,
-    Track, TrackId, TrackUpdate, VideoSettings,
+    Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -114,6 +114,9 @@ impl PeerError {
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
+#[enum_delegate(
+    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>)
+)]
 #[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
@@ -305,37 +308,46 @@ enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
+
+    /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
+    TrackPatch(TrackPatch),
 }
 
 impl TrackChange {
-    /// Tries to return [`Track`] based on this [`TrackChange`].
+    /// Tries to return new [`Track`] based on this [`TrackChange`].
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
     /// creation.
-    fn try_as_track(&self, partner_peer_id: Id) -> Option<Track> {
-        let (direction, track) = match self {
-            TrackChange::AddSendTrack(track) => (
-                Direction::Send {
+    fn as_new_track(&self, partner_peer_id: Id) -> Option<Track> {
+        match self.as_track_update(partner_peer_id) {
+            TrackUpdate::Added(track) => Some(track),
+            _ => None,
+        }
+    }
+
+    /// Returns [`TrackUpdate`] based on this [`TrackChange`].
+    fn as_track_update(&self, partner_peer_id: Id) -> TrackUpdate {
+        match self {
+            TrackChange::AddSendTrack(track) => TrackUpdate::Added(Track {
+                id: track.id,
+                media_type: track.media_type.clone(),
+                direction: Direction::Send {
                     receivers: vec![partner_peer_id],
                     mid: track.mid(),
                 },
-                track,
-            ),
-            TrackChange::AddRecvTrack(track) => (
-                Direction::Recv {
+            }),
+            TrackChange::AddRecvTrack(track) => TrackUpdate::Added(Track {
+                id: track.id,
+                media_type: track.media_type.clone(),
+                direction: Direction::Recv {
                     sender: partner_peer_id,
                     mid: track.mid(),
                 },
-                track,
-            ),
-        };
-
-        Some(Track {
-            id: track.id,
-            is_muted: false,
-            media_type: track.media_type.clone(),
-            direction,
-        })
+            }),
+            TrackChange::TrackPatch(track_patch) => {
+                TrackUpdate::Updated(track_patch.clone())
+            }
+        }
     }
 }
 
@@ -379,12 +391,7 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .map(|change| {
-                // TODO: remove this unwrap when new TrackChanges will be
-                //       implemented.
-                change.try_as_track(self.partner_peer_id()).unwrap()
-            })
-            .map(TrackUpdate::Added)
+            .map(|c| c.as_track_update(self.partner_peer_id()))
             .collect()
     }
 
@@ -393,7 +400,7 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .filter_map(|update| update.try_as_track(self.partner_peer_id()))
+            .filter_map(|c| c.as_new_track(self.partner_peer_id()))
             .collect()
     }
 
@@ -461,6 +468,18 @@ impl<T> Peer<T> {
     /// for this [`Peer`] was sent to the client).
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
+    }
+
+    /// Stores provided [`TrackPatch`]s in the `pending_track_updates`.
+    ///
+    /// Patches will be applied on client side when renegotiation will be
+    /// started for this [`Peer`].
+    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>) {
+        for track_patch in track_patches {
+            self.context
+                .pending_track_updates
+                .push(TrackChange::TrackPatch(track_patch));
+        }
     }
 
     /// Schedules `send` tracks adding to `self` and `recv` tracks for this

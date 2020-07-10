@@ -43,38 +43,6 @@ impl Room {
                 .into_actor(self),
         )
     }
-
-    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
-    /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
-    /// [`NegotiationRole::Offerer`].
-    ///
-    /// # Errors
-    ///
-    /// Errors if [`Peer`] lookup fails, or it is not in [`Stable`] state.
-    fn send_tracks_applied(
-        &mut self,
-        peer_id: PeerId,
-    ) -> ActFuture<Result<(), RoomError>> {
-        let peer: Peer<Stable> =
-            actix_try!(self.peers.take_inner_peer(peer_id));
-        let peer = peer.start_negotiation();
-        let updates = peer.get_updates();
-        let member_id = peer.member_id();
-        self.peers.add_peer(peer);
-
-        Box::new(
-            self.members
-                .send_event_to_member(
-                    member_id,
-                    Event::TracksApplied {
-                        updates,
-                        negotiation_role: Some(NegotiationRole::Offerer),
-                        peer_id,
-                    },
-                )
-                .into_actor(self),
-        )
-    }
 }
 
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
