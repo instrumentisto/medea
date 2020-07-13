@@ -11,17 +11,16 @@
 //! executed and new (re)negotiation process will be started automatically by
 //! calling [`NegotiationSubscriber::negotiation_needed`].
 //!
-//! All functions of the [`Peer`]/[`PeerStateMachine`] which are named as
-//! `schedule_*` requires (re)negotiation and will be ran only by calling
-//! [`PeerStateMachine::commit_scheduled_tasks`] or on [`Peer`] transferring to
-//! the [`Stable`] state.
+//! All functions from the [`PeerChangesScheduler`] requires (re)negotiation and
+//! will be ran only by calling [`PeerStateMachine::commit_scheduler_tasks`] or
+//! on [`Peer`] transferring to the [`Stable`] state.
 //!
 //! # How to perform update which requires (re)negotiation
 //!
 //! If you wanna perform update which requires (re)negotiation:
 //!
-//! 1. Schedule this change (call [`PeerStateMachine::schedule_add_receiver`]
-//!    for example)
+//! 1. Schedule this change (call any function of the [`PeerChangesScheduler`]
+//! for example)
 //!
 //! 2. Optionally, you can schedule as many changes as you want
 //!
@@ -40,16 +39,11 @@
 //! 2. Implement your changing logic in the [`TrackChangeHandler`]
 //!    implementation
 //!
-//! 3. Create function named by `schedule_*` pattern which will schedule your
+//! 3. Create function in the [`PeerChangesScheduler`] which will schedule your
 //!    change by adding it into [`Context::scheduled_tasks`]
-//!
-//! 4. Add docs which are explains that this change requires
-//!    [`PeerStateMachine::commit_scheduled_tasks`]
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
-// TODO: Extend docs. Scheduling and committing changes, negotiation_needed
-//       event: all that should be explained in details.
 #![allow(clippy::use_self)]
 
 use std::{
@@ -150,30 +144,50 @@ impl PeerError {
     }
 }
 
+/// Scheduler of the changes of the [`Peer`] which are requires (re)negotiation.
 pub struct PeerChangesScheduler<'a> {
+    /// [`Context`] of the [`Peer`] in which will scheduled changes.
     context: &'a mut Context,
 }
 
 impl<'a> PeerChangesScheduler<'a> {
     /// Schedules [`Task`] which will be ran before negotiation process start.
     fn schedule_task(&mut self, job: Task) {
-        self.context.jobs_queue.push_back(job);
+        self.context.tasks_queue.push_back(job);
     }
 
+    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
+    /// be ran.
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.schedule_task(Task::new(TrackChange::AddRecvTrack(track)));
     }
 
+    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
+    /// be ran.
     pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.schedule_task(Task::new(TrackChange::AddSendTrack(track)));
     }
 
+    /// Schedules provided [`TrackPatch`]s.
+    ///
+    /// Provided [`TrackPatch`]s will be sent to the client on (re)negotiation.
     pub fn patch_tracks(&mut self, patches: Vec<TrackPatch>) {
         for patch in patches {
             self.schedule_task(Task::new(TrackChange::TrackPatch(patch)));
         }
     }
 
+    /// Schedules `send` tracks adding to `self` and `recv` tracks for this
+    /// `send` to `partner_peer`.
+    ///
+    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
+    /// and [`WebRtcPublishEndpoint::video_settings`].
     pub fn add_publisher(
         &mut self,
         src: &WebRtcPublishEndpoint,
@@ -386,7 +400,7 @@ pub struct Context {
     ///
     /// When this [`Task`]s will be executed, negotiation process should be
     /// started for this [`Peer`].
-    jobs_queue: VecDeque<Task>,
+    tasks_queue: VecDeque<Task>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
@@ -583,6 +597,7 @@ impl<T> Peer<T> {
         self.context.is_known_to_remote
     }
 
+    /// Returns [`PeerChangesScheduler`] for this [`Peer`].
     pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler {
         PeerChangesScheduler {
             context: &mut self.context,
@@ -689,7 +704,7 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
-            jobs_queue: VecDeque::new(),
+            tasks_queue: VecDeque::new(),
             negotiation_subscriber,
         };
 
@@ -767,11 +782,11 @@ impl Peer<Stable> {
     ///
     /// Returns `false` if nothing was done.
     fn commit_scheduled_changes(&mut self) -> bool {
-        if self.context.jobs_queue.is_empty() {
+        if self.context.tasks_queue.is_empty() {
             false
         } else {
-            while let Some(job) = self.context.jobs_queue.pop_front() {
-                job.run(self);
+            while let Some(task) = self.context.tasks_queue.pop_front() {
+                task.run(self);
             }
 
             self.context
@@ -829,7 +844,7 @@ mod peer_mutation_task {
 
     impl fmt::Debug for Task {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.debug_tuple("Job").finish()
+            f.debug_tuple("Task").finish()
         }
     }
 }
@@ -930,8 +945,8 @@ pub mod tests {
             Rc::new(negotiation_sub),
         );
 
-        peer.schedule_add_receiver(media_track(0));
-        peer.schedule_add_sender(media_track(1));
+        peer.as_changes_scheduler().add_receiver(media_track(0));
+        peer.as_changes_scheduler().add_sender(media_track(1));
 
         assert!(peer.context.senders.is_empty());
         assert!(peer.context.receivers.is_empty());
@@ -963,8 +978,8 @@ pub mod tests {
         );
 
         let mut peer = peer.start();
-        peer.schedule_add_sender(media_track(0));
-        peer.schedule_add_receiver(media_track(1));
+        peer.as_changes_scheduler().add_sender(media_track(0));
+        peer.as_changes_scheduler().add_receiver(media_track(1));
         assert!(peer.context.senders.is_empty());
         assert!(peer.context.receivers.is_empty());
 
@@ -976,7 +991,7 @@ pub mod tests {
         assert_eq!(peer.context.receivers.len(), 1);
         assert_eq!(peer.context.senders.len(), 1);
         assert_eq!(peer.context.pending_track_updates.len(), 2);
-        assert_eq!(peer.context.jobs_queue.len(), 0);
+        assert_eq!(peer.context.tasks_queue.len(), 0);
         assert_eq!(rx.recv().unwrap(), PeerId(0));
     }
 }

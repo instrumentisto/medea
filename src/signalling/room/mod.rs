@@ -28,7 +28,7 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{peer::NegotiationSubscriber, PeerError},
+    media::{peer::NegotiationSubscriber, Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
@@ -40,7 +40,6 @@ use crate::{
     AppContext,
 };
 
-use crate::media::{Peer, Stable};
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
@@ -237,8 +236,8 @@ impl Room {
                     for (src_peer_id, sink_peer_id) in
                         result?.into_iter().filter_map(|r| r)
                     {
-                        room.peers.run_scheduled_jobs(src_peer_id)?;
-                        room.peers.run_scheduled_jobs(sink_peer_id)?;
+                        room.peers.run_scheduled_tasks(src_peer_id)?;
+                        room.peers.run_scheduled_tasks(sink_peer_id)?;
                     }
 
                     Ok(())

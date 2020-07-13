@@ -351,14 +351,17 @@ impl PeersService {
         }
     }
 
-    /// Calls [`PeerStateMachine::run_scheduled_jobs`] on the
+    /// Calls [`PeerStateMachine::run_scheduled_tasks`] on the
     /// [`PeerStateMachine`] with a provided [`PeerId`].
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn run_scheduled_jobs(&self, peer_id: PeerId) -> Result<(), RoomError> {
+    pub fn run_scheduled_tasks(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
         self.peers.map_peer_by_id_mut(peer_id, |peer| {
             peer.commit_scheduled_changes();
         })?;
@@ -823,8 +826,8 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        peers_service.run_scheduled_jobs(src_peer_id).unwrap();
-        peers_service.run_scheduled_jobs(sink_peer_id).unwrap();
+        peers_service.run_scheduled_tasks(src_peer_id).unwrap();
+        peers_service.run_scheduled_tasks(sink_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
@@ -916,8 +919,8 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        peers_service.run_scheduled_jobs(src_peer_id).unwrap();
-        peers_service.run_scheduled_jobs(sink_peer_id).unwrap();
+        peers_service.run_scheduled_tasks(src_peer_id).unwrap();
+        peers_service.run_scheduled_tasks(sink_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
@@ -956,8 +959,8 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        peers_service.run_scheduled_jobs(src_peer_id).unwrap();
-        peers_service.run_scheduled_jobs(sink_peer_id).unwrap();
+        peers_service.run_scheduled_tasks(src_peer_id).unwrap();
+        peers_service.run_scheduled_tasks(sink_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
