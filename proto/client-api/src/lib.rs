@@ -312,7 +312,7 @@ pub enum Event {
         /// Negotiation role basing on which should be sent
         /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
         ///
-        /// If `None` then no renegotiation should be done.
+        /// If `None` then no (re)negotiation should be done.
         negotiation_role: Option<NegotiationRole>,
     },
 }
@@ -370,7 +370,6 @@ pub struct Track {
     pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
-    pub is_muted: bool,
 }
 
 impl Track {

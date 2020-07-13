@@ -85,7 +85,12 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::utils::{window, JasonError};
+use medea_jason::{
+    media::{LocalStreamConstraints, VideoTrackConstraints},
+    peer::TransceiverKind,
+    utils::{window, JasonError},
+    AudioTrackConstraints, MediaStreamSettings,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -123,23 +128,26 @@ extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
 
-pub fn get_test_required_tracks(
-    is_audio_muted: bool,
-    is_video_muted: bool,
-) -> (Track, Track) {
-    get_test_tracks(is_audio_muted, is_video_muted, true, true)
+pub fn get_test_required_tracks() -> (Track, Track) {
+    get_test_tracks(true, true)
 }
 
-pub fn get_test_unrequired_tracks(
+pub fn get_test_unrequired_tracks() -> (Track, Track) {
+    get_test_tracks(false, false)
+}
+
+pub fn get_media_stream_settings(
     is_audio_muted: bool,
     is_video_muted: bool,
-) -> (Track, Track) {
-    get_test_tracks(is_audio_muted, is_video_muted, false, false)
+) -> MediaStreamSettings {
+    let mut settings = MediaStreamSettings::default();
+    settings.toggle_enable(!is_audio_muted, TransceiverKind::Audio);
+    settings.toggle_enable(!is_video_muted, TransceiverKind::Video);
+
+    settings
 }
 
 pub fn get_test_tracks(
-    is_audio_muted: bool,
-    is_video_muted: bool,
     is_audio_required: bool,
     is_video_required: bool,
 ) -> (Track, Track) {
@@ -153,7 +161,6 @@ pub fn get_test_tracks(
             media_type: MediaType::Audio(AudioSettings {
                 is_required: is_audio_required,
             }),
-            is_muted: is_audio_muted,
         },
         Track {
             id: TrackId(2),
@@ -164,7 +171,6 @@ pub fn get_test_tracks(
             media_type: MediaType::Video(VideoSettings {
                 is_required: is_video_required,
             }),
-            is_muted: is_video_muted,
         },
     )
 }
@@ -182,6 +188,32 @@ pub async fn delay_for(delay_ms: i32) {
     .unwrap();
 }
 
+fn media_stream_settings(
+    is_audio_enabled: bool,
+    is_video_enabled: bool,
+) -> MediaStreamSettings {
+    let mut settings = MediaStreamSettings::new();
+    if is_audio_enabled {
+        settings.audio(AudioTrackConstraints::default());
+    }
+    if is_video_enabled {
+        settings.video(VideoTrackConstraints::default());
+    }
+
+    settings
+}
+
+fn local_constraints(
+    is_audio_enabled: bool,
+    is_video_enabled: bool,
+) -> LocalStreamConstraints {
+    let constraints = LocalStreamConstraints::new();
+    constraints
+        .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
+
+    constraints
+}
+
 /// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
 ///
 /// Also it will check result of test and will panic if some error will be
@@ -191,7 +223,7 @@ async fn wait_and_check_test_result(
     finally: impl FnOnce(),
 ) {
     let result =
-        futures::future::select(Box::pin(rx), Box::pin(delay_for(500))).await;
+        futures::future::select(Box::pin(rx), Box::pin(delay_for(5000))).await;
     finally();
     match result {
         Either::Left((oneshot_fut_result, _)) => {

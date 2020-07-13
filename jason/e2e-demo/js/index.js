@@ -409,14 +409,15 @@ window.onload = async function() {
   let localStream = null;
   let isAudioMuted = false;
   let isVideoMuted = false;
-  let connectBtnsDiv = document.getElementsByClassName('connect')[0];
-  let controlBtns = document.getElementsByClassName('control')[0];
   let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
   let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
   let localVideo = document.querySelector('.local-video > video');
 
   async function initLocalStream() {
-      let constraints = await build_constraints(audioSelect, videoSelect);
+      let constraints = await build_constraints(
+        isAudioMuted ? null : audioSelect,
+        isVideoMuted ? null : videoSelect
+      );
       try {
         localStream = await jason.media_manager().init_local_stream(constraints)
       } catch (e) {
@@ -518,6 +519,7 @@ window.onload = async function() {
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
+        video.controls = "true";
         video.srcObject = stream.get_media_stream();
         let innerVideoDiv = document.createElement("div");
         innerVideoDiv.className = "video";
@@ -625,17 +627,16 @@ window.onload = async function() {
     muteAudio.addEventListener('click', async () => {
       try {
         if (isAudioMuted) {
-          if (isCallStarted) {
-            await room.unmute_audio();
-          }
+          await room.unmute_audio();
           isAudioMuted = false;
           muteAudio.textContent = "Mute audio";
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
         } else {
-          if (isCallStarted) {
-            await room.mute_audio();
-            if (localStream && localStream.ptr > 0 ){
-              localStream.free_audio();
-            }
+          await room.mute_audio();
+          if (localStream && localStream.ptr > 0 ){
+            localStream.free_audio();
           }
           isAudioMuted = true;
           muteAudio.textContent = "Unmute audio";
@@ -647,12 +648,12 @@ window.onload = async function() {
     muteVideo.addEventListener('click', async () => {
       try {
         if (isVideoMuted) {
-          if (!isCallStarted) {
-            await initLocalStream();
-          }
           await room.unmute_video();
           isVideoMuted = false;
           muteVideo.textContent = "Mute video";
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
         } else {
           await room.mute_video();
           if (localStream && localStream.ptr > 0 ){

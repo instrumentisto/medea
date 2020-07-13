@@ -203,26 +203,26 @@ impl InnerMediaManager {
             .map(|track| track.upgrade().unwrap())
             .collect();
 
-        if let Some(audio) = caps.get_audio() {
+        if caps.is_audio_enabled() {
             let track = storage
                 .iter()
-                .find(|track| audio.satisfies(track.as_ref()))
+                .find(|track| caps.get_audio().satisfies(track.as_ref()))
                 .cloned();
 
             if let Some(track) = track {
-                caps.take_audio();
+                caps.toggle_publish_audio(false);
                 tracks.push(track);
             }
         }
 
-        if let Some(video) = caps.get_video() {
+        if caps.is_video_enabled() {
             let track = storage
                 .iter()
-                .find(|track| video.satisfies(track.as_ref()))
+                .find(|track| caps.get_video().satisfies(track.as_ref()))
                 .cloned();
 
             if let Some(track) = track {
-                caps.take_video();
+                caps.toggle_publish_video(false);
                 tracks.push(track);
             }
         }

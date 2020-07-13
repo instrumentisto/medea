@@ -113,17 +113,15 @@ impl Room {
                         }
                     }
                 }
+                for updated_peer_id in updated_peers {
+                    self.peers.run_scheduled_tasks(updated_peer_id);
+                }
 
-                let mut futs: Vec<_> = updated_peers
-                    .into_iter()
-                    .filter(|peer_id| !discard_updates.contains(peer_id))
-                    .map(|peer_id| self.send_tracks_applied(peer_id))
-                    .collect();
-                futs.extend(removed_peers.into_iter().map(
+                let futs: Vec<_> = removed_peers.into_iter().map(
                     |(member_id, peer_ids)| {
                         self.send_peers_removed(member_id, peer_ids)
                     },
-                ));
+                ).collect();
 
                 futs
             };
@@ -259,11 +257,29 @@ impl Room {
 
         member.insert_sink(sink);
 
-        if self.members.member_has_connection(member_id) {
-            Ok(Box::new(self.init_member_connections(&member)))
-        } else {
-            Ok(Box::new(actix::fut::ok(())))
-        }
+        Ok(Box::new(fut::ready(()).map(
+            move |_, this: &mut Self, ctx| {
+                let member_id = member.id();
+                if this.members.member_has_connection(&member_id) {
+                    ctx.spawn(this.init_member_connections(&member).map(
+                        move |res, this, ctx| {
+                            if let Err(e) = res {
+                                error!(
+                                    "Failed to interconnect Members, because \
+                                     {}. Connection with Member [id = {}, \
+                                     room_id: {}] will be stopped.",
+                                    e, member_id, this.id,
+                                );
+                                this.members
+                                    .close_member_connection(&member_id, ctx);
+                            }
+                        },
+                    ));
+                }
+
+                Ok(())
+            },
+        )))
     }
 
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every

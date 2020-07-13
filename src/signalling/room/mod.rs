@@ -6,15 +6,11 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-    sync::Arc,
-};
+use std::{rc::Rc, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, AsyncContext as _, Context, Handler, MailboxError,
-    WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
+    MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -32,12 +28,12 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{Peer, PeerError, Stable},
+    media::{peer::NegotiationSubscriber, Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
         participants::{ParticipantService, ParticipantServiceErr},
-        peers::{ConnectEndpointsResult, PeerTrafficWatcher, PeersService},
+        peers::{PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
     utils::{actix_try_join_all, ResponseActAnyFuture},
@@ -47,6 +43,7 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
+use std::collections::HashSet;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -147,29 +144,39 @@ pub struct Room {
 }
 
 impl Room {
-    /// Creates new instance of [`Room`].
+    /// Creates and starts [`Room`] [`Actor`] on current thread.
+    ///
+    /// Returns [`Addr`] to the newly created [`Room`] [`Actor`].
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::BadRoomSpec`] if [`RoomSpec`] transformation
     /// fails.
-    pub fn new(
+    pub fn start(
         room_spec: &RoomSpec,
         context: &AppContext,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-    ) -> Result<Self, RoomError> {
-        Ok(Self {
+    ) -> Result<Addr<Self>, RoomError> {
+        // 16 is the default actix address channel capacity.
+        let (_, rx) = actix::dev::channel::channel(16);
+
+        let ctx = Context::with_receiver(rx);
+        let this = Self {
             id: room_spec.id().clone(),
             peers: PeersService::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
                 peers_traffic_watcher,
                 &context.config.media,
+                Rc::new(ctx.address().downgrade())
+                    as Rc<dyn NegotiationSubscriber>,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
             callbacks: context.callbacks.clone(),
-        })
+        };
+
+        Ok(ctx.run(this))
     }
 
     /// Returns [`RoomId`] of this [`Room`].
@@ -203,38 +210,6 @@ impl Room {
         Box::new(
             self.members
                 .send_event_to_member(member_id, peer_created)
-                .into_actor(self),
-        )
-    }
-
-    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
-    /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
-    /// [`NegotiationRole::Offerer`].
-    ///
-    /// # Errors
-    ///
-    /// Errors if [`Peer`] lookup fails, or it is not in [`Stable`] state.
-    fn send_tracks_applied(
-        &mut self,
-        peer_id: PeerId,
-    ) -> ActFuture<Result<(), RoomError>> {
-        let peer: Peer<Stable> =
-            actix_try!(self.peers.take_inner_peer(peer_id));
-        let peer = peer.start_renegotiation();
-        let updates = peer.get_updates();
-        let member_id = peer.member_id();
-        self.peers.add_peer(peer);
-
-        Box::new(
-            self.members
-                .send_event_to_member(
-                    member_id,
-                    Event::TracksApplied {
-                        updates,
-                        negotiation_role: Some(NegotiationRole::Offerer),
-                        peer_id,
-                    },
-                )
                 .into_actor(self),
         )
     }
@@ -288,78 +263,15 @@ impl Room {
         Box::new(
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
-                .then(move |result, room: &mut Room, ctx| {
-                    let connected_peers = actix_try!(result);
-
-                    // If there are at least one
-                    // ConnectEndpointsResult::Created for Peers pair, then
-                    // Peers should be created on remote.
-                    //
-                    // If there only ConnectEndpointsResult::Updated for Peers
-                    // pair, then Peers should be renegotiated.
-                    let mut peer_pairs_actions: HashMap<
-                        (PeerId, PeerId),
-                        ConnectEndpointsResult,
-                    > = HashMap::new();
-
-                    // We should keep PeerId's pairs order-agnostic for correct
-                    // Hash and Eq.
-                    let sort_pair =
-                        |(id1, id2): (PeerId, PeerId)| -> (PeerId, PeerId) {
-                            if id1.0.lt(&id2.0) {
-                                (id1, id2)
-                            } else {
-                                (id2, id1)
-                            }
-                        };
-
-                    // Fill `peer_pairs_actions` map.
-                    connected_peers
-                        .into_iter()
-                        .filter_map(|item| item)
-                        .for_each(|item| match item {
-                            ConnectEndpointsResult::Created(id1, id2) => {
-                                peer_pairs_actions
-                                    .insert(sort_pair((id1, id2)), item);
-                            }
-                            ConnectEndpointsResult::Updated(id1, id2) => {
-                                peer_pairs_actions
-                                    .entry(sort_pair((id1, id2)))
-                                    .or_insert_with(|| item);
-                            }
-                        });
-
-                    let mut peer_updates = Vec::new();
-                    let mut peer_creates = Vec::new();
-                    for (_, action) in peer_pairs_actions.drain() {
-                        match action {
-                            ConnectEndpointsResult::Created(id1, _) => {
-                                peer_creates.push(room.send_peer_created(id1));
-                            }
-                            ConnectEndpointsResult::Updated(id1, _) => {
-                                peer_updates
-                                    .push(room.send_tracks_applied(id1));
-                            }
-                        }
+                .map(move |result, room: &mut Room, _| {
+                    for (src_peer_id, sink_peer_id) in
+                        result?.into_iter().filter_map(|r| r)
+                    {
+                        room.peers.run_scheduled_tasks(src_peer_id)?;
+                        room.peers.run_scheduled_tasks(sink_peer_id)?;
                     }
 
-                    // TODO: peer_creates are spawned to avoid deadlock.
-                    //       Fixed in #111.
-                    ctx.spawn(actix_try_join_all(peer_creates).map(
-                        |res, _, _| {
-                            if let Err(e) = res {
-                                error!(
-                                    "Failed to connect Endpoints because: {:?}",
-                                    e,
-                                );
-                            }
-                        },
-                    ));
-
-                    Box::new(
-                        actix_try_join_all(peer_updates)
-                            .map(|res, _, _| res.map(|_| ())),
-                    )
+                    Ok(())
                 }),
         )
     }
@@ -372,7 +284,7 @@ impl Room {
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
     /// the connected [`Member`].
     ///
-    /// Will start renegotiation with `MediaTrack`s adding if some not
+    /// Will start (re)negotiation with `MediaTrack`s adding if some not
     /// interconnected `Endpoint`s will be found and if [`Peer`]s pair is
     /// already exists.
     fn init_member_connections(
@@ -470,6 +382,38 @@ impl Room {
                 }
             },
         ))
+    }
+
+    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
+    /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
+    /// [`NegotiationRole::Offerer`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if [`Peer`] lookup fails, or it is not in [`Stable`] state.
+    fn send_tracks_applied(
+        &mut self,
+        peer_id: PeerId,
+    ) -> ActFuture<Result<(), RoomError>> {
+        let peer: Peer<Stable> =
+            actix_try!(self.peers.take_inner_peer(peer_id));
+        let peer = peer.start_negotiation();
+        let updates = peer.get_updates();
+        let member_id = peer.member_id();
+        self.peers.add_peer(peer);
+
+        Box::new(
+            self.members
+                .send_event_to_member(
+                    member_id,
+                    Event::TracksApplied {
+                        updates,
+                        negotiation_role: Some(NegotiationRole::Offerer),
+                        peer_id,
+                    },
+                )
+                .into_actor(self),
+        )
     }
 }
 

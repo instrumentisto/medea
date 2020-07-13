@@ -70,7 +70,7 @@ type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [3]: https://w3.org/TR/mediacapture-streams/#mediastream
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct StreamRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
     video: HashMap<TrackId, VideoTrackConstraints>,
@@ -96,6 +96,7 @@ impl StreamRequest {
 
 /// Subtype of [`StreamRequest`], which can have maximum one track of each kind
 /// and must have at least one track of any kind.
+#[derive(Debug)]
 pub struct SimpleStreamRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
     video: Option<(TrackId, VideoTrackConstraints)>,
@@ -176,10 +177,10 @@ impl SimpleStreamRequest {
         &mut self,
         other: T,
     ) -> Result<()> {
-        let mut other = other.into();
+        let other = other.into();
 
         if let Some((_, video_caps)) = &self.video {
-            if other.get_video().is_none() {
+            if !other.is_video_enabled() {
                 if video_caps.is_required() {
                     return Err(tracerr::new!(
                         StreamRequestError::ExpectedVideoTracks
@@ -190,7 +191,7 @@ impl SimpleStreamRequest {
             }
         }
         if let Some((_, audio_caps)) = &self.audio {
-            if other.get_audio().is_none() {
+            if !other.is_audio_enabled() {
                 if audio_caps.is_required() {
                     return Err(tracerr::new!(
                         StreamRequestError::ExpectedAudioTracks
@@ -201,14 +202,14 @@ impl SimpleStreamRequest {
             }
         }
 
-        if let Some(other_audio) = other.take_audio() {
+        if other.is_audio_enabled() {
             if let Some((_, audio)) = self.audio.as_mut() {
-                audio.merge(other_audio);
+                audio.merge(other.get_audio().clone());
             }
         }
-        if let Some(other_video) = other.take_video() {
+        if other.is_video_enabled() {
             if let Some((_, video)) = self.video.as_mut() {
-                video.merge(other_video);
+                video.merge(other.get_video().clone());
             }
         }
 
