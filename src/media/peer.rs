@@ -151,29 +151,6 @@ pub struct PeerChangesScheduler<'a> {
 }
 
 impl<'a> PeerChangesScheduler<'a> {
-    /// Schedules [`Task`] which will be ran before negotiation process start.
-    fn schedule_task(&mut self, job: Task) {
-        self.context.tasks_queue.push_back(job);
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
-    /// be ran.
-    pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_task(Task::new(TrackChange::AddRecvTrack(track)));
-    }
-
-    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
-    ///
-    /// This [`Track`] will be considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
-    /// be ran.
-    pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_task(Task::new(TrackChange::AddSendTrack(track)));
-    }
-
     /// Schedules provided [`TrackPatch`]s.
     ///
     /// Provided [`TrackPatch`]s will be sent to the client on (re)negotiation.
@@ -221,6 +198,29 @@ impl<'a> PeerChangesScheduler<'a> {
                 .as_changes_scheduler()
                 .add_receiver(track_video);
         }
+    }
+
+    /// Schedules [`Task`] which will be ran before negotiation process start.
+    fn schedule_task(&mut self, job: Task) {
+        self.context.tasks_queue.push_back(job);
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
+    /// be ran.
+    fn add_receiver(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_task(Task::new(TrackChange::AddRecvTrack(track)));
+    }
+
+    /// Schedules [`Track`] adding to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled [`Task`] will
+    /// be ran.
+    fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_task(Task::new(TrackChange::AddSendTrack(track)));
     }
 }
 
