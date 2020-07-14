@@ -20,7 +20,11 @@ use crate::{
 };
 
 #[doc(inline)]
-pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
+pub use self::{
+    connection::{ConnectionHandle, Connections},
+    room::Room,
+    room::RoomHandle,
+};
 
 /// General library interface.
 ///

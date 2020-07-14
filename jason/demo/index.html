@@ -52,6 +52,7 @@
     let isAudioMuted = false;
     let isVideoMuted = false;
     let isPublishingEnabled = true;
+    let remote_videos = {};
 
     async function createRoom(roomId) {
       try {
@@ -493,11 +494,17 @@
           let innerVideoDiv = document.createElement("div");
           innerVideoDiv.className = "col-md-3";
           innerVideoDiv.appendChild(video);
+          remote_videos[connection.get_remote_id()] = innerVideoDiv;
           videoDiv.appendChild(innerVideoDiv);
 
           video.oncanplay = async () => {
             await video.play();
           };
+        });
+
+        connection.on_close(() => {
+          remote_videos[connection.get_remote_id()].remove();
+          delete remote_videos[connection.get_remote_id()];
         });
       });
 
