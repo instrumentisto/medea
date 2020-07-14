@@ -11,6 +11,7 @@ use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
 use medea_control_api_proto::grpc::api as proto;
+use redis::RedisError;
 
 use crate::{
     api::control::{
@@ -135,13 +136,13 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetricsService`] fails
+    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails
     /// to connect to Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
-    ) -> Result<Self, redis_pub_sub::RedisError> {
+    ) -> Result<Self, RedisError> {
         let peer_traffic_watcher =
             build_peers_traffic_watcher(&app.config.media);
         Ok(Self {

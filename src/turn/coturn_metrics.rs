@@ -11,7 +11,7 @@ use actix::{
     fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, StreamExt as _};
-use redis_pub_sub::ConnectionInfo;
+use redis::{ConnectionAddr, ConnectionInfo, RedisError};
 
 use crate::{
     log::prelude::*,
@@ -39,7 +39,7 @@ pub struct CoturnMetricsService {
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates are received.
-    client: redis_pub_sub::Client,
+    client: redis::Client,
 
     /// Count of allocations for each [`CoturnUsername`] (which acts as a key).
     allocations_count: HashMap<CoturnUsername, u64>,
@@ -54,9 +54,9 @@ impl CoturnMetricsService {
     pub fn new(
         cf: &crate::conf::turn::Turn,
         peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-    ) -> Result<Self, redis_pub_sub::RedisError> {
+    ) -> Result<Self, RedisError> {
         let connection_info = ConnectionInfo {
-            addr: Box::new(redis_pub_sub::ConnectionAddr::Tcp(
+            addr: Box::new(ConnectionAddr::Tcp(
                 cf.db.redis.host.to_string(),
                 cf.db.redis.port,
             )),
@@ -67,7 +67,7 @@ impl CoturnMetricsService {
                 Some(cf.db.redis.pass.to_string())
             },
         };
-        let client = redis_pub_sub::Client::open(connection_info)?;
+        let client = redis::Client::open(connection_info)?;
 
         Ok(Self {
             client,
@@ -79,9 +79,7 @@ impl CoturnMetricsService {
     /// Opens new Redis connection, subscribes to Coturn events and injects
     /// [`Stream`] with these events into the [`CoturnMetricsService`]'s
     /// context.
-    fn connect_and_subscribe(
-        &mut self,
-    ) -> ActFuture<Result<(), redis_pub_sub::RedisError>> {
+    fn connect_and_subscribe(&mut self) -> ActFuture<Result<(), RedisError>> {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();
 
@@ -94,25 +92,23 @@ impl CoturnMetricsService {
                 Ok(pubsub)
             }
             .into_actor(self)
-            .map(
-                |res: Result<_, redis_pub_sub::RedisError>, this, ctx| {
-                    let mut pubsub = res?;
-                    ctx.spawn(
-                        async move {
-                            let mut msg_stream = pubsub.on_message();
-                            while let Some(msg) = msg_stream.next().await {
-                                if msg_tx.unbounded_send(msg).is_err() {
-                                    break;
-                                }
+            .map(|res: Result<_, RedisError>, this, ctx| {
+                let mut pubsub = res?;
+                ctx.spawn(
+                    async move {
+                        let mut msg_stream = pubsub.on_message();
+                        while let Some(msg) = msg_stream.next().await {
+                            if msg_tx.unbounded_send(msg).is_err() {
+                                break;
                             }
                         }
-                        .into_actor(this),
-                    );
-                    ctx.add_stream(msg_stream);
+                    }
+                    .into_actor(this),
+                );
+                ctx.add_stream(msg_stream);
 
-                    Ok(())
-                },
-            ),
+                Ok(())
+            }),
         )
     }
 
@@ -146,8 +142,8 @@ impl Actor for CoturnMetricsService {
     }
 }
 
-impl StreamHandler<redis_pub_sub::Msg> for CoturnMetricsService {
-    fn handle(&mut self, msg: redis_pub_sub::Msg, _: &mut Self::Context) {
+impl StreamHandler<redis::Msg> for CoturnMetricsService {
+    fn handle(&mut self, msg: redis::Msg, _: &mut Self::Context) {
         let event = match CoturnEvent::parse(&msg) {
             Ok(ev) => ev,
             Err(e) => {
