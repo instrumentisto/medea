@@ -111,7 +111,7 @@ pub struct ConnectionHandle(Weak<InnerConnection>);
 /// Rust side ([`Connection`]).
 struct InnerConnection {
     /// Remote [`PeerId`].
-    sender_id: PeerId,
+    remote_id: PeerId,
 
     /// [`PeerMediaStream`] received from remote member.
     remote_stream: RefCell<Option<PeerMediaStream>>,
@@ -140,7 +140,7 @@ impl ConnectionHandle {
 
     /// Returns remote `PeerId`.
     pub fn get_remote_id(&self) -> Result<u32, JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| inner.sender_id.0)
+        upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0)
     }
 }
 
@@ -153,9 +153,9 @@ pub struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub fn new(sender_id: PeerId) -> Self {
+    pub fn new(remote_id: PeerId) -> Self {
         Self(Rc::new(InnerConnection {
-            sender_id,
+            remote_id,
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback1::default(),
             on_close: Callback0::default(),
