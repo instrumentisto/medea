@@ -4,7 +4,10 @@
 use std::collections::HashMap;
 
 use actix::WrapFuture as _;
-use medea_client_api_proto::{CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics, TrackId, TrackPatch, Mid};
+use medea_client_api_proto::{
+    CommandHandler, Event, IceCandidate, Mid, NegotiationRole, PeerId,
+    PeerMetrics, TrackId, TrackPatch,
+};
 
 use crate::{
     log::prelude::*,

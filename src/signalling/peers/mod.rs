@@ -737,35 +737,28 @@ impl PeerRepository {
         let mut changes = HashSet::new();
 
         if let Some(sink_peer_id) = sink_endpoint.peer_id() {
-            let mut sink_peer: Peer<Stable> =
-                self.take_inner_peer(sink_peer_id).unwrap();
-            let mut src_peer: Peer<Stable> =
-                self.take_inner_peer(sink_peer.partner_peer_id()).unwrap();
+            // let mut sink_peer: Peer<Stable> =
+            //     self.take_inner_peer(sink_peer_id).unwrap();
+            // TODO: UNWRAP
+            let (src_peer_id, tracks_to_remove) = self
+                .map_peer_by_id_mut(sink_peer_id, |sink_peer| {
+                    let src_peer_id = sink_peer.partner_peer_id();
+                    let src_endpoint = sink_endpoint.src();
+                    let tracks_to_remove =
+                        src_endpoint.get_tracks_ids_by_peer_id(src_peer_id);
+                    sink_peer
+                        .as_changes_scheduler()
+                        .remove_tracks(tracks_to_remove.clone());
 
-            let src_endpoint = sink_endpoint.src();
-            let tracks_to_remove =
-                src_endpoint.get_tracks_ids_by_peer_id(src_peer.id());
-            sink_peer.as_changes_scheduler().remove_tracks(tracks_to_remove.clone());
-            src_peer.as_changes_scheduler().remove_tracks(tracks_to_remove);
-
-            if sink_peer.is_empty() && src_peer.is_empty() {
-                let member = sink_endpoint.owner();
-                member.peers_removed(&hashset![sink_peer_id]);
-
-                changes.insert(PeerChange::Removed(
-                    sink_peer.member_id(),
-                    sink_peer_id,
-                ));
-                changes.insert(PeerChange::Removed(
-                    src_peer.member_id(),
-                    src_peer.id(),
-                ));
-            } else {
-                changes.insert(PeerChange::Updated(sink_peer_id));
-
-                self.add_peer(sink_peer);
-                self.add_peer(src_peer);
-            }
+                    (src_peer_id, tracks_to_remove)
+                })
+                .unwrap();
+            self.map_peer_by_id_mut(src_peer_id, |src_peer| {
+                src_peer
+                    .as_changes_scheduler()
+                    .remove_tracks(tracks_to_remove.clone());
+            });
+            changes.insert(PeerChange::Updated(sink_peer_id));
         }
 
         changes

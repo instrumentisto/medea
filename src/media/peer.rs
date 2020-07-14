@@ -47,7 +47,7 @@
 #![allow(clippy::use_self)]
 
 use std::{
-    collections::{HashMap, VecDeque, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     convert::TryFrom,
     fmt,
     rc::Rc,
@@ -55,13 +55,17 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{AudioSettings, Direction, IceServer, MediaType, PeerId as Id, PeerId, Track, TrackId, TrackPatch, TrackUpdate, VideoSettings, Mid};
+use medea_client_api_proto::{
+    AudioSettings, Direction, IceServer, MediaType, Mid, PeerId as Id, PeerId,
+    Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
+};
 use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::{
         endpoints::webrtc_publish_endpoint::PublishPolicy, MemberId,
     },
+    log::prelude::*,
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
@@ -176,6 +180,7 @@ impl<'a> PeerChangesScheduler<'a> {
                     is_required: audio_settings.publish_policy.is_required(),
                 }),
             ));
+            src.add_track_id(self.context.id, track_audio.id);
             self.add_sender(Rc::clone(&track_audio));
             partner_peer
                 .as_changes_scheduler()
@@ -190,6 +195,7 @@ impl<'a> PeerChangesScheduler<'a> {
                     is_required: video_settings.publish_policy.is_required(),
                 }),
             ));
+            src.add_track_id(self.context.id, track_video.id);
             self.add_sender(Rc::clone(&track_video));
             partner_peer
                 .as_changes_scheduler()
@@ -198,8 +204,9 @@ impl<'a> PeerChangesScheduler<'a> {
     }
 
     pub fn remove_tracks(&mut self, track_ids: HashSet<TrackId>) {
-        track_ids.into_iter()
-            .for_each(|id| self.schedule_task(Task::new(TrackChange::RemoveTrack(id))));
+        track_ids.into_iter().for_each(|id| {
+            self.schedule_task(Task::new(TrackChange::RemoveTrack(id)))
+        });
     }
 
     /// Schedules [`Task`] which will be ran before negotiation process start.

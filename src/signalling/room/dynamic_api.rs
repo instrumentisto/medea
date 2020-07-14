@@ -28,13 +28,13 @@ use crate::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             member::MemberError,
         },
+        peers::PeerChange,
         room::ActFuture,
     },
     utils::actix_try_join_all,
 };
 
 use super::{Room, RoomError};
-use crate::signalling::peers::PeerChange;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -117,11 +117,12 @@ impl Room {
                     self.peers.run_scheduled_tasks(updated_peer_id);
                 }
 
-                let futs: Vec<_> = removed_peers.into_iter().map(
-                    |(member_id, peer_ids)| {
+                let futs: Vec<_> = removed_peers
+                    .into_iter()
+                    .map(|(member_id, peer_ids)| {
                         self.send_peers_removed(member_id, peer_ids)
-                    },
-                ).collect();
+                    })
+                    .collect();
 
                 futs
             };
