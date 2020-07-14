@@ -737,9 +737,6 @@ impl PeerRepository {
         let mut changes = HashSet::new();
 
         if let Some(sink_peer_id) = sink_endpoint.peer_id() {
-            // let mut sink_peer: Peer<Stable> =
-            //     self.take_inner_peer(sink_peer_id).unwrap();
-            // TODO: UNWRAP
             let (src_peer_id, tracks_to_remove) = self
                 .map_peer_by_id_mut(sink_peer_id, |sink_peer| {
                     let src_peer_id = sink_peer.partner_peer_id();
@@ -758,7 +755,29 @@ impl PeerRepository {
                     .as_changes_scheduler()
                     .remove_tracks(tracks_to_remove.clone());
             });
-            changes.insert(PeerChange::Updated(sink_peer_id));
+
+            let is_sink_peer_empty = self
+                .map_peer_by_id(sink_peer_id, |peer| peer.is_empty())
+                .unwrap();
+            let is_src_peer_empty = self
+                .map_peer_by_id(src_peer_id, |peer| peer.is_empty())
+                .unwrap();
+
+            if is_sink_peer_empty && is_src_peer_empty {
+                let member = sink_endpoint.owner();
+                member.peers_removed(&hashset![sink_peer_id]);
+
+                self.remove(sink_peer_id);
+                self.remove(src_peer_id);
+
+                changes.insert(PeerChange::Removed(member.id(), sink_peer_id));
+                changes.insert(PeerChange::Removed(
+                    sink_endpoint.src().owner().id(),
+                    src_peer_id,
+                ));
+            } else {
+                changes.insert(PeerChange::Updated(sink_peer_id));
+            }
         }
 
         changes

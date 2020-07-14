@@ -11,6 +11,7 @@ use std::{
 
 use actix::{Arbiter, Context};
 use futures::{channel::mpsc, StreamExt as _};
+use medea::api::control::endpoints::webrtc_publish_endpoint::P2pMode;
 use medea_client_api_proto::Event;
 use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
 use tokio::time::timeout;
@@ -21,7 +22,6 @@ use super::{
     MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
     WebRtcPublishEndpointBuilder,
 };
-use medea::api::control::endpoints::webrtc_publish_endpoint::P2pMode;
 
 fn done_on_both_peers_created() -> (
     impl Fn(&Event, &mut Context<TestMember>, Vec<&Event>) + Clone,

@@ -76,6 +76,7 @@ use crate::{
 };
 
 use self::peer_mutation_task::Task;
+use slog::Level::Trace;
 
 /// Subscriber to the events which indicates that negotiation process should
 /// be started for the some [`Peer`].
@@ -205,7 +206,22 @@ impl<'a> PeerChangesScheduler<'a> {
 
     pub fn remove_tracks(&mut self, track_ids: HashSet<TrackId>) {
         track_ids.into_iter().for_each(|id| {
-            self.schedule_task(Task::new(TrackChange::RemoveTrack(id)))
+            let task_index_to_remove = self
+                .context
+                .tasks_queue
+                .iter()
+                .enumerate()
+                .find(|(n, task)| match TrackChange::from(*task) {
+                    TrackChange::AddSendTrack(track)
+                    | TrackChange::AddRecvTrack(track) => track.id == id,
+                    _ => false,
+                })
+                .map(|(n, _)| n);
+            if let Some(remove_index) = task_index_to_remove {
+                self.context.tasks_queue.remove(remove_index);
+            } else {
+                self.schedule_task(Task::new(TrackChange::RemoveTrack(id)))
+            }
         });
     }
 
@@ -257,6 +273,7 @@ impl<'a> PeerChangesScheduler<'a> {
     )
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
+#[enum_delegate(pub fn is_empty(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -621,7 +638,28 @@ impl<T> Peer<T> {
     /// Returns `true` if this [`Peer`] doesn't have any `Send` and `Recv`
     /// [`MediaTrack`]s.
     pub fn is_empty(&self) -> bool {
-        self.context.senders.is_empty() && self.context.receivers.is_empty()
+        let removed_tracks: HashSet<_> = self
+            .context
+            .tasks_queue
+            .iter()
+            .filter_map(|t| match TrackChange::from(t) {
+                TrackChange::RemoveTrack(track_id) => Some(track_id),
+                _ => None,
+            })
+            .collect();
+        let peers_tracks: HashSet<_> = self
+            .context
+            .senders
+            .iter()
+            .chain(self.context.receivers.iter())
+            .map(|t| *t.0)
+            .collect();
+
+        if removed_tracks == peers_tracks {
+            true
+        } else {
+            false
+        }
     }
 
     /// Returns [`PeerChangesScheduler`] for this [`Peer`].
@@ -854,6 +892,12 @@ mod peer_mutation_task {
     /// After all queued [`Task`]s are executed, negotiation __should__ be
     /// performed.
     pub(super) struct Task(TrackChange);
+
+    impl From<&Task> for TrackChange {
+        fn from(task: &Task) -> Self {
+            task.0.clone()
+        }
+    }
 
     impl Task {
         /// Returns new [`Task`] with provided [`FnOnce`] which will be ran on
