@@ -86,6 +86,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         Some(Box::new(on_event.clone())),
         None,
         deadline,
+        true,
     )
     .await;
 
@@ -109,6 +110,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         Some(Box::new(on_event)),
         None,
         deadline,
+        true,
     )
     .await;
 
@@ -152,6 +154,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         Some(Box::new(on_event.clone())),
         None,
         deadline,
+        true,
     )
     .await;
 
@@ -177,6 +180,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         Some(Box::new(on_event)),
         None,
         deadline,
+        true,
     )
     .await;
 
@@ -220,6 +224,7 @@ async fn signalling_starts_in_loopback_scenario() {
         Some(Box::new(on_event)),
         None,
         deadline,
+        true,
     )
     .await;
 
