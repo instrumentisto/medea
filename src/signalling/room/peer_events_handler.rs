@@ -1,8 +1,8 @@
 //! [`PeerConnectionStateEventsHandler`] implementation for [`Room`].
 
-use actix::{fut, Handler, Message, WeakAddr, WrapFuture};
+use actix::{fut, Handler, Message, WeakAddr};
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{Event, NegotiationRole, PeerId};
+use medea_client_api_proto::PeerId;
 
 use crate::{
     media::{peer::NegotiationSubscriber, Peer, PeerStateMachine, Stable},

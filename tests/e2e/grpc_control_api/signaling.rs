@@ -441,7 +441,7 @@ async fn test_renegotiation_queue() {
                     }
                 })
                 .count();
-            if peer_created_count > 10 {
+            if peer_created_count > 100 {
                 done_tx.unbounded_send(());
             }
         })),
@@ -451,7 +451,7 @@ async fn test_renegotiation_queue() {
 
     tokio::time::delay_for(Duration::from_millis(250)).await;
 
-    for _ in 0..10 {
+    for _ in 0..100 {
         delete_and_create_endpoint().await;
     }
 

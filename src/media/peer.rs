@@ -65,7 +65,6 @@ use crate::{
     api::control::{
         endpoints::webrtc_publish_endpoint::PublishPolicy, MemberId,
     },
-    log::prelude::*,
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
@@ -76,7 +75,6 @@ use crate::{
 };
 
 use self::peer_mutation_task::Task;
-use slog::Level::Trace;
 
 /// Subscriber to the events which indicates that negotiation process should
 /// be started for the some [`Peer`].
@@ -206,21 +204,29 @@ impl<'a> PeerChangesScheduler<'a> {
 
     pub fn remove_tracks(&mut self, track_ids: HashSet<TrackId>) {
         track_ids.into_iter().for_each(|id| {
-            let task_index_to_remove = self
+            let tasks_index_to_remove: Vec<_> = self
                 .context
                 .tasks_queue
                 .iter()
                 .enumerate()
-                .find(|(n, task)| match TrackChange::from(*task) {
+                .filter_map(|(n, task)| match TrackChange::from(task) {
                     TrackChange::AddSendTrack(track)
-                    | TrackChange::AddRecvTrack(track) => track.id == id,
-                    _ => false,
+                    | TrackChange::AddRecvTrack(track) => {
+                        if track.id == id {
+                            Some(n)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
                 })
-                .map(|(n, _)| n);
-            if let Some(remove_index) = task_index_to_remove {
-                self.context.tasks_queue.remove(remove_index);
-            } else {
+                .collect();
+            if tasks_index_to_remove.is_empty() {
                 self.schedule_task(Task::new(TrackChange::RemoveTrack(id)))
+            } else {
+                for remove_index in tasks_index_to_remove {
+                    self.context.tasks_queue.remove(remove_index);
+                }
             }
         });
     }
@@ -655,11 +661,7 @@ impl<T> Peer<T> {
             .map(|t| *t.0)
             .collect();
 
-        if removed_tracks == peers_tracks {
-            true
-        } else {
-            false
-        }
+        removed_tracks == peers_tracks
     }
 
     /// Returns [`PeerChangesScheduler`] for this [`Peer`].

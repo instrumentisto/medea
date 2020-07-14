@@ -41,7 +41,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use crate::media::Stable;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -338,15 +337,15 @@ impl PeersService {
     ///
     /// Returns [`PeerChange`]s which are was performed by this function.
     ///
-    /// ## Panics
+    /// ## Errors
     ///
-    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
-    /// [`Stable`] state.
+    /// Errors if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not
+    /// found.
     #[inline]
     pub fn delete_sink_endpoint(
         &self,
         sink: &WebRtcPlayEndpoint,
-    ) -> HashSet<PeerChange> {
+    ) -> Result<HashSet<PeerChange>, RoomError> {
         self.peers.delete_sink_endpoint(sink)
     }
 
@@ -354,15 +353,15 @@ impl PeersService {
     ///
     /// Returns [`PeerChange`]s which are was performed by this function.
     ///
-    /// ## Panics
+    /// ## Errors
     ///
-    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
-    /// [`Stable`] state.
+    /// Errors if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not
+    /// found.
     #[inline]
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> HashSet<PeerChange> {
+    ) -> Result<HashSet<PeerChange>, RoomError> {
         self.peers.delete_src_endpoint(src)
     }
 
@@ -713,13 +712,13 @@ impl PeerRepository {
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> HashSet<PeerChange> {
+    ) -> Result<HashSet<PeerChange>, RoomError> {
         let mut affected_peers = HashSet::new();
         for sink in src.sinks() {
-            affected_peers.extend(self.delete_sink_endpoint(&sink));
+            affected_peers.extend(self.delete_sink_endpoint(&sink)?);
         }
 
-        affected_peers
+        Ok(affected_peers)
     }
 
     /// Deletes provided [`WebRtcPlayEndpoint`].
@@ -733,12 +732,12 @@ impl PeerRepository {
     pub fn delete_sink_endpoint(
         &self,
         sink_endpoint: &WebRtcPlayEndpoint,
-    ) -> HashSet<PeerChange> {
+    ) -> Result<HashSet<PeerChange>, RoomError> {
         let mut changes = HashSet::new();
 
         if let Some(sink_peer_id) = sink_endpoint.peer_id() {
-            let (src_peer_id, tracks_to_remove) = self
-                .map_peer_by_id_mut(sink_peer_id, |sink_peer| {
+            let (src_peer_id, tracks_to_remove) =
+                self.map_peer_by_id_mut(sink_peer_id, |sink_peer| {
                     let src_peer_id = sink_peer.partner_peer_id();
                     let src_endpoint = sink_endpoint.src();
                     let tracks_to_remove =
@@ -748,20 +747,17 @@ impl PeerRepository {
                         .remove_tracks(tracks_to_remove.clone());
 
                     (src_peer_id, tracks_to_remove)
-                })
-                .unwrap();
+                })?;
             self.map_peer_by_id_mut(src_peer_id, |src_peer| {
                 src_peer
                     .as_changes_scheduler()
                     .remove_tracks(tracks_to_remove.clone());
-            });
+            })?;
 
-            let is_sink_peer_empty = self
-                .map_peer_by_id(sink_peer_id, |peer| peer.is_empty())
-                .unwrap();
-            let is_src_peer_empty = self
-                .map_peer_by_id(src_peer_id, |peer| peer.is_empty())
-                .unwrap();
+            let is_sink_peer_empty =
+                self.map_peer_by_id(sink_peer_id, PeerStateMachine::is_empty)?;
+            let is_src_peer_empty =
+                self.map_peer_by_id(src_peer_id, PeerStateMachine::is_empty)?;
 
             if is_sink_peer_empty && is_src_peer_empty {
                 let member = sink_endpoint.owner();
@@ -780,7 +776,7 @@ impl PeerRepository {
             }
         }
 
-        changes
+        Ok(changes)
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -824,7 +820,7 @@ impl PeerRepository {
 
         peers_to_remove
             .values()
-            .flat_map(|peer_ids| peer_ids.iter())
+            .flat_map(HashSet::iter)
             .for_each(|id| {
                 self.0.borrow_mut().remove(id);
             });

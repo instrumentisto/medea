@@ -79,17 +79,17 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
-    ) {
+    ) -> Result<(), RoomError> {
         if let Some(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
             let changeset =
                 if let Some(sink_endpoint) = member.take_sink(&play_id) {
-                    self.peers.delete_sink_endpoint(&sink_endpoint)
+                    self.peers.delete_sink_endpoint(&sink_endpoint)?
                 } else {
                     let publish_id = String::from(play_id).into();
 
                     if let Some(src_endpoint) = member.take_src(&publish_id) {
-                        self.peers.delete_src_endpoint(&src_endpoint)
+                        self.peers.delete_src_endpoint(&src_endpoint)?
                     } else {
                         HashSet::new()
                     }
@@ -114,7 +114,7 @@ impl Room {
                     }
                 }
                 for updated_peer_id in updated_peers {
-                    self.peers.run_scheduled_tasks(updated_peer_id);
+                    self.peers.run_scheduled_tasks(updated_peer_id)?;
                 }
 
                 let futs: Vec<_> = removed_peers
@@ -138,6 +138,8 @@ impl Room {
                 }
             }));
         }
+
+        Ok(())
     }
 
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
@@ -416,7 +418,13 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            self.delete_endpoint(&member_id, endpoint_id, ctx);
+            if let Err(e) = self.delete_endpoint(&member_id, endpoint_id, ctx) {
+                error!(
+                    "Failed to remove Endpoint: {:?}. Closing Room [id = {}].",
+                    e, self.id
+                );
+                self.close_gracefully(ctx);
+            }
         });
     }
 }
