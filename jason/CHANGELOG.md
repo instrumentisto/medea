@@ -50,6 +50,7 @@ All user visible changes to this project will be documented in this file. This p
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+        - `ConnectionHandle.get_remote_id` method ([#120]);
         - `ConnectionHandle.on_close` callback ([#120]).
 - RPC messaging:
     - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
