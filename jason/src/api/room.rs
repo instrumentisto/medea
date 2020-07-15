@@ -818,8 +818,11 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.connections
-            .create_connections_from_tracks(&peer, &tracks);
+        self.connections.create_connections_from_tracks(
+            peer.id(),
+            &peer,
+            &tracks,
+        );
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,

@@ -14,8 +14,8 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::MediaStreamTrack,
     peer::{
-        MuteStateUpdate, PeerConnection, PeerMediaStream, RemoteMediaStream,
-        StableMuteState,
+        MuteStateUpdate, MuteStateUpdatesPublisher, PeerConnection,
+        PeerMediaStream, RemoteMediaStream, StableMuteState,
     },
     utils::{yield_now, Callback0, Callback1, HandlerDetachedError},
 };
@@ -47,11 +47,14 @@ impl Connections {
     /// [`Track`]s.
     // TODO: creates connections based on remote peer_ids atm, should create
     //       connections based on remote member_ids
-    pub fn create_connections_from_tracks(
+    pub fn create_connections_from_tracks<T>(
         &self,
-        local_peer: &Rc<PeerConnection>,
+        peer_id: PeerId,
+        local_peer: &T,
         tracks: &[Track],
-    ) {
+    ) where
+        T: MuteStateUpdatesPublisher,
+    {
         let create_connection = |connections: &Self, remote_id: &PeerId| {
             let is_new =
                 !connections.connections.borrow().contains_key(remote_id);
@@ -65,7 +68,7 @@ impl Connections {
                 connections
                     .local_to_remote
                     .borrow_mut()
-                    .insert(local_peer.id(), *remote_id);
+                    .insert(peer_id, *remote_id);
             }
         };
 

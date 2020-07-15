@@ -36,6 +36,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use crate::peer::MuteStateUpdatesPublisher;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -338,21 +339,6 @@ impl MediaConnections {
         Ok(())
     }
 
-    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
-    /// [`StableMuteState`] will be sent.
-    pub fn on_mute_state_update(
-        &self,
-    ) -> LocalBoxStream<'static, MuteStateUpdate> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0
-            .borrow_mut()
-            .recv_mute_state_senders
-            .borrow_mut()
-            .push(tx);
-
-        Box::pin(rx)
-    }
-
     /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
     /// with [`proto::TrackPatch`].
     ///
@@ -501,5 +487,20 @@ impl MediaConnections {
             .senders
             .values()
             .for_each(|sender| sender.reset_mute_state_transition_timeout());
+    }
+}
+
+impl MuteStateUpdatesPublisher for Rc<MediaConnections> {
+    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
+    /// [`StableMuteState`] will be sent.
+    fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0
+            .borrow_mut()
+            .recv_mute_state_senders
+            .borrow_mut()
+            .push(tx);
+
+        Box::pin(rx)
     }
 }

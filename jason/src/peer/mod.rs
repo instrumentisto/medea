@@ -186,6 +186,16 @@ pub enum PeerEvent {
     },
 }
 
+pub trait MuteStateUpdatesPublisher {
+    fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate>;
+}
+
+impl MuteStateUpdatesPublisher for Rc<PeerConnection> {
+    fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate> {
+        self.media_connections.on_mute_state_update()
+    }
+}
+
 /// High-level wrapper around [`RtcPeerConnection`].
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
