@@ -26,7 +26,7 @@ impl Callback0 {
         self.f.borrow().as_ref().map(|f| f.call0(&JsValue::NULL))
     }
 
-    /// Indicates if callback is set.
+    /// Indicates whether callback is set.
     #[inline]
     pub fn is_set(&self) -> bool {
         self.f.borrow().as_ref().is_some()

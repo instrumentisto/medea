@@ -75,7 +75,7 @@ impl Connections {
         }
     }
 
-    /// Lookup [`Connection`] by remote [`PeerId`].
+    /// Lookups [`Connection`] by the given remote [`PeerId`].
     pub fn get(&self, remote_peer_id: PeerId) -> Option<Connection> {
         self.connections.borrow().get(&remote_peer_id).cloned()
     }
