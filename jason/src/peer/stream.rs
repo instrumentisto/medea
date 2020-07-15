@@ -14,7 +14,7 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     media::{MediaStreamTrack, TrackKind},
-    utils::{Callback, HandlerDetachedError},
+    utils::{Callback1, HandlerDetachedError},
 };
 
 /// Actual data of a [`PeerMediaStream`].
@@ -34,13 +34,13 @@ struct InnerStream {
     video_tracks: HashMap<TrackId, MediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on new `MediaTrack` adding.
-    on_track_added: Callback<TrackKind>,
+    on_track_added: Callback1<TrackKind>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` starting.
-    on_track_started: Callback<TrackKind>,
+    on_track_started: Callback1<TrackKind>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` stopping.
-    on_track_stopped: Callback<TrackKind>,
+    on_track_stopped: Callback1<TrackKind>,
 }
 
 impl InnerStream {
@@ -50,9 +50,9 @@ impl InnerStream {
             stream: SysMediaStream::new().unwrap(),
             audio_tracks: HashMap::new(),
             video_tracks: HashMap::new(),
-            on_track_added: Callback::default(),
-            on_track_started: Callback::default(),
-            on_track_stopped: Callback::default(),
+            on_track_added: Callback1::default(),
+            on_track_started: Callback1::default(),
+            on_track_stopped: Callback1::default(),
         }
     }
 
@@ -167,27 +167,25 @@ impl RemoteMediaStream {
     }
 
     pub fn get_audio_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| {
-                let stream = SysMediaStream::new().unwrap();
-                for audio_track in inner.borrow().audio_tracks.values() {
-                    stream.add_track(audio_track.as_ref());
-                }
+        upgrade_or_detached!(self.0).map(|inner| {
+            let stream = SysMediaStream::new().unwrap();
+            for audio_track in inner.borrow().audio_tracks.values() {
+                stream.add_track(audio_track.as_ref());
+            }
 
-                stream
-            })
+            stream
+        })
     }
 
     pub fn get_video_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| {
-                let stream = SysMediaStream::new().unwrap();
-                for video_track in inner.borrow().video_tracks.values() {
-                    stream.add_track(video_track.as_ref());
-                }
+        upgrade_or_detached!(self.0).map(|inner| {
+            let stream = SysMediaStream::new().unwrap();
+            for video_track in inner.borrow().video_tracks.values() {
+                stream.add_track(video_track.as_ref());
+            }
 
-                stream
-            })
+            stream
+        })
     }
 
     /// Sets callback, which will be invoked on new `MediaTrack` adding.

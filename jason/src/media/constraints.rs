@@ -20,20 +20,22 @@ pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
 
 #[cfg(feature = "mockable")]
 impl From<MediaStreamSettings> for LocalStreamConstraints {
+    #[inline]
     fn from(from: MediaStreamSettings) -> Self {
         Self(Rc::new(RefCell::new(from)))
     }
 }
 
 impl LocalStreamConstraints {
-    /// Returns new [`LocalStreamConstraints`] with the default values.
+    /// Returns new [`LocalStreamConstraints`] with default values.
     #[inline]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Constrains underlying [`MediaStreamSettings`] with a provided
+    /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
     /// [`MediaStreamSettings`].
+    #[inline]
     pub fn constrain(&self, other: MediaStreamSettings) {
         self.0.borrow_mut().constrain(other)
     }
@@ -44,19 +46,19 @@ impl LocalStreamConstraints {
         self.0.borrow().clone()
     }
 
-    /// Enabled/disables audio or video type in underlying
+    /// Enables or disables audio or video type in underlying
     /// [`MediaStreamSettings`].
     ///
-    /// Don't do anything if no [`MediaStreamSettings`] was set.
+    /// Doesn't do anything if no [`MediaStreamSettings`] was set.
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
-    /// of media wouldn't be published.
+    /// of media won't be published.
     #[inline]
     pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
         self.0.borrow_mut().toggle_enable(is_enabled, kind);
     }
 
-    /// Returns `true` if provided [`MediaType`] is enabled in underlying
+    /// Indicates whether provided [`MediaType`] is enabled in the underlying
     /// [`MediaStreamSettings`].
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
@@ -105,12 +107,13 @@ struct AudioMediaStreamSettings {
     /// Constraints applicable to video tracks.
     constraints: AudioTrackConstraints,
 
-    /// If `true` then audio is enabled and this constraints should be injected
-    /// into `Peer`.
+    /// Indicator whether audio is enabled and this constraints should be
+    /// injected into `Peer`.
     is_enabled: bool,
 }
 
 impl Default for AudioMediaStreamSettings {
+    #[inline]
     fn default() -> Self {
         Self {
             constraints: AudioTrackConstraints::default(),
@@ -124,15 +127,16 @@ impl Default for AudioMediaStreamSettings {
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[derive(Clone, Debug)]
 struct VideoMediaStreamSettings {
-    /// Constraints applicable to audio tracks.
+    /// Constraints applicable to video tracks.
     constraints: VideoTrackConstraints,
 
-    /// If `true` then video is enabled and this constraints should be injected
-    /// into `Peer`.
+    /// Indicator whether video is enabled and this constraints should be
+    /// injected into `Peer`.
     is_enabled: bool,
 }
 
 impl Default for VideoMediaStreamSettings {
+    #[inline]
     fn default() -> Self {
         Self {
             constraints: VideoTrackConstraints::default(),
@@ -200,25 +204,29 @@ impl MediaStreamSettings {
 
 impl MediaStreamSettings {
     /// Returns only audio constraints.
+    #[inline]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
         &self.audio.constraints
     }
 
     /// Returns only video constraints.
+    #[inline]
     pub fn get_video(&self) -> &VideoTrackConstraints {
         &self.video.constraints
     }
 
     /// Set [`VideoTrackConstraints`].
+    #[inline]
     pub fn video(&mut self, constraints: VideoTrackConstraints) {
         self.video.is_enabled = true;
         self.video.constraints = constraints;
     }
 
-    /// Enabled/disables audio or video type in this [`MediaStreamSettings`].
+    /// Enables or disables audio or video type in this [`MediaStreamSettings`].
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
-    /// of media wouldn't be published.
+    /// of media won't be published.
+    #[inline]
     pub fn toggle_enable(&mut self, is_enabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
@@ -230,30 +238,35 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets underlying [`AudioMediaStreamSettings::is_enabled`] to a provided
-    /// [`bool`].
+    /// Sets the underlying [`AudioMediaStreamSettings::is_enabled`] to the
+    /// given value.
+    #[inline]
     pub fn toggle_publish_audio(&mut self, is_enabled: bool) {
         self.audio.is_enabled = is_enabled;
     }
 
-    /// Sets underlying [`VideoMediaStreamSettings::is_enabled`] to a provided
-    /// [`bool`].
+    /// Sets the underlying [`VideoMediaStreamSettings::is_enabled`] to the
+    /// given value.
+    #[inline]
     pub fn toggle_publish_video(&mut self, is_enabled: bool) {
         self.video.is_enabled = is_enabled;
     }
 
-    /// Returns `true` if audio is enabled in this [`MediaStreamSettings`].
+    /// Indicates whether audio is enabled in this [`MediaStreamSettings`].
+    #[inline]
     pub fn is_audio_enabled(&self) -> bool {
         self.audio.is_enabled
     }
 
-    /// Returns `true` if video is enabled in this [`MediaStreamSettings`].
+    /// Indicates whether video is enabled in this [`MediaStreamSettings`].
+    #[inline]
     pub fn is_video_enabled(&self) -> bool {
         self.video.is_enabled
     }
 
-    /// Returns `true` if provided [`MediaType`] is enabled in this
+    /// Indicates whether the given [`MediaType`] is enabled in this
     /// [`MediaStreamSettings`].
+    #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         match kind {
             MediaType::Video(_) => self.video.is_enabled,
@@ -261,8 +274,9 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Constrains this [`MediaStreamSettings`] with a provided
+    /// Constrains this [`MediaStreamSettings`] with the given `other`
     /// [`MediaStreamSettings`].
+    #[inline]
     fn constrain(&mut self, other: Self) {
         // `&=` cause we should not unmute muted Room, but we can mute not muted
         // room.

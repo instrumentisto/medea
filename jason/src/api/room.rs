@@ -2,7 +2,6 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
     ops::Deref as _,
     rc::{Rc, Weak},
 };
@@ -12,15 +11,16 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, NegotiationRole, PeerConnectionState,
-    PeerId, PeerMetrics, Track, TrackId, TrackPatch, TrackUpdate,
+    Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
+    IceServer, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
+    Track, TrackId, TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
+    api::connection::Connections,
     media::{
         LocalStreamConstraints, MediaStream, MediaStreamSettings,
         MediaStreamTrack,
@@ -35,12 +35,10 @@ use crate::{
         RpcClientError, TransportError,
     },
     utils::{
-        console_error, Callback, HandlerDetachedError, JasonError, JsCaused,
+        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
         JsError,
     },
 };
-
-use super::{connection::Connection, ConnectionHandle};
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -278,13 +276,14 @@ impl RoomHandle {
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// Sets callback, which will be invoked on new `Connection` establishing.
+    /// Sets callback, which will be invoked when new [`Connection`] with some
+    /// remote `Peer` is established.
     pub fn on_new_connection(
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_new_connection.set_func(f))
+            .map(|inner| inner.connections.on_new_connection(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
@@ -531,7 +530,7 @@ impl Room {
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     ///
-    /// Used to inspect [`Room`]s inner state in integration tests.
+    /// Used to inspect [`Room`]'s inner state in integration tests.
     #[cfg(feature = "mockable")]
     pub fn get_peer_by_id(
         &self,
@@ -558,11 +557,7 @@ struct InnerRoom {
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Collection of [`Connection`]s with a remote [`Member`]s.
-    connections: RefCell<HashMap<PeerId, Connection>>,
-
-    /// Callback from JS side which will be invoked on remote `Member` media
-    /// stream arrival.
-    on_new_connection: Callback<ConnectionHandle>,
+    connections: Connections,
 
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
     /// its actual underlying [MediaStream][1] object.
@@ -570,17 +565,17 @@ struct InnerRoom {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
-    on_local_stream: Callback<MediaStream>,
+    on_local_stream: Callback1<MediaStream>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_stream: Rc<Callback<JasonError>>,
+    on_failed_local_stream: Rc<Callback1<JasonError>>,
 
     /// Callback to be invoked when [`RpcClient`] loses connection.
-    on_connection_loss: Callback<ReconnectHandle>,
+    on_connection_loss: Callback1<ReconnectHandle>,
 
     /// JS callback which will be called when this [`Room`] will be closed.
-    on_close: Rc<Callback<RoomCloseReason>>,
+    on_close: Rc<Callback1<RoomCloseReason>>,
 
     /// Reason of [`Room`] closing.
     ///
@@ -605,12 +600,11 @@ impl InnerRoom {
             local_stream_settings,
             peers,
             peer_event_sender,
-            connections: RefCell::new(HashMap::new()),
-            on_new_connection: Callback::default(),
-            on_local_stream: Callback::default(),
-            on_connection_loss: Callback::default(),
-            on_failed_local_stream: Rc::new(Callback::default()),
-            on_close: Rc::new(Callback::default()),
+            connections: Connections::default(),
+            on_local_stream: Callback1::default(),
+            on_connection_loss: Callback1::default(),
+            on_failed_local_stream: Rc::new(Callback1::default()),
+            on_close: Rc::new(Callback1::default()),
             close_reason: RefCell::new(CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
@@ -624,42 +618,6 @@ impl InnerRoom {
     /// to be triggered after this function call.
     fn set_close_reason(&self, reason: CloseReason) {
         self.close_reason.replace(reason);
-    }
-
-    /// Creates new [`Connection`]s basing on senders and receivers of provided
-    /// [`Track`]s.
-    // TODO: creates connections based on remote peer_ids atm, should create
-    //       connections based on remote member_ids
-    fn create_connections_from_tracks(
-        &self,
-        tracks: &[Track],
-        peer: &Rc<PeerConnection>,
-    ) {
-        fn create_connection(
-            room: &InnerRoom,
-            peer_id: PeerId,
-            peer: &Rc<PeerConnection>,
-        ) {
-            let is_new = !room.connections.borrow().contains_key(&peer_id);
-            if is_new {
-                let con = Connection::new(peer.on_mute_state_update());
-                room.on_new_connection.call(con.new_handle());
-                room.connections.borrow_mut().insert(peer_id, con);
-            }
-        }
-
-        for track in tracks {
-            match &track.direction {
-                Direction::Send { receivers, .. } => {
-                    for receiver in receivers {
-                        create_connection(self, *receiver, peer);
-                    }
-                }
-                Direction::Recv { sender, .. } => {
-                    create_connection(self, *sender, peer);
-                }
-            }
-        }
     }
 
     /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
@@ -860,7 +818,8 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.create_connections_from_tracks(&tracks, &peer);
+        self.connections
+            .create_connections_from_tracks(&peer, &tracks);
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,
@@ -913,6 +872,7 @@ impl EventHandler for InnerRoom {
     ) -> Result<(), Traced<RoomError>> {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
+            self.connections.close_connection(*id);
             self.peers.remove(*id);
         });
         Ok(())
@@ -993,9 +953,9 @@ impl PeerEventHandler for InnerRoom {
         track_id: TrackId,
         track: MediaStreamTrack,
     ) -> Result<(), Traced<RoomError>> {
-        let connections_ref = self.connections.borrow();
-        let conn = connections_ref
-            .get(&sender_id)
+        let conn = self
+            .connections
+            .get(sender_id)
             .ok_or_else(|| tracerr::new!(RoomError::UnknownRemotePeer))?;
         conn.add_remote_track(track_id, track);
         Ok(())
