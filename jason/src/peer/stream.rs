@@ -167,6 +167,7 @@ impl RemoteMediaStream {
     }
 
     // TODO(evdokimovs): REMOVE ME
+    #[allow(missing_docs, clippy::missing_errors_doc)]
     pub fn get_audio_stream(&self) -> Result<SysMediaStream, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             let stream = SysMediaStream::new().unwrap();
@@ -179,6 +180,7 @@ impl RemoteMediaStream {
     }
 
     // TODO(evdokimovs): REMOVE ME
+    #[allow(missing_docs, clippy::missing_errors_doc)]
     pub fn get_video_stream(&self) -> Result<SysMediaStream, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             let stream = SysMediaStream::new().unwrap();

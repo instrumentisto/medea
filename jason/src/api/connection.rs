@@ -14,7 +14,7 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::MediaStreamTrack,
     peer::{
-        MuteState, MuteStateUpdate, MuteStateUpdatesPublisher, PeerMediaStream,
+        MuteStateUpdate, MuteStateUpdatesPublisher, PeerMediaStream,
         RemoteMediaStream, StableMuteState,
     },
     utils::{yield_now, Callback0, Callback1, HandlerDetachedError},
