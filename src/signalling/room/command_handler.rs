@@ -171,6 +171,8 @@ impl CommandHandler for Room {
             peer.as_changes_scheduler().patch_tracks(tracks_patches);
         })?;
 
-        Ok(self.send_tracks_applied(peer_id))
+        self.peers.run_scheduled_tasks(peer_id)?;
+
+        Ok(Box::new(actix::fut::ok(())))
     }
 }
