@@ -317,18 +317,31 @@ impl MediaConnections {
                     let mute_state_senders =
                         inner.recv_mute_state_senders.clone();
                     spawn_local(async move {
+                        let mut general_mute_state = HashMap::new();
                         while let Some(mute_state_update) =
                             mute_state_stream.next().await
                         {
-                            for mute_state_sender in
-                                mute_state_senders.borrow().iter()
+                            let is_updated;
+                            if let Some(old_mute_state) = general_mute_state
+                                .insert(track_kind, mute_state_update)
                             {
-                                mute_state_sender
-                                    .unbounded_send(MuteStateUpdate {
-                                        new_mute_state: mute_state_update,
-                                        kind: track_kind,
-                                    })
-                                    .unwrap();
+                                is_updated =
+                                    old_mute_state != mute_state_update;
+                            } else {
+                                is_updated = true;
+                            }
+
+                            if is_updated {
+                                for mute_state_sender in
+                                    mute_state_senders.borrow().iter()
+                                {
+                                    mute_state_sender
+                                        .unbounded_send(MuteStateUpdate {
+                                            new_mute_state: mute_state_update,
+                                            kind: track_kind,
+                                        })
+                                        .unwrap();
+                                }
                             }
                         }
                     });

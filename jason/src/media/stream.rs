@@ -107,7 +107,7 @@ pub struct MediaStreamTrack(Rc<SysMediaStreamTrack>);
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Display, Eq, PartialEq)]
+#[derive(Clone, Copy, Display, Eq, PartialEq, Hash)]
 pub enum TrackKind {
     /// Audio track.
     #[display(fmt = "audio")]

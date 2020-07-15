@@ -535,6 +535,7 @@ window.onload = async function() {
         video.style.background = '#f5f5f5';
 
         stream.on_track_started((kind) => {
+          console.log(`on_track_started: ${kind}`);
           if (kind === 'audio') {
             isAudioStarted = true;
           }
@@ -554,6 +555,7 @@ window.onload = async function() {
           video.controls = true;
         });
         stream.on_track_stopped((kind) => {
+          console.log(`on_track_stopped: ${kind}`);
           if (kind === 'audio') {
             isAudioStarted = false;
           }
@@ -573,6 +575,7 @@ window.onload = async function() {
           video.controls = true;
         });
         stream.on_track_added((kind) => {
+          console.log(`on_track_added: ${kind}`);
           console.log(`added: ${kind}`);
         });
 

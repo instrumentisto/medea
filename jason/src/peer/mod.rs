@@ -186,11 +186,17 @@ pub enum PeerEvent {
     },
 }
 
+/// Object which can send [`StableMuteState`] updates of the
+/// [`PeerConnection`]'s `MediaTrack`s.
 pub trait MuteStateUpdatesPublisher {
+    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
+    /// [`StableMuteState`] will be sent.
     fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate>;
 }
 
 impl MuteStateUpdatesPublisher for Rc<PeerConnection> {
+    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
+    /// [`StableMuteState`] will be sent.
     fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate> {
         self.media_connections.on_mute_state_update()
     }
