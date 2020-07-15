@@ -10,8 +10,11 @@ use std::{
 use actix::{
     fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
 };
+use deadpool_redis::redis::{
+    Client as RedisClient, ConnectionAddr, ConnectionInfo, Msg as RedisMsg,
+    RedisError,
+};
 use futures::{channel::mpsc, StreamExt as _};
-use redis::{ConnectionAddr, ConnectionInfo, RedisError};
 
 use crate::{
     log::prelude::*,
@@ -39,7 +42,7 @@ pub struct CoturnMetricsService {
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Redis client with which Coturn stat updates are received.
-    client: redis::Client,
+    client: RedisClient,
 
     /// Count of allocations for each [`CoturnUsername`] (which acts as a key).
     allocations_count: HashMap<CoturnUsername, u64>,
@@ -67,7 +70,7 @@ impl CoturnMetricsService {
                 Some(cf.db.redis.pass.to_string())
             },
         };
-        let client = redis::Client::open(connection_info)?;
+        let client = RedisClient::open(connection_info)?;
 
         Ok(Self {
             client,
@@ -142,8 +145,8 @@ impl Actor for CoturnMetricsService {
     }
 }
 
-impl StreamHandler<redis::Msg> for CoturnMetricsService {
-    fn handle(&mut self, msg: redis::Msg, _: &mut Self::Context) {
+impl StreamHandler<RedisMsg> for CoturnMetricsService {
+    fn handle(&mut self, msg: RedisMsg, _: &mut Self::Context) {
         let event = match CoturnEvent::parse(&msg) {
             Ok(ev) => ev,
             Err(e) => {

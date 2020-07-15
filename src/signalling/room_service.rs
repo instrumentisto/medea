@@ -5,13 +5,13 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use actix::{
     Actor, Addr, Context, Handler, MailboxError, Message, ResponseFuture,
 };
+use deadpool_redis::redis::RedisError;
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
 use medea_control_api_proto::grpc::api as proto;
-use redis::RedisError;
 
 use crate::{
     api::control::{

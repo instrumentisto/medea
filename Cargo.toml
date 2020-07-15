@@ -66,11 +66,6 @@ url = "2.1"
 [dependencies.slog]
     version = "2.5"
     features = ["release_max_level_trace", "max_level_trace"]
-[dependencies.redis]
-    package = "redis"
-    version = "0.16"
-    default-features = false
-    features = ["tokio-comp"]
 
 [dev-dependencies]
 actix-codec = "0.2"
