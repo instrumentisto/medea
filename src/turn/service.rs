@@ -6,11 +6,11 @@
 use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
-use deadpool_redis::redis::{ConnectionAddr, ConnectionInfo};
 use derive_more::{Display, From};
 use failure::Fail;
 use medea_client_api_proto::PeerId;
 use rand::{distributions::Alphanumeric, Rng};
+use redis::ConnectionInfo;
 
 use crate::{
     api::control::RoomId,
@@ -163,7 +163,7 @@ pub fn new_turn_auth_service<'a>(
     let turn_db = TurnDatabase::new(
         cf.db.redis.connect_timeout,
         ConnectionInfo {
-            addr: Box::new(ConnectionAddr::Tcp(
+            addr: Box::new(redis::ConnectionAddr::Tcp(
                 cf.db.redis.host.to_string(),
                 cf.db.redis.port,
             )),

@@ -1533,6 +1533,7 @@ dependencies = [
  "medea-macro",
  "mockall",
  "rand 0.7.3",
+ "redis",
  "rust-crypto",
  "serde 1.0.114",
  "serde_json",

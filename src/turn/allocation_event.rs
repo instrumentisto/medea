@@ -2,7 +2,6 @@
 
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
-use deadpool_redis::redis::Msg as RedisMsg;
 use derive_more::Display;
 use medea_client_api_proto::PeerId;
 
@@ -99,7 +98,7 @@ impl CoturnEvent {
     ///
     /// All errors from this function should never happen, so there is no sense
     /// to catch them individually.
-    pub fn parse(msg: &RedisMsg) -> Result<Self, CoturnEventParseError> {
+    pub fn parse(msg: &redis::Msg) -> Result<Self, CoturnEventParseError> {
         use CoturnEventParseError as E;
 
         let channel: String =

@@ -5,13 +5,10 @@ use std::{fmt, time::Duration};
 
 use crypto::{digest::Digest, md5::Md5};
 use deadpool::managed::{PoolConfig, Timeouts};
-use deadpool_redis::{
-    cmd,
-    redis::{IntoConnectionInfo, RedisError},
-    Pool, PoolError,
-};
+use deadpool_redis::{cmd, Pool, PoolError};
 use derive_more::{Display, From};
 use failure::Fail;
+use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{log::prelude::*, media::IceUser};
 
