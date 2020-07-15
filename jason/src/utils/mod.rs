@@ -18,7 +18,7 @@ use web_sys::Window;
 
 #[doc(inline)]
 pub use self::{
-    callback::{Callback, Callback2},
+    callback::{Callback0, Callback1, Callback2},
     errors::{
         console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
         JsonParseError,
