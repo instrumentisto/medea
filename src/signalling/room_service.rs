@@ -136,8 +136,8 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails
-    /// to connect to Redis stats server.
+    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails to connect to
+    /// Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
