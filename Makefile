@@ -22,7 +22,7 @@ CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.44
 CHROME_VERSION := 83.0
-FIREFOX_VERSION := 78.0
+FIREFOX_VERSION := 78.0.2
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
