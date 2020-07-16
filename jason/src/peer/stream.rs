@@ -10,11 +10,13 @@ use std::{
 
 use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
-use web_sys::MediaStream as SysMediaStream;
+use web_sys::{
+    MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
+};
 
 use crate::{
     media::{MediaStreamTrack, TrackKind},
-    utils::{Callback1, HandlerDetachedError},
+    utils::{console_error, Callback1, HandlerDetachedError},
 };
 
 /// Actual data of a [`PeerMediaStream`].
@@ -34,13 +36,13 @@ struct InnerStream {
     video_tracks: HashMap<TrackId, MediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on new `MediaTrack` adding.
-    on_track_added: Callback1<TrackKind>,
+    on_track_added: Callback1<SysMediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` starting.
-    on_track_started: Callback1<TrackKind>,
+    on_track_started: Callback1<SysMediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` stopping.
-    on_track_stopped: Callback1<TrackKind>,
+    on_track_stopped: Callback1<SysMediaStreamTrack>,
 }
 
 impl InnerStream {
@@ -61,6 +63,7 @@ impl InnerStream {
         self.stream.add_track(track.as_ref());
 
         let track_kind = track.kind();
+        let sys_track = track.as_sys();
         match track_kind {
             TrackKind::Audio => {
                 self.audio_tracks.insert(track_id, track);
@@ -69,8 +72,7 @@ impl InnerStream {
                 self.video_tracks.insert(track_id, track);
             }
         };
-
-        self.on_track_added.call(track_kind);
+        self.on_track_added.call(sys_track);
     }
 }
 
@@ -83,6 +85,7 @@ impl InnerStream {
 /// [`RemoteMediaStream`].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+#[derive(Clone)]
 pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
 
 #[allow(clippy::new_without_default)]
@@ -136,16 +139,16 @@ impl PeerMediaStream {
     /// [`TrackKind`] was started.
     ///
     /// Calls [`PeerMediaStream::on_track_started`] JS callback function.
-    pub fn track_started(&self, kind: TrackKind) {
-        self.0.borrow().on_track_started.call(kind);
+    pub fn track_started(&self, track: &MediaStreamTrack) {
+        self.0.borrow().on_track_started.call(track.as_sys());
     }
 
     /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
     /// [`TrackKind`] was stopped.
     ///
     /// Calls [`PeerMediaStream::on_track_stopped`] JS callback function.
-    pub fn track_stopped(&self, kind: TrackKind) {
-        self.0.borrow().on_track_stopped.call(kind);
+    pub fn track_stopped(&self, track: &MediaStreamTrack) {
+        self.0.borrow().on_track_stopped.call(track.as_sys());
     }
 }
 
@@ -203,7 +206,7 @@ impl RemoteMediaStream {
                     .values()
                     .chain(inner.video_tracks.values())
                     .for_each(|track| {
-                        inner.on_track_added.call(track.kind());
+                        inner.on_track_added.call(track.as_sys());
                     });
             }
         })

@@ -818,11 +818,8 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.connections.create_connections_from_tracks(
-            peer.id(),
-            &peer,
-            &tracks,
-        );
+        self.connections
+            .create_connections_from_tracks(peer.id(), &tracks);
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,
@@ -955,7 +952,7 @@ impl PeerEventHandler for InnerRoom {
         sender_id: PeerId,
         track_id: TrackId,
         track: MediaStreamTrack,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let conn = self
             .connections
             .get(sender_id)
@@ -969,7 +966,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         _: PeerId,
         stream: MediaStream,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.on_local_stream.call(stream);
         Ok(())
     }
@@ -980,7 +977,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         ice_connection_state: IceConnectionState,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
             metrics: PeerMetrics::IceConnectionState(ice_connection_state),
@@ -994,7 +991,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         peer_connection_state: PeerConnectionState,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
             metrics: PeerMetrics::PeerConnectionState(peer_connection_state),
@@ -1014,7 +1011,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         stats: RtcStats,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
             metrics: PeerMetrics::RtcStats(stats.0),
@@ -1027,7 +1024,7 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_local_stream_required(
         &self,
         peer_id: PeerId,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -1039,6 +1036,23 @@ impl PeerEventHandler for InnerRoom {
         {
             self.on_failed_local_stream.call(JasonError::from(err));
         };
+        Ok(())
+    }
+
+    /// Updates [`StableMuteState`] in the [`Connection`] for the provided
+    /// [`PeerId`].
+    ///
+    /// Does nothing if [`Connection`] for the provided [`PeerId`] not found.
+    async fn on_mute_state_changed(
+        &self,
+        peer_id: PeerId,
+        track: MediaStreamTrack,
+        mute_state: StableMuteState,
+    ) -> Self::Output {
+        if let Some(conn) = self.connections.get(peer_id) {
+            conn.update_mute_state(&track, mute_state).await;
+        }
+
         Ok(())
     }
 }

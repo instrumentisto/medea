@@ -534,7 +534,8 @@ window.onload = async function() {
         video.poster = 'https://image.flaticon.com/icons/svg/813/813734.svg';
         video.style.background = '#f5f5f5';
 
-        stream.on_track_started((kind) => {
+        stream.on_track_started((track) => {
+          let kind = track.kind;
           console.log(`on_track_started: ${kind}`);
           if (kind === 'audio') {
             isAudioStarted = true;
@@ -554,7 +555,8 @@ window.onload = async function() {
           video.controls = false;
           video.controls = true;
         });
-        stream.on_track_stopped((kind) => {
+        stream.on_track_stopped((track) => {
+          let kind = track.kind;
           console.log(`on_track_stopped: ${kind}`);
           if (kind === 'audio') {
             isAudioStarted = false;
@@ -574,9 +576,9 @@ window.onload = async function() {
           video.controls = false;
           video.controls = true;
         });
-        stream.on_track_added((kind) => {
+        stream.on_track_added((track) => {
+          let kind = track.kind;
           console.log(`on_track_added: ${kind}`);
-          console.log(`added: ${kind}`);
         });
 
         video.oncanplay = async () => {

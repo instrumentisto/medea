@@ -13,15 +13,17 @@ use medea_jason::{
     api::{ConnectionHandle, Connections},
     media::{MediaManager, MediaStreamTrack, TrackKind},
     peer::{
-        MuteStateUpdate, MuteStateUpdatesPublisher, PeerConnection,
-        RemoteMediaStream, RtcPeerConnection, StableMuteState,
+        MuteStateUpdate, PeerConnection, RemoteMediaStream, RtcPeerConnection,
+        StableMuteState,
     },
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
+use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{timeout, wait_and_check_test_result};
+use medea_jason::utils::yield_now;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -61,11 +63,7 @@ async fn on_new_connection_fires() {
     });
     cons.on_new_connection(cb.into());
 
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &MuteStateUpdatePublisherMock::new(),
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -74,11 +72,7 @@ async fn on_new_connection_fires() {
 async fn on_remote_stream_fires() {
     let cons = Connections::default();
 
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &MuteStateUpdatePublisherMock::new(),
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
 
     let con = cons.get(PeerId(234)).unwrap();
     let con_handle = con.new_handle();
@@ -104,11 +98,7 @@ async fn on_remote_stream_fires() {
 async fn tracks_are_added_to_remote_stream() {
     let cons = Connections::default();
 
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &MuteStateUpdatePublisherMock::new(),
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
 
     let con = cons.get(PeerId(234)).unwrap();
     let con_handle = con.new_handle();
@@ -147,23 +137,10 @@ impl MuteStateUpdatePublisherMock {
     }
 }
 
-impl MuteStateUpdatesPublisher for MuteStateUpdatePublisherMock {
-    fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate> {
-        let (tx, rx) = mpsc::unbounded();
-        self.tx.borrow_mut().push(tx);
-
-        Box::pin(rx)
-    }
-}
-
 #[wasm_bindgen_test]
 async fn on_closed_fires() {
     let cons = Connections::default();
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &MuteStateUpdatePublisherMock::new(),
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
     let con = cons.get(PeerId(234)).unwrap();
     let con_handle = con.new_handle();
 
@@ -181,12 +158,7 @@ async fn on_closed_fires() {
 async fn on_track_added_works() {
     let cons = Connections::default();
 
-    let mute_state_update_publisher = MuteStateUpdatePublisherMock::new();
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &mute_state_update_publisher,
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
     let conn = cons.get(PeerId(234)).unwrap();
 
     let conn_handle = conn.new_handle();
@@ -203,13 +175,12 @@ async fn on_track_added_works() {
     conn.add_remote_track(TrackId(1), get_audio_track().await);
 
     let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_started, test_result) = js_callback!(|kind: String| {
-        cb_assert_eq!(kind, "audio".to_string());
-    });
+    let (on_track_added, test_result) =
+        js_callback!(|track: SysMediaStreamTrack| {
+            cb_assert_eq!(track.kind(), "audio".to_string());
+        });
 
-    remote_stream
-        .on_track_added(on_track_started.into())
-        .unwrap();
+    remote_stream.on_track_added(on_track_added.into()).unwrap();
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -218,12 +189,7 @@ async fn on_track_added_works() {
 async fn on_track_stopped_works() {
     let cons = Connections::default();
 
-    let mute_state_update_publisher = MuteStateUpdatePublisherMock::new();
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &mute_state_update_publisher,
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
     let conn = cons.get(PeerId(234)).unwrap();
 
     let conn_handle = conn.new_handle();
@@ -237,21 +203,21 @@ async fn on_track_stopped_works() {
             .into(),
         )
         .unwrap();
-    conn.add_remote_track(TrackId(1), get_audio_track().await);
+    let audio_track = get_audio_track().await;
+    conn.add_remote_track(TrackId(1), audio_track.clone());
 
     let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_started, test_result) = js_callback!(|kind: String| {
-        cb_assert_eq!(kind, "audio".to_string());
-    });
+    let (on_track_stopped, test_result) =
+        js_callback!(|track: SysMediaStreamTrack| {
+            cb_assert_eq!(track.kind(), "audio".to_string());
+        });
 
     remote_stream
-        .on_track_stopped(on_track_started.into())
+        .on_track_stopped(on_track_stopped.into())
         .unwrap();
 
-    mute_state_update_publisher.send_mute_state(MuteStateUpdate {
-        kind: TrackKind::Audio,
-        new_mute_state: StableMuteState::Muted,
-    });
+    conn.update_mute_state(&audio_track, StableMuteState::Muted)
+        .await;
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -260,12 +226,7 @@ async fn on_track_stopped_works() {
 async fn on_track_started_works() {
     let cons = Connections::default();
 
-    let mute_state_update_publisher = MuteStateUpdatePublisherMock::new();
-    cons.create_connections_from_tracks(
-        PeerId(1),
-        &mute_state_update_publisher,
-        &[proto_recv_video_track()],
-    );
+    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
     let conn = cons.get(PeerId(234)).unwrap();
 
     let conn_handle = conn.new_handle();
@@ -279,37 +240,34 @@ async fn on_track_started_works() {
             .into(),
         )
         .unwrap();
-    conn.add_remote_track(TrackId(1), get_audio_track().await);
+    let audio_track = get_audio_track().await;
+    conn.add_remote_track(TrackId(1), audio_track.clone());
 
     let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
     let (on_track_started, test_result_on_stop) =
-        js_callback!(|kind: String| {
-            cb_assert_eq!(kind, "audio".to_string());
+        js_callback!(|track: SysMediaStreamTrack| {
+            cb_assert_eq!(track.kind(), "audio".to_string());
         });
-
-    mute_state_update_publisher.send_mute_state(MuteStateUpdate {
-        kind: TrackKind::Audio,
-        new_mute_state: StableMuteState::Muted,
-    });
 
     remote_stream
         .on_track_stopped(on_track_started.into())
         .unwrap();
 
+    conn.update_mute_state(&audio_track, StableMuteState::Muted)
+        .await;
+
     wait_and_check_test_result(test_result_on_stop, || {}).await;
 
     let (on_track_started, test_result_on_start) =
-        js_callback!(|kind: String| {
-            cb_assert_eq!(kind, "audio".to_string());
+        js_callback!(|track: SysMediaStreamTrack| {
+            cb_assert_eq!(track.kind(), "audio".to_string());
         });
     remote_stream
         .on_track_started(on_track_started.into())
         .unwrap();
 
-    mute_state_update_publisher.send_mute_state(MuteStateUpdate {
-        kind: TrackKind::Audio,
-        new_mute_state: StableMuteState::NotMuted,
-    });
+    conn.update_mute_state(&audio_track, StableMuteState::NotMuted)
+        .await;
 
     wait_and_check_test_result(test_result_on_start, || {}).await;
 }

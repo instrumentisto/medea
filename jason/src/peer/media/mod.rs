@@ -9,12 +9,11 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt};
+use futures::{channel::mpsc, future};
 use medea_client_api_proto as proto;
-use medea_reactive::{DroppedError, ObservableHashMap};
+use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
@@ -36,7 +35,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::peer::MuteStateUpdatesPublisher;
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -126,16 +124,6 @@ struct InnerMediaConnections {
 
     /// [`TrackId`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
-
-    /// [`StableMuteState`] of all [`Receiver`]s from this
-    /// [`MediaConnections`]..
-    recv_mute_states:
-        Rc<RefCell<ObservableHashMap<(TrackId, TrackKind), StableMuteState>>>,
-
-    /// All [`mpsc::UnboundedSender`]s of the [`Receiver`] [`StableMuteState`]
-    /// updates.
-    recv_mute_state_senders:
-        Rc<RefCell<Vec<mpsc::UnboundedSender<MuteStateUpdate>>>>,
 }
 
 impl InnerMediaConnections {
@@ -160,49 +148,12 @@ impl MediaConnections {
         peer: Rc<RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
-        let recv_mute_states = ObservableHashMap::new();
-        let mut on_mute_state_insert = recv_mute_states.on_insert();
-        let recv_mute_states = Rc::new(RefCell::new(recv_mute_states));
-        let recv_mute_state_senders: Rc<
-            RefCell<Vec<mpsc::UnboundedSender<MuteStateUpdate>>>,
-        > = Rc::default();
-        spawn_local({
-            let recv_mute_state_senders = Rc::clone(&recv_mute_state_senders);
-            let recv_mute_states = Rc::clone(&recv_mute_states);
-            async move {
-                'mute_stream: while let Some((
-                    (_, inserted_track_kind),
-                    new_mute_state,
-                )) = on_mute_state_insert.next().await
-                {
-                    for ((_, track_kind), mute_state) in
-                        recv_mute_states.borrow().iter()
-                    {
-                        if track_kind == &inserted_track_kind
-                            && &new_mute_state != mute_state
-                        {
-                            continue 'mute_stream;
-                        }
-                    }
-
-                    for sender in recv_mute_state_senders.borrow().iter() {
-                        let _ = sender.unbounded_send(MuteStateUpdate {
-                            new_mute_state,
-                            kind: inserted_track_kind,
-                        });
-                    }
-                }
-            }
-        });
-
         Self(RefCell::new(InnerMediaConnections {
             peer_id,
             peer,
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            recv_mute_states,
-            recv_mute_state_senders,
         }))
     }
 
@@ -346,28 +297,14 @@ impl MediaConnections {
                     inner.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
-                    let track_kind = TrackKind::from(&track.media_type);
                     let recv = Receiver::new(
                         track.id,
                         &(track.media_type.into()),
                         sender,
                         &inner.peer,
                         mid,
+                        inner.peer_events_sender.clone(),
                     );
-
-                    let mut mute_state_stream = recv.on_mute_state_update();
-                    let recv_mute_states = Rc::clone(&inner.recv_mute_states);
-                    let recv_track_id = recv.track_id;
-                    spawn_local(async move {
-                        while let Some(mute_state_update) =
-                            mute_state_stream.next().await
-                        {
-                            recv_mute_states.borrow_mut().insert(
-                                (recv_track_id, track_kind),
-                                mute_state_update,
-                            );
-                        }
-                    });
                     inner.receivers.insert(track.id, recv);
                 }
             }
@@ -492,7 +429,7 @@ impl MediaConnections {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
                         receiver.transceiver.replace(transceiver);
-                        receiver.track.replace(track);
+                        receiver.track.borrow_mut().replace(track);
                         return Some((receiver.sender_id, receiver.track_id));
                     }
                 }
@@ -523,20 +460,5 @@ impl MediaConnections {
             .senders
             .values()
             .for_each(|sender| sender.reset_mute_state_transition_timeout());
-    }
-}
-
-impl MuteStateUpdatesPublisher for Rc<MediaConnections> {
-    /// Returns [`LocalBoxStream`] to which updates of all [`Receiver`]'s
-    /// [`StableMuteState`] will be sent.
-    fn on_mute_state_update(&self) -> LocalBoxStream<'static, MuteStateUpdate> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0
-            .borrow_mut()
-            .recv_mute_state_senders
-            .borrow_mut()
-            .push(tx);
-
-        Box::pin(rx)
     }
 }

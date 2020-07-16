@@ -104,6 +104,14 @@ impl WeakMediaStreamTrack {
 #[derive(Clone)]
 pub struct MediaStreamTrack(Rc<SysMediaStreamTrack>);
 
+impl MediaStreamTrack {
+    /// Returns [`SysMediaStreamTrack`] from this [`MediaStreamTrack`].
+    #[inline]
+    pub fn as_sys(&self) -> SysMediaStreamTrack {
+        (*self.0).clone()
+    }
+}
+
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind

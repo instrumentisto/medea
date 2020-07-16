@@ -6,18 +6,14 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use futures::{stream::LocalBoxStream, StreamExt};
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStreamTrack,
-    peer::{
-        MuteStateUpdate, MuteStateUpdatesPublisher, PeerMediaStream,
-        RemoteMediaStream, StableMuteState,
-    },
-    utils::{yield_now, Callback0, Callback1, HandlerDetachedError},
+    peer::{PeerMediaStream, RemoteMediaStream, StableMuteState},
+    utils::{wait_for, Callback0, Callback1, HandlerDetachedError},
 };
 
 /// Connections service.
@@ -47,22 +43,16 @@ impl Connections {
     /// [`Track`]s.
     // TODO: creates connections based on remote peer_ids atm, should create
     //       connections based on remote member_ids
-    pub fn create_connections_from_tracks<T>(
+    pub fn create_connections_from_tracks(
         &self,
         peer_id: PeerId,
-        local_peer: &T,
         tracks: &[Track],
-    ) where
-        T: MuteStateUpdatesPublisher,
-    {
+    ) {
         let create_connection = |connections: &Self, remote_id: &PeerId| {
             let is_new =
                 !connections.connections.borrow().contains_key(remote_id);
             if is_new {
-                let con = Connection::new(
-                    *remote_id,
-                    local_peer.on_mute_state_update(),
-                );
+                let con = Connection::new(*remote_id);
                 connections.on_new_connection.call(con.new_handle());
                 connections.connections.borrow_mut().insert(*remote_id, con);
                 connections
@@ -167,55 +157,13 @@ impl Connection {
     /// Spawns [`Future`] which will poll provided [`LocalBoxStream`] and notify
     /// [`RemoteMediaStream`] about [`StableMuteState`] changes.
     #[inline]
-    pub(crate) fn new(
-        remote_id: PeerId,
-        mut mute_stream: LocalBoxStream<'static, MuteStateUpdate>,
-    ) -> Self {
-        let inner = Rc::new(InnerConnection {
+    pub(crate) fn new(remote_id: PeerId) -> Self {
+        Self(Rc::new(InnerConnection {
             remote_id,
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback1::default(),
             on_close: Callback0::default(),
-        });
-        let weak_inner = Rc::downgrade(&inner);
-
-        spawn_local(async move {
-            while let Some(mute_state_update) = mute_stream.next().await {
-                loop {
-                    let is_finished = async {
-                        yield_now().await;
-                        let inner = if let Some(inner) = weak_inner.upgrade() {
-                            inner
-                        } else {
-                            return false;
-                        };
-                        let stream = inner.remote_stream.borrow();
-                        if let Some(stream) = stream.as_ref() {
-                            match mute_state_update.new_mute_state {
-                                StableMuteState::Muted => {
-                                    stream
-                                        .track_stopped(mute_state_update.kind);
-                                }
-                                StableMuteState::NotMuted => {
-                                    stream
-                                        .track_started(mute_state_update.kind);
-                                }
-                            }
-                        } else {
-                            return false;
-                        }
-
-                        true
-                    };
-
-                    if is_finished.await {
-                        break;
-                    }
-                }
-            }
-        });
-
-        Self(inner)
+        }))
     }
 
     /// Adds provided [`MediaStreamTrack`] to remote stream of this
@@ -231,6 +179,43 @@ impl Connection {
 
         if is_new_stream {
             self.0.on_remote_stream.call(stream.new_handle());
+        }
+    }
+
+    /// Updates [`StableMuteState`] of this [`Connection`] with a provided
+    /// [`StableMuteState`].
+    pub async fn update_mute_state(
+        &self,
+        track: &MediaStreamTrack,
+        mute_state: StableMuteState,
+    ) {
+        fn get_stream(
+            conn: Connection,
+        ) -> LocalBoxFuture<'static, PeerMediaStream> {
+            Box::pin(async move {
+                let remote_stream =
+                    { conn.0.remote_stream.borrow().as_ref().cloned() };
+                if let Some(remote_stream) = remote_stream {
+                    remote_stream
+                } else {
+                    wait_for(
+                        |conn| conn.0.remote_stream.borrow().is_some(),
+                        conn.clone(),
+                    )
+                    .await;
+
+                    get_stream(conn).await
+                }
+            })
+        }
+        let remote_stream = get_stream(self.clone()).await;
+        match mute_state {
+            StableMuteState::Muted => {
+                remote_stream.track_stopped(track);
+            }
+            StableMuteState::NotMuted => {
+                remote_stream.track_started(track);
+            }
         }
     }
 

@@ -1,18 +1,22 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
-use futures::stream::LocalBoxStream;
+use std::{cell::RefCell, rc::Rc};
+
+use futures::{channel::mpsc, future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::TrackPatch;
 use medea_reactive::ObservableCell;
 use proto::{PeerId, TrackId};
+use wasm_bindgen_futures::spawn_local;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-        StableMuteState,
+        PeerEvent, StableMuteState,
     },
+    utils::wait_for,
 };
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
@@ -25,7 +29,7 @@ pub struct Receiver {
     pub(super) sender_id: PeerId,
     pub(super) transceiver: Option<RtcRtpTransceiver>,
     pub(super) mid: Option<String>,
-    pub(super) track: Option<MediaStreamTrack>,
+    pub(super) track: Rc<RefCell<Option<MediaStreamTrack>>>,
     pub(super) mute_state: ObservableCell<StableMuteState>,
 }
 
@@ -43,6 +47,7 @@ impl Receiver {
         sender_id: PeerId,
         peer: &RtcPeerConnection,
         mid: Option<String>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
@@ -51,14 +56,58 @@ impl Receiver {
             }
             Some(_) => None,
         };
+        let mute_state = ObservableCell::new(StableMuteState::NotMuted);
+        let mut mute_state_changes = mute_state.subscribe();
+        let track = Rc::new(RefCell::new(None));
+        spawn_local({
+            let track = Rc::clone(&track);
+            async move {
+                while let Some(mute_state_update) =
+                    mute_state_changes.next().await
+                {
+                    fn get_track(
+                        track: Rc<RefCell<Option<MediaStreamTrack>>>,
+                    ) -> LocalBoxFuture<'static, MediaStreamTrack>
+                    {
+                        Box::pin(async move {
+                            let inner_track =
+                                { track.borrow().as_ref().cloned() };
+                            if let Some(track) = inner_track {
+                                track
+                            } else {
+                                wait_for(
+                                    |track| track.borrow().is_some(),
+                                    Rc::clone(&track),
+                                )
+                                .await;
+
+                                get_track(track).await
+                            }
+                        })
+                    }
+
+                    let track = get_track(Rc::clone(&track)).await;
+                    if peer_events_sender
+                        .unbounded_send(PeerEvent::MuteStateChanged {
+                            peer_id: sender_id,
+                            track,
+                            mute_state: mute_state_update,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+        });
 
         Self {
             track_id,
             sender_id,
             transceiver,
             mid,
-            track: None,
-            mute_state: ObservableCell::new(StableMuteState::NotMuted),
+            track,
+            mute_state,
         }
     }
 
@@ -67,14 +116,6 @@ impl Receiver {
         if let Some(is_muted) = track_patch.is_muted {
             self.mute_state.set(is_muted.into());
         }
-    }
-
-    /// Returns [`LocalBoxStream`] to which all [`StableMuteState`] updates of
-    /// this [`Receiver`] will be sent.
-    pub fn on_mute_state_update(
-        &self,
-    ) -> LocalBoxStream<'static, StableMuteState> {
-        self.mute_state.subscribe()
     }
 
     /// Returns `mid` of this [`Receiver`].
