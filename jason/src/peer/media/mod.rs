@@ -300,22 +300,26 @@ impl MediaConnections {
         Ok(())
     }
 
-    /// Updates [`Sender`]s of this [`super::PeerConnection`] with
-    /// [`proto::TrackPatch`].
+    /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
+    /// with [`proto::TrackPatch`].
     ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
-    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn patch_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         for track_proto in tracks {
-            let sender =
-                self.get_sender_by_id(track_proto.id).ok_or_else(|| {
-                    tracerr::new!(MediaConnectionsError::InvalidTrackPatch(
-                        track_proto.id
-                    ))
-                })?;
-            sender.update(&track_proto);
+            if let Some(sender) = self.get_sender_by_id(track_proto.id) {
+                sender.update(&track_proto);
+            } else if let Some(_receiver) =
+                self.0.borrow().receivers.get(&track_proto.id)
+            {
+                // TODO: Update receivers.
+            } else {
+                return Err(tracerr::new!(
+                    MediaConnectionsError::InvalidTrackPatch(track_proto.id)
+                ));
+            }
         }
         Ok(())
     }

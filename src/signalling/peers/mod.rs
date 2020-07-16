@@ -351,18 +351,24 @@ impl PeersService {
         }
     }
 
-    /// Calls [`PeerStateMachine::run_scheduled_tasks`] on the
-    /// [`PeerStateMachine`] with a provided [`PeerId`].
+    /// Tries to run all scheduled changes on specified [`Peer`] and its
+    /// partner [`Peer`].
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn run_scheduled_tasks(
+    pub fn commit_scheduled_changes(
         &self,
         peer_id: PeerId,
     ) -> Result<(), RoomError> {
-        self.peers.map_peer_by_id_mut(peer_id, |peer| {
+        let partner_peer_id =
+            self.peers.map_peer_by_id_mut(peer_id, |peer| {
+                peer.commit_scheduled_changes();
+                peer.partner_peer_id()
+            })?;
+
+        self.peers.map_peer_by_id_mut(partner_peer_id, |peer| {
             peer.commit_scheduled_changes();
         })?;
 
@@ -826,8 +832,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        peers_service.run_scheduled_tasks(src_peer_id).unwrap();
-        peers_service.run_scheduled_tasks(sink_peer_id).unwrap();
+        peers_service.commit_scheduled_changes(src_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
@@ -919,8 +924,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        peers_service.run_scheduled_tasks(src_peer_id).unwrap();
-        peers_service.run_scheduled_tasks(sink_peer_id).unwrap();
+        peers_service.commit_scheduled_changes(src_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
@@ -959,8 +963,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        peers_service.run_scheduled_tasks(src_peer_id).unwrap();
-        peers_service.run_scheduled_tasks(sink_peer_id).unwrap();
+        peers_service.commit_scheduled_changes(src_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 

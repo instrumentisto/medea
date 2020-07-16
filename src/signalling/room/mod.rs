@@ -233,11 +233,10 @@ impl Room {
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
                 .map(move |result, room: &mut Room, _| {
-                    for (src_peer_id, sink_peer_id) in
+                    for (src_peer_id, _) in
                         result?.into_iter().filter_map(|r| r)
                     {
-                        room.peers.run_scheduled_tasks(src_peer_id)?;
-                        room.peers.run_scheduled_tasks(sink_peer_id)?;
+                        room.peers.commit_scheduled_changes(src_peer_id)?;
                     }
 
                     Ok(())

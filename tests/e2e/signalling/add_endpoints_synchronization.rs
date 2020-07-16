@@ -3,6 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{Command, Direction, Event, TrackUpdate};
 use medea_control_api_proto::grpc::api::{self as proto};
+use tokio::time::delay_for;
 
 use crate::{
     grpc_control_api::{
@@ -12,6 +13,7 @@ use crate::{
     signalling::{SendCommand, TestMember},
 };
 
+/// Creates Room with two Member's with WebRtcPublishEndpoint's.
 pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
     RoomBuilder::default()
         .id(room_id.to_string())
@@ -47,6 +49,17 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .build_request(String::new())
 }
 
+/// Makes sure that creating endpoints during negotiation works properly.
+///
+/// 1. Create `Room` with two `Member`'s `WebRtcPublishEndpoint`'s.
+/// 2. Connect `Member`'s to `Medea`.
+/// 3. Add `WebRtcPlayEndpoint` starting negotiation.
+/// 4. Wait for `Event::PeerCreated`.
+/// 5. Add second `WebRtcPlayEndpoint`.
+/// 6. Answer `Event::PeerCreated` with `Command::MakeSdpOffer`.
+/// 7. Make sure that `Event::SdpAnswerMade` is received before
+/// `Event::TracksApplied`, meaning that renegotiation starts only after initial
+/// negotiation finishes.
 #[actix_rt::test]
 async fn add_endpoints_synchronization() {
     const TEST_NAME: &str = "add_endpoints_synchronization";
@@ -100,6 +113,8 @@ async fn add_endpoints_synchronization() {
                 .unwrap()
                 .build_request(format!("{}/second", TEST_NAME));
             client.create(second_play_endpoint).await;
+
+            delay_for(Duration::from_millis(100)).await;
 
             let count_send_tracks = tracks
                 .iter()

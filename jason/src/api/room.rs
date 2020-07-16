@@ -906,7 +906,7 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
-        peer.update_senders(patches)
+        peer.patch_tracks(patches)
             .map_err(tracerr::map_from_and_wrap!())?;
         self.create_tracks_and_maybe_negotiate(
             peer,
