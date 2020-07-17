@@ -15,7 +15,7 @@ use crate::{
 
 impl Room {
     /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
-    /// will be changed to [`WaitLocalSdp`] state.
+    /// will be changed to a [`WaitLocalSdp`] state.
     fn send_peer_created(
         &mut self,
         peer_id: PeerId,
@@ -104,10 +104,11 @@ impl Handler<PeerStopped> for Room {
 }
 
 impl NegotiationSubscriber for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] and if it successful then sends to the
-    /// upgraded [`Addr`] [`NegotiationNeeded`] [`Message`].
+    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
+    /// [`Addr`] a [`NegotiationNeeded`] [`Message`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
+    #[inline]
     fn negotiation_needed(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(NegotiationNeeded(peer_id));
@@ -118,8 +119,8 @@ impl NegotiationSubscriber for WeakAddr<Room> {
 /// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
 /// be renegotiated.
 ///
-/// If provided [`Peer`] or it's partner [`Peer`] will be not [`Stable`] then
-/// nothing should be done.
+/// If provided [`Peer`] or it's partner [`Peer`] are not in a [`Stable`] state,
+/// then nothing should be done.
 #[derive(Message, Clone, Debug, Copy)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct NegotiationNeeded(pub PeerId);

@@ -94,7 +94,6 @@ impl<T: Incrementable + Copy> Counter<T> {
     pub fn next_id(&self) -> T {
         let id = self.count.get();
         self.count.set(id.incr());
-
         id
     }
 }
@@ -351,8 +350,8 @@ impl PeersService {
         }
     }
 
-    /// Tries to run all scheduled changes on specified [`Peer`] and its
-    /// partner [`Peer`].
+    /// Tries to run all scheduled changes on specified [`Peer`] and its partner
+    /// [`Peer`].
     ///
     /// # Errors
     ///

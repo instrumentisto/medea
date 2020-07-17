@@ -2,42 +2,42 @@
 //!
 //! # Applying changes to [`Peer`]
 //!
-//! Some [`Peer`] state changes require SDP negotiation. SDP
-//! negotiation is a process that requires some message exchange between remote
-//! `Peer`s, so it cannot be performed in place.
+//! Some [`Peer`] state changes require SDP negotiation. SDP negotiation is a
+//! process that requires some message exchange between remote `Peer`s, so it
+//! cannot be performed immediately in a place.
 //!
-//! The problem arises when we need to apply changes to [`Peer`], when it is
-//! already performing negotiation caused by other changes. In this case we
-//! cannot start new negotiation and must wait until ongoing negotiation
-//! finishes.
+//! The problem arises when we need to apply changes to [`Peer`] while it's
+//! already performing negotiation caused by another changes. In this case we
+//! cannot start a new negotiation and should wait until ongoing negotiation
+//! is finished.
 //!
-//! So how [`PeerStateMachine`] handles such situations.
+//! So, how [`PeerStateMachine`] handles such situations?
 //!
-//! All methods that perform changes that might require negotiations are
-//! placed in [`PeerChangesScheduler`], which can be obtained via
+//! All methods performing changes that might require negotiations are placed in
+//! a [`PeerChangesScheduler`], which can be obtained via
 //! [`PeerStateMachine::as_changes_scheduler`].
 //!
-//! Calling [`PeerChangesScheduler`] methods do not change [`Peer`] actual
-//! state, but it will schedule those changes to be applied when it will be
-//! possible.
+//! Calling [`PeerChangesScheduler`] methods don't change the [`Peer`]'s actual
+//! state, but just schedules those changes to be applied when it will be
+//! appropriate.
 //!
 //! After scheduling changes you should call
-//! [`PeerStateMachine::commit_scheduled_changes`], this will try to apply
-//! changes, but if [`Peer`] is not in [`Stable`] state then its
-//! no-op, and these changes will be applied when [`Peer`] will be transferred
-//! into [`Stable`] state.
+//! [`PeerStateMachine::commit_scheduled_changes`], which will try to apply
+//! changes, but if the [`Peer`] is not in a [`Stable`] state then it's no-op,
+//! and these changes will be applied when the [`Peer`] will be transferred into
+//! a [`Stable`] state only.
 //!
-//! After changes will be applied, [`Peer`] will notify
-//! [`NegotiationSubscriber`] that it is possible to start negotiation.
+//! After the changes are applied, the [`Peer`] will notify
+//! [`NegotiationSubscriber`] that it's appropriate to start a negotiation.
 //!
-//! # Implementing [`Peer`] update that requires (re)negotiation
+//! # Implementing [`Peer`]'s update that requires (re)negotiation
 //!
-//! 1. All changes that require (re)negotiation should be done by adding
-//!    new variant into [`TrackChange`]
+//! 1. All changes that require (re)negotiation should be done by adding a new
+//!    variant into [`TrackChange`].
 //! 2. Implement your changing logic in the [`TrackChangeHandler`]
-//!    implementation
-//! 3. Create function in the [`PeerChangesScheduler`] which will schedule your
-//!    change by adding it into [`Context::track_changes_queue`]
+//!    implementation.
+//! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
+//!    your change by adding it into the [`Context::track_changes_queue`].
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
@@ -71,15 +71,14 @@ use crate::{
     },
 };
 
-/// Subscriber to the events which indicates that negotiation process should
-/// be started for the some [`Peer`].
+/// Subscriber to the events indicating that negotiation process should be
+/// started for the some [`Peer`].
 #[cfg_attr(test, mockall::automock)]
 pub trait NegotiationSubscriber: fmt::Debug {
-    /// Starts negotiation process for the [`Peer`] with a provided
-    /// [`PeerId`].
+    /// Starts negotiation process for the [`Peer`] with the provided `peer_id`.
     ///
-    /// Provided [`Peer`] and it's partner [`Peer`] should be in [`Stable`],
-    /// otherwise nothing will be done.
+    /// Provided [`Peer`] and it's partner [`Peer`] should be in a [`Stable`]
+    /// state, otherwise nothing will be done.
     fn negotiation_needed(&self, peer_id: PeerId);
 }
 
@@ -174,7 +173,8 @@ pub enum PeerStateMachine {
 impl PeerStateMachine {
     /// Tries to run all scheduled changes.
     ///
-    /// Changes are applied __only if [`Peer`] is in [`Stable`]__ state.
+    /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
+    #[inline]
     pub fn commit_scheduled_changes(&mut self) {
         if let PeerStateMachine::Stable(stable_peer) = self {
             stable_peer.commit_scheduled_changes();
@@ -183,12 +183,10 @@ impl PeerStateMachine {
 
     /// Returns `true` if this [`PeerStateMachine`] currently in [`Stable`]
     /// state.
+    #[inline]
+    #[must_use]
     pub fn is_stable(&self) -> bool {
-        if let PeerStateMachine::Stable(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, PeerStateMachine::Stable(_))
     }
 }
 
@@ -302,7 +300,7 @@ pub struct Context {
     pending_track_updates: Vec<TrackChange>,
 
     /// Queue of the [`TrackChange`]s that are scheduled to apply when this
-    /// [`Peer`] will be [`Stable`].
+    /// [`Peer`] will be in a [`Stable`] state.
     track_changes_queue: VecDeque<TrackChange>,
 
     /// Subscriber to the events which indicates that negotiation process
@@ -368,16 +366,19 @@ impl TrackChangeHandler for Peer<Stable> {
     type Output = ();
 
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
+    #[inline]
     fn on_add_send_track(&mut self, track: Rc<MediaTrack>) {
         self.context.senders.insert(track.id, track);
     }
 
     /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
+    #[inline]
     fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) {
         self.context.receivers.insert(track.id, track);
     }
 
     /// Does nothing.
+    #[inline]
     fn on_track_patch(&mut self, _: TrackPatch) {}
 }
 
@@ -496,11 +497,14 @@ impl<T> Peer<T> {
 
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
     /// for this [`Peer`] was sent to the client).
+    #[must_use]
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
     }
 
     /// Returns [`PeerChangesScheduler`] for this [`Peer`].
+    #[inline]
+    #[must_use]
     pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler {
         PeerChangesScheduler {
             context: &mut self.context,
@@ -682,7 +686,7 @@ impl Peer<Stable> {
 
     /// Runs [`Task`]s which are scheduled for this [`Peer`].
     ///
-    /// Returns `true` if at least one [`Task`] was ran.
+    /// Returns `true` if at least one [`Task`] was run.
     ///
     /// Returns `false` if nothing was done.
     fn commit_scheduled_changes(&mut self) {
@@ -773,6 +777,7 @@ impl<'a> PeerChangesScheduler<'a> {
     }
 
     /// Adds provided [`TrackChange`] to scheduled changes queue.
+    #[inline]
     fn schedule_change(&mut self, job: TrackChange) {
         self.context.track_changes_queue.push_back(job);
     }
@@ -782,6 +787,7 @@ impl<'a> PeerChangesScheduler<'a> {
     /// This [`Track`] will be considered new (not known to remote) and may be
     /// obtained by calling `Peer.new_tracks` after this scheduled
     /// [`TrackChange`] will be applied.
+    #[inline]
     fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.schedule_change(TrackChange::AddRecvTrack(track));
     }
@@ -791,6 +797,7 @@ impl<'a> PeerChangesScheduler<'a> {
     /// This [`Track`] will be considered new (not known to remote) and may be
     /// obtained by calling `Peer.new_tracks` after this scheduled
     /// [`TrackChange`] will be applied.
+    #[inline]
     fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.schedule_change(TrackChange::AddSendTrack(track));
     }
