@@ -1,18 +1,62 @@
 //! Remote [`RTCPeerConnection`][1] representation.
 //!
+//! # Applying changes to [`Peer`]
+//!
+//! Some [`Peer`] state changes require SDP negotiation. SDP negotiation is a
+//! process that requires some message exchange between remote `Peer`s, so it
+//! cannot be performed immediately in a place.
+//!
+//! The problem arises when we need to apply changes to [`Peer`] while it's
+//! already performing negotiation caused by another changes. In this case we
+//! cannot start a new negotiation and should wait until ongoing negotiation
+//! is finished.
+//!
+//! So, how [`PeerStateMachine`] handles such situations?
+//!
+//! All methods performing changes that might require negotiations are placed in
+//! a [`PeerChangesScheduler`], which can be obtained via
+//! [`PeerStateMachine::as_changes_scheduler`].
+//!
+//! Calling [`PeerChangesScheduler`] methods don't change the [`Peer`]'s actual
+//! state, but just schedules those changes to be applied when it will be
+//! appropriate.
+//!
+//! After scheduling changes you should call
+//! [`PeerStateMachine::commit_scheduled_changes`], which will try to apply
+//! changes, but if the [`Peer`] is not in a [`Stable`] state then it's no-op,
+//! and these changes will be applied when the [`Peer`] will be transferred into
+//! a [`Stable`] state only.
+//!
+//! After the changes are applied, the [`Peer`] will notify
+//! [`NegotiationSubscriber`] that it's appropriate to start a negotiation.
+//!
+//! # Implementing [`Peer`]'s update that requires (re)negotiation
+//!
+//! 1. All changes that require (re)negotiation should be done by adding a new
+//!    variant into [`TrackChange`].
+//! 2. Implement your changing logic in the [`TrackChangeHandler`]
+//!    implementation.
+//! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
+//!    your change by adding it into the [`Context::track_changes_queue`].
+//!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{
+    collections::{HashMap, VecDeque},
+    convert::TryFrom,
+    fmt,
+    rc::Rc,
+};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, Track,
-    TrackId, TrackPatch, TrackUpdate, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, PeerId,
+    Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
 };
-use medea_macro::enum_delegate;
+use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::{
@@ -26,6 +70,24 @@ use crate::{
         peers::Counter,
     },
 };
+
+/// Subscriber to the events indicating that negotiation process should be
+/// started for the some [`Peer`].
+#[cfg_attr(test, mockall::automock)]
+pub trait NegotiationSubscriber: fmt::Debug {
+    /// Starts negotiation process for the [`Peer`] with the provided `peer_id`.
+    ///
+    /// Provided [`Peer`] and it's partner [`Peer`] should be in a [`Stable`]
+    /// state, otherwise nothing will be done.
+    fn negotiation_needed(&self, peer_id: PeerId);
+}
+
+#[cfg(test)]
+impl fmt::Debug for MockNegotiationSubscriber {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("MockNegotiationSubscriber").finish()
+    }
+}
 
 /// [`Peer`] doesn't have remote [SDP] and is waiting for local [SDP].
 ///
@@ -87,9 +149,6 @@ impl PeerError {
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
-    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>)
-)]
-#[enum_delegate(
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>>
 )]
 #[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
@@ -102,12 +161,33 @@ impl PeerError {
         senders_statuses: HashMap<TrackId, bool>,
     )
 )]
+#[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
+}
+
+impl PeerStateMachine {
+    /// Tries to run all scheduled changes.
+    ///
+    /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
+    #[inline]
+    pub fn commit_scheduled_changes(&mut self) {
+        if let PeerStateMachine::Stable(stable_peer) = self {
+            stable_peer.commit_scheduled_changes();
+        }
+    }
+
+    /// Returns `true` if this [`PeerStateMachine`] currently in [`Stable`]
+    /// state.
+    #[inline]
+    #[must_use]
+    pub fn is_stable(&self) -> bool {
+        matches!(self, PeerStateMachine::Stable(_))
+    }
 }
 
 impl fmt::Display for PeerStateMachine {
@@ -218,10 +298,19 @@ pub struct Context {
 
     /// Tracks changes, that remote [`Peer`] is not aware of.
     pending_track_updates: Vec<TrackChange>,
+
+    /// Queue of the [`TrackChange`]s that are scheduled to apply when this
+    /// [`Peer`] will be in a [`Stable`] state.
+    track_changes_queue: VecDeque<TrackChange>,
+
+    /// Subscriber to the events which indicates that negotiation process
+    /// should be started for this [`Peer`].
+    negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
-#[derive(Debug)]
+#[dispatchable]
+#[derive(Clone, Debug)]
 enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
@@ -271,6 +360,26 @@ impl TrackChange {
             }
         }
     }
+}
+
+impl TrackChangeHandler for Peer<Stable> {
+    type Output = ();
+
+    /// Inserts provided [`MediaTrack`] into [`Context::senders`].
+    #[inline]
+    fn on_add_send_track(&mut self, track: Rc<MediaTrack>) {
+        self.context.senders.insert(track.id, track);
+    }
+
+    /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
+    #[inline]
+    fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) {
+        self.context.receivers.insert(track.id, track);
+    }
+
+    /// Does nothing.
+    #[inline]
+    fn on_track_patch(&mut self, _: TrackPatch) {}
 }
 
 /// [RTCPeerConnection] representation.
@@ -388,30 +497,18 @@ impl<T> Peer<T> {
 
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
     /// for this [`Peer`] was sent to the client).
+    #[must_use]
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
     }
 
-    /// Stores provided [`TrackPatch`]s in the `pending_track_updates`.
-    ///
-    /// Patches will be applied on client side when renegotiation will be
-    /// started for this [`Peer`].
-    pub fn apply_track_changes(&mut self, track_patches: Vec<TrackPatch>) {
-        for track_patch in track_patches {
-            self.context
-                .pending_track_updates
-                .push(TrackChange::TrackPatch(track_patch));
+    /// Returns [`PeerChangesScheduler`] for this [`Peer`].
+    #[inline]
+    #[must_use]
+    pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler {
+        PeerChangesScheduler {
+            context: &mut self.context,
         }
-    }
-
-    /// Sets [`Self::is_known_to_remote`] to `true`.
-    ///
-    /// Resets `pending_changes` buffer.
-    ///
-    /// Should be called when renegotiation was finished.
-    fn negotiation_finished(&mut self) {
-        self.context.is_known_to_remote = true;
-        self.context.pending_track_updates.clear();
     }
 }
 
@@ -462,26 +559,30 @@ impl Peer<WaitLocalSdp> {
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
-        self.negotiation_finished();
         self.context.sdp_answer = Some(sdp_answer.to_string());
 
-        Peer {
+        let mut peer = Peer {
             context: self.context,
             state: Stable {},
-        }
+        };
+        peer.negotiation_finished();
+
+        peer
     }
 }
 
 impl Peer<WaitLocalHaveRemote> {
     /// Sets local description and transitions [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
-        self.negotiation_finished();
         self.context.sdp_answer = Some(sdp_answer);
 
-        Peer {
+        let mut peer = Peer {
             context: self.context,
             state: Stable {},
-        }
+        };
+        peer.negotiation_finished();
+
+        peer
     }
 }
 
@@ -495,6 +596,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
+        negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -510,47 +612,13 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
+            track_changes_queue: VecDeque::new(),
+            negotiation_subscriber,
         };
 
         Self {
             context,
             state: Stable {},
-        }
-    }
-
-    /// Adds `send` tracks to `self` and add `recv` for this `send`
-    /// to `partner_peer`.
-    ///
-    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
-    /// and [`WebRtcPublishEndpoint::video_settings`].
-    pub fn add_publisher(
-        &mut self,
-        src: &WebRtcPublishEndpoint,
-        partner_peer: &mut Peer<Stable>,
-        tracks_counter: &Counter<TrackId>,
-    ) {
-        let audio_settings = src.audio_settings();
-        if audio_settings.publish_policy != PublishPolicy::Disabled {
-            let track_audio = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Audio(AudioSettings {
-                    is_required: audio_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.add_sender(Rc::clone(&track_audio));
-            partner_peer.add_receiver(track_audio);
-        }
-
-        let video_settings = src.video_settings();
-        if video_settings.publish_policy != PublishPolicy::Disabled {
-            let track_video = Rc::new(MediaTrack::new(
-                tracks_counter.next_id(),
-                MediaType::Video(VideoSettings {
-                    is_required: video_settings.publish_policy.is_required(),
-                }),
-            ));
-            self.add_sender(Rc::clone(&track_video));
-            partner_peer.add_receiver(track_video);
         }
     }
 
@@ -605,7 +673,7 @@ impl Peer<Stable> {
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_renegotiation(self) -> Peer<WaitLocalSdp> {
+    pub fn start_negotiation(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
@@ -616,32 +684,136 @@ impl Peer<Stable> {
         }
     }
 
-    /// Adds [`Track`] to [`Peer`] send tracks list.
+    /// Runs [`Task`]s which are scheduled for this [`Peer`].
     ///
-    /// This [`Track`] is considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks`.
-    fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.context
-            .pending_track_updates
-            .push(TrackChange::AddSendTrack(Rc::clone(&track)));
-        self.context.senders.insert(track.id, track);
+    /// Returns `true` if at least one [`Task`] was run.
+    ///
+    /// Returns `false` if nothing was done.
+    fn commit_scheduled_changes(&mut self) {
+        if !self.context.track_changes_queue.is_empty() {
+            while let Some(task) = self.context.track_changes_queue.pop_front()
+            {
+                self.context.pending_track_updates.push(task.clone());
+                task.dispatch_with(self);
+            }
+
+            self.context
+                .negotiation_subscriber
+                .negotiation_needed(self.id());
+        }
     }
 
-    /// Adds [`Track`] to [`Peer`] receive tracks list.
+    /// Sets [`Context::is_known_to_remote`] to `true`.
     ///
-    /// This [`Track`] is considered new (not known to remote) and may be
-    /// obtained by calling `Peer.new_tracks`.
+    /// Resets [`Context::pending_track_updates`] buffer.
+    ///
+    /// Applies all scheduled changes.
+    ///
+    /// Should be called when negotiation was finished.
+    fn negotiation_finished(&mut self) {
+        self.context.is_known_to_remote = true;
+        self.context.pending_track_updates.clear();
+        self.commit_scheduled_changes();
+    }
+}
+
+/// Scheduler of the [`Peer`] state changes that require (re)negotiation.
+///
+/// Obtainable via `PeerStateMachine::as_changes_scheduler`. Refer to module
+/// documentation for more details.
+pub struct PeerChangesScheduler<'a> {
+    /// [`Context`] of the [`Peer`] in which will scheduled changes.
+    context: &'a mut Context,
+}
+
+impl<'a> PeerChangesScheduler<'a> {
+    /// Schedules provided [`TrackPatch`]s.
+    ///
+    /// Provided [`TrackPatch`]s will be sent to the client on (re)negotiation.
+    pub fn patch_tracks(&mut self, patches: Vec<TrackPatch>) {
+        for patch in patches {
+            self.schedule_change(TrackChange::TrackPatch(patch));
+        }
+    }
+
+    /// Schedules `send` tracks adding to `self` and `recv` tracks for this
+    /// `send` to `partner_peer`.
+    ///
+    /// Tracks will be added based on [`WebRtcPublishEndpoint::audio_settings`]
+    /// and [`WebRtcPublishEndpoint::video_settings`].
+    pub fn add_publisher(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        partner_peer: &mut PeerStateMachine,
+        tracks_counter: &Counter<TrackId>,
+    ) {
+        let audio_settings = src.audio_settings();
+        if audio_settings.publish_policy != PublishPolicy::Disabled {
+            let track_audio = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Audio(AudioSettings {
+                    is_required: audio_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_audio));
+            partner_peer
+                .as_changes_scheduler()
+                .add_receiver(track_audio);
+        }
+
+        let video_settings = src.video_settings();
+        if video_settings.publish_policy != PublishPolicy::Disabled {
+            let track_video = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: video_settings.publish_policy.is_required(),
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_video));
+            partner_peer
+                .as_changes_scheduler()
+                .add_receiver(track_video);
+        }
+    }
+
+    /// Adds provided [`TrackChange`] to scheduled changes queue.
+    #[inline]
+    fn schedule_change(&mut self, job: TrackChange) {
+        self.context.track_changes_queue.push_back(job);
+    }
+
+    /// Schedules [`Track`] addition to [`Peer`] receive tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled
+    /// [`TrackChange`] will be applied.
+    #[inline]
     fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.context
-            .pending_track_updates
-            .push(TrackChange::AddRecvTrack(Rc::clone(&track)));
-        self.context.receivers.insert(track.id, track);
+        self.schedule_change(TrackChange::AddRecvTrack(track));
+    }
+
+    /// Schedules [`Track`] addition to [`Peer`] send tracks list.
+    ///
+    /// This [`Track`] will be considered new (not known to remote) and may be
+    /// obtained by calling `Peer.new_tracks` after this scheduled
+    /// [`TrackChange`] will be applied.
+    #[inline]
+    fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        self.schedule_change(TrackChange::AddSendTrack(track));
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    /// Returns dummy [`NegotiationSubscriber`] mock which does nothing.
+    pub fn dummy_negotiation_sub_mock() -> Rc<dyn NegotiationSubscriber> {
+        let mut mock = MockNegotiationSubscriber::new();
+        mock.expect_negotiation_needed().returning(|_| ());
+
+        Rc::new(mock)
+    }
 
     /// Returns [`PeerStateMachine`] with provided count of the `MediaTrack`s
     /// media types.
@@ -657,6 +829,7 @@ pub mod tests {
             Id(2),
             MemberId::from("partner-member"),
             false,
+            dummy_negotiation_sub_mock(),
         );
 
         let track_id_counter = Counter::default();
@@ -698,5 +871,81 @@ pub mod tests {
         }
 
         peer.into()
+    }
+
+    fn media_track(track_id: u32) -> Rc<MediaTrack> {
+        Rc::new(MediaTrack::new(
+            TrackId(track_id),
+            MediaType::Video(VideoSettings { is_required: true }),
+        ))
+    }
+
+    #[test]
+    fn scheduled_changes_normally_ran() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |peer_id| {
+                tx.send(peer_id).unwrap();
+            });
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+
+        peer.as_changes_scheduler().add_receiver(media_track(0));
+        peer.as_changes_scheduler().add_sender(media_track(1));
+
+        assert!(peer.context.senders.is_empty());
+        assert!(peer.context.receivers.is_empty());
+
+        peer.commit_scheduled_changes();
+
+        assert_eq!(rx.recv().unwrap(), PeerId(0));
+        assert_eq!(peer.context.senders.len(), 1);
+        assert_eq!(peer.context.receivers.len(), 1);
+    }
+
+    #[test]
+    fn scheduled_changes_will_be_ran_on_stable() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |peer_id| {
+                tx.send(peer_id).unwrap();
+            });
+
+        let peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+
+        let mut peer = peer.start();
+        peer.as_changes_scheduler().add_sender(media_track(0));
+        peer.as_changes_scheduler().add_receiver(media_track(1));
+        assert!(peer.context.senders.is_empty());
+        assert!(peer.context.receivers.is_empty());
+
+        let peer = peer.set_local_sdp(String::new());
+        assert!(peer.context.senders.is_empty());
+        assert!(peer.context.receivers.is_empty());
+
+        let peer = peer.set_remote_sdp("");
+        assert_eq!(peer.context.receivers.len(), 1);
+        assert_eq!(peer.context.senders.len(), 1);
+        assert_eq!(peer.context.pending_track_updates.len(), 2);
+        assert_eq!(peer.context.track_changes_queue.len(), 0);
+        assert_eq!(rx.recv().unwrap(), PeerId(0));
     }
 }

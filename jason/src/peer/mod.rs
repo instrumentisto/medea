@@ -423,17 +423,17 @@ impl PeerConnection {
         self.id
     }
 
-    /// Updates [`Sender`]s of this [`PeerConnection`] with
+    /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
     /// [`proto::TrackPatch`].
     ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// provided [`proto::TrackPatch`] contains unknown ID.
-    pub fn update_senders(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn patch_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
         Ok(self
             .media_connections
-            .update_senders(tracks)
+            .patch_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?)
     }
 

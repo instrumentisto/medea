@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut, ActorFuture as _, Context, ContextFutureSpawner as _, Handler,
-    Message, WrapFuture as _,
+    fut, ActorFuture as _, AsyncContext as _, Context,
+    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
@@ -229,11 +229,27 @@ impl Room {
 
         member.insert_sink(sink);
 
-        if self.members.member_has_connection(member_id) {
-            Ok(Box::new(self.init_member_connections(&member)))
-        } else {
-            Ok(Box::new(actix::fut::ok(())))
-        }
+        let fut = fut::ready(()).map(move |_, this: &mut Self, ctx| {
+            let member_id = member.id();
+            if this.members.member_has_connection(&member_id) {
+                ctx.spawn(this.init_member_connections(&member).map(
+                    move |res, this, ctx| {
+                        if let Err(e) = res {
+                            error!(
+                                "Failed to interconnect Members, because {}. \
+                                 Connection with Member [id = {}, room_id: \
+                                 {}] will be stopped.",
+                                e, member_id, this.id,
+                            );
+                            this.members
+                                .close_member_connection(&member_id, ctx);
+                        }
+                    },
+                ));
+            }
+            Ok(())
+        });
+        Ok(Box::new(fut))
     }
 
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every

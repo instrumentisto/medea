@@ -125,7 +125,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .update_senders(vec![TrackPatch {
+        .patch_tracks(vec![TrackPatch {
             id: audio_track_id,
             is_muted: Some(true),
         }])
@@ -137,7 +137,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .update_senders(vec![TrackPatch {
+        .patch_tracks(vec![TrackPatch {
             id: video_track_id,
             is_muted: Some(true),
         }])
@@ -149,7 +149,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::NotMuted)
         .unwrap();
     media_connections
-        .update_senders(vec![TrackPatch {
+        .patch_tracks(vec![TrackPatch {
             id: audio_track_id,
             is_muted: Some(false),
         }])
@@ -161,7 +161,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::NotMuted)
         .unwrap();
     media_connections
-        .update_senders(vec![TrackPatch {
+        .patch_tracks(vec![TrackPatch {
             id: video_track_id,
             is_muted: Some(false),
         }])

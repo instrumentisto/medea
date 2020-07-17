@@ -232,9 +232,12 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room =
-                Room::new(&spec, &self.app, self.peer_traffic_watcher.clone())?
-                    .start();
+            let room = Room::start(
+                &spec,
+                &self.app,
+                self.peer_traffic_watcher.clone(),
+            )?;
+
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -290,12 +293,11 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(
+        let room_addr = Room::start(
             &room_spec,
             &self.app,
             self.peer_traffic_watcher.clone(),
         )?;
-        let room_addr = room.start();
 
         shutdown::subscribe(
             &self.graceful_shutdown,
@@ -750,13 +752,12 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(
+        let room = Room::start(
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -799,13 +800,12 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".into();
-        let room = Room::new(
+        let room = Room::start(
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -867,13 +867,12 @@ mod room_service_specs {
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -889,13 +888,12 @@ mod room_service_specs {
             "caller".to_string().into(),
         ));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -912,13 +910,12 @@ mod room_service_specs {
             "publish".to_string().into(),
         ));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));

@@ -167,10 +167,18 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        self.peers.map_peer_by_id_mut(peer_id, |peer| {
-            peer.apply_track_changes(tracks_patches);
+        let partner_peer_id =
+            self.peers.map_peer_by_id_mut(peer_id, |peer| {
+                peer.as_changes_scheduler()
+                    .patch_tracks(tracks_patches.clone());
+                peer.partner_peer_id()
+            })?;
+        self.peers.map_peer_by_id_mut(partner_peer_id, |peer| {
+            peer.as_changes_scheduler().patch_tracks(tracks_patches);
         })?;
 
-        Ok(self.send_tracks_applied(peer_id))
+        self.peers.commit_scheduled_changes(peer_id)?;
+
+        Ok(Box::new(actix::fut::ok(())))
     }
 }
