@@ -6,12 +6,9 @@ pub mod control;
 use std::fmt::Debug;
 
 use futures::future::LocalBoxFuture;
-use medea_client_api_proto::Command;
+use medea_client_api_proto::{Command, MemberId};
 
-use crate::api::{
-    client::rpc_connection::{ClosedReason, RpcConnection},
-    control::MemberId,
-};
+use crate::api::client::rpc_connection::{ClosedReason, RpcConnection};
 
 /// Server side of Medea RPC protocol.
 #[cfg_attr(test, mockall::automock)]

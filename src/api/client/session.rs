@@ -15,13 +15,14 @@ use actix::{
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RpcSettings,
+    ServerMsg,
 };
 
 use crate::{
     api::{
         client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
-        control::{MemberId, RoomId},
+        control::RoomId,
         RpcServer,
     },
     log::prelude::*,

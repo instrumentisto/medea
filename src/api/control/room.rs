@@ -5,6 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
 use derive_more::{Display, From};
+use medea_client_api_proto::MemberId;
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -15,7 +16,7 @@ use crate::api::control::{
 use super::{
     member::{MemberElement, MemberSpec},
     pipeline::Pipeline,
-    MemberId, RootElement, TryFromElementError,
+    RootElement, TryFromElementError,
 };
 
 /// ID of [`Room`].

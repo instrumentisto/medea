@@ -15,10 +15,10 @@ use std::{
 
 use derive_more::Display;
 use futures::future;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use medea_client_api_proto::{Incrementable, MemberId, PeerId, TrackId};
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::control::RoomId,
     conf,
     log::prelude::*,
     media::{peer::NegotiationSubscriber, Peer, PeerError, PeerStateMachine},

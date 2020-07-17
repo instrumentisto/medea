@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use derive_more::{Display, From};
+use medea_client_api_proto::MemberId as Id;
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
@@ -26,11 +26,6 @@ use crate::api::control::{
 };
 
 const CREDENTIALS_LEN: usize = 32;
-
-/// ID of `Member`.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
-#[from(forward)]
-pub struct Id(pub String);
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///

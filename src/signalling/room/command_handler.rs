@@ -58,6 +58,7 @@ impl CommandHandler for Room {
         } else {
             Event::PeerCreated {
                 peer_id: to_peer.id(),
+                partner_member_id: to_peer.partner_member_id(),
                 negotiation_role: NegotiationRole::Answerer(sdp_offer),
                 tracks: to_peer.new_tracks(),
                 ice_servers,

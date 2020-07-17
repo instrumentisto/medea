@@ -9,7 +9,7 @@ use actix::{
     fut, ActorFuture as _, AsyncContext as _, Context,
     ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
 };
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -19,8 +19,7 @@ use crate::{
             WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
         },
         refs::StatefulFid,
-        EndpointId, EndpointSpec, MemberId, MemberSpec, WebRtcPlayId,
-        WebRtcPublishId,
+        EndpointId, EndpointSpec, MemberSpec, WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
     signalling::{

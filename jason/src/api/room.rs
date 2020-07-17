@@ -12,8 +12,8 @@ use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch, TrackUpdate,
+    IceServer, MemberId, NegotiationRole, PeerConnectionState, PeerId,
+    PeerMetrics, Track, TrackId, TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -802,6 +802,7 @@ impl EventHandler for InnerRoom {
     async fn on_peer_created(
         &self,
         peer_id: PeerId,
+        _partner_member_id: MemberId,
         negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,

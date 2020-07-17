@@ -27,7 +27,7 @@ pub mod stats;
 
 use std::{collections::HashMap, convert::TryInto as _};
 
-use derive_more::{Constructor, Display};
+use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
@@ -50,6 +50,13 @@ pub struct PeerId(pub u32);
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
+
+/// ID of `Member`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct MemberId(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -263,6 +270,7 @@ pub enum Event {
     /// creation.
     PeerCreated {
         peer_id: PeerId,
+        partner_member_id: MemberId,
         negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,

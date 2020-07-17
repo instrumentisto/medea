@@ -53,15 +53,13 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, PeerId as Id, PeerId,
-    Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
+    AudioSettings, Direction, IceServer, MediaType, MemberId, PeerId as Id,
+    PeerId, Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
-    api::control::{
-        endpoints::webrtc_publish_endpoint::PublishPolicy, MemberId,
-    },
+    api::control::endpoints::webrtc_publish_endpoint::PublishPolicy,
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
