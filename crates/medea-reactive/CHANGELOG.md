@@ -18,9 +18,11 @@ All user visible changes to this project will be documented in this file. This p
     - `ObservableVec`;
     - `ObservableHashMap`;
     - `ObservableHashSet`.
+- `ObservableOption` ([#123]).
 
 [#81]: /../../pull/81
 [#103]: /../../pull/103
+[#123]: /../../pull/123
 
 
 
