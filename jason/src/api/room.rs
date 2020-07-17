@@ -881,7 +881,7 @@ impl EventHandler for InnerRoom {
     /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
     /// [`TrackUpdate`]s.
     ///
-    /// Will start renegotiation process if `Some` [`NegotiationRole`] is
+    /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
     async fn on_tracks_applied(
         &self,
@@ -906,7 +906,7 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
-        peer.update_tracks(patches)
+        peer.patch_tracks(patches)
             .map_err(tracerr::map_from_and_wrap!())?;
         self.create_tracks_and_maybe_negotiate(
             peer,

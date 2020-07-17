@@ -11,6 +11,7 @@ use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
 use medea_control_api_proto::grpc::api as proto;
+use redis::RedisError;
 
 use crate::{
     api::control::{
@@ -135,13 +136,13 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`redis_pub_sub::RedisError`] if [`CoturnMetricsService`] fails
-    /// to connect to Redis stats server.
+    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails to connect to
+    /// Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
         graceful_shutdown: Addr<GracefulShutdown>,
-    ) -> Result<Self, redis_pub_sub::RedisError> {
+    ) -> Result<Self, RedisError> {
         let peer_traffic_watcher =
             build_peers_traffic_watcher(&app.config.media);
         Ok(Self {
@@ -231,9 +232,12 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room =
-                Room::new(&spec, &self.app, self.peer_traffic_watcher.clone())?
-                    .start();
+            let room = Room::start(
+                &spec,
+                &self.app,
+                self.peer_traffic_watcher.clone(),
+            )?;
+
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -289,12 +293,11 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(
+        let room_addr = Room::start(
             &room_spec,
             &self.app,
             self.peer_traffic_watcher.clone(),
         )?;
-        let room_addr = room.start();
 
         shutdown::subscribe(
             &self.graceful_shutdown,
@@ -749,13 +752,12 @@ mod room_service_specs {
             .clone();
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let room = Room::new(
+        let room = Room::start(
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -798,13 +800,12 @@ mod room_service_specs {
         let endpoint_spec = endpoint_spec.into();
 
         let room_id: RoomId = "pub-sub-video-call".into();
-        let room = Room::new(
+        let room = Room::start(
             &spec,
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id.clone() => room,
         )));
@@ -866,13 +867,12 @@ mod room_service_specs {
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -888,13 +888,12 @@ mod room_service_specs {
             "caller".to_string().into(),
         ));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));
@@ -911,13 +910,12 @@ mod room_service_specs {
             "publish".to_string().into(),
         ));
 
-        let room = Room::new(
+        let room = Room::start(
             &room_spec(),
             &app_ctx(),
             build_peers_traffic_watcher(&conf::Media::default()),
         )
-        .unwrap()
-        .start();
+        .unwrap();
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => room,
         )));

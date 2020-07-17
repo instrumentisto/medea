@@ -402,7 +402,7 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
 ///             spec:
 ///               src: "local://{{ room_id }}/publisher/publish"
 /// ```
-fn create_room_req(room_id: &str) -> proto::CreateRequest {
+pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
     RoomBuilder::default()
         .id(room_id.to_string())
         .add_member(

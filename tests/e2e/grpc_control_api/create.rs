@@ -410,6 +410,7 @@ mod endpoint {
             })),
             None,
             None,
+            true,
         )
         .await;
         let _responder = TestMember::connect(
@@ -418,7 +419,7 @@ mod endpoint {
                 if let Event::TracksApplied { updates, .. } = event {
                     if updates.iter().any(|u| enum_eq!(TrackUpdate::Added, u)) {
                         responder_tx.unbounded_send(()).unwrap();
-                        let sdp_answer_mades_count = events
+                        let sdp_answer_made_count = events
                             .iter()
                             .filter(|e| {
                                 if let Event::SdpAnswerMade { .. } = e {
@@ -428,7 +429,7 @@ mod endpoint {
                                 }
                             })
                             .count();
-                        if sdp_answer_mades_count == 2 {
+                        if sdp_answer_made_count == 2 {
                             responder_tx.unbounded_send(()).unwrap();
                         }
                     }
@@ -436,6 +437,7 @@ mod endpoint {
             })),
             None,
             None,
+            true,
         )
         .await;
 

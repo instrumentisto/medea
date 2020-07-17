@@ -16,7 +16,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaStreamTrack, TrackKind},
-    utils::{console_error, Callback1, HandlerDetachedError},
+    utils::{Callback1, HandlerDetachedError},
 };
 
 /// Actual data of a [`PeerMediaStream`].

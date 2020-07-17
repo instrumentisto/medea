@@ -330,6 +330,16 @@ impl ParticipantService {
         member_id: &MemberId,
         ctx: &mut Context<Room>,
     ) {
+        self.close_member_connection(member_id, ctx);
+        self.members.remove(member_id);
+    }
+
+    /// Closes [`RpcConnection`] with [`Member`] with a provided [`MemberId`]/
+    pub fn close_member_connection(
+        &mut self,
+        member_id: &MemberId,
+        ctx: &mut Context<Room>,
+    ) {
         if let Some(drop) = self.drop_connection_tasks.remove(member_id) {
             ctx.cancel_future(drop);
         }
@@ -340,8 +350,6 @@ impl ParticipantService {
             )
             .spawn(ctx);
         }
-
-        self.members.remove(member_id);
     }
 
     /// Inserts given [`Member`] into [`ParticipantService`].

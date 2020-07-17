@@ -98,9 +98,7 @@ impl CoturnEvent {
     ///
     /// All errors from this function should never happen, so there is no sense
     /// to catch them individually.
-    pub fn parse(
-        msg: &redis_pub_sub::Msg,
-    ) -> Result<Self, CoturnEventParseError> {
+    pub fn parse(msg: &redis::Msg) -> Result<Self, CoturnEventParseError> {
         use CoturnEventParseError as E;
 
         let channel: String =
