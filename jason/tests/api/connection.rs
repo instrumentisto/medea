@@ -1,21 +1,13 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::cell::RefCell;
-
-use futures::{
-    channel::{mpsc, oneshot},
-    stream::LocalBoxStream,
-};
+use futures::channel::oneshot;
 use medea_client_api_proto::{
     Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
 use medea_jason::{
     api::{ConnectionHandle, Connections},
-    media::{MediaManager, MediaStreamTrack, TrackKind},
-    peer::{
-        MuteStateUpdate, PeerConnection, RemoteMediaStream, RtcPeerConnection,
-        StableMuteState,
-    },
+    media::{MediaManager, MediaStreamTrack},
+    peer::{RemoteMediaStream, StableMuteState},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::{closure::Closure, JsValue};
@@ -23,7 +15,6 @@ use wasm_bindgen_test::*;
 use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{timeout, wait_and_check_test_result};
-use medea_jason::utils::yield_now;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -117,24 +108,6 @@ async fn tracks_are_added_to_remote_stream() {
 
     con.add_remote_track(TrackId(2), get_audio_track().await);
     assert_eq!(stream.get_tracks().length(), 2);
-}
-
-struct MuteStateUpdatePublisherMock {
-    tx: RefCell<Vec<mpsc::UnboundedSender<MuteStateUpdate>>>,
-}
-
-impl MuteStateUpdatePublisherMock {
-    pub fn new() -> Self {
-        Self {
-            tx: RefCell::default(),
-        }
-    }
-
-    pub fn send_mute_state(&self, update: MuteStateUpdate) {
-        for tx in self.tx.borrow().iter() {
-            tx.unbounded_send(update.clone());
-        }
-    }
 }
 
 #[wasm_bindgen_test]

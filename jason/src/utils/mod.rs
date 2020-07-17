@@ -32,20 +32,6 @@ pub async fn yield_now() {
     delay_for(Duration::from_millis(0).into()).await;
 }
 
-/// Will be resolved when provided function returns `true`.
-///
-/// Provided function will be called in loop untils it returns `false`.
-///
-/// After all calls of the provided function [`yield_now`] will be called.
-pub async fn wait_for<F, T>(f: F, v: T)
-where
-    F: Fn(&T) -> bool,
-{
-    while !(f)(&v) {
-        yield_now().await;
-    }
-}
-
 /// Returns [`Window`] object.
 ///
 /// # Panics

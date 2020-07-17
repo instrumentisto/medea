@@ -2,7 +2,10 @@
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 
-use std::rc::{Rc, Weak};
+use std::{
+    cell::Cell,
+    rc::{Rc, Weak},
+};
 
 use derive_more::{AsRef, Display};
 use medea_client_api_proto::MediaType;
@@ -11,7 +14,7 @@ use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::MediaStreamSettings;
+use crate::{peer::StableMuteState, MediaStreamSettings};
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -79,7 +82,7 @@ impl MediaStream {
 /// Weak reference to [MediaStreamTrack][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-pub struct WeakMediaStreamTrack(Weak<SysMediaStreamTrack>);
+pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
 
 impl WeakMediaStreamTrack {
     /// Tries to upgrade this weak reference to a strong one.
@@ -95,6 +98,11 @@ impl WeakMediaStreamTrack {
     }
 }
 
+struct InnerMediaStreamTrack {
+    track: SysMediaStreamTrack,
+    mute_state: Cell<StableMuteState>,
+}
+
 /// Strong reference to [MediaStreamTrack][1].
 ///
 /// Track will be automatically stopped when there are no strong references
@@ -102,13 +110,28 @@ impl WeakMediaStreamTrack {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[derive(Clone)]
-pub struct MediaStreamTrack(Rc<SysMediaStreamTrack>);
+pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
     /// Returns [`SysMediaStreamTrack`] from this [`MediaStreamTrack`].
     #[inline]
     pub fn as_sys(&self) -> SysMediaStreamTrack {
-        (*self.0).clone()
+        self.0.track.clone()
+    }
+
+    /// Returns `true` if this [`MediaStreamTrack`] is considered as active.
+    ///
+    /// Currently, returns result of [`SysMediaStreamTrack::muted`] function.
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.0.mute_state.get() != StableMuteState::Muted
+    }
+
+    /// Sets [`StableMuteState`] of this [`MediaStreamTrack`] to the provided
+    /// [`StableMuteState`].
+    #[inline]
+    pub fn set_mute_state(&self, mute_state: StableMuteState) {
+        self.0.mute_state.set(mute_state);
     }
 }
 
@@ -147,14 +170,17 @@ where
 {
     #[inline]
     fn from(track: T) -> Self {
-        MediaStreamTrack(Rc::new(<SysMediaStreamTrack as From<T>>::from(track)))
+        MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+            track: <SysMediaStreamTrack as From<T>>::from(track),
+            mute_state: Cell::new(StableMuteState::NotMuted),
+        }))
     }
 }
 
 impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
     #[inline]
     fn as_ref(&self) -> &SysMediaStreamTrack {
-        &self.0
+        &self.0.track
     }
 }
 
@@ -165,13 +191,13 @@ impl MediaStreamTrack {
     /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
     pub fn id(&self) -> String {
-        self.0.id()
+        self.0.track.id()
     }
 
     /// Returns track kind (audio/video).
     #[inline]
     pub fn kind(&self) -> TrackKind {
-        match self.0.kind().as_ref() {
+        match self.0.track.kind().as_ref() {
             "audio" => TrackKind::Audio,
             "video" => TrackKind::Video,
             _ => unreachable!(),
@@ -192,7 +218,7 @@ impl Drop for MediaStreamTrack {
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
         if Rc::strong_count(&self.0) == 1 {
-            self.0.stop();
+            self.0.track.stop();
         }
     }
 }

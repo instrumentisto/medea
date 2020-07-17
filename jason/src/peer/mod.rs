@@ -48,7 +48,7 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, MuteStateUpdate, Sender, StableMuteState,
+        MuteStateTransition, Sender, StableMuteState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,

@@ -6,15 +6,15 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
     media::MediaStreamTrack,
     peer::{PeerMediaStream, RemoteMediaStream, StableMuteState},
-    utils::{wait_for, Callback0, Callback1, HandlerDetachedError},
+    utils::{Callback0, Callback1, HandlerDetachedError},
 };
+use medea_reactive::ObservableOption;
 
 /// Connections service.
 // TODO: Store MemberId's or some other metadata, that will make it possible
@@ -115,7 +115,7 @@ struct InnerConnection {
     remote_id: PeerId,
 
     /// [`PeerMediaStream`] received from remote member.
-    remote_stream: RefCell<Option<PeerMediaStream>>,
+    remote_stream: RefCell<ObservableOption<PeerMediaStream>>,
 
     /// JS callback, that will be invoked when remote [`PeerMediaStream`] is
     /// received.
@@ -160,7 +160,7 @@ impl Connection {
     pub(crate) fn new(remote_id: PeerId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
-            remote_stream: RefCell::new(None),
+            remote_stream: RefCell::new(ObservableOption::none()),
             on_remote_stream: Callback1::default(),
             on_close: Callback0::default(),
         }))
@@ -189,26 +189,12 @@ impl Connection {
         track: &MediaStreamTrack,
         mute_state: StableMuteState,
     ) {
-        fn get_stream(
-            conn: Connection,
-        ) -> LocalBoxFuture<'static, PeerMediaStream> {
-            Box::pin(async move {
-                let remote_stream =
-                    { conn.0.remote_stream.borrow().as_ref().cloned() };
-                if let Some(remote_stream) = remote_stream {
-                    remote_stream
-                } else {
-                    wait_for(
-                        |conn| conn.0.remote_stream.borrow().is_some(),
-                        conn.clone(),
-                    )
-                    .await;
-
-                    get_stream(conn).await
-                }
-            })
-        }
-        let remote_stream = get_stream(self.clone()).await;
+        let get_stream = self.0.remote_stream.borrow().when_some();
+        let remote_stream = if let Ok(stream) = get_stream.await {
+            stream
+        } else {
+            return;
+        };
         match mute_state {
             StableMuteState::Muted => {
                 remote_stream.track_stopped(track);

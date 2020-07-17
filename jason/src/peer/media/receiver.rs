@@ -2,10 +2,10 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{channel::mpsc, future::LocalBoxFuture, StreamExt as _};
+use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::TrackPatch;
-use medea_reactive::ObservableCell;
+use medea_reactive::{ObservableCell, ObservableOption};
 use proto::{PeerId, TrackId};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::RtcRtpTransceiver;
@@ -16,7 +16,6 @@ use crate::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         PeerEvent, StableMuteState,
     },
-    utils::wait_for,
 };
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
@@ -29,7 +28,7 @@ pub struct Receiver {
     pub(super) sender_id: PeerId,
     pub(super) transceiver: Option<RtcRtpTransceiver>,
     pub(super) mid: Option<String>,
-    pub(super) track: Rc<RefCell<Option<MediaStreamTrack>>>,
+    pub(super) track: Rc<RefCell<ObservableOption<MediaStreamTrack>>>,
     pub(super) mute_state: ObservableCell<StableMuteState>,
 }
 
@@ -58,35 +57,22 @@ impl Receiver {
         };
         let mute_state = ObservableCell::new(StableMuteState::NotMuted);
         let mut mute_state_changes = mute_state.subscribe();
-        let track = Rc::new(RefCell::new(None));
+        let track = Rc::new(RefCell::new(ObservableOption::none()));
         spawn_local({
             let track = Rc::clone(&track);
             async move {
                 while let Some(mute_state_update) =
                     mute_state_changes.next().await
                 {
-                    fn get_track(
-                        track: Rc<RefCell<Option<MediaStreamTrack>>>,
-                    ) -> LocalBoxFuture<'static, MediaStreamTrack>
-                    {
-                        Box::pin(async move {
-                            let inner_track =
-                                { track.borrow().as_ref().cloned() };
-                            if let Some(track) = inner_track {
-                                track
-                            } else {
-                                wait_for(
-                                    |track| track.borrow().is_some(),
-                                    Rc::clone(&track),
-                                )
-                                .await;
+                    let get_track = track.borrow().when_some();
+                    let track: MediaStreamTrack =
+                        if let Ok(track) = get_track.await {
+                            track
+                        } else {
+                            break;
+                        };
+                    track.set_mute_state(mute_state_update);
 
-                                get_track(track).await
-                            }
-                        })
-                    }
-
-                    let track = get_track(Rc::clone(&track)).await;
                     if peer_events_sender
                         .unbounded_send(PeerEvent::MuteStateChanged {
                             peer_id: sender_id,

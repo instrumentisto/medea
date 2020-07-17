@@ -17,7 +17,7 @@ use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{LocalStreamConstraints, MediaStreamTrack, TrackKind},
+    media::{LocalStreamConstraints, MediaStreamTrack},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
@@ -95,17 +95,6 @@ impl From<DroppedError> for MediaConnectionsError {
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
-
-/// Metadata which will be sent into [`MediaConnections::on_mute_state_update`]
-/// [`LocalBoxStream`].
-#[derive(Clone)]
-pub struct MuteStateUpdate {
-    /// [`TrackKind`] of `MediaTrack` which was muted or unmuted.
-    pub kind: TrackKind,
-
-    /// Updated [`StableMuteState`].
-    pub new_mute_state: StableMuteState,
-}
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {

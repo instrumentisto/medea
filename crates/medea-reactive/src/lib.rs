@@ -23,6 +23,7 @@
 
 pub mod collections;
 pub mod field;
+pub mod option;
 
 #[doc(inline)]
 pub use crate::{
@@ -32,4 +33,5 @@ pub use crate::{
         Observable, ObservableField, OnObservableFieldModification,
         Subscribable, UniversalSubscriber, Whenable,
     },
+    option::ObservableOption,
 };

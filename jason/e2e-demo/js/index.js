@@ -533,10 +533,15 @@ window.onload = async function() {
         let isVideoStarted = false;
         video.poster = 'https://image.flaticon.com/icons/svg/813/813734.svg';
         video.style.background = '#f5f5f5';
+        document.stream = stream;
 
         stream.on_track_started((track) => {
           let kind = track.kind;
           console.log(`on_track_started: ${kind}`);
+          let isAudioActive = stream.has_active_audio();
+          let isVideoActive = stream.has_active_video();
+          console.log(`has_active_audio: ${isAudioActive}`);
+          console.log(`has_active_video: ${isVideoActive}`);
           if (kind === 'audio') {
             isAudioStarted = true;
           }
@@ -558,6 +563,10 @@ window.onload = async function() {
         stream.on_track_stopped((track) => {
           let kind = track.kind;
           console.log(`on_track_stopped: ${kind}`);
+          let isAudioActive = stream.has_active_audio();
+          let isVideoActive = stream.has_active_video();
+          console.log(`has_active_audio: ${isAudioActive}`);
+          console.log(`has_active_video: ${isVideoActive}`);
           if (kind === 'audio') {
             isAudioStarted = false;
           }
@@ -579,6 +588,10 @@ window.onload = async function() {
         stream.on_track_added((track) => {
           let kind = track.kind;
           console.log(`on_track_added: ${kind}`);
+          let isAudioActive = stream.has_active_audio();
+          let isVideoActive = stream.has_active_video();
+          console.log(`has_active_audio: ${isAudioActive}`);
+          console.log(`has_active_video: ${isVideoActive}`);
         });
 
         video.oncanplay = async () => {
