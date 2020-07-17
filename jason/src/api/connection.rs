@@ -6,7 +6,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
+use medea_client_api_proto::{Direction, MemberId, PeerId, Track, TrackId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -45,13 +45,14 @@ impl Connections {
     pub fn create_connections_from_tracks(
         &self,
         local_peer: PeerId,
+        remote_member_id: MemberId,
         tracks: &[Track],
     ) {
         let create_connection = |connections: &Self, remote_id: &PeerId| {
             let is_new =
                 !connections.connections.borrow().contains_key(remote_id);
             if is_new {
-                let con = Connection::new(*remote_id);
+                let con = Connection::new(*remote_id, remote_member_id.clone());
                 connections.on_new_connection.call(con.new_handle());
                 connections.connections.borrow_mut().insert(*remote_id, con);
                 connections
@@ -113,6 +114,9 @@ struct InnerConnection {
     /// Remote [`PeerId`].
     remote_id: PeerId,
 
+    /// [`MemberId`] of the specific remote [`Member`].
+    remote_member_id: MemberId,
+
     /// [`PeerMediaStream`] received from remote member.
     remote_stream: RefCell<Option<PeerMediaStream>>,
 
@@ -142,6 +146,13 @@ impl ConnectionHandle {
     pub fn get_remote_id(&self) -> Result<u32, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0)
     }
+
+    /// Returns [`MemberId`] of the remote [`Member`] with which this connection
+    /// is.
+    pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.remote_member_id.0.clone())
+    }
 }
 
 /// Connection with a specific remote [`Member`], that is used on Rust side.
@@ -153,9 +164,10 @@ pub struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub fn new(remote_id: PeerId) -> Self {
+    pub fn new(remote_id: PeerId, remote_member_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
+            remote_member_id,
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback1::default(),
             on_close: Callback0::default(),
