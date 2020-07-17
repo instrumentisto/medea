@@ -245,7 +245,10 @@ impl RemoteMediaStream {
     }
 
     /// Sets callback, which will be invoked on `MediaTrack` stopping.
-    pub fn on_track_disabled(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_track_disabled(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             inner.on_track_disabled.set_func(f);
         })

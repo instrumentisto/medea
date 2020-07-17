@@ -137,7 +137,10 @@ where
     }
 }
 
-impl<T> Default for ObservableOption<T> where T: Clone {
+impl<T> Default for ObservableOption<T>
+where
+    T: Clone,
+{
     fn default() -> Self {
         Self {
             storage: None,
