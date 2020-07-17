@@ -166,32 +166,6 @@ impl RemoteMediaStream {
         upgrade_or_detached!(self.0).map(|inner| Clone::clone(&inner.stream))
     }
 
-    // TODO(evdokimovs): REMOVE ME
-    #[allow(missing_docs, clippy::missing_errors_doc)]
-    pub fn get_audio_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            let stream = SysMediaStream::new().unwrap();
-            for audio_track in inner.audio_tracks.borrow().values() {
-                stream.add_track(audio_track.as_ref());
-            }
-
-            stream
-        })
-    }
-
-    // TODO(evdokimovs): REMOVE ME
-    #[allow(missing_docs, clippy::missing_errors_doc)]
-    pub fn get_video_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            let stream = SysMediaStream::new().unwrap();
-            for video_track in inner.video_tracks.borrow().values() {
-                stream.add_track(video_track.as_ref());
-            }
-
-            stream
-        })
-    }
-
     /// Returns `true` if at least one video [`MediaStreamTrack`] exists in this
     /// [`RemoteMediaStream`].
     pub fn has_active_audio(&self) -> Result<bool, JsValue> {

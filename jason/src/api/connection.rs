@@ -7,6 +7,7 @@ use std::{
 };
 
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
+use medea_reactive::ObservableOption;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -14,7 +15,6 @@ use crate::{
     peer::{PeerMediaStream, RemoteMediaStream, StableMuteState},
     utils::{Callback0, Callback1, HandlerDetachedError},
 };
-use medea_reactive::ObservableOption;
 
 /// Connections service.
 // TODO: Store MemberId's or some other metadata, that will make it possible

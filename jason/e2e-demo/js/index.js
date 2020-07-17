@@ -529,74 +529,23 @@ window.onload = async function() {
         innerVideoDiv.appendChild(video);
         remote_videos[connection.get_remote_id()] = innerVideoDiv;
         videoDiv.appendChild(innerVideoDiv);
-        let isAudioStarted = false;
-        let isVideoStarted = false;
-        video.poster = 'https://image.flaticon.com/icons/svg/813/813734.svg';
-        video.style.background = '#f5f5f5';
-        document.stream = stream;
-
-        stream.on_track_enabled((track) => {
-          let kind = track.kind;
-          console.log(`on_track_enabled: ${kind}`);
-          let isAudioActive = stream.has_active_audio();
-          let isVideoActive = stream.has_active_video();
-          console.log(`has_active_audio: ${isAudioActive}`);
-          console.log(`has_active_video: ${isVideoActive}`);
-          if (kind === 'audio') {
-            isAudioStarted = true;
-          }
-          if (kind === 'video') {
-            isVideoStarted = true;
-          }
-          if (isAudioStarted && !isVideoStarted) {
-            video.srcObject = stream.get_audio_stream();
-          } else if (isVideoStarted && !isAudioStarted) {
-            video.srcObject = stream.get_video_stream();
-          } else if (isVideoStarted && isAudioStarted) {
-            video.srcObject = stream.get_media_stream();
-          } else {
-            video.srcObject = null;
-          }
-          video.controls = false;
-          video.controls = true;
-        });
-        stream.on_track_disabled((track) => {
-          let kind = track.kind;
-          console.log(`on_track_disabled: ${kind}`);
-          let isAudioActive = stream.has_active_audio();
-          let isVideoActive = stream.has_active_video();
-          console.log(`has_active_audio: ${isAudioActive}`);
-          console.log(`has_active_video: ${isVideoActive}`);
-          if (kind === 'audio') {
-            isAudioStarted = false;
-          }
-          if (kind === 'video') {
-            isVideoStarted = false;
-          }
-          if (isAudioStarted && !isVideoStarted) {
-            video.srcObject = stream.get_audio_stream();
-          } else if (isVideoStarted && !isAudioStarted) {
-            video.srcObject = stream.get_video_stream();
-          } else if (isVideoStarted && isAudioStarted) {
-            video.srcObject = stream.get_media_stream();
-          } else {
-            video.srcObject = null;
-          }
-          video.controls = false;
-          video.controls = true;
-        });
-        stream.on_track_added((track) => {
-          let kind = track.kind;
-          console.log(`on_track_added: ${kind}`);
-          let isAudioActive = stream.has_active_audio();
-          let isVideoActive = stream.has_active_video();
-          console.log(`has_active_audio: ${isAudioActive}`);
-          console.log(`has_active_video: ${isVideoActive}`);
-        });
 
         video.oncanplay = async () => {
           await video.play();
         };
+
+        stream.on_track_added( (track) => {
+          let kind = track.kind;
+          console.log(`Track added: ${kind}`);
+        });
+        stream.on_track_enabled( (track) => {
+          let kind = track.kind;
+          console.log(`Track enabled: ${kind}`);
+        });
+        stream.on_track_disabled( (track) => {
+          let kind = track.kind;
+          console.log(`Track disabled: ${kind}`);
+        });
       });
 
       connection.on_close(() => {
