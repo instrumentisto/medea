@@ -159,7 +159,7 @@ async fn on_track_added_works() {
 }
 
 #[wasm_bindgen_test]
-async fn on_track_stopped_works() {
+async fn on_track_disabled_works() {
     let cons = Connections::default();
 
     cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
@@ -180,13 +180,12 @@ async fn on_track_stopped_works() {
     conn.add_remote_track(TrackId(1), audio_track.clone());
 
     let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_stopped, test_result) =
+    let (on_track_disabled, test_result) =
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());
         });
-
     remote_stream
-        .on_track_stopped(on_track_stopped.into())
+        .on_track_disabled(on_track_disabled.into())
         .unwrap();
 
     conn.update_mute_state(&audio_track, StableMuteState::Muted)
@@ -196,7 +195,7 @@ async fn on_track_stopped_works() {
 }
 
 #[wasm_bindgen_test]
-async fn on_track_started_works() {
+async fn on_track_enabled_works() {
     let cons = Connections::default();
 
     cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
@@ -217,13 +216,13 @@ async fn on_track_started_works() {
     conn.add_remote_track(TrackId(1), audio_track.clone());
 
     let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_started, test_result_on_stop) =
+    let (on_track_disabled, test_result_on_stop) =
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());
         });
 
     remote_stream
-        .on_track_stopped(on_track_started.into())
+        .on_track_disabled(on_track_disabled.into())
         .unwrap();
 
     conn.update_mute_state(&audio_track, StableMuteState::Muted)
@@ -231,12 +230,12 @@ async fn on_track_started_works() {
 
     wait_and_check_test_result(test_result_on_stop, || {}).await;
 
-    let (on_track_started, test_result_on_start) =
+    let (on_track_enabled, test_result_on_start) =
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());
         });
     remote_stream
-        .on_track_started(on_track_started.into())
+        .on_track_enabled(on_track_enabled.into())
         .unwrap();
 
     conn.update_mute_state(&audio_track, StableMuteState::NotMuted)

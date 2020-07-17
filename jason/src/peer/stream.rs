@@ -39,10 +39,10 @@ struct InnerStream {
     on_track_added: Callback1<SysMediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` starting.
-    on_track_started: Callback1<SysMediaStreamTrack>,
+    on_track_enabled: Callback1<SysMediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` stopping.
-    on_track_stopped: Callback1<SysMediaStreamTrack>,
+    on_track_disabled: Callback1<SysMediaStreamTrack>,
 }
 
 impl InnerStream {
@@ -53,8 +53,8 @@ impl InnerStream {
             audio_tracks: RefCell::default(),
             video_tracks: RefCell::default(),
             on_track_added: Callback1::default(),
-            on_track_started: Callback1::default(),
-            on_track_stopped: Callback1::default(),
+            on_track_enabled: Callback1::default(),
+            on_track_disabled: Callback1::default(),
         }
     }
 
@@ -136,17 +136,17 @@ impl PeerMediaStream {
     /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
     /// [`TrackKind`] was started.
     ///
-    /// Calls [`PeerMediaStream::on_track_started`] JS callback function.
+    /// Calls [`PeerMediaStream::on_track_enabled`] JS callback function.
     pub fn track_started(&self, track: &MediaStreamTrack) {
-        self.0.on_track_started.call(track.as_sys());
+        self.0.on_track_enabled.call(track.as_sys());
     }
 
     /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
     /// [`TrackKind`] was stopped.
     ///
-    /// Calls [`PeerMediaStream::on_track_stopped`] JS callback function.
+    /// Calls [`PeerMediaStream::on_track_disabled`] JS callback function.
     pub fn track_stopped(&self, track: &MediaStreamTrack) {
-        self.0.on_track_stopped.call(track.as_sys());
+        self.0.on_track_disabled.call(track.as_sys());
     }
 }
 
@@ -238,16 +238,16 @@ impl RemoteMediaStream {
     }
 
     /// Sets callback, which will be invoked on `MediaTrack` starting.
-    pub fn on_track_started(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_track_enabled(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_track_started.set_func(f);
+            inner.on_track_enabled.set_func(f);
         })
     }
 
     /// Sets callback, which will be invoked on `MediaTrack` stopping.
-    pub fn on_track_stopped(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_track_disabled(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_track_stopped.set_func(f);
+            inner.on_track_disabled.set_func(f);
         })
     }
 }

@@ -535,9 +535,9 @@ window.onload = async function() {
         video.style.background = '#f5f5f5';
         document.stream = stream;
 
-        stream.on_track_started((track) => {
+        stream.on_track_enabled((track) => {
           let kind = track.kind;
-          console.log(`on_track_started: ${kind}`);
+          console.log(`on_track_enabled: ${kind}`);
           let isAudioActive = stream.has_active_audio();
           let isVideoActive = stream.has_active_video();
           console.log(`has_active_audio: ${isAudioActive}`);
@@ -560,9 +560,9 @@ window.onload = async function() {
           video.controls = false;
           video.controls = true;
         });
-        stream.on_track_stopped((track) => {
+        stream.on_track_disabled((track) => {
           let kind = track.kind;
-          console.log(`on_track_stopped: ${kind}`);
+          console.log(`on_track_disabled: ${kind}`);
           let isAudioActive = stream.has_active_audio();
           let isVideoActive = stream.has_active_video();
           console.log(`has_active_audio: ${isAudioActive}`);
