@@ -27,11 +27,6 @@ pub use self::{
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
 
-/// Async [`std::thread::yield_now`].
-pub async fn yield_now() {
-    delay_for(Duration::from_millis(0).into()).await;
-}
-
 /// Returns [`Window`] object.
 ///
 /// # Panics

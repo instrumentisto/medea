@@ -38,10 +38,10 @@ struct InnerStream {
     /// Callback from JS side which will be invoked on new `MediaTrack` adding.
     on_track_added: Callback1<SysMediaStreamTrack>,
 
-    /// Callback from JS side which will be invoked on `MediaTrack` starting.
+    /// Callback from JS side which will be invoked on `MediaTrack` enabling.
     on_track_enabled: Callback1<SysMediaStreamTrack>,
 
-    /// Callback from JS side which will be invoked on `MediaTrack` stopping.
+    /// Callback from JS side which will be invoked on `MediaTrack` disabling.
     on_track_disabled: Callback1<SysMediaStreamTrack>,
 }
 
@@ -134,18 +134,18 @@ impl PeerMediaStream {
     }
 
     /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
-    /// [`TrackKind`] was started.
+    /// [`TrackKind`] was enabled.
     ///
     /// Calls [`PeerMediaStream::on_track_enabled`] JS callback function.
-    pub fn track_started(&self, track: &MediaStreamTrack) {
+    pub fn track_enabled(&self, track: &MediaStreamTrack) {
         self.0.on_track_enabled.call(track.as_sys());
     }
 
     /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
-    /// [`TrackKind`] was stopped.
+    /// [`TrackKind`] was disabled.
     ///
     /// Calls [`PeerMediaStream::on_track_disabled`] JS callback function.
-    pub fn track_stopped(&self, track: &MediaStreamTrack) {
+    pub fn track_disabled(&self, track: &MediaStreamTrack) {
         self.0.on_track_disabled.call(track.as_sys());
     }
 }
@@ -198,27 +198,25 @@ impl RemoteMediaStream {
     pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             inner.on_track_added.set_func(f);
-            {
-                inner
-                    .audio_tracks
-                    .borrow()
-                    .values()
-                    .chain(inner.video_tracks.borrow().values())
-                    .for_each(|track| {
-                        inner.on_track_added.call(track.as_sys());
-                    });
-            }
+            inner
+                .audio_tracks
+                .borrow()
+                .values()
+                .chain(inner.video_tracks.borrow().values())
+                .for_each(|track| {
+                    inner.on_track_added.call(track.as_sys());
+                });
         })
     }
 
-    /// Sets callback, which will be invoked on `MediaTrack` starting.
+    /// Sets callback, which will be invoked on `MediaTrack` enabling.
     pub fn on_track_enabled(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             inner.on_track_enabled.set_func(f);
         })
     }
 
-    /// Sets callback, which will be invoked on `MediaTrack` stopping.
+    /// Sets callback, which will be invoked on `MediaTrack` disabling.
     pub fn on_track_disabled(
         &self,
         f: js_sys::Function,

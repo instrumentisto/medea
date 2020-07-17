@@ -197,10 +197,10 @@ impl Connection {
         };
         match mute_state {
             StableMuteState::Muted => {
-                remote_stream.track_stopped(track);
+                remote_stream.track_disabled(track);
             }
             StableMuteState::NotMuted => {
-                remote_stream.track_started(track);
+                remote_stream.track_enabled(track);
             }
         }
     }
