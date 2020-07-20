@@ -812,6 +812,7 @@ impl EventHandler for InnerRoom {
             .peers
             .create_peer(
                 peer_id,
+                partner_member_id.clone(),
                 ice_servers,
                 self.peer_event_sender.clone(),
                 is_force_relayed,
@@ -819,11 +820,8 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.connections.create_connections_from_tracks(
-            peer_id,
-            &partner_member_id,
-            &tracks,
-        );
+        self.connections
+            .create_connection(peer_id, &partner_member_id);
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,
@@ -952,14 +950,19 @@ impl PeerEventHandler for InnerRoom {
     /// [`MediaStreamTrack`] to the related [`Connection`].
     async fn on_new_remote_track(
         &self,
+        peer_id: PeerId,
         _: PeerId,
-        sender_id: PeerId,
         track_id: TrackId,
         track: MediaStreamTrack,
     ) -> Result<(), Traced<RoomError>> {
+        let peer = self
+            .peers
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        let remote_member_id = peer.remote_member_id();
         let conn = self
             .connections
-            .get(sender_id)
+            .get(&remote_member_id)
             .ok_or_else(|| tracerr::new!(RoomError::UnknownRemotePeer))?;
         conn.add_remote_track(track_id, track);
         Ok(())

@@ -22,7 +22,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -194,6 +194,8 @@ pub struct PeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
+    remote_member_id: MemberId,
+
     /// [`Sender`]s and [`Receiver`]s of this [`RtcPeerConnection`].
     ///
     /// [`Receiver`]: self::media::Receiver
@@ -240,6 +242,7 @@ impl PeerConnection {
     /// [`RtcPeerConnection`] can't be set.
     pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
+        remote_member_id: MemberId,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
@@ -258,6 +261,7 @@ impl PeerConnection {
 
         let peer = Self {
             id,
+            remote_member_id,
             peer,
             media_connections,
             media_manager,
@@ -314,6 +318,11 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(Rc::new(peer))
+    }
+
+    /// Returns [`MemberId`] of the partner [`PeerConnection`].
+    pub fn remote_member_id(&self) -> MemberId {
+        self.remote_member_id.clone()
     }
 
     /// Stops inner state transitions expiry timers.

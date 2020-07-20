@@ -532,7 +532,7 @@ window.onload = async function() {
         let remoteMemberIdSpan = document.createElement('span');
         remoteMemberIdSpan.innerText = remoteMemberId;
         innerVideoDiv.appendChild(remoteMemberIdSpan);
-        remote_videos[connection.get_remote_id()] = innerVideoDiv;
+        remote_videos[remoteMemberId] = innerVideoDiv;
         videoDiv.appendChild(innerVideoDiv);
 
         video.oncanplay = async () => {
@@ -541,8 +541,8 @@ window.onload = async function() {
       });
 
       connection.on_close(() => {
-        remote_videos[connection.get_remote_id()].remove();
-        delete remote_videos[connection.get_remote_id()];
+        remote_videos[remoteMemberId].remove();
+        delete remote_videos[remoteMemberId];
       });
     });
 

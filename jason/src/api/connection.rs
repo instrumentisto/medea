@@ -6,7 +6,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{Direction, MemberId, PeerId, Track, TrackId};
+use medea_client_api_proto::{MemberId, PeerId, TrackId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -15,16 +15,14 @@ use crate::{
     utils::{Callback0, Callback1, HandlerDetachedError},
 };
 
-/// Connections service.
-// TODO: Store MemberId's or some other metadata, that will make it possible
-//       to identify remote Member.
+/// Service which manages [`Connection`]s with the remote `Member`s.
 #[derive(Default)]
 pub struct Connections {
-    /// Local [`PeerId`] to remote [`PeerId`].
-    local_to_remote: RefCell<HashMap<PeerId, PeerId>>,
+    /// Local [`PeerId`] to remote [`MemberId`].
+    local_to_remote: RefCell<HashMap<PeerId, MemberId>>,
 
     /// Remote [`PeerId`] to [`Connection`] with that `Peer`.
-    connections: RefCell<HashMap<PeerId, Connection>>,
+    connections: RefCell<HashMap<MemberId, Connection>>,
 
     /// Callback from JS side which will be invoked on remote `Member` media
     /// stream arrival.
@@ -38,47 +36,28 @@ impl Connections {
         self.on_new_connection.set_func(f);
     }
 
-    /// Creates new [`Connection`]s based on senders and receivers of provided
-    /// [`Track`]s.
-    // TODO: creates connections based on remote peer_ids atm, should create
-    //       connections based on remote member_ids
-    pub fn create_connections_from_tracks(
+    /// Creates new connection with a provided remote [`MemberId`].
+    pub fn create_connection(
         &self,
-        local_peer: PeerId,
+        local_peer_id: PeerId,
         remote_member_id: &MemberId,
-        tracks: &[Track],
     ) {
-        let create_connection = |connections: &Self, remote_id: &PeerId| {
-            let is_new =
-                !connections.connections.borrow().contains_key(remote_id);
-            if is_new {
-                let con = Connection::new(*remote_id, remote_member_id.clone());
-                connections.on_new_connection.call(con.new_handle());
-                connections.connections.borrow_mut().insert(*remote_id, con);
-                connections
-                    .local_to_remote
-                    .borrow_mut()
-                    .insert(local_peer, *remote_id);
-            }
-        };
-
-        for track in tracks {
-            match &track.direction {
-                Direction::Send { ref receivers, .. } => {
-                    for receiver in receivers {
-                        create_connection(self, receiver);
-                    }
-                }
-                Direction::Recv { ref sender, .. } => {
-                    create_connection(self, sender);
-                }
-            }
+        let is_new = !self.connections.borrow().contains_key(remote_member_id);
+        if is_new {
+            let con = Connection::new(remote_member_id.clone());
+            self.on_new_connection.call(con.new_handle());
+            self.connections
+                .borrow_mut()
+                .insert(remote_member_id.clone(), con);
+            self.local_to_remote
+                .borrow_mut()
+                .insert(local_peer_id, remote_member_id.clone());
         }
     }
 
     /// Lookups [`Connection`] by the given remote [`PeerId`].
-    pub fn get(&self, remote_peer_id: PeerId) -> Option<Connection> {
-        self.connections.borrow().get(&remote_peer_id).cloned()
+    pub fn get(&self, remote_member_id: &MemberId) -> Option<Connection> {
+        self.connections.borrow().get(remote_member_id).cloned()
     }
 
     /// Closes [`Connection`] associated with provided local [`PeerId`].
@@ -111,9 +90,6 @@ pub struct ConnectionHandle(Weak<InnerConnection>);
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    /// Remote [`PeerId`].
-    remote_id: PeerId,
-
     /// [`MemberId`] of the specific remote [`Member`].
     remote_member_id: MemberId,
 
@@ -142,11 +118,6 @@ impl ConnectionHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Returns remote `PeerId`.
-    pub fn get_remote_id(&self) -> Result<u32, JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0)
-    }
-
     /// Returns [`MemberId`] of the remote [`Member`] with which this connection
     /// is.
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
@@ -164,9 +135,8 @@ pub struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub fn new(remote_id: PeerId, remote_member_id: MemberId) -> Self {
+    pub fn new(remote_member_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
-            remote_id,
             remote_member_id,
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback1::default(),
