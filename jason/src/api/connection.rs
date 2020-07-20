@@ -45,7 +45,7 @@ impl Connections {
     pub fn create_connections_from_tracks(
         &self,
         local_peer: PeerId,
-        remote_member_id: MemberId,
+        remote_member_id: &MemberId,
         tracks: &[Track],
     ) {
         let create_connection = |connections: &Self, remote_id: &PeerId| {

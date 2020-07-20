@@ -821,7 +821,7 @@ impl EventHandler for InnerRoom {
 
         self.connections.create_connections_from_tracks(
             peer_id,
-            partner_member_id,
+            &partner_member_id,
             &tracks,
         );
         self.create_tracks_and_maybe_negotiate(
