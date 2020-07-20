@@ -30,6 +30,7 @@ fn pub_sub_video_call() {
                 let is_caller;
                 if let Event::PeerCreated {
                     peer_id,
+                    partner_member_id: _,
                     negotiation_role,
                     tracks,
                     ice_servers,

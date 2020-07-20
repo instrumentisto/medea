@@ -399,7 +399,7 @@ mod test {
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use medea_client_api_proto::{
         CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
-        PeerId,
+        MemberId, PeerId,
     };
 
     use futures::{
@@ -409,7 +409,7 @@ mod test {
 
     use crate::api::{
         client::rpc_connection::{ClosedReason, RpcConnection},
-        control::{MemberId, RoomId},
+        control::RoomId,
         MockRpcServer,
     };
 

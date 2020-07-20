@@ -53,7 +53,11 @@ async fn on_new_connection_fires() {
     });
     cons.on_new_connection(cb.into());
 
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
+    cons.create_connections_from_tracks(
+        PeerId(1),
+        "bob".into(),
+        &[proto_recv_video_track()],
+    );
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -62,7 +66,11 @@ async fn on_new_connection_fires() {
 async fn on_remote_stream_fires() {
     let cons = Connections::default();
 
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
+    cons.create_connections_from_tracks(
+        PeerId(1),
+        "bob".into(),
+        &[proto_recv_video_track()],
+    );
 
     let con = cons.get(PeerId(234)).unwrap();
     let con_handle = con.new_handle();
@@ -88,7 +96,11 @@ async fn on_remote_stream_fires() {
 async fn tracks_are_added_to_remote_stream() {
     let cons = Connections::default();
 
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
+    cons.create_connections_from_tracks(
+        PeerId(1),
+        "bob".into(),
+        &[proto_recv_video_track()],
+    );
 
     let con = cons.get(PeerId(234)).unwrap();
     let con_handle = con.new_handle();
@@ -112,7 +124,11 @@ async fn tracks_are_added_to_remote_stream() {
 #[wasm_bindgen_test]
 async fn on_closed_fires() {
     let cons = Connections::default();
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
+    cons.create_connections_from_tracks(
+        PeerId(1),
+        "bob".into(),
+        &[proto_recv_video_track()],
+    );
     let con = cons.get(PeerId(234)).unwrap();
     let con_handle = con.new_handle();
 

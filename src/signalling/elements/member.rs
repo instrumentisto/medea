@@ -619,7 +619,9 @@ impl Into<proto::Element> for Member {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::control::{MemberId, RootElement};
+    use medea_client_api_proto::MemberId;
+
+    use crate::api::control::RootElement;
 
     use super::*;
 
