@@ -99,7 +99,7 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    /// Enabling state of the [`MediaStreamTrack`].
+    /// State of the [`MediaStreamTrack`].
     enabled: ObservableCell<bool>,
 }
 
@@ -113,16 +113,15 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
-    /// Returns `true` if this [`MediaStreamTrack`] is considered as active.
-    ///
-    /// Currently, returns result of [`SysMediaStreamTrack::muted`] function.
+    /// Returns `true` if this [`MediaStreamTrack`] is enabled.
     #[inline]
     pub fn enabled(&self) -> &ObservableCell<bool> {
         &self.0.enabled
     }
 
-    /// Sets [`StableMuteState`] of this [`MediaStreamTrack`] to the provided
-    /// [`StableMuteState`].
+    /// Sets [`MediaStreamTrack::enabled`] to the provided value.
+    ///
+    /// Updates `enabled` in the underlying [`SysMediaStreamTrack`].
     #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
