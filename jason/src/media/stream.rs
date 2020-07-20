@@ -96,7 +96,10 @@ impl WeakMediaStreamTrack {
 }
 
 struct InnerMediaStreamTrack {
+    /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
+
+    /// Enabling state of the [`MediaStreamTrack`].
     enabled: ObservableCell<bool>,
 }
 
@@ -145,7 +148,7 @@ where
 {
     #[inline]
     fn from(track: T) -> Self {
-        let track = <SysMediaStreamTrack as From<T>>::from(track);
+        let track = SysMediaStreamTrack::from(track);
         MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
             enabled: ObservableCell::new(track.enabled()),
             track,

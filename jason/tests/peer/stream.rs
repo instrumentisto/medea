@@ -8,8 +8,8 @@ use crate::{get_audio_track, wait_and_check_test_result};
 #[wasm_bindgen_test]
 async fn on_track_added_works() {
     let stream = PeerMediaStream::new();
-    let track = get_audio_track().await;
-    stream.add_track(TrackId(1), track.clone());
+    stream.add_track(TrackId(1), get_audio_track().await);
+
     let (on_track_added, test_result_on_added) =
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());
@@ -27,6 +27,7 @@ async fn on_track_enabled_works() {
     let stream = PeerMediaStream::new();
     let track = get_audio_track().await;
     stream.add_track(TrackId(1), track.clone());
+
     let (on_track_enabled, test_result_on_enabled) =
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());
@@ -47,6 +48,7 @@ async fn on_track_disabled_works() {
     let stream = PeerMediaStream::new();
     let track = get_audio_track().await;
     stream.add_track(TrackId(1), track.clone());
+
     let (on_track_disabled, test_result_on_disabled) =
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());

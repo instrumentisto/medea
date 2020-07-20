@@ -69,6 +69,8 @@ impl Receiver {
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to this
     /// [`Receiver`].
     ///
+    /// Sets [`MediaStreamTrack::enabled`] to the [`Receiver::enabled`].
+    ///
     /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
     /// any.
     pub fn set_remote_track(
