@@ -1,20 +1,16 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
-use std::{cell::RefCell, rc::Rc};
-
-use futures::{channel::mpsc, StreamExt as _};
+use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::TrackPatch;
-use medea_reactive::{ObservableCell, ObservableOption};
 use proto::{PeerId, TrackId};
-use wasm_bindgen_futures::spawn_local;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-        PeerEvent, StableMuteState,
+        PeerEvent,
     },
 };
 
@@ -24,12 +20,14 @@ use crate::{
 /// We can save related [`RtcRtpTransceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
-    pub(super) track_id: TrackId,
-    pub(super) sender_id: PeerId,
-    pub(super) transceiver: Option<RtcRtpTransceiver>,
-    pub(super) mid: Option<String>,
-    pub(super) track: Rc<RefCell<ObservableOption<MediaStreamTrack>>>,
-    pub(super) mute_state: ObservableCell<StableMuteState>,
+    peer_id: PeerId,
+    track_id: TrackId,
+    sender_id: PeerId,
+    transceiver: Option<RtcRtpTransceiver>,
+    mid: Option<String>,
+    track: Option<MediaStreamTrack>,
+    enabled: bool,
+    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
 impl Receiver {
@@ -41,6 +39,7 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
     pub(super) fn new(
+        peer_id: PeerId,
         track_id: TrackId,
         caps: &TrackConstraints,
         sender_id: PeerId,
@@ -55,52 +54,49 @@ impl Receiver {
             }
             Some(_) => None,
         };
-        let mute_state = ObservableCell::new(StableMuteState::NotMuted);
-        let mut mute_state_changes = mute_state.subscribe();
-        let track = Rc::new(RefCell::new(ObservableOption::none()));
-        spawn_local({
-            let track = Rc::clone(&track);
-            async move {
-                while let Some(mute_state_update) =
-                    mute_state_changes.next().await
-                {
-                    let get_track = track.borrow().when_some();
-                    let track: MediaStreamTrack =
-                        if let Ok(track) = get_track.await {
-                            track
-                        } else {
-                            break;
-                        };
-                    track.set_mute_state(mute_state_update);
-
-                    if peer_events_sender
-                        .unbounded_send(PeerEvent::MuteStateChanged {
-                            peer_id: sender_id,
-                            track,
-                            mute_state: mute_state_update,
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-            }
-        });
-
         Self {
+            peer_id,
             track_id,
             sender_id,
             transceiver,
             mid,
-            track,
-            mute_state,
+            track: None,
+            enabled: true,
+            peer_events_sender,
         }
     }
 
+    /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to this
+    /// [`Receiver`].
+    ///
+    /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
+    /// any.
+    pub fn set_remote_track(
+        &mut self,
+        transceiver: RtcRtpTransceiver,
+        track: MediaStreamTrack,
+    ) {
+        self.transceiver.replace(transceiver);
+        self.track.replace(track.clone());
+        track.set_enabled(self.enabled);
+
+        let _ =
+            self.peer_events_sender
+                .unbounded_send(PeerEvent::NewRemoteTrack {
+                    peer_id: self.peer_id,
+                    sender_id: self.sender_id,
+                    track_id: self.track_id,
+                    track,
+                });
+    }
+
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
-    pub fn update(&self, track_patch: &TrackPatch) {
+    pub fn update(&mut self, track_patch: &TrackPatch) {
         if let Some(is_muted) = track_patch.is_muted {
-            self.mute_state.set(is_muted.into());
+            self.enabled = !is_muted;
+            if let Some(track) = &self.track {
+                track.set_enabled(!is_muted);
+            }
         }
     }
 

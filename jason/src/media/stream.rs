@@ -2,19 +2,16 @@
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 
-use std::{
-    cell::Cell,
-    rc::{Rc, Weak},
-};
+use std::rc::{Rc, Weak};
 
-use derive_more::{AsRef, Display};
-use medea_client_api_proto::MediaType;
+use derive_more::AsRef;
+use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::{peer::StableMuteState, MediaStreamSettings};
+use crate::MediaStreamSettings;
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -100,7 +97,7 @@ impl WeakMediaStreamTrack {
 
 struct InnerMediaStreamTrack {
     track: SysMediaStreamTrack,
-    mute_state: Cell<StableMuteState>,
+    enabled: ObservableCell<bool>,
 }
 
 /// Strong reference to [MediaStreamTrack][1].
@@ -113,55 +110,33 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
-    /// Returns [`SysMediaStreamTrack`] from this [`MediaStreamTrack`].
-    #[inline]
-    pub fn as_sys(&self) -> SysMediaStreamTrack {
-        self.0.track.clone()
-    }
-
     /// Returns `true` if this [`MediaStreamTrack`] is considered as active.
     ///
     /// Currently, returns result of [`SysMediaStreamTrack::muted`] function.
     #[inline]
-    pub fn is_active(&self) -> bool {
-        self.0.mute_state.get() != StableMuteState::Muted
+    pub fn enabled(&self) -> &ObservableCell<bool> {
+        &self.0.enabled
     }
 
     /// Sets [`StableMuteState`] of this [`MediaStreamTrack`] to the provided
     /// [`StableMuteState`].
     #[inline]
-    pub fn set_mute_state(&self, mute_state: StableMuteState) {
-        self.0.mute_state.set(mute_state);
+    pub fn set_enabled(&self, enabled: bool) {
+        self.0.enabled.set(enabled);
+        self.0.track.set_enabled(enabled);
     }
 }
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Display, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TrackKind {
     /// Audio track.
-    #[display(fmt = "audio")]
     Audio,
 
     /// Video track.
-    #[display(fmt = "video")]
     Video,
-}
-
-impl From<TrackKind> for JsValue {
-    fn from(from: TrackKind) -> Self {
-        JsValue::from(from.to_string())
-    }
-}
-
-impl From<&MediaType> for TrackKind {
-    fn from(from: &MediaType) -> Self {
-        match from {
-            MediaType::Audio(_) => Self::Audio,
-            MediaType::Video(_) => Self::Video,
-        }
-    }
 }
 
 impl<T> From<T> for MediaStreamTrack
@@ -170,9 +145,10 @@ where
 {
     #[inline]
     fn from(track: T) -> Self {
+        let track = <SysMediaStreamTrack as From<T>>::from(track);
         MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            track: <SysMediaStreamTrack as From<T>>::from(track),
-            mute_state: Cell::new(StableMuteState::NotMuted),
+            enabled: ObservableCell::new(track.enabled()),
+            track,
         }))
     }
 }

@@ -329,11 +329,10 @@ impl TrackChange {
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
     /// creation.
-    #[allow(clippy::match_wildcard_for_single_variants)]
     fn as_new_track(&self, partner_peer_id: Id) -> Option<Track> {
         match self.as_track_update(partner_peer_id) {
             TrackUpdate::Added(track) => Some(track),
-            _ => None,
+            TrackUpdate::Updated(_) => None,
         }
     }
 

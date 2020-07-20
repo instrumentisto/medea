@@ -8,8 +8,10 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use futures::StreamExt;
 use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
@@ -39,10 +41,10 @@ struct InnerStream {
     on_track_added: Callback1<SysMediaStreamTrack>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` enabling.
-    on_track_enabled: Callback1<SysMediaStreamTrack>,
+    on_track_enabled: Rc<Callback1<SysMediaStreamTrack>>,
 
     /// Callback from JS side which will be invoked on `MediaTrack` disabling.
-    on_track_disabled: Callback1<SysMediaStreamTrack>,
+    on_track_disabled: Rc<Callback1<SysMediaStreamTrack>>,
 }
 
 impl InnerStream {
@@ -53,8 +55,8 @@ impl InnerStream {
             audio_tracks: RefCell::default(),
             video_tracks: RefCell::default(),
             on_track_added: Callback1::default(),
-            on_track_enabled: Callback1::default(),
-            on_track_disabled: Callback1::default(),
+            on_track_enabled: Rc::new(Callback1::default()),
+            on_track_disabled: Rc::new(Callback1::default()),
         }
     }
 
@@ -62,9 +64,11 @@ impl InnerStream {
     fn add_track(&self, track_id: TrackId, track: MediaStreamTrack) {
         self.stream.add_track(track.as_ref());
 
-        let track_kind = track.kind();
-        let sys_track = track.as_sys();
-        match track_kind {
+        let mut track_enabled_state_changes =
+            track.enabled().subscribe().skip(1);
+        let sys_track = Clone::clone(track.as_ref());
+        let weak_track = track.downgrade();
+        match track.kind() {
             TrackKind::Audio => {
                 self.audio_tracks.borrow_mut().insert(track_id, track);
             }
@@ -72,7 +76,25 @@ impl InnerStream {
                 self.video_tracks.borrow_mut().insert(track_id, track);
             }
         };
+
+        // TODO: not called
         self.on_track_added.call(sys_track);
+
+        let on_track_enabled = Rc::clone(&self.on_track_enabled);
+        let on_track_disabled = Rc::clone(&self.on_track_disabled);
+        spawn_local(async move {
+            while let Some(enabled) = track_enabled_state_changes.next().await {
+                if let Some(track) = weak_track.upgrade() {
+                    if enabled {
+                        on_track_enabled.call(Clone::clone(track.as_ref()));
+                    } else {
+                        on_track_disabled.call(Clone::clone(track.as_ref()));
+                    }
+                } else {
+                    break;
+                }
+            }
+        })
     }
 }
 
@@ -132,22 +154,6 @@ impl PeerMediaStream {
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.stream)
     }
-
-    /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
-    /// [`TrackKind`] was enabled.
-    ///
-    /// Calls [`PeerMediaStream::on_track_enabled`] JS callback function.
-    pub fn track_enabled(&self, track: &MediaStreamTrack) {
-        self.0.on_track_enabled.call(track.as_sys());
-    }
-
-    /// Notifies [`PeerMediaStream`] that `MediaTrack` with provided
-    /// [`TrackKind`] was disabled.
-    ///
-    /// Calls [`PeerMediaStream::on_track_disabled`] JS callback function.
-    pub fn track_disabled(&self, track: &MediaStreamTrack) {
-        self.0.on_track_disabled.call(track.as_sys());
-    }
 }
 
 /// JS side handle to [`PeerMediaStream`].
@@ -171,7 +177,7 @@ impl RemoteMediaStream {
     pub fn has_active_audio(&self) -> Result<bool, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             for audio_track in inner.audio_tracks.borrow().values() {
-                if audio_track.is_active() {
+                if audio_track.enabled().get() {
                     return true;
                 }
             }
@@ -185,7 +191,7 @@ impl RemoteMediaStream {
     pub fn has_active_video(&self) -> Result<bool, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             for video_track in inner.video_tracks.borrow().values() {
-                if video_track.is_active() {
+                if video_track.enabled().get() {
                     return true;
                 }
             }
@@ -204,7 +210,7 @@ impl RemoteMediaStream {
                 .values()
                 .chain(inner.video_tracks.borrow().values())
                 .for_each(|track| {
-                    inner.on_track_added.call(track.as_sys());
+                    inner.on_track_added.call(Clone::clone(track.as_ref()));
                 });
         })
     }

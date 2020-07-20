@@ -184,20 +184,6 @@ pub enum PeerEvent {
         /// ID of the [`PeerConnection`] that requested new media stream.
         peer_id: Id,
     },
-
-    /// [`RtcPeerConnection`] is signalling that [`StableMuteState`] of some
-    /// [`Receiver`] was changed.
-    MuteStateChanged {
-        /// ID of the [`PeerConnection`] that signals about [`StableMuteState`]
-        /// update.
-        peer_id: Id,
-
-        /// [`MediaStreamTrack`] which [`StableMuteState`] was updated.
-        track: MediaStreamTrack,
-
-        /// Updated [`StableMuteState`] of the [`Receiver`].
-        mute_state: StableMuteState,
-    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -318,12 +304,14 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         // Bind to `track` event.
-        let id = peer.id;
         let media_connections = Rc::clone(&peer.media_connections);
-        let sender = peer.peer_events_sender.clone();
         peer.peer
             .on_track(Some(move |track_event| {
-                Self::on_track(id, &media_connections, &sender, &track_event);
+                if let Err(err) =
+                    Self::on_track(&media_connections, &track_event)
+                {
+                    JasonError::from(err).print();
+                };
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -475,7 +463,6 @@ impl PeerConnection {
     /// Handle `iceconnectionstatechange` event from underlying peer emitting
     /// [`PeerEvent::IceConnectionStateChanged`] event into this peers
     /// `peer_events_sender`.
-    #[allow(clippy::match_wildcard_for_single_variants)]
     fn on_ice_connection_state_changed(
         peer_id: Id,
         sender: &mpsc::UnboundedSender<PeerEvent>,
@@ -491,7 +478,7 @@ impl PeerConnection {
             S::Failed => IceConnectionState::Failed,
             S::Disconnected => IceConnectionState::Disconnected,
             S::Closed => IceConnectionState::Closed,
-            _ => {
+            S::__Nonexhaustive => {
                 console_error("Unknown ICE connection state");
                 return;
             }
@@ -508,28 +495,15 @@ impl PeerConnection {
     /// event into this peers `peer_events_sender` if all tracks from this
     /// sender has arrived.
     fn on_track(
-        id: Id,
         media_connections: &MediaConnections,
-        sender: &mpsc::UnboundedSender<PeerEvent>,
         track_event: &RtcTrackEvent,
-    ) {
+    ) -> Result<()> {
         let transceiver = track_event.transceiver();
         let track = MediaStreamTrack::from(track_event.track());
-
-        if let Some((sender_id, track_id)) = media_connections
+        media_connections
             .add_remote_track(transceiver, Clone::clone(&track))
-        {
-            let _ = sender.unbounded_send(PeerEvent::NewRemoteTrack {
-                peer_id: id,
-                sender_id,
-                track_id,
-                track,
-            });
-        } else {
-            // TODO: means that this peer is out of sync, should be
-            //       handled somehow (propagated to medea to init peer
-            //       recreation?)
-        }
+            .map_err(tracerr::map_from_and_wrap!())?;
+        Ok(())
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
@@ -659,8 +633,8 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::InvalidMediaStream`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
-    /// [`MediaConnectionsError::CouldNotInsertTrack`] if [`MediaStream`] cannot
-    /// be inserted into peer's [`Sender`]s.
+    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if [`MediaStream`]
+    /// cannot be inserted into peer's [`Sender`]s.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface

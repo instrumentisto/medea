@@ -533,12 +533,23 @@ window.onload = async function() {
         video.oncanplay = async () => {
           await video.play();
         };
-
+        window.remote_videos = remote_videos;
         stream.on_track_added( (track) => {
-          let kind = track.kind;
+          // switch controls off and on, cause controls are not updated
+          // automatically
+          let video = remote_videos[connection.get_remote_id()]
+            .getElementsByTagName("video")[0];
+          video.controls = false;
+          video.controls = true;
           console.log(`Track added: ${kind}`);
         });
         stream.on_track_enabled( (track) => {
+          // switch controls off and on, cause controls are not updated
+          // automatically
+          let video = remote_videos[connection.get_remote_id()]
+            .getElementsByTagName("video")[0];
+          video.controls = false;
+          video.controls = true;
           let kind = track.kind;
           console.log(`Track enabled: ${kind}`);
         });

@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
-use medea_reactive::{ObservableCell, ObservableOption};
+use medea_reactive::ObservableCell;
 use proto::{PeerId, TrackId};
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
@@ -59,7 +59,7 @@ impl<'a> SenderBuilder<'a> {
         let this = Rc::new(Sender {
             track_id: self.track_id,
             caps: self.caps,
-            track: RefCell::new(ObservableOption::none()),
+            track: RefCell::new(None),
             transceiver,
             mute_state,
             mute_timeout_handle: RefCell::new(None),
@@ -70,7 +70,6 @@ impl<'a> SenderBuilder<'a> {
         let weak_this = Rc::downgrade(&this);
         let peer_events_sender = self.peer_events_sender;
         let peer_id = self.peer_id;
-        this.spawn_track_mute_state_updater();
         spawn_local(async move {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
@@ -144,7 +143,7 @@ impl<'a> SenderBuilder<'a> {
 pub struct Sender {
     pub(super) track_id: TrackId,
     pub(super) caps: TrackConstraints,
-    pub(super) track: RefCell<ObservableOption<MediaStreamTrack>>,
+    pub(super) track: RefCell<Option<MediaStreamTrack>>,
     pub(super) transceiver: RtcRtpTransceiver,
     pub(super) mute_state: ObservableCell<MuteState>,
     pub(super) mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
@@ -232,7 +231,7 @@ impl Sender {
             )
             .await
             .map_err(Into::into)
-            .map_err(MediaConnectionsError::CouldNotInsertTrack)
+            .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
             .map_err(tracerr::wrap!())?;
 
             sender.track.borrow_mut().replace(new_track);
@@ -349,41 +348,5 @@ impl Sender {
 
             self.mute_state.set(mute_state_update);
         }
-    }
-
-    /// Spawns task which will update [`StableMuteState`] of the
-    /// [`MediaStreamTrack`] from this [`Receiver`].
-    fn spawn_track_mute_state_updater(self: &Rc<Self>) {
-        spawn_local({
-            let mut mute_state_changes = self.mute_state.subscribe();
-            let weak_this = Rc::downgrade(&self);
-            async move {
-                while let Some(mute_state_update) =
-                    mute_state_changes.next().await
-                {
-                    let mute_state = if let MuteState::Stable(mute_state) =
-                        mute_state_update
-                    {
-                        mute_state
-                    } else {
-                        continue;
-                    };
-                    let this = if let Some(this) = weak_this.upgrade() {
-                        this
-                    } else {
-                        break;
-                    };
-                    let get_track = this.track.borrow().when_some();
-                    let track: MediaStreamTrack =
-                        if let Ok(track) = get_track.await {
-                            track
-                        } else {
-                            break;
-                        };
-
-                    track.set_mute_state(mute_state);
-                }
-            }
-        });
     }
 }

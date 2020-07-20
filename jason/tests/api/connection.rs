@@ -7,7 +7,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     api::{ConnectionHandle, Connections},
     media::{MediaManager, MediaStreamTrack},
-    peer::{RemoteMediaStream, StableMuteState},
+    peer::RemoteMediaStream,
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::{closure::Closure, JsValue};
@@ -156,90 +156,4 @@ async fn on_track_added_works() {
     remote_stream.on_track_added(on_track_added.into()).unwrap();
 
     wait_and_check_test_result(test_result, || {}).await;
-}
-
-#[wasm_bindgen_test]
-async fn on_track_disabled_works() {
-    let cons = Connections::default();
-
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
-    let conn = cons.get(PeerId(234)).unwrap();
-
-    let conn_handle = conn.new_handle();
-    let (remote_stream_tx, remote_stream_rx) = oneshot::channel();
-
-    conn_handle
-        .on_remote_stream(
-            Closure::once_into_js(move |remote_stream: RemoteMediaStream| {
-                let _ = remote_stream_tx.send(remote_stream);
-            })
-            .into(),
-        )
-        .unwrap();
-    let audio_track = get_audio_track().await;
-    conn.add_remote_track(TrackId(1), audio_track.clone());
-
-    let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_disabled, test_result) =
-        js_callback!(|track: SysMediaStreamTrack| {
-            cb_assert_eq!(track.kind(), "audio".to_string());
-        });
-    remote_stream
-        .on_track_disabled(on_track_disabled.into())
-        .unwrap();
-
-    conn.update_mute_state(&audio_track, StableMuteState::Muted)
-        .await;
-
-    wait_and_check_test_result(test_result, || {}).await;
-}
-
-#[wasm_bindgen_test]
-async fn on_track_enabled_works() {
-    let cons = Connections::default();
-
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
-    let conn = cons.get(PeerId(234)).unwrap();
-
-    let conn_handle = conn.new_handle();
-    let (remote_stream_tx, remote_stream_rx) = oneshot::channel();
-
-    conn_handle
-        .on_remote_stream(
-            Closure::once_into_js(move |remote_stream: RemoteMediaStream| {
-                let _ = remote_stream_tx.send(remote_stream);
-            })
-            .into(),
-        )
-        .unwrap();
-    let audio_track = get_audio_track().await;
-    conn.add_remote_track(TrackId(1), audio_track.clone());
-
-    let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_disabled, test_result_on_stop) =
-        js_callback!(|track: SysMediaStreamTrack| {
-            cb_assert_eq!(track.kind(), "audio".to_string());
-        });
-
-    remote_stream
-        .on_track_disabled(on_track_disabled.into())
-        .unwrap();
-
-    conn.update_mute_state(&audio_track, StableMuteState::Muted)
-        .await;
-
-    wait_and_check_test_result(test_result_on_stop, || {}).await;
-
-    let (on_track_enabled, test_result_on_start) =
-        js_callback!(|track: SysMediaStreamTrack| {
-            cb_assert_eq!(track.kind(), "audio".to_string());
-        });
-    remote_stream
-        .on_track_enabled(on_track_enabled.into())
-        .unwrap();
-
-    conn.update_mute_state(&audio_track, StableMuteState::NotMuted)
-        .await;
-
-    wait_and_check_test_result(test_result_on_start, || {}).await;
 }

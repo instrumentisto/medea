@@ -7,12 +7,11 @@ use std::{
 };
 
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
-use medea_reactive::ObservableOption;
 use wasm_bindgen::prelude::*;
 
 use crate::{
     media::MediaStreamTrack,
-    peer::{PeerMediaStream, RemoteMediaStream, StableMuteState},
+    peer::{PeerMediaStream, RemoteMediaStream},
     utils::{Callback0, Callback1, HandlerDetachedError},
 };
 
@@ -45,7 +44,7 @@ impl Connections {
     //       connections based on remote member_ids
     pub fn create_connections_from_tracks(
         &self,
-        peer_id: PeerId,
+        local_peer_id: PeerId,
         tracks: &[Track],
     ) {
         let create_connection = |connections: &Self, remote_id: &PeerId| {
@@ -58,7 +57,7 @@ impl Connections {
                 connections
                     .local_to_remote
                     .borrow_mut()
-                    .insert(peer_id, *remote_id);
+                    .insert(local_peer_id, *remote_id);
             }
         };
 
@@ -115,7 +114,7 @@ struct InnerConnection {
     remote_id: PeerId,
 
     /// [`PeerMediaStream`] received from remote member.
-    remote_stream: RefCell<ObservableOption<PeerMediaStream>>,
+    remote_stream: RefCell<Option<PeerMediaStream>>,
 
     /// JS callback, that will be invoked when remote [`PeerMediaStream`] is
     /// received.
@@ -153,14 +152,11 @@ pub struct Connection(Rc<InnerConnection>);
 
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
-    ///
-    /// Spawns [`Future`] which will poll provided [`LocalBoxStream`] and notify
-    /// [`RemoteMediaStream`] about [`StableMuteState`] changes.
     #[inline]
     pub(crate) fn new(remote_id: PeerId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
-            remote_stream: RefCell::new(ObservableOption::none()),
+            remote_stream: RefCell::new(None),
             on_remote_stream: Callback1::default(),
             on_close: Callback0::default(),
         }))
@@ -179,29 +175,6 @@ impl Connection {
 
         if is_new_stream {
             self.0.on_remote_stream.call(stream.new_handle());
-        }
-    }
-
-    /// Updates [`StableMuteState`] of this [`Connection`] with a provided
-    /// [`StableMuteState`].
-    pub async fn update_mute_state(
-        &self,
-        track: &MediaStreamTrack,
-        mute_state: StableMuteState,
-    ) {
-        let get_stream = self.0.remote_stream.borrow().when_some();
-        let remote_stream = if let Ok(stream) = get_stream.await {
-            stream
-        } else {
-            return;
-        };
-        match mute_state {
-            StableMuteState::Muted => {
-                remote_stream.track_disabled(track);
-            }
-            StableMuteState::NotMuted => {
-                remote_stream.track_enabled(track);
-            }
         }
     }
 

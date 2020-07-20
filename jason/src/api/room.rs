@@ -806,7 +806,7 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .create_peer(
@@ -835,7 +835,7 @@ impl EventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         sdp_answer: String,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -850,7 +850,7 @@ impl EventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         candidate: IceCandidate,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -866,10 +866,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Disposes specified [`PeerConnection`]s.
-    async fn on_peers_removed(
-        &self,
-        peer_ids: Vec<PeerId>,
-    ) -> Result<(), Traced<RoomError>> {
+    async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.connections.close_connection(*id);
@@ -888,7 +885,7 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -932,7 +929,7 @@ impl PeerEventHandler for InnerRoom {
         candidate: String,
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::SetIceCandidate {
             peer_id,
             candidate: IceCandidate {
@@ -1036,23 +1033,6 @@ impl PeerEventHandler for InnerRoom {
         {
             self.on_failed_local_stream.call(JasonError::from(err));
         };
-        Ok(())
-    }
-
-    /// Updates [`StableMuteState`] in the [`Connection`] for the provided
-    /// [`PeerId`].
-    ///
-    /// Does nothing if [`Connection`] for the provided [`PeerId`] not found.
-    async fn on_mute_state_changed(
-        &self,
-        peer_id: PeerId,
-        track: MediaStreamTrack,
-        mute_state: StableMuteState,
-    ) -> Self::Output {
-        if let Some(conn) = self.connections.get(peer_id) {
-            conn.update_mute_state(&track, mute_state).await;
-        }
-
         Ok(())
     }
 }
