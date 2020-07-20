@@ -331,7 +331,7 @@ impl TrackChange {
     fn as_new_track(&self, partner_peer_id: Id) -> Option<Track> {
         match self.as_track_update(partner_peer_id) {
             TrackUpdate::Added(track) => Some(track),
-            _ => None,
+            TrackUpdate::Updated(_) => None,
         }
     }
 

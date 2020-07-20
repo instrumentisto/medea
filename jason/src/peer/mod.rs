@@ -486,7 +486,7 @@ impl PeerConnection {
             S::Failed => IceConnectionState::Failed,
             S::Disconnected => IceConnectionState::Disconnected,
             S::Closed => IceConnectionState::Closed,
-            _ => {
+            S::__Nonexhaustive => {
                 console_error("Unknown ICE connection state");
                 return;
             }
