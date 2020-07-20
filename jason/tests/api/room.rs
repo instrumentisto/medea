@@ -951,6 +951,7 @@ mod patches_generation {
             );
             let peer = PeerConnection::new(
                 peer_id,
+                "bob".into(),
                 tx,
                 Vec::new(),
                 Rc::new(MediaManager::default()),
