@@ -55,7 +55,7 @@ async fn on_new_connection_fires() {
 
     cons.create_connections_from_tracks(
         PeerId(1),
-        "bob".into(),
+        &"bob".into(),
         &[proto_recv_video_track()],
     );
 
@@ -68,7 +68,7 @@ async fn on_remote_stream_fires() {
 
     cons.create_connections_from_tracks(
         PeerId(1),
-        "bob".into(),
+        &"bob".into(),
         &[proto_recv_video_track()],
     );
 
@@ -98,7 +98,7 @@ async fn tracks_are_added_to_remote_stream() {
 
     cons.create_connections_from_tracks(
         PeerId(1),
-        "bob".into(),
+        &"bob".into(),
         &[proto_recv_video_track()],
     );
 
@@ -126,7 +126,7 @@ async fn on_closed_fires() {
     let cons = Connections::default();
     cons.create_connections_from_tracks(
         PeerId(1),
-        "bob".into(),
+        &"bob".into(),
         &[proto_recv_video_track()],
     );
     let con = cons.get(PeerId(234)).unwrap();

@@ -133,7 +133,7 @@
           data: {
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
-            force_relay: (controlRoom.data.element.pipeline[id].pipeline.publish || {force_relay: isForceRelay}).force_relay,
+            force_relay: (controlRoom.data.element.pipeline[id].pipeline.publish || { force_relay: isForceRelay }).force_relay,
           }
         });
         play_requests.push(playRequest);
@@ -485,6 +485,7 @@
       room.on_new_connection((connection) => {
         logsTextArea.value +=  "new connection established" + '\r\n';
         isCallStarted = true;
+        let remoteMemberId = connection.get_remote_member_id();
         connection.on_remote_stream(async (stream) => {
           let video = document.createElement("video");
           video.srcObject = stream.get_media_stream();
@@ -494,6 +495,9 @@
           let innerVideoDiv = document.createElement("div");
           innerVideoDiv.className = "col-md-3";
           innerVideoDiv.appendChild(video);
+          let remoteMemberIdEl = document.createElement('span');
+          remoteMemberIdEl.innerHTML = remoteMemberId;
+          innerVideoDiv.appendChild(remoteMemberIdEl);
           remote_videos[connection.get_remote_id()] = innerVideoDiv;
           videoDiv.appendChild(innerVideoDiv);
 
