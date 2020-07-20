@@ -6,15 +6,15 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     api::{ConnectionHandle, Connections},
-    media::{MediaManager, MediaStreamTrack},
     peer::RemoteMediaStream,
-    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
 use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
-use crate::{timeout, wait_and_check_test_result};
+use crate::{
+    get_audio_track, get_video_track, timeout, wait_and_check_test_result,
+};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -27,22 +27,6 @@ fn proto_recv_video_track() -> Track {
         },
         media_type: MediaType::Video(VideoSettings { is_required: false }),
     }
-}
-
-async fn get_video_track() -> MediaStreamTrack {
-    let manager = MediaManager::default();
-    let mut settings = MediaStreamSettings::new();
-    settings.device_video(DeviceVideoTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
-}
-
-async fn get_audio_track() -> MediaStreamTrack {
-    let manager = MediaManager::default();
-    let mut settings = MediaStreamSettings::new();
-    settings.audio(AudioTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
 }
 
 #[wasm_bindgen_test]

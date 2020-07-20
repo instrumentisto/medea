@@ -77,7 +77,6 @@ impl InnerStream {
             }
         };
 
-        // TODO: not called
         self.on_track_added.call(sys_track);
 
         let on_track_enabled = Rc::clone(&self.on_track_enabled);

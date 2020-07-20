@@ -541,6 +541,7 @@ window.onload = async function() {
             .getElementsByTagName("video")[0];
           video.controls = false;
           video.controls = true;
+          let kind = track.kind;
           console.log(`Track added: ${kind}`);
         });
         stream.on_track_enabled( (track) => {

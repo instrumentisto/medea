@@ -86,10 +86,13 @@ use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
 use medea_jason::{
-    media::{LocalStreamConstraints, VideoTrackConstraints},
+    media::{
+        LocalStreamConstraints, MediaManager, MediaStreamTrack,
+        VideoTrackConstraints,
+    },
     peer::TransceiverKind,
     utils::{window, JasonError},
-    AudioTrackConstraints, MediaStreamSettings,
+    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -234,6 +237,22 @@ async fn wait_and_check_test_result(
             panic!("callback didn't fired");
         }
     };
+}
+
+async fn get_video_track() -> MediaStreamTrack {
+    let manager = MediaManager::default();
+    let mut settings = MediaStreamSettings::new();
+    settings.device_video(DeviceVideoTrackConstraints::new());
+    let (stream, _) = manager.get_stream(settings).await.unwrap();
+    stream.into_tracks().into_iter().next().unwrap()
+}
+
+async fn get_audio_track() -> MediaStreamTrack {
+    let manager = MediaManager::default();
+    let mut settings = MediaStreamSettings::new();
+    settings.audio(AudioTrackConstraints::new());
+    let (stream, _) = manager.get_stream(settings).await.unwrap();
+    stream.into_tracks().into_iter().next().unwrap()
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
