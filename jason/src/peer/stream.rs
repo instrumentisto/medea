@@ -37,13 +37,16 @@ struct InnerStream {
     /// List of video tracks.
     video_tracks: RefCell<HashMap<TrackId, MediaStreamTrack>>,
 
-    /// Callback from JS side which will be invoked on new `MediaTrack` adding.
+    /// Callback from JS side which is invoked when new [`MediaStreamTrack`] is
+    /// added.
     on_track_added: Callback1<SysMediaStreamTrack>,
 
-    /// Callback from JS side which will be invoked on `MediaTrack` enabling.
+    /// Callback from JS side which is invoked when [`MediaStreamTrack`] is
+    /// enabled.
     on_track_enabled: Rc<Callback1<SysMediaStreamTrack>>,
 
-    /// Callback from JS side which will be invoked on `MediaTrack` disabling.
+    /// Callback from JS side which is invoked when [`MediaStreamTrack`] is
+    /// disabled.
     on_track_disabled: Rc<Callback1<SysMediaStreamTrack>>,
 }
 
@@ -171,7 +174,7 @@ impl RemoteMediaStream {
         upgrade_or_detached!(self.0).map(|inner| Clone::clone(&inner.stream))
     }
 
-    /// Returns `true` if at least one video [`MediaStreamTrack`] exists in this
+    /// Indicates whether at least one video [`MediaStreamTrack`] exists in this
     /// [`RemoteMediaStream`].
     pub fn has_active_audio(&self) -> Result<bool, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
@@ -185,7 +188,7 @@ impl RemoteMediaStream {
         })
     }
 
-    /// Returns `true` if at least one video [`MediaStreamTrack`] exists in this
+    /// Indicates whether at least one video [`MediaStreamTrack`] exists in this
     /// [`RemoteMediaStream`].
     pub fn has_active_video(&self) -> Result<bool, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
@@ -199,27 +202,34 @@ impl RemoteMediaStream {
         })
     }
 
-    /// Sets callback, which will be invoked on new `MediaTrack` adding.
-    pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_track_added.set_func(f);
-        })
-    }
-
-    /// Sets callback, which will be invoked on `MediaTrack` enabling.
-    pub fn on_track_enabled(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_track_enabled.set_func(f);
-        })
-    }
-
-    /// Sets callback, which will be invoked on `MediaTrack` disabling.
-    pub fn on_track_disabled(
+    /// Sets the `callback` being invoked when new [`MediaStreamTrack`] is
+    /// added.
+    pub fn on_track_added(
         &self,
-        f: js_sys::Function,
+        callback: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_track_disabled.set_func(f);
+            inner.on_track_added.set_func(callback);
+        })
+    }
+
+    /// Sets the `callback` being invoked when [`MediaStreamTrack`] is enabled.
+    pub fn on_track_enabled(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_track_enabled.set_func(callback);
+        })
+    }
+
+    /// Sets the `callback` being invoked when [`MediaStreamTrack`] is disabled.
+    pub fn on_track_disabled(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_track_disabled.set_func(callback);
         })
     }
 }

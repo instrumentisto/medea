@@ -95,6 +95,8 @@ impl WeakMediaStreamTrack {
     }
 }
 
+/// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
+/// disabled.
 struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
@@ -102,7 +104,7 @@ struct InnerMediaStreamTrack {
     /// [enabled] property of [MediaStreamTrack][1].
     ///
     /// [enabled]: https://tinyurl.com/y5byqdea
-    /// [1]:
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
     enabled: ObservableCell<bool>,
 }
 
