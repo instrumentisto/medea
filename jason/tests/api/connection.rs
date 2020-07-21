@@ -1,17 +1,20 @@
 #![cfg(target_arch = "wasm32")]
 
-use futures::channel::oneshot;
+use std::{cell::Cell, rc::Rc};
+
+use futures::{
+    channel::{mpsc, oneshot},
+    StreamExt,
+};
 use medea_client_api_proto::{PeerId, TrackId};
 use medea_jason::{
     api::{ConnectionHandle, Connections},
     peer::RemoteMediaStream,
 };
-use wasm_bindgen::{closure::Closure, JsValue};
+use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_test::*;
 
-use crate::{
-    get_audio_track, get_video_track, timeout, wait_and_check_test_result,
-};
+use crate::{get_audio_track, get_video_track, timeout, wait_and_check_test_result, delay_for};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -98,4 +101,42 @@ async fn on_closed_fires() {
     cons.close_connection(PeerId(1));
 
     wait_and_check_test_result(test_result, || {}).await;
+}
+
+#[wasm_bindgen_test]
+async fn two_peers_in_one_connection_works() {
+    let cons = Connections::default();
+
+    let (test_tx, mut test_rx) = mpsc::unbounded();
+    let on_new_connection = Closure::wrap(Box::new(
+        move |_: ConnectionHandle| {
+            test_tx.unbounded_send(());
+        }
+    ) as Box<dyn Fn(ConnectionHandle)>);
+    cons.on_new_connection(on_new_connection.as_ref().clone().into());
+
+    cons.create_connection(PeerId(1), &"bob".into());
+    test_rx.next().await.unwrap();
+
+    cons.create_connection(PeerId(2), &"bob".into());
+    timeout(300, test_rx.next()).await.unwrap_err();
+}
+
+#[wasm_bindgen_test]
+async fn create_two_connections() {
+    let cons = Connections::default();
+
+    let (test_tx, mut test_rx) = mpsc::unbounded();
+    let on_new_connection = Closure::wrap(Box::new(
+        move |_: ConnectionHandle| {
+            test_tx.unbounded_send(());
+        }
+    ) as Box<dyn Fn(ConnectionHandle)>);
+    cons.on_new_connection(on_new_connection.as_ref().clone().into());
+    
+    cons.create_connection(PeerId(1), &"bob".into());
+    test_rx.next().await.unwrap();
+
+    cons.create_connection(PeerId(2), &"alice".into());
+    timeout(300, test_rx.next()).await.unwrap();
 }
