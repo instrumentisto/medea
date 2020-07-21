@@ -1,6 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
 mod media;
+mod stream;
 
 use std::{pin::Pin, rc::Rc};
 

@@ -231,7 +231,7 @@ impl Sender {
             )
             .await
             .map_err(Into::into)
-            .map_err(MediaConnectionsError::CouldNotInsertTrack)
+            .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
             .map_err(tracerr::wrap!())?;
 
             sender.track.borrow_mut().replace(new_track);

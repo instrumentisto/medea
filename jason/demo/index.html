@@ -505,6 +505,28 @@
           video.oncanplay = async () => {
             await video.play();
           };
+
+          stream.on_track_added( (track) => {
+            // switch controls off and on, cause controls are not updated
+            // automatically
+            let video = remote_videos[connection.get_remote_id()]
+              .getElementsByTagName("video")[0];
+            video.controls = false;
+            video.controls = true;
+            console.log(`Track added: ${track.kind}`);
+            console.log(`Has active audio: ${stream.has_active_audio()}`);
+            console.log(`Has active video: ${stream.has_active_video()}`);
+          });
+          stream.on_track_enabled( (track) => {
+            console.log(`Track enabled: ${track.kind}`);
+            console.log(`Has active audio: ${stream.has_active_audio()}`);
+            console.log(`Has active video: ${stream.has_active_video()}`);
+          });
+          stream.on_track_disabled( (track) => {
+            console.log(`Track disabled: ${track.kind}`);
+            console.log(`Has active audio: ${stream.has_active_audio()}`);
+            console.log(`Has active video: ${stream.has_active_video()}`);
+          });
         });
 
         connection.on_close(() => {

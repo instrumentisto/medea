@@ -807,7 +807,7 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .create_peer(
@@ -837,7 +837,7 @@ impl EventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         sdp_answer: String,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -852,7 +852,7 @@ impl EventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         candidate: IceCandidate,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -868,10 +868,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Disposes specified [`PeerConnection`]s.
-    async fn on_peers_removed(
-        &self,
-        peer_ids: Vec<PeerId>,
-    ) -> Result<(), Traced<RoomError>> {
+    async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.connections.close_connection(*id);
@@ -890,7 +887,7 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -934,7 +931,7 @@ impl PeerEventHandler for InnerRoom {
         candidate: String,
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::SetIceCandidate {
             peer_id,
             candidate: IceCandidate {
@@ -954,7 +951,7 @@ impl PeerEventHandler for InnerRoom {
         _: PeerId,
         track_id: TrackId,
         track: MediaStreamTrack,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
@@ -973,7 +970,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         _: PeerId,
         stream: MediaStream,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.on_local_stream.call(stream);
         Ok(())
     }
@@ -984,7 +981,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         ice_connection_state: IceConnectionState,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
             metrics: PeerMetrics::IceConnectionState(ice_connection_state),
@@ -998,7 +995,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         peer_connection_state: PeerConnectionState,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
             metrics: PeerMetrics::PeerConnectionState(peer_connection_state),
@@ -1018,7 +1015,7 @@ impl PeerEventHandler for InnerRoom {
         &self,
         peer_id: PeerId,
         stats: RtcStats,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         self.rpc.send_command(Command::AddPeerConnectionMetrics {
             peer_id,
             metrics: PeerMetrics::RtcStats(stats.0),
@@ -1031,7 +1028,7 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_local_stream_required(
         &self,
         peer_id: PeerId,
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)

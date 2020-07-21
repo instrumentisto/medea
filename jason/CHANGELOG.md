@@ -44,6 +44,9 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
+        - `RemoteMediaStream.on_track_enabled` and `RemoteMediaStream.on_track_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123]);
+        - `RemoteMediaStream.on_track_added` callback being called when new receiver `MediaTrack` is added ([#123]);
+        - `RemoteMediaStream.has_active_audio` and `RemoteMediaStream.has_active_video` methods returning current state of the receivers ([#123]).
     - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
@@ -87,6 +90,7 @@ All user visible changes to this project will be documented in this file. This p
 [#105]: /../../pull/105
 [#106]: /../../pull/106
 [#120]: /../../pull/120
+[#123]: /../../pull/123
 [#124]: /../../pull/124
 
 

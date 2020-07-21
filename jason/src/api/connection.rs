@@ -108,8 +108,12 @@ struct InnerConnection {
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked on remote `Member` media stream
-    /// arrival.
+    /// Sets callback, which will be invoked as soon as first media track from
+    /// remote `Member` is received.
+    ///
+    /// It's guaranteed that provided stream will have at least one media track
+    /// when this callback is fired. List of tracks in provided stream is not
+    /// final and can be changed in future.
     pub fn on_remote_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_remote_stream.set_func(f))

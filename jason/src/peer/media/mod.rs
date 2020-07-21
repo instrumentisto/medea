@@ -42,7 +42,16 @@ pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaStreamTrack`] cannot be inserted into
     /// provided [`Sender`]s transceiver.
     #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
-    CouldNotInsertTrack(JsError),
+    CouldNotInsertLocalTrack(JsError),
+
+    /// Occurs when [`MediaStreamTrack`] discovered by [`RtcPeerConnection`]
+    /// could not be inserted into [`Receiver`].
+    #[display(
+        fmt = "Could not insert remote track with mid: {:?} into media \
+               connections",
+        _0
+    )]
+    CouldNotInsertRemoteTrack(Option<String>),
 
     /// Could not find [`RtcRtpTransceiver`] by `mid`.
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
@@ -287,11 +296,13 @@ impl MediaConnections {
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Receiver::new(
+                        inner.peer_id,
                         track.id,
                         &(track.media_type.into()),
                         sender,
                         &inner.peer,
                         mid,
+                        inner.peer_events_sender.clone(),
                     );
                     inner.receivers.insert(track.id, recv);
                 }
@@ -311,10 +322,10 @@ impl MediaConnections {
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
                 sender.update(&track_proto);
-            } else if let Some(_receiver) =
-                self.0.borrow().receivers.get(&track_proto.id)
+            } else if let Some(receiver) =
+                self.0.borrow_mut().receivers.get_mut(&track_proto.id)
             {
-                // TODO: Update receivers.
+                receiver.update(&track_proto);
             } else {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidTrackPatch(track_proto.id)
@@ -356,7 +367,7 @@ impl MediaConnections {
     /// [`MediaStreamTrack`] cannot be inserted into associated [`Sender`]
     /// because of constraints mismatch.
     ///
-    /// With [`MediaConnectionsError::CouldNotInsertTrack`] if some
+    /// With [`MediaConnectionsError::CouldNotInsertLocalTrack`] if some
     /// [`MediaStreamTrack`] from provided [`PeerMediaStream`] cannot be
     /// inserted into provided [`Sender`]s transceiver.
     ///
@@ -406,24 +417,34 @@ impl MediaConnections {
     ///
     /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
     /// any.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
+    /// provided transceiver has empty `mid`, that means that negotiation has
+    /// not completed.
+    ///
+    /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
+    /// could not find [`Receiver`] by transceivers `mid`.
     pub fn add_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
-    ) -> Option<(PeerId, TrackId)> {
+    ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         if let Some(mid) = transceiver.mid() {
             for receiver in &mut inner.receivers.values_mut() {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
-                        receiver.transceiver.replace(transceiver);
-                        receiver.track.replace(track);
-                        return Some((receiver.sender_id, receiver.track_id));
+                        receiver.set_remote_track(transceiver, track);
+                        return Ok(());
                     }
                 }
             }
         }
-        None
+        Err(tracerr::new!(
+            MediaConnectionsError::CouldNotInsertRemoteTrack(transceiver.mid())
+        ))
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
