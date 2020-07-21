@@ -1,6 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
 mod media;
+mod stream;
 
 use std::{pin::Pin, rc::Rc};
 
@@ -71,12 +72,12 @@ async fn mute_unmute_audio() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], true))
+    peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], true))
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], false))
+    peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], false))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
@@ -103,12 +104,12 @@ async fn mute_unmute_video() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], true))
+    peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], true))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled());
 
-    peer.update_senders(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], false))
+    peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], false))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled());

@@ -70,6 +70,7 @@ async fn command_validation() {
         )),
         None,
         deadline,
+        true,
     )
     .await;
 

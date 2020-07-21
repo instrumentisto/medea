@@ -5,6 +5,7 @@
 use std::rc::{Rc, Weak};
 
 use derive_more::AsRef;
+use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
@@ -78,7 +79,7 @@ impl MediaStream {
 /// Weak reference to [MediaStreamTrack][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-pub struct WeakMediaStreamTrack(Weak<SysMediaStreamTrack>);
+pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
 
 impl WeakMediaStreamTrack {
     /// Tries to upgrade this weak reference to a strong one.
@@ -94,6 +95,19 @@ impl WeakMediaStreamTrack {
     }
 }
 
+/// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
+/// disabled.
+struct InnerMediaStreamTrack {
+    /// Underlying JS-side [`SysMediaStreamTrack`].
+    track: SysMediaStreamTrack,
+
+    /// [enabled] property of [MediaStreamTrack][1].
+    ///
+    /// [enabled]: https://tinyurl.com/y5byqdea
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    enabled: ObservableCell<bool>,
+}
+
 /// Strong reference to [MediaStreamTrack][1].
 ///
 /// Track will be automatically stopped when there are no strong references
@@ -101,7 +115,24 @@ impl WeakMediaStreamTrack {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[derive(Clone)]
-pub struct MediaStreamTrack(Rc<SysMediaStreamTrack>);
+pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
+
+impl MediaStreamTrack {
+    /// Returns `true` if this [`MediaStreamTrack`] is enabled.
+    #[inline]
+    pub fn enabled(&self) -> &ObservableCell<bool> {
+        &self.0.enabled
+    }
+
+    /// Sets [`MediaStreamTrack::enabled`] to the provided value.
+    ///
+    /// Updates `enabled` in the underlying [`SysMediaStreamTrack`].
+    #[inline]
+    pub fn set_enabled(&self, enabled: bool) {
+        self.0.enabled.set(enabled);
+        self.0.track.set_enabled(enabled);
+    }
+}
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
@@ -121,14 +152,18 @@ where
 {
     #[inline]
     fn from(track: T) -> Self {
-        MediaStreamTrack(Rc::new(<SysMediaStreamTrack as From<T>>::from(track)))
+        let track = SysMediaStreamTrack::from(track);
+        MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+            enabled: ObservableCell::new(track.enabled()),
+            track,
+        }))
     }
 }
 
 impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
     #[inline]
     fn as_ref(&self) -> &SysMediaStreamTrack {
-        &self.0
+        &self.0.track
     }
 }
 
@@ -139,13 +174,13 @@ impl MediaStreamTrack {
     /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
     pub fn id(&self) -> String {
-        self.0.id()
+        self.0.track.id()
     }
 
     /// Returns track kind (audio/video).
     #[inline]
     pub fn kind(&self) -> TrackKind {
-        match self.0.kind().as_ref() {
+        match self.0.track.kind().as_ref() {
             "audio" => TrackKind::Audio,
             "video" => TrackKind::Video,
             _ => unreachable!(),
@@ -166,7 +201,7 @@ impl Drop for MediaStreamTrack {
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
         if Rc::strong_count(&self.0) == 1 {
-            self.0.stop();
+            self.0.track.stop();
         }
     }
 }

@@ -3,6 +3,7 @@ const controlUrl = controlDomain + '/control-api/';
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
+let remote_videos = {};
 
 let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
 let usernameMenuButton = document.getElementById('username-menu-button');
@@ -123,25 +124,27 @@ async function createMember(roomId, memberId) {
     }
   });
 
-  try {
-    for (let i = 0; i < memberIds.length; i++) {
-      let id = memberIds[i];
-      await axios({
-        method: 'post',
-        url: controlUrl + roomId + "/" + id + '/' + 'play-' + memberId,
-        data: {
-          kind: 'WebRtcPlayEndpoint',
-          src: 'local://' + roomId + '/' + memberId + '/publish',
-          force_relay: false
-        }
-      })
-    }
+  if (isPublish) {
+    try {
+      for (let i = 0; i < memberIds.length; i++) {
+        let id = memberIds[i];
+        await axios({
+          method: 'post',
+          url: controlUrl + roomId + "/" + id + '/' + 'play-' + memberId,
+          data: {
+            kind: 'WebRtcPlayEndpoint',
+            src: 'local://' + roomId + '/' + memberId + '/publish',
+            force_relay: false
+          }
+        })
+      }
 
-  } catch (e) {
-    console.log(e.response);
+    } catch (e) {
+      console.log(e.response);
+    }
   }
 
-  return resp.data.sids[memberId]
+  return resp.data.sids[memberId];
 }
 
 const colorizedJson = {
@@ -524,11 +527,38 @@ window.onload = async function() {
         let innerVideoDiv = document.createElement("div");
         innerVideoDiv.className = "video";
         innerVideoDiv.appendChild(video);
+        remote_videos[connection.get_remote_id()] = innerVideoDiv;
         videoDiv.appendChild(innerVideoDiv);
 
         video.oncanplay = async () => {
           await video.play();
         };
+        stream.on_track_added( (track) => {
+          // switch controls off and on, cause controls are not updated
+          // automatically
+          let video = remote_videos[connection.get_remote_id()]
+            .getElementsByTagName("video")[0];
+          video.controls = false;
+          video.controls = true;
+          console.log(`Track added: ${track.kind}`);
+          console.log(`Has active audio: ${stream.has_active_audio()}`);
+          console.log(`Has active video: ${stream.has_active_video()}`);
+        });
+        stream.on_track_enabled( (track) => {
+          console.log(`Track enabled: ${track.kind}`);
+          console.log(`Has active audio: ${stream.has_active_audio()}`);
+          console.log(`Has active video: ${stream.has_active_video()}`);
+        });
+        stream.on_track_disabled( (track) => {
+          console.log(`Track disabled: ${track.kind}`);
+          console.log(`Has active audio: ${stream.has_active_audio()}`);
+          console.log(`Has active video: ${stream.has_active_video()}`);
+        });
+      });
+
+      connection.on_close(() => {
+        remote_videos[connection.get_remote_id()].remove();
+        delete remote_videos[connection.get_remote_id()];
       });
     });
 

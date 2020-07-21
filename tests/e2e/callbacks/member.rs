@@ -59,6 +59,7 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
         Some(Box::new(on_event)),
         None,
         deadline,
+        true,
     )
     .await;
     (client, callback_server)
