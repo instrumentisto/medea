@@ -21,7 +21,7 @@ pub struct Connections {
     /// Local [`PeerId`] to remote [`MemberId`].
     local_to_remote: RefCell<HashMap<PeerId, MemberId>>,
 
-    /// Remote [`PeerId`] to [`Connection`] with that `Peer`.
+    /// Remote [`MemberId`] to [`Connection`] with that `Member`.
     connections: RefCell<HashMap<MemberId, Connection>>,
 
     /// Callback from JS side which will be invoked on remote `Member` media

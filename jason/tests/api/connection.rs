@@ -14,7 +14,10 @@ use medea_jason::{
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_test::*;
 
-use crate::{get_audio_track, get_video_track, timeout, wait_and_check_test_result, delay_for};
+use crate::{
+    delay_for, get_audio_track, get_video_track, timeout,
+    wait_and_check_test_result,
+};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -108,11 +111,10 @@ async fn two_peers_in_one_connection_works() {
     let cons = Connections::default();
 
     let (test_tx, mut test_rx) = mpsc::unbounded();
-    let on_new_connection = Closure::wrap(Box::new(
-        move |_: ConnectionHandle| {
+    let on_new_connection =
+        Closure::wrap(Box::new(move |_: ConnectionHandle| {
             test_tx.unbounded_send(());
-        }
-    ) as Box<dyn Fn(ConnectionHandle)>);
+        }) as Box<dyn Fn(ConnectionHandle)>);
     cons.on_new_connection(on_new_connection.as_ref().clone().into());
 
     cons.create_connection(PeerId(1), &"bob".into());
@@ -127,13 +129,12 @@ async fn create_two_connections() {
     let cons = Connections::default();
 
     let (test_tx, mut test_rx) = mpsc::unbounded();
-    let on_new_connection = Closure::wrap(Box::new(
-        move |_: ConnectionHandle| {
+    let on_new_connection =
+        Closure::wrap(Box::new(move |_: ConnectionHandle| {
             test_tx.unbounded_send(());
-        }
-    ) as Box<dyn Fn(ConnectionHandle)>);
+        }) as Box<dyn Fn(ConnectionHandle)>);
     cons.on_new_connection(on_new_connection.as_ref().clone().into());
-    
+
     cons.create_connection(PeerId(1), &"bob".into());
     test_rx.next().await.unwrap();
 
