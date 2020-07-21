@@ -126,8 +126,12 @@ struct InnerConnection {
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked on remote `Member` media stream
-    /// arrival.
+    /// Sets callback, which will be invoked as soon as first media track from
+    /// remote `Member` is received.
+    ///
+    /// It is guaranteed that provided stream will have at least one media track
+    /// when this callback is fired. List of tracks in provided stream is not
+    /// final and can be changed.
     pub fn on_remote_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_remote_stream.set_func(f))
@@ -153,7 +157,7 @@ pub struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub(crate) fn new(remote_id: PeerId) -> Self {
+    pub fn new(remote_id: PeerId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
             remote_stream: RefCell::new(None),

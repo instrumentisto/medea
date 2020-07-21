@@ -10,7 +10,6 @@ use medea_jason::{
 };
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
-use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{
     get_audio_track, get_video_track, timeout, wait_and_check_test_result,
@@ -107,37 +106,6 @@ async fn on_closed_fires() {
     con_handle.on_close(on_close.into()).unwrap();
 
     cons.close_connection(PeerId(1));
-
-    wait_and_check_test_result(test_result, || {}).await;
-}
-
-#[wasm_bindgen_test]
-async fn on_track_added_works() {
-    let cons = Connections::default();
-
-    cons.create_connections_from_tracks(PeerId(1), &[proto_recv_video_track()]);
-    let conn = cons.get(PeerId(234)).unwrap();
-
-    let conn_handle = conn.new_handle();
-    let (remote_stream_tx, remote_stream_rx) = oneshot::channel();
-
-    conn_handle
-        .on_remote_stream(
-            Closure::once_into_js(move |remote_stream: RemoteMediaStream| {
-                let _ = remote_stream_tx.send(remote_stream);
-            })
-            .into(),
-        )
-        .unwrap();
-    conn.add_remote_track(TrackId(1), get_audio_track().await);
-
-    let remote_stream: RemoteMediaStream = remote_stream_rx.await.unwrap();
-    let (on_track_added, test_result) =
-        js_callback!(|track: SysMediaStreamTrack| {
-            cb_assert_eq!(track.kind(), "audio".to_string());
-        });
-
-    remote_stream.on_track_added(on_track_added.into()).unwrap();
 
     wait_and_check_test_result(test_result, || {}).await;
 }

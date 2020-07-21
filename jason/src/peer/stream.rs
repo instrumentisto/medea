@@ -203,14 +203,6 @@ impl RemoteMediaStream {
     pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| {
             inner.on_track_added.set_func(f);
-            inner
-                .audio_tracks
-                .borrow()
-                .values()
-                .chain(inner.video_tracks.borrow().values())
-                .for_each(|track| {
-                    inner.on_track_added.call(Clone::clone(track.as_ref()));
-                });
         })
     }
 

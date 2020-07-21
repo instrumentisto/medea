@@ -99,7 +99,10 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    /// State of the [`MediaStreamTrack`].
+    /// [enabled] property of [MediaStreamTrack][1].
+    ///
+    /// [enabled]: https://tinyurl.com/y5byqdea
+    /// [1]:
     enabled: ObservableCell<bool>,
 }
 
