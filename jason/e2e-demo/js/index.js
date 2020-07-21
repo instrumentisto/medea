@@ -519,7 +519,6 @@ window.onload = async function() {
 
     room.on_new_connection( (connection) => {
       let remoteMemberId = connection.get_remote_member_id();
-      console.log(`Remote MemberId: ${remoteMemberId}`);
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];

@@ -191,10 +191,12 @@ pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,
 
+    /// [`MemberId`] of the remote `Member` with which this [`PeerConnection`]
+    /// is connected.
+    remote_member_id: MemberId,
+
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
-
-    remote_member_id: MemberId,
 
     /// [`Sender`]s and [`Receiver`]s of this [`RtcPeerConnection`].
     ///
@@ -320,7 +322,8 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
-    /// Returns [`MemberId`] of the partner [`PeerConnection`].
+    /// Returns [`MemberId`] of the remote `Member` with which this
+    /// [`PeerConnection`] is connected.
     pub fn remote_member_id(&self) -> MemberId {
         self.remote_member_id.clone()
     }
@@ -470,7 +473,6 @@ impl PeerConnection {
     /// Handle `iceconnectionstatechange` event from underlying peer emitting
     /// [`PeerEvent::IceConnectionStateChanged`] event into this peers
     /// `peer_events_sender`.
-    #[allow(clippy::match_wildcard_for_single_variants)]
     fn on_ice_connection_state_changed(
         peer_id: Id,
         sender: &mpsc::UnboundedSender<PeerEvent>,

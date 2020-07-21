@@ -37,6 +37,8 @@ impl Connections {
     }
 
     /// Creates new connection with a provided remote [`MemberId`].
+    ///
+    /// No-op if [`Connection`] already exists.
     pub fn create_connection(
         &self,
         local_peer_id: PeerId,
