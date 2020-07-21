@@ -44,7 +44,7 @@ impl Connections {
     //       connections based on remote member_ids
     pub fn create_connections_from_tracks(
         &self,
-        local_peer: PeerId,
+        local_peer_id: PeerId,
         tracks: &[Track],
     ) {
         let create_connection = |connections: &Self, remote_id: &PeerId| {
@@ -57,7 +57,7 @@ impl Connections {
                 connections
                     .local_to_remote
                     .borrow_mut()
-                    .insert(local_peer, *remote_id);
+                    .insert(local_peer_id, *remote_id);
             }
         };
 
@@ -126,8 +126,12 @@ struct InnerConnection {
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked on remote `Member` media stream
-    /// arrival.
+    /// Sets callback, which will be invoked as soon as first media track from
+    /// remote `Member` is received.
+    ///
+    /// It's guaranteed that provided stream will have at least one media track
+    /// when this callback is fired. List of tracks in provided stream is not
+    /// final and can be changed in future.
     pub fn on_remote_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_remote_stream.set_func(f))

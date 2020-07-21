@@ -304,12 +304,14 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         // Bind to `track` event.
-        let id = peer.id;
         let media_connections = Rc::clone(&peer.media_connections);
-        let sender = peer.peer_events_sender.clone();
         peer.peer
             .on_track(Some(move |track_event| {
-                Self::on_track(id, &media_connections, &sender, &track_event);
+                if let Err(err) =
+                    Self::on_track(&media_connections, &track_event)
+                {
+                    JasonError::from(err).print();
+                };
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -493,28 +495,15 @@ impl PeerConnection {
     /// event into this peers `peer_events_sender` if all tracks from this
     /// sender has arrived.
     fn on_track(
-        id: Id,
         media_connections: &MediaConnections,
-        sender: &mpsc::UnboundedSender<PeerEvent>,
         track_event: &RtcTrackEvent,
-    ) {
+    ) -> Result<()> {
         let transceiver = track_event.transceiver();
         let track = MediaStreamTrack::from(track_event.track());
-
-        if let Some((sender_id, track_id)) = media_connections
+        media_connections
             .add_remote_track(transceiver, Clone::clone(&track))
-        {
-            let _ = sender.unbounded_send(PeerEvent::NewRemoteTrack {
-                peer_id: id,
-                sender_id,
-                track_id,
-                track,
-            });
-        } else {
-            // TODO: means that this peer is out of sync, should be
-            //       handled somehow (propagated to medea to init peer
-            //       recreation?)
-        }
+            .map_err(tracerr::map_from_and_wrap!())?;
+        Ok(())
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
@@ -644,8 +633,8 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::InvalidMediaStream`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
-    /// [`MediaConnectionsError::CouldNotInsertTrack`] if [`MediaStream`] cannot
-    /// be inserted into peer's [`Sender`]s.
+    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if [`MediaStream`]
+    /// cannot be inserted into peer's [`Sender`]s.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface

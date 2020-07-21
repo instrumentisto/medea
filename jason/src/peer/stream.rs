@@ -8,13 +8,17 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use futures::StreamExt;
 use medea_client_api_proto::TrackId;
 use wasm_bindgen::{prelude::*, JsValue};
-use web_sys::MediaStream as SysMediaStream;
+use wasm_bindgen_futures::spawn_local;
+use web_sys::{
+    MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
+};
 
 use crate::{
     media::{MediaStreamTrack, TrackKind},
-    utils::HandlerDetachedError,
+    utils::{Callback1, HandlerDetachedError},
 };
 
 /// Actual data of a [`PeerMediaStream`].
@@ -28,10 +32,22 @@ struct InnerStream {
     stream: SysMediaStream,
 
     /// List of audio tracks.
-    audio_tracks: HashMap<TrackId, MediaStreamTrack>,
+    audio_tracks: RefCell<HashMap<TrackId, MediaStreamTrack>>,
 
     /// List of video tracks.
-    video_tracks: HashMap<TrackId, MediaStreamTrack>,
+    video_tracks: RefCell<HashMap<TrackId, MediaStreamTrack>>,
+
+    /// Callback from JS side which is invoked when new [`MediaStreamTrack`] is
+    /// added.
+    on_track_added: Callback1<SysMediaStreamTrack>,
+
+    /// Callback from JS side which is invoked when [`MediaStreamTrack`] is
+    /// enabled.
+    on_track_enabled: Rc<Callback1<SysMediaStreamTrack>>,
+
+    /// Callback from JS side which is invoked when [`MediaStreamTrack`] is
+    /// disabled.
+    on_track_disabled: Rc<Callback1<SysMediaStreamTrack>>,
 }
 
 impl InnerStream {
@@ -39,22 +55,48 @@ impl InnerStream {
     fn new() -> Self {
         Self {
             stream: SysMediaStream::new().unwrap(),
-            audio_tracks: HashMap::new(),
-            video_tracks: HashMap::new(),
+            audio_tracks: RefCell::default(),
+            video_tracks: RefCell::default(),
+            on_track_added: Callback1::default(),
+            on_track_enabled: Rc::new(Callback1::default()),
+            on_track_disabled: Rc::new(Callback1::default()),
         }
     }
 
     /// Adds provided [`MediaStreamTrack`] to a stream.
-    fn add_track(&mut self, track_id: TrackId, track: MediaStreamTrack) {
+    fn add_track(&self, track_id: TrackId, track: MediaStreamTrack) {
         self.stream.add_track(track.as_ref());
+
+        let mut track_enabled_state_changes =
+            track.enabled().subscribe().skip(1);
+        let sys_track = Clone::clone(track.as_ref());
+        let weak_track = track.downgrade();
         match track.kind() {
             TrackKind::Audio => {
-                self.audio_tracks.insert(track_id, track);
+                self.audio_tracks.borrow_mut().insert(track_id, track);
             }
             TrackKind::Video => {
-                self.video_tracks.insert(track_id, track);
+                self.video_tracks.borrow_mut().insert(track_id, track);
             }
-        }
+        };
+
+        self.on_track_added.call(sys_track);
+
+        let on_track_enabled = Rc::clone(&self.on_track_enabled);
+        let on_track_disabled = Rc::clone(&self.on_track_disabled);
+        spawn_local(async move {
+            while let Some(enabled) = track_enabled_state_changes.next().await {
+                if let Some(track) = weak_track.upgrade() {
+                    if enabled {
+                        on_track_enabled.call(Clone::clone(track.as_ref()));
+                    } else {
+                        on_track_disabled.call(Clone::clone(track.as_ref()));
+                    }
+                } else {
+                    break;
+                }
+            }
+        })
     }
 }
 
@@ -67,26 +109,26 @@ impl InnerStream {
 /// [`RemoteMediaStream`].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-pub struct PeerMediaStream(Rc<RefCell<InnerStream>>);
+#[derive(Clone)]
+pub struct PeerMediaStream(Rc<InnerStream>);
 
 #[allow(clippy::new_without_default)]
 impl PeerMediaStream {
     /// Creates empty [`PeerMediaStream`].
     pub fn new() -> Self {
-        Self(Rc::new(RefCell::new(InnerStream::new())))
+        Self(Rc::new(InnerStream::new()))
     }
 
     /// Adds provided [`MediaStreamTrack`] to a stream.
     pub fn add_track(&self, track_id: TrackId, track: MediaStreamTrack) {
-        self.0.borrow_mut().add_track(track_id, track);
+        self.0.add_track(track_id, track);
     }
 
     /// Checks if [`PeerMediaStream`] contains a [`MediaStreamTrack`] with
     /// specified ID.
     pub fn has_track(&self, id: TrackId) -> bool {
-        let inner = self.0.borrow();
-        inner.video_tracks.contains_key(&id)
-            || inner.audio_tracks.contains_key(&id)
+        self.0.video_tracks.borrow().contains_key(&id)
+            || self.0.audio_tracks.borrow().contains_key(&id)
     }
 
     /// Returns a [`MediaStreamTrack`] of [`PeerMediaStream`] by its ID, if any.
@@ -94,10 +136,9 @@ impl PeerMediaStream {
         &self,
         track_id: TrackId,
     ) -> Option<MediaStreamTrack> {
-        let inner = self.0.borrow();
-        match inner.video_tracks.get(&track_id) {
+        match self.0.video_tracks.borrow().get(&track_id) {
             Some(track) => Some(track.clone()),
-            None => match inner.audio_tracks.get(&track_id) {
+            None => match self.0.audio_tracks.borrow().get(&track_id) {
                 Some(track) => Some(track.clone()),
                 None => None,
             },
@@ -113,7 +154,7 @@ impl PeerMediaStream {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn stream(&self) -> SysMediaStream {
-        Clone::clone(&self.0.borrow().stream)
+        Clone::clone(&self.0.stream)
     }
 }
 
@@ -124,13 +165,71 @@ impl PeerMediaStream {
 /// For using [`RemoteMediaStream`] on Rust side, consider the
 /// [`PeerMediaStream`].
 #[wasm_bindgen]
-pub struct RemoteMediaStream(Weak<RefCell<InnerStream>>);
+pub struct RemoteMediaStream(Weak<InnerStream>);
 
 #[wasm_bindgen]
 impl RemoteMediaStream {
     /// Returns the underlying [`PeerMediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| Clone::clone(&inner.borrow().stream))
+        upgrade_or_detached!(self.0).map(|inner| Clone::clone(&inner.stream))
+    }
+
+    /// Indicates whether at least one video [`MediaStreamTrack`] exists in this
+    /// [`RemoteMediaStream`].
+    pub fn has_active_audio(&self) -> Result<bool, JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            for audio_track in inner.audio_tracks.borrow().values() {
+                if audio_track.enabled().get() {
+                    return true;
+                }
+            }
+
+            false
+        })
+    }
+
+    /// Indicates whether at least one video [`MediaStreamTrack`] exists in this
+    /// [`RemoteMediaStream`].
+    pub fn has_active_video(&self) -> Result<bool, JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            for video_track in inner.video_tracks.borrow().values() {
+                if video_track.enabled().get() {
+                    return true;
+                }
+            }
+
+            false
+        })
+    }
+
+    /// Sets the `callback` being invoked when new [`MediaStreamTrack`] is
+    /// added.
+    pub fn on_track_added(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_track_added.set_func(callback);
+        })
+    }
+
+    /// Sets the `callback` being invoked when [`MediaStreamTrack`] is enabled.
+    pub fn on_track_enabled(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_track_enabled.set_func(callback);
+        })
+    }
+
+    /// Sets the `callback` being invoked when [`MediaStreamTrack`] is disabled.
+    pub fn on_track_disabled(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_track_disabled.set_func(callback);
+        })
     }
 }

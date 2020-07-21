@@ -1,12 +1,17 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
+use futures::channel::mpsc;
 use medea_client_api_proto as proto;
+use medea_client_api_proto::TrackPatch;
 use proto::{PeerId, TrackId};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
-    peer::conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+    peer::{
+        conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        PeerEvent,
+    },
 };
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
@@ -15,11 +20,14 @@ use crate::{
 /// We can save related [`RtcRtpTransceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
-    pub(super) track_id: TrackId,
-    pub(super) sender_id: PeerId,
-    pub(super) transceiver: Option<RtcRtpTransceiver>,
-    pub(super) mid: Option<String>,
-    pub(super) track: Option<MediaStreamTrack>,
+    peer_id: PeerId,
+    track_id: TrackId,
+    sender_id: PeerId,
+    transceiver: Option<RtcRtpTransceiver>,
+    mid: Option<String>,
+    track: Option<MediaStreamTrack>,
+    enabled: bool,
+    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
 impl Receiver {
@@ -31,11 +39,13 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
     pub(super) fn new(
+        peer_id: PeerId,
         track_id: TrackId,
         caps: &TrackConstraints,
         sender_id: PeerId,
         peer: &RtcPeerConnection,
         mid: Option<String>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         let kind = TransceiverKind::from(caps);
         let transceiver = match mid {
@@ -45,11 +55,48 @@ impl Receiver {
             Some(_) => None,
         };
         Self {
+            peer_id,
             track_id,
             sender_id,
             transceiver,
             mid,
             track: None,
+            enabled: true,
+            peer_events_sender,
+        }
+    }
+
+    /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to this
+    /// [`Receiver`].
+    ///
+    /// Sets [`MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of this
+    /// [`Receiver`].
+    pub fn set_remote_track(
+        &mut self,
+        transceiver: RtcRtpTransceiver,
+        track: MediaStreamTrack,
+    ) {
+        self.transceiver.replace(transceiver);
+        self.track.replace(track.clone());
+        track.set_enabled(self.enabled);
+
+        let _ =
+            self.peer_events_sender
+                .unbounded_send(PeerEvent::NewRemoteTrack {
+                    peer_id: self.peer_id,
+                    sender_id: self.sender_id,
+                    track_id: self.track_id,
+                    track,
+                });
+    }
+
+    /// Updates [`Receiver`] with a provided [`TrackPatch`].
+    pub fn update(&mut self, track_patch: &TrackPatch) {
+        if let Some(is_muted) = track_patch.is_muted {
+            self.enabled = !is_muted;
+            if let Some(track) = &self.track {
+                track.set_enabled(!is_muted);
+            }
         }
     }
 
