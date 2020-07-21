@@ -33,12 +33,9 @@ async fn on_track_enabled_works() {
         js_callback!(|track: SysMediaStreamTrack| {
             cb_assert_eq!(track.kind(), "audio".to_string());
         });
-    let handle = stream
-        .new_handle();
+    let handle = stream.new_handle();
 
-    handle
-        .on_track_enabled(on_track_enabled.into())
-        .unwrap();
+    handle.on_track_enabled(on_track_enabled.into()).unwrap();
 
     assert!(handle.has_active_audio().unwrap());
     track.set_enabled(false);
