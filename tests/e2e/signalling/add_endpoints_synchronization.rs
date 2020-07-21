@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{Command, Direction, Event, TrackUpdate};
+use medea_client_api_proto::{Command, Direction, Event, TrackUpdate, Mid};
 use medea_control_api_proto::grpc::api::{self as proto};
 use tokio::time::delay_for;
 
@@ -134,7 +134,7 @@ async fn add_endpoints_synchronization() {
                     .iter()
                     .map(|t| t.id)
                     .enumerate()
-                    .map(|(mid, id)| (id, mid.to_string()))
+                    .map(|(mid, id)| (id, Mid(mid.to_string())))
                     .collect(),
                 senders_statuses: HashMap::new(),
             };
