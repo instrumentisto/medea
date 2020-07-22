@@ -49,6 +49,7 @@ use std::{
     fmt,
     rc::Rc,
 };
+use std::collections::HashSet;
 
 use derive_more::Display;
 use failure::Fail;
@@ -70,7 +71,6 @@ use crate::{
         peers::Counter,
     },
 };
-use std::collections::HashSet;
 
 /// Subscriber to the events indicating that negotiation process should be
 /// started for the some [`Peer`].
@@ -793,6 +793,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
+            src.add_track_id(self.context.id, track_audio.id);
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(track_audio);
@@ -807,6 +808,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));
+            src.add_track_id(self.context.id, track_video.id);
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(track_video);
