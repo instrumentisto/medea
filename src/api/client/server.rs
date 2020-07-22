@@ -5,6 +5,7 @@ use std::io;
 use actix::{Actor, Addr, Handler};
 use actix_web::{
     dev::Server as ActixServer,
+    http::header,
     middleware,
     web::{resource, Data, Path, Payload, ServiceConfig},
     App, HttpRequest, HttpResponse, HttpServer,
@@ -55,7 +56,6 @@ async fn ws_index(
         member_id,
         credentials,
     } = info.into_inner();
-
     match state.rooms.get(&room_id) {
         Some(room) => {
             let auth_result = room
@@ -64,6 +64,10 @@ async fn ws_index(
                     credentials,
                 })
                 .await?;
+            let user_agent = request
+                .headers()
+                .get(header::USER_AGENT)
+                .and_then(|v| v.to_str().ok().map(ToString::to_string));
             match auth_result {
                 Ok(settings) => ws::start(
                     WsSession::new(
@@ -72,6 +76,7 @@ async fn ws_index(
                         Box::new(room),
                         settings.idle_timeout,
                         settings.ping_interval,
+                        &user_agent,
                     ),
                     &request,
                     payload,

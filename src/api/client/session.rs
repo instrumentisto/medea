@@ -12,6 +12,7 @@ use actix::{
     AsyncContext, ContextFutureSpawner as _, Handler, MailboxError, Message,
     StreamHandler,
 };
+use actix_http::ws::Item;
 use actix_web_actors::ws::{self, CloseCode};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
@@ -65,6 +66,9 @@ pub struct WsSession {
     /// from client.
     last_activity: Instant,
 
+    /// Buffer in which fragmented WebSocket messages will be collected.
+    fragmentation_buffer: Vec<u8>,
+
     /// Last number of [`ServerMsg::Ping`].
     last_ping_num: u32,
 
@@ -84,17 +88,47 @@ impl WsSession {
         room: Box<dyn RpcServer>,
         idle_timeout: Duration,
         ping_interval: Duration,
+        user_agent: &Option<String>,
     ) -> Self {
-        Self {
+        let this = Self {
             id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
             member_id,
             room_id,
             room,
             idle_timeout,
+            fragmentation_buffer: Vec::new(),
             last_activity: Instant::now(),
             last_ping_num: 0,
             ping_interval,
             close_reason: None,
+        };
+        info!("{}: Connected with a User Agent: {:?}", this, user_agent);
+
+        this
+    }
+
+    /// Handles text WebSocket messages.
+    fn handle_text(
+        &mut self,
+        text: &str,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) {
+        self.last_activity = Instant::now();
+        match serde_json::from_str::<ClientMsg>(&text) {
+            Ok(ClientMsg::Pong(n)) => {
+                debug!("{}: Received Pong: {}", self, n);
+            }
+            Ok(ClientMsg::Command(command)) => {
+                debug!("{}: Received Command: {:?}", self, command);
+                self.room
+                    .send_command(self.member_id.clone(), command)
+                    .into_actor(self)
+                    .spawn(ctx);
+            }
+            Err(err) => error!(
+                "{}: Error [{:?}] parsing client message: [{}]",
+                self, err, &text,
+            ),
         }
     }
 
@@ -320,25 +354,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     ) {
         match msg {
             Ok(msg) => match msg {
-                ws::Message::Text(text) => {
-                    self.last_activity = Instant::now();
-                    match serde_json::from_str::<ClientMsg>(&text) {
-                        Ok(ClientMsg::Pong(n)) => {
-                            debug!("{}: Received Pong: {}", self, n);
-                        }
-                        Ok(ClientMsg::Command(command)) => {
-                            debug!("{}: Received Command: {:?}", self, command);
-                            self.room
-                                .send_command(self.member_id.clone(), command)
-                                .into_actor(self)
-                                .spawn(ctx);
-                        }
-                        Err(err) => error!(
-                            "{}: Error [{:?}] parsing client message: [{}]",
-                            self, err, &text,
-                        ),
-                    }
-                }
+                ws::Message::Text(text) => self.handle_text(&text, ctx),
                 ws::Message::Close(reason) => {
                     debug!("{}: Received Close message: {:?}", self, reason);
                     if self.close_reason.is_none() {
@@ -360,7 +376,51 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         ctx.stop();
                     }
                 }
-                _ => error!("{}: Unsupported client message", self),
+                ws::Message::Continuation(item) => match item {
+                    Item::FirstText(value) => {
+                        warn!("{}: First continuation message received", self);
+                        self.fragmentation_buffer.extend_from_slice(&value);
+                    }
+                    Item::Continue(value) => {
+                        info!("{}: Collecting continuation messages", self);
+                        self.fragmentation_buffer.extend_from_slice(&value);
+                    }
+                    Item::Last(value) => {
+                        self.fragmentation_buffer.extend_from_slice(&value);
+                        let mut finished_fragmentation = Vec::new();
+                        std::mem::swap(
+                            &mut finished_fragmentation,
+                            &mut self.fragmentation_buffer,
+                        );
+                        let text = if let Ok(text) =
+                            String::from_utf8(finished_fragmentation)
+                        {
+                            warn!(
+                                "{}: All continuation messages was collected. \
+                                 Total text length: {}. Final text:\n '{}'",
+                                self,
+                                text.len(),
+                                text
+                            );
+                            text
+                        } else {
+                            error!(
+                                "{}: Failed to build UTF8 String from the \
+                                 received continuation messages",
+                                self
+                            );
+                            return;
+                        };
+                        self.handle_text(&text, ctx)
+                    }
+                    Item::FirstBinary(_) => {
+                        error!(
+                            "{}: Received binary continuation message",
+                            self
+                        );
+                    }
+                },
+                _ => error!("{}: Unsupported client message: {:?}", self, msg),
             },
             Err(err) => {
                 error!("{}: StreamHandler Error: {:?}", self, err);
@@ -449,6 +509,7 @@ mod test {
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
+                &None,
             )
         }
 
@@ -485,6 +546,7 @@ mod test {
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_millis(50),
+                &None,
             )
         });
 
@@ -534,6 +596,7 @@ mod test {
                 Box::new(rpc_server),
                 Duration::from_millis(100),
                 Duration::from_secs(10),
+                &None,
             )
         });
 
@@ -587,6 +650,7 @@ mod test {
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
+                &None,
             )
         });
 
@@ -651,6 +715,7 @@ mod test {
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
+                &None,
             )
         });
 
@@ -707,6 +772,7 @@ mod test {
                 Box::new(rpc_server),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
+                &None,
             )
         });
 
