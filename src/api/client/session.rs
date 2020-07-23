@@ -27,6 +27,7 @@ use crate::{
     },
     log::prelude::*,
 };
+use chrono::{DateTime, Utc};
 
 /// Used to generate [`WsSession`] IDs.
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -198,6 +199,19 @@ impl Actor for WsSession {
     /// signal to the [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("{}: WsSession started", self);
+
+        ctx.run_interval(Duration::from_millis(500), |this, ctx| {
+            let datetime: DateTime<Utc> = DateTime::from(ctx.last_flush_time());
+            debug!(
+                "{}: flushes count: {}, flushed messages count: {}, \
+                 last_flush_time: {}, queued_messages_count: {}",
+                this,
+                ctx.flushes_count(),
+                ctx.flushed_messages_count(),
+                datetime,
+                ctx.queued_messages_count(),
+            );
+        });
 
         self.room
             .connection_established(
