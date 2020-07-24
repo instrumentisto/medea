@@ -65,6 +65,9 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
+            C::AddMetrics(_) => {
+                return Ok(());
+            }
         };
 
         let peer_member_id = self

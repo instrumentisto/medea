@@ -32,6 +32,7 @@ use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
+use std::collections::VecDeque;
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -73,6 +74,91 @@ macro_rules! impl_incrementable {
             }
         }
     };
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct RoomMetricPerf {
+    name: String,
+    timestamp: f64,
+    runtime: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct RpcMetric {
+    name: String,
+    timestamp: f64,
+}
+
+#[derive(Default, Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct JasonMetrics {
+    room_event_loop_perf: VecDeque<RoomMetricPerf>,
+    rpc_events_dispatched_count: u32,
+    peer_events_dispatched_count: u32,
+    total_events_dispatched_count: u32,
+    network_failure: bool,
+    performance_failure: bool,
+    rpc_connection_events: VecDeque<RpcMetric>,
+    timestamp: f64,
+}
+
+impl JasonMetrics {
+    pub fn merge(&mut self, another: Self) {
+        self.room_event_loop_perf
+            .extend(another.room_event_loop_perf);
+        self.rpc_connection_events
+            .extend(another.rpc_connection_events);
+        self.rpc_events_dispatched_count += another.rpc_events_dispatched_count;
+        self.peer_events_dispatched_count +=
+            another.peer_events_dispatched_count;
+        self.total_events_dispatched_count +=
+            another.total_events_dispatched_count;
+        self.network_failure |= another.network_failure;
+        self.performance_failure |= another.performance_failure;
+    }
+
+    pub fn add_room_event_loop_perf(
+        &mut self,
+        name: String,
+        timestamp: f64,
+        runtime: f64,
+    ) {
+        self.room_event_loop_perf.push_back(RoomMetricPerf {
+            name,
+            timestamp,
+            runtime,
+        });
+    }
+
+    pub fn add_rpc_metric(&mut self, name: String, timestamp: f64) {
+        self.rpc_connection_events
+            .push_back(RpcMetric { name, timestamp });
+    }
+
+    pub fn incr_rpc_events_dispatched(&mut self) {
+        self.rpc_events_dispatched_count += 1;
+    }
+
+    pub fn incr_peer_events_dispatched(&mut self) {
+        self.peer_events_dispatched_count += 1;
+    }
+
+    pub fn incr_total_events_dispatched(&mut self) {
+        self.total_events_dispatched_count += 1;
+    }
+
+    pub fn set_network_failure(&mut self) {
+        self.network_failure = true;
+    }
+
+    pub fn set_performance_failure(&mut self) {
+        self.performance_failure = true;
+    }
+
+    pub fn take(&mut self, timestamp: f64) -> Self {
+        self.timestamp = timestamp;
+
+        std::mem::replace(self, Self::default())
+    }
 }
 
 #[cfg(feature = "medea")]
@@ -172,6 +258,8 @@ pub enum Command {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     },
+
+    AddMetrics(JasonMetrics),
 }
 
 /// Web Client's Peer Connection metrics.
@@ -299,6 +387,20 @@ pub enum Event {
         /// If `None` then no (re)negotiation should be done.
         negotiation_role: Option<NegotiationRole>,
     },
+}
+
+impl Event {
+    pub fn name(&self) -> String {
+        let variant = match self {
+            Event::TracksApplied { .. } => "TracksApplied",
+            Event::PeerCreated { .. } => "PeerCreated",
+            Event::SdpAnswerMade { .. } => "SdpAnswerMade",
+            Event::IceCandidateDiscovered { .. } => "IceCandidateDiscovered",
+            Event::PeersRemoved { .. } => "PeersRemoved",
+        };
+
+        format!("Event::{}", variant)
+    }
 }
 
 /// `Peer`'s negotiation role.

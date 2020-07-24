@@ -12,8 +12,8 @@ use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch, TrackUpdate,
+    IceServer, JasonMetrics, NegotiationRole, PeerConnectionState, PeerId,
+    PeerMetrics, Track, TrackId, TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -35,8 +35,8 @@ use crate::{
         RpcClientError, TransportError,
     },
     utils::{
-        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
+        console_error, window, Callback1, HandlerDetachedError, JasonError,
+        JsCaused, JsError,
     },
 };
 
@@ -423,6 +423,21 @@ impl Room {
             RpcClientReconnected,
         }
 
+        impl RoomEvent {
+            pub fn name(&self) -> String {
+                match self {
+                    RoomEvent::RpcEvent(event) => event.name(),
+                    RoomEvent::PeerEvent(event) => event.name(),
+                    RoomEvent::RpcClientLostConnection => {
+                        "RpcLostConnection".to_string()
+                    }
+                    RoomEvent::RpcClientReconnected => {
+                        "RpcClientReconnected".to_string()
+                    }
+                }
+            }
+        }
+
         let (tx, peer_events_rx) = mpsc::unbounded();
 
         let mut rpc_events_stream =
@@ -455,6 +470,19 @@ impl Room {
                     event = rpc_client_reconnected.select_next_some() => event,
                     complete => break,
                 };
+                let mut metric_update = JasonMetrics::default();
+                metric_update.incr_total_events_dispatched();
+
+                fn now(metric_update: &mut JasonMetrics) -> f64 {
+                    if let Some(performance) = window().performance() {
+                        performance.now()
+                    } else {
+                        metric_update.set_performance_failure();
+                        js_sys::Date::now()
+                    }
+                }
+
+                let exec_start = now(&mut metric_update);
 
                 match inner.upgrade() {
                     None => {
@@ -462,8 +490,10 @@ impl Room {
                         break;
                     }
                     Some(inner) => {
+                        let event_name = event.name();
                         match event {
                             RoomEvent::RpcEvent(event) => {
+                                metric_update.incr_rpc_events_dispatched();
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
@@ -485,6 +515,7 @@ impl Room {
                                 };
                             }
                             RoomEvent::PeerEvent(event) => {
+                                metric_update.incr_peer_events_dispatched();
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
@@ -498,6 +529,15 @@ impl Room {
                                 inner.handle_rpc_connection_recovered();
                             }
                         };
+
+                        let exec_finish = now(&mut metric_update);
+                        let perf = exec_finish - exec_start;
+                        metric_update.add_room_event_loop_perf(
+                            event_name,
+                            js_sys::Date::now(),
+                            perf,
+                        );
+                        inner.rpc.add_metrics(metric_update);
                     }
                 }
             }

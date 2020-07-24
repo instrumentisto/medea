@@ -120,11 +120,16 @@ impl WsSession {
                 debug!("{}: Received Pong: {}", self, n);
             }
             Ok(ClientMsg::Command(command)) => {
-                debug!("{}: Received Command: {:?}", self, command);
-                self.room
-                    .send_command(self.member_id.clone(), command)
-                    .into_actor(self)
-                    .spawn(ctx);
+                use medea_client_api_proto::Command;
+                if let Command::AddMetrics(metrics) = &command {
+                    debug!("{}: Received client metrics: {:?}", self, metrics);
+                } else {
+                    debug!("{}: Received Command: {:?}", self, command);
+                    self.room
+                        .send_command(self.member_id.clone(), command)
+                        .into_actor(self)
+                        .spawn(ctx);
+                }
             }
             Err(err) => error!(
                 "{}: Error [{:?}] parsing client message: [{}]",

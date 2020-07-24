@@ -15,7 +15,7 @@ use futures::{
 };
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
-    Event, RpcSettings, ServerMsg,
+    Event, JasonMetrics, RpcSettings, ServerMsg,
 };
 use medea_reactive::ObservableCell;
 use serde::Serialize;
@@ -23,7 +23,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, JasonError, JsCaused, JsError};
+use crate::utils::{console_error, delay_for, JasonError, JsCaused, JsError};
 
 use websocket::TransportState;
 
@@ -267,6 +267,9 @@ pub trait RpcClient {
     ///
     /// If token is `None` then [`RpcClient`] never was connected to a server.
     fn get_token(&self) -> Option<String>;
+
+    /// Adds provided [`JasonMetrics`] update to the RPC's metrics.
+    fn add_metrics(&self, metrics_update: JasonMetrics);
 }
 
 /// Inner state of [`WebsocketRpcClient`].
@@ -279,6 +282,8 @@ struct Inner {
 
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
+
+    metrics: JasonMetrics,
 
     /// [`oneshot::Sender`] with which [`CloseReason`] will be sent when
     /// WebSocket connection normally closed by server.
@@ -324,6 +329,7 @@ impl Inner {
         Rc::new(RefCell::new(Self {
             sock: None,
             on_close_subscribers: Vec::new(),
+            metrics: JasonMetrics::default(),
             subs: Vec::new(),
             heartbeat: None,
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
@@ -351,7 +357,43 @@ impl WebSocketRpcClient {
     /// Creates new [`WebSocketRpcClient`] with provided [`RpcTransportFactory`]
     /// closure.
     pub fn new(rpc_transport_factory: RpcTransportFactory) -> Self {
-        Self(Inner::new(rpc_transport_factory))
+        let inner = Inner::new(rpc_transport_factory);
+
+        let inner_weak = Rc::downgrade(&inner);
+        spawn_local(async move {
+            loop {
+                delay_for(Duration::from_secs(5).into()).await;
+                if let Some(inner) = inner_weak.upgrade() {
+                    let metrics =
+                        inner.borrow_mut().metrics.take(js_sys::Date::now());
+                    let this = inner.borrow();
+                    if let Some(sock) = this.sock.as_ref() {
+                        if let Err(e) = sock.send(&ClientMsg::Command(
+                            Command::AddMetrics(metrics.clone()),
+                        )) {
+                            drop(this);
+                            let mut this = inner.borrow_mut();
+                            this.metrics = metrics;
+                            this.metrics.set_network_failure();
+                            console_error(format!(
+                                "Error while sending metrics to the server: \
+                                 {:?}",
+                                e
+                            ))
+                        };
+                    } else {
+                        drop(this);
+                        let mut this = inner.borrow_mut();
+                        this.metrics = metrics;
+                        this.metrics.set_network_failure();
+                    }
+                } else {
+                    break;
+                }
+            }
+        });
+
+        Self(inner)
     }
 
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
@@ -418,6 +460,10 @@ impl WebSocketRpcClient {
         match msg {
             ServerMsg::Event(event) => {
                 // TODO: filter messages by session
+                self.0
+                    .borrow_mut()
+                    .metrics
+                    .add_rpc_metric(event.name(), js_sys::Date::now());
                 self.0.borrow_mut().subs.retain(|sub| !sub.is_closed());
                 self.0
                     .borrow()
@@ -691,6 +737,10 @@ impl RpcClient for WebSocketRpcClient {
 
     fn get_token(&self) -> Option<String> {
         self.0.borrow().token.clone()
+    }
+
+    fn add_metrics(&self, metrics_update: JasonMetrics) {
+        self.0.borrow_mut().metrics.merge(metrics_update);
     }
 }
 

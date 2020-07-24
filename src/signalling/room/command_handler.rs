@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use actix::WrapFuture as _;
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
-    TrackId, TrackPatch,
+    CommandHandler, Event, IceCandidate, JasonMetrics, NegotiationRole, PeerId,
+    PeerMetrics, TrackId, TrackPatch,
 };
 
 use crate::{
@@ -179,6 +179,10 @@ impl CommandHandler for Room {
 
         self.peers.commit_scheduled_changes(peer_id)?;
 
+        Ok(Box::new(actix::fut::ok(())))
+    }
+
+    fn on_add_metrics(&mut self, _: JasonMetrics) -> Self::Output {
         Ok(Box::new(actix::fut::ok(())))
     }
 }

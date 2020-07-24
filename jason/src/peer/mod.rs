@@ -186,6 +186,31 @@ pub enum PeerEvent {
     },
 }
 
+impl PeerEvent {
+    /// Returns name of this [`PeerEvent`].
+    pub fn name(&self) -> String {
+        let variant = match self {
+            PeerEvent::IceCandidateDiscovered { .. } => {
+                "IceCandidateDiscovered"
+            }
+            PeerEvent::NewRemoteTrack { .. } => "NewRemoteTrack",
+            PeerEvent::NewLocalStream { .. } => "NewLocalStream",
+            PeerEvent::IceConnectionStateChanged { .. } => {
+                "IceConnectionStateChanged"
+            }
+            PeerEvent::ConnectionStateChanged { .. } => {
+                "ConnectionStateChanged"
+            }
+            PeerEvent::StatsUpdate { .. } => "StatsUpdate",
+            PeerEvent::NewLocalStreamRequired { .. } => {
+                "NewLocalStreamRequired"
+            }
+        };
+
+        format!("PeerEvent::{}", variant)
+    }
+}
+
 /// High-level wrapper around [`RtcPeerConnection`].
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
