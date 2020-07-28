@@ -80,6 +80,8 @@ pub trait NegotiationSubscriber: fmt::Debug {
     /// Provided [`Peer`] and it's partner [`Peer`] should be in a [`Stable`]
     /// state, otherwise nothing will be done.
     fn negotiation_needed(&self, peer_id: PeerId);
+
+    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
 }
 
 #[cfg(test)]
@@ -162,6 +164,7 @@ impl PeerError {
     )
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
+#[enum_delegate(pub fn commit_force_changes(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -178,6 +181,8 @@ impl PeerStateMachine {
     pub fn commit_scheduled_changes(&mut self) {
         if let PeerStateMachine::Stable(stable_peer) = self {
             stable_peer.commit_scheduled_changes();
+        } else {
+            self.commit_force_changes();
         }
     }
 
@@ -306,6 +311,8 @@ pub struct Context {
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
     negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
+
+    is_renegotiation_forced: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -360,9 +367,18 @@ impl TrackChange {
             }
         }
     }
+
+    pub fn is_force(&self) -> bool {
+        match self {
+            TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
+                false
+            }
+            TrackChange::TrackPatch(_) => true,
+        }
+    }
 }
 
-impl TrackChangeHandler for Peer<Stable> {
+impl<T> TrackChangeHandler for Peer<T> {
     type Output = ();
 
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
@@ -495,6 +511,44 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
+    fn schedule_forced_renegotiation(&mut self) {
+        self.context.is_renegotiation_forced = true;
+    }
+
+    pub fn commit_force_changes(&mut self) {
+        let forced_indexes: Vec<_> = self
+            .context
+            .track_changes_queue
+            .iter()
+            .enumerate()
+            .filter_map(
+                |(i, change)| {
+                    if change.is_force() {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                },
+            )
+            .collect();
+        let mut changes = Vec::new();
+        for index in forced_indexes {
+            if let Some(change) = self.context.track_changes_queue.remove(index)
+            {
+                changes.push(change.as_track_update(self.partner_peer_id()));
+                change.dispatch_with(self);
+                self.schedule_forced_renegotiation();
+            }
+        }
+
+        if !changes.is_empty() {
+            self.context
+                .negotiation_subscriber
+                .force_update(self.id(), changes);
+            self.schedule_forced_renegotiation();
+        }
+    }
+
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
     /// for this [`Peer`] was sent to the client).
     #[must_use]
@@ -614,6 +668,7 @@ impl Peer<Stable> {
             pending_track_updates: Vec::new(),
             track_changes_queue: VecDeque::new(),
             negotiation_subscriber,
+            is_renegotiation_forced: false,
         };
 
         Self {
@@ -677,6 +732,7 @@ impl Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
+        context.is_renegotiation_forced = false;
 
         Peer {
             context,
@@ -690,7 +746,9 @@ impl Peer<Stable> {
     ///
     /// Returns `false` if nothing was done.
     fn commit_scheduled_changes(&mut self) {
-        if !self.context.track_changes_queue.is_empty() {
+        if !self.context.track_changes_queue.is_empty()
+            || self.context.is_renegotiation_forced
+        {
             while let Some(task) = self.context.track_changes_queue.pop_front()
             {
                 self.context.pending_track_updates.push(task.clone());

@@ -114,6 +114,45 @@ impl NegotiationSubscriber for WeakAddr<Room> {
             addr.do_send(NegotiationNeeded(peer_id));
         }
     }
+
+    #[inline]
+    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
+        if let Some(addr) = self.upgrade() {
+            addr.do_send(ForceUpdate(peer_id, changes));
+        }
+    }
+}
+
+use medea_client_api_proto::TrackUpdate;
+
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
+
+impl Handler<ForceUpdate> for Room {
+    type Result = ActFuture<Result<(), RoomError>>;
+
+    fn handle(
+        &mut self,
+        msg: ForceUpdate,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let member_id = actix_try!(self
+            .peers
+            .map_peer_by_id(msg.0, |peer| peer.member_id()));
+        Box::new(
+            self.members
+                .send_event_to_member(
+                    member_id,
+                    Event::TracksApplied {
+                        updates: msg.1,
+                        negotiation_role: None,
+                        peer_id: msg.0,
+                    },
+                )
+                .into_actor(self),
+        )
+    }
 }
 
 /// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
