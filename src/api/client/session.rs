@@ -450,7 +450,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 ws::Message::Continuation(item) => {
                     self.handle_continuation(item, ctx);
                 }
-                _ => error!("{}: Unsupported client message: {:?}", self, msg),
+                ws::Message::Binary(_) => {
+                    warn!("{}: Received binary message", self);
+                }
+                ws::Message::Ping(ping) => {
+                    ctx.pong(ping.bytes());
+                }
+                ws::Message::Nop | ws::Message::Pong(_)=> {
+                    // nothing to do here
+                }
             },
             Err(err) => {
                 error!("{}: StreamHandler Error: {:?}", self, err);
