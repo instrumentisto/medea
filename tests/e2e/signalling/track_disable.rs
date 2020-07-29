@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use actix::Addr;
 use futures::{
-    channel::mpsc::{self, UnboundedReceiver},
+    channel::{
+        mpsc::{self, UnboundedReceiver},
+        oneshot,
+    },
     StreamExt,
 };
 use medea_client_api_proto::{
@@ -131,4 +134,102 @@ async fn track_disables_and_enables() {
 
     helper(true, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
     helper(false, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
+}
+
+/// Tests that track disabled and enables will be performed instantly and will
+/// not wait for renegotiation finish.
+#[actix_rt::test]
+async fn track_disables_and_enables_are_instant() {
+    const TEST_NAME: &str = "track_disables_and_enables_are_instant";
+
+    let mut client = ControlClient::new().await;
+    let credentials = client.create(create_room_req(TEST_NAME)).await;
+
+    let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
+    let _publisher = TestMember::connect(
+        credentials.get("publisher").unwrap(),
+        Some(Box::new(move |event, _, _| {
+            publisher_tx.unbounded_send(event.clone()).unwrap();
+        })),
+        None,
+        Some(Duration::from_secs(500)),
+        true,
+    )
+    .await;
+    let (force_update_received_tx, force_update_received_rx) =
+        oneshot::channel();
+    let mut force_update_received_tx = Some(force_update_received_tx);
+    let (all_renegotiations_performed_tx, all_renegotiations_performed_rx) =
+        oneshot::channel();
+    let mut all_renegotiations_performed_tx =
+        Some(all_renegotiations_performed_tx);
+    let mut renegotiations_count = 0;
+    let subscriber = TestMember::connect(
+        credentials.get("responder").unwrap(),
+        Some(Box::new(move |event, _, _| match event {
+            Event::TracksApplied {
+                negotiation_role, ..
+            } => {
+                if negotiation_role.is_none() {
+                    if let Some(force_update_received_tx) =
+                        force_update_received_tx.take()
+                    {
+                        let _ = force_update_received_tx.send(());
+                    }
+                } else {
+                    renegotiations_count += 1;
+                    if renegotiations_count > 1 {
+                        if let Some(all_renegotiations_performed_tx) =
+                            all_renegotiations_performed_tx.take()
+                        {
+                            let _ = all_renegotiations_performed_tx.send(());
+                        }
+                    }
+                }
+            }
+            _ => {}
+        })),
+        None,
+        Some(Duration::from_secs(500)),
+        true,
+    )
+    .await;
+
+    // wait until initial negotiation finishes
+    loop {
+        if let Event::SdpAnswerMade { .. } =
+            publisher_rx.select_next_some().await
+        {
+            break;
+        };
+    }
+
+    for i in 0..20 {
+        let mut tracks_patches = Vec::new();
+        tracks_patches.push(TrackPatch {
+            id: TrackId(2),
+            is_muted: Some(i % 2 == 0),
+        });
+        subscriber
+            .send(SendCommand(Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches,
+            }))
+            .await
+            .unwrap();
+    }
+    use futures::future;
+
+    let (force_update_received, all_renegotiations_performed) =
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            future::join(
+                force_update_received_rx,
+                all_renegotiations_performed_rx,
+            ),
+        )
+        .await
+        .unwrap();
+    force_update_received.unwrap();
+    all_renegotiations_performed.unwrap();
 }

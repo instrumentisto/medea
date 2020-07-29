@@ -711,6 +711,7 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{channel::mpsc, future, Stream, StreamExt as _};
+    use medea_client_api_proto::TrackUpdate;
     use tokio::time::timeout;
 
     use crate::{
@@ -733,32 +734,56 @@ mod tests {
     /// You can subscribe to the [`Stream`] into which will be sent all
     /// [`PeerId`]s of [`Peer`] which are should be renegotiated.
     #[derive(Debug, Clone)]
-    struct NegotiationSubMock(Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>);
+    struct NegotiationSubMock(
+        Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>,
+        Rc<RefCell<Vec<mpsc::UnboundedSender<(PeerId, Vec<TrackUpdate>)>>>>,
+    );
 
     impl NegotiationSubMock {
         /// Returns new empty [`NegotiationSubMock`].
         pub fn new() -> Self {
-            Self(Rc::new(RefCell::new(Vec::new())))
+            Self(Rc::default(), Rc::default())
         }
 
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s of
         /// [`Peer`] which are should be renegotiated.
-        pub fn subscribe(&self) -> impl Stream<Item = PeerId> {
+        pub fn on_negotiation_needed(&self) -> impl Stream<Item = PeerId> {
             let (tx, rx) = mpsc::unbounded();
 
             self.0.borrow_mut().push(tx);
 
             rx
         }
+
+        /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
+        /// [`TrackUpdate`]s of [`Peer`] which are should be forcebly
+        /// updated.
+        pub fn on_force_update(
+            &self,
+        ) -> impl Stream<Item = (PeerId, Vec<TrackUpdate>)> {
+            let (tx, rx) = mpsc::unbounded();
+
+            self.1.borrow_mut().push(tx);
+
+            rx
+        }
     }
 
     impl NegotiationSubscriber for NegotiationSubMock {
-        /// Sends [`PeerId`] to the [`NegotiationSubMock::subscribe`]
-        /// [`Stream`].
+        /// Sends [`PeerId`] to the
+        /// [`NegotiationSubMock::on_negotiation_needed`] [`Stream`].
         fn negotiation_needed(&self, peer_id: PeerId) {
             self.0.borrow().iter().for_each(|sender| {
                 let _ = sender.unbounded_send(peer_id);
             });
+        }
+
+        /// Sends [`PeerId`] to the [`NegotiationSubMock::on_force_update`]
+        /// [`Stream`].
+        fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
+            self.1.borrow().iter().for_each(|sender| {
+                let _ = sender.unbounded_send((peer_id, changes.clone()));
+            })
         }
     }
 
@@ -781,7 +806,7 @@ mod tests {
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
         let negotiation_sub = NegotiationSubMock::new();
-        let negotiations = negotiation_sub.subscribe();
+        let negotiations = negotiation_sub.on_negotiation_needed();
 
         let peers_service = PeersService::new(
             "test".into(),
@@ -873,7 +898,7 @@ mod tests {
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
         let negotiation_sub = NegotiationSubMock::new();
-        let negotiations = negotiation_sub.subscribe();
+        let negotiations = negotiation_sub.on_negotiation_needed();
 
         let peers_service = PeersService::new(
             "test".into(),
