@@ -165,7 +165,7 @@ impl WsSession {
         // happens only when dealing with large payloads ( > 128kb in Chrome).
         // We will handle this message, but it probably signals that some
         // bug occurred on sending side.
-        warn!("{}: Continuation frame received: {:?}", self, frame);
+        warn!("{}: Continuation frame received.", self);
         match frame {
             Item::FirstText(value) => {
                 if !self.fragmentation_buffer.is_empty() {
