@@ -12,7 +12,9 @@ use actix::{
     AsyncContext, ContextFutureSpawner as _, Handler, MailboxError, Message,
     StreamHandler,
 };
+use actix_http::ws::{CloseReason as WsCloseReason, Item};
 use actix_web_actors::ws::{self, CloseCode};
+use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Event, RpcSettings, ServerMsg,
@@ -65,6 +67,9 @@ pub struct WsSession {
     /// from client.
     last_activity: Instant,
 
+    // Buffer where continuation WebSocket frames are accumulated.
+    fragmentation_buffer: BytesMut,
+
     /// Last number of [`ServerMsg::Ping`].
     last_ping_num: u32,
 
@@ -92,10 +97,127 @@ impl WsSession {
             room,
             idle_timeout,
             last_activity: Instant::now(),
+            fragmentation_buffer: BytesMut::new(),
             last_ping_num: 0,
             ping_interval,
             close_reason: None,
         }
+    }
+
+    /// Handles text WebSocket messages.
+    fn handle_text(
+        &mut self,
+        text: &str,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) {
+        self.last_activity = Instant::now();
+        match serde_json::from_str::<ClientMsg>(&text) {
+            Ok(ClientMsg::Pong(n)) => {
+                debug!("{}: Received Pong: {}", self, n);
+            }
+            Ok(ClientMsg::Command(command)) => {
+                debug!("{}: Received Command: {:?}", self, command);
+                self.room
+                    .send_command(self.member_id.clone(), command)
+                    .into_actor(self)
+                    .spawn(ctx);
+            }
+            Err(err) => error!(
+                "{}: Error [{:?}] parsing client message: [{}]",
+                self, err, &text,
+            ),
+        }
+    }
+
+    /// Handles WebSocket close frame.
+    fn handle_close(
+        &mut self,
+        reason: Option<WsCloseReason>,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) {
+        debug!("{}: Received Close message: {:?}", self, reason);
+        if self.close_reason.is_none() {
+            let closed_reason = if let Some(reason) = &reason {
+                if reason.code == CloseCode::Normal
+                    || reason.code == CloseCode::Away
+                {
+                    ClosedReason::Closed { normal: true }
+                } else {
+                    ClosedReason::Lost
+                }
+            } else {
+                ClosedReason::Lost
+            };
+
+            self.close_reason = Some(InnerCloseReason::ByClient(closed_reason));
+            ctx.close(reason);
+            ctx.stop();
+        }
+    }
+
+    /// Handles WebSocket continuation frame.
+    fn handle_continuation(
+        &mut self,
+        frame: Item,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) {
+        // This is logged as at `WARN` level, because fragmentation usually
+        // happens only when dealing with large payloads ( > 128kb in Chrome).
+        // We will handle this message, but it probably signals that some
+        // bug occurred on sending side.
+        warn!("{}: Continuation frame received: {:?}", self, frame);
+        match frame {
+            Item::FirstText(value) => {
+                if !self.fragmentation_buffer.is_empty() {
+                    error!(
+                        "{}: Received new continuation frame before \
+                         completing previous.",
+                        self
+                    );
+                    self.fragmentation_buffer.clear();
+                }
+                self.fragmentation_buffer.extend_from_slice(value.bytes());
+            }
+            Item::FirstBinary(_) => {
+                error!(
+                    "{}: Received unexpected continuation-binary frame.",
+                    self
+                );
+            }
+            Item::Continue(value) => {
+                if self.fragmentation_buffer.is_empty() {
+                    error!(
+                        "{}: Received continuation frame that was not \
+                         preceded by continuation-first frame",
+                        self
+                    );
+                } else {
+                    self.fragmentation_buffer.extend_from_slice(value.bytes());
+                }
+            }
+            Item::Last(value) => {
+                self.fragmentation_buffer.extend_from_slice(value.bytes());
+                let frame = self.fragmentation_buffer.split();
+                match std::str::from_utf8(frame.as_ref()) {
+                    Ok(text) => self.handle_text(&text, ctx),
+                    Err(err) => {
+                        error!("{}: Could not parse ws frame: {}", self, err);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Sends close frame and stops connection [`Actor`].
+    fn close_in_place(
+        &mut self,
+        ctx: &mut ws::WebsocketContext<Self>,
+        reason: Close,
+    ) {
+        debug!("{}: Closing WsSession", self);
+        self.close_reason = Some(InnerCloseReason::ByServer);
+        ctx.close(Some(reason.0));
+        ctx.stop();
     }
 
     /// Starts watchdog which will drop connection if `now`-`last_activity` >
@@ -112,9 +234,12 @@ impl WsSession {
                     ClosedReason::Lost,
                 ));
 
-                ctx.notify(Close::with_normal_code(&CloseDescription::new(
-                    CloseReason::Idle,
-                )))
+                this.close_in_place(
+                    ctx,
+                    Close::with_normal_code(&CloseDescription::new(
+                        CloseReason::Idle,
+                    )),
+                );
             }
         });
     }
@@ -189,9 +314,12 @@ impl Actor for WsSession {
                              because: {:?}",
                             this, err,
                         );
-                        ctx.notify(Close::with_normal_code(
-                            &CloseDescription::new(CloseReason::InternalError),
-                        ));
+                        this.close_in_place(
+                            ctx,
+                            Close::with_normal_code(&CloseDescription::new(
+                                CloseReason::InternalError,
+                            )),
+                        );
                     }
                 };
                 actix::fut::ready(())
@@ -292,10 +420,7 @@ impl Handler<Close> for WsSession {
 
     /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
-        debug!("{}: Closing WsSession", self);
-        self.close_reason = Some(InnerCloseReason::ByServer);
-        ctx.close(Some(close.0));
-        ctx.stop();
+        self.close_in_place(ctx, close);
     }
 }
 
@@ -320,50 +445,21 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     ) {
         match msg {
             Ok(msg) => match msg {
-                ws::Message::Text(text) => {
-                    self.last_activity = Instant::now();
-                    match serde_json::from_str::<ClientMsg>(&text) {
-                        Ok(ClientMsg::Pong(n)) => {
-                            debug!("{}: Received Pong: {}", self, n);
-                        }
-                        Ok(ClientMsg::Command(command)) => {
-                            debug!("{}: Received Command: {:?}", self, command);
-                            self.room
-                                .send_command(self.member_id.clone(), command)
-                                .into_actor(self)
-                                .spawn(ctx);
-                        }
-                        Err(err) => error!(
-                            "{}: Error [{:?}] parsing client message: [{}]",
-                            self, err, &text,
-                        ),
-                    }
+                ws::Message::Text(text) => self.handle_text(&text, ctx),
+                ws::Message::Close(reason) => self.handle_close(reason, ctx),
+                ws::Message::Continuation(item) => {
+                    self.handle_continuation(item, ctx);
                 }
-                ws::Message::Close(reason) => {
-                    debug!("{}: Received Close message: {:?}", self, reason);
-                    if self.close_reason.is_none() {
-                        let closed_reason = if let Some(reason) = &reason {
-                            if reason.code == CloseCode::Normal
-                                || reason.code == CloseCode::Away
-                            {
-                                ClosedReason::Closed { normal: true }
-                            } else {
-                                ClosedReason::Lost
-                            }
-                        } else {
-                            ClosedReason::Lost
-                        };
-
-                        self.close_reason =
-                            Some(InnerCloseReason::ByClient(closed_reason));
-                        ctx.close(reason);
-                        ctx.stop();
-                    }
-                }
-                _ => error!("{}: Unsupported client message", self),
+                _ => error!("{}: Unsupported client message: {:?}", self, msg),
             },
             Err(err) => {
                 error!("{}: StreamHandler Error: {:?}", self, err);
+                self.close_in_place(
+                    ctx,
+                    Close::with_normal_code(&CloseDescription {
+                        reason: CloseReason::InternalError,
+                    }),
+                );
             }
         };
     }
@@ -394,15 +490,21 @@ mod test {
         time::{Duration, Instant},
     };
 
+    use actix_http::ws::Item;
     use actix_web::{test::TestServer, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
+    use bytes::{Buf, Bytes};
     use medea_client_api_proto::{
         CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
         PeerId,
     };
+    use tokio::time::timeout;
 
     use futures::{
-        channel::oneshot::{self, Receiver, Sender},
+        channel::{
+            mpsc::{self, UnboundedReceiver, UnboundedSender},
+            oneshot::{self, Receiver, Sender},
+        },
         future, FutureExt as _, SinkExt as _, StreamExt as _,
     };
 
@@ -414,7 +516,12 @@ mod test {
 
     use super::WsSession;
 
-    type SharedChan<T> = (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
+    type SharedOneshot<T> =
+        (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
+    type SharedUnbounded<T> = (
+        Mutex<UnboundedSender<T>>,
+        Mutex<Option<UnboundedReceiver<T>>>,
+    );
 
     fn test_server(factory: fn() -> WsSession) -> TestServer {
         actix_web::test::start(move || {
@@ -559,9 +666,9 @@ mod test {
     #[actix_rt::test]
     async fn passes_commands_to_rpc_server() {
         lazy_static::lazy_static! {
-            static ref CHAN: SharedChan<Command> = {
-                let (tx, rx) = oneshot::channel();
-                (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
+            static ref CHAN: SharedUnbounded<Command> = {
+                let (tx, rx) = mpsc::unbounded();
+                (Mutex::new(tx), Mutex::new(Some(rx)))
             };
         }
 
@@ -576,8 +683,8 @@ mod test {
                 .expect_connection_closed()
                 .returning(|_, _| future::ready(()).boxed_local());
 
-            rpc_server.expect_send_command().return_once(|_, command| {
-                let _ = CHAN.0.lock().unwrap().take().unwrap().send(command);
+            rpc_server.expect_send_command().returning(|_, command| {
+                CHAN.0.lock().unwrap().unbounded_send(command).unwrap();
                 future::ready(()).boxed_local()
             });
 
@@ -592,7 +699,8 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let command = r#"{
+        let command = Bytes::from(
+            r#"{
                             "command":"SetIceCandidate",
                                 "data":{
                                     "peer_id":15,
@@ -602,20 +710,61 @@ mod test {
                                         "sdp_mid":"2"
                                     }
                                 }
-                            }"#;
-
+                            }"#,
+        );
         client
-            .send(Message::Text(String::from(command)))
+            .send(Message::Text(
+                std::str::from_utf8(command.bytes()).unwrap().to_owned(),
+            ))
+            .await
+            .unwrap();
+        // TODO: Change to `FirstText` when upgrade actix-web to v3.
+        //       Fixed in https://github.com/actix/actix-web/pull/1465.
+        client
+            .send(Message::Continuation(Item::FirstBinary(
+                command.slice(0..10),
+            )))
+            .await
+            .unwrap();
+        client
+            .send(Message::Continuation(Item::Last(
+                command.slice(10..command.len()),
+            )))
+            .await
+            .unwrap();
+        // TODO: Change to `FirstText` when upgrade actix-web to v3.
+        //       Fixed in https://github.com/actix/actix-web/pull/1465.
+        client
+            .send(Message::Continuation(Item::FirstBinary(
+                command.slice(0..10),
+            )))
+            .await
+            .unwrap();
+        client
+            .send(Message::Continuation(Item::Continue(command.slice(10..20))))
+            .await
+            .unwrap();
+        client
+            .send(Message::Continuation(Item::Last(
+                command.slice(20..command.len()),
+            )))
             .await
             .unwrap();
 
-        let command = CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
-        match command {
-            Command::SetIceCandidate { peer_id, candidate } => {
-                assert_eq!(peer_id.0, 15);
-                assert_eq!(candidate.candidate, "asd");
+        let commands: Vec<Command> = timeout(
+            Duration::from_millis(500),
+            CHAN.1.lock().unwrap().take().unwrap().take(3).collect(),
+        )
+        .await
+        .unwrap();
+        for command in commands {
+            match command {
+                Command::SetIceCandidate { peer_id, candidate } => {
+                    assert_eq!(peer_id.0, 15);
+                    assert_eq!(candidate.candidate, "asd");
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
         }
     }
 
@@ -624,7 +773,7 @@ mod test {
     #[actix_rt::test]
     async fn close_when_rpc_connection_close() {
         lazy_static::lazy_static! {
-            static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
+            static ref CHAN: SharedOneshot<Box<dyn RpcConnection>> = {
                 let (tx, rx) = oneshot::channel();
                 (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
             };
@@ -680,7 +829,7 @@ mod test {
     #[actix_rt::test]
     async fn send_text_message_when_rpc_connection_send_event() {
         lazy_static::lazy_static! {
-            static ref CHAN: SharedChan<Box<dyn RpcConnection>> = {
+            static ref CHAN: SharedOneshot<Box<dyn RpcConnection>> = {
                 let (tx, rx) = oneshot::channel();
                 (Mutex::new(Some(tx)), Mutex::new(Some(rx)))
             };
