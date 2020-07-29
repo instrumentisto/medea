@@ -21,7 +21,7 @@ use crate::{
     api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{peer::NegotiationSubscriber, Peer, PeerError, PeerStateMachine},
+    media::{peer::PeerUpdatesSubscriber, Peer, PeerError, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -80,7 +80,7 @@ pub struct PeersService {
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
-    negotiation_sub: Rc<dyn NegotiationSubscriber>,
+    negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
 }
 
 /// Simple ID counter.
@@ -126,7 +126,7 @@ impl PeersService {
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         media_conf: &conf::Media,
-        negotiation_sub: Rc<dyn NegotiationSubscriber>,
+        negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Rc<Self> {
         Rc::new(Self {
             room_id: room_id.clone(),
@@ -729,7 +729,7 @@ mod tests {
 
     use super::*;
 
-    /// Mock for the [`NegotiationSubscriber`] trait.
+    /// Mock for the [`PeerUpdatesSubscriber`] trait.
     ///
     /// You can subscribe to the [`Stream`] into which will be sent all
     /// [`PeerId`]s of [`Peer`] which are should be renegotiated.
@@ -756,7 +756,7 @@ mod tests {
         }
 
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
-        /// [`TrackUpdate`]s of [`Peer`] which are should be forcebly
+        /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly
         /// updated.
         pub fn on_force_update(
             &self,
@@ -769,7 +769,7 @@ mod tests {
         }
     }
 
-    impl NegotiationSubscriber for NegotiationSubMock {
+    impl PeerUpdatesSubscriber for NegotiationSubMock {
         /// Sends [`PeerId`] to the
         /// [`NegotiationSubMock::on_negotiation_needed`] [`Stream`].
         fn negotiation_needed(&self, peer_id: PeerId) {

@@ -28,7 +28,7 @@ use crate::{
         MemberId, RoomId,
     },
     log::prelude::*,
-    media::{peer::NegotiationSubscriber, Peer, PeerError, Stable},
+    media::{peer::PeerUpdatesSubscriber, Peer, PeerError, Stable},
     shutdown::ShutdownGracefully,
     signalling::{
         elements::{member::MemberError, Member, MembersLoadError},
@@ -168,7 +168,7 @@ impl Room {
                 peers_traffic_watcher,
                 &context.config.media,
                 Rc::new(ctx.address().downgrade())
-                    as Rc<dyn NegotiationSubscriber>,
+                    as Rc<dyn PeerUpdatesSubscriber>,
             ),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,

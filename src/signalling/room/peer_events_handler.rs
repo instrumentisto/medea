@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use medea_client_api_proto::{Event, NegotiationRole, PeerId, TrackUpdate};
 
 use crate::{
-    media::{peer::NegotiationSubscriber, Peer, PeerStateMachine, Stable},
+    media::{peer::PeerUpdatesSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
         peers::PeerConnectionStateEventsHandler,
         room::{ActFuture, RoomError},
@@ -103,7 +103,7 @@ impl Handler<PeerStopped> for Room {
     }
 }
 
-impl NegotiationSubscriber for WeakAddr<Room> {
+impl PeerUpdatesSubscriber for WeakAddr<Room> {
     /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
     /// [`Addr`] a [`NegotiationNeeded`] [`Message`].
     ///
@@ -153,9 +153,9 @@ impl Handler<ForceUpdate> for Room {
                 .send_event_to_member(
                     member_id,
                     Event::TracksApplied {
+                        peer_id: msg.0,
                         updates: msg.1,
                         negotiation_role: None,
-                        peer_id: msg.0,
                     },
                 )
                 .into_actor(self),
@@ -183,8 +183,8 @@ impl Handler<NegotiationNeeded> for Room {
     /// Sends [`Event::TrackApplied`] if this [`Peer`] known for the remote
     /// side.
     ///
-    /// If this [`Peer`] or it's partner not [`Stable`] then nothing will be
-    /// done.
+    /// If this [`Peer`] or it's partner not [`Stable`] then forcible
+    /// [`TrackChange`]s will be committed.
     fn handle(
         &mut self,
         msg: NegotiationNeeded,
@@ -225,7 +225,7 @@ impl Handler<NegotiationNeeded> for Room {
         } else {
             actix_try!(self.peers.map_peer_by_id_mut(
                 msg.0,
-                PeerStateMachine::commit_force_changes
+                PeerStateMachine::commit_forcible_changes
             ));
 
             Box::new(fut::ok(()))
