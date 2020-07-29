@@ -223,6 +223,11 @@ impl Handler<NegotiationNeeded> for Room {
                 self.send_peer_created(peer_id)
             }
         } else {
+            actix_try!(self.peers.map_peer_by_id_mut(
+                msg.0,
+                PeerStateMachine::commit_force_changes
+            ));
+
             Box::new(fut::ok(()))
         }
     }

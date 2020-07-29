@@ -682,7 +682,9 @@ impl Peer<Stable> {
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
-    pub fn start(self) -> Peer<WaitLocalSdp> {
+    pub fn start(mut self) -> Peer<WaitLocalSdp> {
+        self.negotiation_started();
+
         Peer {
             context: self.context,
             state: WaitLocalSdp {},
@@ -691,15 +693,23 @@ impl Peer<Stable> {
 
     /// Transition new [`Peer`] into state of waiting for remote description.
     pub fn set_remote_sdp(
-        self,
+        mut self,
         sdp_offer: String,
     ) -> Peer<WaitLocalHaveRemote> {
+        self.negotiation_started();
+
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
             state: WaitLocalHaveRemote {},
         }
+    }
+
+    /// This method will be called everytime when [`Peer`] goes from [`Stable`]
+    /// state into any other state.
+    fn negotiation_started(&mut self) {
+        self.context.is_forcebly_updated = false;
     }
 
     /// Returns [mid]s of this [`Peer`].
@@ -732,11 +742,12 @@ impl Peer<Stable> {
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_negotiation(self) -> Peer<WaitLocalSdp> {
+    pub fn start_negotiation(mut self) -> Peer<WaitLocalSdp> {
+        self.negotiation_started();
+
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
-        context.is_forcebly_updated = false;
 
         Peer {
             context,
