@@ -2,7 +2,7 @@
 
 use actix::{fut, Handler, Message, WeakAddr, WrapFuture};
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{Event, NegotiationRole, PeerId};
+use medea_client_api_proto::{Event, NegotiationRole, PeerId, TrackUpdate};
 
 use crate::{
     media::{peer::NegotiationSubscriber, Peer, PeerStateMachine, Stable},
@@ -115,6 +115,10 @@ impl NegotiationSubscriber for WeakAddr<Room> {
         }
     }
 
+    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
+    /// [`Addr`] a [`ForceUpdate`] [`Message`].
+    ///
+    /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
     fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
         if let Some(addr) = self.upgrade() {
@@ -123,8 +127,10 @@ impl NegotiationSubscriber for WeakAddr<Room> {
     }
 }
 
-use medea_client_api_proto::TrackUpdate;
-
+/// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
+/// be updated with a provided [`TrackUpdate`]s, but without renegotiation.
+///
+/// Can be done in any [`Peer`] state.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
@@ -132,6 +138,8 @@ pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
 impl Handler<ForceUpdate> for Room {
     type Result = ActFuture<Result<(), RoomError>>;
 
+    /// Gets [`MemberId`] of the provided [`Peer`] and sends all provided
+    /// [`TrackUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
     fn handle(
         &mut self,
         msg: ForceUpdate,
@@ -139,7 +147,7 @@ impl Handler<ForceUpdate> for Room {
     ) -> Self::Result {
         let member_id = actix_try!(self
             .peers
-            .map_peer_by_id(msg.0, |peer| peer.member_id()));
+            .map_peer_by_id(msg.0, PeerStateMachine::member_id));
         Box::new(
             self.members
                 .send_event_to_member(

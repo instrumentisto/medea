@@ -81,6 +81,7 @@ pub trait NegotiationSubscriber: fmt::Debug {
     /// state, otherwise nothing will be done.
     fn negotiation_needed(&self, peer_id: PeerId);
 
+    /// Forcebly updates [`Peer`] without renegotiation.
     fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
 }
 
@@ -312,7 +313,12 @@ pub struct Context {
     /// should be started for this [`Peer`].
     negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
 
-    is_renegotiation_forced: bool,
+    /// Flag which indicates that this [`Peer`] should be renegotiated when it
+    /// will be [`Stable`].
+    ///
+    /// If this flag `true` then `track_changes_queue` length will be ignored
+    /// and renegotiation will be started on any length.
+    is_forcebly_updated: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -368,6 +374,8 @@ impl TrackChange {
         }
     }
 
+    /// Returns `true` if this [`TrackChange`] can be sent forcebly without
+    /// instant renegotiation starting.
     pub fn is_force(&self) -> bool {
         match self {
             TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
@@ -511,10 +519,7 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
-    fn schedule_forced_renegotiation(&mut self) {
-        self.context.is_renegotiation_forced = true;
-    }
-
+    /// Commits all [`TrackChange`]s which are marked as forced.
     pub fn commit_force_changes(&mut self) {
         let forced_indexes: Vec<_> = self
             .context
@@ -537,7 +542,6 @@ impl<T> Peer<T> {
             {
                 changes.push(change.as_track_update(self.partner_peer_id()));
                 change.dispatch_with(self);
-                self.schedule_forced_renegotiation();
             }
         }
 
@@ -545,7 +549,7 @@ impl<T> Peer<T> {
             self.context
                 .negotiation_subscriber
                 .force_update(self.id(), changes);
-            self.schedule_forced_renegotiation();
+            self.context.is_forcebly_updated = true;
         }
     }
 
@@ -668,7 +672,7 @@ impl Peer<Stable> {
             pending_track_updates: Vec::new(),
             track_changes_queue: VecDeque::new(),
             negotiation_subscriber,
-            is_renegotiation_forced: false,
+            is_forcebly_updated: false,
         };
 
         Self {
@@ -732,7 +736,7 @@ impl Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
-        context.is_renegotiation_forced = false;
+        context.is_forcebly_updated = false;
 
         Peer {
             context,
@@ -740,14 +744,14 @@ impl Peer<Stable> {
         }
     }
 
-    /// Runs [`Task`]s which are scheduled for this [`Peer`].
+    /// Runs [`TrackChange`]s which are scheduled for this [`Peer`].
     ///
-    /// Returns `true` if at least one [`Task`] was run.
-    ///
-    /// Returns `false` if nothing was done.
+    /// If this [`Peer`] is not [`Stable`] then only forced [`TrackChange`]s
+    /// will be ran without renegotiation. Renegotiation for the forced
+    /// [`TrackChange`]s will be done when [`Peer`] will be [`Stable`].
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty()
-            || self.context.is_renegotiation_forced
+            || self.context.is_forcebly_updated
         {
             while let Some(task) = self.context.track_changes_queue.pop_front()
             {
