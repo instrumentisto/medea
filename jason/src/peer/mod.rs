@@ -55,6 +55,7 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
+use crate::peer::media::Receiver;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -521,6 +522,11 @@ impl PeerConnection {
     #[inline]
     pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
         self.media_connections.get_senders(kind)
+    }
+
+    #[inline]
+    pub fn get_receivers_ids(&self, kind: TransceiverKind) -> Vec<TrackId> {
+        self.media_connections.get_receivers_ids(kind)
     }
 
     /// Track id to mid relations of all send tracks of this
