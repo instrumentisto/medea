@@ -83,7 +83,8 @@ mod utils;
 use futures::{channel::oneshot, future::Either, Future};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
+    AudioSettings, Direction, MediaType, MemberId, Track, TrackId,
+    VideoSettings,
 };
 use medea_jason::{
     media::{
@@ -158,7 +159,7 @@ pub fn get_test_tracks(
         Track {
             id: TrackId(1),
             direction: Direction::Send {
-                receivers: vec![PeerId(2)],
+                receivers: vec![MemberId::from("bob")],
                 mid: None,
             },
             media_type: MediaType::Audio(AudioSettings {
@@ -168,7 +169,7 @@ pub fn get_test_tracks(
         Track {
             id: TrackId(2),
             direction: Direction::Send {
-                receivers: vec![PeerId(2)],
+                receivers: vec![MemberId::from("bob")],
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {

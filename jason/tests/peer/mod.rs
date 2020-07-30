@@ -16,8 +16,8 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStat, TrackStatKind,
     },
-    AudioSettings, Direction, IceConnectionState, MediaType, PeerId, Track,
-    TrackId, TrackPatch, VideoSettings,
+    AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
+    Track, TrackId, TrackPatch, VideoSettings,
 };
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager},
@@ -57,7 +57,6 @@ async fn mute_unmute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx,
         Vec::new(),
         manager,
@@ -91,7 +90,6 @@ async fn mute_unmute_video() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx,
         Vec::new(),
         manager,
@@ -124,7 +122,6 @@ async fn new_with_mute_audio() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx,
         Vec::new(),
         manager,
@@ -148,7 +145,6 @@ async fn new_with_mute_video() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx,
         Vec::new(),
         manager,
@@ -172,7 +168,6 @@ async fn add_candidates_to_answerer_before_offer() {
     let manager = Rc::new(MediaManager::default());
     let pc1 = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx1,
         Vec::new(),
         Rc::clone(&manager),
@@ -183,7 +178,6 @@ async fn add_candidates_to_answerer_before_offer() {
 
     let pc2 = PeerConnection::new(
         PeerId(2),
-        "alice".into(),
         tx2,
         Vec::new(),
         manager,
@@ -213,7 +207,6 @@ async fn add_candidates_to_offerer_before_answer() {
     let pc1 = Rc::new(
         PeerConnection::new(
             PeerId(1),
-            "bob".into(),
             tx1,
             Vec::new(),
             Rc::clone(&manager),
@@ -225,7 +218,6 @@ async fn add_candidates_to_offerer_before_answer() {
     let pc2 = Rc::new(
         PeerConnection::new(
             PeerId(2),
-            "alice".into(),
             tx2,
             Vec::new(),
             manager,
@@ -256,7 +248,6 @@ async fn normal_exchange_of_candidates() {
     let manager = Rc::new(MediaManager::default());
     let peer1 = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx1,
         Vec::new(),
         Rc::clone(&manager),
@@ -266,7 +257,6 @@ async fn normal_exchange_of_candidates() {
     .unwrap();
     let peer2 = PeerConnection::new(
         PeerId(2),
-        "alice".into(),
         tx2,
         Vec::new(),
         manager,
@@ -330,7 +320,6 @@ async fn send_event_on_new_local_stream() {
     let id = PeerId(1);
     let peer = PeerConnection::new(
         id,
-        "bob".into(),
         tx,
         Vec::new(),
         manager,
@@ -364,7 +353,6 @@ async fn ice_connection_state_changed_is_emitted() {
     let manager = Rc::new(MediaManager::default());
     let peer1 = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx1,
         Vec::new(),
         Rc::clone(&manager),
@@ -374,7 +362,6 @@ async fn ice_connection_state_changed_is_emitted() {
     .unwrap();
     let peer2 = PeerConnection::new(
         PeerId(2),
-        "alice".into(),
         tx2,
         Vec::new(),
         manager,
@@ -477,7 +464,6 @@ impl InterconnectedPeers {
         let manager = Rc::new(MediaManager::default());
         let peer1 = PeerConnection::new(
             PeerId(1),
-            "bob".into(),
             tx1,
             Vec::new(),
             Rc::clone(&manager),
@@ -487,7 +473,6 @@ impl InterconnectedPeers {
         .unwrap();
         let peer2 = PeerConnection::new(
             PeerId(2),
-            "alice".into(),
             tx2,
             Vec::new(),
             manager,
@@ -594,7 +579,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(1),
                 direction: Direction::Send {
-                    receivers: vec![PeerId(2)],
+                    receivers: vec![MemberId::from("bob")],
                     mid: None,
                 },
                 media_type: MediaType::Audio(AudioSettings {
@@ -604,7 +589,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(2),
                 direction: Direction::Send {
-                    receivers: vec![PeerId(2)],
+                    receivers: vec![MemberId::from("bob")],
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
@@ -620,7 +605,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(1),
                 direction: Direction::Recv {
-                    sender: PeerId(1),
+                    sender: MemberId::from("alice"),
                     mid: None,
                 },
                 media_type: MediaType::Audio(AudioSettings {
@@ -630,7 +615,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(2),
                 direction: Direction::Recv {
-                    sender: PeerId(2),
+                    sender: MemberId::from("alice"),
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
@@ -722,7 +707,6 @@ mod peer_stats_caching {
         let manager = Rc::new(MediaManager::default());
         let peer = PeerConnection::new(
             PeerId(1),
-            "bob".into(),
             tx,
             Vec::new(),
             manager,
@@ -769,7 +753,6 @@ mod peer_stats_caching {
         let manager = Rc::new(MediaManager::default());
         let peer = PeerConnection::new(
             PeerId(1),
-            "bob".into(),
             tx,
             Vec::new(),
             manager,
@@ -818,7 +801,6 @@ mod peer_stats_caching {
         let manager = Rc::new(MediaManager::default());
         let peer = PeerConnection::new(
             PeerId(1),
-            "bob".into(),
             tx,
             Vec::new(),
             manager,
@@ -868,7 +850,6 @@ async fn reset_transition_timers() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
     let peer = PeerConnection::new(
         PeerId(1),
-        "bob".into(),
         tx,
         Vec::new(),
         manager,

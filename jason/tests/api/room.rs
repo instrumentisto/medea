@@ -107,7 +107,6 @@ async fn get_test_room_and_exist_peer(
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            partner_member_id: "bob".into(),
             negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
@@ -382,7 +381,6 @@ async fn mute_audio_room_before_init_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            partner_member_id: "bob".into(),
             negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
@@ -433,7 +431,6 @@ async fn mute_video_room_before_init_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            partner_member_id: "bob".into(),
             negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
@@ -501,7 +498,6 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            partner_member_id: "bob".into(),
             negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
@@ -624,7 +620,6 @@ async fn error_get_local_stream_on_new_peer() {
     event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: PeerId(1),
-            partner_member_id: "bob".into(),
             negotiation_role: NegotiationRole::Offerer,
             tracks: vec![audio_track, video_track],
             ice_servers: Vec::new(),
@@ -951,7 +946,6 @@ mod patches_generation {
             );
             let peer = PeerConnection::new(
                 peer_id,
-                "bob".into(),
                 tx,
                 Vec::new(),
                 Rc::new(MediaManager::default()),

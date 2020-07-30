@@ -1,5 +1,5 @@
 use actix::{Context, System};
-use medea_client_api_proto::{Direction, Event, NegotiationRole};
+use medea_client_api_proto::{Direction, Event, MemberId, NegotiationRole};
 
 use crate::signalling::TestMember;
 
@@ -29,8 +29,7 @@ fn pub_sub_video_call() {
             if let Event::IceCandidateDiscovered { .. } = event {
                 let is_caller;
                 if let Event::PeerCreated {
-                    peer_id,
-                    partner_member_id: _,
+                    peer_id: _,
                     negotiation_role,
                     tracks,
                     ice_servers,
@@ -62,11 +61,12 @@ fn pub_sub_video_call() {
                         match &track.direction {
                             Direction::Send { receivers, .. } => {
                                 assert!(is_caller);
-                                assert!(!receivers.contains(&peer_id));
+                                assert!(receivers
+                                    .contains(&MemberId::from("responder")));
                             }
                             Direction::Recv { sender, .. } => {
                                 assert!(!is_caller);
-                                assert_ne!(sender, peer_id);
+                                assert_eq!(sender, &MemberId::from("caller"));
                             }
                         }
                     }
