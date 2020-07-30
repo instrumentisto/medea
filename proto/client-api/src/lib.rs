@@ -270,15 +270,6 @@ pub enum Event {
     /// creation.
     PeerCreated {
         peer_id: PeerId,
-        // TODO: Peer can have many connections with different
-        //       members in SFU scenario, so we cant put MemberId here.
-        //       We either:
-        //       1. Pair PeerId with MemberId everywhere, which is
-        //          simple but less optimized.
-        //       2. Provide PeerId => MemberId (or even PeerId => Rc<MemberId>)
-        //          associative array, which is more optimized but kinda error
-        //          prone.
-        partner_member_id: MemberId,
         negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
@@ -404,11 +395,11 @@ pub struct IceServer {
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
-        receivers: Vec<PeerId>,
+        receivers: Vec<MemberId>,
         mid: Option<String>,
     },
     Recv {
-        sender: PeerId,
+        sender: MemberId,
         mid: Option<String>,
     },
 }

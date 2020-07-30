@@ -118,12 +118,8 @@ pub enum PeerEvent {
     /// [`RtcPeerConnection`] received new [`MediaStreamTrack`] from remote
     /// sender.
     NewRemoteTrack {
-        /// ID of the [`PeerConnection`] that received new stream from remote
-        /// sender.
-        peer_id: Id,
-
-        /// ID of the remote sender's [`PeerConnection`].
-        sender_id: Id,
+        /// ID of the remote sender's `Member`.
+        sender_id: MemberId,
 
         /// [`TrackId`] of provided [`MediaStreamTrack`].
         track_id: TrackId,
@@ -191,10 +187,6 @@ pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,
 
-    /// [`MemberId`] of the remote `Member` with which this [`PeerConnection`]
-    /// is connected.
-    remote_member_id: MemberId,
-
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
@@ -244,7 +236,6 @@ impl PeerConnection {
     /// [`RtcPeerConnection`] can't be set.
     pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
-        remote_member_id: MemberId,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
@@ -263,7 +254,6 @@ impl PeerConnection {
 
         let peer = Self {
             id,
-            remote_member_id,
             peer,
             media_connections,
             media_manager,
@@ -322,12 +312,6 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(Rc::new(peer))
-    }
-
-    /// Returns [`MemberId`] of the remote `Member` with which this
-    /// [`PeerConnection`] is connected.
-    pub fn remote_member_id(&self) -> MemberId {
-        self.remote_member_id.clone()
     }
 
     /// Stops inner state transitions expiry timers.

@@ -31,7 +31,6 @@ impl Room {
         let ice_servers = actix_try!(ice_servers);
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
-            partner_member_id: peer.partner_member_id(),
             negotiation_role: NegotiationRole::Offerer,
             tracks: peer.new_tracks(),
             ice_servers,

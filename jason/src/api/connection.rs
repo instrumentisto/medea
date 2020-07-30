@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
@@ -19,7 +19,7 @@ use crate::{
 #[derive(Default)]
 pub struct Connections {
     /// Local [`PeerId`] to remote [`MemberId`].
-    local_to_remote: RefCell<HashMap<PeerId, MemberId>>,
+    local_to_remote_member_id: RefCell<HashMap<PeerId, HashSet<MemberId>>>,
 
     /// Remote [`MemberId`] to [`Connection`] with that `Member`.
     connections: RefCell<HashMap<MemberId, Connection>>,
@@ -51,9 +51,11 @@ impl Connections {
             self.connections
                 .borrow_mut()
                 .insert(remote_member_id.clone(), con);
-            self.local_to_remote
+            self.local_to_remote_member_id
                 .borrow_mut()
-                .insert(local_peer_id, remote_member_id.clone());
+                .entry(local_peer_id)
+                .or_default()
+                .insert(remote_member_id.clone());
         }
     }
 
@@ -66,16 +68,20 @@ impl Connections {
     ///
     /// Invokes `on_close` callback.
     pub fn close_connection(&self, local_peer: PeerId) {
-        if let Some(remote_id) =
-            self.local_to_remote.borrow_mut().remove(&local_peer)
+        if let Some(remote_ids) = self
+            .local_to_remote_member_id
+            .borrow_mut()
+            .remove(&local_peer)
         {
-            if let Some(connection) =
-                self.connections.borrow_mut().remove(&remote_id)
-            {
-                // `on_close` callback is invoked here and not in `Drop`
-                // implementation so `ConnectionHandle` is
-                // available during callback invocation
-                connection.0.on_close.call();
+            for remote_id in remote_ids {
+                if let Some(connection) =
+                    self.connections.borrow_mut().remove(&remote_id)
+                {
+                    // `on_close` callback is invoked here and not in `Drop`
+                    // implementation so `ConnectionHandle` is
+                    // available during callback invocation
+                    connection.0.on_close.call();
+                }
             }
         }
     }
@@ -89,7 +95,7 @@ pub struct ConnectionHandle(Weak<InnerConnection>);
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
-/// Shared between JS side ([`ConnectionHandle`]) and
+/// Shared between JS side ([`ConnectionHandle`]) anEnricod
 /// Rust side ([`Connection`]).
 struct InnerConnection {
     /// [`MemberId`] of the specific remote [`Member`].

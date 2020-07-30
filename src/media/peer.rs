@@ -327,21 +327,21 @@ impl TrackChange {
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
     /// creation.
-    fn as_new_track(&self, partner_peer_id: Id) -> Option<Track> {
-        match self.as_track_update(partner_peer_id) {
+    fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
+        match self.as_track_update(partner_member_id) {
             TrackUpdate::Added(track) => Some(track),
             TrackUpdate::Updated(_) => None,
         }
     }
 
     /// Returns [`TrackUpdate`] based on this [`TrackChange`].
-    fn as_track_update(&self, partner_peer_id: Id) -> TrackUpdate {
+    fn as_track_update(&self, partner_member_id: MemberId) -> TrackUpdate {
         match self {
             TrackChange::AddSendTrack(track) => TrackUpdate::Added(Track {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Send {
-                    receivers: vec![partner_peer_id],
+                    receivers: vec![partner_member_id],
                     mid: track.mid(),
                 },
             }),
@@ -349,7 +349,7 @@ impl TrackChange {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Recv {
-                    sender: partner_peer_id,
+                    sender: partner_member_id,
                     mid: track.mid(),
                 },
             }),
@@ -420,7 +420,7 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .map(|c| c.as_track_update(self.partner_peer_id()))
+            .map(|c| c.as_track_update(self.partner_member_id()))
             .collect()
     }
 
@@ -429,7 +429,7 @@ impl<T> Peer<T> {
         self.context
             .pending_track_updates
             .iter()
-            .filter_map(|c| c.as_new_track(self.partner_peer_id()))
+            .filter_map(|c| c.as_new_track(self.partner_member_id()))
             .collect()
     }
 

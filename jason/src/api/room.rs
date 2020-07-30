@@ -11,9 +11,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, MemberId, NegotiationRole, PeerConnectionState, PeerId,
-    PeerMetrics, Track, TrackId, TrackPatch, TrackUpdate,
+    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
+    IceConnectionState, IceServer, MemberId, NegotiationRole,
+    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
+    TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -137,8 +138,8 @@ enum RoomError {
 
     /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
     /// [`Connection`] with remote [`Member`].
-    #[display(fmt = "Remote stream from unknown peer")]
-    UnknownRemotePeer,
+    #[display(fmt = "Remote stream from unknown member")]
+    UnknownRemoteMember,
 
     /// Returned if [`MediaStreamTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
@@ -802,7 +803,6 @@ impl EventHandler for InnerRoom {
     async fn on_peer_created(
         &self,
         peer_id: PeerId,
-        partner_member_id: MemberId,
         negotiation_role: NegotiationRole,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
@@ -812,7 +812,6 @@ impl EventHandler for InnerRoom {
             .peers
             .create_peer(
                 peer_id,
-                partner_member_id.clone(),
                 ice_servers,
                 self.peer_event_sender.clone(),
                 is_force_relayed,
@@ -820,8 +819,18 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.connections
-            .create_connection(peer_id, &partner_member_id);
+        for track in &tracks {
+            match &track.direction {
+                Direction::Recv { sender, .. } => {
+                    self.connections.create_connection(peer_id, sender);
+                }
+                Direction::Send { receivers, .. } => {
+                    for receiver in receivers {
+                        self.connections.create_connection(peer_id, receiver);
+                    }
+                }
+            }
+        }
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,
@@ -947,21 +956,16 @@ impl PeerEventHandler for InnerRoom {
     /// [`MediaStreamTrack`] to the related [`Connection`].
     async fn on_new_remote_track(
         &self,
-        peer_id: PeerId,
-        _: PeerId,
+        sender_id: MemberId,
         track_id: TrackId,
         track: MediaStreamTrack,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        let remote_member_id = peer.remote_member_id();
         let conn = self
             .connections
-            .get(&remote_member_id)
-            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemotePeer))?;
+            .get(&sender_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
         conn.add_remote_track(track_id, track);
+
         Ok(())
     }
 
