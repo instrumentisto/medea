@@ -67,7 +67,7 @@ pub struct WsSession {
     /// from client.
     last_activity: Instant,
 
-    // Buffer where continuation WebSocket frames are accumulated.
+    /// Buffer where continuation WebSocket frames are accumulated.
     fragmentation_buffer: BytesMut,
 
     /// Last number of [`ServerMsg::Ping`].
@@ -162,7 +162,7 @@ impl WsSession {
         ctx: &mut ws::WebsocketContext<Self>,
     ) {
         // This is logged as at `WARN` level, because fragmentation usually
-        // happens only when dealing with large payloads ( > 128kb in Chrome).
+        // happens only when dealing with large payloads (>128kb in Chrome).
         // We will handle this message, but it probably signals that some
         // bug occurred on sending side.
         warn!("{}: Continuation frame received.", self);
@@ -456,7 +456,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 ws::Message::Ping(ping) => {
                     ctx.pong(ping.bytes());
                 }
-                ws::Message::Nop | ws::Message::Pong(_)=> {
+                ws::Message::Nop | ws::Message::Pong(_) => {
                     // nothing to do here
                 }
             },
