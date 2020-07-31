@@ -29,6 +29,7 @@ lto = "thin"
 
 [dependencies]
 actix = "0.9"
+actix-http = "1.0"
 actix-web = "2.0"
 actix-web-actors = "2.0"
 async-trait = "0.1"
@@ -74,7 +75,6 @@ url = "2.1"
 
 [dev-dependencies]
 actix-codec = "0.2"
-actix-http = "1.0"
 actix-rt = "1.0"
 awc = "1.0"
 derive_builder = "0.9"
