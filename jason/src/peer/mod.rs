@@ -118,7 +118,7 @@ pub enum PeerEvent {
     /// [`RtcPeerConnection`] received new [`MediaStreamTrack`] from remote
     /// sender.
     NewRemoteTrack {
-        /// ID of the remote sender's `Member`.
+        /// Remote `Member` ID.
         sender_id: MemberId,
 
         /// [`TrackId`] of provided [`MediaStreamTrack`].

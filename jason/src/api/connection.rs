@@ -19,7 +19,7 @@ use crate::{
 #[derive(Default)]
 pub struct Connections {
     /// Local [`PeerId`] to remote [`MemberId`].
-    local_to_remote_member_id: RefCell<HashMap<PeerId, HashSet<MemberId>>>,
+    peer_members: RefCell<HashMap<PeerId, HashSet<MemberId>>>,
 
     /// Remote [`MemberId`] to [`Connection`] with that `Member`.
     connections: RefCell<HashMap<MemberId, Connection>>,
@@ -36,7 +36,7 @@ impl Connections {
         self.on_new_connection.set_func(f);
     }
 
-    /// Creates new connection with a provided remote [`MemberId`].
+    /// Creates new connection with remote `Member` based on its [`MemberId`].
     ///
     /// No-op if [`Connection`] already exists.
     pub fn create_connection(
@@ -51,7 +51,7 @@ impl Connections {
             self.connections
                 .borrow_mut()
                 .insert(remote_member_id.clone(), con);
-            self.local_to_remote_member_id
+            self.peer_members
                 .borrow_mut()
                 .entry(local_peer_id)
                 .or_default()
@@ -68,10 +68,8 @@ impl Connections {
     ///
     /// Invokes `on_close` callback.
     pub fn close_connection(&self, local_peer: PeerId) {
-        if let Some(remote_ids) = self
-            .local_to_remote_member_id
-            .borrow_mut()
-            .remove(&local_peer)
+        if let Some(remote_ids) =
+            self.peer_members.borrow_mut().remove(&local_peer)
         {
             for remote_id in remote_ids {
                 if let Some(connection) =
@@ -95,11 +93,11 @@ pub struct ConnectionHandle(Weak<InnerConnection>);
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
-/// Shared between JS side ([`ConnectionHandle`]) anEnricod
-/// Rust side ([`Connection`]).
+/// Shared between JS side ([`ConnectionHandle`]) and Rust side
+/// ([`Connection`]).
 struct InnerConnection {
-    /// [`MemberId`] of the specific remote [`Member`].
-    remote_member_id: MemberId,
+    /// Remote [`Member`] ID.
+    remote_id: MemberId,
 
     /// [`PeerMediaStream`] received from remote member.
     remote_stream: RefCell<Option<PeerMediaStream>>,
@@ -130,8 +128,7 @@ impl ConnectionHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Returns [`MemberId`] of the remote [`Member`] with which this connection
-    /// is.
+    /// Returns remote `Member` ID.
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.remote_member_id.0.clone())
@@ -147,9 +144,9 @@ pub struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub fn new(remote_member_id: MemberId) -> Self {
+    pub fn new(remote_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
-            remote_member_id,
+            remote_id,
             remote_stream: RefCell::new(None),
             on_remote_stream: Callback1::default(),
             on_close: Callback0::default(),
