@@ -76,8 +76,8 @@ impl Connections {
                     self.connections.borrow_mut().remove(&remote_id)
                 {
                     // `on_close` callback is invoked here and not in `Drop`
-                    // implementation so `ConnectionHandle` is
-                    // available during callback invocation
+                    // implementation so `ConnectionHandle` is available during
+                    // callback invocation.
                     connection.0.on_close.call();
                 }
             }
