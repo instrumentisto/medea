@@ -204,7 +204,7 @@ async fn track_disables_and_enables_are_instant() {
         };
     }
 
-    for i in 0..25 {
+    for i in 0..20 {
         let mut tracks_patches = Vec::new();
         tracks_patches.push(TrackPatch {
             id: TrackId(2),
@@ -223,14 +223,14 @@ async fn track_disables_and_enables_are_instant() {
         tokio::time::timeout(
             Duration::from_secs(30),
             future::join(
-                force_update_received_rx,
-                all_renegotiations_performed_rx,
+                tokio::time::timeout(Duration::from_secs(10), force_update_received_rx),
+                tokio::time::timeout(Duration::from_secs(10), all_renegotiations_performed_rx),
             ),
         )
         .await
         .unwrap();
-    force_update_received.unwrap();
-    all_renegotiations_performed.unwrap();
+    force_update_received.expect("force_update_received");
+    all_renegotiations_performed.unwrap("all_renegotiations_performed");
 }
 
 #[actix_rt::test]
