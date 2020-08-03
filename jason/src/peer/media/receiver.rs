@@ -65,6 +65,8 @@ impl Receiver {
         }
     }
 
+    /// Returns [`TrackId`] of this [`Receiver`].
+    #[inline]
     pub fn track_id(&self) -> TrackId {
         self.track_id
     }
@@ -102,6 +104,13 @@ impl Receiver {
         }
     }
 
+    /// Returns `true` if this [`Receiver`] is enabled.
+    #[inline]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Returns [`TransceiverKind`] of this [`Receiver`].
     #[inline]
     pub fn kind(&self) -> TransceiverKind {
         self.kind

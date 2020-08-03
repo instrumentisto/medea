@@ -1,7 +1,7 @@
 //! Medea room.
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     ops::Deref as _,
     rc::{Rc, Weak},
 };
@@ -40,7 +40,6 @@ use crate::{
         JsError,
     },
 };
-use std::cell::Cell;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -274,18 +273,6 @@ impl RoomHandle {
         }
         Ok(())
     }
-
-    fn toggle_remote_mute(
-        &self,
-        is_muted: bool,
-        kind: TransceiverKind,
-    ) -> Result<(), JasonError> {
-        let inner = upgrade_or_detached!(self.0, JasonError)?;
-
-        inner.toggle_remote_mute(is_muted, kind);
-
-        Ok(())
-    }
 }
 
 #[wasm_bindgen]
@@ -380,31 +367,31 @@ impl RoomHandle {
     }
 
     /// Mutes inbound audio in this [`Room`].
-    pub fn mute_remote_audio(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(true, TransceiverKind::Audio)
-            .unwrap();
+    pub fn mute_remote_audio(&self) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.toggle_remote_mute(true, TransceiverKind::Audio);
+        })
     }
 
     /// Mutes inbound video in this [`Room`].
-    pub fn mute_remote_video(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(true, TransceiverKind::Video)
-            .unwrap();
+    pub fn mute_remote_video(&self) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.toggle_remote_mute(true, TransceiverKind::Video);
+        })
     }
 
     /// Unmutes inbound audio in this [`Room`].
-    pub fn unmute_remote_audio(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(false, TransceiverKind::Audio)
-            .unwrap();
+    pub fn unmute_remote_audio(&self) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.toggle_remote_mute(false, TransceiverKind::Audio);
+        })
     }
 
     /// Unmutes inbound video in this [`Room`].
-    pub fn unmute_remote_video(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(false, TransceiverKind::Video)
-            .unwrap();
+    pub fn unmute_remote_video(&self) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.toggle_remote_mute(false, TransceiverKind::Video);
+        })
     }
 
     /// Mutes outbound audio in this [`Room`].
@@ -627,7 +614,18 @@ struct InnerRoom {
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
 
+    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Audio`]
+    /// in this [`Room`].
+    ///
+    /// Based on this value, new [`Receiver`]s will be muted (or not) on
+    /// [`Event::PeerCreated`].
     is_remote_audio_muted: Cell<bool>,
+
+    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Video`]
+    /// in this [`Room`].
+    ///
+    /// Based on this value, new [`Receiver`]s will be muted (or not) on
+    /// [`Event::PeerCreated`].
     is_remote_video_muted: Cell<bool>,
 }
 
@@ -755,15 +753,13 @@ impl InnerRoom {
                 self.is_remote_video_muted.set(is_muted);
             }
         }
-
-        let track_patches: Vec<_> = self
-            .peers
+        self.peers
             .get_all()
             .into_iter()
             .map(|peer| {
                 let peer_id = peer.id();
                 let tracks_to_mute: Vec<_> = peer
-                    .get_receivers_ids(kind)
+                    .get_receivers_ids(kind, !is_muted)
                     .into_iter()
                     .map(|id| TrackPatch {
                         id,
@@ -773,13 +769,14 @@ impl InnerRoom {
 
                 (peer_id, tracks_to_mute)
             })
-            .collect();
-        for (peer_id, tracks_patches) in track_patches {
-            self.rpc.send_command(Command::UpdateTracks {
-                peer_id,
-                tracks_patches,
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|(peer_id, tracks_patches)| {
+                self.rpc.send_command(Command::UpdateTracks {
+                    peer_id,
+                    tracks_patches,
+                });
             });
-        }
     }
 
     /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
@@ -950,7 +947,6 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         sdp_answer: String,
     ) -> Self::Output {
-        console_error("SDP ANSWER MADE");
         let peer = self
             .peers
             .get(peer_id)

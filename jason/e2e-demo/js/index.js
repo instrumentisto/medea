@@ -525,7 +525,6 @@ window.onload = async function() {
   async function newRoom() {
     jason = new rust.Jason();
     room = await jason.init_room();
-    window.room = room;
 
     try {
       const constraints = await initLocalStream();

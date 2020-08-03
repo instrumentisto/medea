@@ -168,12 +168,16 @@ impl MediaConnections {
     /// Returns [`TrackId`]s of the all [`Receiver`] with provided
     /// [`TransceiverKind`] from this [`MediaConnections`].
     #[allow(clippy::filter_map)]
-    pub fn get_receivers_ids(&self, kind: TransceiverKind) -> Vec<TrackId> {
+    pub fn get_receivers_ids(
+        &self,
+        kind: TransceiverKind,
+        is_muted: bool,
+    ) -> Vec<TrackId> {
         self.0
             .borrow_mut()
             .receivers
             .values()
-            .filter(move |s| s.kind() == kind)
+            .filter(move |s| s.kind() == kind && s.is_enabled() == !is_muted)
             .map(Receiver::track_id)
             .collect()
     }
