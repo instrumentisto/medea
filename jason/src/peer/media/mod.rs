@@ -167,7 +167,7 @@ impl MediaConnections {
 
     /// Returns [`TrackId`]s of the all [`Receiver`] with provided
     /// [`TransceiverKind`] from this [`MediaConnections`].
-    #[allow(clippy::filter_map)]
+    #[allow(clippy::filter_map, clippy::bool_comparison)]
     pub fn get_receivers_ids(
         &self,
         kind: TransceiverKind,
