@@ -10,6 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
+use medea_client_api_proto::MemberId;
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
@@ -18,8 +19,8 @@ use crate::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId,
-        RoomSpec, TryFromElementError,
+        EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
+        TryFromElementError,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},

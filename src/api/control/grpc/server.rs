@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
+use medea_client_api_proto::MemberId;
 use medea_control_api_proto::grpc::{
     api as proto,
     api::control_api_server::{
@@ -29,8 +30,7 @@ use crate::{
             ErrorResponse,
         },
         refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomSpec,
-        TryFromProtobufError,
+        EndpointId, EndpointSpec, MemberSpec, RoomSpec, TryFromProtobufError,
     },
     log::prelude::*,
     shutdown::ShutdownGracefully,

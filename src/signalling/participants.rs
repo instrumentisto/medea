@@ -18,7 +18,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{CloseDescription, CloseReason, Event};
+use medea_client_api_proto::{CloseDescription, CloseReason, Event, MemberId};
 
 use crate::{
     api::{
@@ -28,7 +28,7 @@ use crate::{
         },
         control::{
             refs::{Fid, ToEndpoint, ToMember},
-            MemberId, MemberSpec, RoomId, RoomSpec,
+            MemberSpec, RoomId, RoomSpec,
         },
     },
     conf::Rpc as RpcConf,

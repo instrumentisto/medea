@@ -12,7 +12,7 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -20,8 +20,8 @@ use crate::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
-        EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
-        TryFromElementError, WebRtcPlayId, WebRtcPublishId,
+        EndpointId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
+        WebRtcPlayId, WebRtcPublishId,
     },
     conf::Rpc as RpcConf,
     log::prelude::*,
@@ -619,7 +619,9 @@ impl Into<proto::Element> for Member {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::control::{MemberId, RootElement};
+    use medea_client_api_proto::MemberId;
+
+    use crate::api::control::RootElement;
 
     use super::*;
 

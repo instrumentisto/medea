@@ -22,7 +22,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -118,12 +118,8 @@ pub enum PeerEvent {
     /// [`RtcPeerConnection`] received new [`MediaStreamTrack`] from remote
     /// sender.
     NewRemoteTrack {
-        /// ID of the [`PeerConnection`] that received new stream from remote
-        /// sender.
-        peer_id: Id,
-
-        /// ID of the remote sender's [`PeerConnection`].
-        sender_id: Id,
+        /// Remote `Member` ID.
+        sender_id: MemberId,
 
         /// [`TrackId`] of provided [`MediaStreamTrack`].
         track_id: TrackId,

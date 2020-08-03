@@ -27,11 +27,18 @@ pub mod stats;
 
 use std::{collections::HashMap, convert::TryInto as _};
 
-use derive_more::{Constructor, Display};
+use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
+
+/// ID of `Member`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct MemberId(pub String);
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -388,11 +395,11 @@ pub struct IceServer {
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
-        receivers: Vec<PeerId>,
+        receivers: Vec<MemberId>,
         mid: Option<String>,
     },
     Recv {
-        sender: PeerId,
+        sender: MemberId,
         mid: Option<String>,
     },
 }

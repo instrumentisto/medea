@@ -16,11 +16,13 @@ All user visible changes to this project will be documented in this file. This p
         - `Pong` is now `Ping`.
     - Client messages:
         - `Ping` is now `Pong`.
+    - Change `sender` and `receivers` in `Track`'s `Direction` to contain remote `MemberId` instead of `PeerId` ([#124]);
     - Use 32-bit integer types instead of 64-bit ([#115]).
 
 ### Added
 
 - `TrackId` and `PeerId` types ([#28]);
+- `MemberId` type ([#124]);
 - `Incrementable` trait ([#28]);
 - `CloseReason` and `CloseDescription` types ([#58]);
 - `AddPeerConnectionMetrics` client command with `IceConnectionState` and `PeerConnectionState` metrics ([#71], [#87]);
