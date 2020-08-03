@@ -4,7 +4,7 @@ use actix::{ActorFuture, Addr, ContextFutureSpawner as _, Handler};
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
-use medea_client_api_proto::{Command, PeerId};
+use medea_client_api_proto::{Command, MemberId, PeerId};
 
 use crate::{
     api::{
@@ -13,10 +13,7 @@ use crate::{
             RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
             RpcConnectionSettings,
         },
-        control::{
-            callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
-            MemberId,
-        },
+        control::callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
         RpcServer,
     },
     log::prelude::*,

@@ -71,7 +71,7 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
 ///
 /// 1. Start test callback server and connect [`TestMember`] to it.
 ///
-/// 2. Wait `300ms`.
+/// 2. Wait `500ms`.
 ///
 /// 3. Check that test callback server receives `on_join` callback.
 #[actix_rt::test]
@@ -79,7 +79,7 @@ async fn on_join() {
     const TEST_NAME: &str = "member_callback_on_join";
 
     let (_, callback_server) = callback_test(TEST_NAME, 9096).await;
-    delay_for(Duration::from_millis(300)).await;
+    delay_for(Duration::from_millis(500)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
     let on_joins_count = callbacks
         .into_iter()
@@ -102,7 +102,7 @@ async fn on_join() {
 ///
 /// 2. Close [`TestMember`]'s socket with [`CloseCode::Normal`].
 ///
-/// 3. Wait `300ms`.
+/// 3. Wait `500ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
 /// [`proto::on_leave::Reason::DISONNECTED`].
@@ -112,7 +112,7 @@ async fn on_leave_normally_disconnected() {
 
     let (client, callback_server) = callback_test(TEST_NAME, 9097).await;
     client.send(CloseSocket(CloseCode::Normal)).await.unwrap();
-    delay_for(Duration::from_millis(300)).await;
+    delay_for(Duration::from_millis(500)).await;
 
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
 
@@ -140,7 +140,7 @@ async fn on_leave_normally_disconnected() {
 ///
 /// 2. Close [`TestMember`]'s socket with [`CloseCode::Abnormal`].
 ///
-/// 3. Wait `3000ms`.
+/// 3. Wait `500ms`.
 ///
 /// 4. Check that test callback server receives `on_leave` callback with
 /// [`proto::on_leave::Reason::LOST_CONNECTION`].
@@ -151,7 +151,7 @@ async fn on_leave_on_connection_loss() {
     let (client, callback_server) = callback_test(TEST_NAME, 9098).await;
 
     client.send(CloseSocket(CloseCode::Abnormal)).await.unwrap();
-    delay_for(Duration::from_millis(300)).await;
+    delay_for(Duration::from_millis(500)).await;
 
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
 

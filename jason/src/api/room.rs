@@ -11,9 +11,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch, TrackUpdate,
+    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
+    IceConnectionState, IceServer, MemberId, NegotiationRole,
+    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
+    TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -137,8 +138,8 @@ enum RoomError {
 
     /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
     /// [`Connection`] with remote [`Member`].
-    #[display(fmt = "Remote stream from unknown peer")]
-    UnknownRemotePeer,
+    #[display(fmt = "Remote stream from unknown member")]
+    UnknownRemoteMember,
 
     /// Returned if [`MediaStreamTrack`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
@@ -818,8 +819,18 @@ impl EventHandler for InnerRoom {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.connections
-            .create_connections_from_tracks(peer.id(), &tracks);
+        for track in &tracks {
+            match &track.direction {
+                Direction::Recv { sender, .. } => {
+                    self.connections.create_connection(peer_id, sender);
+                }
+                Direction::Send { receivers, .. } => {
+                    for receiver in receivers {
+                        self.connections.create_connection(peer_id, receiver);
+                    }
+                }
+            }
+        }
         self.create_tracks_and_maybe_negotiate(
             peer,
             tracks,
@@ -945,16 +956,16 @@ impl PeerEventHandler for InnerRoom {
     /// [`MediaStreamTrack`] to the related [`Connection`].
     async fn on_new_remote_track(
         &self,
-        _: PeerId,
-        sender_id: PeerId,
+        sender_id: MemberId,
         track_id: TrackId,
         track: MediaStreamTrack,
     ) -> Self::Output {
         let conn = self
             .connections
-            .get(sender_id)
-            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemotePeer))?;
+            .get(&sender_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
         conn.add_remote_track(track_id, track);
+
         Ok(())
     }
 
