@@ -238,119 +238,6 @@ impl Handler<SendCommand> for TestMember {
     }
 }
 
-#[derive(actix::Message)]
-#[rtype(result = "()")]
-pub struct NegotiationStep(pub Event);
-
-impl Handler<NegotiationStep> for TestMember {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: NegotiationStep,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        let event = msg.0;
-        match &event {
-            Event::PeerCreated {
-                peer_id,
-                negotiation_role,
-                tracks,
-                ..
-            } => {
-                self.known_peers.insert(*peer_id);
-                tracks.iter().for_each(|t| {
-                    use medea_client_api_proto::Direction;
-                    let mid = match &t.direction {
-                        Direction::Send { mid, .. }
-                        | Direction::Recv { mid, .. } => mid.clone(),
-                    };
-                    if let Some(mid) = mid {
-                        self.add_mid(t.id, mid);
-                    } else {
-                        self.generate_mid(t.id);
-                    }
-                });
-
-                match negotiation_role {
-                    NegotiationRole::Offerer => {
-                        self.send_command(Command::MakeSdpOffer {
-                            peer_id: *peer_id,
-                            sdp_offer: "caller_offer".into(),
-                            mids: self.known_tracks_mids.clone(),
-                            senders_statuses: HashMap::new(),
-                        })
-                    }
-                    NegotiationRole::Answerer(sdp_offer) => {
-                        assert_eq!(sdp_offer, "caller_offer");
-                        self.send_command(Command::MakeSdpAnswer {
-                            peer_id: *peer_id,
-                            sdp_answer: "responder_answer".into(),
-                            senders_statuses: HashMap::new(),
-                        })
-                    }
-                }
-
-                self.send_command(Command::SetIceCandidate {
-                    peer_id: *peer_id,
-                    candidate: IceCandidate {
-                        candidate: "ice_candidate".to_string(),
-                        sdp_m_line_index: None,
-                        sdp_mid: None,
-                    },
-                });
-            }
-            Event::TracksApplied {
-                peer_id,
-                negotiation_role,
-                updates,
-            } => {
-                assert!(self.known_peers.contains(peer_id));
-                updates.iter().for_each(|t| {
-                    use medea_client_api_proto::Direction;
-                    if let TrackUpdate::Added(track) = t {
-                        let mid = match &track.direction {
-                            Direction::Send { mid, .. }
-                            | Direction::Recv { mid, .. } => mid.clone(),
-                        };
-                        if let Some(mid) = mid {
-                            self.add_mid(track.id, mid);
-                        } else {
-                            self.generate_mid(track.id);
-                        }
-                    }
-                });
-
-                if let Some(negotiation_role) = negotiation_role {
-                    match negotiation_role {
-                        NegotiationRole::Answerer(sdp_offer) => {
-                            assert_eq!(sdp_offer, "caller_offer");
-                            self.send_command(Command::MakeSdpAnswer {
-                                peer_id: *peer_id,
-                                sdp_answer: "responder_answer".into(),
-                                senders_statuses: HashMap::new(),
-                            })
-                        }
-                        NegotiationRole::Offerer => {
-                            self.send_command(Command::MakeSdpOffer {
-                                peer_id: *peer_id,
-                                sdp_offer: "caller_offer".into(),
-                                mids: self.known_tracks_mids.clone(),
-                                senders_statuses: HashMap::new(),
-                            })
-                        }
-                    }
-                }
-            }
-            Event::SdpAnswerMade { peer_id, .. }
-            | Event::IceCandidateDiscovered { peer_id, .. } => {
-                assert!(self.known_peers.contains(peer_id))
-            }
-            Event::PeersRemoved { .. } => {}
-        }
-    }
-}
-
 /// Basic signalling implementation.
 /// [`TestMember::on_message`] function will be called for each [`Event`]
 /// received from test server.
@@ -368,7 +255,128 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event(event) => {
                     if self.auto_negotiation {
-                        ctx.notify(NegotiationStep(event.clone()));
+                        match &event {
+                            Event::PeerCreated {
+                                peer_id,
+                                negotiation_role,
+                                tracks,
+                                ..
+                            } => {
+                                self.known_peers.insert(*peer_id);
+                                tracks.iter().for_each(|t| {
+                                    use medea_client_api_proto::Direction;
+                                    let mid = match &t.direction {
+                                        Direction::Send { mid, .. }
+                                        | Direction::Recv { mid, .. } => {
+                                            mid.clone()
+                                        }
+                                    };
+                                    if let Some(mid) = mid {
+                                        self.add_mid(t.id, mid);
+                                    } else {
+                                        self.generate_mid(t.id);
+                                    }
+                                });
+
+                                match negotiation_role {
+                                    NegotiationRole::Offerer => self
+                                        .send_command(Command::MakeSdpOffer {
+                                            peer_id: *peer_id,
+                                            sdp_offer: "caller_offer".into(),
+                                            mids: self
+                                                .known_tracks_mids
+                                                .clone(),
+                                            senders_statuses: HashMap::new(),
+                                        }),
+                                    NegotiationRole::Answerer(sdp_offer) => {
+                                        assert_eq!(sdp_offer, "caller_offer");
+                                        self.send_command(
+                                            Command::MakeSdpAnswer {
+                                                peer_id: *peer_id,
+                                                sdp_answer: "responder_answer"
+                                                    .into(),
+                                                senders_statuses: HashMap::new(
+                                                ),
+                                            },
+                                        )
+                                    }
+                                }
+
+                                self.send_command(Command::SetIceCandidate {
+                                    peer_id: *peer_id,
+                                    candidate: IceCandidate {
+                                        candidate: "ice_candidate".to_string(),
+                                        sdp_m_line_index: None,
+                                        sdp_mid: None,
+                                    },
+                                });
+                            }
+                            Event::TracksApplied {
+                                peer_id,
+                                negotiation_role,
+                                updates,
+                            } => {
+                                assert!(self.known_peers.contains(peer_id));
+                                updates.iter().for_each(|t| {
+                                    use medea_client_api_proto::Direction;
+                                    if let TrackUpdate::Added(track) = t {
+                                        let mid = match &track.direction {
+                                            Direction::Send { mid, .. }
+                                            | Direction::Recv { mid, .. } => {
+                                                mid.clone()
+                                            }
+                                        };
+                                        if let Some(mid) = mid {
+                                            self.add_mid(track.id, mid);
+                                        } else {
+                                            self.generate_mid(track.id);
+                                        }
+                                    }
+                                });
+
+                                if let Some(negotiation_role) = negotiation_role
+                                {
+                                    match negotiation_role {
+                                        NegotiationRole::Answerer(
+                                            sdp_offer,
+                                        ) => {
+                                            assert_eq!(
+                                                sdp_offer,
+                                                "caller_offer"
+                                            );
+                                            self.send_command(
+                                                Command::MakeSdpAnswer {
+                                                    peer_id: *peer_id,
+                                                    sdp_answer:
+                                                        "responder_answer"
+                                                            .into(),
+                                                    senders_statuses:
+                                                        HashMap::new(),
+                                                },
+                                            )
+                                        }
+                                        NegotiationRole::Offerer => self
+                                            .send_command(
+                                                Command::MakeSdpOffer {
+                                                    peer_id: *peer_id,
+                                                    sdp_offer: "caller_offer"
+                                                        .into(),
+                                                    mids: self
+                                                        .known_tracks_mids
+                                                        .clone(),
+                                                    senders_statuses:
+                                                        HashMap::new(),
+                                                },
+                                            ),
+                                    }
+                                }
+                            }
+                            Event::SdpAnswerMade { peer_id, .. }
+                            | Event::IceCandidateDiscovered {
+                                peer_id, ..
+                            } => assert!(self.known_peers.contains(peer_id)),
+                            Event::PeersRemoved { .. } => {}
+                        }
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
                     events.push(&event);
