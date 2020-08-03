@@ -39,6 +39,7 @@ use crate::{
         JsError,
     },
 };
+use std::cell::Cell;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -279,30 +280,8 @@ impl RoomHandle {
         kind: TransceiverKind,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        let track_patches: Vec<_> = inner
-            .peers
-            .get_all()
-            .into_iter()
-            .map(|peer| {
-                let peer_id = peer.id();
-                let tracks_to_mute: Vec<_> = peer
-                    .get_receivers_ids(kind)
-                    .into_iter()
-                    .map(|id| TrackPatch {
-                        id,
-                        is_muted: Some(is_muted),
-                    })
-                    .collect();
 
-                (peer_id, tracks_to_mute)
-            })
-            .collect();
-        for (peer_id, tracks_patches) in track_patches {
-            inner.rpc.send_command(Command::UpdateTracks {
-                peer_id,
-                tracks_patches,
-            });
-        }
+        inner.toggle_remote_mute(is_muted, kind);
 
         Ok(())
     }
@@ -399,24 +378,28 @@ impl RoomHandle {
         })
     }
 
+    /// Mutes inbound audio in this [`Room`].
     pub fn mute_remote_audio(&self) {
         let this = Self(self.0.clone());
         this.toggle_remote_mute(true, TransceiverKind::Audio)
             .unwrap();
     }
 
+    /// Mutes inbound video in this [`Room`].
     pub fn mute_remote_video(&self) {
         let this = Self(self.0.clone());
         this.toggle_remote_mute(true, TransceiverKind::Video)
             .unwrap();
     }
 
+    /// Unmutes inbound audio in this [`Room`].
     pub fn unmute_remote_audio(&self) {
         let this = Self(self.0.clone());
         this.toggle_remote_mute(false, TransceiverKind::Audio)
             .unwrap();
     }
 
+    /// Unmutes inbound video in this [`Room`].
     pub fn unmute_remote_video(&self) {
         let this = Self(self.0.clone());
         this.toggle_remote_mute(false, TransceiverKind::Video)
@@ -642,6 +625,9 @@ struct InnerRoom {
     /// Note that `None` will be considered as error and `is_err` will be
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
+
+    is_remote_audio_muted: Cell<bool>,
+    is_remote_video_muted: Cell<bool>,
 }
 
 impl InnerRoom {
@@ -667,6 +653,8 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
+            is_remote_audio_muted: Cell::new(false),
+            is_remote_video_muted: Cell::new(false),
         }
     }
 
@@ -744,6 +732,53 @@ impl InnerRoom {
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
+    }
+
+    /// Enables/disables [`Receiver`]s by provided [`TransceiverKind`] in all
+    /// [`PeerConnection`]s in this [`Room`].
+    ///
+    /// [`Sender`]s of the all enabled/disabled [`Receiver`]s also will be
+    /// enabled/disabled.
+    ///
+    /// Sets [`Room`]'s remote muting state
+    /// ([`InnerRoom::is_remote_audio_muted`]/[`InnerRoom::
+    /// is_remote_video_muted`]).
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
+    fn toggle_remote_mute(&self, is_muted: bool, kind: TransceiverKind) {
+        match kind {
+            TransceiverKind::Audio => {
+                self.is_remote_audio_muted.set(is_muted);
+            }
+            TransceiverKind::Video => {
+                self.is_remote_video_muted.set(is_muted);
+            }
+        }
+
+        let track_patches: Vec<_> = self
+            .peers
+            .get_all()
+            .into_iter()
+            .map(|peer| {
+                let peer_id = peer.id();
+                let tracks_to_mute: Vec<_> = peer
+                    .get_receivers_ids(kind)
+                    .into_iter()
+                    .map(|id| TrackPatch {
+                        id,
+                        is_muted: Some(is_muted),
+                    })
+                    .collect();
+
+                (peer_id, tracks_to_mute)
+            })
+            .collect();
+        for (peer_id, tracks_patches) in track_patches {
+            self.rpc.send_command(Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            });
+        }
     }
 
     /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
@@ -885,6 +920,16 @@ impl EventHandler for InnerRoom {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
+
+        self.toggle_remote_mute(
+            self.is_remote_audio_muted.get(),
+            TransceiverKind::Audio,
+        );
+        self.toggle_remote_mute(
+            self.is_remote_video_muted.get(),
+            TransceiverKind::Video,
+        );
+
         Ok(())
     }
 
