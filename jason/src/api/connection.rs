@@ -130,8 +130,7 @@ impl ConnectionHandle {
 
     /// Returns remote `Member` ID.
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.remote_id.0.clone())
+        upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
     }
 }
 

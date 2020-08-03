@@ -22,6 +22,8 @@ CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.45
 CHROME_VERSION := 83.0
+# TODO: Use latest geckodriver when wasm-bindgen is fixed:
+#       https://github.com/rustwasm/wasm-bindgen/issues/2261
 FIREFOX_VERSION := 79.0-driver0.26.0
 
 crate-dir = .
