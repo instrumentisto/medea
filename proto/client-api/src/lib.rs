@@ -33,6 +33,13 @@ use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
 
+/// ID of `Member`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct MemberId(pub String);
+
 /// ID of `Peer`.
 #[cfg_attr(
     feature = "medea",
@@ -50,13 +57,6 @@ pub struct PeerId(pub u32);
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
-
-/// ID of `Member`.
-#[derive(
-    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
-)]
-#[from(forward)]
-pub struct MemberId(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
