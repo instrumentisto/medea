@@ -532,30 +532,32 @@ impl<T> Peer<T> {
     /// Commits all [`TrackChange`]s which are marked as forcible
     /// ([`TrackChange::is_forcible`]).
     pub fn commit_forcible_changes(&mut self) {
-        let changes: Vec<_> = self
-            .context
-            .track_changes_queue
-            .iter()
-            .enumerate()
-            .filter_map(
-                |(i, chng)| if chng.if_forcible() { Some(i) } else { None },
-            )
-            .collect::<Vec<_>>()
-            .into_iter()
-            .filter_map(|i| {
-                let change = self.context.track_changes_queue.remove(i)?;
-                let track_update =
-                    change.as_track_update(self.partner_peer_id());
-                change.dispatch_with(self);
+        let track_changes_queue = std::mem::replace(
+            &mut self.context.track_changes_queue,
+            VecDeque::new(),
+        );
+        let mut forcible_changes = VecDeque::new();
+        let mut filtered_changes_queue = VecDeque::new();
+        for track_change in track_changes_queue {
+            if track_change.if_forcible() {
+                forcible_changes.push_back(track_change);
+            } else {
+                filtered_changes_queue.push_back(track_change);
+            }
+        }
+        self.context.track_changes_queue = filtered_changes_queue;
 
-                Some(track_update)
-            })
-            .collect();
+        let mut updates = Vec::new();
+        for change in forcible_changes {
+            let track_update = change.as_track_update(self.partner_peer_id());
+            change.dispatch_with(self);
+            updates.push(track_update);
+        }
 
-        if !changes.is_empty() {
+        if !updates.is_empty() {
             self.context
                 .peer_updates_sub
-                .force_update(self.id(), changes);
+                .force_update(self.id(), updates);
             self.context.is_forcibly_updated = true;
         }
     }
@@ -1025,5 +1027,60 @@ pub mod tests {
         assert_eq!(peer.context.pending_track_updates.len(), 2);
         assert_eq!(peer.context.track_changes_queue.len(), 0);
         assert_eq!(rx.recv().unwrap(), PeerId(0));
+    }
+
+    #[test]
+    fn force_updates_works() {
+        let (force_update_tx, force_update_rx) = std::sync::mpsc::channel();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub.expect_force_update().returning(
+            move |peer_id: PeerId, changes: Vec<TrackUpdate>| {
+                force_update_tx.send((peer_id, changes)).unwrap();
+            },
+        );
+        let (negotiation_needed_tx, negotiation_needed_rx) =
+            std::sync::mpsc::channel();
+        negotiation_sub.expect_negotiation_needed().returning(
+            move |peer_id: PeerId| {
+                negotiation_needed_tx.send(peer_id).unwrap();
+            },
+        );
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+        peer.as_changes_scheduler().add_sender(media_track(0));
+        peer.as_changes_scheduler().add_receiver(media_track(1));
+        peer.commit_scheduled_changes();
+        let peer_id = negotiation_needed_rx.recv().unwrap();
+        let mut peer = peer.start();
+
+        peer.as_changes_scheduler().patch_tracks(vec![
+            TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            },
+        ]);
+        peer.commit_forcible_changes();
+        let (peer_id, mut changes) = force_update_rx.recv().unwrap();
+
+        assert_eq!(peer_id, PeerId(0));
+        assert_eq!(changes.len(), 2);
+        assert!(peer.context.track_changes_queue.is_empty());
+
+        let peer = peer.set_local_sdp(String::new());
+        let peer = peer.set_remote_sdp("");
+
+        let peer_id = negotiation_needed_rx.recv().unwrap();
+        assert_eq!(peer_id, PeerId(0));
     }
 }

@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use actix::Addr;
+use actix::{Addr, AsyncContext};
 use futures::{
     channel::{
         mpsc::{self, UnboundedReceiver},
         oneshot,
     },
-    StreamExt,
+    future, StreamExt,
 };
 use medea_client_api_proto::{
     Command, Event, PeerId, TrackId, TrackPatch, TrackUpdate,
@@ -14,7 +14,7 @@ use medea_client_api_proto::{
 
 use crate::{
     grpc_control_api::{create_room_req, ControlClient},
-    signalling::{SendCommand, TestMember},
+    signalling::{ConnectionEvent, SendCommand, TestMember},
 };
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
@@ -218,7 +218,6 @@ async fn track_disables_and_enables_are_instant() {
             .await
             .unwrap();
     }
-    use futures::future;
 
     let (force_update_received, all_renegotiations_performed) =
         tokio::time::timeout(
@@ -232,4 +231,94 @@ async fn track_disables_and_enables_are_instant() {
         .unwrap();
     force_update_received.unwrap();
     all_renegotiations_performed.unwrap();
+}
+
+#[actix_rt::test]
+async fn force_update_works() {
+    const TEST_NAME: &str = "force_update_works";
+
+    let mut client = ControlClient::new().await;
+    let credentials = client.create(create_room_req(TEST_NAME)).await;
+
+    let (
+        publisher_connection_established_tx,
+        mut publisher_connection_established_rx,
+    ) = mpsc::unbounded();
+    let _publisher = TestMember::connect(
+        credentials.get("publisher").unwrap(),
+        Some(Box::new(move |event, ctx, events| match &event {
+            Event::SdpAnswerMade { peer_id, .. } => {
+                let sdp_answers_made = events
+                    .iter()
+                    .filter(|e| match e {
+                        Event::SdpAnswerMade { .. } => true,
+                        _ => false,
+                    })
+                    .count();
+                if sdp_answers_made == 1 {
+                    ctx.notify(SendCommand(Command::UpdateTracks {
+                        peer_id: *peer_id,
+                        tracks_patches: vec![TrackPatch {
+                            is_muted: Some(true),
+                            id: TrackId(0),
+                        }],
+                    }));
+                }
+            }
+            _ => {}
+        })),
+        Some(Box::new(move |event| match event {
+            ConnectionEvent::Started => publisher_connection_established_tx
+                .unbounded_send(())
+                .unwrap(),
+            _ => (),
+        })),
+        Some(Duration::from_secs(500)),
+        true,
+    )
+    .await;
+
+    publisher_connection_established_rx.next().await.unwrap();
+
+    let mut pub_peer_id = None;
+    let (force_update_tx, mut force_update_rx) = mpsc::unbounded();
+    let (renegotiation_update_tx, mut renegotiation_update_rx) =
+        mpsc::unbounded();
+    let _subscriber = TestMember::connect(
+        credentials.get("responder").unwrap(),
+        Some(Box::new(move |event, ctx, _| match &event {
+            Event::PeerCreated { peer_id, .. } => {
+                pub_peer_id = Some(*peer_id);
+            }
+            Event::IceCandidateDiscovered { .. } => {
+                ctx.notify(SendCommand(Command::UpdateTracks {
+                    peer_id: pub_peer_id.unwrap(),
+                    tracks_patches: vec![TrackPatch {
+                        is_muted: Some(true),
+                        id: TrackId(0),
+                    }],
+                }));
+            }
+            Event::TracksApplied {
+                negotiation_role, ..
+            } => {
+                if negotiation_role.is_none() {
+                    force_update_tx.unbounded_send(()).unwrap();
+                } else {
+                    renegotiation_update_tx.unbounded_send(()).unwrap();
+                }
+            }
+            _ => {}
+        })),
+        None,
+        Some(Duration::from_secs(500)),
+        true,
+    )
+    .await;
+
+    let (force_update, renegotiation_update) =
+        future::join(force_update_rx.next(), renegotiation_update_rx.next())
+            .await;
+    force_update.unwrap();
+    renegotiation_update.unwrap();
 }
