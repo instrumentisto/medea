@@ -201,29 +201,26 @@ async fn track_disables_and_enables_are_instant() {
         };
     }
 
-    let mut futs = Vec::new();
-    for i in 0..20 {
-        let mut tracks_patches = Vec::new();
-        tracks_patches.push(TrackPatch {
-            id: TrackId(2),
-            is_muted: Some(i % 2 == 0),
-        });
-        futs.push(subscriber.send(SendCommand(Command::UpdateTracks {
-            peer_id: PeerId(1),
-            tracks_patches,
-        })));
-        // subscriber
-        //     .send(SendCommand(Command::UpdateTracks {
-        //         peer_id: PeerId(1),
-        //         tracks_patches,
-        //     }))
-        //     .await
-        //     .unwrap();
+    async fn send_track_patches(subscriber: &Addr<TestMember>, id: TrackId) {
+        let mut futs = Vec::new();
+        for i in 0..10 {
+            let mut tracks_patches = Vec::new();
+            tracks_patches.push(TrackPatch {
+                id: id,
+                is_muted: Some(i % 2 == 0),
+            });
+            futs.push(subscriber.send(SendCommand(Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches,
+            })));
+        }
+        future::join_all(futs)
+            .await
+            .into_iter()
+            .for_each(|r| r.unwrap());
     }
-    future::join_all(futs)
-        .await
-        .into_iter()
-        .for_each(|r| r.unwrap());
+    send_track_patches(&subscriber, TrackId(1)).await;
+    send_track_patches(&subscriber, TrackId(0)).await;
 
     let (force_update_received, all_renegotiations_performed) =
         tokio::time::timeout(
