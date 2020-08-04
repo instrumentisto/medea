@@ -16,6 +16,7 @@ use crate::{
     grpc_control_api::{create_room_req, ControlClient},
     signalling::{ConnectionEvent, SendCommand, TestMember},
 };
+use std::{cell::Cell, rc::Rc};
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
 // Waits for single/multiple TracksApplied with expected track changes on on
@@ -163,7 +164,6 @@ async fn track_disables_and_enables_are_instant() {
         oneshot::channel();
     let mut all_renegotiations_performed_tx =
         Some(all_renegotiations_performed_tx);
-    let mut renegotiations_count = 0;
     let subscriber = TestMember::connect(
         credentials.get("responder").unwrap(),
         Some(Box::new(move |event, _, _| match event {
@@ -177,13 +177,10 @@ async fn track_disables_and_enables_are_instant() {
                         let _ = force_update_received_tx.send(());
                     }
                 } else {
-                    renegotiations_count += 1;
-                    if renegotiations_count > 1 {
-                        if let Some(all_renegotiations_performed_tx) =
-                            all_renegotiations_performed_tx.take()
-                        {
-                            let _ = all_renegotiations_performed_tx.send(());
-                        }
+                    if let Some(all_renegotiations_performed_tx) =
+                        all_renegotiations_performed_tx.take()
+                    {
+                        let _ = all_renegotiations_performed_tx.send(());
                     }
                 }
             }
@@ -223,14 +220,24 @@ async fn track_disables_and_enables_are_instant() {
         tokio::time::timeout(
             Duration::from_secs(30),
             future::join(
-                tokio::time::timeout(Duration::from_secs(10), force_update_received_rx),
-                tokio::time::timeout(Duration::from_secs(10), all_renegotiations_performed_rx),
+                tokio::time::timeout(
+                    Duration::from_secs(10),
+                    force_update_received_rx,
+                ),
+                tokio::time::timeout(
+                    Duration::from_secs(10),
+                    all_renegotiations_performed_rx,
+                ),
             ),
         )
         .await
         .unwrap();
-    force_update_received.expect("force_update_received");
-    all_renegotiations_performed.expect("all_renegotiations_performed");
+    force_update_received
+        .expect("force_update_received")
+        .unwrap();
+    all_renegotiations_performed
+        .expect("all_renegotiations_performed")
+        .unwrap();
 }
 
 #[actix_rt::test]
@@ -244,18 +251,19 @@ async fn force_update_works() {
         publisher_connection_established_tx,
         mut publisher_connection_established_rx,
     ) = mpsc::unbounded();
+    let (force_update_tx, mut force_update_rx) = mpsc::unbounded();
+    let (renegotiation_update_tx, mut renegotiation_update_rx) =
+        mpsc::unbounded();
+    let is_renegotiation_happened = Rc::new(Cell::new(false));
     let _publisher = TestMember::connect(
         credentials.get("publisher").unwrap(),
-        Some(Box::new(move |event, ctx, events| match &event {
-            Event::SdpAnswerMade { peer_id, .. } => {
-                let sdp_answers_made = events
-                    .iter()
-                    .filter(|e| match e {
-                        Event::SdpAnswerMade { .. } => true,
-                        _ => false,
-                    })
-                    .count();
-                if sdp_answers_made == 1 {
+        Some(Box::new({
+            let is_renegotiation_happened =
+                Rc::clone(&is_renegotiation_happened);
+            let renegotiation_update_tx = renegotiation_update_tx.clone();
+            let force_update_tx = force_update_tx.clone();
+            move |event, ctx, _| match &event {
+                Event::IceCandidateDiscovered { peer_id, .. } => {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: *peer_id,
                         tracks_patches: vec![TrackPatch {
@@ -264,8 +272,30 @@ async fn force_update_works() {
                         }],
                     }));
                 }
+                Event::TracksApplied {
+                    negotiation_role,
+                    peer_id,
+                    ..
+                } => {
+                    if negotiation_role.is_none() {
+                        force_update_tx.unbounded_send(()).unwrap();
+                    } else {
+                        if is_renegotiation_happened.get() {
+                            renegotiation_update_tx.unbounded_send(()).unwrap();
+                        } else {
+                            ctx.notify(SendCommand(Command::UpdateTracks {
+                                peer_id: *peer_id,
+                                tracks_patches: vec![TrackPatch {
+                                    is_muted: Some(true),
+                                    id: TrackId(0),
+                                }],
+                            }));
+                            is_renegotiation_happened.set(true);
+                        }
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         })),
         Some(Box::new(move |event| match event {
             ConnectionEvent::Started => publisher_connection_established_tx
@@ -281,13 +311,14 @@ async fn force_update_works() {
     publisher_connection_established_rx.next().await.unwrap();
 
     let mut pub_peer_id = None;
-    let (force_update_tx, mut force_update_rx) = mpsc::unbounded();
-    let (renegotiation_update_tx, mut renegotiation_update_rx) =
-        mpsc::unbounded();
+    let mut track_id = None;
     let _subscriber = TestMember::connect(
         credentials.get("responder").unwrap(),
         Some(Box::new(move |event, ctx, _| match &event {
-            Event::PeerCreated { peer_id, .. } => {
+            Event::PeerCreated {
+                peer_id, tracks, ..
+            } => {
+                track_id = Some(tracks[0].id);
                 pub_peer_id = Some(*peer_id);
             }
             Event::IceCandidateDiscovered { .. } => {
@@ -295,7 +326,7 @@ async fn force_update_works() {
                     peer_id: pub_peer_id.unwrap(),
                     tracks_patches: vec![TrackPatch {
                         is_muted: Some(true),
-                        id: TrackId(0),
+                        id: track_id.unwrap(),
                     }],
                 }));
             }
@@ -305,7 +336,18 @@ async fn force_update_works() {
                 if negotiation_role.is_none() {
                     force_update_tx.unbounded_send(()).unwrap();
                 } else {
-                    renegotiation_update_tx.unbounded_send(()).unwrap();
+                    if is_renegotiation_happened.get() {
+                        renegotiation_update_tx.unbounded_send(()).unwrap();
+                    } else {
+                        ctx.notify(SendCommand(Command::UpdateTracks {
+                            peer_id: pub_peer_id.unwrap(),
+                            tracks_patches: vec![TrackPatch {
+                                is_muted: Some(true),
+                                id: track_id.unwrap(),
+                            }],
+                        }));
+                        is_renegotiation_happened.set(true);
+                    }
                 }
             }
             _ => {}
@@ -316,9 +358,14 @@ async fn force_update_works() {
     )
     .await;
 
-    let (force_update, renegotiation_update) =
-        future::join(force_update_rx.next(), renegotiation_update_rx.next())
-            .await;
-    force_update.unwrap();
-    renegotiation_update.unwrap();
+    let (force_update, renegotiation_update) = future::join(
+        tokio::time::timeout(Duration::from_secs(10), force_update_rx.next()),
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            renegotiation_update_rx.next(),
+        ),
+    )
+    .await;
+    force_update.unwrap().unwrap();
+    renegotiation_update.unwrap().unwrap();
 }
