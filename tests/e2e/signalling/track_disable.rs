@@ -230,7 +230,7 @@ async fn track_disables_and_enables_are_instant() {
         .await
         .unwrap();
     force_update_received.expect("force_update_received");
-    all_renegotiations_performed.unwrap("all_renegotiations_performed");
+    all_renegotiations_performed.expect("all_renegotiations_performed");
 }
 
 #[actix_rt::test]
