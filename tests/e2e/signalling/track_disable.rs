@@ -201,20 +201,29 @@ async fn track_disables_and_enables_are_instant() {
         };
     }
 
+    let mut futs = Vec::new();
     for i in 0..20 {
         let mut tracks_patches = Vec::new();
         tracks_patches.push(TrackPatch {
             id: TrackId(2),
             is_muted: Some(i % 2 == 0),
         });
-        subscriber
-            .send(SendCommand(Command::UpdateTracks {
-                peer_id: PeerId(1),
-                tracks_patches,
-            }))
-            .await
-            .unwrap();
+        futs.push(subscriber.send(SendCommand(Command::UpdateTracks {
+            peer_id: PeerId(1),
+            tracks_patches,
+        })));
+        // subscriber
+        //     .send(SendCommand(Command::UpdateTracks {
+        //         peer_id: PeerId(1),
+        //         tracks_patches,
+        //     }))
+        //     .await
+        //     .unwrap();
     }
+    future::join_all(futs)
+        .await
+        .into_iter()
+        .for_each(|r| r.unwrap());
 
     let (force_update_received, all_renegotiations_performed) =
         tokio::time::timeout(
