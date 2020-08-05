@@ -508,7 +508,6 @@ window.onload = async function() {
   async function newRoom() {
     jason = new rust.Jason();
     room = await jason.init_room();
-    window.room = room;
 
     try {
       const constraints = await initLocalStream();
@@ -517,6 +516,13 @@ window.onload = async function() {
     } catch (e) {
       console.error("Init local video failed: " + e);
     }
+
+    room.on_quality_score_update((update) => {
+      console.log(update.avg_quality_score());
+      for (const [key, value] of update.quality_scores().entries()) {
+        console.log(`${key}: ${value}`);
+      }
+    });
 
     room.on_new_connection( (connection) => {
       isCallStarted = true;

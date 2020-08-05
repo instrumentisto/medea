@@ -150,9 +150,16 @@ impl CommandHandler for Room {
     /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
-        _: PeerId,
-        _: PeerMetrics,
+        peer_id: PeerId,
+        metrics: PeerMetrics,
     ) -> Self::Output {
+        match metrics {
+            PeerMetrics::RtcStats(stats) => {
+                self.peers.add_stats(peer_id, stats);
+            }
+            _ => (),
+        }
+
         Ok(Box::new(actix::fut::ok(())))
     }
 

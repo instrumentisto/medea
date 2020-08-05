@@ -1,13 +1,19 @@
 //! [`PeerConnectionStateEventsHandler`] implementation for [`Room`].
 
-use actix::{fut, Handler, Message, WeakAddr, WrapFuture};
+use actix::{
+    fut, AsyncContext, Handler, Message, StreamHandler, WeakAddr, WrapFuture,
+};
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{Event, NegotiationRole, PeerId};
+use medea_client_api_proto::{stats::Float, Event, NegotiationRole, PeerId};
 
 use crate::{
+    api::control::callback::{MediaDirection, MediaType},
     media::{peer::NegotiationSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
-        peers::PeerConnectionStateEventsHandler,
+        peers::{
+            PeerConnectionStateEventsHandler, PeersMetricsEvent,
+            PeersMetricsEventHandler,
+        },
         room::{ActFuture, RoomError},
         Room,
     },
@@ -59,6 +65,74 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
+        }
+    }
+}
+
+impl StreamHandler<PeersMetricsEvent> for Room {
+    fn handle(&mut self, event: PeersMetricsEvent, ctx: &mut Self::Context) {
+        ctx.spawn(event.dispatch_with(self));
+    }
+}
+
+impl PeersMetricsEventHandler for Room {
+    type Output = ActFuture<()>;
+
+    /// Notifies [`Room`] about [`PeerConnection`]'s partial media traffic
+    /// stopping.
+    fn on_no_traffic_flow(
+        &mut self,
+        _: PeerId,
+        _: DateTime<Utc>,
+        _: MediaType,
+        _: MediaDirection,
+    ) -> Self::Output {
+        Box::new(actix::fut::ready(()))
+    }
+
+    /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
+    #[allow(clippy::filter_map)]
+    fn on_traffic_flows(
+        &mut self,
+        _: PeerId,
+        _: MediaType,
+        _: MediaDirection,
+    ) -> Self::Output {
+        Box::new(actix::fut::ready(()))
+    }
+
+    fn on_quality_meter_update(
+        &mut self,
+        peer_id: PeerId,
+        quality_score: f64,
+    ) -> Self::Output {
+        use crate::log::prelude::*;
+        debug!("[{}] Quality score: {}", peer_id, quality_score);
+
+        if let Ok(member_id) =
+            self.peers.map_peer_by_id(peer_id, |p| p.member_id())
+        {
+            let fut = self.members.send_event_to_member(
+                member_id,
+                Event::QualityScoreUpdated {
+                    peer_id,
+                    quality_score: Float(quality_score),
+                },
+            );
+
+            Box::new(
+                async move {
+                    if let Err(e) = fut.await {
+                        error!(
+                            "Failed to send quality score to the client: {:?}",
+                            e
+                        );
+                    }
+                }
+                .into_actor(self),
+            )
+        } else {
+            Box::new(actix::fut::ready(()))
         }
     }
 }

@@ -9,8 +9,8 @@ mod rpc_server;
 use std::{rc::Rc, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
-    MailboxError, WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext as _, AsyncContext, Context,
+    Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -43,6 +43,7 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
+use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
@@ -390,8 +391,12 @@ impl Room {
 impl Actor for Room {
     type Context = Context<Self>;
 
-    fn started(&mut self, _: &mut Self::Context) {
+    fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
+        ctx.run_interval(Duration::from_secs(5), |this, _| {
+            this.peers.check_peers();
+        });
+        ctx.add_stream(self.peers.subscribe_to_metrics_events());
     }
 }
 
