@@ -164,7 +164,7 @@ async fn track_disables_and_enables_are_instant() {
                         }));
                     }
                 }
-                _ => ()
+                _ => (),
             }
             publisher_tx.unbounded_send(event.clone()).unwrap();
         })),

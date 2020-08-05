@@ -16,8 +16,8 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStat, TrackStatKind,
     },
-    AudioSettings, Direction, IceConnectionState, MediaType, PeerId, Track,
-    TrackId, TrackPatch, VideoSettings,
+    AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
+    Track, TrackId, TrackPatch, VideoSettings,
 };
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager},
@@ -579,7 +579,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(1),
                 direction: Direction::Send {
-                    receivers: vec![PeerId(2)],
+                    receivers: vec![MemberId::from("bob")],
                     mid: None,
                 },
                 media_type: MediaType::Audio(AudioSettings {
@@ -589,7 +589,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(2),
                 direction: Direction::Send {
-                    receivers: vec![PeerId(2)],
+                    receivers: vec![MemberId::from("bob")],
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
@@ -605,7 +605,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(1),
                 direction: Direction::Recv {
-                    sender: PeerId(1),
+                    sender: MemberId::from("alice"),
                     mid: None,
                 },
                 media_type: MediaType::Audio(AudioSettings {
@@ -615,7 +615,7 @@ impl InterconnectedPeers {
             Track {
                 id: TrackId(2),
                 direction: Direction::Recv {
-                    sender: PeerId(2),
+                    sender: MemberId::from("alice"),
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {

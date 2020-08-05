@@ -15,10 +15,10 @@ use std::{
 
 use derive_more::Display;
 use futures::future;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use medea_client_api_proto::{Incrementable, MemberId, PeerId, TrackId};
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::control::RoomId,
     conf,
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, PeerStateMachine},
@@ -758,6 +758,7 @@ mod tests {
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
         /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly
         /// updated.
+        #[allow(dead_code)]
         pub fn on_force_update(
             &self,
         ) -> impl Stream<Item = (PeerId, Vec<TrackUpdate>)> {

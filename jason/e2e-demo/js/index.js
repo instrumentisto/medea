@@ -518,6 +518,7 @@ window.onload = async function() {
     }
 
     room.on_new_connection( (connection) => {
+      let remoteMemberId = connection.get_remote_member_id();
       isCallStarted = true;
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
@@ -527,7 +528,10 @@ window.onload = async function() {
         let innerVideoDiv = document.createElement("div");
         innerVideoDiv.className = "video";
         innerVideoDiv.appendChild(video);
-        remote_videos[connection.get_remote_id()] = innerVideoDiv;
+        let remoteMemberIdSpan = document.createElement('span');
+        remoteMemberIdSpan.innerText = remoteMemberId;
+        innerVideoDiv.appendChild(remoteMemberIdSpan);
+        remote_videos[remoteMemberId] = innerVideoDiv;
         videoDiv.appendChild(innerVideoDiv);
 
         video.oncanplay = async () => {
@@ -557,8 +561,8 @@ window.onload = async function() {
       });
 
       connection.on_close(() => {
-        remote_videos[connection.get_remote_id()].remove();
-        delete remote_videos[connection.get_remote_id()];
+        remote_videos[remoteMemberId].remove();
+        delete remote_videos[remoteMemberId];
       });
     });
 

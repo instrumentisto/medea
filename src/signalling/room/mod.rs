@@ -15,7 +15,7 @@ use actix::{
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Event, NegotiationRole, PeerId};
+use medea_client_api_proto::{Event, MemberId, NegotiationRole, PeerId};
 
 use crate::{
     api::control::{
@@ -25,7 +25,7 @@ use crate::{
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
         room::RoomSpec,
-        MemberId, RoomId,
+        RoomId,
     },
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, Stable},
