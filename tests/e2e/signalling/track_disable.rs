@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 use actix::{Addr, AsyncContext};
 use futures::{
@@ -16,7 +16,6 @@ use crate::{
     grpc_control_api::{create_room_req, ControlClient},
     signalling::{ConnectionEvent, SendCommand, TestMember},
 };
-use std::{cell::Cell, rc::Rc};
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
 // Waits for single/multiple TracksApplied with expected track changes on on
@@ -248,6 +247,8 @@ async fn track_disables_and_enables_are_instant() {
         .unwrap();
 }
 
+/// Checks that force update mechanism works for muting and renegotiation after
+/// force update will be performed.
 #[actix_rt::test]
 async fn force_update_works() {
     const TEST_NAME: &str = "force_update_works";
