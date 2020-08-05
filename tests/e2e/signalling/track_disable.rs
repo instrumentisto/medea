@@ -149,7 +149,23 @@ async fn track_disables_and_enables_are_instant() {
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let _publisher = TestMember::connect(
         credentials.get("publisher").unwrap(),
-        Some(Box::new(move |event, _, _| {
+        Some(Box::new(move |event, ctx, _| {
+            match event {
+                Event::SdpAnswerMade { peer_id, .. } => {
+                    for i in 0..20 {
+                        let mut tracks_patches = Vec::new();
+                        tracks_patches.push(TrackPatch {
+                            id: TrackId(0),
+                            is_muted: Some(i % 2 == 0),
+                        });
+                        ctx.notify(SendCommand(Command::UpdateTracks {
+                            peer_id: *peer_id,
+                            tracks_patches,
+                        }));
+                    }
+                }
+                _ => ()
+            }
             publisher_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
@@ -165,7 +181,7 @@ async fn track_disables_and_enables_are_instant() {
     let mut all_renegotiations_performed_tx =
         Some(all_renegotiations_performed_tx);
     let pub_peer_id = Rc::new(Cell::new(None));
-    let subscriber = TestMember::connect(
+    let _subscriber = TestMember::connect(
         credentials.get("responder").unwrap(),
         Some(Box::new({
             let pub_peer_id = Rc::clone(&pub_peer_id);
@@ -207,23 +223,6 @@ async fn track_disables_and_enables_are_instant() {
             break;
         };
     }
-
-    let mut futs = Vec::new();
-    for i in 0..10 {
-        let mut tracks_patches = Vec::new();
-        tracks_patches.push(TrackPatch {
-            id: TrackId(0),
-            is_muted: Some(i % 2 == 0),
-        });
-        futs.push(subscriber.send(SendCommand(Command::UpdateTracks {
-            peer_id: pub_peer_id.get().unwrap(),
-            tracks_patches,
-        })));
-    }
-    future::join_all(futs)
-        .await
-        .into_iter()
-        .for_each(|r| r.unwrap());
 
     let (force_update_received, all_renegotiations_performed) =
         tokio::time::timeout(
