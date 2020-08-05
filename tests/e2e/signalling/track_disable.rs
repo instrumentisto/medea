@@ -164,27 +164,34 @@ async fn track_disables_and_enables_are_instant() {
         oneshot::channel();
     let mut all_renegotiations_performed_tx =
         Some(all_renegotiations_performed_tx);
+    let pub_peer_id = Rc::new(Cell::new(None));
     let subscriber = TestMember::connect(
         credentials.get("responder").unwrap(),
-        Some(Box::new(move |event, _, _| match event {
-            Event::TracksApplied {
-                negotiation_role, ..
-            } => {
-                if negotiation_role.is_none() {
-                    if let Some(force_update_received_tx) =
-                        force_update_received_tx.take()
-                    {
-                        let _ = force_update_received_tx.send(());
-                    }
-                } else {
-                    if let Some(all_renegotiations_performed_tx) =
-                        all_renegotiations_performed_tx.take()
-                    {
-                        let _ = all_renegotiations_performed_tx.send(());
+        Some(Box::new({
+            let pub_peer_id = Rc::clone(&pub_peer_id);
+            move |event, _, _| match event {
+                Event::PeerCreated { peer_id, .. } => {
+                    pub_peer_id.set(Some(*peer_id));
+                }
+                Event::TracksApplied {
+                    negotiation_role, ..
+                } => {
+                    if negotiation_role.is_none() {
+                        if let Some(force_update_received_tx) =
+                            force_update_received_tx.take()
+                        {
+                            let _ = force_update_received_tx.send(());
+                        }
+                    } else {
+                        if let Some(all_renegotiations_performed_tx) =
+                            all_renegotiations_performed_tx.take()
+                        {
+                            let _ = all_renegotiations_performed_tx.send(());
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
         })),
         None,
         Some(Duration::from_secs(500)),
@@ -201,26 +208,22 @@ async fn track_disables_and_enables_are_instant() {
         };
     }
 
-    async fn send_track_patches(subscriber: &Addr<TestMember>, id: TrackId) {
-        let mut futs = Vec::new();
-        for i in 0..10 {
-            let mut tracks_patches = Vec::new();
-            tracks_patches.push(TrackPatch {
-                id: id,
-                is_muted: Some(i % 2 == 0),
-            });
-            futs.push(subscriber.send(SendCommand(Command::UpdateTracks {
-                peer_id: PeerId(1),
-                tracks_patches,
-            })));
-        }
-        future::join_all(futs)
-            .await
-            .into_iter()
-            .for_each(|r| r.unwrap());
+    let mut futs = Vec::new();
+    for i in 0..10 {
+        let mut tracks_patches = Vec::new();
+        tracks_patches.push(TrackPatch {
+            id: TrackId(0),
+            is_muted: Some(i % 2 == 0),
+        });
+        futs.push(subscriber.send(SendCommand(Command::UpdateTracks {
+            peer_id: pub_peer_id.get().unwrap(),
+            tracks_patches,
+        })));
     }
-    send_track_patches(&subscriber, TrackId(1)).await;
-    send_track_patches(&subscriber, TrackId(0)).await;
+    future::join_all(futs)
+        .await
+        .into_iter()
+        .for_each(|r| r.unwrap());
 
     let (force_update_received, all_renegotiations_performed) =
         tokio::time::timeout(
