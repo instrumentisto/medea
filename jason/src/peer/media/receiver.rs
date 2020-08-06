@@ -2,8 +2,8 @@
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::TrackPatch;
-use proto::{PeerId, TrackId};
+use medea_client_api_proto::{MemberId, TrackPatch};
+use proto::TrackId;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
@@ -20,9 +20,8 @@ use crate::{
 /// We can save related [`RtcRtpTransceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
-    peer_id: PeerId,
     track_id: TrackId,
-    sender_id: PeerId,
+    sender_id: MemberId,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
@@ -39,10 +38,9 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
     pub(super) fn new(
-        peer_id: PeerId,
         track_id: TrackId,
         caps: &TrackConstraints,
-        sender_id: PeerId,
+        sender_id: MemberId,
         peer: &RtcPeerConnection,
         mid: Option<String>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -55,7 +53,6 @@ impl Receiver {
             Some(_) => None,
         };
         Self {
-            peer_id,
             track_id,
             sender_id,
             transceiver,
@@ -83,8 +80,7 @@ impl Receiver {
         let _ =
             self.peer_events_sender
                 .unbounded_send(PeerEvent::NewRemoteTrack {
-                    peer_id: self.peer_id,
-                    sender_id: self.sender_id,
+                    sender_id: self.sender_id.clone(),
                     track_id: self.track_id,
                     track,
                 });

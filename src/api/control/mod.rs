@@ -16,6 +16,7 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use actix::Addr;
 use derive_more::Display;
 use failure::{Error, Fail};
+use medea_client_api_proto::MemberId;
 use serde::Deserialize;
 
 use crate::{
@@ -35,7 +36,7 @@ pub use self::{
         webrtc_publish_endpoint::WebRtcPublishId, EndpointSpec,
         Id as EndpointId,
     },
-    member::{Id as MemberId, MemberSpec},
+    member::MemberSpec,
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
 

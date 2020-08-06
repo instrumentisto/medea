@@ -11,6 +11,7 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use futures::FutureExt as _;
+use medea_client_api_proto::MemberId;
 use serde::Deserialize;
 
 use crate::{
@@ -19,7 +20,7 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::{MemberId, RoomId},
+        control::RoomId,
     },
     conf::{Conf, Rpc},
     log::prelude::*,
