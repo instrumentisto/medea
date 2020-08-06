@@ -303,6 +303,7 @@ pub enum Event {
 
     QualityScoreUpdated {
         peer_id: PeerId,
+        partner_peer_id: PeerId,
         quality_score: Float,
     },
 }

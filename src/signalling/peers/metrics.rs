@@ -348,11 +348,15 @@ impl PeersMetricsService {
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
             let quality_score = peer.quality_meter.calculate();
-            let _ =
-                sender.unbounded_send(PeersMetricsEvent::QualityMeterUpdate {
-                    peer_id: peer.peer_id,
-                    quality_score,
-                });
+            if let Some(partner_peer_id) = peer.get_partner_peer_id() {
+                let _ = sender.unbounded_send(
+                    PeersMetricsEvent::QualityMeterUpdate {
+                        peer_id: peer.peer_id,
+                        partner_peer_id,
+                        quality_score,
+                    },
+                );
+            }
         }
     }
 
@@ -421,6 +425,7 @@ pub enum PeersMetricsEvent {
 
     QualityMeterUpdate {
         peer_id: PeerId,
+        partner_peer_id: PeerId,
         quality_score: f64,
     },
 }
@@ -880,7 +885,7 @@ mod tests {
     use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt as _};
     use medea_client_api_proto::{
         stats::{
-            RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
+            Float, RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
             RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
             RtcStatsType, StatId,
         },
@@ -995,6 +1000,7 @@ mod tests {
             jitter: None,
             total_decode_time: None,
             jitter_buffer_emitted_count: None,
+            jitter_buffer_delay: Some(Float(0.0)),
         }
     }
 
@@ -1132,17 +1138,19 @@ mod tests {
         pub async fn next_no_traffic_event(
             &mut self,
         ) -> (PeerId, DateTime<Utc>, MediaType, MediaDirection) {
-            let event = self.peer_events_stream.next().await.unwrap();
-            if let PeersMetricsEvent::NoTrafficFlow {
-                peer_id,
-                was_flowing_at,
-                media_type,
-                direction,
-            } = event
-            {
-                (peer_id, was_flowing_at, media_type, direction)
-            } else {
-                unreachable!("Unexpected event received: {:?}.", event)
+            loop {
+                let event = self.peer_events_stream.next().await.unwrap();
+                if let PeersMetricsEvent::NoTrafficFlow {
+                    peer_id,
+                    was_flowing_at,
+                    media_type,
+                    direction,
+                } = event
+                {
+                    break (peer_id, was_flowing_at, media_type, direction);
+                } else {
+                    continue;
+                }
             }
         }
 

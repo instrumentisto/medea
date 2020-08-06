@@ -518,9 +518,18 @@ window.onload = async function() {
     }
 
     room.on_quality_score_update((update) => {
-      console.log(update.avg_quality_score());
       for (const [key, value] of update.quality_scores().entries()) {
-        console.log(`${key}: ${value}`);
+        let videoDiv = remote_videos[key];
+        let el = videoDiv.getElementsByClassName('quality-score');
+        let score = value.toFixed(2);
+
+        if (el[0] === undefined) {
+          let qualityEl = document.createElement('span');
+          qualityEl.innerHTML = score;
+          qualityEl.className = 'quality-score';
+          remote_videos[key].appendChild(qualityEl);
+        }
+        el[0].innerHTML = score;
       }
     });
 

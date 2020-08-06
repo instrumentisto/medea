@@ -8,6 +8,7 @@ use medea_client_api_proto::{stats::Float, Event, NegotiationRole, PeerId};
 
 use crate::{
     api::control::callback::{MediaDirection, MediaType},
+    log::prelude::*,
     media::{peer::NegotiationSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
         peers::{
@@ -104,9 +105,9 @@ impl PeersMetricsEventHandler for Room {
     fn on_quality_meter_update(
         &mut self,
         peer_id: PeerId,
+        partner_peer_id: PeerId,
         quality_score: f64,
     ) -> Self::Output {
-        use crate::log::prelude::*;
         debug!("[{}] Quality score: {}", peer_id, quality_score);
 
         if let Ok(member_id) =
@@ -116,6 +117,7 @@ impl PeersMetricsEventHandler for Room {
                 member_id,
                 Event::QualityScoreUpdated {
                     peer_id,
+                    partner_peer_id,
                     quality_score: Float(quality_score),
                 },
             );

@@ -6,11 +6,11 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{rc::Rc, sync::Arc};
+use std::{rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext as _, AsyncContext, Context,
-    Handler, MailboxError, WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
+    MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -43,7 +43,6 @@ use crate::{
 pub use dynamic_api::{
     Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
 };
-use std::time::Duration;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;

@@ -859,7 +859,9 @@ pub struct RtcIceCandidatePairStats {
     ///
     /// [RFC 3890]: https://tools.ietf.org/html/rfc3890
     /// [1]: https://tinyurl.com/rfc72eh
-    pub available_outgoing_bitrate: Option<u64>,
+    pub available_outgoing_bitrate: Option<Float>,
+
+    pub available_incoming_bitrate: Option<Float>,
 }
 
 /// Each candidate pair in the check list has a foundation and a state.

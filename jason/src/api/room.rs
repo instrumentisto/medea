@@ -9,7 +9,7 @@ use std::{
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
-use js_sys::Promise;
+use js_sys::{Map, Promise};
 use medea_client_api_proto::{
     Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
     IceServer, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
@@ -609,13 +609,10 @@ impl Room {
 }
 
 #[wasm_bindgen]
-struct QualityScoreUpdate {
+pub struct QualityScoreUpdate {
     avg_quality_score: f64,
     quality_scores: HashMap<PeerId, f64>,
 }
-
-use js_sys::Map;
-use medea_client_api_proto::Event::QualityScoreUpdated;
 
 #[wasm_bindgen]
 impl QualityScoreUpdate {
@@ -624,7 +621,7 @@ impl QualityScoreUpdate {
     }
 
     pub fn quality_scores(&self) -> Map {
-        let mut map = Map::new();
+        let map = Map::new();
         for (peer_id, score) in &self.quality_scores {
             map.set(&(peer_id.0).into(), &(*score).into());
         }
@@ -1017,12 +1014,13 @@ impl EventHandler for InnerRoom {
 
     async fn on_quality_score_updated(
         &self,
-        peer_id: PeerId,
+        _: PeerId,
+        partner_peer_id: PeerId,
         quality_score: Float,
     ) -> Self::Output {
         self.quality_scores
             .borrow_mut()
-            .insert(peer_id, quality_score.0);
+            .insert(partner_peer_id, quality_score.0);
         let avg_quality_score = {
             let quality_scores = self.quality_scores.borrow();
             quality_scores.values().sum::<f64>() / (quality_scores.len() as f64)

@@ -55,7 +55,6 @@ pub use self::{
     stream::{PeerMediaStream, RemoteMediaStream},
     stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
 };
-use crate::peer::media::Receiver;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
