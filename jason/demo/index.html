@@ -495,10 +495,11 @@
           let innerVideoDiv = document.createElement("div");
           innerVideoDiv.className = "col-md-3";
           innerVideoDiv.appendChild(video);
-          let remoteMemberIdEl = document.createElement('p');
+          let remoteMemberIdEl = document.createElement('span');
           remoteMemberIdEl.className = 'text-center';
           remoteMemberIdEl.innerHTML = remoteMemberId;
           innerVideoDiv.appendChild(remoteMemberIdEl);
+          innerVideoDiv.appendChild(document.createElement('br'));
           remote_videos[remoteMemberId] = innerVideoDiv;
           videoDiv.appendChild(innerVideoDiv);
 
@@ -544,15 +545,14 @@
         for (const [key, value] of update.quality_scores().entries()) {
           let videoDiv = remote_videos[key];
           let el = videoDiv.getElementsByClassName('quality-score');
-          let score = value.toFixed(2);
 
           if (el[0] === undefined) {
             let qualityEl = document.createElement('span');
-            qualityEl.innerHTML = score;
+            qualityEl.innerHTML = value;
             qualityEl.className = 'quality-score';
             remote_videos[key].appendChild(qualityEl);
           }
-          el[0].innerHTML = score;
+          el[0].innerHTML = value;
         }
       });
 

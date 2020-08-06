@@ -28,7 +28,7 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamStats, RtcOutboundRtpStreamMediaType,
         RtcOutboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
     },
-    MediaType as MediaTypeProto, PeerId,
+    MediaType as MediaTypeProto, MemberId, PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -173,6 +173,7 @@ impl PeersMetricsService {
 
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: peer.id(),
+            member_id: peer.member_id(),
             partner_peer: Weak::new(),
             last_update: Utc::now(),
             senders: HashMap::new(),
@@ -183,6 +184,7 @@ impl PeersMetricsService {
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
             quality_meter: QualityMeter::new(),
+            last_quality_score: 1,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
@@ -348,11 +350,15 @@ impl PeersMetricsService {
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
             let quality_score = peer.quality_meter.calculate();
-            if let Some(partner_peer_id) = peer.get_partner_peer_id() {
+            if quality_score == peer.last_quality_score {
+                return;
+            }
+            peer.last_quality_score = quality_score;
+            if let Some(partner_member_id) = peer.get_partner_member_id() {
                 let _ = sender.unbounded_send(
                     PeersMetricsEvent::QualityMeterUpdate {
-                        peer_id: peer.peer_id,
-                        partner_peer_id,
+                        member_id: peer.get_member_id(),
+                        partner_member_id,
                         quality_score,
                     },
                 );
@@ -424,9 +430,9 @@ pub enum PeersMetricsEvent {
     },
 
     QualityMeterUpdate {
-        peer_id: PeerId,
-        partner_peer_id: PeerId,
-        quality_score: f64,
+        member_id: MemberId,
+        partner_member_id: MemberId,
+        quality_score: u8,
     },
 }
 
@@ -593,6 +599,8 @@ struct PeerStat {
     /// [`PeerId`] of [`Peer`] which this [`PeerStat`] represents.
     peer_id: PeerId,
 
+    member_id: MemberId,
+
     /// Weak reference to a [`PeerStat`] which represents a partner
     /// [`Peer`].
     partner_peer: Weak<RefCell<PeerStat>>,
@@ -624,6 +632,8 @@ struct PeerStat {
     stats_ttl: Duration,
 
     quality_meter: QualityMeter,
+
+    last_quality_score: u8,
 }
 
 impl PeerStat {
@@ -837,6 +847,16 @@ impl PeerStat {
         self.partner_peer
             .upgrade()
             .map(|partner_peer| partner_peer.borrow().get_peer_id())
+    }
+
+    fn get_partner_member_id(&self) -> Option<MemberId> {
+        self.partner_peer
+            .upgrade()
+            .map(|partner_peer| partner_peer.borrow().get_member_id())
+    }
+
+    fn get_member_id(&self) -> MemberId {
+        self.member_id.clone()
     }
 
     /// Returns [`PeerId`] of [`Peer`] which this [`PeerStat`]

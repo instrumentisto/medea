@@ -4,7 +4,7 @@ use actix::{
     fut, AsyncContext, Handler, Message, StreamHandler, WeakAddr, WrapFuture,
 };
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{stats::Float, Event, NegotiationRole, PeerId};
+use medea_client_api_proto::{Event, MemberId, NegotiationRole, PeerId};
 
 use crate::{
     api::control::callback::{MediaDirection, MediaType},
@@ -104,38 +104,34 @@ impl PeersMetricsEventHandler for Room {
 
     fn on_quality_meter_update(
         &mut self,
-        peer_id: PeerId,
-        partner_peer_id: PeerId,
-        quality_score: f64,
+        member_id: MemberId,
+        partner_member_id: MemberId,
+        quality_score: u8,
     ) -> Self::Output {
-        debug!("[{}] Quality score: {}", peer_id, quality_score);
+        debug!(
+            "[{} <-> {}] Quality score: {}",
+            member_id, partner_member_id, quality_score
+        );
 
-        if let Ok(member_id) =
-            self.peers.map_peer_by_id(peer_id, |p| p.member_id())
-        {
-            let fut = self.members.send_event_to_member(
-                member_id,
-                Event::QualityScoreUpdated {
-                    peer_id,
-                    partner_peer_id,
-                    quality_score: Float(quality_score),
-                },
-            );
+        let fut = self.members.send_event_to_member(
+            member_id,
+            Event::QualityScoreUpdated {
+                partner_member_id,
+                quality_score,
+            },
+        );
 
-            Box::new(
-                async move {
-                    if let Err(e) = fut.await {
-                        error!(
-                            "Failed to send quality score to the client: {:?}",
-                            e
-                        );
-                    }
+        Box::new(
+            async move {
+                if let Err(e) = fut.await {
+                    error!(
+                        "Failed to send quality score to the client: {:?}",
+                        e
+                    );
                 }
-                .into_actor(self),
-            )
-        } else {
-            Box::new(actix::fut::ready(()))
-        }
+            }
+            .into_actor(self),
+        )
     }
 }
 

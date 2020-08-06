@@ -32,7 +32,6 @@ use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
-use crate::stats::Float;
 
 /// ID of `Member`.
 #[derive(
@@ -309,9 +308,8 @@ pub enum Event {
     },
 
     QualityScoreUpdated {
-        peer_id: PeerId,
-        partner_peer_id: PeerId,
-        quality_score: Float,
+        partner_member_id: MemberId,
+        quality_score: u8,
     },
 }
 

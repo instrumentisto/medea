@@ -105,26 +105,29 @@ impl QualityMeter {
             / (self.packet_loss.len() as f64)
     }
 
-    pub fn calculate(&mut self) -> f64 {
+    pub fn calculate(&mut self) -> u8 {
         self.burn_stats();
 
         let effective_latency =
-            self.average_latency() + (self.jitter() as f64) * 2.0;
+            self.average_latency() + (self.jitter() as f64) * 2.0 + 10.0;
 
         let r = if effective_latency < 160.0 {
-            100.0 - (effective_latency / 40.0)
+            93.5 - (effective_latency / 40.0)
         } else {
-            100.0 - (effective_latency - 120.0) / 10.0
+            93.5 - (effective_latency - 120.0) / 10.0
         };
 
         let r = r - (self.average_packet_loss() * 0.5);
-        if r < 0.0 {
-            return 1.0;
-        } else if r > 100.0 {
-            return 4.0;
-        }
 
-        1.0 + (0.030) * r + (0.000007) * r * (r - 60.0) * (100.0 - r)
+        if r < 50.0 {
+            1
+        } else if r < 60.0 {
+            2
+        } else if r < 70.0 {
+            3
+        } else {
+            4
+        }
     }
 }
 
@@ -247,7 +250,7 @@ mod tests {
         }
 
         let quality_score = meter.calculate();
-        assert!(quality_score > 1.3 && quality_score < 1.6);
+        assert!(quality_score < 2.1);
     }
 
     #[test]

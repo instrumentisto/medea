@@ -538,15 +538,14 @@ window.onload = async function() {
       for (const [key, value] of update.quality_scores().entries()) {
         let videoDiv = remote_videos[key];
         let el = videoDiv.getElementsByClassName('quality-score');
-        let score = value.toFixed(2);
 
         if (el[0] === undefined) {
           let qualityEl = document.createElement('span');
-          qualityEl.innerHTML = score;
+          qualityEl.innerHTML = value;
           qualityEl.className = 'quality-score';
           remote_videos[key].appendChild(qualityEl);
         }
-        el[0].innerHTML = score;
+        el[0].innerHTML = value;
       }
     });
 

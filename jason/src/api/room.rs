@@ -12,8 +12,8 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::{Map, Promise};
 use medea_client_api_proto::{
-    stats::Float, Command, Direction, Event as RpcEvent, EventHandler,
-    IceCandidate, IceConnectionState, IceServer, MemberId, NegotiationRole,
+    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
+    IceConnectionState, IceServer, MemberId, NegotiationRole,
     PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
     TrackUpdate,
 };
@@ -580,20 +580,20 @@ impl Room {
 
 #[wasm_bindgen]
 pub struct QualityScoreUpdate {
-    avg_quality_score: f64,
-    quality_scores: HashMap<PeerId, f64>,
+    avg_quality_score: f32,
+    quality_scores: HashMap<MemberId, u8>,
 }
 
 #[wasm_bindgen]
 impl QualityScoreUpdate {
-    pub fn avg_quality_score(&self) -> f64 {
+    pub fn avg_quality_score(&self) -> f32 {
         self.avg_quality_score
     }
 
     pub fn quality_scores(&self) -> Map {
         let map = Map::new();
-        for (peer_id, score) in &self.quality_scores {
-            map.set(&(peer_id.0).into(), &(*score).into());
+        for (member_id, score) in &self.quality_scores {
+            map.set(&(member_id.0.clone()).into(), &(*score).into());
         }
 
         map
@@ -619,7 +619,7 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
-    quality_scores: RefCell<HashMap<PeerId, f64>>,
+    quality_scores: RefCell<HashMap<MemberId, u8>>,
 
     on_quality_score_update: Callback1<QualityScoreUpdate>,
 
@@ -1065,16 +1065,17 @@ impl EventHandler for InnerRoom {
 
     async fn on_quality_score_updated(
         &self,
-        _: PeerId,
-        partner_peer_id: PeerId,
-        quality_score: Float,
+        partner_member_id: MemberId,
+        quality_score: u8,
     ) -> Self::Output {
         self.quality_scores
             .borrow_mut()
-            .insert(partner_peer_id, quality_score.0);
+            .insert(partner_member_id, quality_score);
         let avg_quality_score = {
             let quality_scores = self.quality_scores.borrow();
-            quality_scores.values().sum::<f64>() / (quality_scores.len() as f64)
+            f32::from(
+                quality_scores.values().copied().map(u16::from).sum::<u16>(),
+            ) / quality_scores.len() as f32
         };
         let update = QualityScoreUpdate {
             avg_quality_score,
