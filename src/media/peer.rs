@@ -39,6 +39,35 @@
 //! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
 //!    your change by adding it into the [`Context::track_changes_queue`].
 //!
+//! # Force [`Peer`] updates which are requires renegotiation
+//!
+//! Some updates are require renegotiation, but at same time they require
+//! instant [`Event::TracksApplied`] response even if [`Peer`]s will be out
+//! of sync for a while.
+//!
+//! ## Usage
+//!
+//! If you wanna just use already implemented forcible [`TrackChange`] - use it
+//! same as non-forcible changes. [`Peer`] implementation will take care of how
+//! to do it correctly. __No extra actions are required.__
+//!
+//! ## Algorithm of the forcible [`Peer`] update
+//!
+//! ### If [`Peer`] isn't [`Stable`]
+//!
+//! 1. Send [`Event::TracksApplied`] with `renegotiation_role: None`
+//! 2. When [`Peer`] goes into [`Stable`] state, start new renegotiation process
+//!
+//! ### If [`Peer`] is [`Stable`]
+//!
+//! Same as non-forcible [`TrackChange`].
+//!
+//! ## Implementation
+//!
+//! 1. Implement your change same as non-forcible [`TrackChange`]
+//! 2. Return `true` for your [`TrackChange`] variant in the
+//!    [`TrackChange::is_forcible`] function
+//!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 #![allow(clippy::use_self)]
@@ -373,7 +402,7 @@ impl TrackChange {
 
     /// Returns `true` if this [`TrackChange`] can be sent forcibly sent without
     /// instant renegotiation starting.
-    pub fn if_forcible(&self) -> bool {
+    pub fn is_forcible(&self) -> bool {
         match self {
             TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
                 false
@@ -537,7 +566,7 @@ impl<T> Peer<T> {
         let mut forcible_changes = VecDeque::new();
         let mut filtered_changes_queue = VecDeque::new();
         for track_change in track_changes_queue {
-            if track_change.if_forcible() {
+            if track_change.is_forcible() {
                 forcible_changes.push_back(track_change);
             } else {
                 filtered_changes_queue.push_back(track_change);
