@@ -24,7 +24,6 @@ pub struct Receiver {
     track_id: TrackId,
     sender_id: PeerId,
     transceiver: Option<RtcRtpTransceiver>,
-    kind: TransceiverKind,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
     enabled: bool,
@@ -60,16 +59,11 @@ impl Receiver {
             track_id,
             sender_id,
             transceiver,
-            kind,
             mid,
             track: None,
             enabled: true,
             peer_events_sender,
         }
-    }
-
-    pub fn track_id(&self) -> TrackId {
-        self.track_id
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -104,11 +98,6 @@ impl Receiver {
                 track.set_enabled(!is_muted);
             }
         }
-    }
-
-    #[inline]
-    pub fn kind(&self) -> TransceiverKind {
-        self.kind
     }
 
     /// Returns `mid` of this [`Receiver`].

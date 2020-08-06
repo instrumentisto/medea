@@ -274,40 +274,6 @@ impl RoomHandle {
         }
         Ok(())
     }
-
-    fn toggle_remote_mute(
-        &self,
-        is_muted: bool,
-        kind: TransceiverKind,
-    ) -> Result<(), JasonError> {
-        let inner = upgrade_or_detached!(self.0, JasonError)?;
-        let track_patches: Vec<_> = inner
-            .peers
-            .get_all()
-            .into_iter()
-            .map(|peer| {
-                let peer_id = peer.id();
-                let tracks_to_mute: Vec<_> = peer
-                    .get_receivers_ids(kind)
-                    .into_iter()
-                    .map(|id| TrackPatch {
-                        id,
-                        is_muted: Some(is_muted),
-                    })
-                    .collect();
-
-                (peer_id, tracks_to_mute)
-            })
-            .collect();
-        for (peer_id, tracks_patches) in track_patches {
-            inner.rpc.send_command(Command::UpdateTracks {
-                peer_id,
-                tracks_patches,
-            });
-        }
-
-        Ok(())
-    }
 }
 
 #[wasm_bindgen]
@@ -407,30 +373,6 @@ impl RoomHandle {
             inner?.set_local_media_settings(settings).await;
             Ok(JsValue::UNDEFINED)
         })
-    }
-
-    pub fn mute_remote_audio(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(true, TransceiverKind::Audio)
-            .unwrap();
-    }
-
-    pub fn mute_remote_video(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(true, TransceiverKind::Video)
-            .unwrap();
-    }
-
-    pub fn unmute_remote_audio(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(false, TransceiverKind::Audio)
-            .unwrap();
-    }
-
-    pub fn unmute_remote_video(&self) {
-        let this = Self(self.0.clone());
-        this.toggle_remote_mute(false, TransceiverKind::Video)
-            .unwrap();
     }
 
     /// Mutes outbound audio in this [`Room`].
