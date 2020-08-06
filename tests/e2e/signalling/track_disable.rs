@@ -149,21 +149,18 @@ async fn track_disables_and_enables_are_instant() {
     let _publisher = TestMember::connect(
         credentials.get("publisher").unwrap(),
         Some(Box::new(move |event, ctx, _| {
-            match event {
-                Event::SdpAnswerMade { peer_id, .. } => {
-                    for i in 0..20 {
-                        let mut tracks_patches = Vec::new();
-                        tracks_patches.push(TrackPatch {
-                            id: TrackId(0),
-                            is_muted: Some(i % 2 == 0),
-                        });
-                        ctx.notify(SendCommand(Command::UpdateTracks {
-                            peer_id: *peer_id,
-                            tracks_patches,
-                        }));
-                    }
+            if let Event::SdpAnswerMade { peer_id, .. } = event {
+                for i in 0..20 {
+                    let mut tracks_patches = Vec::new();
+                    tracks_patches.push(TrackPatch {
+                        id: TrackId(0),
+                        is_muted: Some(i % 2 == 0),
+                    });
+                    ctx.notify(SendCommand(Command::UpdateTracks {
+                        peer_id: *peer_id,
+                        tracks_patches,
+                    }));
                 }
-                _ => (),
             }
             publisher_tx.unbounded_send(event.clone()).unwrap();
         })),
@@ -197,12 +194,10 @@ async fn track_disables_and_enables_are_instant() {
                         {
                             let _ = force_update_received_tx.send(());
                         }
-                    } else {
-                        if let Some(all_renegotiations_performed_tx) =
-                            all_renegotiations_performed_tx.take()
-                        {
-                            let _ = all_renegotiations_performed_tx.send(());
-                        }
+                    } else if let Some(all_renegotiations_performed_tx) =
+                        all_renegotiations_performed_tx.take()
+                    {
+                        all_renegotiations_performed_tx.send(()).unwrap();
                     }
                 }
                 _ => {}
@@ -288,29 +283,28 @@ async fn force_update_works() {
                 } => {
                     if negotiation_role.is_none() {
                         force_update_tx.unbounded_send(()).unwrap();
+                    } else if is_renegotiation_happened.get() {
+                        renegotiation_update_tx.unbounded_send(()).unwrap();
                     } else {
-                        if is_renegotiation_happened.get() {
-                            renegotiation_update_tx.unbounded_send(()).unwrap();
-                        } else {
-                            ctx.notify(SendCommand(Command::UpdateTracks {
-                                peer_id: *peer_id,
-                                tracks_patches: vec![TrackPatch {
-                                    is_muted: Some(true),
-                                    id: TrackId(0),
-                                }],
-                            }));
-                            is_renegotiation_happened.set(true);
-                        }
+                        ctx.notify(SendCommand(Command::UpdateTracks {
+                            peer_id: *peer_id,
+                            tracks_patches: vec![TrackPatch {
+                                is_muted: Some(true),
+                                id: TrackId(0),
+                            }],
+                        }));
+                        is_renegotiation_happened.set(true);
                     }
                 }
                 _ => {}
             }
         })),
-        Some(Box::new(move |event| match event {
-            ConnectionEvent::Started => publisher_connection_established_tx
-                .unbounded_send(())
-                .unwrap(),
-            _ => (),
+        Some(Box::new(move |event| {
+            if let ConnectionEvent::Started = event {
+                publisher_connection_established_tx
+                    .unbounded_send(())
+                    .unwrap()
+            }
         })),
         Some(Duration::from_secs(500)),
         true,
@@ -344,19 +338,17 @@ async fn force_update_works() {
             } => {
                 if negotiation_role.is_none() {
                     force_update_tx.unbounded_send(()).unwrap();
+                } else if is_renegotiation_happened.get() {
+                    renegotiation_update_tx.unbounded_send(()).unwrap();
                 } else {
-                    if is_renegotiation_happened.get() {
-                        renegotiation_update_tx.unbounded_send(()).unwrap();
-                    } else {
-                        ctx.notify(SendCommand(Command::UpdateTracks {
-                            peer_id: pub_peer_id.unwrap(),
-                            tracks_patches: vec![TrackPatch {
-                                is_muted: Some(true),
-                                id: track_id.unwrap(),
-                            }],
-                        }));
-                        is_renegotiation_happened.set(true);
-                    }
+                    ctx.notify(SendCommand(Command::UpdateTracks {
+                        peer_id: pub_peer_id.unwrap(),
+                        tracks_patches: vec![TrackPatch {
+                            is_muted: Some(true),
+                            id: track_id.unwrap(),
+                        }],
+                    }));
+                    is_renegotiation_happened.set(true);
                 }
             }
             _ => {}

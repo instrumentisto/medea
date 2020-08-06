@@ -13,7 +13,7 @@ use crate::{
     signalling::{SendCommand, TestMember},
 };
 
-/// Creates Room with two Member's with WebRtcPublishEndpoint's.
+/// Creates Room with two Member's with `WebRtcPublishEndpoint`'s.
 pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
     RoomBuilder::default()
         .id(room_id.to_string())

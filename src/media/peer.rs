@@ -107,7 +107,7 @@ pub trait PeerUpdatesSubscriber: fmt::Debug {
     /// state, otherwise only forced [`TrackChange`]s will be sent.
     fn negotiation_needed(&self, peer_id: PeerId);
 
-    /// Forcebly updates [`Peer`] without renegotiation.
+    /// Forcibly updates [`Peer`] without renegotiation.
     fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
 }
 
