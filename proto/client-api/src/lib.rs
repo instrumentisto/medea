@@ -32,6 +32,7 @@ use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 use self::stats::RtcStat;
+use crate::stats::Float;
 
 /// ID of `Member`.
 #[derive(
@@ -305,6 +306,12 @@ pub enum Event {
         ///
         /// If `None` then no (re)negotiation should be done.
         negotiation_role: Option<NegotiationRole>,
+    },
+
+    QualityScoreUpdated {
+        peer_id: PeerId,
+        partner_peer_id: PeerId,
+        quality_score: Float,
     },
 }
 

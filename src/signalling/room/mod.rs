@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{rc::Rc, sync::Arc};
+use std::{rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
     Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
@@ -390,8 +390,12 @@ impl Room {
 impl Actor for Room {
     type Context = Context<Self>;
 
-    fn started(&mut self, _: &mut Self::Context) {
+    fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Room [id = {}] started.", self.id);
+        ctx.run_interval(Duration::from_secs(5), |this, _| {
+            this.peers.check_peers();
+        });
+        ctx.add_stream(self.peers.subscribe_to_metrics_events());
     }
 }
 

@@ -534,6 +534,22 @@ window.onload = async function() {
       console.error("Init local video failed: " + e);
     }
 
+    room.on_quality_score_update((update) => {
+      for (const [key, value] of update.quality_scores().entries()) {
+        let videoDiv = remote_videos[key];
+        let el = videoDiv.getElementsByClassName('quality-score');
+        let score = value.toFixed(2);
+
+        if (el[0] === undefined) {
+          let qualityEl = document.createElement('span');
+          qualityEl.innerHTML = score;
+          qualityEl.className = 'quality-score';
+          remote_videos[key].appendChild(qualityEl);
+        }
+        el[0].innerHTML = score;
+      }
+    });
+
     room.on_new_connection( (connection) => {
       let remoteMemberId = connection.get_remote_member_id();
       isCallStarted = true;

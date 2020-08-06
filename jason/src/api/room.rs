@@ -2,6 +2,7 @@
 
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     ops::Deref as _,
     rc::{Rc, Weak},
 };
@@ -9,10 +10,10 @@ use std::{
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
-use js_sys::Promise;
+use js_sys::{Map, Promise};
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, MemberId, NegotiationRole,
+    stats::Float, Command, Direction, Event as RpcEvent, EventHandler,
+    IceCandidate, IceConnectionState, IceServer, MemberId, NegotiationRole,
     PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
     TrackUpdate,
 };
@@ -314,6 +315,14 @@ impl RoomHandle {
             .map(|inner| inner.on_failed_local_stream.set_func(f))
     }
 
+    pub fn on_quality_score_update(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.on_quality_score_update.set_func(f))
+    }
+
     /// Sets `on_connection_loss` callback, which will be invoked on
     /// [`RpcClient`] connection loss.
     pub fn on_connection_loss(
@@ -569,6 +578,28 @@ impl Room {
     }
 }
 
+#[wasm_bindgen]
+pub struct QualityScoreUpdate {
+    avg_quality_score: f64,
+    quality_scores: HashMap<PeerId, f64>,
+}
+
+#[wasm_bindgen]
+impl QualityScoreUpdate {
+    pub fn avg_quality_score(&self) -> f64 {
+        self.avg_quality_score
+    }
+
+    pub fn quality_scores(&self) -> Map {
+        let map = Map::new();
+        for (peer_id, score) in &self.quality_scores {
+            map.set(&(peer_id.0).into(), &(*score).into());
+        }
+
+        map
+    }
+}
+
 /// Actual data of a [`Room`].
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
@@ -587,6 +618,10 @@ struct InnerRoom {
 
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
+
+    quality_scores: RefCell<HashMap<PeerId, f64>>,
+
+    on_quality_score_update: Callback1<QualityScoreUpdate>,
 
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
     /// its actual underlying [MediaStream][1] object.
@@ -644,6 +679,8 @@ impl InnerRoom {
             peers,
             peer_event_sender,
             connections: Connections::default(),
+            quality_scores: RefCell::default(),
+            on_quality_score_update: Callback1::default(),
             on_local_stream: Callback1::default(),
             on_connection_loss: Callback1::default(),
             on_failed_local_stream: Rc::new(Callback1::default()),
@@ -1023,6 +1060,29 @@ impl EventHandler for InnerRoom {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
+        Ok(())
+    }
+
+    async fn on_quality_score_updated(
+        &self,
+        _: PeerId,
+        partner_peer_id: PeerId,
+        quality_score: Float,
+    ) -> Self::Output {
+        self.quality_scores
+            .borrow_mut()
+            .insert(partner_peer_id, quality_score.0);
+        let avg_quality_score = {
+            let quality_scores = self.quality_scores.borrow();
+            quality_scores.values().sum::<f64>() / (quality_scores.len() as f64)
+        };
+        let update = QualityScoreUpdate {
+            avg_quality_score,
+            quality_scores: self.quality_scores.borrow().clone(),
+        };
+
+        self.on_quality_score_update.call(update);
+
         Ok(())
     }
 }
