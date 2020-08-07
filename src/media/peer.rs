@@ -28,7 +28,7 @@
 //! a [`Stable`] state only.
 //!
 //! After the changes are applied, the [`Peer`] will notify
-//! [`NegotiationSubscriber`] that it's appropriate to start a negotiation.
+//! [`PeerUpdatesSubscriber`] that it's appropriate to start a negotiation.
 //!
 //! # Implementing [`Peer`]'s update that requires (re)negotiation
 //!
@@ -38,6 +38,35 @@
 //!    implementation.
 //! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
 //!    your change by adding it into the [`Context::track_changes_queue`].
+//!
+//! # Force [`Peer`] updates which are requires renegotiation
+//!
+//! Some updates are require renegotiation, but at same time they require
+//! instant [`Event::TracksApplied`] response even if [`Peer`]s will be out
+//! of sync for a while.
+//!
+//! ## Usage
+//!
+//! If you wanna just use already implemented forcible [`TrackChange`] - use it
+//! same as non-forcible changes. [`Peer`] implementation will take care of how
+//! to do it correctly. __No extra actions are required.__
+//!
+//! ## Algorithm of the forcible [`Peer`] update
+//!
+//! ### If [`Peer`] isn't [`Stable`]
+//!
+//! 1. Send [`Event::TracksApplied`] with `renegotiation_role: None`
+//! 2. When [`Peer`] goes into [`Stable`] state, start new renegotiation process
+//!
+//! ### If [`Peer`] is [`Stable`]
+//!
+//! Same as non-forcible [`TrackChange`].
+//!
+//! ## Implementation
+//!
+//! 1. Implement your change same as non-forcible [`TrackChange`]
+//! 2. Return `true` for your [`TrackChange`] variant in the
+//!    [`TrackChange::is_forcible`] function
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
@@ -69,21 +98,23 @@ use crate::{
     },
 };
 
-/// Subscriber to the events indicating that negotiation process should be
-/// started for the some [`Peer`].
+/// Subscriber to the events indicating that [`Peer`] was updated.
 #[cfg_attr(test, mockall::automock)]
-pub trait NegotiationSubscriber: fmt::Debug {
+pub trait PeerUpdatesSubscriber: fmt::Debug {
     /// Starts negotiation process for the [`Peer`] with the provided `peer_id`.
     ///
     /// Provided [`Peer`] and it's partner [`Peer`] should be in a [`Stable`]
-    /// state, otherwise nothing will be done.
+    /// state, otherwise only forced [`TrackChange`]s will be sent.
     fn negotiation_needed(&self, peer_id: PeerId);
+
+    /// Forcibly updates [`Peer`] without renegotiation.
+    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
 }
 
 #[cfg(test)]
-impl fmt::Debug for MockNegotiationSubscriber {
+impl fmt::Debug for MockPeerUpdatesSubscriber {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("MockNegotiationSubscriber").finish()
+        f.debug_struct("MockPeerUpdatesSubscriber").finish()
     }
 }
 
@@ -160,6 +191,7 @@ impl PeerError {
     )
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
+#[enum_delegate(pub fn commit_forcible_changes(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -176,6 +208,8 @@ impl PeerStateMachine {
     pub fn commit_scheduled_changes(&mut self) {
         if let PeerStateMachine::Stable(stable_peer) = self {
             stable_peer.commit_scheduled_changes();
+        } else {
+            self.commit_forcible_changes();
         }
     }
 
@@ -303,7 +337,14 @@ pub struct Context {
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
-    negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
+    peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
+
+    /// Flag which indicates that this [`Peer`] should be renegotiated when it
+    /// will be [`Stable`].
+    ///
+    /// If this flag `true` then `track_changes_queue` length will be ignored
+    /// and renegotiation will be started on any length.
+    is_forcibly_updated: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -358,9 +399,20 @@ impl TrackChange {
             }
         }
     }
+
+    /// Returns `true` if this [`TrackChange`] can be sent forcibly sent without
+    /// instant renegotiation starting.
+    pub fn is_forcible(&self) -> bool {
+        match self {
+            TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
+                false
+            }
+            TrackChange::TrackPatch(_) => true,
+        }
+    }
 }
 
-impl TrackChangeHandler for Peer<Stable> {
+impl<T> TrackChangeHandler for Peer<T> {
     type Output = ();
 
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
@@ -393,16 +445,19 @@ impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
+    #[inline]
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
     }
 
     /// Returns ID of [`Peer`].
+    #[inline]
     pub fn id(&self) -> Id {
         self.context.id
     }
 
     /// Returns ID of interconnected [`Peer`].
+    #[inline]
     pub fn partner_peer_id(&self) -> Id {
         self.context.partner_peer
     }
@@ -410,6 +465,7 @@ impl<T> Peer<T> {
     /// Returns ID of interconnected [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
+    #[inline]
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
     }
@@ -434,26 +490,31 @@ impl<T> Peer<T> {
     }
 
     /// Indicates whether this [`Peer`] has any send tracks.
+    #[inline]
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
 
     /// Indicates whether all media is forcibly relayed through a TURN server.
+    #[inline]
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
     }
 
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
+    #[inline]
     pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
         self.context.ice_user.as_ref().map(IceUser::servers_list)
     }
 
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s
+    #[inline]
     pub fn set_ice_user(&mut self, ice_user: IceUser) {
         self.context.ice_user.replace(ice_user);
     }
 
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
+    #[inline]
     pub fn endpoints(&self) -> Vec<WeakEndpoint> {
         self.context.endpoints.clone()
     }
@@ -484,13 +545,48 @@ impl<T> Peer<T> {
     }
 
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
+    #[inline]
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
         &self.context.receivers
     }
 
     /// Returns all sending [`MediaTrack`]s of this [`Peer`].
+    #[inline]
     pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
         &self.context.senders
+    }
+
+    /// Commits all [`TrackChange`]s which are marked as forcible
+    /// ([`TrackChange::is_forcible`]).
+    pub fn commit_forcible_changes(&mut self) {
+        let track_changes_queue = std::mem::replace(
+            &mut self.context.track_changes_queue,
+            VecDeque::new(),
+        );
+        let mut forcible_changes = VecDeque::new();
+        let mut filtered_changes_queue = VecDeque::new();
+        for track_change in track_changes_queue {
+            if track_change.is_forcible() {
+                forcible_changes.push_back(track_change);
+            } else {
+                filtered_changes_queue.push_back(track_change);
+            }
+        }
+        self.context.track_changes_queue = filtered_changes_queue;
+
+        let mut updates = Vec::new();
+        for change in forcible_changes {
+            let track_update = change.as_track_update(self.partner_member_id());
+            change.dispatch_with(self);
+            updates.push(track_update);
+        }
+
+        if !updates.is_empty() {
+            self.context
+                .peer_updates_sub
+                .force_update(self.id(), updates);
+            self.context.is_forcibly_updated = true;
+        }
     }
 
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
@@ -594,7 +690,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
-        negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
+        negotiation_subscriber: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -611,7 +707,8 @@ impl Peer<Stable> {
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
             track_changes_queue: VecDeque::new(),
-            negotiation_subscriber,
+            peer_updates_sub: negotiation_subscriber,
+            is_forcibly_updated: false,
         };
 
         Self {
@@ -621,7 +718,9 @@ impl Peer<Stable> {
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
-    pub fn start(self) -> Peer<WaitLocalSdp> {
+    pub fn start(mut self) -> Peer<WaitLocalSdp> {
+        self.negotiation_started();
+
         Peer {
             context: self.context,
             state: WaitLocalSdp {},
@@ -630,15 +729,23 @@ impl Peer<Stable> {
 
     /// Transition new [`Peer`] into state of waiting for remote description.
     pub fn set_remote_sdp(
-        self,
+        mut self,
         sdp_offer: String,
     ) -> Peer<WaitLocalHaveRemote> {
+        self.negotiation_started();
+
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
             state: WaitLocalHaveRemote {},
         }
+    }
+
+    /// This method will be called everytime when [`Peer`] goes from [`Stable`]
+    /// state into any other state.
+    fn negotiation_started(&mut self) {
+        self.context.is_forcibly_updated = false;
     }
 
     /// Returns [mid]s of this [`Peer`].
@@ -671,7 +778,9 @@ impl Peer<Stable> {
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_negotiation(self) -> Peer<WaitLocalSdp> {
+    pub fn start_negotiation(mut self) -> Peer<WaitLocalSdp> {
+        self.negotiation_started();
+
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
@@ -682,22 +791,22 @@ impl Peer<Stable> {
         }
     }
 
-    /// Runs [`Task`]s which are scheduled for this [`Peer`].
+    /// Runs [`TrackChange`]s which are scheduled for this [`Peer`].
     ///
-    /// Returns `true` if at least one [`Task`] was run.
-    ///
-    /// Returns `false` if nothing was done.
+    /// If this [`Peer`] is not [`Stable`] then only forced [`TrackChange`]s
+    /// will be ran without renegotiation. Renegotiation for the forced
+    /// [`TrackChange`]s will be done when [`Peer`] will be [`Stable`].
     fn commit_scheduled_changes(&mut self) {
-        if !self.context.track_changes_queue.is_empty() {
+        if !self.context.track_changes_queue.is_empty()
+            || self.context.is_forcibly_updated
+        {
             while let Some(task) = self.context.track_changes_queue.pop_front()
             {
                 self.context.pending_track_updates.push(task.clone());
                 task.dispatch_with(self);
             }
 
-            self.context
-                .negotiation_subscriber
-                .negotiation_needed(self.id());
+            self.context.peer_updates_sub.negotiation_needed(self.id());
         }
     }
 
@@ -805,9 +914,9 @@ impl<'a> PeerChangesScheduler<'a> {
 pub mod tests {
     use super::*;
 
-    /// Returns dummy [`NegotiationSubscriber`] mock which does nothing.
-    pub fn dummy_negotiation_sub_mock() -> Rc<dyn NegotiationSubscriber> {
-        let mut mock = MockNegotiationSubscriber::new();
+    /// Returns dummy [`PeerUpdatesSubscriber`] mock which does nothing.
+    pub fn dummy_negotiation_sub_mock() -> Rc<dyn PeerUpdatesSubscriber> {
+        let mut mock = MockPeerUpdatesSubscriber::new();
         mock.expect_negotiation_needed().returning(|_| ());
 
         Rc::new(mock)
@@ -881,7 +990,7 @@ pub mod tests {
     #[test]
     fn scheduled_changes_normally_ran() {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |peer_id| {
@@ -913,7 +1022,7 @@ pub mod tests {
     #[test]
     fn scheduled_changes_will_be_ran_on_stable() {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |peer_id| {
@@ -945,5 +1054,59 @@ pub mod tests {
         assert_eq!(peer.context.pending_track_updates.len(), 2);
         assert_eq!(peer.context.track_changes_queue.len(), 0);
         assert_eq!(rx.recv().unwrap(), PeerId(0));
+    }
+
+    #[test]
+    fn force_updates_works() {
+        let (force_update_tx, force_update_rx) = std::sync::mpsc::channel();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub.expect_force_update().returning(
+            move |peer_id: PeerId, changes: Vec<TrackUpdate>| {
+                force_update_tx.send((peer_id, changes)).unwrap();
+            },
+        );
+        let (negotiation_needed_tx, negotiation_needed_rx) =
+            std::sync::mpsc::channel();
+        negotiation_sub.expect_negotiation_needed().returning(
+            move |peer_id: PeerId| {
+                negotiation_needed_tx.send(peer_id).unwrap();
+            },
+        );
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+        peer.as_changes_scheduler().add_sender(media_track(0));
+        peer.as_changes_scheduler().add_receiver(media_track(1));
+        peer.commit_scheduled_changes();
+        let mut peer = peer.start();
+
+        peer.as_changes_scheduler().patch_tracks(vec![
+            TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            },
+        ]);
+        peer.commit_forcible_changes();
+        let (peer_id, changes) = force_update_rx.recv().unwrap();
+
+        assert_eq!(peer_id, PeerId(0));
+        assert_eq!(changes.len(), 2);
+        assert!(peer.context.track_changes_queue.is_empty());
+
+        let peer = peer.set_local_sdp(String::new());
+        peer.set_remote_sdp("");
+
+        let peer_id = negotiation_needed_rx.recv().unwrap();
+        assert_eq!(peer_id, PeerId(0));
     }
 }

@@ -4,12 +4,14 @@ use actix::{
     fut, AsyncContext, Handler, Message, StreamHandler, WeakAddr, WrapFuture,
 };
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{Event, MemberId, NegotiationRole, PeerId};
+use medea_client_api_proto::{
+    Event, MemberId, NegotiationRole, PeerId, TrackUpdate,
+};
 
 use crate::{
     api::control::callback::{MediaDirection, MediaType},
     log::prelude::*,
-    media::{peer::NegotiationSubscriber, Peer, PeerStateMachine, Stable},
+    media::{peer::PeerUpdatesSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
         peers::{
             PeerConnectionStateEventsHandler, PeersMetricsEvent,
@@ -175,7 +177,7 @@ impl Handler<PeerStopped> for Room {
     }
 }
 
-impl NegotiationSubscriber for WeakAddr<Room> {
+impl PeerUpdatesSubscriber for WeakAddr<Room> {
     /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
     /// [`Addr`] a [`NegotiationNeeded`] [`Message`].
     ///
@@ -185,6 +187,53 @@ impl NegotiationSubscriber for WeakAddr<Room> {
         if let Some(addr) = self.upgrade() {
             addr.do_send(NegotiationNeeded(peer_id));
         }
+    }
+
+    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
+    /// [`Addr`] a [`ForceUpdate`] [`Message`].
+    ///
+    /// If [`WeakAddr`] upgrade fails then nothing will be done.
+    #[inline]
+    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
+        if let Some(addr) = self.upgrade() {
+            addr.do_send(ForceUpdate(peer_id, changes));
+        }
+    }
+}
+
+/// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
+/// be updated with a provided [`TrackUpdate`]s, but without renegotiation.
+///
+/// Can be done in any [`Peer`] state.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
+
+impl Handler<ForceUpdate> for Room {
+    type Result = ActFuture<Result<(), RoomError>>;
+
+    /// Gets [`MemberId`] of the provided [`Peer`] and sends all provided
+    /// [`TrackUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
+    fn handle(
+        &mut self,
+        msg: ForceUpdate,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let member_id = actix_try!(self
+            .peers
+            .map_peer_by_id(msg.0, PeerStateMachine::member_id));
+        Box::new(
+            self.members
+                .send_event_to_member(
+                    member_id,
+                    Event::TracksApplied {
+                        peer_id: msg.0,
+                        updates: msg.1,
+                        negotiation_role: None,
+                    },
+                )
+                .into_actor(self),
+        )
     }
 }
 
@@ -208,8 +257,8 @@ impl Handler<NegotiationNeeded> for Room {
     /// Sends [`Event::TrackApplied`] if this [`Peer`] known for the remote
     /// side.
     ///
-    /// If this [`Peer`] or it's partner not [`Stable`] then nothing will be
-    /// done.
+    /// If this [`Peer`] or it's partner not [`Stable`] then forcible
+    /// [`TrackChange`]s will be committed.
     fn handle(
         &mut self,
         msg: NegotiationNeeded,
@@ -248,6 +297,11 @@ impl Handler<NegotiationNeeded> for Room {
                 self.send_peer_created(peer_id)
             }
         } else {
+            actix_try!(self.peers.map_peer_by_id_mut(
+                msg.0,
+                PeerStateMachine::commit_forcible_changes
+            ));
+
             Box::new(fut::ok(()))
         }
     }
