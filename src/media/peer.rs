@@ -167,6 +167,16 @@ impl PeerError {
     }
 }
 
+/// State of the negotiation process of [`Peer`].
+#[derive(Debug, Clone, Copy)]
+enum NegotiationState {
+    /// Negotiation process is in progress.
+    InProgress,
+
+    /// Negotiation process is finished.
+    Finished,
+}
+
 /// Implementation of ['Peer'] state machine.
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
@@ -192,6 +202,7 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
 #[enum_delegate(pub fn commit_forcible_changes(&mut self))]
+#[enum_delegate(pub fn negotiation_in_progress(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -203,11 +214,18 @@ pub enum PeerStateMachine {
 impl PeerStateMachine {
     /// Tries to run all scheduled changes.
     ///
-    /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
+    /// All changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
+    ///
+    /// Only forcible changes will be applied if peer isn't in [`Stable`] state
+    /// or negotiation state is [`NegotiationState::InProgress`].
     #[inline]
     pub fn commit_scheduled_changes(&mut self) {
         if let PeerStateMachine::Stable(stable_peer) = self {
-            stable_peer.commit_scheduled_changes();
+            if stable_peer.is_negotiates() {
+                stable_peer.commit_forcible_changes();
+            } else {
+                stable_peer.commit_scheduled_changes();
+            }
         } else {
             self.commit_forcible_changes();
         }
@@ -345,6 +363,15 @@ pub struct Context {
     /// If this flag `true` then `track_changes_queue` length will be ignored
     /// and renegotiation will be started on any length.
     is_forcibly_updated: bool,
+
+    /// State which indicates that this [`Peer`] is currently negotiates.
+    ///
+    /// While [`Peer`] is in [`NegotiationState::InProgress`], only forcible
+    /// [`TrackChange`]s can be handled.
+    ///
+    /// This field will be [`NegotiationState::Finished`] when this [`Peer`]
+    /// will be transferred to the [`Stable`] state.
+    negotiation_state: NegotiationState,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -604,6 +631,21 @@ impl<T> Peer<T> {
             context: &mut self.context,
         }
     }
+
+    /// Sets indicator that this [`Peer`] is currently in negotiation state.
+    ///
+    /// Sets [`Context::negotiation_state`] to [`NegotiationState::InProgress`].
+    pub fn negotiation_in_progress(&mut self) {
+        self.context.negotiation_state = NegotiationState::InProgress;
+    }
+
+    /// Returns `true` if this [`Peer`] currently is negotiating.
+    ///
+    /// Returns `true` if [`Context::negotiation_state`] is
+    /// [`NegotiationState::InProgress`].
+    pub fn is_negotiates(&self) -> bool {
+        matches!(self.context.negotiation_state, NegotiationState::InProgress)
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -709,6 +751,7 @@ impl Peer<Stable> {
             track_changes_queue: VecDeque::new(),
             peer_updates_sub: negotiation_subscriber,
             is_forcibly_updated: false,
+            negotiation_state: NegotiationState::Finished,
         };
 
         Self {
@@ -820,6 +863,7 @@ impl Peer<Stable> {
     fn negotiation_finished(&mut self) {
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
+        self.context.negotiation_state = NegotiationState::Finished;
         self.commit_scheduled_changes();
     }
 }

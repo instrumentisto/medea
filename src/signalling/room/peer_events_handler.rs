@@ -196,7 +196,7 @@ impl Handler<NegotiationNeeded> for Room {
         // Make sure that both peers are in stable state, if that is not the
         // case then we just skip this iteration, and wait for next
         // proc.
-        let peer: Peer<Stable> =
+        let mut peer: Peer<Stable> =
             if let Ok(peer) = self.peers.take_inner_peer(msg.0) {
                 peer
             } else {
@@ -214,20 +214,23 @@ impl Handler<NegotiationNeeded> for Room {
             }
         };
         let is_known_to_remote = peer.is_known_to_remote();
+        let partner_peer_id = peer.partner_peer_id();
+        peer.negotiation_in_progress();
         self.peers.add_peer(peer);
 
         if is_partner_stable {
+            actix_try!(self.peers.map_peer_by_id_mut(
+                partner_peer_id,
+                |peer| {
+                    peer.negotiation_in_progress();
+                }
+            ));
             if is_known_to_remote {
                 self.send_tracks_applied(peer_id)
             } else {
                 self.send_peer_created(peer_id)
             }
         } else {
-            actix_try!(self.peers.map_peer_by_id_mut(
-                msg.0,
-                PeerStateMachine::commit_forcible_changes
-            ));
-
             Box::new(fut::ok(()))
         }
     }
