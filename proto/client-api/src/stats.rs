@@ -1116,8 +1116,6 @@ pub struct RtcInboundRtpStreamStats {
     /// Packet jitter measured in seconds for this SSRC.
     pub jitter: Option<Float>,
 
-    pub jitter_buffer_delay: Option<Float>,
-
     /// Total number of seconds that have been spent decoding the
     /// [`framesDecoded`] frames of this stream.
     ///

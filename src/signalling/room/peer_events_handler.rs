@@ -14,8 +14,8 @@ use crate::{
     media::{peer::PeerUpdatesSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
         peers::{
-            PeerConnectionStateEventsHandler, PeersMetricsEvent,
-            PeersMetricsEventHandler,
+            EstimatedConnectionQuality, PeerConnectionStateEventsHandler,
+            PeersMetricsEvent, PeersMetricsEventHandler,
         },
         room::{ActFuture, RoomError},
         Room,
@@ -108,7 +108,7 @@ impl PeersMetricsEventHandler for Room {
         &mut self,
         member_id: MemberId,
         partner_member_id: MemberId,
-        quality_score: u8,
+        quality_score: EstimatedConnectionQuality,
     ) -> Self::Output {
         debug!(
             "[{} <-> {}] Quality score: {}",
@@ -119,7 +119,7 @@ impl PeersMetricsEventHandler for Room {
             member_id,
             Event::QualityScoreUpdated {
                 partner_member_id,
-                quality_score,
+                quality_score: quality_score as u8,
             },
         );
 

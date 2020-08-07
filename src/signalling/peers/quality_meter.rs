@@ -1,4 +1,10 @@
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
+
+use derive_more::Display;
+use medea_client_api_proto::stats::StatId;
 
 fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
     let burned_stats = std::mem::replace(stats, Vec::new());
@@ -9,128 +15,191 @@ fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
         .collect();
 }
 
-static R0: f64 = 93.2;
-static P_LOSS_FACTOR: f64 = 2.5;
-static CODEC_DELAY: u8 = 10;
-static JITTER_FACTOR: f64 = 2.0;
-
-static R_LOWER_LIMIT_ALL_DISSATISFIED: u8 = 50;
-static R_LOWER_LIMIT_MANY_DISSATISFIED: u8 = 60;
-static R_LOWER_LIMIT_SOME_DISSATISFIED: u8 = 70;
-
-enum EstimatedConnectionQuality {
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Display)]
+pub enum EstimatedConnectionQuality {
     AllDissatisfied = 1,
     ManyDissatisfied = 2,
     SomeDissatisfied = 3,
-    Satisfied = 4
+    Satisfied = 4,
 }
 
 #[derive(Debug)]
 pub struct QualityMeter {
     rtt: Vec<BurningStat<Rtt>>,
-    jitter: Vec<BurningStat<Jitter>>,
-    packet_loss: Vec<BurningStat<PacketLoss>>,
-    last_packets_lost: u64,
-    last_total_packets: u64,
+    jitter: HashMap<StatId, Vec<BurningStat<Jitter>>>,
+    packet_loss: HashMap<StatId, Vec<BurningStat<PacketLoss>>>,
+    last_packets_lost: HashMap<StatId, u64>,
+    last_total_packets: HashMap<StatId, u64>,
 }
 
 impl QualityMeter {
+    const CODEC_DELAY: f64 = 10.0;
+    const JITTER_FACTOR: f64 = 2.0;
+    const P_LOSS_FACTOR: f64 = 2.5;
+    const R0: f64 = 93.2;
+    const R_LOWER_LIMIT_ALL_DISSATISFIED: f64 = 50.0;
+    const R_LOWER_LIMIT_MANY_DISSATISFIED: f64 = 60.0;
+    const R_LOWER_LIMIT_SOME_DISSATISFIED: f64 = 70.0;
+
     pub fn new() -> Self {
         Self {
             rtt: Vec::new(),
-            jitter: Vec::new(),
-            packet_loss: Vec::new(),
-            last_packets_lost: 0,
-            last_total_packets: 0,
+            jitter: HashMap::new(),
+            packet_loss: HashMap::new(),
+            last_packets_lost: HashMap::new(),
+            last_total_packets: HashMap::new(),
         }
     }
 
-    pub fn add_rtt(&mut self, rtt: u64) {
-        // TODO: get timestamp from metrics
-        self.rtt.push(BurningStat::new(Rtt(rtt), Instant::now()));
+    pub fn add_rtt(&mut self, timestamp: SystemTime, rtt: u64) {
+        self.rtt.push(BurningStat::new(Rtt(rtt), timestamp));
     }
 
-    pub fn add_jitter(&mut self, jitter: u64) {
+    pub fn add_jitter(
+        &mut self,
+        timestamp: SystemTime,
+        stat_id: StatId,
+        jitter: u64,
+    ) {
         self.jitter
-            .push(BurningStat::new(Jitter(jitter), Instant::now()));
+            .entry(stat_id)
+            .or_default()
+            .push(BurningStat::new(Jitter(jitter), timestamp));
     }
 
-    pub fn add_packet_loss(&mut self, packets_lost: u64, total_packets: u64) {
-        if self.last_packets_lost > packets_lost {
-            return;
-        }
-        if self.last_total_packets > total_packets {
-            return;
-        }
+    pub fn add_packet_loss(
+        &mut self,
+        timestamp: SystemTime,
+        stat_id: StatId,
+        packets_lost: u64,
+        total_packets: u64,
+    ) {
+        let last_packets_lost = if let Some(last_packets_lost) =
+            self.last_packets_lost.get(&stat_id)
+        {
+            if *last_packets_lost > packets_lost {
+                return;
+            } else {
+                *last_packets_lost
+            }
+        } else {
+            0
+        };
+        let last_total_packets = if let Some(last_total_packets) =
+            self.last_total_packets.get(&stat_id)
+        {
+            if *last_total_packets > packets_lost {
+                return;
+            } else {
+                *last_total_packets
+            }
+        } else {
+            0
+        };
 
-        let packet_loss_at_period = packets_lost - self.last_packets_lost;
-        let total_packets_at_period = total_packets - self.last_total_packets;
-        self.last_total_packets = total_packets;
-        self.last_packets_lost = packets_lost;
+        let packet_loss_at_period = packets_lost - last_packets_lost;
+        let total_packets_at_period = total_packets - last_total_packets;
+        self.last_total_packets
+            .insert(stat_id.clone(), total_packets);
+        self.last_packets_lost.insert(stat_id.clone(), packets_lost);
         if total_packets_at_period == 0 {
             return;
         }
 
         let packet_loss =
             (packet_loss_at_period as f64) / (total_packets_at_period as f64);
+        if packet_loss > 1.0 {
+            println!(
+                "\n\n\n\n\n\n\nPACKET LOSS: {}; packets_lost: {}; \
+                 total_packets: {}",
+                packet_loss, packet_loss_at_period, total_packets_at_period
+            );
+        }
 
-        self.packet_loss.push(BurningStat::new(
-            PacketLoss((packet_loss * 100.0) as u64),
-            Instant::now(),
-        ));
+        self.packet_loss
+            .entry(stat_id)
+            .or_default()
+            .push(BurningStat::new(
+                PacketLoss((packet_loss * 100.0) as u64),
+                timestamp,
+            ));
     }
 
     fn burn_stats(&mut self) {
         burn(&mut self.rtt);
-        burn(&mut self.jitter);
-        burn(&mut self.packet_loss);
+        self.jitter.values_mut().for_each(burn);
+        self.packet_loss.values_mut().for_each(burn);
     }
 
-    fn average_latency(&self) -> f64 {
+    fn average_latency(&self) -> Option<f64> {
         if self.rtt.is_empty() {
-            return 0.0;
+            return None;
         }
 
-        self.rtt.iter().map(|s| s.stat.0 as f64).sum::<f64>()
-            / (self.rtt.len() as f64)
+        Some(
+            self.rtt.iter().map(|s| s.stat.0 as f64).sum::<f64>()
+                / (self.rtt.len() as f64),
+        )
     }
 
-    // TODO: always 0 for me
-    fn jitter(&self) -> u64 {
-        let mut jitter_iter = self.jitter.iter();
-        let mut prev = jitter_iter.next().map(|s| s.stat.0).unwrap_or(0);
-        jitter_iter.map(|j| j.stat.0).fold(0, |acc, val| {
-            let out = if prev > val {
-                acc + prev - val
-            } else {
-                acc + val - prev
-            };
-            prev = val;
+    fn jitter(&self) -> Option<u64> {
+        let jitter: Vec<u64> = self
+            .jitter
+            .values()
+            .filter_map(|jitter| {
+                let mut jitter_iter = jitter.iter();
+                let mut prev = jitter_iter.next().map(|s| s.stat.0)?;
+                Some(jitter_iter.map(|j| j.stat.0).fold(0, |acc, val| {
+                    let out = if prev > val {
+                        acc + prev - val
+                    } else {
+                        acc + val - prev
+                    };
+                    prev = val;
 
-            out
-        })
-    }
+                    out
+                }))
+            })
+            .collect();
 
-    fn average_packet_loss(&self) -> f64 {
-        if self.packet_loss.is_empty() {
-            return 0.0;
+        let count = jitter.len();
+        if count < 1 {
+            return None;
         }
 
-        self.packet_loss
-            .iter()
-            .map(|s| s.stat.0 as f64)
-            .sum::<f64>()
-            / (self.packet_loss.len() as f64)
+        Some(jitter.into_iter().sum::<u64>() / count as u64)
     }
 
-    // TODO: Option<u8>
-    pub fn calculate(&mut self) -> EstimatedConnectionQuality {
-        use EstimatedConnectionQuality as Quality;
+    fn average_packet_loss(&self) -> Option<f64> {
+        let packet_loss: Vec<f64> = self
+            .packet_loss
+            .values()
+            .filter_map(|packet_loss| {
+                if packet_loss.is_empty() {
+                    return None;
+                }
+
+                Some(
+                    packet_loss.iter().map(|s| s.stat.0 as f64).sum::<f64>()
+                        / (packet_loss.len() as f64),
+                )
+            })
+            .collect();
+
+        let packet_loss_len = packet_loss.len();
+        if packet_loss_len < 1 {
+            return None;
+        }
+
+        Some(packet_loss.into_iter().sum::<f64>() / packet_loss_len as f64)
+    }
+
+    pub fn calculate(&mut self) -> Option<EstimatedConnectionQuality> {
         self.burn_stats();
 
-        let latency = self.average_latency();
-        let jitter = self.jitter() as f64;
-        let packet_loss = self.average_packet_loss();
+        let latency = self.average_latency()?;
+        let jitter = self.jitter()? as f64;
+        let packet_loss = self.average_packet_loss()?;
 
         debug_assert!(latency >= 0.0, "latency cannot be negative");
         debug_assert!(jitter >= 0.0, "jitter cannot be negative");
@@ -141,46 +210,50 @@ impl QualityMeter {
             packet_loss
         );
 
-        let effective_latency = jitter * JITTER_FACTOR + latency + CODEC_DELAY;
+        let effective_latency =
+            jitter * Self::JITTER_FACTOR + latency + Self::CODEC_DELAY;
 
         // Calculate the R-Value (Transmission Rating Factor R) based on
         // Effective Latency. The voice quality drops more significantly
         // over 160ms so the R-Value is penalized more.
         let r = if effective_latency < 160.0 {
-            R0 - (effective_latency / 40.0)
+            Self::R0 - (effective_latency / 40.0)
         } else {
-            R0 - (effective_latency - 120.0) / 10.0
+            Self::R0 - (effective_latency - 120.0) / 10.0
         };
 
-        let r = r - (packet_loss * P_LOSS_FACTOR);
+        let r = r - (packet_loss * Self::P_LOSS_FACTOR);
 
         crate::log::prelude::info!("R = {}", r);
 
-        if r < R_LOWER_LIMIT_ALL_DISSATISFIED {
-            Quality::AllDissatisfied
-        } else if r < R_LOWER_LIMIT_MANY_DISSATISFIED {
-            Quality::ManyDissatisfied
-        } else if r < R_LOWER_LIMIT_SOME_DISSATISFIED {
-            Quality::SomeDissatisfied
-        } else {
-            Quality::Satisfied
+        {
+            use EstimatedConnectionQuality::*;
+            Some(if r < Self::R_LOWER_LIMIT_ALL_DISSATISFIED {
+                AllDissatisfied
+            } else if r < Self::R_LOWER_LIMIT_MANY_DISSATISFIED {
+                ManyDissatisfied
+            } else if r < Self::R_LOWER_LIMIT_SOME_DISSATISFIED {
+                SomeDissatisfied
+            } else {
+                Satisfied
+            })
         }
     }
 }
 
 #[derive(Debug)]
 pub struct BurningStat<T> {
-    timestamp: Instant,
+    timestamp: SystemTime,
     pub stat: T,
 }
 
 impl<T> BurningStat<T> {
-    pub fn new(stat: T, timestamp: Instant) -> Self {
+    pub fn new(stat: T, timestamp: SystemTime) -> Self {
         Self { timestamp, stat }
     }
 
     pub fn should_be_burned(&self) -> bool {
-        (self.timestamp + Duration::from_secs(5)) < Instant::now()
+        (self.timestamp + Duration::from_secs(5)) < SystemTime::now()
     }
 }
 

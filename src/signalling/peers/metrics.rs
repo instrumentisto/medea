@@ -24,9 +24,10 @@ use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, Stream};
 use medea_client_api_proto::{
     stats::{
-        RemoteInboundRtpStreamStat, RtcInboundRtpStreamMediaType,
-        RtcInboundRtpStreamStats, RtcOutboundRtpStreamMediaType,
-        RtcOutboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
+        HighResTimeStamp, RemoteInboundRtpStreamStat,
+        RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
+        RtcStatsType, StatId,
     },
     MediaType as MediaTypeProto, MemberId, PeerId,
 };
@@ -43,6 +44,7 @@ use crate::{
         media_traffic_state::{
             get_diff_added, get_diff_removed, MediaTrafficState,
         },
+        quality_meter::EstimatedConnectionQuality,
         FlowMetricSource,
     },
     utils::instant_into_utc,
@@ -184,7 +186,7 @@ impl PeersMetricsService {
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
             quality_meter: QualityMeter::new(),
-            last_quality_score: 1,
+            last_quality_score: EstimatedConnectionQuality::ManyDissatisfied,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
@@ -220,13 +222,20 @@ impl PeersMetricsService {
             for stat in stats {
                 match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
-                        peer_ref.update_receiver(stat.id, inbound);
+                        peer_ref.update_receiver(
+                            stat.timestamp,
+                            stat.id,
+                            inbound,
+                        );
                     }
                     RtcStatsType::OutboundRtp(outbound) => {
                         peer_ref.update_sender(stat.id, outbound);
                     }
                     RtcStatsType::RemoteInboundRtp(remote_inbound) => {
-                        peer_ref.update_remote_inbound_rtp(remote_inbound);
+                        peer_ref.update_remote_inbound_rtp(
+                            stat.timestamp,
+                            remote_inbound,
+                        );
                     }
                     _ => (),
                 }
@@ -349,19 +358,20 @@ impl PeersMetricsService {
 
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
-            let quality_score = peer.quality_meter.calculate();
-            if quality_score == peer.last_quality_score {
-                return;
-            }
-            peer.last_quality_score = quality_score;
-            if let Some(partner_member_id) = peer.get_partner_member_id() {
-                let _ = sender.unbounded_send(
-                    PeersMetricsEvent::QualityMeterUpdate {
-                        member_id: peer.get_member_id(),
-                        partner_member_id,
-                        quality_score,
-                    },
-                );
+            if let Some(quality_score) = peer.quality_meter.calculate() {
+                if quality_score == peer.last_quality_score {
+                    return;
+                }
+                peer.last_quality_score = quality_score;
+                if let Some(partner_member_id) = peer.get_partner_member_id() {
+                    let _ = sender.unbounded_send(
+                        PeersMetricsEvent::QualityMeterUpdate {
+                            member_id: peer.get_member_id(),
+                            partner_member_id,
+                            quality_score,
+                        },
+                    );
+                }
             }
         }
     }
@@ -432,7 +442,7 @@ pub enum PeersMetricsEvent {
     QualityMeterUpdate {
         member_id: MemberId,
         partner_member_id: MemberId,
-        quality_score: u8,
+        quality_score: EstimatedConnectionQuality,
     },
 }
 
@@ -633,7 +643,7 @@ struct PeerStat {
 
     quality_meter: QualityMeter,
 
-    last_quality_score: u8,
+    last_quality_score: EstimatedConnectionQuality,
 }
 
 impl PeerStat {
@@ -663,35 +673,49 @@ impl PeerStat {
     /// Updates [`MediaTrafficState`] of the [`Recv`] direction.
     fn update_receiver(
         &mut self,
+        timestamp: HighResTimeStamp,
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
     ) {
         self.last_update = Utc::now();
         let ttl = self.stats_ttl;
         let receiver =
-            self.receivers.entry(stat_id).or_insert_with(|| TrackStat {
-                updated_at: Instant::now(),
-                ttl,
-                direction: Recv {
-                    packets_received: 0,
-                },
-                media_type: TrackMediaType::from(&upd.media_specific_stats),
+            self.receivers.entry(stat_id.clone()).or_insert_with(|| {
+                TrackStat {
+                    updated_at: Instant::now(),
+                    ttl,
+                    direction: Recv {
+                        packets_received: 0,
+                    },
+                    media_type: TrackMediaType::from(&upd.media_specific_stats),
+                }
             });
         receiver.update(upd);
-        if let Some(jitter_buffer_delay) = upd.jitter_buffer_delay {
-            self.quality_meter
-                .add_jitter((jitter_buffer_delay.0 * 1000.0) as u64);
+        if let Some(jitter) = upd.jitter {
+            self.quality_meter.add_jitter(
+                timestamp.into(),
+                stat_id.clone(),
+                (jitter.0 * 1000.0) as u64,
+            );
         }
         if let Some(packets_lost) = upd.packets_lost {
-            self.quality_meter
-                .add_packet_loss(packets_lost, upd.packets_received);
+            self.quality_meter.add_packet_loss(
+                timestamp.into(),
+                stat_id,
+                packets_lost,
+                upd.packets_received,
+            );
         }
     }
 
-    fn update_remote_inbound_rtp(&mut self, upd: &RemoteInboundRtpStreamStat) {
+    fn update_remote_inbound_rtp(
+        &mut self,
+        timestamp: HighResTimeStamp,
+        upd: &RemoteInboundRtpStreamStat,
+    ) {
         if let Some(rtt) = upd.round_trip_time {
             let rtt = (rtt.0 * 1000.0) as u64;
-            self.quality_meter.add_rtt(rtt);
+            self.quality_meter.add_rtt(timestamp.into(), rtt);
         }
     }
 
