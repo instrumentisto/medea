@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{cell::Cell, collections::HashMap, rc::Rc, time::Duration};
 
 use actix::{Addr, AsyncContext};
 use futures::{
@@ -9,11 +9,15 @@ use futures::{
     future, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, PeerId, TrackId, TrackPatch, TrackUpdate,
+    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatch, TrackUpdate,
 };
+use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
-    grpc_control_api::{create_room_req, ControlClient},
+    grpc_control_api::{
+        create_room_req, ControlClient, WebRtcPlayEndpointBuilder,
+        WebRtcPublishEndpointBuilder,
+    },
     signalling::{ConnectionEvent, SendCommand, TestMember},
 };
 
@@ -240,6 +244,164 @@ async fn track_disables_and_enables_are_instant() {
     all_renegotiations_performed
         .expect("all_renegotiations_performed")
         .unwrap();
+}
+
+#[actix_rt::test]
+async fn track_disables_and_enables_are_instant2() {
+    const TEST_NAME: &str = "track_disables_and_enables_are_instant2";
+
+    let mut client = ControlClient::new().await;
+    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    client
+        .create(
+            WebRtcPublishEndpointBuilder::default()
+                .id("publish")
+                .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
+                .build()
+                .unwrap()
+                .build_request(format!("{}/responder", TEST_NAME)),
+        )
+        .await;
+    client
+        .create(
+            WebRtcPlayEndpointBuilder::default()
+                .id("play")
+                .src(format!("local://{}/responder/publish", TEST_NAME))
+                .build()
+                .unwrap()
+                .build_request(format!("{}/publisher", TEST_NAME)),
+        )
+        .await;
+
+    let (first_tx, mut first_rx) = mpsc::unbounded();
+    let first = TestMember::connect(
+        credentials.get("publisher").unwrap(),
+        Some(Box::new(move |event, _, _| {
+            first_tx.unbounded_send(event.clone()).unwrap();
+        })),
+        None,
+        Some(Duration::from_secs(500)),
+        false,
+    )
+    .await;
+
+    let (second_tx, mut second_rx) = mpsc::unbounded();
+    let second = TestMember::connect(
+        credentials.get("responder").unwrap(),
+        Some(Box::new(move |event, _, _| {
+            second_tx.unbounded_send(event.clone()).unwrap();
+        })),
+        None,
+        Some(Duration::from_secs(500)),
+        false,
+    )
+    .await;
+
+    loop {
+        if let Event::PeerCreated {
+            peer_id,
+            negotiation_role,
+            tracks,
+            ..
+        } = first_rx.select_next_some().await
+        {
+            let answer = match negotiation_role {
+                NegotiationRole::Offerer => Command::MakeSdpOffer {
+                    peer_id,
+                    sdp_offer: "offer".into(),
+                    mids: tracks
+                        .iter()
+                        .map(|t| t.id)
+                        .enumerate()
+                        .map(|(mid, id)| (id, mid.to_string()))
+                        .collect(),
+                    senders_statuses: HashMap::new(),
+                },
+                NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
+                    peer_id,
+                    sdp_answer: "answer".into(),
+                    senders_statuses: HashMap::new(),
+                },
+            };
+            first.send(SendCommand(answer)).await.unwrap();
+            break;
+        }
+    }
+
+    loop {
+        if let Event::PeerCreated {
+            peer_id,
+            negotiation_role,
+            tracks,
+            ..
+        } = second_rx.select_next_some().await
+        {
+            let answer = match negotiation_role {
+                NegotiationRole::Offerer => Command::MakeSdpOffer {
+                    peer_id,
+                    sdp_offer: "offer".into(),
+                    mids: tracks
+                        .iter()
+                        .map(|t| t.id)
+                        .enumerate()
+                        .map(|(mid, id)| (id, mid.to_string()))
+                        .collect(),
+                    senders_statuses: HashMap::new(),
+                },
+                NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
+                    peer_id,
+                    sdp_answer: "answer".into(),
+                    senders_statuses: HashMap::new(),
+                },
+            };
+            second.send(SendCommand(answer)).await.unwrap();
+            break;
+        }
+    }
+    first
+        .send(SendCommand(Command::UpdateTracks {
+            peer_id: PeerId(0),
+            tracks_patches: vec![TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            }],
+        }))
+        .await
+        .unwrap();
+    loop {
+        if let Event::TracksApplied {
+            peer_id,
+            updates: _,
+            negotiation_role,
+        } = first_rx.select_next_some().await
+        {
+            assert_eq!(peer_id.0, 0);
+            assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
+            break;
+        }
+    }
+    second
+        .send(SendCommand(Command::UpdateTracks {
+            peer_id: PeerId(1),
+            tracks_patches: vec![TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(true),
+            }],
+        }))
+        .await
+        .unwrap();
+    loop {
+        if let Event::TracksApplied {
+            peer_id,
+            updates: _,
+            negotiation_role,
+        } = second_rx.select_next_some().await
+        {
+            assert_eq!(peer_id.0, 1);
+            assert_eq!(negotiation_role, None);
+            break;
+        }
+    }
 }
 
 /// Checks that force update mechanism works for muting and renegotiation after
