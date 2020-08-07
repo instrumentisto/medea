@@ -416,23 +416,6 @@ window.onload = async function() {
   let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
   let localVideo = document.querySelector('.local-video > video');
 
-  let muteRemoteAudioBtn = document.getElementById('mute-remote-audio-btn');
-  muteRemoteAudioBtn.addEventListener('click', () => {
-    room.mute_remote_audio();
-  });
-  let unmuteRemoteAudioBtn = document.getElementById('unmute-remote-audio-btn');
-  unmuteRemoteAudioBtn.addEventListener('click', () => {
-    room.unmute_remote_audio();
-  });
-  let muteRemoteVideoBtn = document.getElementById('mute-remote-video-btn');
-  muteRemoteVideoBtn.addEventListener('click', () => {
-    room.mute_remote_video();
-  });
-  let unmuteRemoteVideoBtn = document.getElementById('unmute-remote-video-btn');
-  unmuteRemoteVideoBtn.addEventListener('click', () => {
-    room.unmute_remote_video();
-  });
-
   async function initLocalStream() {
       let constraints = await build_constraints(
         isAudioMuted ? null : audioSelect,

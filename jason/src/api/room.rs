@@ -1,7 +1,7 @@
 //! Medea room.
 
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     collections::HashMap,
     ops::Deref as _,
     rc::{Rc, Weak},
@@ -375,34 +375,6 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes inbound audio in this [`Room`].
-    pub fn mute_remote_audio(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_remote_mute(true, TransceiverKind::Audio);
-        })
-    }
-
-    /// Mutes inbound video in this [`Room`].
-    pub fn mute_remote_video(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_remote_mute(true, TransceiverKind::Video);
-        })
-    }
-
-    /// Unmutes inbound audio in this [`Room`].
-    pub fn unmute_remote_audio(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_remote_mute(false, TransceiverKind::Audio);
-        })
-    }
-
-    /// Unmutes inbound video in this [`Room`].
-    pub fn unmute_remote_video(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_remote_mute(false, TransceiverKind::Video);
-        })
-    }
-
     /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
@@ -648,20 +620,6 @@ struct InnerRoom {
     /// Note that `None` will be considered as error and `is_err` will be
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
-
-    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Audio`]
-    /// in this [`Room`].
-    ///
-    /// Based on this value, new [`Receiver`]s will be muted (or not) on
-    /// [`Event::PeerCreated`].
-    is_remote_audio_muted: Cell<bool>,
-
-    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Video`]
-    /// in this [`Room`].
-    ///
-    /// Based on this value, new [`Receiver`]s will be muted (or not) on
-    /// [`Event::PeerCreated`].
-    is_remote_video_muted: Cell<bool>,
 }
 
 impl InnerRoom {
@@ -689,8 +647,6 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
-            is_remote_audio_muted: Cell::new(false),
-            is_remote_video_muted: Cell::new(false),
         }
     }
 
@@ -768,52 +724,6 @@ impl InnerRoom {
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
-    }
-
-    /// Enables/disables [`Receiver`]s by provided [`TransceiverKind`] in all
-    /// [`PeerConnection`]s in this [`Room`].
-    ///
-    /// [`Sender`]s of the all enabled/disabled [`Receiver`]s also will be
-    /// enabled/disabled.
-    ///
-    /// Sets [`Room`]'s remote muting state
-    /// ([`InnerRoom::is_remote_audio_muted`]/[`InnerRoom::
-    /// is_remote_video_muted`]).
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    fn toggle_remote_mute(&self, is_muted: bool, kind: TransceiverKind) {
-        match kind {
-            TransceiverKind::Audio => {
-                self.is_remote_audio_muted.set(is_muted);
-            }
-            TransceiverKind::Video => {
-                self.is_remote_video_muted.set(is_muted);
-            }
-        }
-        self.peers
-            .get_all()
-            .into_iter()
-            .map(|peer| {
-                let peer_id = peer.id();
-                let tracks_to_mute: Vec<_> = peer
-                    .get_receivers_ids(kind, !is_muted)
-                    .into_iter()
-                    .map(|id| TrackPatch {
-                        id,
-                        is_muted: Some(is_muted),
-                    })
-                    .collect();
-
-                (peer_id, tracks_to_mute)
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .for_each(|(peer_id, tracks_patches)| {
-                self.rpc.send_command(Command::UpdateTracks {
-                    peer_id,
-                    tracks_patches,
-                });
-            });
     }
 
     /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
@@ -965,16 +875,6 @@ impl EventHandler for InnerRoom {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
-
-        self.toggle_remote_mute(
-            self.is_remote_audio_muted.get(),
-            TransceiverKind::Audio,
-        );
-        self.toggle_remote_mute(
-            self.is_remote_video_muted.get(),
-            TransceiverKind::Video,
-        );
-
         Ok(())
     }
 
