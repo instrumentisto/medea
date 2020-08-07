@@ -117,7 +117,7 @@ impl QualityMeter {
             93.5 - (effective_latency - 120.0) / 10.0
         };
 
-        let r = r - (self.average_packet_loss() * 0.5);
+        let r = r - (self.average_packet_loss() * 2.5);
 
         if r < 50.0 {
             1
@@ -169,7 +169,7 @@ mod tests {
             meter.add_jitter(*jitter);
         }
 
-        assert_eq!(meter.calculate(), 4.0);
+        assert_eq!(meter.calculate(), 4);
     }
 
     #[test]
@@ -208,7 +208,7 @@ mod tests {
             meter.add_rtt(*rtt);
         }
 
-        assert!(meter.calculate() > 3.9);
+        assert_eq!(meter.calculate(), 4);
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
         }
 
         let quality_score = meter.calculate();
-        assert!(quality_score < 2.1);
+        assert_eq!(quality_score, 1);
     }
 
     #[test]
@@ -262,7 +262,7 @@ mod tests {
             meter.add_jitter(*jitter);
         }
 
-        assert_eq!(meter.calculate(), 1.0);
+        assert_eq!(meter.calculate(), 1);
     }
 
     #[test]
