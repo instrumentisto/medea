@@ -9,6 +9,22 @@ fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
         .collect();
 }
 
+static R0: f64 = 93.2;
+static P_LOSS_FACTOR: f64 = 2.5;
+static CODEC_DELAY: u8 = 10;
+static JITTER_FACTOR: f64 = 2.0;
+
+static R_LOWER_LIMIT_ALL_DISSATISFIED: u8 = 50;
+static R_LOWER_LIMIT_MANY_DISSATISFIED: u8 = 60;
+static R_LOWER_LIMIT_SOME_DISSATISFIED: u8 = 70;
+
+enum EstimatedConnectionQuality {
+    AllDissatisfied = 1,
+    ManyDissatisfied = 2,
+    SomeDissatisfied = 3,
+    Satisfied = 4
+}
+
 #[derive(Debug)]
 pub struct QualityMeter {
     rtt: Vec<BurningStat<Rtt>>,
@@ -30,6 +46,7 @@ impl QualityMeter {
     }
 
     pub fn add_rtt(&mut self, rtt: u64) {
+        // TODO: get timestamp from metrics
         self.rtt.push(BurningStat::new(Rtt(rtt), Instant::now()));
     }
 
@@ -78,6 +95,7 @@ impl QualityMeter {
             / (self.rtt.len() as f64)
     }
 
+    // TODO: always 0 for me
     fn jitter(&self) -> u64 {
         let mut jitter_iter = self.jitter.iter();
         let mut prev = jitter_iter.next().map(|s| s.stat.0).unwrap_or(0);
@@ -105,28 +123,47 @@ impl QualityMeter {
             / (self.packet_loss.len() as f64)
     }
 
-    pub fn calculate(&mut self) -> u8 {
+    // TODO: Option<u8>
+    pub fn calculate(&mut self) -> EstimatedConnectionQuality {
+        use EstimatedConnectionQuality as Quality;
         self.burn_stats();
 
-        let effective_latency =
-            self.average_latency() + (self.jitter() as f64) * 2.0 + 10.0;
+        let latency = self.average_latency();
+        let jitter = self.jitter() as f64;
+        let packet_loss = self.average_packet_loss();
 
+        debug_assert!(latency >= 0.0, "latency cannot be negative");
+        debug_assert!(jitter >= 0.0, "jitter cannot be negative");
+        // TODO: panics
+        debug_assert!(
+            packet_loss >= 0.0 && packet_loss <= 100.0,
+            "packet_loss must be between 0 and 100 but was {}",
+            packet_loss
+        );
+
+        let effective_latency = jitter * JITTER_FACTOR + latency + CODEC_DELAY;
+
+        // Calculate the R-Value (Transmission Rating Factor R) based on
+        // Effective Latency. The voice quality drops more significantly
+        // over 160ms so the R-Value is penalized more.
         let r = if effective_latency < 160.0 {
-            93.5 - (effective_latency / 40.0)
+            R0 - (effective_latency / 40.0)
         } else {
-            93.5 - (effective_latency - 120.0) / 10.0
+            R0 - (effective_latency - 120.0) / 10.0
         };
 
-        let r = r - (self.average_packet_loss() * 2.5);
+        let r = r - (packet_loss * P_LOSS_FACTOR);
 
-        if r < 50.0 {
-            1
-        } else if r < 60.0 {
-            2
-        } else if r < 70.0 {
-            3
+        crate::log::prelude::info!("R = {}", r);
+
+        if r < R_LOWER_LIMIT_ALL_DISSATISFIED {
+            Quality::AllDissatisfied
+        } else if r < R_LOWER_LIMIT_MANY_DISSATISFIED {
+            Quality::ManyDissatisfied
+        } else if r < R_LOWER_LIMIT_SOME_DISSATISFIED {
+            Quality::SomeDissatisfied
         } else {
-            4
+            Quality::Satisfied
         }
     }
 }
