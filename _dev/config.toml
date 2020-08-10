@@ -5,7 +5,7 @@ static_specs_dir = "_dev/specs/"
 level = "DEBUG"
 
 [server.client.http]
-public_url = "ws://192.168.1.158:8080/ws"
+public_url = "ws://10.0.0.102:8080/ws"
 
 [turn]
-host = "192.168.1.158"
+host = "10.0.0.102"

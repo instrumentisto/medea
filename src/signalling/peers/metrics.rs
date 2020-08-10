@@ -358,7 +358,15 @@ impl PeersMetricsService {
 
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
-            if let Some(quality_score) = peer.quality_meter.calculate() {
+            let score = peer.quality_meter.calculate()
+                .and_then(|first| {
+                    peer.partner_peer()
+                        .and_then(|p| p.borrow_mut().quality_meter.calculate())
+                        .map(|second| EstimatedConnectionQuality::avg(first, second))
+                });
+
+
+            if let Some(quality_score) = score {
                 if quality_score == peer.last_quality_score {
                     return;
                 }
@@ -708,6 +716,10 @@ impl PeerStat {
         }
     }
 
+    fn partner_peer(&self) -> Option<Rc<RefCell<PeerStat>>> {
+        self.partner_peer.upgrade()
+    }
+
     fn update_remote_inbound_rtp(
         &mut self,
         timestamp: HighResTimeStamp,
@@ -929,7 +941,7 @@ mod tests {
     use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt as _};
     use medea_client_api_proto::{
         stats::{
-            Float, RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
+            RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
             RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
             RtcStatsType, StatId,
         },
@@ -1044,7 +1056,6 @@ mod tests {
             jitter: None,
             total_decode_time: None,
             jitter_buffer_emitted_count: None,
-            jitter_buffer_delay: Some(Float(0.0)),
         }
     }
 

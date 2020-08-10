@@ -2,9 +2,12 @@ use std::{
     collections::HashMap,
     time::{Duration, SystemTime},
 };
+use std::convert::TryFrom;
 
 use derive_more::Display;
 use medea_client_api_proto::stats::StatId;
+
+use crate::log::prelude::*;
 
 fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
     let burned_stats = std::mem::replace(stats, Vec::new());
@@ -21,6 +24,28 @@ pub enum EstimatedConnectionQuality {
     ManyDissatisfied = 2,
     SomeDissatisfied = 3,
     Satisfied = 4,
+}
+
+impl TryFrom<u8> for EstimatedConnectionQuality {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            1 => Self::AllDissatisfied,
+            2 => Self::ManyDissatisfied,
+            3 => Self::SomeDissatisfied,
+            4 => Self::Satisfied,
+            _ => {
+                return Err(())
+            }
+        })
+    }
+}
+
+impl EstimatedConnectionQuality {
+    pub fn avg(first: Self, second: Self) -> Self {
+        Self::try_from(((first as u8) + (second as u8)) / 2).unwrap()
+    }
 }
 
 #[derive(Debug)]
@@ -72,14 +97,16 @@ impl QualityMeter {
         timestamp: SystemTime,
         stat_id: StatId,
         packets_lost: u64,
-        total_packets: u64,
+        packets_received: u64,
     ) {
+        let total_packets = packets_received + packets_lost;
         let last_packets_lost = if let Some(last_packets_lost) =
             self.last_packets_lost.get(&stat_id)
         {
             if *last_packets_lost > packets_lost {
                 return;
             } else {
+
                 *last_packets_lost
             }
         } else {
@@ -88,7 +115,7 @@ impl QualityMeter {
         let last_total_packets = if let Some(last_total_packets) =
             self.last_total_packets.get(&stat_id)
         {
-            if *last_total_packets > packets_lost {
+            if *last_total_packets > total_packets {
                 return;
             } else {
                 *last_total_packets
@@ -108,13 +135,6 @@ impl QualityMeter {
 
         let packet_loss =
             (packet_loss_at_period as f64) / (total_packets_at_period as f64);
-        if packet_loss > 1.0 {
-            println!(
-                "\n\n\n\n\n\n\nPACKET LOSS: {}; packets_lost: {}; \
-                 total_packets: {}",
-                packet_loss, packet_loss_at_period, total_packets_at_period
-            );
-        }
 
         self.packet_loss
             .entry(stat_id)
@@ -201,15 +221,6 @@ impl QualityMeter {
         let jitter = self.jitter()? as f64;
         let packet_loss = self.average_packet_loss()?;
 
-        debug_assert!(latency >= 0.0, "latency cannot be negative");
-        debug_assert!(jitter >= 0.0, "jitter cannot be negative");
-        // TODO: panics
-        debug_assert!(
-            packet_loss >= 0.0 && packet_loss <= 100.0,
-            "packet_loss must be between 0 and 100 but was {}",
-            packet_loss
-        );
-
         let effective_latency =
             jitter * Self::JITTER_FACTOR + latency + Self::CODEC_DELAY;
 
@@ -223,8 +234,6 @@ impl QualityMeter {
         };
 
         let r = r - (packet_loss * Self::P_LOSS_FACTOR);
-
-        crate::log::prelude::info!("R = {}", r);
 
         {
             use EstimatedConnectionQuality::*;
@@ -273,13 +282,25 @@ mod tests {
     #[test]
     fn very_good_call_quality() {
         let mut meter = QualityMeter::new();
-        meter.add_packet_loss(0, 1000);
-        meter.add_rtt(0);
+        meter.add_packet_loss(
+            SystemTime::now(),
+            StatId("a".to_string()),
+            0,
+            1000,
+        );
+        meter.add_rtt(SystemTime::now(), 0);
         for jitter in &[0, 0, 0] {
-            meter.add_jitter(*jitter);
+            meter.add_jitter(
+                SystemTime::now(),
+                StatId("a".to_string()),
+                *jitter,
+            );
         }
 
-        assert_eq!(meter.calculate(), 4);
+        assert_eq!(
+            meter.calculate().unwrap(),
+            EstimatedConnectionQuality::Satisfied
+        );
     }
 
     #[test]
@@ -287,7 +308,11 @@ mod tests {
         let mut meter = QualityMeter::new();
 
         for jitter in &[0, 0, 0, 1, 3, 3, 0, 5, 0, 6, 0, 5, 0, 4, 2, 5, 2, 8] {
-            meter.add_jitter(*jitter);
+            meter.add_jitter(
+                SystemTime::now(),
+                StatId("a".to_string()),
+                *jitter,
+            );
         }
         for (packet_lost, packets_received) in &[
             (0, 45),
@@ -312,13 +337,21 @@ mod tests {
             (0, 528),
             (0, 600),
         ] {
-            meter.add_packet_loss(*packet_lost, *packets_received);
+            meter.add_packet_loss(
+                SystemTime::now(),
+                StatId("a".to_string()),
+                *packet_lost,
+                *packets_received,
+            );
         }
         for rtt in &[1, 1, 2, 2, 2, 1, 1] {
-            meter.add_rtt(*rtt);
+            meter.add_rtt(SystemTime::now(), *rtt);
         }
 
-        assert_eq!(meter.calculate(), 4);
+        assert_eq!(
+            meter.calculate().unwrap(),
+            EstimatedConnectionQuality::Satisfied
+        );
     }
 
     #[test]
@@ -328,7 +361,11 @@ mod tests {
         for jitter in
             &[0, 3, 5, 1, 7, 40, 15, 1, 43, 5, 0, 30, 3, 4, 9, 40, 5, 8]
         {
-            meter.add_jitter(*jitter);
+            meter.add_jitter(
+                SystemTime::now(),
+                StatId("a".to_string()),
+                *jitter,
+            );
         }
         for (packet_lost, packets_received) in &[
             (0, 45),
@@ -353,57 +390,79 @@ mod tests {
             (81, 528),
             (81, 600),
         ] {
-            meter.add_packet_loss(*packet_lost, *packets_received);
+            meter.add_packet_loss(
+                SystemTime::now(),
+                StatId("a".to_string()),
+                *packet_lost,
+                *packets_received,
+            );
         }
         for rtt in &[5, 3, 2, 1, 6, 5, 3] {
-            meter.add_rtt(*rtt);
+            meter.add_rtt(SystemTime::now(), *rtt);
         }
 
-        let quality_score = meter.calculate();
-        assert_eq!(quality_score, 1);
+        assert_eq!(
+            meter.calculate().unwrap(),
+            EstimatedConnectionQuality::AllDissatisfied
+        );
     }
 
     #[test]
     fn extremely_bad_call() {
         let mut meter = QualityMeter::new();
-        meter.add_packet_loss(100, 100);
-        meter.add_rtt(1000);
+        meter.add_packet_loss(
+            SystemTime::now(),
+            StatId("a".to_string()),
+            100,
+            100,
+        );
+        meter.add_rtt(SystemTime::now(), 1000);
         for jitter in &[10, 1000, 3000] {
-            meter.add_jitter(*jitter);
+            meter.add_jitter(
+                SystemTime::now(),
+                StatId("a".to_string()),
+                *jitter,
+            );
         }
 
-        assert_eq!(meter.calculate(), 1);
+        assert_eq!(
+            meter.calculate().unwrap(),
+            EstimatedConnectionQuality::AllDissatisfied
+        );
     }
 
     #[test]
     fn outdated_stats_are_burned() {
         let mut meter = QualityMeter::new();
 
-        meter.jitter.push(BurningStat::new(
-            Jitter(0),
-            Instant::now() - Duration::from_secs(5),
-        ));
-        meter.rtt.push(BurningStat::new(
-            Rtt(0),
-            Instant::now() - Duration::from_secs(5),
-        ));
-        meter.packet_loss.push(BurningStat::new(
-            PacketLoss(0),
-            Instant::now() - Duration::from_secs(5),
-        ));
-        meter.add_jitter(1);
-        meter.add_rtt(1);
-        meter.add_packet_loss(1, 2);
+        meter.add_jitter(
+            SystemTime::now() - Duration::from_secs(5),
+            StatId("a".to_string()),
+            0,
+        );
+        meter.add_rtt(SystemTime::now() - Duration::from_secs(5), 0);
+        meter.add_packet_loss(
+            SystemTime::now() - Duration::from_secs(5),
+            StatId("a".to_string()),
+            0,
+            0,
+        );
+        meter.add_jitter(SystemTime::now(), StatId("a".to_string()), 1);
+        meter.add_rtt(SystemTime::now(), 1);
+        meter.add_packet_loss(SystemTime::now(), StatId("a".to_string()), 1, 2);
 
         meter.calculate();
 
-        assert_eq!(meter.jitter.len(), 1);
-        assert_eq!(meter.jitter.pop().unwrap().stat.0, 1);
+        let mut jitter = meter.jitter.remove(&StatId("a".to_string())).unwrap();
+        assert_eq!(jitter.len(), 1);
+        assert_eq!(jitter.pop().unwrap().stat.0, 1);
 
         assert_eq!(meter.rtt.len(), 1);
         assert_eq!(meter.rtt.pop().unwrap().stat.0, 1);
 
-        assert_eq!(meter.packet_loss.len(), 1);
-        assert_eq!(meter.packet_loss.pop().unwrap().stat.0, 50);
+        let mut packet_loss =
+            meter.packet_loss.remove(&StatId("a".to_string())).unwrap();
+        assert_eq!(packet_loss.len(), 1);
+        assert_eq!(packet_loss.pop().unwrap().stat.0, 33);
     }
 }

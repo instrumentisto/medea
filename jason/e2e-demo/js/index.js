@@ -1,6 +1,6 @@
-const controlDomain = 'http://192.168.1.158:8000';
+const controlDomain = 'http://10.0.0.102:8000';
 const controlUrl = controlDomain + '/control-api/';
-const baseUrl = 'ws://192.168.1.158:8080/ws/';
+const baseUrl = 'ws://10.0.0.102:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
 let remote_videos = {};
