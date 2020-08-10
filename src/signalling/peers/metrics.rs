@@ -358,13 +358,13 @@ impl PeersMetricsService {
 
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
-            let score = peer.quality_meter.calculate()
-                .and_then(|first| {
-                    peer.partner_peer()
-                        .and_then(|p| p.borrow_mut().quality_meter.calculate())
-                        .map(|second| EstimatedConnectionQuality::avg(first, second))
-                });
-
+            let score = peer.quality_meter.calculate().and_then(|first| {
+                peer.partner_peer()
+                    .and_then(|p| p.borrow_mut().quality_meter.calculate())
+                    .map(|second| {
+                        EstimatedConnectionQuality::avg(first, second)
+                    })
+            });
 
             if let Some(quality_score) = score {
                 if quality_score == peer.last_quality_score {

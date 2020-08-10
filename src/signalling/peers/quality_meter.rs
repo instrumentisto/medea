@@ -1,8 +1,8 @@
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     time::{Duration, SystemTime},
 };
-use std::convert::TryFrom;
 
 use derive_more::Display;
 use medea_client_api_proto::stats::StatId;
@@ -35,9 +35,7 @@ impl TryFrom<u8> for EstimatedConnectionQuality {
             2 => Self::ManyDissatisfied,
             3 => Self::SomeDissatisfied,
             4 => Self::Satisfied,
-            _ => {
-                return Err(())
-            }
+            _ => return Err(()),
         })
     }
 }
@@ -106,7 +104,6 @@ impl QualityMeter {
             if *last_packets_lost > packets_lost {
                 return;
             } else {
-
                 *last_packets_lost
             }
         } else {
