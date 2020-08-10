@@ -1538,8 +1538,6 @@ impl Hash for Float {
     }
 }
 
-impl Eq for Float {}
-
 /// Comparison string representations.
 ///
 /// Such implementation is required, so that the results of comparing values and
