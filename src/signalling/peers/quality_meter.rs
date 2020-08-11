@@ -7,8 +7,6 @@ use std::{
 use derive_more::Display;
 use medea_client_api_proto::stats::StatId;
 
-use crate::log::prelude::*;
-
 fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
     let burned_stats = std::mem::replace(stats, Vec::new());
 

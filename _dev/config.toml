@@ -3,9 +3,3 @@ static_specs_dir = "_dev/specs/"
 
 [log]
 level = "DEBUG"
-
-[server.client.http]
-public_url = "ws://10.0.0.102:8080/ws"
-
-[turn]
-host = "10.0.0.102"
