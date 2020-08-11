@@ -315,6 +315,8 @@ impl RoomHandle {
             .map(|inner| inner.on_failed_local_stream.set_func(f))
     }
 
+    /// Sets `on_quality_score_update` callback, which will be invoked when
+    /// connection quality score will be update by server.
     pub fn on_quality_score_update(
         &self,
         f: js_sys::Function,

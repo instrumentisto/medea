@@ -7,6 +7,7 @@ use std::{
 use derive_more::Display;
 use medea_client_api_proto::stats::StatId;
 
+/// Burns outdated stats from the provided [`Vec`].
 fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
     let burned_stats = std::mem::replace(stats, Vec::new());
 
@@ -16,11 +17,19 @@ fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
         .collect();
 }
 
+/// Estimated connection quality.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Display)]
 pub enum EstimatedConnectionQuality {
+    /// All users are dissatisfied.
     AllDissatisfied = 1,
+
+    /// Many users are dissatisfied.
     ManyDissatisfied = 2,
+
+    /// Some users are dissatisfied.
     SomeDissatisfied = 3,
+
+    /// All users are satisfied.
     Satisfied = 4,
 }
 
@@ -39,17 +48,38 @@ impl TryFrom<u8> for EstimatedConnectionQuality {
 }
 
 impl EstimatedConnectionQuality {
+    /// Returns average [`EstimatedConnectionQuality`] between two
+    /// [`EstimatedConnectionQuality`].
     pub fn avg(first: Self, second: Self) -> Self {
+        // Should never panic.
         Self::try_from(((first as u8) + (second as u8)) / 2).unwrap()
     }
 }
 
+/// Calculator of the [`EstimatedConnectionQuality`] score based on RTC stats.
 #[derive(Debug)]
 pub struct QualityMeter {
+    /// Round trip time stats.
     rtt: Vec<BurningStat<Rtt>>,
+
+    /// Jitter stats.
+    ///
+    /// This kind of stats are separated by [`StatId`], but will be united on
+    /// calculation phase.
     jitter: HashMap<StatId, Vec<BurningStat<Jitter>>>,
+
+    /// Packet loss stats in percents (0..100).
+    ///
+    /// This kind of stats are separated by [`StatId`], but will be united on
+    /// calculation phase.
+    ///
+    /// Calculated based on `packetsReceived` and `packetsLost`.
     packet_loss: HashMap<StatId, Vec<BurningStat<PacketLoss>>>,
+
+    /// Last packets lost count for the all [`StatId`]s.
     last_packets_lost: HashMap<StatId, u64>,
+
+    /// Last total packets count for the all [`StatId`]s.
     last_total_packets: HashMap<StatId, u64>,
 }
 
@@ -62,6 +92,7 @@ impl QualityMeter {
     const R_LOWER_LIMIT_MANY_DISSATISFIED: f64 = 60.0;
     const R_LOWER_LIMIT_SOME_DISSATISFIED: f64 = 70.0;
 
+    /// Returns new empty [`QualityMeter`].
     pub fn new() -> Self {
         Self {
             rtt: Vec::new(),
@@ -72,10 +103,12 @@ impl QualityMeter {
         }
     }
 
+    /// Adds new round trip time measurement.
     pub fn add_rtt(&mut self, timestamp: SystemTime, rtt: u64) {
         self.rtt.push(BurningStat::new(Rtt(rtt), timestamp));
     }
 
+    /// Adds new jitter measurement.
     pub fn add_jitter(
         &mut self,
         timestamp: SystemTime,
@@ -88,6 +121,8 @@ impl QualityMeter {
             .push(BurningStat::new(Jitter(jitter), timestamp));
     }
 
+    /// Adds packet loss stat based on the provided `packetsLost` and
+    /// `packetsReceived` stats.
     pub fn add_packet_loss(
         &mut self,
         timestamp: SystemTime,
@@ -140,12 +175,17 @@ impl QualityMeter {
             ));
     }
 
+    /// Burns all outdated stats from this [`QualityMeter`].
     fn burn_stats(&mut self) {
         burn(&mut self.rtt);
         self.jitter.values_mut().for_each(burn);
         self.packet_loss.values_mut().for_each(burn);
     }
 
+    /// Returns average round trip time.
+    ///
+    /// Returns `None` if [`QualityMeter`] doesn't have any round trip time
+    /// stats.
     fn average_latency(&self) -> Option<f64> {
         if self.rtt.is_empty() {
             return None;
@@ -157,6 +197,10 @@ impl QualityMeter {
         )
     }
 
+    /// Returns average jitter value based on the all jitter stats from
+    /// [`QualityMeter`].
+    ///
+    /// Returns `None` if [`QualityMeter`] doesn't have any jitter stats.
     fn jitter(&self) -> Option<u64> {
         let jitter: Vec<u64> = self
             .jitter
@@ -185,6 +229,10 @@ impl QualityMeter {
         Some(jitter.into_iter().sum::<u64>() / count as u64)
     }
 
+    /// Returns average packet loss based on the al packet loss stats from
+    /// [`QualityMeter`].
+    ///
+    /// Returns `None` if [`QualityMeter`] doesn't have any packet loss stats.
     fn average_packet_loss(&self) -> Option<f64> {
         let packet_loss: Vec<f64> = self
             .packet_loss
@@ -209,6 +257,10 @@ impl QualityMeter {
         Some(packet_loss.into_iter().sum::<f64>() / packet_loss_len as f64)
     }
 
+    /// Calculates and returns [`EstimatedConnectionQuality`] based on stats
+    /// from this [`QualityMeter`].
+    ///
+    /// Returns `None` if some of the stats are empty.
     pub fn calculate(&mut self) -> Option<EstimatedConnectionQuality> {
         self.burn_stats();
 
@@ -231,7 +283,9 @@ impl QualityMeter {
         let r = r - (packet_loss * Self::P_LOSS_FACTOR);
 
         {
-            use EstimatedConnectionQuality::*;
+            use EstimatedConnectionQuality::{
+                AllDissatisfied, ManyDissatisfied, Satisfied, SomeDissatisfied,
+            };
             Some(if r < Self::R_LOWER_LIMIT_ALL_DISSATISFIED {
                 AllDissatisfied
             } else if r < Self::R_LOWER_LIMIT_MANY_DISSATISFIED {
@@ -245,28 +299,40 @@ impl QualityMeter {
     }
 }
 
+/// Stat which can be burned when it will be outdated.
 #[derive(Debug)]
 pub struct BurningStat<T> {
+    /// Timestamp of the RTC stat.
     timestamp: SystemTime,
+
+    /// Actual stat.
     pub stat: T,
 }
 
 impl<T> BurningStat<T> {
+    /// Returns new stat with a provided [`SystemTime`] as timestamp.
     pub fn new(stat: T, timestamp: SystemTime) -> Self {
         Self { timestamp, stat }
     }
 
+    /// Returns `true` if this [`BurningStat`] is outdated.
+    ///
+    /// If this stat age more that 5 seconds, then this stat will be considered
+    /// as outdated.
     pub fn should_be_burned(&self) -> bool {
         (self.timestamp + Duration::from_secs(5)) < SystemTime::now()
     }
 }
 
+/// Round trip time stat.
 #[derive(Debug)]
 pub struct Rtt(u64);
 
+/// Jitter stat.
 #[derive(Debug)]
 pub struct Jitter(u64);
 
+/// Packet loss percent stat.
 #[derive(Debug)]
 pub struct PacketLoss(u64);
 
@@ -459,5 +525,26 @@ mod tests {
             meter.packet_loss.remove(&StatId("a".to_string())).unwrap();
         assert_eq!(packet_loss.len(), 1);
         assert_eq!(packet_loss.pop().unwrap().stat.0, 33);
+    }
+
+    #[test]
+    fn avg_connection_quality() {
+        use EstimatedConnectionQuality::{
+            AllDissatisfied, ManyDissatisfied, Satisfied, SomeDissatisfied,
+        };
+
+        for (first, second, result) in &[
+            (Satisfied, Satisfied, Satisfied),
+            (AllDissatisfied, AllDissatisfied, AllDissatisfied),
+            (AllDissatisfied, Satisfied, ManyDissatisfied),
+        ] {
+            assert_eq!(
+                EstimatedConnectionQuality::avg(*first, *second),
+                *result,
+                "{} avg {}",
+                first,
+                second
+            );
+        }
     }
 }

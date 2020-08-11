@@ -356,6 +356,9 @@ impl PeersMetricsService {
         }
     }
 
+    /// Sends [`EstimatedQualityScore`] to the [`PeerMetricsEvent`]s subsciber.
+    ///
+    /// Will be sent average score of the [`Peer`]s pair.
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
             let score = peer.quality_meter.calculate().and_then(|first| {
@@ -447,9 +450,16 @@ pub enum PeersMetricsEvent {
         direction: MediaDirection,
     },
 
+    /// [`EstimatedConnectionQuality`] updated.
     QualityMeterUpdate {
+        /// [`MemberId`] of the [`Peer`] which's [`EstimatedConnectionQuality`]
+        /// was updated.
         member_id: MemberId,
+
+        /// [`MemberId`] of the partner [`Peer`].
         partner_member_id: MemberId,
+
+        /// Actual [`EstimatedConnectionQuality`].
         quality_score: EstimatedConnectionQuality,
     },
 }
@@ -617,6 +627,7 @@ struct PeerStat {
     /// [`PeerId`] of [`Peer`] which this [`PeerStat`] represents.
     peer_id: PeerId,
 
+    /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
     member_id: MemberId,
 
     /// Weak reference to a [`PeerStat`] which represents a partner
@@ -649,8 +660,10 @@ struct PeerStat {
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
 
+    /// [`EstimatedConnectionQuality`] score calculator for this [`PeerStat`].
     quality_meter: QualityMeter,
 
+    /// Last calculated [`EstimatedConnectionQuality`].
     last_quality_score: EstimatedConnectionQuality,
 }
 
@@ -716,10 +729,16 @@ impl PeerStat {
         }
     }
 
+    /// Returns partner [`PeerStat`].
+    ///
+    /// Returns `None` if partner [`PeerStat`] weak reference can't be upgraded.
     fn partner_peer(&self) -> Option<Rc<RefCell<PeerStat>>> {
         self.partner_peer.upgrade()
     }
 
+    /// Updates remote inbond rtp stats.
+    ///
+    /// Adds round trip time stats to the [`QualityMeter`].
     fn update_remote_inbound_rtp(
         &mut self,
         timestamp: HighResTimeStamp,
@@ -885,12 +904,14 @@ impl PeerStat {
             .map(|partner_peer| partner_peer.borrow().get_peer_id())
     }
 
+    /// Returns [`MemberId`] of the partner [`Member`].
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()
             .map(|partner_peer| partner_peer.borrow().get_member_id())
     }
 
+    /// Returns [`MemberId`] of this [`PeerStat`].
     fn get_member_id(&self) -> MemberId {
         self.member_id.clone()
     }

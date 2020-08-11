@@ -307,8 +307,12 @@ pub enum Event {
         negotiation_role: Option<NegotiationRole>,
     },
 
+    /// Media Server notifies about connection quality score update.
     QualityScoreUpdated {
+        /// Partner [`MemberId`] of the [`Peer`].
         partner_member_id: MemberId,
+
+        /// Score (in range 1..4) of the call.
         quality_score: u8,
     },
 }
