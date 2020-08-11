@@ -880,11 +880,29 @@ pub struct PeerChangesScheduler<'a> {
 impl<'a> PeerChangesScheduler<'a> {
     /// Schedules provided [`TrackPatch`]s.
     ///
+    /// Removes all opposite to the provided [`TrackPatch`]es from the
+    /// [`Context::pending_track_updates`].
+    ///
     /// Provided [`TrackPatch`]s will be sent to the client on (re)negotiation.
     pub fn patch_tracks(&mut self, patches: Vec<TrackPatch>) {
+        let mut pending_track_updates =
+            std::mem::take(&mut self.context.pending_track_updates);
+
         for patch in patches {
+            pending_track_updates = pending_track_updates
+                .into_iter()
+                .filter(|t| {
+                    if let TrackChange::TrackPatch(p) = t {
+                        patch.is_opposite(&p) && p != &patch
+                    } else {
+                        true
+                    }
+                })
+                .collect();
             self.schedule_change(TrackChange::TrackPatch(patch));
         }
+
+        self.context.pending_track_updates = pending_track_updates;
     }
 
     /// Schedules `send` tracks adding to `self` and `recv` tracks for this

@@ -366,11 +366,25 @@ impl Track {
 }
 
 /// Path to existing [`Track`] and field which can be updated.
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Eq, PartialEq)]
 pub struct TrackPatch {
     pub id: TrackId,
     pub is_muted: Option<bool>,
+}
+
+impl TrackPatch {
+    /// Returns `true` if this [`TrackPatch`] is opposite to the provided one.
+    #[must_use]
+    pub fn is_opposite(&self, another: &Self) -> bool {
+        let is_muted_opposite = self
+            .is_muted
+            .and_then(|t| another.is_muted.map(|a| t != a))
+            .unwrap_or(true);
+
+        self.id != another.id || is_muted_opposite
+    }
 }
 
 /// Representation of [RTCIceServer][1] (item of `iceServers` field
@@ -664,5 +678,85 @@ mod test {
             serde_json::from_str(&serde_json::to_string(&pong).unwrap())
                 .unwrap()
         )
+    }
+
+    #[test]
+    fn track_patch_opposite() {
+        for (patch_a, patch_b, result) in &[
+            (
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(false),
+                },
+                true,
+            ),
+            (
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+                TrackPatch {
+                    id: TrackId(2),
+                    is_muted: Some(false),
+                },
+                true,
+            ),
+            (
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: None,
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+                true,
+            ),
+            (
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: None,
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: None,
+                },
+                true,
+            ),
+            (
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(false),
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(false),
+                },
+                false,
+            ),
+            (
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+                false,
+            ),
+        ] {
+            assert_eq!(
+                patch_a.is_opposite(&patch_b),
+                *result,
+                "a: {:?}, b: {:?}",
+                patch_a,
+                patch_b
+            );
+        }
     }
 }
