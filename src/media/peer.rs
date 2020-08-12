@@ -454,25 +454,9 @@ impl<T> TrackChangeHandler for Peer<T> {
         self.context.receivers.insert(track.id, track);
     }
 
-    /// Removes all opposite to the provided [`TrackPatch`]es from the
-    /// [`Context::pending_track_updates`].
+    /// Does nothing.
     #[inline]
-    fn on_track_patch(&mut self, patch: TrackPatch) {
-        self.context.pending_track_updates =
-            std::mem::take(&mut self.context.pending_track_updates)
-                .into_iter()
-                .filter(|t| {
-                    if let TrackChange::TrackPatch(p) = t {
-                        patch.is_opposite(&p) || p != &patch
-                    } else {
-                        true
-                    }
-                })
-                .collect();
-        self.context
-            .pending_track_updates
-            .push(TrackChange::TrackPatch(patch));
-    }
+    fn on_track_patch(&mut self, _: TrackPatch) {}
 }
 
 /// [RTCPeerConnection] representation.
@@ -630,6 +614,8 @@ impl<T> Peer<T> {
                 .force_update(self.id(), updates);
             self.context.is_forcibly_updated = true;
         }
+
+        self.dedup_track_patches();
     }
 
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
@@ -661,6 +647,43 @@ impl<T> Peer<T> {
     /// [`NegotiationState::InProgress`].
     pub fn is_negotiates(&self) -> bool {
         matches!(self.context.negotiation_state, NegotiationState::InProgress)
+    }
+
+    /// Dedups [`TrackPatch`]s.
+    ///
+    /// All [`TrackPatch`]s for the some [`TrackId`] will be merged into one
+    /// [`TrackPatch`] with [`TrackPatch::merge`] and pushed to the end of
+    /// [`Context::pending_track_updates`].
+    ///
+    /// Only [`TrackChange::TrackPatch`] will be affected.
+    pub fn dedup_track_patches(&mut self) {
+        let mut grouped_track_patches: HashMap<TrackId, Vec<TrackPatch>> =
+            HashMap::new();
+        let mut track_changes = Vec::new();
+
+        for track_change in
+            std::mem::take(&mut self.context.pending_track_updates)
+        {
+            if let TrackChange::TrackPatch(patch) = track_change {
+                grouped_track_patches
+                    .entry(patch.id)
+                    .or_default()
+                    .push(patch);
+            } else {
+                track_changes.push(track_change);
+            }
+        }
+
+        for (track_id, track_patches) in grouped_track_patches {
+            let mut merged_track_patch = TrackPatch::new(track_id);
+            for track_patch in &track_patches {
+                merged_track_patch.merge(track_patch);
+            }
+
+            track_changes.push(TrackChange::TrackPatch(merged_track_patch));
+        }
+
+        self.context.pending_track_updates = track_changes;
     }
 }
 
@@ -867,6 +890,8 @@ impl Peer<Stable> {
 
             self.context.peer_updates_sub.negotiation_needed(self.id());
         }
+
+        self.dedup_track_patches();
     }
 
     /// Sets [`Context::is_known_to_remote`] to `true`.
@@ -1168,5 +1193,86 @@ pub mod tests {
 
         let peer_id = negotiation_needed_rx.recv().unwrap();
         assert_eq!(peer_id, PeerId(0));
+    }
+
+    #[test]
+    fn track_patch_dedup_works() {
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub
+            .expect_force_update()
+            .returning(move |_: PeerId, _: Vec<TrackUpdate>| {});
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |_: PeerId| {});
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+
+        let patches = vec![
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: None,
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(false),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(false),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: None,
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: None,
+            },
+        ];
+        peer.as_changes_scheduler().patch_tracks(patches);
+        let mut peer = PeerStateMachine::from(peer);
+        peer.commit_scheduled_changes();
+        let peer = if let PeerStateMachine::Stable(peer) = peer {
+            peer
+        } else {
+            unreachable!("Peer should be in Stable state.");
+        };
+
+        let mut track_patches_after: Vec<_> = peer
+            .context
+            .pending_track_updates
+            .iter()
+            .filter_map(|t| {
+                if let TrackChange::TrackPatch(patch) = t {
+                    Some(patch.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let second_track_patch = track_patches_after.pop().unwrap();
+        assert_eq!(second_track_patch.id, TrackId(2));
+        assert_eq!(second_track_patch.is_muted, Some(false));
+
+        let first_track_patch = track_patches_after.pop().unwrap();
+        assert_eq!(first_track_patch.id, TrackId(1));
+        assert_eq!(first_track_patch.is_muted, Some(false));
+
+        assert!(track_patches_after.is_empty());
     }
 }

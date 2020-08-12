@@ -375,15 +375,24 @@ pub struct TrackPatch {
 }
 
 impl TrackPatch {
-    /// Returns `true` if this [`TrackPatch`] is opposite to the provided one.
+    /// Returns new empty [`TrackPatch`] with a provided [`TrackId`].
     #[must_use]
-    pub fn is_opposite(&self, another: &Self) -> bool {
-        let is_muted_opposite = self
-            .is_muted
-            .and_then(|t| another.is_muted.map(|a| t != a))
-            .unwrap_or(true);
+    pub fn new(id: TrackId) -> Self {
+        Self { id, is_muted: None }
+    }
 
-        self.id != another.id || is_muted_opposite
+    /// Merges this [`TrackPatch`] with a provided [`TrackPatch`].
+    ///
+    /// Does nothing if [`TrackId`] of this [`TrackPatch`] and the provided
+    /// [`TrackPatch`] are different.
+    pub fn merge(&mut self, another: &TrackPatch) {
+        if self.id != another.id {
+            return;
+        }
+
+        if let Some(is_muted) = another.is_muted {
+            self.is_muted = Some(is_muted);
+        }
     }
 }
 
@@ -681,81 +690,94 @@ mod test {
     }
 
     #[test]
-    fn track_patch_opposite() {
-        for (patch_a, patch_b, result) in &[
+    fn track_patch_merge() {
+        for (track_patches, result) in vec![
             (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(false),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                ],
                 TrackPatch {
                     id: TrackId(1),
                     is_muted: Some(true),
                 },
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: Some(false),
-                },
-                true,
             ),
             (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                ],
                 TrackPatch {
                     id: TrackId(1),
                     is_muted: Some(true),
                 },
-                TrackPatch {
-                    id: TrackId(2),
-                    is_muted: Some(false),
-                },
-                true,
             ),
             (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                ],
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+            ),
+            (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                    TrackPatch {
+                        id: TrackId(2),
+                        is_muted: Some(true),
+                    },
+                ],
                 TrackPatch {
                     id: TrackId(1),
                     is_muted: None,
                 },
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: Some(true),
-                },
-                true,
-            ),
-            (
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: None,
-                },
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: None,
-                },
-                true,
-            ),
-            (
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: Some(false),
-                },
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: Some(false),
-                },
-                false,
-            ),
-            (
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: Some(true),
-                },
-                TrackPatch {
-                    id: TrackId(1),
-                    is_muted: Some(true),
-                },
-                false,
             ),
         ] {
+            let mut merge_track_patch = TrackPatch::new(TrackId(1));
+            for track_patch in &track_patches {
+                merge_track_patch.merge(track_patch);
+            }
+
             assert_eq!(
-                patch_a.is_opposite(&patch_b),
-                *result,
-                "a: {:?}, b: {:?}",
-                patch_a,
-                patch_b
+                result, merge_track_patch,
+                "track patches: {:?}",
+                track_patches
             );
         }
     }
