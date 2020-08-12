@@ -232,10 +232,17 @@ impl PeersMetricsService {
                         peer_ref.update_sender(stat.id, outbound);
                     }
                     RtcStatsType::RemoteInboundRtp(remote_inbound) => {
-                        peer_ref.update_remote_inbound_rtp(
-                            stat.timestamp,
-                            remote_inbound,
-                        );
+                        if let Some(partner_peer) =
+                            peer_ref.partner_peer.upgrade()
+                        {
+                            let mut partner_peer_ref =
+                                partner_peer.borrow_mut();
+                            partner_peer_ref.update_remote_inbound_rtp(
+                                stat.id.clone(),
+                                stat.timestamp,
+                                remote_inbound,
+                            );
+                        }
                     }
                     _ => (),
                 }
@@ -741,12 +748,20 @@ impl PeerStat {
     /// Adds round trip time stats to the [`QualityMeter`].
     fn update_remote_inbound_rtp(
         &mut self,
+        stat_id: StatId,
         timestamp: HighResTimeStamp,
         upd: &RemoteInboundRtpStreamStat,
     ) {
         if let Some(rtt) = upd.round_trip_time {
             let rtt = (rtt.0 * 1000.0) as u64;
             self.quality_meter.add_rtt(timestamp.into(), rtt);
+        }
+        if let Some(jitter) = upd.jitter {
+            self.quality_meter.add_jitter(
+                timestamp.into(),
+                stat_id,
+                (jitter.0 * 1000.0) as u64,
+            );
         }
     }
 

@@ -558,6 +558,12 @@ pub struct RemoteInboundRtpStreamStat {
     /// [RTCOutBoundRtpStreamStats]: https://tinyurl.com/r6f5vqg
     pub local_id: Option<String>,
 
+    /// Packet jitter measured in seconds for this SSRC.
+    pub jitter: Option<Float>,
+
+    /// Total number of bytes received for this SSRC.
+    pub bytes_received: Option<u64>,
+
     /// Estimated round trip time for this SSRC based on the RTCP timestamps in
     /// the RTCP Receiver Report (RR) and measured in seconds. Calculated as
     /// defined in [Section 6.4.1 of RFC 3550][1]. If no RTCP Receiver Report
