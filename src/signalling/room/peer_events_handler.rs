@@ -104,6 +104,8 @@ impl PeersMetricsEventHandler for Room {
         Box::new(actix::fut::ready(()))
     }
 
+    /// Sends [`Event::QualityScoreUpdated`] to the [`Member`] with a provided
+    /// [`MemberId`].
     fn on_quality_meter_update(
         &mut self,
         member_id: MemberId,

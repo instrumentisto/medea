@@ -560,10 +560,12 @@ pub struct QualityScoreUpdate {
 
 #[wasm_bindgen]
 impl QualityScoreUpdate {
+    /// Returns average quality score.
     pub fn avg_quality_score(&self) -> f32 {
         self.avg_quality_score
     }
 
+    /// Returns all quality scores from this [`Room`].
     pub fn quality_scores(&self) -> Map {
         let map = Map::new();
         for (member_id, score) in &self.quality_scores {
@@ -593,8 +595,11 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
+    /// Quality scores of the all `Member`s connected with this client.
     quality_scores: RefCell<HashMap<MemberId, u8>>,
 
+    /// Callback to be invoked when new [`QualityScoreUpdate`] will be received
+    /// from server.
     on_quality_score_update: Callback1<QualityScoreUpdate>,
 
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
@@ -965,6 +970,8 @@ impl EventHandler for InnerRoom {
         Ok(())
     }
 
+    /// Calculates average score and calls `on_quality_score_update` callback
+    /// with a calculated values.
     async fn on_quality_score_updated(
         &self,
         partner_member_id: MemberId,
