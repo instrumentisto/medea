@@ -729,11 +729,12 @@ impl PeerStat {
                 }
             });
         receiver.update(upd);
-        if let Some(jitter) = upd.jitter {
+        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.0) {
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             self.quality_meter.add_jitter(
                 timestamp.into(),
                 stat_id.clone(),
-                (jitter.0 * 1000.0) as u64,
+                (jitter * 1000.0) as u64,
             );
         }
         if let Some(packets_lost) = upd.packets_lost {
@@ -762,15 +763,17 @@ impl PeerStat {
         timestamp: HighResTimeStamp,
         upd: &RemoteInboundRtpStreamStat,
     ) {
-        if let Some(rtt) = upd.round_trip_time {
+        if let Some(rtt) = upd.round_trip_time.filter(|t| t.0 > 0.0) {
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             let rtt = (rtt.0 * 1000.0) as u64;
             self.quality_meter.add_rtt(timestamp.into(), rtt);
         }
-        if let Some(jitter) = upd.jitter {
+        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.0) {
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             self.quality_meter.add_jitter(
                 timestamp.into(),
                 stat_id,
-                (jitter.0 * 1000.0) as u64,
+                (jitter * 1000.0) as u64,
             );
         }
     }

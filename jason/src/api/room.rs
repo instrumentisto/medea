@@ -980,6 +980,7 @@ impl EventHandler for InnerRoom {
         self.quality_scores
             .borrow_mut()
             .insert(partner_member_id, quality_score);
+        #[allow(clippy::cast_precision_loss)]
         let avg_quality_score = {
             let quality_scores = self.quality_scores.borrow();
             f32::from(

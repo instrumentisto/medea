@@ -163,9 +163,11 @@ impl QualityMeter {
             return;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let packet_loss =
             (packet_loss_at_period as f64) / (total_packets_at_period as f64);
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         self.packet_loss
             .entry(stat_id)
             .or_default()
@@ -191,6 +193,7 @@ impl QualityMeter {
             return None;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         Some(
             self.rtt.iter().map(|s| s.stat.0 as f64).sum::<f64>()
                 / (self.rtt.len() as f64),
@@ -201,7 +204,7 @@ impl QualityMeter {
     /// [`QualityMeter`].
     ///
     /// Returns `None` if [`QualityMeter`] doesn't have any jitter stats.
-    fn jitter(&self) -> Option<u64> {
+    fn jitter(&self) -> Option<f64> {
         let jitter: Vec<u64> = self
             .jitter
             .values()
@@ -226,7 +229,8 @@ impl QualityMeter {
             return None;
         }
 
-        Some(jitter.into_iter().sum::<u64>() / count as u64)
+        #[allow(clippy::cast_precision_loss)]
+        Some(jitter.into_iter().map(|j| j as f64).sum::<f64>() / count as f64)
     }
 
     /// Returns average packet loss based on the al packet loss stats from
@@ -234,7 +238,7 @@ impl QualityMeter {
     ///
     /// Returns `None` if [`QualityMeter`] doesn't have any packet loss stats.
     fn average_packet_loss(&self) -> Option<f64> {
-        let packet_loss: Vec<f64> = self
+        let packet_loss: Vec<_> = self
             .packet_loss
             .values()
             .filter_map(|packet_loss| {
@@ -242,6 +246,7 @@ impl QualityMeter {
                     return None;
                 }
 
+                #[allow(clippy::cast_precision_loss)]
                 Some(
                     packet_loss.iter().map(|s| s.stat.0 as f64).sum::<f64>()
                         / (packet_loss.len() as f64),
@@ -254,6 +259,7 @@ impl QualityMeter {
             return None;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         Some(packet_loss.into_iter().sum::<f64>() / packet_loss_len as f64)
     }
 
@@ -265,7 +271,7 @@ impl QualityMeter {
         self.burn_stats();
 
         let latency = self.average_latency()?;
-        let jitter = self.jitter()? as f64;
+        let jitter = self.jitter()?;
         let packet_loss = self.average_packet_loss()?;
 
         let effective_latency =
