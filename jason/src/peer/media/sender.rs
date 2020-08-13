@@ -6,7 +6,12 @@ use std::{
     time::Duration,
 };
 
-use futures::{channel::mpsc, future, future::Either, StreamExt};
+use futures::{
+    channel::mpsc,
+    future,
+    future::{Either, LocalBoxFuture},
+    FutureExt, StreamExt,
+};
 use medea_client_api_proto as proto;
 use medea_reactive::ObservableCell;
 use proto::{PeerId, TrackId};
@@ -24,7 +29,7 @@ use crate::{
 
 use super::{
     mute_state::{MuteState, StableMuteState},
-    MediaConnectionsError, Result,
+    MediaConnectionsError, MuteableTrack, Result, Track,
 };
 
 /// Builder of the [`Sender`].
@@ -150,11 +155,6 @@ impl Sender {
         &self.caps
     }
 
-    /// Returns [`TrackId`] of this [`Sender`].
-    pub fn track_id(&self) -> TrackId {
-        self.track_id
-    }
-
     /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
     pub fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
@@ -223,11 +223,6 @@ impl Sender {
         self.mute_state.get() == StableMuteState::NotMuted.into()
     }
 
-    /// Returns [`MuteState`] of this [`Sender`].
-    pub fn mute_state(&self) -> MuteState {
-        self.mute_state.get()
-    }
-
     /// Stops mute/unmute timeout of this [`Sender`].
     pub fn stop_mute_state_transition_timeout(&self) {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
@@ -240,68 +235,6 @@ impl Sender {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
             timer.reset();
         }
-    }
-
-    /// Sets current [`MuteState`] to [`MuteState::Transition`].
-    ///
-    /// # Errors
-    ///
-    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
-    /// required for the call and can't be muted.
-    pub fn mute_state_transition_to(
-        &self,
-        desired_state: StableMuteState,
-    ) -> Result<()> {
-        if self.is_required {
-            Err(tracerr::new!(
-                MediaConnectionsError::CannotDisableRequiredSender
-            ))
-        } else {
-            let current_mute_state = self.mute_state.get();
-            self.mute_state
-                .set(current_mute_state.transition_to(desired_state));
-            Ok(())
-        }
-    }
-
-    /// Cancels [`MuteState`] transition.
-    pub fn cancel_transition(&self) {
-        let mute_state = self.mute_state.get();
-        self.mute_state.set(mute_state.cancel_transition());
-    }
-
-    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
-    ///
-    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
-    /// or the [`Sender`] is dropped.
-    ///
-    /// # Errors
-    ///
-    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
-    /// the `desired_state`.
-    pub async fn when_mute_state_stable(
-        self: Rc<Self>,
-        desired_state: StableMuteState,
-    ) -> Result<()> {
-        let mut mute_states = self.mute_state.subscribe();
-        while let Some(state) = mute_states.next().await {
-            match state {
-                MuteState::Transition(_) => continue,
-                MuteState::Stable(s) => {
-                    return if s == desired_state {
-                        Ok(())
-                    } else {
-                        Err(tracerr::new!(
-                                MediaConnectionsError::
-                                MuteStateTransitsIntoOppositeState
-                            ))
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Updates this [`Sender`]s tracks based on the provided
@@ -351,5 +284,84 @@ impl Sender {
                 peer_id: self.peer_id,
             },
         );
+    }
+}
+
+impl Track for Sender {
+    /// Returns [`TrackId`] of this [`Sender`].
+    fn track_id(&self) -> TrackId {
+        self.track_id
+    }
+}
+
+impl MuteableTrack for Sender {
+    /// Returns [`MuteState`] of this [`Sender`].
+    fn mute_state(&self) -> MuteState {
+        self.mute_state.get()
+    }
+
+    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    ///
+    /// # Errors
+    ///
+    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
+    /// required for the call and can't be muted.
+    fn mute_state_transition_to(
+        &self,
+        desired_state: StableMuteState,
+    ) -> Result<()> {
+        if self.is_required {
+            Err(tracerr::new!(
+                MediaConnectionsError::CannotDisableRequiredSender
+            ))
+        } else {
+            let current_mute_state = self.mute_state.get();
+            self.mute_state
+                .set(current_mute_state.transition_to(desired_state));
+            Ok(())
+        }
+    }
+
+    /// Cancels [`MuteState`] transition.
+    fn cancel_transition(&self) {
+        let mute_state = self.mute_state.get();
+        self.mute_state.set(mute_state.cancel_transition());
+    }
+
+    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
+    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    ///
+    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
+    /// or the [`Sender`] is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// the `desired_state`.
+    fn when_mute_state_stable(
+        &self,
+        desired_state: StableMuteState,
+    ) -> future::LocalBoxFuture<'static, Result<()>> {
+        let mut mute_states = self.mute_state.subscribe();
+        async move {
+            while let Some(state) = mute_states.next().await {
+                match state {
+                    MuteState::Transition(_) => continue,
+                    MuteState::Stable(s) => {
+                        return if s == desired_state {
+                            Ok(())
+                        } else {
+                            Err(tracerr::new!(
+                                MediaConnectionsError::
+                                MuteStateTransitsIntoOppositeState
+                            ))
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        .boxed_local()
     }
 }

@@ -22,7 +22,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MemberId, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -48,7 +48,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Receiver, Sender, StableMuteState,
+        MuteStateTransition, MuteableTrack, Receiver, Sender, StableMuteState,
+        Track,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -519,7 +520,10 @@ impl PeerConnection {
     /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
     /// [`TransceiverKind`].
     #[inline]
-    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
+    pub fn get_senders(
+        &self,
+        kind: TransceiverKind,
+    ) -> Vec<Rc<dyn MuteableTrack>> {
         self.media_connections.get_senders(kind)
     }
 
@@ -574,7 +578,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(&self, tracks: Vec<Track>) -> Result<String> {
+    pub async fn get_offer(&self, tracks: Vec<proto::Track>) -> Result<String> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -599,7 +603,7 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+    pub fn create_tracks(&self, tracks: Vec<proto::Track>) -> Result<()> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -791,7 +795,7 @@ impl PeerConnection {
     pub async fn process_offer(
         &self,
         offer: String,
-        tracks: Vec<Track>,
+        tracks: Vec<proto::Track>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =

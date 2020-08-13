@@ -10,7 +10,7 @@ use derive_more::Display;
 use futures::{channel::mpsc, future};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
-use proto::{Direction, PeerId, Track, TrackId};
+use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
@@ -19,6 +19,7 @@ use crate::{
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
+use future::LocalBoxFuture;
 
 use super::{
     conn::{RtcPeerConnection, TransceiverKind},
@@ -33,6 +34,50 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+
+pub trait Track {
+    fn track_id(&self) -> TrackId;
+}
+
+pub trait MuteableTrack: Track {
+    fn mute_state(&self) -> MuteState;
+
+    fn mute_state_transition_to(
+        &self,
+        desired_state: StableMuteState,
+    ) -> Result<()>;
+
+    fn cancel_transition(&self);
+
+    fn when_mute_state_stable(
+        &self,
+        desired_state: StableMuteState,
+    ) -> LocalBoxFuture<'static, Result<()>>;
+}
+
+// impl<T> Track for Rc<T> where T: Track {
+//     fn track_id(&self) -> TrackId {
+//         self.track_id()
+//     }
+// }
+//
+// impl<T> MuteableTrack for Rc<T> where T: MuteableTrack + Track {
+//     fn mute_state(&self) -> MuteState {
+//         self.mute_state()
+//     }
+//
+//     fn mute_state_transition_to(&self, desired_state: StableMuteState) ->
+// Result<()> {         self.mute_state_transition_to(desired_state)
+//     }
+//
+//     fn cancel_transition(&self) {
+//         self.cancel_transition()
+//     }
+//
+//     fn when_mute_state_stable(&self, desired_state: StableMuteState) ->
+// LocalBoxFuture<'static, Result<()>> {         self.
+// when_mute_state_stable(desired_state)     }
+// }
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -164,11 +209,16 @@ impl MediaConnections {
 
     /// Returns all [`Sender`]s from this [`MediaConnections`] with provided
     /// [`TransceiverKind`].
-    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
+    pub fn get_senders(
+        &self,
+        kind: TransceiverKind,
+    ) -> Vec<Rc<dyn MuteableTrack>> {
         self.0
             .borrow()
-            .iter_senders_with_kind(kind)
-            .cloned()
+            .senders
+            .values()
+            .filter(|t| t.kind() == kind)
+            .map(|t| Rc::clone(&t) as Rc<dyn MuteableTrack>)
             .collect()
     }
 
@@ -278,7 +328,7 @@ impl MediaConnections {
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] cause transceiver with specified `mid` does not
     /// exist.
-    pub fn create_tracks<I: IntoIterator<Item = Track>>(
+    pub fn create_tracks<I: IntoIterator<Item = proto::Track>>(
         &self,
         tracks: I,
         send_constraints: &LocalStreamConstraints,

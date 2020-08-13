@@ -27,9 +27,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, Sender, StableMuteState,
-        TransceiverKind,
+        MediaConnectionsError, MuteState, MuteableTrack as _, MuteableTrack,
+        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        RtcStats, Sender, StableMuteState, Track as _, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -678,7 +678,8 @@ impl InnerRoom {
                     }
                 });
 
-                let mut processed_senders: Vec<Rc<Sender>> = Vec::new();
+                let mut processed_senders: Vec<Rc<dyn MuteableTrack>> =
+                    Vec::new();
                 let mut tracks_patches = Vec::new();
                 for sender in senders_to_mute {
                     if let Err(e) =
