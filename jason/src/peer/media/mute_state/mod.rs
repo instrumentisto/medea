@@ -2,7 +2,11 @@
 //!
 //! [`PeerConnection`]: crate::peer::PeerConnection
 
+mod controller;
+
 use derive_more::From;
+
+pub use self::controller::MuteStateController;
 
 /// All mute states in which [`Sender`] can be.
 ///
