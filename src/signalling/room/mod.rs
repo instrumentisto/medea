@@ -9,7 +9,7 @@ mod rpc_server;
 use std::{rc::Rc, sync::Arc};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
+    fut, Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
     MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
@@ -188,16 +188,12 @@ impl Room {
         &mut self,
         member_id: MemberId,
         removed_peers_ids: Vec<PeerId>,
-    ) -> ActFuture<Result<(), RoomError>> {
-        Box::new(
-            self.members
-                .send_event_to_member(
-                    member_id,
-                    Event::PeersRemoved {
-                        peer_ids: removed_peers_ids,
-                    },
-                )
-                .into_actor(self),
+    ) -> Result<(), RoomError> {
+        self.members.send_event_to_member(
+            member_id,
+            Event::PeersRemoved {
+                peer_ids: removed_peers_ids,
+            },
         )
     }
 
@@ -327,29 +323,30 @@ impl Room {
 
             return self.close_gracefully(ctx);
         }
-
-        Box::new(self.send_peers_removed(member_id, peers_id).then(
-            |err, this, ctx: &mut Context<Self>| {
-                if let Err(e) = err {
-                    match e {
-                        RoomError::ConnectionNotExists(_)
-                        | RoomError::UnableToSendEvent(_) => {
-                            Box::new(actix::fut::ready(()))
+        Box::new(
+            fut::ready(self.send_peers_removed(member_id, peers_id)).then(
+                |err, this: &mut Room, ctx: &mut Context<Self>| {
+                    if let Err(e) = err {
+                        match e {
+                            RoomError::ConnectionNotExists(_)
+                            | RoomError::UnableToSendEvent(_) => {
+                                Box::new(actix::fut::ready(()))
+                            }
+                            _ => {
+                                error!(
+                                    "Unexpected failed PeersEvent command, \
+                                     because {}. Room will be stopped.",
+                                    e
+                                );
+                                this.close_gracefully(ctx)
+                            }
                         }
-                        _ => {
-                            error!(
-                                "Unexpected failed PeersEvent command, \
-                                 because {}. Room will be stopped.",
-                                e
-                            );
-                            this.close_gracefully(ctx)
-                        }
+                    } else {
+                        Box::new(actix::fut::ready(()))
                     }
-                } else {
-                    Box::new(actix::fut::ready(()))
-                }
-            },
-        ))
+                },
+            ),
+        )
     }
 
     /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
@@ -362,25 +359,27 @@ impl Room {
     fn send_tracks_applied(
         &mut self,
         peer_id: PeerId,
-    ) -> ActFuture<Result<(), RoomError>> {
-        let peer: Peer<Stable> =
-            actix_try!(self.peers.take_inner_peer(peer_id));
-        let peer = peer.start_negotiation();
+    ) -> Result<(), RoomError> {
+        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
+        let partner_peer: Peer<Stable> =
+            self.peers.take_inner_peer(peer.partner_peer_id())?;
+
+        let peer = peer.start_as_offerer();
+        let partner_peer = partner_peer.start_as_answerer();
+
         let updates = peer.get_updates();
         let member_id = peer.member_id();
-        self.peers.add_peer(peer);
 
-        Box::new(
-            self.members
-                .send_event_to_member(
-                    member_id,
-                    Event::TracksApplied {
-                        updates,
-                        negotiation_role: Some(NegotiationRole::Offerer),
-                        peer_id,
-                    },
-                )
-                .into_actor(self),
+        self.peers.add_peer(peer);
+        self.peers.add_peer(partner_peer);
+
+        self.members.send_event_to_member(
+            member_id,
+            Event::TracksApplied {
+                updates,
+                negotiation_role: Some(NegotiationRole::Offerer),
+                peer_id,
+            },
         )
     }
 }

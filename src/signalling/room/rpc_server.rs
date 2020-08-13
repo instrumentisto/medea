@@ -163,30 +163,18 @@ impl Handler<CommandMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let fut = match self.validate_command(&msg) {
-            Ok(_) => match msg.command.dispatch_with(self) {
-                Ok(res) => {
-                    Box::new(res.then(|res, this, ctx| -> ActFuture<()> {
-                        if let Err(e) = res {
-                            error!(
-                                "Failed handle command, because {}. Room [id \
-                                 = {}] will be stopped.",
-                                e, this.id,
-                            );
-                            this.close_gracefully(ctx)
-                        } else {
-                            Box::new(actix::fut::ready(()))
-                        }
-                    }))
-                }
-                Err(err) => {
+            Ok(_) => {
+                if let Err(err) = msg.command.dispatch_with(self) {
                     error!(
                         "Failed handle command, because {}. Room [id = {}] \
                          will be stopped.",
                         err, self.id,
                     );
                     self.close_gracefully(ctx)
+                } else {
+                    Box::new(actix::fut::ready(()))
                 }
-            },
+            }
             Err(err) => {
                 warn!(
                     "Ignoring Command from Member [{}] that failed validation \

@@ -382,21 +382,8 @@ impl RpcConnection for Addr<WsSession> {
     /// Sends [`Event`] to Web Client.
     ///
     /// [`Event`]: medea_client_api_proto::Event
-    fn send_event(
-        &self,
-        msg: Event,
-    ) -> LocalBoxFuture<'static, Result<(), ()>> {
-        let send_result = self.send(EventMessage::from(msg));
-        async {
-            match send_result.await {
-                Ok(_) => Ok(()),
-                Err(err) => {
-                    error!("Failed send Event to RpcConnection: {:?} ", err);
-                    Err(())
-                }
-            }
-        }
-        .boxed_local()
+    fn send_event(&self, msg: Event) {
+        self.do_send(EventMessage::from(msg));
     }
 }
 
@@ -873,13 +860,10 @@ mod test {
         let rpc_connection: Box<dyn RpcConnection> =
             CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
 
-        rpc_connection
-            .send_event(Event::SdpAnswerMade {
-                peer_id: PeerId(77),
-                sdp_answer: String::from("sdp_answer"),
-            })
-            .await
-            .unwrap();
+        rpc_connection.send_event(Event::SdpAnswerMade {
+            peer_id: PeerId(77),
+            sdp_answer: String::from("sdp_answer"),
+        });
 
         let item = client.skip(2).next().await.unwrap().unwrap();
 
