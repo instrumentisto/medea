@@ -368,13 +368,23 @@ impl PeersMetricsService {
     /// Will be sent average score of the [`Peer`]s pair.
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
-            let score = peer.quality_meter.calculate().and_then(|first| {
-                peer.partner_peer()
-                    .and_then(|p| p.borrow_mut().quality_meter.calculate())
-                    .map(|second| {
-                        EstimatedConnectionQuality::avg(first, second)
-                    })
-            });
+            let partner_score = peer
+                .partner_peer()
+                .and_then(|p| p.borrow_mut().quality_meter.calculate());
+            let score = peer
+                .quality_meter
+                .calculate()
+                .and_then(|score| {
+                    partner_score
+                        .map(|partner_score| {
+                            EstimatedConnectionQuality::avg(
+                                score,
+                                partner_score,
+                            )
+                        })
+                        .or_else(|| Some(score))
+                })
+                .or_else(|| partner_score);
 
             if let Some(quality_score) = score {
                 if quality_score == peer.last_quality_score {
