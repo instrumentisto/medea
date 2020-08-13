@@ -55,29 +55,11 @@ pub trait MuteableTrack: Track {
     ) -> LocalBoxFuture<'static, Result<()>>;
 }
 
-// impl<T> Track for Rc<T> where T: Track {
-//     fn track_id(&self) -> TrackId {
-//         self.track_id()
-//     }
-// }
-//
-// impl<T> MuteableTrack for Rc<T> where T: MuteableTrack + Track {
-//     fn mute_state(&self) -> MuteState {
-//         self.mute_state()
-//     }
-//
-//     fn mute_state_transition_to(&self, desired_state: StableMuteState) ->
-// Result<()> {         self.mute_state_transition_to(desired_state)
-//     }
-//
-//     fn cancel_transition(&self) {
-//         self.cancel_transition()
-//     }
-//
-//     fn when_mute_state_stable(&self, desired_state: StableMuteState) ->
-// LocalBoxFuture<'static, Result<()>> {         self.
-// when_mute_state_stable(desired_state)     }
-// }
+#[derive(Debug, Clone, Copy)]
+pub enum TrackDirection {
+    Send,
+    Recv,
+}
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -212,14 +194,26 @@ impl MediaConnections {
     pub fn get_senders(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
     ) -> Vec<Rc<dyn MuteableTrack>> {
-        self.0
-            .borrow()
-            .senders
-            .values()
-            .filter(|t| t.kind() == kind)
-            .map(|t| Rc::clone(&t) as Rc<dyn MuteableTrack>)
-            .collect()
+        match direction {
+            TrackDirection::Send => self
+                .0
+                .borrow()
+                .senders
+                .values()
+                .filter(|t| t.kind() == kind)
+                .map(|t| Rc::clone(&t) as Rc<dyn MuteableTrack>)
+                .collect(),
+            TrackDirection::Recv => self
+                .0
+                .borrow()
+                .receivers
+                .values()
+                .filter(|t| t.kind() == kind)
+                .map(|t| Rc::clone(&t) as Rc<dyn MuteableTrack>)
+                .collect(),
+        }
     }
 
     /// Returns all [`Receiver`]s from this [`MediaConnections`] with provided

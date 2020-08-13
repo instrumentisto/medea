@@ -49,7 +49,7 @@ pub use self::{
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, MuteableTrack, Receiver, Sender, StableMuteState,
-        Track,
+        Track, TrackDirection,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -523,8 +523,9 @@ impl PeerConnection {
     pub fn get_senders(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
     ) -> Vec<Rc<dyn MuteableTrack>> {
-        self.media_connections.get_senders(kind)
+        self.media_connections.get_senders(kind, direction)
     }
 
     /// Returns all [`Receiver`]s from this [`PeerConnection`] with provided
