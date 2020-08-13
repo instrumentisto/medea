@@ -1,20 +1,25 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
 use proto::TrackId;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        media::{mute_state::MuteStateController, Result},
         PeerEvent,
     },
 };
+
+use super::mute_state::StableMuteState;
+use crate::peer::{MuteState, MuteableTrack, Track};
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -34,6 +39,7 @@ struct InnerReceiver {
     notified_track: bool,
     // TODO: ObservableCell
     muted: bool,
+    mute_state_controller: Rc<MuteStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
@@ -53,7 +59,7 @@ impl Receiver {
         mid: Option<String>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         recv_constraints: &RecvConstraints,
-    ) -> Self {
+    ) -> Rc<Self> {
         let kind = TransceiverKind::from(caps);
         let muted = match kind {
             TransceiverKind::Audio => recv_constraints.is_audio_disabled(),
@@ -68,24 +74,38 @@ impl Receiver {
             None => Some(peer.add_transceiver(kind, transceiver_direction)),
             Some(_) => None,
         };
-        Self(RefCell::new(InnerReceiver {
+        let mute_state_controller = MuteStateController::new(muted.into());
+        let mut on_finalized_mute_state = mute_state_controller.on_finalized();
+        let this = Rc::new(Self(RefCell::new(InnerReceiver {
             track_id,
             sender_id,
             transceiver,
             transceiver_direction,
             kind,
             mid,
+            mute_state_controller,
             notified_track: false,
             track: None,
             muted,
             peer_events_sender,
-        }))
-    }
+        })));
 
-    /// Returns [`TrackId`] of this [`Receiver`].
-    #[inline]
-    pub fn track_id(&self) -> TrackId {
-        self.0.borrow().track_id
+        spawn_local({
+            let weak_this = Rc::downgrade(&this);
+
+            async move {
+                while let Some(finalize_mute_state) =
+                    on_finalized_mute_state.next().await
+                {
+                    match finalize_mute_state {
+                        StableMuteState::Muted => {}
+                        StableMuteState::NotMuted => {}
+                    }
+                }
+            }
+        });
+
+        this
     }
 
     #[inline]
@@ -198,5 +218,68 @@ impl InnerReceiver {
             );
             self.notified_track = true;
         }
+    }
+}
+
+impl Track for Receiver {
+    /// Returns [`TrackId`] of this [`Sender`].
+    fn track_id(&self) -> TrackId {
+        self.0.borrow().track_id
+    }
+}
+
+impl MuteableTrack for Receiver {
+    /// Returns [`MuteState`] of this [`Sender`].
+    fn mute_state(&self) -> MuteState {
+        self.0.borrow().mute_state_controller.mute_state()
+    }
+
+    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    ///
+    /// # Errors
+    ///
+    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
+    /// required for the call and can't be muted.
+    fn mute_state_transition_to(
+        &self,
+        desired_state: StableMuteState,
+    ) -> Result<()> {
+        // if self.is_required {
+        //     Err(tracerr::new!(
+        //         MediaConnectionsError::CannotDisableRequiredSender
+        //     ))
+        // } else {
+        self.0
+            .borrow()
+            .mute_state_controller
+            .transition_to(desired_state);
+        Ok(())
+        // }
+    }
+
+    /// Cancels [`MuteState`] transition.
+    fn cancel_transition(&self) {
+        self.0.borrow().mute_state_controller.cancel_transition()
+    }
+
+    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
+    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    ///
+    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
+    /// or the [`Sender`] is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// the `desired_state`.
+    fn when_mute_state_stable(
+        &self,
+        desired_state: StableMuteState,
+    ) -> LocalBoxFuture<'static, Result<()>> {
+        self.0
+            .borrow()
+            .mute_state_controller
+            .when_mute_state_stable(desired_state)
     }
 }

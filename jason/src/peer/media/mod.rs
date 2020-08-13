@@ -374,7 +374,7 @@ impl MediaConnections {
                         inner.peer_events_sender.clone(),
                         recv_constraints,
                     );
-                    inner.receivers.insert(track.id, Rc::new(recv));
+                    inner.receivers.insert(track.id, recv);
                 }
             }
         }
