@@ -62,31 +62,85 @@ impl<'a> SenderBuilder<'a> {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let mute_state = ObservableCell::new(self.mute_state.into());
-        // we dont care about initial state, cause transceiver is inactive atm
-        let mut mute_state_changes = mute_state.subscribe().skip(1);
+        let mute_state_observer = MuteStateObserver::new(self.mute_state);
+        let mut finalized_mute_state_rx = mute_state_observer.on_finalized();
         let this = Rc::new(Sender {
             peer_id: self.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
             transceiver,
-            mute_state,
-            mute_timeout_handle: RefCell::new(None),
+            mute_state_observer,
             is_required: self.is_required,
             transceiver_direction: Cell::new(TransceiverDirection::Inactive),
             peer_events_sender: self.peer_events_sender,
         });
+        spawn_local({
+            let weak_this = Rc::downgrade(&this);
+            async move {
+                while let Some(finalized_mute_state) =
+                    finalized_mute_state_rx.next().await
+                {
+                    if let Some(this) = weak_this.upgrade() {
+                        match finalized_mute_state {
+                            StableMuteState::NotMuted => this.request_track(),
+                            StableMuteState::Muted => this.disable().await,
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
 
-        let weak_this = Rc::downgrade(&this);
+        Ok(this)
+    }
+}
+
+struct MuteStateObserver {
+    mute_state: ObservableCell<MuteState>,
+    mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+    on_finalized_subs: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
+}
+
+use futures::stream::LocalBoxStream;
+
+impl MuteStateObserver {
+    pub fn new(mute_state: StableMuteState) -> Rc<Self> {
+        let this = Rc::new(Self {
+            mute_state: ObservableCell::new(mute_state.into()),
+            on_finalized_subs: RefCell::default(),
+            mute_timeout_handle: RefCell::new(None),
+        });
+        this.clone().spawn();
+
+        this
+    }
+
+    pub fn on_finalized(&self) -> LocalBoxStream<'static, StableMuteState> {
+        let (tx, rx) = mpsc::unbounded();
+        self.on_finalized_subs.borrow_mut().push(tx);
+
+        Box::pin(rx)
+    }
+
+    fn send_finalized_state(&self, state: StableMuteState) {
+        self.on_finalized_subs.borrow().iter().for_each(|s| {
+            s.unbounded_send(state);
+        });
+    }
+
+    pub fn spawn(self: Rc<Self>) {
+        // we don't care about initial state, cause transceiver is inactive atm
+        let mut mute_state_changes = self.mute_state.subscribe().skip(1);
+        let weak_this = Rc::downgrade(&self);
         spawn_local(async move {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     match mute_state {
-                        MuteState::Stable(stable) => match stable {
-                            StableMuteState::NotMuted => this.request_track(),
-                            StableMuteState::Muted => this.disable().await,
-                        },
+                        MuteState::Stable(stable) => {
+                            this.send_finalized_state(stable);
+                        }
                         MuteState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {
@@ -125,8 +179,100 @@ impl<'a> SenderBuilder<'a> {
                 }
             }
         });
+    }
 
-        Ok(this)
+    /// Checks whether [`Sender`] is in [`MuteState::Muted`].
+    pub fn is_muted(&self) -> bool {
+        self.mute_state.get() == StableMuteState::Muted.into()
+    }
+
+    /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
+    pub fn is_not_muted(&self) -> bool {
+        self.mute_state.get() == StableMuteState::NotMuted.into()
+    }
+
+    /// Stops mute/unmute timeout of this [`Sender`].
+    pub fn stop_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.stop();
+        }
+    }
+
+    /// Resets mute/unmute timeout of this [`Sender`].
+    pub fn reset_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.reset();
+        }
+    }
+
+    pub fn update(&self, is_muted: bool) {
+        let new_mute_state = StableMuteState::from(is_muted);
+        let current_mute_state = self.mute_state.get();
+
+        let mute_state_update: MuteState = match current_mute_state {
+            MuteState::Stable(_) => new_mute_state.into(),
+            MuteState::Transition(t) => {
+                if t.intended() == new_mute_state {
+                    new_mute_state.into()
+                } else {
+                    t.set_inner(new_mute_state).into()
+                }
+            }
+        };
+
+        self.mute_state.set(mute_state_update);
+    }
+
+    pub fn mute_state(&self) -> MuteState {
+        self.mute_state.get()
+    }
+
+    pub fn transition_to(&self, desired_state: StableMuteState) {
+        let current_mute_state = self.mute_state.get();
+        self.mute_state
+            .set(current_mute_state.transition_to(desired_state));
+    }
+
+    pub fn cancel_transition(&self) {
+        let mute_state = self.mute_state.get();
+        self.mute_state.set(mute_state.cancel_transition());
+    }
+
+    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
+    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    ///
+    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
+    /// or the [`Sender`] is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// the `desired_state`.
+    pub fn when_mute_state_stable(
+        &self,
+        desired_state: StableMuteState,
+    ) -> future::LocalBoxFuture<'static, Result<()>> {
+        let mut mute_states = self.mute_state.subscribe();
+        async move {
+            while let Some(state) = mute_states.next().await {
+                match state {
+                    MuteState::Transition(_) => continue,
+                    MuteState::Stable(s) => {
+                        return if s == desired_state {
+                            Ok(())
+                        } else {
+                            Err(tracerr::new!(
+                                MediaConnectionsError::
+                                MuteStateTransitsIntoOppositeState
+                            ))
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        .boxed_local()
     }
 }
 
@@ -139,8 +285,9 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     transceiver_direction: Cell<TransceiverDirection>,
-    mute_state: ObservableCell<MuteState>,
-    mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+    mute_state_observer: Rc<MuteStateObserver>,
+    // mute_state: ObservableCell<MuteState>,
+    // mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
@@ -215,26 +362,24 @@ impl Sender {
 
     /// Checks whether [`Sender`] is in [`MuteState::Muted`].
     pub fn is_muted(&self) -> bool {
-        self.mute_state.get() == StableMuteState::Muted.into()
+        self.mute_state_observer.is_muted()
     }
 
     /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
     pub fn is_not_muted(&self) -> bool {
-        self.mute_state.get() == StableMuteState::NotMuted.into()
+        self.mute_state_observer.is_not_muted()
     }
 
     /// Stops mute/unmute timeout of this [`Sender`].
     pub fn stop_mute_state_transition_timeout(&self) {
-        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
-            timer.stop();
-        }
+        self.mute_state_observer
+            .stop_mute_state_transition_timeout()
     }
 
     /// Resets mute/unmute timeout of this [`Sender`].
     pub fn reset_mute_state_transition_timeout(&self) {
-        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
-            timer.reset();
-        }
+        self.mute_state_observer
+            .reset_mute_state_transition_timeout()
     }
 
     /// Updates this [`Sender`]s tracks based on the provided
@@ -245,21 +390,7 @@ impl Sender {
         }
 
         if let Some(is_muted) = track.is_muted {
-            let new_mute_state = StableMuteState::from(is_muted);
-            let current_mute_state = self.mute_state.get();
-
-            let mute_state_update: MuteState = match current_mute_state {
-                MuteState::Stable(_) => new_mute_state.into(),
-                MuteState::Transition(t) => {
-                    if t.intended() == new_mute_state {
-                        new_mute_state.into()
-                    } else {
-                        t.set_inner(new_mute_state).into()
-                    }
-                }
-            };
-
-            self.mute_state.set(mute_state_update);
+            self.mute_state_observer.update(is_muted);
         }
     }
 
@@ -297,7 +428,7 @@ impl Track for Sender {
 impl MuteableTrack for Sender {
     /// Returns [`MuteState`] of this [`Sender`].
     fn mute_state(&self) -> MuteState {
-        self.mute_state.get()
+        self.mute_state_observer.mute_state()
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
@@ -315,17 +446,14 @@ impl MuteableTrack for Sender {
                 MediaConnectionsError::CannotDisableRequiredSender
             ))
         } else {
-            let current_mute_state = self.mute_state.get();
-            self.mute_state
-                .set(current_mute_state.transition_to(desired_state));
+            self.mute_state_observer.transition_to(desired_state);
             Ok(())
         }
     }
 
     /// Cancels [`MuteState`] transition.
     fn cancel_transition(&self) {
-        let mute_state = self.mute_state.get();
-        self.mute_state.set(mute_state.cancel_transition());
+        self.mute_state_observer.cancel_transition()
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this
@@ -343,25 +471,7 @@ impl MuteableTrack for Sender {
         &self,
         desired_state: StableMuteState,
     ) -> future::LocalBoxFuture<'static, Result<()>> {
-        let mut mute_states = self.mute_state.subscribe();
-        async move {
-            while let Some(state) = mute_states.next().await {
-                match state {
-                    MuteState::Transition(_) => continue,
-                    MuteState::Stable(s) => {
-                        return if s == desired_state {
-                            Ok(())
-                        } else {
-                            Err(tracerr::new!(
-                                MediaConnectionsError::
-                                MuteStateTransitsIntoOppositeState
-                            ))
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }
-        .boxed_local()
+        self.mute_state_observer
+            .when_mute_state_stable(desired_state)
     }
 }
