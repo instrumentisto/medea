@@ -150,7 +150,7 @@ pub enum Command {
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
         /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+        transceiver_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
@@ -158,7 +158,7 @@ pub enum Command {
         peer_id: PeerId,
         sdp_answer: String,
         /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+        transceiver_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends Ice Candidate.

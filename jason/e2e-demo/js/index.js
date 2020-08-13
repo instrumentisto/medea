@@ -5,8 +5,17 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 let roomId = window.location.hash.replace("#", "");
 let remote_videos = {};
 
-let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
+let joinCallerButton = document.getElementById('connection-settings__connect');
+let usernameInput = document.getElementById('connection-settings__username');
 let usernameMenuButton = document.getElementById('username-menu-button');
+let muteAudioSend = document.getElementById('control__mute_audio_send');
+let muteVideoSend = document.getElementById('control__mute_video_send');
+let muteAudioRecv = document.getElementById('control__mute_audio_recv');
+let muteVideoRecv = document.getElementById('control__mute_video_recv');
+let closeApp = document.getElementById('control__close_app');
+let audioSelect = document.getElementById('connect__select-device_audio');
+let videoSelect = document.getElementById('connect__select-device_video');
+let localVideo = document.getElementById("local-video");
 
 function getMemberId() {
   return usernameInput.value;
@@ -378,6 +387,11 @@ async function startPublishing() {
   });
 }
 
+async function updateLocalVideo(stream) {
+  localVideo.srcObject = stream.get_media_stream();
+  await localVideo.play();
+}
+
 window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
@@ -403,40 +417,20 @@ window.onload = async function() {
     await startPublishing();
   });
 
-
-
   Object.values(controlDebugWindows).forEach(s => s());
 
-  let room = newRoom();
   let isCallStarted = false;
   let localStream = null;
-  let isAudioMuted = false;
-  let isVideoMuted = false;
-  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-  let localVideo = document.querySelector('.local-video > video');
-
-  let muteRemoteAudioBtn = document.getElementById('mute-remote-audio-btn');
-  muteRemoteAudioBtn.addEventListener('click', () => {
-    room.mute_remote_audio();
-  });
-  let unmuteRemoteAudioBtn = document.getElementById('unmute-remote-audio-btn');
-  unmuteRemoteAudioBtn.addEventListener('click', () => {
-    room.unmute_remote_audio();
-  });
-  let muteRemoteVideoBtn = document.getElementById('mute-remote-video-btn');
-  muteRemoteVideoBtn.addEventListener('click', () => {
-    room.mute_remote_video();
-  });
-  let unmuteRemoteVideoBtn = document.getElementById('unmute-remote-video-btn');
-  unmuteRemoteVideoBtn.addEventListener('click', () => {
-    room.unmute_remote_video();
-  });
+  let isAudioSendMuted = false;
+  let isVideoSendMuted = false;
+  let isAudioRecvMuted = false;
+  let isVideoRecvMuted = false;
+  let room = await newRoom();
 
   async function initLocalStream() {
       let constraints = await build_constraints(
-        isAudioMuted ? null : audioSelect,
-        isVideoMuted ? null : videoSelect
+        isAudioSendMuted ? null : audioSelect,
+        isVideoSendMuted ? null : videoSelect
       );
       try {
         localStream = await jason.media_manager().init_local_stream(constraints)
@@ -517,14 +511,8 @@ window.onload = async function() {
     return constraints;
   }
 
-  const updateLocalVideo = async (stream) => {
-    localVideo.srcObject = stream.get_media_stream();
-    await localVideo.play();
-  };
-
   async function newRoom() {
-    jason = new rust.Jason();
-    room = await jason.init_room();
+    let room = await jason.init_room();
 
     try {
       const constraints = await initLocalStream();
@@ -620,12 +608,12 @@ window.onload = async function() {
       $( connectionLossNotification ).toast('hide');
     });
 
-    room.on_close(function (on_closed) {
+    room.on_close(async function (on_closed) {
       let videos = document.getElementsByClassName('remote-videos')[0];
       while (videos.firstChild) {
         videos.firstChild.remove();
       }
-      room = newRoom();
+
       $('#connection-settings').modal('show');
       $('#connect-btn').show();
       $('.control').hide();
@@ -636,18 +624,18 @@ window.onload = async function() {
         Is error: ${on_closed.is_err()}.`
       );
     });
+
+    return room;
   }
 
   try {
-    let joinCallerButton = document.getElementsByClassName('connection-settings__connect')[0];
-
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
         if (localStream && localStream.ptr > 0 ){
           localStream.free();
         }
-        if (!isAudioMuted) {
+        if (!isAudioSendMuted) {
           constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
@@ -662,7 +650,7 @@ window.onload = async function() {
         if (localStream && localStream.ptr > 0 ){
           localStream.free();
         }
-        if (!isVideoMuted) {
+        if (!isVideoSendMuted) {
           constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
@@ -671,16 +659,12 @@ window.onload = async function() {
       }
     });
 
-    let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
-    let muteVideo = document.getElementsByClassName('control__mute_video')[0];
-    let closeApp = document.getElementsByClassName('control__close_app')[0];
-
-    muteAudio.addEventListener('click', async () => {
+    muteAudioSend.addEventListener('click', async () => {
       try {
-        if (isAudioMuted) {
+        if (isAudioSendMuted) {
           await room.unmute_audio();
-          isAudioMuted = false;
-          muteAudio.textContent = "Mute audio";
+          isAudioSendMuted = false;
+          muteAudioSend.textContent = "Disable audio send";
           if (!isCallStarted) {
             await initLocalStream();
           }
@@ -689,19 +673,19 @@ window.onload = async function() {
           if (localStream && localStream.ptr > 0 ){
             localStream.free_audio();
           }
-          isAudioMuted = true;
-          muteAudio.textContent = "Unmute audio";
+          isAudioSendMuted = true;
+          muteAudioSend.textContent = "Enable audio send";
         }
       } catch (e) {
         console.error(e.message());
       }
     });
-    muteVideo.addEventListener('click', async () => {
+    muteVideoSend.addEventListener('click', async () => {
       try {
-        if (isVideoMuted) {
+        if (isVideoSendMuted) {
           await room.unmute_video();
-          isVideoMuted = false;
-          muteVideo.textContent = "Mute video";
+          isVideoSendMuted = false;
+          muteVideoSend.textContent = "Disable video send";
           if (!isCallStarted) {
             await initLocalStream();
           }
@@ -710,11 +694,33 @@ window.onload = async function() {
           if (localStream && localStream.ptr > 0 ){
             localStream.free_video();
           }
-          isVideoMuted = true;
-          muteVideo.textContent = "Unmute video";
+          isVideoSendMuted = true;
+          muteVideoSend.textContent = "Enable video send";
         }
       } catch (e) {
         console.error(e.message());
+      }
+    });
+    muteAudioRecv.addEventListener('click', () => {
+      if (isAudioRecvMuted) {
+        room.unmute_remote_audio();
+        isAudioRecvMuted = false;
+        muteAudioRecv.textContent = "Disable audio recv"
+      } else {
+        room.mute_remote_audio();
+        isAudioRecvMuted = true;
+        muteAudioRecv.textContent = "Enable audio recv"
+      }
+    });
+    muteVideoRecv.addEventListener('click', () => {
+      if (isVideoRecvMuted) {
+        room.unmute_remote_video();
+        isVideoRecvMuted = false;
+        muteVideoRecv.textContent = "Disable video recv"
+      } else {
+        room.mute_remote_video();
+        isVideoRecvMuted = true;
+        muteVideoRecv.textContent = "Enable video recv"
       }
     });
     closeApp.addEventListener('click', () => {

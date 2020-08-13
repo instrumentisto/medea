@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
@@ -17,6 +20,41 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
 pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
+
+#[derive(Default)]
+pub struct RecvConstraints {
+    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Audio`]
+    /// in this [`Room`].
+    ///
+    /// Based on this value, new [`Receiver`]s will be muted (or not) on
+    /// [`Event::PeerCreated`].
+    audio_disabled: Cell<bool>,
+
+    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Video`]
+    /// in this [`Room`].
+    ///
+    /// Based on this value, new [`Receiver`]s will be muted (or not) on
+    /// [`Event::PeerCreated`].
+    video_disabled: Cell<bool>,
+}
+
+impl RecvConstraints {
+    pub fn is_audio_disabled(&self) -> bool {
+        self.audio_disabled.get()
+    }
+
+    pub fn is_video_disabled(&self) -> bool {
+        self.video_disabled.get()
+    }
+
+    pub fn set_audio_disabled(&self, val: bool) {
+        self.audio_disabled.set(val);
+    }
+
+    pub fn set_video_disabled(&self, val: bool) {
+        self.video_disabled.set(val);
+    }
+}
 
 #[cfg(feature = "mockable")]
 impl From<MediaStreamSettings> for LocalStreamConstraints {

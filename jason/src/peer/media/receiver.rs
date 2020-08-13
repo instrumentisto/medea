@@ -1,5 +1,7 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
+use std::cell::RefCell;
+
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
@@ -7,7 +9,7 @@ use proto::TrackId;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
+    media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         PeerEvent,
@@ -19,14 +21,19 @@ use crate::{
 ///
 /// We can save related [`RtcRtpTransceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
-pub struct Receiver {
+pub struct Receiver(RefCell<InnerReceiver>);
+
+struct InnerReceiver {
     track_id: TrackId,
     sender_id: MemberId,
     transceiver: Option<RtcRtpTransceiver>,
+    transceiver_direction: TransceiverDirection,
     kind: TransceiverKind,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
-    enabled: bool,
+    notified_track: bool,
+    // TODO: ObservableCell
+    muted: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
@@ -45,30 +52,45 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+        recv_constraints: &RecvConstraints,
     ) -> Self {
         let kind = TransceiverKind::from(caps);
+        let muted = match kind {
+            TransceiverKind::Audio => recv_constraints.is_audio_disabled(),
+            TransceiverKind::Video => recv_constraints.is_video_disabled(),
+        };
+        let transceiver_direction = if muted {
+            TransceiverDirection::Inactive
+        } else {
+            TransceiverDirection::Recvonly
+        };
         let transceiver = match mid {
-            None => {
-                Some(peer.add_transceiver(kind, TransceiverDirection::Recvonly))
-            }
+            None => Some(peer.add_transceiver(kind, transceiver_direction)),
             Some(_) => None,
         };
-        Self {
+        Self(RefCell::new(InnerReceiver {
             track_id,
             sender_id,
             transceiver,
+            transceiver_direction,
             kind,
             mid,
+            notified_track: false,
             track: None,
-            enabled: true,
+            muted,
             peer_events_sender,
-        }
+        }))
     }
 
     /// Returns [`TrackId`] of this [`Receiver`].
     #[inline]
     pub fn track_id(&self) -> TrackId {
-        self.track_id
+        self.0.borrow().track_id
+    }
+
+    #[inline]
+    pub fn muted(&self) -> bool {
+        self.0.borrow().muted
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -77,53 +99,104 @@ impl Receiver {
     /// Sets [`MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of this
     /// [`Receiver`].
     pub fn set_remote_track(
-        &mut self,
+        &self,
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
     ) {
-        self.transceiver.replace(transceiver);
-        self.track.replace(track.clone());
-        track.set_enabled(self.enabled);
+        let mut inner = self.0.borrow_mut();
 
-        let _ =
-            self.peer_events_sender
-                .unbounded_send(PeerEvent::NewRemoteTrack {
-                    sender_id: self.sender_id.clone(),
-                    track_id: self.track_id,
-                    track,
-                });
+        transceiver.set_direction(inner.transceiver_direction.into());
+        track.set_enabled(!inner.muted);
+
+        inner.transceiver.replace(transceiver);
+        inner.track.replace(track);
+        inner.maybe_notify_track();
     }
 
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
-    pub fn update(&mut self, track_patch: &TrackPatch) {
+    pub fn update(&self, track_patch: &TrackPatch) {
         if let Some(is_muted) = track_patch.is_muted {
-            self.enabled = !is_muted;
-            if let Some(track) = &self.track {
-                track.set_enabled(!is_muted);
-            }
+            self.0.borrow_mut().apply_muted(is_muted);
         }
     }
 
-    /// Returns `true` if this [`Receiver`] is enabled.
-    #[inline]
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
+    /// Checks underlying transceiver direction returning `true` if its
+    /// [`TransceiverDirection::Recvonly`].
+    // TODO: `sendrecv` is also true.
+    pub fn is_receiving(&self) -> bool {
+        self.0.borrow().is_receiving()
     }
 
     /// Returns [`TransceiverKind`] of this [`Receiver`].
     #[inline]
     pub fn kind(&self) -> TransceiverKind {
-        self.kind
+        self.0.borrow().kind
     }
 
     /// Returns `mid` of this [`Receiver`].
     ///
     /// Tries to fetch it from the underlying [`RtcRtpTransceiver`] if current
     /// value is `None`.
-    pub(crate) fn mid(&mut self) -> Option<&str> {
-        if self.mid.is_none() && self.transceiver.is_some() {
-            self.mid = self.transceiver.as_ref().unwrap().mid()
+    pub fn mid(&self) -> Option<String> {
+        let mut inner = self.0.borrow_mut();
+
+        if inner.mid.is_none() && inner.transceiver.is_some() {
+            if let Some(transceiver) = &inner.transceiver {
+                inner.mid = transceiver.mid();
+            }
         }
-        self.mid.as_deref()
+        inner.mid.clone()
+    }
+}
+
+impl InnerReceiver {
+    fn is_receiving(&self) -> bool {
+        if self.transceiver.is_none() {
+            return false;
+        }
+        match self.transceiver_direction {
+            TransceiverDirection::Sendonly | TransceiverDirection::Inactive => {
+                false
+            }
+            TransceiverDirection::Recvonly => true,
+        }
+    }
+
+    fn apply_muted(&mut self, is_muted: bool) {
+        self.muted = is_muted;
+        if let Some(track) = &self.track {
+            track.set_enabled(!is_muted);
+        }
+        if let Some(transceiver) = &self.transceiver {
+            if is_muted {
+                self.transceiver_direction = TransceiverDirection::Inactive;
+            } else {
+                self.transceiver_direction = TransceiverDirection::Recvonly;
+            }
+            transceiver.set_direction(self.transceiver_direction.into());
+        }
+        self.maybe_notify_track()
+    }
+
+    fn maybe_notify_track(&mut self) {
+        if self.notified_track {
+            return;
+        }
+        if !self.is_receiving() {
+            return;
+        }
+        if self.muted {
+            return;
+        }
+        if let Some(track) = &self.track {
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::NewRemoteTrack {
+                    sender_id: self.sender_id.clone(),
+                    track_id: self.track_id,
+                    track: track.clone(),
+                },
+            );
+            self.notified_track = true;
+        }
     }
 }

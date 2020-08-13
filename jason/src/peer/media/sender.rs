@@ -1,6 +1,10 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{channel::mpsc, future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
@@ -57,6 +61,7 @@ impl<'a> SenderBuilder<'a> {
         // we dont care about initial state, cause transceiver is inactive atm
         let mut mute_state_changes = mute_state.subscribe().skip(1);
         let this = Rc::new(Sender {
+            peer_id: self.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
@@ -64,37 +69,19 @@ impl<'a> SenderBuilder<'a> {
             mute_state,
             mute_timeout_handle: RefCell::new(None),
             is_required: self.is_required,
-            transceiver_direction: RefCell::new(TransceiverDirection::Inactive),
+            transceiver_direction: Cell::new(TransceiverDirection::Inactive),
+            peer_events_sender: self.peer_events_sender,
         });
 
         let weak_this = Rc::downgrade(&this);
-        let peer_events_sender = self.peer_events_sender;
-        let peer_id = self.peer_id;
         spawn_local(async move {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     match mute_state {
-                        MuteState::Stable(stable) => {
-                            match stable {
-                                StableMuteState::NotMuted => {
-                                    let _ = peer_events_sender.unbounded_send(
-                                        PeerEvent::NewLocalStreamRequired {
-                                            peer_id,
-                                        },
-                                    );
-                                }
-                                StableMuteState::Muted => {
-                                    // cannot fail
-                                    this.track.borrow_mut().take();
-                                    let _ = JsFuture::from(
-                                        this.transceiver
-                                            .sender()
-                                            .replace_track(None),
-                                    )
-                                    .await;
-                                }
-                            }
-                        }
+                        MuteState::Stable(stable) => match stable {
+                            StableMuteState::NotMuted => this.request_track(),
+                            StableMuteState::Muted => this.disable().await,
+                        },
                         MuteState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {
@@ -141,14 +128,16 @@ impl<'a> SenderBuilder<'a> {
 /// Representation of a local [`MediaStreamTrack`] that is being sent to some
 /// remote peer.
 pub struct Sender {
-    pub(super) track_id: TrackId,
-    pub(super) caps: TrackConstraints,
-    pub(super) track: RefCell<Option<MediaStreamTrack>>,
-    pub(super) transceiver: RtcRtpTransceiver,
-    pub(super) mute_state: ObservableCell<MuteState>,
-    pub(super) mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
-    pub(super) is_required: bool,
-    pub(super) transceiver_direction: RefCell<TransceiverDirection>,
+    peer_id: PeerId,
+    track_id: TrackId,
+    caps: TrackConstraints,
+    track: RefCell<Option<MediaStreamTrack>>,
+    transceiver: RtcRtpTransceiver,
+    transceiver_direction: Cell<TransceiverDirection>,
+    mute_state: ObservableCell<MuteState>,
+    mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+    is_required: bool,
+    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
 impl Sender {
@@ -157,35 +146,8 @@ impl Sender {
     #[cfg(feature = "mockable")]
     const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
 
-    /// Returns `true` if this [`Sender`] is important and without it call
-    /// session can't be started.
-    pub fn is_required(&self) -> bool {
-        self.caps.is_required()
-    }
-
-    /// Stops mute/unmute timeout of this [`Sender`].
-    pub fn stop_mute_state_transition_timeout(&self) {
-        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
-            timer.stop();
-        }
-    }
-
-    /// Resets mute/unmute timeout of this [`Sender`].
-    pub fn reset_mute_state_transition_timeout(&self) {
-        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
-            timer.reset();
-        }
-    }
-
-    /// Returns `true` if this [`Sender`] is publishes media traffic.
-    pub fn is_publishing(&self) -> bool {
-        let transceiver_direction = *self.transceiver_direction.borrow();
-        match transceiver_direction {
-            TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {
-                false
-            }
-            TransceiverDirection::Sendonly => true,
-        }
+    pub fn caps(&self) -> &TrackConstraints {
+        &self.caps
     }
 
     /// Returns [`TrackId`] of this [`Sender`].
@@ -198,9 +160,18 @@ impl Sender {
         TransceiverKind::from(&self.caps)
     }
 
-    /// Returns [`MuteState`] of this [`Sender`].
-    pub fn mute_state(&self) -> MuteState {
-        self.mute_state.get()
+    pub fn transceiver(&self) -> &RtcRtpTransceiver {
+        &self.transceiver
+    }
+
+    /// Returns `true` if this [`Sender`] is publishes media traffic.
+    pub fn is_publishing(&self) -> bool {
+        match self.transceiver_direction.get() {
+            TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {
+                false
+            }
+            TransceiverDirection::Sendonly => true,
+        }
     }
 
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
@@ -208,7 +179,7 @@ impl Sender {
     /// direction to `sendonly`.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    pub(super) async fn insert_and_enable_track(
+    pub(super) async fn insert_track_and_enable(
         sender: Rc<Self>,
         new_track: MediaStreamTrack,
     ) -> Result<()> {
@@ -242,16 +213,6 @@ impl Sender {
         Ok(())
     }
 
-    /// Sets provided [`TransceiverDirection`] of this [`Sender`]'s
-    /// [`RtcRtpTransceiver`].
-    ///
-    /// Sets [`Sender::transceiver_direction`] to the provided
-    /// [`TransceiverDirection`].
-    fn set_transceiver_direction(&self, direction: TransceiverDirection) {
-        self.transceiver.set_direction(direction.into());
-        *self.transceiver_direction.borrow_mut() = direction;
-    }
-
     /// Checks whether [`Sender`] is in [`MuteState::Muted`].
     pub fn is_muted(&self) -> bool {
         self.mute_state.get() == StableMuteState::Muted.into()
@@ -260,6 +221,25 @@ impl Sender {
     /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
     pub fn is_not_muted(&self) -> bool {
         self.mute_state.get() == StableMuteState::NotMuted.into()
+    }
+
+    /// Returns [`MuteState`] of this [`Sender`].
+    pub fn mute_state(&self) -> MuteState {
+        self.mute_state.get()
+    }
+
+    /// Stops mute/unmute timeout of this [`Sender`].
+    pub fn stop_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.stop();
+        }
+    }
+
+    /// Resets mute/unmute timeout of this [`Sender`].
+    pub fn reset_mute_state_transition_timeout(&self) {
+        if let Some(timer) = &*self.mute_timeout_handle.borrow() {
+            timer.reset();
+        }
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
@@ -348,5 +328,28 @@ impl Sender {
 
             self.mute_state.set(mute_state_update);
         }
+    }
+
+    /// Sets provided [`TransceiverDirection`] of this [`Sender`]'s
+    /// [`RtcRtpTransceiver`].
+    fn set_transceiver_direction(&self, direction: TransceiverDirection) {
+        self.transceiver.set_direction(direction.into());
+        self.transceiver_direction.set(direction);
+    }
+
+    async fn disable(&self) {
+        self.set_transceiver_direction(TransceiverDirection::Inactive);
+        self.track.borrow_mut().take();
+        // cannot fail
+        let _ =
+            JsFuture::from(self.transceiver.sender().replace_track(None)).await;
+    }
+
+    fn request_track(&self) {
+        let _ = self.peer_events_sender.unbounded_send(
+            PeerEvent::NewLocalStreamRequired {
+                peer_id: self.peer_id,
+            },
+        );
     }
 }
