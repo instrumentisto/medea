@@ -30,7 +30,8 @@ use crate::{
 
 use super::{
     mute_state::{MuteState, MuteStateController, StableMuteState},
-    MediaConnectionsError, MuteableTrack, Result, Track,
+    HasMuteStateController, MediaConnectionsError, MuteableTrack, Result,
+    Track,
 };
 
 /// Builder of the [`Sender`].
@@ -175,28 +176,6 @@ impl Sender {
         Ok(())
     }
 
-    /// Checks whether [`Sender`] is in [`MuteState::Muted`].
-    pub fn is_muted(&self) -> bool {
-        self.mute_state_observer.is_muted()
-    }
-
-    /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
-    pub fn is_not_muted(&self) -> bool {
-        self.mute_state_observer.is_not_muted()
-    }
-
-    /// Stops mute/unmute timeout of this [`Sender`].
-    pub fn stop_mute_state_transition_timeout(&self) {
-        self.mute_state_observer
-            .stop_mute_state_transition_timeout()
-    }
-
-    /// Resets mute/unmute timeout of this [`Sender`].
-    pub fn reset_mute_state_transition_timeout(&self) {
-        self.mute_state_observer
-            .reset_mute_state_transition_timeout()
-    }
-
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`proto::TrackPatch`].
     pub fn update(&self, track: &proto::TrackPatch) {
@@ -240,12 +219,13 @@ impl Track for Sender {
     }
 }
 
-impl MuteableTrack for Sender {
-    /// Returns [`MuteState`] of this [`Sender`].
-    fn mute_state(&self) -> MuteState {
-        self.mute_state_observer.mute_state()
+impl HasMuteStateController for Sender {
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        self.mute_state_observer.clone()
     }
+}
 
+impl MuteableTrack for Sender {
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
     ///
     /// # Errors
@@ -264,29 +244,5 @@ impl MuteableTrack for Sender {
             self.mute_state_observer.transition_to(desired_state);
             Ok(())
         }
-    }
-
-    /// Cancels [`MuteState`] transition.
-    fn cancel_transition(&self) {
-        self.mute_state_observer.cancel_transition()
-    }
-
-    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
-    ///
-    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
-    /// or the [`Sender`] is dropped.
-    ///
-    /// # Errors
-    ///
-    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
-    /// the `desired_state`.
-    fn when_mute_state_stable(
-        &self,
-        desired_state: StableMuteState,
-    ) -> future::LocalBoxFuture<'static, Result<()>> {
-        self.mute_state_observer
-            .when_mute_state_stable(desired_state)
     }
 }

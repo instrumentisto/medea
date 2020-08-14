@@ -14,12 +14,11 @@ use crate::{
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         media::{mute_state::MuteStateController, Result},
-        PeerEvent,
+        MuteState, MuteableTrack, PeerEvent, Track,
     },
 };
 
-use super::mute_state::StableMuteState;
-use crate::peer::{MuteState, MuteableTrack, Track};
+use super::{mute_state::StableMuteState, HasMuteStateController};
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -161,22 +160,6 @@ impl Receiver {
         }
     }
 
-    /// Stops mute/unmute timeout of this [`Sender`].
-    pub fn stop_mute_state_transition_timeout(&self) {
-        self.0
-            .borrow()
-            .mute_state_controller
-            .stop_mute_state_transition_timeout()
-    }
-
-    /// Resets mute/unmute timeout of this [`Sender`].
-    pub fn reset_mute_state_transition_timeout(&self) {
-        self.0
-            .borrow()
-            .mute_state_controller
-            .reset_mute_state_transition_timeout()
-    }
-
     /// Checks underlying transceiver direction returning `true` if its
     /// [`TransceiverDirection::Recvonly`].
     // TODO: `sendrecv` is also true.
@@ -249,58 +232,10 @@ impl Track for Receiver {
     }
 }
 
-impl MuteableTrack for Receiver {
-    /// Returns [`MuteState`] of this [`Sender`].
-    fn mute_state(&self) -> MuteState {
-        self.0.borrow().mute_state_controller.mute_state()
-    }
-
-    /// Sets current [`MuteState`] to [`MuteState::Transition`].
-    ///
-    /// # Errors
-    ///
-    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
-    /// required for the call and can't be muted.
-    fn mute_state_transition_to(
-        &self,
-        desired_state: StableMuteState,
-    ) -> Result<()> {
-        // if self.is_required {
-        //     Err(tracerr::new!(
-        //         MediaConnectionsError::CannotDisableRequiredSender
-        //     ))
-        // } else {
-        self.0
-            .borrow()
-            .mute_state_controller
-            .transition_to(desired_state);
-        Ok(())
-        // }
-    }
-
-    /// Cancels [`MuteState`] transition.
-    fn cancel_transition(&self) {
-        self.0.borrow().mute_state_controller.cancel_transition()
-    }
-
-    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
-    ///
-    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
-    /// or the [`Sender`] is dropped.
-    ///
-    /// # Errors
-    ///
-    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
-    /// the `desired_state`.
-    fn when_mute_state_stable(
-        &self,
-        desired_state: StableMuteState,
-    ) -> LocalBoxFuture<'static, Result<()>> {
-        self.0
-            .borrow()
-            .mute_state_controller
-            .when_mute_state_stable(desired_state)
+impl HasMuteStateController for Receiver {
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        self.0.borrow().mute_state_controller.clone()
     }
 }
+
+impl MuteableTrack for Receiver {}

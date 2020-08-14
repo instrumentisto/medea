@@ -7,6 +7,7 @@ mod sender;
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
 use derive_more::Display;
+use future::LocalBoxFuture;
 use futures::{channel::mpsc, future};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
@@ -16,10 +17,9 @@ use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{LocalStreamConstraints, MediaStreamTrack, RecvConstraints},
-    peer::PeerEvent,
+    peer::{media::mute_state::MuteStateController, PeerEvent},
     utils::{JsCaused, JsError},
 };
-use future::LocalBoxFuture;
 
 use super::{
     conn::{RtcPeerConnection, TransceiverKind},
@@ -27,7 +27,9 @@ use super::{
     stream_request::StreamRequest,
 };
 
-use self::sender::SenderBuilder;
+use self::{
+    has_mute_state_controller::HasMuteStateController, sender::SenderBuilder,
+};
 
 pub use self::{
     mute_state::{MuteState, MuteStateTransition, StableMuteState},
@@ -39,20 +41,82 @@ pub trait Track {
     fn track_id(&self) -> TrackId;
 }
 
-pub trait MuteableTrack: Track {
-    fn mute_state(&self) -> MuteState;
+mod has_mute_state_controller {
+    use std::rc::Rc;
 
+    use super::MuteStateController;
+
+    pub trait HasMuteStateController {
+        fn mute_state_controller(&self) -> Rc<MuteStateController>;
+    }
+}
+
+pub trait MuteableTrack: Track + HasMuteStateController {
+    /// Returns [`MuteState`] of this [`Sender`].
+    fn mute_state(&self) -> MuteState {
+        self.mute_state_controller().mute_state()
+    }
+
+    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    ///
+    /// # Errors
+    ///
+    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
+    /// required for the call and can't be muted.
     fn mute_state_transition_to(
         &self,
         desired_state: StableMuteState,
-    ) -> Result<()>;
+    ) -> Result<()> {
+        self.mute_state_controller().transition_to(desired_state);
 
-    fn cancel_transition(&self);
+        Ok(())
+    }
 
+    /// Cancels [`MuteState`] transition.
+    fn cancel_transition(&self) {
+        self.mute_state_controller().cancel_transition()
+    }
+
+    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
+    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    ///
+    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
+    /// or the [`Sender`] is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
+    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
+    /// the `desired_state`.
     fn when_mute_state_stable(
         &self,
         desired_state: StableMuteState,
-    ) -> LocalBoxFuture<'static, Result<()>>;
+    ) -> LocalBoxFuture<'static, Result<()>> {
+        self.mute_state_controller()
+            .when_mute_state_stable(desired_state)
+    }
+
+    /// Stops mute/unmute timeout of this [`Sender`].
+    fn stop_mute_state_transition_timeout(&self) {
+        self.mute_state_controller()
+            .stop_mute_state_transition_timeout()
+    }
+
+    /// Resets mute/unmute timeout of this [`Sender`].
+    fn reset_mute_state_transition_timeout(&self) {
+        self.mute_state_controller()
+            .reset_mute_state_transition_timeout()
+    }
+
+    /// Checks whether [`Sender`] is in [`MuteState::Muted`].
+    fn is_muted(&self) -> bool {
+        self.mute_state_controller().is_muted()
+    }
+
+    /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
+    fn is_not_muted(&self) -> bool {
+        self.mute_state_controller().is_not_muted()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -533,29 +597,32 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Stops all [`Sender`]s state transitions expiry timers.
-    pub fn stop_state_transitions_timers(&self) {
-        self.0
-            .borrow()
+    fn get_all_muteable_tracks(&self) -> Vec<Rc<dyn MuteableTrack>> {
+        let inner = self.0.borrow();
+        inner
             .senders
             .values()
-            .for_each(|sender| sender.stop_mute_state_transition_timeout());
-        self.0
-            .borrow()
-            .receivers
-            .values()
-            .for_each(|receiver| receiver.stop_mute_state_transition_timeout());
+            .map(|s| Rc::clone(s) as Rc<dyn MuteableTrack>)
+            .chain(
+                inner
+                    .receivers
+                    .values()
+                    .map(|r| Rc::clone(&r) as Rc<dyn MuteableTrack>),
+            )
+            .collect()
+    }
+
+    /// Stops all [`Sender`]s state transitions expiry timers.
+    pub fn stop_state_transitions_timers(&self) {
+        self.get_all_muteable_tracks()
+            .into_iter()
+            .for_each(|t| t.stop_mute_state_transition_timeout())
     }
 
     /// Resets all [`Sender`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
-        self.0
-            .borrow()
-            .senders
-            .values()
-            .for_each(|sender| sender.reset_mute_state_transition_timeout());
-        self.0.borrow().receivers.values().for_each(|receiver| {
-            receiver.reset_mute_state_transition_timeout()
-        });
+        self.get_all_muteable_tracks()
+            .into_iter()
+            .for_each(|t| t.reset_mute_state_transition_timeout());
     }
 }
