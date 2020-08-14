@@ -257,7 +257,19 @@ impl RoomHandle {
         direction: TrackDirection,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.send_constraints.toggle_enable(!is_muted, kind);
+        // TODO: temporary fix
+        if let TrackDirection::Recv = direction {
+            match kind {
+                TransceiverKind::Audio => {
+                    inner.recv_constraints.set_audio_disabled(is_muted);
+                }
+                TransceiverKind::Video => {
+                    inner.recv_constraints.set_video_disabled(is_muted);
+                }
+            }
+        } else {
+            inner.send_constraints.toggle_enable(!is_muted, kind);
+        }
         while !inner.is_all_peers_in_mute_state(
             kind,
             direction,
@@ -267,7 +279,23 @@ impl RoomHandle {
                 .toggle_mute(is_muted, kind, direction)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    inner.send_constraints.toggle_enable(is_muted, kind);
+                    // TODO: temporary fix
+                    if let TrackDirection::Recv = direction {
+                        match kind {
+                            TransceiverKind::Audio => {
+                                inner
+                                    .recv_constraints
+                                    .set_audio_disabled(!is_muted);
+                            }
+                            TransceiverKind::Video => {
+                                inner
+                                    .recv_constraints
+                                    .set_video_disabled(!is_muted);
+                            }
+                        }
+                    } else {
+                        inner.send_constraints.toggle_enable(is_muted, kind);
+                    }
                     tracerr::new!(e)
                 })?;
         }

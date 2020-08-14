@@ -100,31 +100,32 @@ impl Receiver {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(false);
                                 }
+                                if inner.transceiver.is_some() {
+                                    inner.transceiver_direction =
+                                        TransceiverDirection::Inactive;
+                                }
                                 if let Some(transceiver) = &inner.transceiver {
                                     transceiver.set_direction(
                                         inner.transceiver_direction.into(),
                                     );
-                                }
-                                if inner.transceiver.is_some() {
-                                    inner.transceiver_direction =
-                                        TransceiverDirection::Inactive;
                                 }
                             }
                             StableMuteState::NotMuted => {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(true);
                                 }
+                                if inner.transceiver.is_some() {
+                                    inner.transceiver_direction =
+                                        TransceiverDirection::Recvonly;
+                                }
                                 if let Some(transceiver) = &inner.transceiver {
                                     transceiver.set_direction(
                                         inner.transceiver_direction.into(),
                                     );
                                 }
-                                if inner.transceiver.is_some() {
-                                    inner.transceiver_direction =
-                                        TransceiverDirection::Recvonly;
-                                }
                             }
                         }
+                        inner.maybe_notify_track();
                     }
                 }
             }
