@@ -163,13 +163,17 @@ impl Receiver {
 
     /// Stops mute/unmute timeout of this [`Sender`].
     pub fn stop_mute_state_transition_timeout(&self) {
-        self.0.borrow().mute_state_controller
+        self.0
+            .borrow()
+            .mute_state_controller
             .stop_mute_state_transition_timeout()
     }
 
     /// Resets mute/unmute timeout of this [`Sender`].
     pub fn reset_mute_state_transition_timeout(&self) {
-        self.0.borrow().mute_state_controller
+        self.0
+            .borrow()
+            .mute_state_controller
             .reset_mute_state_transition_timeout()
     }
 

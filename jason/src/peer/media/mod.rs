@@ -527,7 +527,11 @@ impl MediaConnections {
             .senders
             .values()
             .for_each(|sender| sender.stop_mute_state_transition_timeout());
-        self.0.borrow().receivers.values().for_each(|receiver| receiver.stop_mute_state_transition_timeout());
+        self.0
+            .borrow()
+            .receivers
+            .values()
+            .for_each(|receiver| receiver.stop_mute_state_transition_timeout());
     }
 
     /// Resets all [`Sender`]s state transitions expiry timers.
@@ -537,9 +541,8 @@ impl MediaConnections {
             .senders
             .values()
             .for_each(|sender| sender.reset_mute_state_transition_timeout());
-        self.0.borrow()
-            .receivers
-            .values()
-            .for_each(|receiver| receiver.reset_mute_state_transition_timeout());
+        self.0.borrow().receivers.values().for_each(|receiver| {
+            receiver.reset_mute_state_transition_timeout()
+        });
     }
 }

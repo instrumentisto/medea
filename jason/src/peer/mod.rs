@@ -29,11 +29,12 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
+    log::console_error,
     media::{
         LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
         MediaStreamTrack, RecvConstraints,
     },
-    utils::{console_error, JasonError, JsCaused, JsError},
+    utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
 

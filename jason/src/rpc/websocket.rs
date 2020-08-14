@@ -11,9 +11,12 @@ use medea_reactive::ObservableCell;
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
-use crate::utils::{
-    console_error, EventListener, EventListenerBindError, JasonError, JsCaused,
-    JsError, JsonParseError,
+use crate::{
+    log::console_error,
+    utils::{
+        EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
+        JsonParseError,
+    },
 };
 
 use super::{ClientDisconnect, CloseMsg};

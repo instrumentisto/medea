@@ -22,6 +22,7 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     api::connection::Connections,
+    log::console_error,
     media::{
         LocalStreamConstraints, MediaStream, MediaStreamSettings,
         MediaStreamTrack, RecvConstraints,
@@ -36,10 +37,8 @@ use crate::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
         RpcClientError, TransportError,
     },
-    utils::{
-        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
-    },
+    utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
+    log::prelude::*,
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -432,7 +431,7 @@ impl RoomHandle {
                 TransceiverKind::Audio,
                 TrackDirection::Recv,
             )
-                .await?;
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -446,7 +445,7 @@ impl RoomHandle {
                 TransceiverKind::Video,
                 TrackDirection::Recv,
             )
-                .await?;
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -460,7 +459,7 @@ impl RoomHandle {
                 TransceiverKind::Audio,
                 TrackDirection::Recv,
             )
-                .await?;
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -474,7 +473,7 @@ impl RoomHandle {
                 TransceiverKind::Video,
                 TrackDirection::Recv,
             )
-                .await?;
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }

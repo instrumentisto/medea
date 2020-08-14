@@ -8,11 +8,9 @@ use medea_client_api_proto::{ClientMsg, ServerMsg};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
+    log::console_error,
     rpc::{RpcTransport, TransportError},
-    utils::{
-        console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
-        TaskHandle,
-    },
+    utils::{delay_for, JasonError, JsCaused, JsDuration, JsError, TaskHandle},
 };
 
 /// Errors that may occur in [`Heartbeat`].

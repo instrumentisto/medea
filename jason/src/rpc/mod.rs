@@ -23,7 +23,10 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, JasonError, JsCaused, JsError};
+use crate::{
+    log::console_error,
+    utils::{JasonError, JsCaused, JsError},
+};
 
 use websocket::TransportState;
 
