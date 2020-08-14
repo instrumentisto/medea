@@ -3,18 +3,10 @@
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
-    time::Duration,
 };
 
-use futures::{
-    channel::mpsc,
-    future,
-    future::{Either, LocalBoxFuture},
-    stream::LocalBoxStream,
-    FutureExt, StreamExt,
-};
+use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto as proto;
-use medea_reactive::ObservableCell;
 use proto::{PeerId, TrackId};
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
@@ -25,7 +17,6 @@ use crate::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         PeerEvent,
     },
-    utils::{resettable_delay_for, ResettableDelayHandle},
 };
 
 use super::{

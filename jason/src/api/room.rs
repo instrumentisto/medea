@@ -22,16 +22,15 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     api::connection::Connections,
-    log::{console_error, prelude::*},
+    log::console_error,
     media::{
         LocalStreamConstraints, MediaStream, MediaStreamSettings,
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, MuteableTrack as _, MuteableTrack,
-        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, Sender, StableMuteState, Track as _, TrackDirection,
-        TransceiverKind,
+        MediaConnectionsError, MuteState, MuteableTrack, PeerConnection,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
+        StableMuteState, TrackDirection, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -769,51 +768,6 @@ impl InnerRoom {
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
-    }
-
-    /// Enables/disables [`Receiver`]s by provided [`TransceiverKind`] in all
-    /// [`PeerConnection`]s in this [`Room`].
-    ///
-    /// [`Sender`]s of the all enabled/disabled [`Receiver`]s also will be
-    /// enabled/disabled.
-    ///
-    /// Sets [`Room`]'s remote muting state
-    /// ([`InnerRoom::is_remote_audio_muted`]/[`InnerRoom::
-    /// is_remote_video_muted`]).
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    fn toggle_recv_mute(&self, is_muted: bool, kind: TransceiverKind) {
-        // // TODO: why this differs from `toggle_mute`?
-        // match kind {
-        //     TransceiverKind::Audio => {
-        //         self.recv_constraints.set_audio_disabled(is_muted);
-        //     }
-        //     TransceiverKind::Video => {
-        //         self.recv_constraints.set_video_disabled(is_muted);
-        //     }
-        // }
-        //
-        // for peer in self.peers.get_all() {
-        //     let receivers_to_mute = peer
-        //         .get_receivers(kind)
-        //         .into_iter()
-        //         .filter(|receiver| receiver.muted() != is_muted);
-        //
-        //     let mut tracks_patches = Vec::new();
-        //     for receiver in receivers_to_mute {
-        //         tracks_patches.push(TrackPatch {
-        //             id: receiver.track_id(),
-        //             is_muted: Some(is_muted),
-        //         });
-        //     }
-        //
-        //     if !tracks_patches.is_empty() {
-        //         self.rpc.send_command(Command::UpdateTracks {
-        //             peer_id: peer.id(),
-        //             tracks_patches,
-        //         });
-        //     }
-        // }
     }
 
     /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided

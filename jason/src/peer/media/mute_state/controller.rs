@@ -1,29 +1,14 @@
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    time::Duration,
-};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{
-    channel::mpsc,
-    future,
-    future::{Either, LocalBoxFuture},
-    stream::LocalBoxStream,
-    FutureExt, StreamExt,
+    channel::mpsc, future, future::Either, stream::LocalBoxStream, FutureExt,
+    StreamExt,
 };
-use medea_client_api_proto as proto;
 use medea_reactive::ObservableCell;
-use proto::{PeerId, TrackId};
-use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::RtcRtpTransceiver;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
-    peer::{
-        conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-        media::{MediaConnectionsError, Result},
-        PeerEvent,
-    },
+    peer::media::{MediaConnectionsError, Result},
     utils::{resettable_delay_for, ResettableDelayHandle},
 };
 
@@ -60,9 +45,11 @@ impl MuteStateController {
     }
 
     fn send_finalized_state(&self, state: StableMuteState) {
-        self.on_finalized_subs.borrow().iter().for_each(|s| {
-            s.unbounded_send(state);
-        });
+        let mut on_finalize_subs = self.on_finalized_subs.borrow_mut();
+        *on_finalize_subs = on_finalize_subs
+            .drain(..)
+            .filter(|s| s.unbounded_send(state).is_ok())
+            .collect();
     }
 
     pub fn spawn(self: Rc<Self>) {

@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{channel::mpsc, future::LocalBoxFuture, StreamExt as _};
+use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
 use proto::TrackId;
@@ -13,8 +13,8 @@ use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-        media::{mute_state::MuteStateController, Result},
-        MuteState, MuteableTrack, PeerEvent, Track,
+        media::mute_state::MuteStateController,
+        MuteableTrack, PeerEvent, Track,
     },
 };
 
