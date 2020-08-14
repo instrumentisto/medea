@@ -37,8 +37,6 @@ struct InnerReceiver {
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
     notified_track: bool,
-    // TODO: ObservableCell
-    muted: bool,
     mute_state_controller: Rc<MuteStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
@@ -76,7 +74,7 @@ impl Receiver {
         };
         let mute_state_controller = MuteStateController::new(muted.into());
         let mut on_finalized_mute_state = mute_state_controller.on_finalized();
-        let this = Rc::new(Self(RefCell::new(InnerReceiver {
+        let this: Rc<Self> = Rc::new(Self(RefCell::new(InnerReceiver {
             track_id,
             sender_id,
             transceiver,
@@ -86,7 +84,6 @@ impl Receiver {
             mute_state_controller,
             notified_track: false,
             track: None,
-            muted,
             peer_events_sender,
         })));
 
@@ -97,20 +94,44 @@ impl Receiver {
                 while let Some(finalize_mute_state) =
                     on_finalized_mute_state.next().await
                 {
-                    match finalize_mute_state {
-                        StableMuteState::Muted => {}
-                        StableMuteState::NotMuted => {}
+                    if let Some(this) = weak_this.upgrade() {
+                        let mut inner = this.0.borrow_mut();
+                        match finalize_mute_state {
+                            StableMuteState::Muted => {
+                                if let Some(track) = &inner.track {
+                                    track.set_enabled(false);
+                                }
+                                if let Some(transceiver) = &inner.transceiver {
+                                    transceiver.set_direction(
+                                        inner.transceiver_direction.into(),
+                                    );
+                                }
+                                if inner.transceiver.is_some() {
+                                    inner.transceiver_direction =
+                                        TransceiverDirection::Inactive;
+                                }
+                            }
+                            StableMuteState::NotMuted => {
+                                if let Some(track) = &inner.track {
+                                    track.set_enabled(true);
+                                }
+                                if let Some(transceiver) = &inner.transceiver {
+                                    transceiver.set_direction(
+                                        inner.transceiver_direction.into(),
+                                    );
+                                }
+                                if inner.transceiver.is_some() {
+                                    inner.transceiver_direction =
+                                        TransceiverDirection::Recvonly;
+                                }
+                            }
+                        }
                     }
                 }
             }
         });
 
         this
-    }
-
-    #[inline]
-    pub fn muted(&self) -> bool {
-        self.0.borrow().muted
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -126,7 +147,7 @@ impl Receiver {
         let mut inner = self.0.borrow_mut();
 
         transceiver.set_direction(inner.transceiver_direction.into());
-        track.set_enabled(!inner.muted);
+        track.set_enabled(inner.mute_state_controller.is_not_muted());
 
         inner.transceiver.replace(transceiver);
         inner.track.replace(track);
@@ -136,8 +157,20 @@ impl Receiver {
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
     pub fn update(&self, track_patch: &TrackPatch) {
         if let Some(is_muted) = track_patch.is_muted {
-            self.0.borrow_mut().apply_muted(is_muted);
+            self.0.borrow().mute_state_controller.update(is_muted);
         }
+    }
+
+    /// Stops mute/unmute timeout of this [`Sender`].
+    pub fn stop_mute_state_transition_timeout(&self) {
+        self.0.borrow().mute_state_controller
+            .stop_mute_state_transition_timeout()
+    }
+
+    /// Resets mute/unmute timeout of this [`Sender`].
+    pub fn reset_mute_state_transition_timeout(&self) {
+        self.0.borrow().mute_state_controller
+            .reset_mute_state_transition_timeout()
     }
 
     /// Checks underlying transceiver direction returning `true` if its
@@ -182,22 +215,6 @@ impl InnerReceiver {
         }
     }
 
-    fn apply_muted(&mut self, is_muted: bool) {
-        self.muted = is_muted;
-        if let Some(track) = &self.track {
-            track.set_enabled(!is_muted);
-        }
-        if let Some(transceiver) = &self.transceiver {
-            if is_muted {
-                self.transceiver_direction = TransceiverDirection::Inactive;
-            } else {
-                self.transceiver_direction = TransceiverDirection::Recvonly;
-            }
-            transceiver.set_direction(self.transceiver_direction.into());
-        }
-        self.maybe_notify_track()
-    }
-
     fn maybe_notify_track(&mut self) {
         if self.notified_track {
             return;
@@ -205,7 +222,7 @@ impl InnerReceiver {
         if !self.is_receiving() {
             return;
         }
-        if self.muted {
+        if self.mute_state_controller.is_muted() {
             return;
         }
         if let Some(track) = &self.track {

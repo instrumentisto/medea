@@ -424,30 +424,58 @@ impl RoomHandle {
     }
 
     /// Mutes inbound audio in this [`Room`].
-    pub fn mute_remote_audio(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_recv_mute(true, TransceiverKind::Audio);
+    pub fn mute_remote_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(
+                true,
+                TransceiverKind::Audio,
+                TrackDirection::Recv,
+            )
+                .await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Mutes inbound video in this [`Room`].
-    pub fn mute_remote_video(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_recv_mute(true, TransceiverKind::Video);
+    pub fn mute_remote_video(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(
+                true,
+                TransceiverKind::Video,
+                TrackDirection::Recv,
+            )
+                .await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Unmutes inbound audio in this [`Room`].
-    pub fn unmute_remote_audio(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_recv_mute(false, TransceiverKind::Audio);
+    pub fn unmute_remote_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(
+                false,
+                TransceiverKind::Audio,
+                TrackDirection::Recv,
+            )
+                .await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Unmutes inbound video in this [`Room`].
-    pub fn unmute_remote_video(&self) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.toggle_recv_mute(false, TransceiverKind::Video);
+    pub fn unmute_remote_video(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.toggle_mute(
+                false,
+                TransceiverKind::Video,
+                TrackDirection::Recv,
+            )
+                .await?;
+            Ok(JsValue::UNDEFINED)
         })
     }
 }
@@ -755,37 +783,37 @@ impl InnerRoom {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     fn toggle_recv_mute(&self, is_muted: bool, kind: TransceiverKind) {
-        // TODO: why this differs from `toggle_mute`?
-        match kind {
-            TransceiverKind::Audio => {
-                self.recv_constraints.set_audio_disabled(is_muted);
-            }
-            TransceiverKind::Video => {
-                self.recv_constraints.set_video_disabled(is_muted);
-            }
-        }
-
-        for peer in self.peers.get_all() {
-            let receivers_to_mute = peer
-                .get_receivers(kind)
-                .into_iter()
-                .filter(|receiver| receiver.muted() != is_muted);
-
-            let mut tracks_patches = Vec::new();
-            for receiver in receivers_to_mute {
-                tracks_patches.push(TrackPatch {
-                    id: receiver.track_id(),
-                    is_muted: Some(is_muted),
-                });
-            }
-
-            if !tracks_patches.is_empty() {
-                self.rpc.send_command(Command::UpdateTracks {
-                    peer_id: peer.id(),
-                    tracks_patches,
-                });
-            }
-        }
+        // // TODO: why this differs from `toggle_mute`?
+        // match kind {
+        //     TransceiverKind::Audio => {
+        //         self.recv_constraints.set_audio_disabled(is_muted);
+        //     }
+        //     TransceiverKind::Video => {
+        //         self.recv_constraints.set_video_disabled(is_muted);
+        //     }
+        // }
+        //
+        // for peer in self.peers.get_all() {
+        //     let receivers_to_mute = peer
+        //         .get_receivers(kind)
+        //         .into_iter()
+        //         .filter(|receiver| receiver.muted() != is_muted);
+        //
+        //     let mut tracks_patches = Vec::new();
+        //     for receiver in receivers_to_mute {
+        //         tracks_patches.push(TrackPatch {
+        //             id: receiver.track_id(),
+        //             is_muted: Some(is_muted),
+        //         });
+        //     }
+        //
+        //     if !tracks_patches.is_empty() {
+        //         self.rpc.send_command(Command::UpdateTracks {
+        //             peer_id: peer.id(),
+        //             tracks_patches,
+        //         });
+        //     }
+        // }
     }
 
     /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided

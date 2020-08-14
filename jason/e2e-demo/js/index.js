@@ -701,24 +701,24 @@ window.onload = async function() {
         console.error(e.message());
       }
     });
-    muteAudioRecv.addEventListener('click', () => {
+    muteAudioRecv.addEventListener('click', async () => {
       if (isAudioRecvMuted) {
-        room.unmute_remote_audio();
+        await room.unmute_remote_audio();
         isAudioRecvMuted = false;
         muteAudioRecv.textContent = "Disable audio recv"
       } else {
-        room.mute_remote_audio();
+        await room.mute_remote_audio();
         isAudioRecvMuted = true;
         muteAudioRecv.textContent = "Enable audio recv"
       }
     });
-    muteVideoRecv.addEventListener('click', () => {
+    muteVideoRecv.addEventListener('click', async () => {
       if (isVideoRecvMuted) {
-        room.unmute_remote_video();
+        await room.unmute_remote_video();
         isVideoRecvMuted = false;
         muteVideoRecv.textContent = "Disable video recv"
       } else {
-        room.mute_remote_video();
+        await room.mute_remote_video();
         isVideoRecvMuted = true;
         muteVideoRecv.textContent = "Enable video recv"
       }
