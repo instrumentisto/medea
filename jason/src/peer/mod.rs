@@ -415,10 +415,11 @@ impl PeerConnection {
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections
-            .is_all_senders_in_mute_state(kind, mute_state)
+            .is_all_senders_in_mute_state(kind, direction, mute_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].

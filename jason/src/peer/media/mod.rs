@@ -231,13 +231,26 @@ impl MediaConnections {
     pub fn is_all_senders_in_mute_state(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
-        for sender in self.0.borrow().iter_senders_with_kind(kind) {
-            if sender.mute_state() != mute_state.into() {
-                return false;
+        match direction {
+            TrackDirection::Send => {
+                for sender in self.0.borrow().iter_senders_with_kind(kind) {
+                    if sender.mute_state() != mute_state.into() {
+                        return false;
+                    }
+                }
+            }
+            TrackDirection::Recv => {
+                for receiver in self.0.borrow().iter_receivers_with_kind(kind) {
+                    if receiver.mute_state() != mute_state.into() {
+                        return false;
+                    }
+                }
             }
         }
+
         true
     }
 

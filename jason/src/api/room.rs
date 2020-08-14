@@ -22,7 +22,7 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     api::connection::Connections,
-    log::console_error,
+    log::{console_error, prelude::*},
     media::{
         LocalStreamConstraints, MediaStream, MediaStreamSettings,
         MediaStreamTrack, RecvConstraints,
@@ -38,7 +38,6 @@ use crate::{
         RpcClientError, TransportError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
-    log::prelude::*,
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -260,9 +259,11 @@ impl RoomHandle {
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
         inner.send_constraints.toggle_enable(!is_muted, kind);
-        while !inner
-            .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
-        {
+        while !inner.is_all_peers_in_mute_state(
+            kind,
+            direction,
+            StableMuteState::from(is_muted),
+        ) {
             inner
                 .toggle_mute(is_muted, kind, direction)
                 .await
@@ -820,12 +821,15 @@ impl InnerRoom {
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
         self.peers
             .get_all()
             .into_iter()
-            .find(|p| !p.is_all_senders_in_mute_state(kind, mute_state))
+            .find(|p| {
+                !p.is_all_senders_in_mute_state(kind, direction, mute_state)
+            })
             .is_none()
     }
 
