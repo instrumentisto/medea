@@ -119,18 +119,8 @@ impl RpcServer for Addr<Room> {
     }
 
     /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
-    fn send_command(
-        &self,
-        member_id: MemberId,
-        msg: Command,
-    ) -> LocalBoxFuture<'static, ()> {
-        self.send(CommandMessage::new(member_id, msg))
-            .map(|res| {
-                if let Err(e) = res {
-                    error!("Failed to send CommandMessage cause {:?}", e);
-                }
-            })
-            .boxed_local()
+    fn send_command(&self, member_id: MemberId, msg: Command) {
+        self.do_send(CommandMessage::new(member_id, msg));
     }
 }
 

@@ -211,7 +211,8 @@ async fn track_disables_and_enables_are_instant() {
     )
     .await;
 
-    // wait until initial negotiation finishes, and send a bunch of UpdateTracks
+    // wait until initial negotiation finishes, and send a bunch of
+    // UpdateTracks
     let mut mutes_sent = Vec::with_capacity(EVENTS_COUNT);
     loop {
         if let Event::SdpAnswerMade { .. } =
@@ -232,36 +233,42 @@ async fn track_disables_and_enables_are_instant() {
         };
     }
 
-    let mutes_received_by_publisher: Vec<_> = timeout(
-        Duration::from_secs(10),
-        filter_events(publisher_rx)
-            .take(EVENTS_COUNT)
-            .map(|val| val.0)
-            .collect(),
+    // we dont know how many events we will receive, so gather events they
+    // stop going
+    let mut mutes_received_by_pub: Vec<_> = tokio::stream::StreamExt::timeout(
+        filter_events(publisher_rx),
+        Duration::from_secs(3),
     )
-    .await
-    .unwrap();
+    .take_while(|val| future::ready(val.is_ok()))
+    .map(Result::unwrap)
+    .map(|val| val.0)
+    .collect()
+    .await;
 
-    // gather events sent to subscriber until they stop going
-    let mut mutes_received_by_receiver: Vec<_> =
-        tokio::stream::StreamExt::timeout(
-            filter_events(subscriber_rx),
-            Duration::from_secs(5),
-        )
-        .take_while(|val| future::ready(val.is_ok()))
-        .map(Result::unwrap)
-        .collect()
-        .await;
+    let mut mutes_received_by_sub: Vec<_> = tokio::stream::StreamExt::timeout(
+        filter_events(subscriber_rx),
+        Duration::from_secs(3),
+    )
+    .take_while(|val| future::ready(val.is_ok()))
+    .map(Result::unwrap)
+    .collect()
+    .await;
 
-    assert_eq!(mutes_sent, mutes_received_by_publisher);
-    assert!(mutes_received_by_receiver.iter().all(|val| val.1.is_some()));
-    assert_eq!(
-        *mutes_sent.get(0).unwrap(),
-        mutes_received_by_receiver.get(0).unwrap().0
-    );
+    let mutes_received_by_pub_len = mutes_received_by_pub.len();
+    assert!(mutes_sent.len() >= mutes_received_by_pub_len);
+
+    // make sure that there are no consecutive repeated elements
+    mutes_received_by_pub.dedup();
+    assert_eq!(mutes_received_by_pub.len(), mutes_received_by_pub_len);
+
+    // make sure that all TracksApplied events received by sub have
+    // Some(NegotiationRole), meaning that there no point to force push
+    // TracksApplied to other member
+    assert!(mutes_received_by_sub.iter().all(|val| val.1.is_some()));
+
     assert_eq!(
         mutes_sent.pop().unwrap(),
-        mutes_received_by_receiver.pop().unwrap().0
+        mutes_received_by_sub.pop().unwrap().0
     );
 }
 

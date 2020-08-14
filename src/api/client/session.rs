@@ -106,11 +106,7 @@ impl WsSession {
     }
 
     /// Handles text WebSocket messages.
-    fn handle_text(
-        &mut self,
-        text: &str,
-        ctx: &mut ws::WebsocketContext<Self>,
-    ) {
+    fn handle_text(&mut self, text: &str) {
         self.last_activity = Instant::now();
         match serde_json::from_str::<ClientMsg>(&text) {
             Ok(ClientMsg::Pong(n)) => {
@@ -118,10 +114,7 @@ impl WsSession {
             }
             Ok(ClientMsg::Command(command)) => {
                 debug!("{}: Received Command: {:?}", self, command);
-                self.room
-                    .send_command(self.member_id.clone(), command)
-                    .into_actor(self)
-                    .spawn(ctx);
+                self.room.send_command(self.member_id.clone(), command);
             }
             Err(err) => error!(
                 "{}: Error [{:?}] parsing client message: [{}]",
@@ -157,11 +150,7 @@ impl WsSession {
     }
 
     /// Handles WebSocket continuation frame.
-    fn handle_continuation(
-        &mut self,
-        frame: Item,
-        ctx: &mut ws::WebsocketContext<Self>,
-    ) {
+    fn handle_continuation(&mut self, frame: Item) {
         // This is logged as at `WARN` level, because fragmentation usually
         // happens only when dealing with large payloads (>128kb in Chrome).
         // We will handle this message, but it probably signals that some
@@ -200,7 +189,7 @@ impl WsSession {
                 self.fragmentation_buffer.extend_from_slice(value.bytes());
                 let frame = self.fragmentation_buffer.split();
                 match std::str::from_utf8(frame.as_ref()) {
-                    Ok(text) => self.handle_text(&text, ctx),
+                    Ok(text) => self.handle_text(&text),
                     Err(err) => {
                         error!("{}: Could not parse ws frame: {}", self, err);
                     }
@@ -433,10 +422,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     ) {
         match msg {
             Ok(msg) => match msg {
-                ws::Message::Text(text) => self.handle_text(&text, ctx),
+                ws::Message::Text(text) => self.handle_text(&text),
                 ws::Message::Close(reason) => self.handle_close(reason, ctx),
                 ws::Message::Continuation(item) => {
-                    self.handle_continuation(item, ctx);
+                    self.handle_continuation(item);
                 }
                 ws::Message::Binary(_) => {
                     warn!("{}: Received binary message", self);
@@ -681,7 +670,6 @@ mod test {
 
             rpc_server.expect_send_command().returning(|_, command| {
                 CHAN.0.lock().unwrap().unbounded_send(command).unwrap();
-                future::ready(()).boxed_local()
             });
 
             WsSession::new(

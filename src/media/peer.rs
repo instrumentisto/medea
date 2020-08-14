@@ -39,34 +39,11 @@
 //! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
 //!    your change by adding it into the [`Context::track_changes_queue`].
 //!
-//! # Force [`Peer`] updates which are requires renegotiation
+//! # Applying changes regardless of [`Peer`] state
 //!
-//! Some updates are require renegotiation, but at same time they require
-//! instant [`Event::TracksApplied`] response even if [`Peer`]s will be out
-//! of sync for a while.
-//!
-//! ## Usage
-//!
-//! If you wanna just use already implemented forcible [`TrackChange`] - use it
-//! same as non-forcible changes. [`Peer`] implementation will take care of how
-//! to do it correctly. __No extra actions are required.__
-//!
-//! ## Algorithm of the forcible [`Peer`] update
-//!
-//! ### If [`Peer`] isn't [`Stable`]
-//!
-//! 1. Send [`Event::TracksApplied`] with `renegotiation_role: None`
-//! 2. When [`Peer`] goes into [`Stable`] state, start new renegotiation process
-//!
-//! ### If [`Peer`] is [`Stable`]
-//!
-//! Same as non-forcible [`TrackChange`].
-//!
-//! ## Implementation
-//!
-//! 1. Implement your change same as non-forcible [`TrackChange`]
-//! 2. Return `true` for your [`TrackChange`] variant in the
-//!    [`TrackChange::is_forcible`] function
+//! Sometimes you may want to apply changes immediately, and perform
+//! renegotiation later. In this case you would call
+//! [`PeerStateMachine::force_commit_scheduled_changes`]`.
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
@@ -101,13 +78,11 @@ use crate::{
 /// Subscriber to the events indicating that [`Peer`] was updated.
 #[cfg_attr(test, mockall::automock)]
 pub trait PeerUpdatesSubscriber: fmt::Debug {
-    /// Starts negotiation process for the [`Peer`] with the provided `peer_id`.
-    ///
-    /// Provided [`Peer`] and it's partner [`Peer`] should be in a [`Stable`]
-    /// state, otherwise only forced [`TrackChange`]s will be sent.
+    /// Notifies subscriber that provided [`Peer`] must be negotiated.
     fn negotiation_needed(&self, peer_id: PeerId);
 
-    /// Forcibly updates [`Peer`] without renegotiation.
+    /// Notifies subscriber that provided [`TrackUpdate`] were forcibly (without
+    /// negotiation) applied to [`Peer`].
     fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
 }
 
@@ -222,7 +197,7 @@ pub enum PeerStateMachine {
 impl PeerStateMachine {
     /// Tries to run all scheduled changes.
     ///
-    /// All changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
+    /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
     #[inline]
     pub fn commit_scheduled_changes(&mut self) -> bool {
         if let PeerStateMachine::Stable(this) = self {
@@ -233,6 +208,8 @@ impl PeerStateMachine {
         }
     }
 
+    /// Runs scheduled changes if [`Peer`] is in [`Stable`] state, otherwise,
+    /// runs scheduled changes forcibly (not all changes can be ran forcibly).
     #[inline]
     pub fn force_commit_scheduled_changes(&mut self) {
         if !self.commit_scheduled_changes() {
@@ -361,13 +338,6 @@ pub struct Context {
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
-
-    /// Flag which indicates that this [`Peer`] should be renegotiated when it
-    /// will be [`Stable`].
-    ///
-    /// If this flag `true` then `track_changes_queue` length will be ignored
-    /// and renegotiation will be started on any length.
-    is_forcibly_updated: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -423,9 +393,8 @@ impl TrackChange {
         }
     }
 
-    /// Returns `true` if this [`TrackChange`] can be sent forcibly sent without
-    /// instant renegotiation starting.
-    pub fn is_forcible(&self) -> bool {
+    /// Returns `true` if this [`TrackChange`] can be forcibly applied.
+    fn can_force_apply(&self) -> bool {
         match self {
             TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
                 false
@@ -568,7 +537,7 @@ impl<T> Peer<T> {
     }
 
     /// Commits all [`TrackChange`]s which are marked as forcible
-    /// ([`TrackChange::is_forcible`]).
+    /// ([`TrackChange::can_force_apply`]).
     pub fn inner_force_commit_scheduled_changes(&mut self) {
         let track_changes_queue = std::mem::replace(
             &mut self.context.track_changes_queue,
@@ -577,7 +546,7 @@ impl<T> Peer<T> {
         let mut forcible_changes = VecDeque::new();
         let mut filtered_changes_queue = VecDeque::new();
         for track_change in track_changes_queue {
-            if track_change.is_forcible() {
+            if track_change.can_force_apply() {
                 forcible_changes.push_back(track_change);
             } else {
                 filtered_changes_queue.push_back(track_change);
@@ -592,14 +561,13 @@ impl<T> Peer<T> {
             updates.push(track_update);
         }
 
+        self.dedup_track_patches();
+
         if !updates.is_empty() {
             self.context
                 .peer_updates_sub
                 .force_update(self.id(), updates);
-            self.context.is_forcibly_updated = true;
         }
-
-        self.dedup_track_patches();
     }
 
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
@@ -618,12 +586,8 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Dedups [`TrackPatch`]s.
-    ///
-    /// All [`TrackPatch`]s for the some [`TrackId`] will be merged into one
-    /// [`TrackPatch`] with [`TrackPatch::merge`] and pushed to the end of
-    /// [`Context::pending_track_updates`].
-    pub fn dedup_track_patches(&mut self) {
+    /// Deduplicates pending [`TrackChanges`]s.
+    fn dedup_track_patches(&mut self) {
         let mut grouped_patches: HashMap<TrackId, TrackPatch> = HashMap::new();
         let mut track_changes = Vec::new();
 
@@ -663,6 +627,8 @@ impl Peer<WaitLocalSdp> {
         }
     }
 
+    /// Sets local description and transition [`Peer`] to [`Stable`]
+    /// state.
     #[inline]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
@@ -719,6 +685,7 @@ impl Peer<WaitLocalSdp> {
 }
 
 impl Peer<WaitRemoteSdp> {
+    /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
         self.context.sdp_answer = Some(sdp_answer);
@@ -732,7 +699,8 @@ impl Peer<WaitRemoteSdp> {
         peer
     }
 
-    /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
+    /// Sets remote description and transitions [`Peer`] to [`WaitLocalSdp`]
+    /// state.
     #[inline]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
         self.context.sdp_offer = Some(sdp_offer);
@@ -772,7 +740,6 @@ impl Peer<Stable> {
             pending_track_updates: Vec::new(),
             track_changes_queue: VecDeque::new(),
             peer_updates_sub: negotiation_subscriber,
-            is_forcibly_updated: false,
         };
 
         Self {
@@ -790,9 +757,7 @@ impl Peer<Stable> {
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
-    pub fn start_as_offerer(mut self) -> Peer<WaitLocalSdp> {
-        self.negotiation_started();
-
+    pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
@@ -803,10 +768,16 @@ impl Peer<Stable> {
         }
     }
 
+    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
+    /// [SDP] Offer and Answer.
+    ///
+    /// Sets [`Context::is_renegotiate`] to `true`.
+    ///
+    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
-    pub fn start_as_answerer(mut self) -> Peer<WaitRemoteSdp> {
-        self.negotiation_started();
-
+    pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_answer = None;
         context.sdp_offer = None;
@@ -815,12 +786,6 @@ impl Peer<Stable> {
             context,
             state: WaitRemoteSdp {},
         }
-    }
-
-    /// This method will be called everytime when [`Peer`] goes from [`Stable`]
-    /// state into any other state.
-    fn negotiation_started(&mut self) {
-        self.context.is_forcibly_updated = false;
     }
 
     /// Returns [mid]s of this [`Peer`].
@@ -845,25 +810,19 @@ impl Peer<Stable> {
         Ok(mids)
     }
 
-    /// Runs [`TrackChange`]s which are scheduled for this [`Peer`].
-    ///
-    /// If this [`Peer`] is not [`Stable`] then only forced [`TrackChange`]s
-    /// will be ran without renegotiation. Renegotiation for the forced
-    /// [`TrackChange`]s will be done when [`Peer`] will be [`Stable`].
+    /// Runs [`Task`]s which are scheduled for this [`Peer`].
     fn commit_scheduled_changes(&mut self) {
-        if !self.context.track_changes_queue.is_empty()
-            || self.context.is_forcibly_updated
-        {
+        if !self.context.track_changes_queue.is_empty() {
             while let Some(task) = self.context.track_changes_queue.pop_front()
             {
                 self.context.pending_track_updates.push(task.clone());
                 task.dispatch_with(self);
             }
 
+            self.dedup_track_patches();
+
             self.context.peer_updates_sub.negotiation_needed(self.id());
         }
-
-        self.dedup_track_patches();
     }
 
     /// Sets [`Context::is_known_to_remote`] to `true`.
