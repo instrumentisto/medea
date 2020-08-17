@@ -1,8 +1,10 @@
 //! [`PeerConnectionStateEventsHandler`] implementation for [`Room`].
 
-use actix::{Handler, Message, WeakAddr};
+use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{Event, NegotiationRole, PeerId, TrackUpdate};
+use medea_client_api_proto::{
+    Event, MemberId, NegotiationRole, PeerId, TrackUpdate,
+};
 
 use crate::{
     api::control::callback::{MediaDirection, MediaType},
@@ -13,7 +15,8 @@ use crate::{
             EstimatedConnectionQuality, PeerConnectionStateEventsHandler,
             PeersMetricsEvent, PeersMetricsEventHandler,
         },
-        room::RoomError, Room,
+        room::RoomError,
+        Room,
     },
 };
 
@@ -66,13 +69,15 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 }
 
 impl StreamHandler<PeersMetricsEvent> for Room {
-    fn handle(&mut self, event: PeersMetricsEvent, ctx: &mut Self::Context) {
-        ctx.spawn(event.dispatch_with(self));
+    fn handle(&mut self, event: PeersMetricsEvent, _: &mut Self::Context) {
+        if let Err(err) = event.dispatch_with(self) {
+            error!("Error handling PeersMetricsEvent: {:?}", err);
+        }
     }
 }
 
 impl PeersMetricsEventHandler for Room {
-    type Output = ActFuture<()>;
+    type Output = Result<(), RoomError>;
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial media traffic
     /// stopping.
@@ -83,7 +88,7 @@ impl PeersMetricsEventHandler for Room {
         _: MediaType,
         _: MediaDirection,
     ) -> Self::Output {
-        Box::new(actix::fut::ready(()))
+        Ok(())
     }
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
@@ -94,7 +99,7 @@ impl PeersMetricsEventHandler for Room {
         _: MediaType,
         _: MediaDirection,
     ) -> Self::Output {
-        Box::new(actix::fut::ready(()))
+        Ok(())
     }
 
     /// Sends [`Event::QualityScoreUpdated`] to the [`Member`] with a provided
@@ -110,24 +115,12 @@ impl PeersMetricsEventHandler for Room {
             member_id, partner_member_id, quality_score
         );
 
-        let fut = self.members.send_event_to_member(
+        self.members.send_event_to_member(
             member_id,
             Event::QualityScoreUpdated {
                 partner_member_id,
                 quality_score: quality_score as u8,
             },
-        );
-
-        Box::new(
-            async move {
-                if let Err(e) = fut.await {
-                    error!(
-                        "Failed to send quality score to the client: {:?}",
-                        e
-                    );
-                }
-            }
-            .into_actor(self),
         )
     }
 }
