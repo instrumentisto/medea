@@ -12,6 +12,7 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
+    log::prelude::*,
     media::{MediaStreamTrack, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -76,8 +77,23 @@ impl<'a> SenderBuilder<'a> {
                 {
                     if let Some(this) = weak_this.upgrade() {
                         match finalized_mute_state {
-                            StableMuteState::NotMuted => this.request_track(),
-                            StableMuteState::Muted => this.disable().await,
+                            StableMuteState::NotMuted => {
+                                let _ = this.peer_events_sender.unbounded_send(
+                                    PeerEvent::NewLocalStreamRequired {
+                                        peer_id: this.peer_id,
+                                    },
+                                );
+                            }
+                            StableMuteState::Muted => {
+                                // cannot fail
+                                this.track.borrow_mut().take();
+                                let _ = JsFuture::from(
+                                    this.transceiver
+                                        .sender()
+                                        .replace_track(None),
+                                )
+                                .await;
+                            }
                         }
                     } else {
                         break;
@@ -190,8 +206,9 @@ impl Sender {
         self.set_transceiver_direction(TransceiverDirection::Inactive);
         self.track.borrow_mut().take();
         // cannot fail
-        let _ =
-            JsFuture::from(self.transceiver.sender().replace_track(None)).await;
+        let _ = JsFuture::from(self.transceiver.sender().replace_track(None))
+            .await
+            .unwrap();
     }
 
     fn request_track(&self) {
@@ -221,7 +238,7 @@ impl MuteableTrack for Sender {
     ///
     /// # Errors
     ///
-    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
+    /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
     /// required for the call and can't be muted.
     fn mute_state_transition_to(
         &self,

@@ -85,7 +85,7 @@ impl TransceiverKind {
 /// Representation of [RTCRtpTransceiverDirection][1].
 ///
 /// [1]:https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 // TODO: sendrecv optimization
 pub enum TransceiverDirection {
     /// [`sendonly` direction][1] of transceiver.

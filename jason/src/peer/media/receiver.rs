@@ -7,9 +7,10 @@ use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
 use proto::TrackId;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::RtcRtpTransceiver;
+use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
+    log::prelude::*,
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -19,6 +20,7 @@ use crate::{
 };
 
 use super::{mute_state::StableMuteState, HasMuteStateController};
+use crate::peer::media::MediaConnectionsError::TransceiverNotFound;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -38,6 +40,15 @@ struct InnerReceiver {
     notified_track: bool,
     mute_state_controller: Rc<MuteStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+}
+
+impl InnerReceiver {
+    fn set_direction(&mut self, direction: TransceiverDirection) {
+        self.transceiver_direction = direction;
+        if let Some(transceiver) = &self.transceiver {
+            transceiver.set_direction(direction.into());
+        }
+    }
 }
 
 impl Receiver {
@@ -100,13 +111,9 @@ impl Receiver {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(false);
                                 }
-                                if inner.transceiver.is_some() {
-                                    inner.transceiver_direction =
-                                        TransceiverDirection::Inactive;
-                                }
-                                if let Some(transceiver) = &inner.transceiver {
-                                    transceiver.set_direction(
-                                        inner.transceiver_direction.into(),
+                                if !inner.notified_track {
+                                    inner.set_direction(
+                                        TransceiverDirection::Inactive,
                                     );
                                 }
                             }
@@ -114,13 +121,9 @@ impl Receiver {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(true);
                                 }
-                                if inner.transceiver.is_some() {
-                                    inner.transceiver_direction =
-                                        TransceiverDirection::Recvonly;
-                                }
-                                if let Some(transceiver) = &inner.transceiver {
-                                    transceiver.set_direction(
-                                        inner.transceiver_direction.into(),
+                                if !inner.notified_track {
+                                    inner.set_direction(
+                                        TransceiverDirection::Recvonly,
                                     );
                                 }
                             }

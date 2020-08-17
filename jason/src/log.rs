@@ -1,7 +1,7 @@
 use wasm_bindgen::JsValue;
 
 pub mod prelude {
-    pub use crate::log_debug;
+    pub use crate::{log_debug, log_error};
 }
 
 /// Prints provided message with [`Console.error()`].
@@ -25,6 +25,17 @@ where
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
-        $crate::log::console_debug(&format!($($arg)*));
+        $crate::log::console_debug(
+            format!("[{}:{}]: ", module_path!(), line!()) + &format!($($arg)*)
+        );
+    };
+}
+
+#[macro_export]
+macro_rules! log_error {
+    ($($arg:tt)*) => {
+        $crate::log::console_error(
+            format!("[{}:{}]: ", module_path!(), line!()) + &format!($($arg)*)
+        );
     };
 }
