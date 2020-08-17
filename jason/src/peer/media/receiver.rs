@@ -7,10 +7,9 @@ use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
 use proto::TrackId;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
+use web_sys::{RtcRtpTransceiver};
 
 use crate::{
-    log::prelude::*,
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -20,7 +19,6 @@ use crate::{
 };
 
 use super::{mute_state::StableMuteState, HasMuteStateController};
-use crate::peer::media::MediaConnectionsError::TransceiverNotFound;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.

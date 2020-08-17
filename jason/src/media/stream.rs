@@ -11,7 +11,7 @@ use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::{log::prelude::*, MediaStreamSettings};
+use crate::{MediaStreamSettings};
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
