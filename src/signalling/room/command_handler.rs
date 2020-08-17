@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use actix::WrapFuture as _;
 use medea_client_api_proto::{
     CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
     TrackId, TrackPatch,
@@ -11,16 +10,13 @@ use medea_client_api_proto::{
 
 use crate::{
     log::prelude::*,
-    media::{
-        Peer, PeerStateMachine, Stable, WaitLocalHaveRemote, WaitLocalSdp,
-        WaitRemoteSdp,
-    },
+    media::{Peer, PeerStateMachine, WaitLocalSdp, WaitRemoteSdp},
 };
 
-use super::{ActFuture, Room, RoomError};
+use super::{Room, RoomError};
 
 impl CommandHandler for Room {
-    type Output = Result<ActFuture<Result<(), RoomError>>, RoomError>;
+    type Output = Result<(), RoomError>;
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
@@ -35,14 +31,14 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
+        let to_peer: Peer<WaitRemoteSdp> =
+            self.peers.take_inner_peer(from_peer.partner_peer_id())?;
+
         from_peer.set_mids(mids)?;
         from_peer.update_senders_statuses(senders_statuses);
 
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<Stable> = self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
-        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
+        let from_peer = from_peer.set_local_offer(sdp_offer.clone());
+        let to_peer = to_peer.set_remote_offer(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
         let ice_servers = to_peer.ice_servers_list().ok_or_else(|| {
@@ -51,7 +47,7 @@ impl CommandHandler for Room {
 
         let event = if from_peer.is_known_to_remote() {
             Event::TracksApplied {
-                peer_id: to_peer_id,
+                peer_id: to_peer.id(),
                 negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
                 updates: to_peer.get_updates(),
             }
@@ -70,11 +66,7 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        Ok(Box::new(
-            self.members
-                .send_event_to_member(to_member_id, event)
-                .into_actor(self),
-        ))
+        self.members.send_event_to_member(to_member_id, event)
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -87,20 +79,19 @@ impl CommandHandler for Room {
         sdp_answer: String,
         senders_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
-        let from_peer: Peer<WaitLocalHaveRemote> =
+        let from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
+        let to_peer: Peer<WaitRemoteSdp> =
+            self.peers.take_inner_peer(from_peer.partner_peer_id())?;
+
         from_peer.update_senders_statuses(senders_statuses);
 
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<WaitRemoteSdp> =
-            self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
-        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
+        let from_peer = from_peer.set_local_answer(sdp_answer.clone());
+        let to_peer = to_peer.set_remote_answer(sdp_answer.clone());
 
         let to_member_id = to_peer.member_id();
         let event = Event::SdpAnswerMade {
-            peer_id: to_peer_id,
+            peer_id: to_peer.id(),
             sdp_answer,
         };
 
@@ -109,11 +100,7 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        Ok(Box::new(
-            self.members
-                .send_event_to_member(to_member_id, event)
-                .into_actor(self),
-        ))
+        self.members.send_event_to_member(to_member_id, event)
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
@@ -126,7 +113,7 @@ impl CommandHandler for Room {
         // TODO: add E2E test
         if candidate.candidate.is_empty() {
             warn!("Empty candidate from Peer: {}, ignoring", from_peer_id);
-            return Ok(Box::new(actix::fut::ok(())));
+            return Ok(());
         }
 
         let to_peer_id = self
@@ -140,11 +127,7 @@ impl CommandHandler for Room {
             candidate,
         };
 
-        Ok(Box::new(
-            self.members
-                .send_event_to_member(to_member_id, event)
-                .into_actor(self),
-        ))
+        self.members.send_event_to_member(to_member_id, event)
     }
 
     /// Does nothing atm.
@@ -153,7 +136,7 @@ impl CommandHandler for Room {
         _: PeerId,
         _: PeerMetrics,
     ) -> Self::Output {
-        Ok(Box::new(actix::fut::ok(())))
+        Ok(())
     }
 
     /// Sends [`Event::TracksApplied`] with data from the received
@@ -167,18 +150,23 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
+        // Note, that we force committing changes to `Member` that send
+        // `UpdateTracks` request, so response will be sent immediately,
+        // regardless of that `Peer` state, but non-forcibly committing
+        // changes to partner `Peer`, so it will be notified of changes only
+        // during next negotiation.
         let partner_peer_id =
             self.peers.map_peer_by_id_mut(peer_id, |peer| {
                 peer.as_changes_scheduler()
                     .patch_tracks(tracks_patches.clone());
+                peer.force_commit_scheduled_changes();
                 peer.partner_peer_id()
             })?;
         self.peers.map_peer_by_id_mut(partner_peer_id, |peer| {
             peer.as_changes_scheduler().patch_tracks(tracks_patches);
+            peer.commit_scheduled_changes();
         })?;
 
-        self.peers.commit_scheduled_changes(peer_id)?;
-
-        Ok(Box::new(actix::fut::ok(())))
+        Ok(())
     }
 }

@@ -28,7 +28,7 @@
 //! a [`Stable`] state only.
 //!
 //! After the changes are applied, the [`Peer`] will notify
-//! [`NegotiationSubscriber`] that it's appropriate to start a negotiation.
+//! [`PeerUpdatesSubscriber`] that it's appropriate to start a negotiation.
 //!
 //! # Implementing [`Peer`]'s update that requires (re)negotiation
 //!
@@ -38,6 +38,12 @@
 //!    implementation.
 //! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
 //!    your change by adding it into the [`Context::track_changes_queue`].
+//!
+//! # Applying changes regardless of [`Peer`] state
+//!
+//! Sometimes you may want to apply changes immediately, and perform
+//! renegotiation later. In this case you should call
+//! [`PeerStateMachine::force_commit_scheduled_changes`]`.
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
@@ -69,21 +75,21 @@ use crate::{
     },
 };
 
-/// Subscriber to the events indicating that negotiation process should be
-/// started for the some [`Peer`].
+/// Subscriber to the events indicating that [`Peer`] was updated.
 #[cfg_attr(test, mockall::automock)]
-pub trait NegotiationSubscriber: fmt::Debug {
-    /// Starts negotiation process for the [`Peer`] with the provided `peer_id`.
-    ///
-    /// Provided [`Peer`] and it's partner [`Peer`] should be in a [`Stable`]
-    /// state, otherwise nothing will be done.
+pub trait PeerUpdatesSubscriber: fmt::Debug {
+    /// Notifies subscriber that provided [`Peer`] must be negotiated.
     fn negotiation_needed(&self, peer_id: PeerId);
+
+    /// Notifies subscriber that provided [`TrackUpdate`] were forcibly (without
+    /// negotiation) applied to [`Peer`].
+    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
 }
 
 #[cfg(test)]
-impl fmt::Debug for MockNegotiationSubscriber {
+impl fmt::Debug for MockPeerUpdatesSubscriber {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("MockNegotiationSubscriber").finish()
+        f.debug_struct("MockPeerUpdatesSubscriber").finish()
     }
 }
 
@@ -92,12 +98,6 @@ impl fmt::Debug for MockNegotiationSubscriber {
 /// [SDP]: https://tools.ietf.org/html/rfc4317
 #[derive(Debug, PartialEq)]
 pub struct WaitLocalSdp;
-
-/// [`Peer`] has remote [SDP] and is waiting for local [SDP].
-///
-/// [SDP]: https://tools.ietf.org/html/rfc4317
-#[derive(Debug, PartialEq)]
-pub struct WaitLocalHaveRemote;
 
 /// [`Peer`] has local [SDP] and is waiting for remote [SDP].
 ///
@@ -136,7 +136,39 @@ impl PeerError {
     }
 }
 
-/// Implementation of ['Peer'] state machine.
+/// Implementation of [`Peer`] state machine.
+///
+/// # State transitions scheme
+///
+/// ```text
+/// +---------------+                   +-----------------+
+/// |               |  set_local_offer  |                 |
+/// | WaitLocalSdp  +------------------>+  WaitRemoteSdp  |
+/// |               |                   |                 |
+/// +------+--------+                   +--------+--------+
+///        ^                                     |
+///        |                                     |
+///        |                                     |
+/// start_as_offerer                       set_remote_answer
+///        |                                     |
+///        |                                     |
+/// +------+--------+                            |
+/// |               +<---------------------------+
+/// |   Stable      |
+/// |               +<---------------------------+
+/// +------+--------+                            |
+///        |                                     |
+///        |                                     |
+/// start_as_answerer                      set_local_answer
+///        |                                     |
+///        |                                     |
+///        v                                     |
+/// +------+--------+                   +--------+---------+
+/// |               | set_remote_offer  |                  |
+/// | WaitRemoteSdp +------------------>+   WaitLocalSdp   |
+/// |               |                   |                  |
+/// +---------------+                   +------------------+
+/// ```
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
@@ -153,17 +185,11 @@ impl PeerError {
 #[enum_delegate(
     pub fn get_updates(&self) -> Vec<TrackUpdate>
 )]
-#[enum_delegate(
-    pub fn update_senders_statuses(
-        &self,
-        senders_statuses: HashMap<TrackId, bool>,
-    )
-)]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
+#[enum_delegate(fn inner_force_commit_scheduled_changes(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
-    WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
 }
@@ -173,9 +199,21 @@ impl PeerStateMachine {
     ///
     /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
     #[inline]
-    pub fn commit_scheduled_changes(&mut self) {
-        if let PeerStateMachine::Stable(stable_peer) = self {
-            stable_peer.commit_scheduled_changes();
+    pub fn commit_scheduled_changes(&mut self) -> bool {
+        if let PeerStateMachine::Stable(this) = self {
+            this.commit_scheduled_changes();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Runs scheduled changes if [`Peer`] is in [`Stable`] state, otherwise,
+    /// runs scheduled changes forcibly (not all changes can be ran forcibly).
+    #[inline]
+    pub fn force_commit_scheduled_changes(&mut self) {
+        if !self.commit_scheduled_changes() {
+            self.inner_force_commit_scheduled_changes();
         }
     }
 
@@ -193,9 +231,6 @@ impl fmt::Display for PeerStateMachine {
         match self {
             PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
             PeerStateMachine::WaitLocalSdp(_) => write!(f, "WaitLocalSdp"),
-            PeerStateMachine::WaitLocalHaveRemote(_) => {
-                write!(f, "WaitLocalHaveRemote")
-            }
             PeerStateMachine::Stable(_) => write!(f, "Stable"),
         }
     }
@@ -247,7 +282,6 @@ macro_rules! impl_peer_converts {
 }
 
 impl_peer_converts!(WaitLocalSdp);
-impl_peer_converts!(WaitLocalHaveRemote);
 impl_peer_converts!(WaitRemoteSdp);
 impl_peer_converts!(Stable);
 
@@ -303,7 +337,7 @@ pub struct Context {
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
-    negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
+    peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -358,9 +392,19 @@ impl TrackChange {
             }
         }
     }
+
+    /// Returns `true` if this [`TrackChange`] can be forcibly applied.
+    fn can_force_apply(&self) -> bool {
+        match self {
+            TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
+                false
+            }
+            TrackChange::TrackPatch(_) => true,
+        }
+    }
 }
 
-impl TrackChangeHandler for Peer<Stable> {
+impl<T> TrackChangeHandler for Peer<T> {
     type Output = ();
 
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
@@ -393,16 +437,19 @@ impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
+    #[inline]
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
     }
 
     /// Returns ID of [`Peer`].
+    #[inline]
     pub fn id(&self) -> Id {
         self.context.id
     }
 
     /// Returns ID of interconnected [`Peer`].
+    #[inline]
     pub fn partner_peer_id(&self) -> Id {
         self.context.partner_peer
     }
@@ -410,6 +457,7 @@ impl<T> Peer<T> {
     /// Returns ID of interconnected [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
+    #[inline]
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
     }
@@ -434,26 +482,31 @@ impl<T> Peer<T> {
     }
 
     /// Indicates whether this [`Peer`] has any send tracks.
+    #[inline]
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
 
     /// Indicates whether all media is forcibly relayed through a TURN server.
+    #[inline]
     pub fn is_force_relayed(&self) -> bool {
         self.context.is_force_relayed
     }
 
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
+    #[inline]
     pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
         self.context.ice_user.as_ref().map(IceUser::servers_list)
     }
 
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s
+    #[inline]
     pub fn set_ice_user(&mut self, ice_user: IceUser) {
         self.context.ice_user.replace(ice_user);
     }
 
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
+    #[inline]
     pub fn endpoints(&self) -> Vec<WeakEndpoint> {
         self.context.endpoints.clone()
     }
@@ -471,26 +524,50 @@ impl<T> Peer<T> {
         self.context.endpoints.push(endpoint.downgrade());
     }
 
-    /// Updates this [`Peer`]'s senders statuses.
-    pub fn update_senders_statuses(
-        &self,
-        senders_statuses: HashMap<TrackId, bool>,
-    ) {
-        for (track_id, is_publishing) in senders_statuses {
-            if let Some(sender) = self.context.senders.get(&track_id) {
-                sender.set_enabled(is_publishing);
-            }
-        }
-    }
-
     /// Returns all receiving [`MediaTrack`]s of this [`Peer`].
+    #[inline]
     pub fn receivers(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
         &self.context.receivers
     }
 
     /// Returns all sending [`MediaTrack`]s of this [`Peer`].
+    #[inline]
     pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>> {
         &self.context.senders
+    }
+
+    /// Commits all [`TrackChange`]s which are marked as forcible
+    /// ([`TrackChange::can_force_apply`]).
+    pub fn inner_force_commit_scheduled_changes(&mut self) {
+        let track_changes_queue = std::mem::replace(
+            &mut self.context.track_changes_queue,
+            VecDeque::new(),
+        );
+        let mut forcible_changes = VecDeque::new();
+        let mut filtered_changes_queue = VecDeque::new();
+        for track_change in track_changes_queue {
+            if track_change.can_force_apply() {
+                forcible_changes.push_back(track_change);
+            } else {
+                filtered_changes_queue.push_back(track_change);
+            }
+        }
+        self.context.track_changes_queue = filtered_changes_queue;
+
+        let mut updates = Vec::new();
+        for change in forcible_changes {
+            let track_update = change.as_track_update(self.partner_member_id());
+            change.dispatch_with(self);
+            updates.push(track_update);
+        }
+
+        self.dedup_track_patches();
+
+        if !updates.is_empty() {
+            self.context
+                .peer_updates_sub
+                .force_update(self.id(), updates);
+        }
     }
 
     /// Indicates whether this [`Peer`] is known to client (`Event::PeerCreated`
@@ -508,19 +585,60 @@ impl<T> Peer<T> {
             context: &mut self.context,
         }
     }
+
+    /// Deduplicates pending [`TrackChanges`]s.
+    fn dedup_track_patches(&mut self) {
+        let mut grouped_patches: HashMap<TrackId, TrackPatch> = HashMap::new();
+        let mut track_changes = Vec::new();
+
+        for track_change in
+            std::mem::take(&mut self.context.pending_track_updates)
+        {
+            if let TrackChange::TrackPatch(patch) = track_change {
+                grouped_patches
+                    .entry(patch.id)
+                    .or_insert_with(|| TrackPatch::new(patch.id))
+                    .merge(&patch);
+            } else {
+                track_changes.push(track_change);
+            }
+        }
+
+        track_changes.extend(
+            grouped_patches
+                .into_iter()
+                .map(|(_, patch)| TrackChange::TrackPatch(patch)),
+        );
+
+        self.context.pending_track_updates = track_changes;
+    }
 }
 
 impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
     /// state.
     #[inline]
-    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
+    pub fn set_local_offer(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
             state: WaitRemoteSdp {},
         }
+    }
+
+    /// Sets local description and transition [`Peer`] to [`Stable`]
+    /// state.
+    #[inline]
+    pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
+        let mut context = self.context;
+        context.sdp_answer = Some(sdp_answer);
+        let mut this = Peer {
+            context,
+            state: Stable {},
+        };
+        this.negotiation_finished();
+        this
     }
 
     /// Sets tracks [mid]s.
@@ -552,26 +670,24 @@ impl Peer<WaitLocalSdp> {
 
         Ok(())
     }
+
+    /// Updates this [`Peer`]'s senders statuses.
+    pub fn update_senders_statuses(
+        &self,
+        senders_statuses: HashMap<TrackId, bool>,
+    ) {
+        for (track_id, is_publishing) in senders_statuses {
+            if let Some(sender) = self.context.senders.get(&track_id) {
+                sender.set_enabled(is_publishing);
+            }
+        }
+    }
 }
 
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
-    pub fn set_remote_sdp(mut self, sdp_answer: &str) -> Peer<Stable> {
-        self.context.sdp_answer = Some(sdp_answer.to_string());
-
-        let mut peer = Peer {
-            context: self.context,
-            state: Stable {},
-        };
-        peer.negotiation_finished();
-
-        peer
-    }
-}
-
-impl Peer<WaitLocalHaveRemote> {
-    /// Sets local description and transitions [`Peer`] to [`Stable`] state.
-    pub fn set_local_sdp(mut self, sdp_answer: String) -> Peer<Stable> {
+    #[inline]
+    pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
         self.context.sdp_answer = Some(sdp_answer);
 
         let mut peer = Peer {
@@ -581,6 +697,18 @@ impl Peer<WaitLocalHaveRemote> {
         peer.negotiation_finished();
 
         peer
+    }
+
+    /// Sets remote description and transitions [`Peer`] to [`WaitLocalSdp`]
+    /// state.
+    #[inline]
+    pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
+        self.context.sdp_offer = Some(sdp_offer);
+
+        Peer {
+            context: self.context,
+            state: WaitLocalSdp {},
+        }
     }
 }
 
@@ -594,7 +722,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
-        negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
+        negotiation_subscriber: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -611,7 +739,7 @@ impl Peer<Stable> {
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
             track_changes_queue: VecDeque::new(),
-            negotiation_subscriber,
+            peer_updates_sub: negotiation_subscriber,
         };
 
         Self {
@@ -620,24 +748,43 @@ impl Peer<Stable> {
         }
     }
 
-    /// Transition new [`Peer`] into state of waiting for local description.
-    pub fn start(self) -> Peer<WaitLocalSdp> {
+    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
+    /// [SDP] Offer and Answer.
+    ///
+    /// Sets [`Context::is_renegotiate`] to `true`.
+    ///
+    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
+    #[inline]
+    pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
+        let mut context = self.context;
+        context.sdp_answer = None;
+        context.sdp_offer = None;
+
         Peer {
-            context: self.context,
+            context,
             state: WaitLocalSdp {},
         }
     }
 
-    /// Transition new [`Peer`] into state of waiting for remote description.
-    pub fn set_remote_sdp(
-        self,
-        sdp_offer: String,
-    ) -> Peer<WaitLocalHaveRemote> {
+    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
+    /// [SDP] Offer and Answer.
+    ///
+    /// Sets [`Context::is_renegotiate`] to `true`.
+    ///
+    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
+    ///
+    /// [SDP]: https://tools.ietf.org/html/rfc4317
+    #[inline]
+    pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        context.sdp_offer = Some(sdp_offer);
+        context.sdp_answer = None;
+        context.sdp_offer = None;
+
         Peer {
             context,
-            state: WaitLocalHaveRemote {},
+            state: WaitRemoteSdp {},
         }
     }
 
@@ -663,30 +810,7 @@ impl Peer<Stable> {
         Ok(mids)
     }
 
-    /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
-    /// [SDP] Offer and Answer.
-    ///
-    /// Sets [`Context::is_renegotiate`] to `true`.
-    ///
-    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
-    ///
-    /// [SDP]: https://tools.ietf.org/html/rfc4317
-    pub fn start_negotiation(self) -> Peer<WaitLocalSdp> {
-        let mut context = self.context;
-        context.sdp_answer = None;
-        context.sdp_offer = None;
-
-        Peer {
-            context,
-            state: WaitLocalSdp {},
-        }
-    }
-
     /// Runs [`Task`]s which are scheduled for this [`Peer`].
-    ///
-    /// Returns `true` if at least one [`Task`] was run.
-    ///
-    /// Returns `false` if nothing was done.
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty() {
             while let Some(task) = self.context.track_changes_queue.pop_front()
@@ -695,9 +819,9 @@ impl Peer<Stable> {
                 task.dispatch_with(self);
             }
 
-            self.context
-                .negotiation_subscriber
-                .negotiation_needed(self.id());
+            self.dedup_track_patches();
+
+            self.context.peer_updates_sub.negotiation_needed(self.id());
         }
     }
 
@@ -805,9 +929,9 @@ impl<'a> PeerChangesScheduler<'a> {
 pub mod tests {
     use super::*;
 
-    /// Returns dummy [`NegotiationSubscriber`] mock which does nothing.
-    pub fn dummy_negotiation_sub_mock() -> Rc<dyn NegotiationSubscriber> {
-        let mut mock = MockNegotiationSubscriber::new();
+    /// Returns dummy [`PeerUpdatesSubscriber`] mock which does nothing.
+    pub fn dummy_negotiation_sub_mock() -> Rc<dyn PeerUpdatesSubscriber> {
+        let mut mock = MockPeerUpdatesSubscriber::new();
         mock.expect_negotiation_needed().returning(|_| ());
 
         Rc::new(mock)
@@ -881,7 +1005,7 @@ pub mod tests {
     #[test]
     fn scheduled_changes_normally_ran() {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |peer_id| {
@@ -913,7 +1037,7 @@ pub mod tests {
     #[test]
     fn scheduled_changes_will_be_ran_on_stable() {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut negotiation_sub = MockNegotiationSubscriber::new();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |peer_id| {
@@ -929,21 +1053,154 @@ pub mod tests {
             Rc::new(negotiation_sub),
         );
 
-        let mut peer = peer.start();
+        let mut peer = peer.start_as_offerer();
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
         assert!(peer.context.senders.is_empty());
         assert!(peer.context.receivers.is_empty());
 
-        let peer = peer.set_local_sdp(String::new());
+        let peer = peer.set_local_offer(String::new());
         assert!(peer.context.senders.is_empty());
         assert!(peer.context.receivers.is_empty());
 
-        let peer = peer.set_remote_sdp("");
+        let peer = peer.set_remote_answer(String::new());
         assert_eq!(peer.context.receivers.len(), 1);
         assert_eq!(peer.context.senders.len(), 1);
         assert_eq!(peer.context.pending_track_updates.len(), 2);
         assert_eq!(peer.context.track_changes_queue.len(), 0);
         assert_eq!(rx.recv().unwrap(), PeerId(0));
+    }
+
+    #[test]
+    fn force_updates_works() {
+        let (force_update_tx, force_update_rx) = std::sync::mpsc::channel();
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub.expect_force_update().returning(
+            move |peer_id: PeerId, changes: Vec<TrackUpdate>| {
+                force_update_tx.send((peer_id, changes)).unwrap();
+            },
+        );
+        let (negotiation_needed_tx, negotiation_needed_rx) =
+            std::sync::mpsc::channel();
+        negotiation_sub.expect_negotiation_needed().returning(
+            move |peer_id: PeerId| {
+                negotiation_needed_tx.send(peer_id).unwrap();
+            },
+        );
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+        peer.as_changes_scheduler().add_sender(media_track(0));
+        peer.as_changes_scheduler().add_receiver(media_track(1));
+        peer.commit_scheduled_changes();
+        let mut peer = peer.start_as_offerer();
+
+        peer.as_changes_scheduler().patch_tracks(vec![
+            TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            },
+        ]);
+        peer.inner_force_commit_scheduled_changes();
+        let (peer_id, changes) = force_update_rx.recv().unwrap();
+
+        assert_eq!(peer_id, PeerId(0));
+        assert_eq!(changes.len(), 2);
+        assert!(peer.context.track_changes_queue.is_empty());
+
+        let peer = peer.set_local_offer(String::new());
+        peer.set_remote_answer(String::new());
+
+        let peer_id = negotiation_needed_rx.recv().unwrap();
+        assert_eq!(peer_id, PeerId(0));
+    }
+
+    #[test]
+    fn track_patch_dedup_works() {
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub
+            .expect_force_update()
+            .returning(move |_: PeerId, _: Vec<TrackUpdate>| {});
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |_: PeerId| {});
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+
+        let patches = vec![
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: None,
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(false),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(false),
+            },
+            TrackPatch {
+                id: TrackId(2),
+                is_muted: None,
+            },
+            TrackPatch {
+                id: TrackId(1),
+                is_muted: None,
+            },
+        ];
+        peer.as_changes_scheduler().patch_tracks(patches);
+        let mut peer = PeerStateMachine::from(peer);
+        peer.commit_scheduled_changes();
+        let peer = if let PeerStateMachine::Stable(peer) = peer {
+            peer
+        } else {
+            unreachable!("Peer should be in Stable state.");
+        };
+
+        let mut track_patches_after: Vec<_> = peer
+            .context
+            .pending_track_updates
+            .iter()
+            .filter_map(|t| {
+                if let TrackChange::TrackPatch(patch) = t {
+                    Some(patch.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let second_track_patch = track_patches_after.pop().unwrap();
+        assert_eq!(second_track_patch.is_muted, Some(false));
+
+        let first_track_patch = track_patches_after.pop().unwrap();
+        assert_eq!(first_track_patch.is_muted, Some(false));
+
+        assert!(track_patches_after.is_empty());
     }
 }
