@@ -42,7 +42,7 @@
 //! # Applying changes regardless of [`Peer`] state
 //!
 //! Sometimes you may want to apply changes immediately, and perform
-//! renegotiation later. In this case you would call
+//! renegotiation later. In this case you should call
 //! [`PeerStateMachine::force_commit_scheduled_changes`]`.
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -138,7 +138,7 @@ impl PeerError {
 
 /// Implementation of [`Peer`] state machine.
 ///
-/// State transitions scheme:
+/// # State transitions scheme
 ///
 /// ```text
 /// +---------------+                   +-----------------+

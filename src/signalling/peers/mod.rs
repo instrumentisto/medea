@@ -756,8 +756,7 @@ mod tests {
         }
 
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
-        /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly
-        /// updated.
+        /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly updated.
         #[allow(dead_code)]
         pub fn on_force_update(
             &self,

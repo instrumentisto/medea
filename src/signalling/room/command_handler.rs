@@ -150,10 +150,10 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
     ) -> Self::Output {
-        // note that we force committing changes to Member that send
-        // UpdateTracks request so, response will be sent immediately,
-        // regardless of that Peer state, but non-foricbly commiting
-        // changes to partner Peer, so it will be notified of changes only
+        // Note, that we force committing changes to `Member` that send
+        // `UpdateTracks` request, so response will be sent immediately,
+        // regardless of that `Peer` state, but non-forcibly committing
+        // changes to partner `Peer`, so it will be notified of changes only
         // during next negotiation.
         let partner_peer_id =
             self.peers.map_peer_by_id_mut(peer_id, |peer| {

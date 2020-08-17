@@ -376,6 +376,7 @@ pub struct TrackPatch {
 
 impl TrackPatch {
     /// Returns new empty [`TrackPatch`] with a provided [`TrackId`].
+    #[inline]
     #[must_use]
     pub fn new(id: TrackId) -> Self {
         Self { id, is_muted: None }
