@@ -4,10 +4,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MemberId, TrackPatch};
+use medea_client_api_proto::{MemberId, ServerTrackPatch};
 use proto::TrackId;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{RtcRtpTransceiver};
+use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
@@ -156,9 +156,21 @@ impl Receiver {
     }
 
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
-    pub fn update(&self, track_patch: &TrackPatch) {
-        if let Some(is_muted) = track_patch.is_muted {
+    pub fn update(&self, track_patch: &ServerTrackPatch) {
+        if let Some(is_muted_general) = track_patch.is_muted_general {
+            self.0
+                .borrow()
+                .mute_state_controller
+                .update_general(is_muted_general);
+        }
+        if let Some(is_muted) = track_patch.is_muted_individual {
             self.0.borrow().mute_state_controller.update(is_muted);
+        }
+        if let Some(is_muted_general) = track_patch.is_muted_general {
+            self.0
+                .borrow()
+                .mute_state_controller
+                .update_general(is_muted_general);
         }
     }
 

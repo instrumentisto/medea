@@ -890,7 +890,7 @@ mod patches_generation {
 
     use futures::StreamExt;
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatch,
+        AudioSettings, ClientTrackPatch, Direction, MediaType, Track, TrackId,
         VideoSettings,
     };
     use wasm_bindgen_futures::spawn_local;
@@ -1010,7 +1010,7 @@ mod patches_generation {
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
                 peer_id: PeerId(1),
-                tracks_patches: vec![TrackPatch {
+                tracks_patches: vec![ClientTrackPatch {
                     id: TrackId(1),
                     is_muted: Some(true),
                 }]
@@ -1057,7 +1057,7 @@ mod patches_generation {
 
         assert_eq!(
             commands.remove(&PeerId(1)).unwrap(),
-            vec![TrackPatch {
+            vec![ClientTrackPatch {
                 id: TrackId(1),
                 is_muted: Some(true),
             }]
@@ -1065,7 +1065,7 @@ mod patches_generation {
 
         assert_eq!(
             commands.remove(&PeerId(2)).unwrap(),
-            vec![TrackPatch {
+            vec![ClientTrackPatch {
                 id: TrackId(2),
                 is_muted: Some(true),
             }]
@@ -1123,7 +1123,7 @@ mod patches_generation {
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
                 peer_id: PeerId(2),
-                tracks_patches: vec![TrackPatch {
+                tracks_patches: vec![ClientTrackPatch {
                     id: TrackId(2),
                     is_muted: Some(true),
                 }]

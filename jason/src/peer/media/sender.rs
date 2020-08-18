@@ -184,13 +184,16 @@ impl Sender {
 
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`proto::TrackPatch`].
-    pub fn update(&self, track: &proto::TrackPatch) {
+    pub fn update(&self, track: &proto::ServerTrackPatch) {
         if track.id != self.track_id {
             return;
         }
 
-        if let Some(is_muted) = track.is_muted {
+        if let Some(is_muted) = track.is_muted_individual {
             self.mute_state_observer.update(is_muted);
+        }
+        if let Some(is_muted_general) = track.is_muted_general {
+            self.mute_state_observer.update_general(is_muted_general);
         }
     }
 

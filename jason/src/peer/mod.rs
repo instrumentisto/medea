@@ -435,7 +435,10 @@ impl PeerConnection {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// provided [`proto::TrackPatch`] contains unknown ID.
-    pub fn patch_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn patch_tracks(
+        &self,
+        tracks: Vec<proto::ServerTrackPatch>,
+    ) -> Result<()> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)

@@ -6,7 +6,7 @@ use futures::{
     StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, PeerId, TrackId, TrackPatch, TrackUpdate,
+    ClientTrackPatch, Command, Event, PeerId, TrackId, TrackUpdate,
 };
 
 use crate::{
@@ -29,7 +29,7 @@ async fn helper(
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![ClientTrackPatch {
                 id: TrackId(0),
                 is_muted: Some(disabled),
             }],
@@ -39,7 +39,7 @@ async fn helper(
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![ClientTrackPatch {
                 id: TrackId(1),
                 is_muted: Some(disabled),
             }],

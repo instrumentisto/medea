@@ -16,8 +16,8 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStat, TrackStatKind,
     },
-    AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
-    Track, TrackId, TrackPatch, VideoSettings,
+    AudioSettings, ClientTrackPatch, Direction, IceConnectionState, MediaType,
+    MemberId, PeerId, Track, TrackId, VideoSettings,
 };
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager},
@@ -37,10 +37,10 @@ wasm_bindgen_test_configure!(run_in_browser);
 fn toggle_mute_tracks_updates(
     tracks_ids: &[u32],
     is_muted: bool,
-) -> Vec<TrackPatch> {
+) -> Vec<ClientTrackPatch> {
     tracks_ids
         .into_iter()
-        .map(|track_id| TrackPatch {
+        .map(|track_id| ClientTrackPatch {
             id: TrackId(*track_id),
             is_muted: Some(is_muted),
         })

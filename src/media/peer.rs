@@ -53,8 +53,9 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, MemberId, PeerId as Id,
-    PeerId, Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
+    AudioSettings, ClientTrackPatch, Direction, IceServer, MediaType, MemberId,
+    PeerId as Id, PeerId, ServerTrackPatch, Track, TrackId, TrackUpdate,
+    VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -306,10 +307,11 @@ pub struct Context {
     negotiation_subscriber: Rc<dyn NegotiationSubscriber>,
 }
 
+// TODO: Do something with a visibility.
 /// Tracks changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
 #[derive(Clone, Debug)]
-enum TrackChange {
+pub enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddSendTrack(Rc<MediaTrack>),
@@ -319,7 +321,9 @@ enum TrackChange {
     AddRecvTrack(Rc<MediaTrack>),
 
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
-    TrackPatch(TrackPatch),
+    TrackPatch(ServerTrackPatch),
+
+    PartnerTrackPatch(ServerTrackPatch),
 }
 
 impl TrackChange {
@@ -356,28 +360,77 @@ impl TrackChange {
             TrackChange::TrackPatch(track_patch) => {
                 TrackUpdate::Updated(track_patch.clone())
             }
+            TrackChange::PartnerTrackPatch(track_patch) => {
+                TrackUpdate::Updated(track_patch.clone())
+            }
         }
     }
 }
 
 impl TrackChangeHandler for Peer<Stable> {
-    type Output = ();
+    type Output = TrackChange;
 
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
     #[inline]
-    fn on_add_send_track(&mut self, track: Rc<MediaTrack>) {
-        self.context.senders.insert(track.id, track);
+    fn on_add_send_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
+        self.context.senders.insert(track.id, Rc::clone(&track));
+
+        TrackChange::AddSendTrack(track)
     }
 
     /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
     #[inline]
-    fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) {
-        self.context.receivers.insert(track.id, track);
+    fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
+        self.context.receivers.insert(track.id, Rc::clone(&track));
+
+        TrackChange::AddRecvTrack(track)
     }
 
-    /// Does nothing.
-    #[inline]
-    fn on_track_patch(&mut self, _: TrackPatch) {}
+    fn on_track_patch(&mut self, mut patch: ServerTrackPatch) -> Self::Output {
+        if let Some(is_muted) = patch.is_muted_individual {
+            let track = self
+                .senders()
+                .get(&patch.id)
+                .cloned()
+                .map(|t| (t, true))
+                .or_else(|| {
+                    self.receivers().get(&patch.id).cloned().map(|t| (t, false))
+                });
+            if let Some((track, is_sender)) = track {
+                if is_sender {
+                    track.set_send_mute_state(is_muted);
+                } else {
+                    track.set_recv_mute_state(is_muted);
+                }
+
+                use crate::log::prelude::*;
+
+                let is_muted_general = track.is_muted();
+                patch.is_muted_general = Some(is_muted_general);
+            }
+        }
+
+        TrackChange::TrackPatch(patch)
+    }
+
+    fn on_partner_track_patch(
+        &mut self,
+        mut patch: ServerTrackPatch,
+    ) -> Self::Output {
+        if let Some(is_muted) = patch.is_muted_individual {
+            let track = self
+                .senders()
+                .get(&patch.id)
+                .or_else(|| self.receivers().get(&patch.id))
+                .cloned();
+            if let Some(track) = track {
+                patch.is_muted_general = Some(track.is_muted());
+                patch.is_muted_individual = None;
+            }
+        }
+
+        TrackChange::PartnerTrackPatch(patch)
+    }
 }
 
 /// [RTCPeerConnection] representation.
@@ -691,8 +744,8 @@ impl Peer<Stable> {
         if !self.context.track_changes_queue.is_empty() {
             while let Some(task) = self.context.track_changes_queue.pop_front()
             {
-                self.context.pending_track_updates.push(task.clone());
-                task.dispatch_with(self);
+                let change = task.dispatch_with(self);
+                self.context.pending_track_updates.push(change);
             }
 
             self.context
@@ -728,9 +781,15 @@ impl<'a> PeerChangesScheduler<'a> {
     /// Schedules provided [`TrackPatch`]s.
     ///
     /// Provided [`TrackPatch`]s will be sent to the client on (re)negotiation.
-    pub fn patch_tracks(&mut self, patches: Vec<TrackPatch>) {
+    pub fn patch_tracks(&mut self, patches: Vec<ClientTrackPatch>) {
         for patch in patches {
-            self.schedule_change(TrackChange::TrackPatch(patch));
+            self.schedule_change(TrackChange::TrackPatch(patch.into()));
+        }
+    }
+
+    pub fn partner_patch_tracks(&mut self, patches: Vec<ClientTrackPatch>) {
+        for patch in patches {
+            self.schedule_change(TrackChange::PartnerTrackPatch(patch.into()));
         }
     }
 

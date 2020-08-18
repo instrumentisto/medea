@@ -177,7 +177,7 @@ pub enum Command {
     /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
-        tracks_patches: Vec<TrackPatch>,
+        tracks_patches: Vec<ClientTrackPatch>,
     },
 }
 
@@ -335,7 +335,7 @@ pub enum TrackUpdate {
 
     /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
     /// Can only refer tracks already known to the `Peer`.
-    Updated(TrackPatch),
+    Updated(ServerTrackPatch),
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -368,9 +368,27 @@ impl Track {
 /// Path to existing [`Track`] and field which can be updated.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct TrackPatch {
+pub struct ClientTrackPatch {
     pub id: TrackId,
     pub is_muted: Option<bool>,
+}
+
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+pub struct ServerTrackPatch {
+    pub id: TrackId,
+    pub is_muted_individual: Option<bool>,
+    pub is_muted_general: Option<bool>,
+}
+
+impl From<ClientTrackPatch> for ServerTrackPatch {
+    fn from(from: ClientTrackPatch) -> Self {
+        Self {
+            id: from.id,
+            is_muted_individual: from.is_muted,
+            is_muted_general: None,
+        }
+    }
 }
 
 /// Representation of [RTCIceServer][1] (item of `iceServers` field

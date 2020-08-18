@@ -11,10 +11,9 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, MemberId, NegotiationRole,
-    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
-    TrackUpdate,
+    ClientTrackPatch, Command, Direction, Event as RpcEvent, EventHandler,
+    IceCandidate, IceConnectionState, IceServer, MemberId, NegotiationRole,
+    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -768,7 +767,7 @@ impl InnerRoom {
                         }
                         return Either::Left(future::err(tracerr::new!(e)));
                     }
-                    tracks_patches.push(TrackPatch {
+                    tracks_patches.push(ClientTrackPatch {
                         id: sender.track_id(),
                         is_muted: Some(is_muted),
                     });

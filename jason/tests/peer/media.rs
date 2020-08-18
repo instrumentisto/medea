@@ -3,7 +3,7 @@
 use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{PeerId, TrackId, TrackPatch};
+use medea_client_api_proto::{ClientTrackPatch, PeerId, TrackId};
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager},
     peer::{
@@ -125,7 +125,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![TrackPatch {
+        .patch_tracks(vec![ClientTrackPatch {
             id: audio_track_id,
             is_muted: Some(true),
         }])
@@ -137,7 +137,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![TrackPatch {
+        .patch_tracks(vec![ClientTrackPatch {
             id: video_track_id,
             is_muted: Some(true),
         }])
@@ -149,7 +149,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::NotMuted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![TrackPatch {
+        .patch_tracks(vec![ClientTrackPatch {
             id: audio_track_id,
             is_muted: Some(false),
         }])
@@ -161,7 +161,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::NotMuted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![TrackPatch {
+        .patch_tracks(vec![ClientTrackPatch {
             id: video_track_id,
             is_muted: Some(false),
         }])
@@ -219,7 +219,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&TrackPatch {
+        sender.update(&ClientTrackPatch {
             id: TrackId(track_id.0 + 100),
             is_muted: Some(true),
         });
@@ -230,7 +230,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&TrackPatch {
+        sender.update(&ClientTrackPatch {
             id: track_id,
             is_muted: Some(true),
         });
@@ -241,7 +241,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn unmute_unmuted() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&TrackPatch {
+        sender.update(&ClientTrackPatch {
             id: track_id,
             is_muted: Some(false),
         });
@@ -252,13 +252,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute_muted() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&TrackPatch {
+        sender.update(&ClientTrackPatch {
             id: track_id,
             is_muted: Some(true),
         });
         assert!(sender.is_muted());
 
-        sender.update(&TrackPatch {
+        sender.update(&ClientTrackPatch {
             id: track_id,
             is_muted: Some(true),
         });
@@ -269,7 +269,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&TrackPatch {
+        sender.update(&ClientTrackPatch {
             id: track_id,
             is_muted: None,
         });
