@@ -256,19 +256,7 @@ impl RoomHandle {
         direction: TrackDirection,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        // TODO: temporary fix
-        if let TrackDirection::Recv = direction {
-            match kind {
-                TransceiverKind::Audio => {
-                    inner.recv_constraints.set_audio_disabled(is_muted);
-                }
-                TransceiverKind::Video => {
-                    inner.recv_constraints.set_video_disabled(is_muted);
-                }
-            }
-        } else {
-            inner.send_constraints.toggle_enable(!is_muted, kind);
-        }
+        inner.toggle_disable_constraints(is_muted, kind, direction);
         while !inner.is_all_peers_in_mute_state(
             kind,
             direction,
@@ -278,23 +266,8 @@ impl RoomHandle {
                 .toggle_mute(is_muted, kind, direction)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    // TODO: temporary fix
-                    if let TrackDirection::Recv = direction {
-                        match kind {
-                            TransceiverKind::Audio => {
-                                inner
-                                    .recv_constraints
-                                    .set_audio_disabled(!is_muted);
-                            }
-                            TransceiverKind::Video => {
-                                inner
-                                    .recv_constraints
-                                    .set_video_disabled(!is_muted);
-                            }
-                        }
-                    } else {
-                        inner.send_constraints.toggle_enable(is_muted, kind);
-                    }
+                    inner
+                        .toggle_disable_constraints(!is_muted, kind, direction);
                     tracerr::new!(e)
                 })?;
         }
@@ -719,6 +692,19 @@ impl InnerRoom {
         }
     }
 
+    fn toggle_disable_constraints(
+        &self,
+        is_muted: bool,
+        kind: TransceiverKind,
+        direction: TrackDirection,
+    ) {
+        if let TrackDirection::Recv = direction {
+            self.recv_constraints.toggle_disable(is_muted, kind);
+        } else {
+            self.send_constraints.toggle_enable(!is_muted, kind);
+        }
+    }
+
     /// Sets `close_reason` of [`InnerRoom`].
     ///
     /// [`Drop`] implementation of [`InnerRoom`] is supposed
@@ -744,7 +730,7 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders = peer.get_senders(kind, direction);
+                let senders = peer.get_muteable_tracks(kind, direction);
 
                 let senders_to_mute = senders.into_iter().filter(|sender| {
                     match sender.mute_state() {
@@ -775,9 +761,9 @@ impl InnerRoom {
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_senders(kind, direction)
+                    .get_muteable_tracks(kind, direction)
                     .into_iter()
-                    .map(|sender| sender.when_mute_state_stable(desired_state))
+                    .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
 
                 if !tracks_patches.is_empty() {

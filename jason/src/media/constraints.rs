@@ -21,38 +21,64 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 #[derive(Clone, Debug, Default)]
 pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
 
-#[derive(Default)]
+/// Constraints for the [`Receiver`]s.
 pub struct RecvConstraints {
     /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Audio`]
     /// in this [`Room`].
     ///
     /// Based on this value, new [`Receiver`]s will be muted (or not) on
     /// [`Event::PeerCreated`].
-    audio_disabled: Cell<bool>,
+    is_audio_enabled: Cell<bool>,
 
     /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Video`]
     /// in this [`Room`].
     ///
     /// Based on this value, new [`Receiver`]s will be muted (or not) on
     /// [`Event::PeerCreated`].
-    video_disabled: Cell<bool>,
+    is_video_enabled: Cell<bool>,
+}
+
+impl Default for RecvConstraints {
+    fn default() -> Self {
+        Self {
+            is_audio_enabled: Cell::new(true),
+            is_video_enabled: Cell::new(true),
+        }
+    }
 }
 
 impl RecvConstraints {
+    /// Sets [`RecvConstraints::is_audio_enabled`] or
+    /// [`RecvConstraints::is_video_enabled`] (based on [`TransceiverKind`]) to
+    /// the provided `is_enabled`.
+    pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
+        match kind {
+            TransceiverKind::Audio => {
+                self.is_audio_enabled.set(is_enabled);
+            }
+            TransceiverKind::Video => {
+                self.is_video_enabled.set(is_enabled);
+            }
+        }
+    }
+
+    /// Sets [`RecvConstraints::is_audio_enabled`] or
+    /// [`RecvConstraints::is_video_enabled`] (based on [`TransceiverKind`]) to
+    /// the opposite to the provided `is_disabled`.
+    pub fn toggle_disable(&self, is_disabled: bool, kind: TransceiverKind) {
+        self.toggle_enable(!is_disabled, kind);
+    }
+
+    /// Returns `true` if [`TransceiverKind::Audio`] is disabled in this
+    /// [`RecvConstraints`].
     pub fn is_audio_disabled(&self) -> bool {
-        self.audio_disabled.get()
+        !self.is_audio_enabled.get()
     }
 
+    /// Returns `true` if [`TransceiverKind::Audio`] is disabled in this
+    /// [`RecvConstraints`].
     pub fn is_video_disabled(&self) -> bool {
-        self.video_disabled.get()
-    }
-
-    pub fn set_audio_disabled(&self, val: bool) {
-        self.audio_disabled.set(val);
-    }
-
-    pub fn set_video_disabled(&self, val: bool) {
-        self.video_disabled.set(val);
+        !self.is_video_enabled.get()
     }
 }
 

@@ -37,7 +37,9 @@ pub use self::{
     sender::Sender,
 };
 
+/// Jason's `MediaStreamTrack` representation.
 pub trait Track {
+    /// Returns [`TrackId`] of this [`Track`].
     fn track_id(&self) -> TrackId;
 }
 
@@ -46,11 +48,17 @@ mod has_mute_state_controller {
 
     use super::MuteStateController;
 
+    /// An interface for dealing with objects which are uses
+    /// [`MuteStateController`].
+    ///
+    /// Needed for the [`MuteableTrack`] default implementation.
     pub trait HasMuteStateController {
+        /// Returns reference to the [`MuteStateController`] from this object.
         fn mute_state_controller(&self) -> Rc<MuteStateController>;
     }
 }
 
+/// An interface for dealing with [`Track`]s which are needs muting logic.
 pub trait MuteableTrack: Track + HasMuteStateController {
     /// Returns [`MuteState`] of this [`Sender`].
     fn mute_state(&self) -> MuteState {
@@ -61,7 +69,7 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     ///
     /// # Errors
     ///
-    /// [`MediaconnectionsError::SenderIsRequired`] is returned if [`Sender`] is
+    /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
     /// required for the call and can't be muted.
     fn mute_state_transition_to(
         &self,
@@ -119,9 +127,13 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     }
 }
 
+/// Direction of the [`Track`].
 #[derive(Debug, Clone, Copy)]
 pub enum TrackDirection {
+    /// Sends media data.
     Send,
+
+    /// Receives media data.
     Recv,
 }
 
@@ -255,7 +267,7 @@ impl MediaConnections {
 
     /// Returns all [`Sender`]s from this [`MediaConnections`] with provided
     /// [`TransceiverKind`].
-    pub fn get_senders(
+    pub fn get_muteable_tracks(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,

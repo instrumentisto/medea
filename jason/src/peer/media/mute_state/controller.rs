@@ -14,11 +14,6 @@ use crate::{
 
 use super::{MuteState, StableMuteState};
 
-#[cfg(not(feature = "mockable"))]
-const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
-#[cfg(feature = "mockable")]
-const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
-
 pub struct MuteStateController {
     general_mute_state: ObservableCell<StableMuteState>,
     individual_mute_state: ObservableCell<MuteState>,
@@ -27,6 +22,11 @@ pub struct MuteStateController {
 }
 
 impl MuteStateController {
+    #[cfg(not(feature = "mockable"))]
+    const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
+    #[cfg(feature = "mockable")]
+    const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
+
     pub fn new(mute_state: StableMuteState) -> Rc<Self> {
         let this = Rc::new(Self {
             general_mute_state: ObservableCell::new(mute_state),
@@ -77,9 +77,7 @@ impl MuteStateController {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     match mute_state {
-                        MuteState::Stable(stable) => {
-                            // this.send_finalized_state(stable);
-                        }
+                        MuteState::Stable(_) => (),
                         MuteState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {
@@ -89,7 +87,7 @@ impl MuteStateController {
                                     .skip(1);
                                 let (timeout, timeout_handle) =
                                     resettable_delay_for(
-                                        MUTE_TRANSITION_TIMEOUT,
+                                        Self::MUTE_TRANSITION_TIMEOUT,
                                     );
                                 this.mute_timeout_handle
                                     .borrow_mut()
@@ -151,7 +149,7 @@ impl MuteStateController {
         self.general_mute_state.set(is_muted.into());
     }
 
-    pub fn update(&self, is_muted: bool) {
+    pub fn update_individual(&self, is_muted: bool) {
         let new_mute_state = StableMuteState::from(is_muted);
         let current_mute_state = self.individual_mute_state.get();
 

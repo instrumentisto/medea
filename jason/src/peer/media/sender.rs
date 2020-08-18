@@ -63,7 +63,7 @@ impl<'a> SenderBuilder<'a> {
             caps: self.caps,
             track: RefCell::new(None),
             transceiver,
-            mute_state_observer,
+            mute_state_controller: mute_state_observer,
             is_required: self.is_required,
             transceiver_direction: Cell::new(TransceiverDirection::Inactive),
             peer_events_sender: self.peer_events_sender,
@@ -77,21 +77,13 @@ impl<'a> SenderBuilder<'a> {
                     if let Some(this) = weak_this.upgrade() {
                         match finalized_mute_state {
                             StableMuteState::NotMuted => {
-                                let _ = this.peer_events_sender.unbounded_send(
-                                    PeerEvent::NewLocalStreamRequired {
-                                        peer_id: this.peer_id,
-                                    },
+                                this.set_transceiver_direction(
+                                    TransceiverDirection::Sendonly,
                                 );
+                                this.request_track();
                             }
                             StableMuteState::Muted => {
-                                // cannot fail
-                                this.track.borrow_mut().take();
-                                let _ = JsFuture::from(
-                                    this.transceiver
-                                        .sender()
-                                        .replace_track(None),
-                                )
-                                .await;
+                                this.disable().await;
                             }
                         }
                     } else {
@@ -114,12 +106,13 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     transceiver_direction: Cell<TransceiverDirection>,
-    mute_state_observer: Rc<MuteStateController>,
+    mute_state_controller: Rc<MuteStateController>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
 impl Sender {
+    /// Returns [`TrackConstraints`] of this [`Sender`].
     pub fn caps(&self) -> &TrackConstraints {
         &self.caps
     }
@@ -129,6 +122,7 @@ impl Sender {
         TransceiverKind::from(&self.caps)
     }
 
+    /// Returns [`RtcRtpTransceiver`] of this [`Sender`].
     pub fn transceiver(&self) -> &RtcRtpTransceiver {
         &self.transceiver
     }
@@ -190,10 +184,10 @@ impl Sender {
         }
 
         if let Some(is_muted) = track.is_muted_individual {
-            self.mute_state_observer.update(is_muted);
+            self.mute_state_controller.update_individual(is_muted);
         }
         if let Some(is_muted_general) = track.is_muted_general {
-            self.mute_state_observer.update_general(is_muted_general);
+            self.mute_state_controller.update_general(is_muted_general);
         }
     }
 
@@ -231,7 +225,7 @@ impl Track for Sender {
 
 impl HasMuteStateController for Sender {
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
-        self.mute_state_observer.clone()
+        self.mute_state_controller.clone()
     }
 }
 
@@ -251,7 +245,7 @@ impl MuteableTrack for Sender {
                 MediaConnectionsError::CannotDisableRequiredSender
             ))
         } else {
-            self.mute_state_observer.transition_to(desired_state);
+            self.mute_state_controller.transition_to(desired_state);
             Ok(())
         }
     }

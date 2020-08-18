@@ -109,11 +109,6 @@ impl Receiver {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(false);
                                 }
-                                if !inner.notified_track {
-                                    inner.set_direction(
-                                        TransceiverDirection::Inactive,
-                                    );
-                                }
                             }
                             StableMuteState::NotMuted => {
                                 if let Some(track) = &inner.track {
@@ -164,7 +159,10 @@ impl Receiver {
                 .update_general(is_muted_general);
         }
         if let Some(is_muted) = track_patch.is_muted_individual {
-            self.0.borrow().mute_state_controller.update(is_muted);
+            self.0
+                .borrow()
+                .mute_state_controller
+                .update_individual(is_muted);
         }
         if let Some(is_muted_general) = track_patch.is_muted_general {
             self.0
@@ -205,6 +203,9 @@ impl Receiver {
 
 impl InnerReceiver {
     fn is_receiving(&self) -> bool {
+        if self.mute_state_controller.is_muted() {
+            return false;
+        }
         if self.transceiver.is_none() {
             return false;
         }

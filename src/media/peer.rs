@@ -403,8 +403,6 @@ impl TrackChangeHandler for Peer<Stable> {
                     track.set_recv_mute_state(is_muted);
                 }
 
-                use crate::log::prelude::*;
-
                 let is_muted_general = track.is_muted();
                 patch.is_muted_general = Some(is_muted_general);
             }
@@ -417,7 +415,7 @@ impl TrackChangeHandler for Peer<Stable> {
         &mut self,
         mut patch: ServerTrackPatch,
     ) -> Self::Output {
-        if let Some(is_muted) = patch.is_muted_individual {
+        if let Some(_) = patch.is_muted_individual {
             let track = self
                 .senders()
                 .get(&patch.id)

@@ -525,12 +525,12 @@ impl PeerConnection {
     /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
     /// [`TransceiverKind`].
     #[inline]
-    pub fn get_senders(
+    pub fn get_muteable_tracks(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn MuteableTrack>> {
-        self.media_connections.get_senders(kind, direction)
+        self.media_connections.get_muteable_tracks(kind, direction)
     }
 
     /// Returns all [`Receiver`]s from this [`PeerConnection`] with provided

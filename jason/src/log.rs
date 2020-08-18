@@ -1,5 +1,13 @@
+//! Provides logging utilities, used by Jason.
+
 use wasm_bindgen::JsValue;
 
+/// Re-exports common definitions for logging.
+///
+/// Use this module as following:
+/// ```rust
+/// use medea_jason::log::prelude::*;
+/// ```
 pub mod prelude {
     pub use crate::{log_debug, log_error};
 }
@@ -22,6 +30,10 @@ where
     web_sys::console::debug_1(&msg.into());
 }
 
+/// Prints provided message same as [`format`] macro with a [`console_debug`]
+/// function.
+///
+/// [`module_path`] and [`line`] will be added to the start of message.
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
@@ -31,6 +43,10 @@ macro_rules! log_debug {
     };
 }
 
+/// Prints provided message same as [`format`] macro with a [`console_error`]
+/// function.
+///
+/// [`module_path`] and [`line`] will be added to the start of message.
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
