@@ -357,10 +357,8 @@ impl TrackChange {
                     mid: track.mid(),
                 },
             }),
-            TrackChange::TrackPatch(track_patch) => {
-                TrackUpdate::Updated(track_patch.clone())
-            }
-            TrackChange::PartnerTrackPatch(track_patch) => {
+            TrackChange::TrackPatch(track_patch)
+            | TrackChange::PartnerTrackPatch(track_patch) => {
                 TrackUpdate::Updated(track_patch.clone())
             }
         }
@@ -415,12 +413,13 @@ impl TrackChangeHandler for Peer<Stable> {
         &mut self,
         mut patch: ServerTrackPatch,
     ) -> Self::Output {
-        if let Some(_) = patch.is_muted_individual {
+        if patch.is_muted_individual.is_some() {
             let track = self
                 .senders()
                 .get(&patch.id)
                 .or_else(|| self.receivers().get(&patch.id))
                 .cloned();
+
             if let Some(track) = track {
                 patch.is_muted_general = Some(track.is_muted());
                 patch.is_muted_individual = None;

@@ -179,12 +179,6 @@ impl Receiver {
         self.0.borrow().is_receiving()
     }
 
-    /// Returns [`TransceiverKind`] of this [`Receiver`].
-    #[inline]
-    pub fn kind(&self) -> TransceiverKind {
-        self.0.borrow().kind
-    }
-
     /// Returns `mid` of this [`Receiver`].
     ///
     /// Tries to fetch it from the underlying [`RtcRtpTransceiver`] if current
@@ -241,13 +235,21 @@ impl InnerReceiver {
 }
 
 impl Track for Receiver {
-    /// Returns [`TrackId`] of this [`Sender`].
+    /// Returns [`TrackId`] of this [`Receiver`].
+    #[inline]
     fn track_id(&self) -> TrackId {
         self.0.borrow().track_id
+    }
+
+    /// Returns [`TransceiverKind`] of this [`Receiver`].
+    #[inline]
+    fn kind(&self) -> TransceiverKind {
+        self.0.borrow().kind
     }
 }
 
 impl HasMuteStateController for Receiver {
+    #[inline]
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         self.0.borrow().mute_state_controller.clone()
     }

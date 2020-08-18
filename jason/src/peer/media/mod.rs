@@ -41,6 +41,9 @@ pub use self::{
 pub trait Track {
     /// Returns [`TrackId`] of this [`Track`].
     fn track_id(&self) -> TrackId;
+
+    /// Returns [`TransceiverKind`] of this [`Track`].
+    fn kind(&self) -> TransceiverKind;
 }
 
 mod has_mute_state_controller {
@@ -272,23 +275,32 @@ impl MediaConnections {
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn MuteableTrack>> {
+        fn collect_muteable_tracks<'a, I, T>(
+            i: I,
+            kind: TransceiverKind,
+        ) -> Vec<Rc<dyn MuteableTrack>>
+        where
+            I: Iterator<Item = &'a Rc<T>> + 'a,
+            T: MuteableTrack + 'static,
+        {
+            i.filter_map(|t| {
+                if t.kind() == kind {
+                    Some(Rc::clone(&t) as Rc<dyn MuteableTrack>)
+                } else {
+                    None
+                }
+            })
+            .collect()
+        }
+
+        let inner = self.0.borrow();
         match direction {
-            TrackDirection::Send => self
-                .0
-                .borrow()
-                .senders
-                .values()
-                .filter(|t| t.kind() == kind)
-                .map(|t| Rc::clone(&t) as Rc<dyn MuteableTrack>)
-                .collect(),
-            TrackDirection::Recv => self
-                .0
-                .borrow()
-                .receivers
-                .values()
-                .filter(|t| t.kind() == kind)
-                .map(|t| Rc::clone(&t) as Rc<dyn MuteableTrack>)
-                .collect(),
+            TrackDirection::Send => {
+                collect_muteable_tracks(inner.senders.values(), kind)
+            }
+            TrackDirection::Recv => {
+                collect_muteable_tracks(inner.receivers.values(), kind)
+            }
         }
     }
 

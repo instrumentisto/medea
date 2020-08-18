@@ -117,11 +117,6 @@ impl Sender {
         &self.caps
     }
 
-    /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
-    pub fn kind(&self) -> TransceiverKind {
-        TransceiverKind::from(&self.caps)
-    }
-
     /// Returns [`RtcRtpTransceiver`] of this [`Sender`].
     pub fn transceiver(&self) -> &RtcRtpTransceiver {
         &self.transceiver
@@ -220,6 +215,12 @@ impl Track for Sender {
     /// Returns [`TrackId`] of this [`Sender`].
     fn track_id(&self) -> TrackId {
         self.track_id
+    }
+
+    /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
+    #[inline]
+    fn kind(&self) -> TransceiverKind {
+        TransceiverKind::from(&self.caps)
     }
 }
 

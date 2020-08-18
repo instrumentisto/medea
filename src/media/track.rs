@@ -32,7 +32,7 @@ impl MuteState {
         }
     }
 
-    pub fn is_muted(&self) -> bool {
+    pub fn is_muted(self) -> bool {
         self.send_muted || self.recv_muted
     }
 
