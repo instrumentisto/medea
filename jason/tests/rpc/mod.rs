@@ -194,7 +194,7 @@ async fn send_goes_to_transport() {
         peer_id: test_peer_id.clone(),
         sdp_offer: test_sdp_offer.clone(),
         mids: HashMap::new(),
-        senders_statuses: HashMap::new(),
+        transceiver_statuses: HashMap::new(),
     };
 
     spawn_local(async move {
@@ -205,7 +205,7 @@ async fn send_goes_to_transport() {
                         peer_id,
                         sdp_offer,
                         mids: _,
-                        senders_statuses: _,
+                        transceiver_statuses: _,
                     } => {
                         assert_eq!(peer_id, test_peer_id);
                         assert_eq!(sdp_offer, test_sdp_offer);

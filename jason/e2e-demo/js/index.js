@@ -733,7 +733,7 @@ window.onload = async function() {
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
         $('#connection-settings').modal('hide');
-        $('.control').show();
+        $('.control').css('display', 'flex');
         $('#connect-btn').hide();
 
         try {

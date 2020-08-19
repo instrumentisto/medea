@@ -1,3 +1,5 @@
+//! Controller of the [`MuteState`] for the all [`Track`]s.
+
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{
@@ -14,10 +16,20 @@ use crate::{
 
 use super::{MuteState, StableMuteState};
 
+/// Controller of the [`MuteState`]s of the [`Track`]s.
 pub struct MuteStateController {
+    /// General [`StableMuteState`] between `Recv` and `Send` [`Track`]s.
     general_mute_state: ObservableCell<StableMuteState>,
+
+    /// [`MuteState`] of the local [`Track`].
     individual_mute_state: ObservableCell<MuteState>,
+
+    /// Timeout of the [`MuteStateController::individual_mute_state`]
+    /// transition.
     mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+
+    /// All subscribers on the [`MuteStateController::general_mute_state`]
+    /// changes.
     on_finalized_subs: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
 }
 
@@ -27,6 +39,7 @@ impl MuteStateController {
     #[cfg(feature = "mockable")]
     const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
 
+    /// Returns new [`MuteStateController`] with a provided [`StableMuteState`].
     pub fn new(mute_state: StableMuteState) -> Rc<Self> {
         let this = Rc::new(Self {
             general_mute_state: ObservableCell::new(mute_state),
@@ -39,6 +52,8 @@ impl MuteStateController {
         this
     }
 
+    /// Returns [`Stream`] to which all
+    /// [`MuteStateController::general_mute_state`]s will be sent.
     pub fn on_finalized(&self) -> LocalBoxStream<'static, StableMuteState> {
         let (tx, rx) = mpsc::unbounded();
         self.on_finalized_subs.borrow_mut().push(tx);
@@ -46,6 +61,7 @@ impl MuteStateController {
         Box::pin(rx)
     }
 
+    /// Sends [`MuteStateController::general_mute_state`] update.
     fn send_finalized_state(&self, state: StableMuteState) {
         let mut on_finalize_subs = self.on_finalized_subs.borrow_mut();
         *on_finalize_subs = on_finalize_subs
@@ -54,7 +70,8 @@ impl MuteStateController {
             .collect();
     }
 
-    pub fn spawn(self: Rc<Self>) {
+    /// Spawns all needed [`Stream`] listeners for this [`MuteStateController`].
+    fn spawn(self: Rc<Self>) {
         // we don't care about initial state, cause transceiver is inactive atm
         let mut mute_state_changes =
             self.individual_mute_state.subscribe().skip(1);
@@ -121,34 +138,44 @@ impl MuteStateController {
         });
     }
 
-    /// Checks whether [`Sender`] is in [`MuteState::Muted`].
+    /// Checks whether [`MuteStateController`] is in [`MuteState::Muted`].
     pub fn is_muted(&self) -> bool {
         self.individual_mute_state.get() == StableMuteState::Muted.into()
     }
 
-    /// Checks whether [`Sender`] is in [`MuteState::NotMuted`].
+    /// Checks whether [`MuteStateController`] is in [`MuteState::NotMuted`].
     pub fn is_not_muted(&self) -> bool {
         self.individual_mute_state.get() == StableMuteState::NotMuted.into()
     }
 
-    /// Stops mute/unmute timeout of this [`Sender`].
+    /// Stops mute/unmute timeout of this [`MuteStateController`].
     pub fn stop_mute_state_transition_timeout(&self) {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
             timer.stop();
         }
     }
 
-    /// Resets mute/unmute timeout of this [`Sender`].
+    /// Resets mute/unmute timeout of this [`MuteStateController`].
     pub fn reset_mute_state_transition_timeout(&self) {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
             timer.reset();
         }
     }
 
+    /// Updates [`MuteStateController::general_mute_state`].
+    ///
+    /// Real mute/unmute will be performed on this update.
+    ///
+    /// No `Promise`s will be resolved on this state update.
     pub fn update_general(&self, is_muted: bool) {
         self.general_mute_state.set(is_muted.into());
     }
 
+    /// Updates [`MuteStateController::individual_mute_state`].
+    ///
+    /// Real mute/unmute __wouldn't__ be performed on this update.
+    ///
+    /// `Room.mute_audio` like `Promise`s will be resolved based on this update.
     pub fn update_individual(&self, is_muted: bool) {
         let new_mute_state = StableMuteState::from(is_muted);
         let current_mute_state = self.individual_mute_state.get();
@@ -167,16 +194,20 @@ impl MuteStateController {
         self.individual_mute_state.set(mute_state_update);
     }
 
-    pub fn mute_state(&self) -> MuteState {
+    /// Returns current [`MuteStateController::individual_mute_state`].
+    pub fn individual_mute_state(&self) -> MuteState {
         self.individual_mute_state.get()
     }
 
+    /// Starts transition of the [`MuteStateController::individual_mute_state`]
+    /// to the provided one.
     pub fn transition_to(&self, desired_state: StableMuteState) {
         let current_mute_state = self.individual_mute_state.get();
         self.individual_mute_state
             .set(current_mute_state.transition_to(desired_state));
     }
 
+    /// Cancels [`MuteStateController::individual_mute_state`] transition.
     pub fn cancel_transition(&self) {
         let mute_state = self.individual_mute_state.get();
         self.individual_mute_state
@@ -184,16 +215,17 @@ impl MuteStateController {
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`Sender`] is dropped.
+    /// [`MuteStateController`] will be [`MuteState::Stable`] or the
+    /// [`MuteStateController`] is dropped.
     ///
-    /// Succeeds if [`Sender`]'s [`MuteState`] transits into the `desired_state`
-    /// or the [`Sender`] is dropped.
+    /// Succeeds if [`MuteStateController`]'s [`MuteState`] transits into the
+    /// `desired_state` or the [`MuteStateController`] is dropped.
     ///
     /// # Errors
     ///
     /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`Sender`]'s [`MuteState`] transits into the opposite to
-    /// the `desired_state`.
+    /// returned if [`MuteStateController`]'s [`MuteState`] transits into the
+    /// opposite to the `desired_state`.
     pub fn when_mute_state_stable(
         &self,
         desired_state: StableMuteState,

@@ -795,7 +795,7 @@ impl InnerRoom {
             .get_all()
             .into_iter()
             .find(|p| {
-                !p.is_all_senders_in_mute_state(kind, direction, mute_state)
+                !p.is_all_tracks_in_mute_state(kind, direction, mute_state)
             })
             .is_none()
     }

@@ -17,7 +17,7 @@ use medea_jason::{
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{
         MockPeerRepository, PeerConnection, Repository, StableMuteState,
-        TransceiverKind,
+        TrackDirection, TransceiverKind,
     },
     rpc::MockRpcClient,
     utils::JasonError,
@@ -85,7 +85,7 @@ async fn get_test_room_and_exist_peer(
                     peer_id,
                     updates: tracks_patches
                         .into_iter()
-                        .map(TrackUpdate::Updated)
+                        .map(|p| TrackUpdate::Updated(p.into()))
                         .collect(),
                     negotiation_role: None,
                 })
@@ -184,8 +184,9 @@ async fn join_two_audio_mutes() {
     first.unwrap();
     second.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::Muted
     ));
 }
@@ -220,8 +221,9 @@ async fn join_two_video_mutes() {
     first.unwrap();
     second.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Video,
+        TrackDirection::Send,
         StableMuteState::Muted
     ));
 }
@@ -249,8 +251,9 @@ async fn join_mute_and_unmute_audio() {
     )
     .await;
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 
@@ -263,8 +266,9 @@ async fn join_mute_and_unmute_audio() {
     mute_audio_result.unwrap_err();
     unmute_audio_result.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 }
@@ -292,8 +296,9 @@ async fn join_mute_and_unmute_video() {
     )
     .await;
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Video,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 
@@ -306,8 +311,9 @@ async fn join_mute_and_unmute_video() {
     mute_video_result.unwrap_err();
     unmute_video_result.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Video,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 }
@@ -335,16 +341,18 @@ async fn join_unmute_and_mute_audio() {
     )
     .await;
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 
     let handle = room.new_handle();
     JsFuture::from(handle.mute_audio()).await.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::Muted
     ));
 
@@ -356,8 +364,9 @@ async fn join_unmute_and_mute_audio() {
     mute_audio_result.unwrap();
     unmute_audio_result.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 }
@@ -394,12 +403,12 @@ async fn mute_audio_room_before_init_peer() {
             peer_id,
             sdp_offer: _,
             mids,
-            senders_statuses,
+            transceiver_statuses,
         } => {
             assert_eq!(peer_id, PeerId(1));
             assert_eq!(mids.len(), 2);
-            let audio = senders_statuses.get(&TrackId(1)).unwrap();
-            let video = senders_statuses.get(&TrackId(2)).unwrap();
+            let audio = transceiver_statuses.get(&TrackId(1)).unwrap();
+            let video = transceiver_statuses.get(&TrackId(2)).unwrap();
 
             assert!(!audio); // muted
             assert!(video); // not muted
@@ -444,12 +453,12 @@ async fn mute_video_room_before_init_peer() {
             peer_id,
             sdp_offer: _,
             mids,
-            senders_statuses,
+            transceiver_statuses,
         } => {
             assert_eq!(peer_id, PeerId(1));
             assert_eq!(mids.len(), 2);
-            let audio = senders_statuses.get(&TrackId(1)).unwrap();
-            let video = senders_statuses.get(&TrackId(2)).unwrap();
+            let audio = transceiver_statuses.get(&TrackId(1)).unwrap();
+            let video = transceiver_statuses.get(&TrackId(2)).unwrap();
 
             assert!(audio); // not muted
             assert!(!video); // muted
@@ -898,6 +907,7 @@ mod patches_generation {
     use crate::timeout;
 
     use super::*;
+    use medea_jason::media::RecvConstraints;
 
     /// Returns [`Room`] with mocked [`PeerRepository`] with provided count of
     /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
@@ -951,6 +961,7 @@ mod patches_generation {
                 Rc::new(MediaManager::default()),
                 false,
                 local_stream.into(),
+                Rc::new(RecvConstraints::default()),
             )
             .unwrap();
 

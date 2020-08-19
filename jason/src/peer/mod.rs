@@ -409,17 +409,18 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
+    // TODO: upd docs
     /// Returns `true` if all [`Sender`]s of this [`PeerConnection`] is in
     /// the provided `mute_state`.
     #[inline]
-    pub fn is_all_senders_in_mute_state(
+    pub fn is_all_tracks_in_mute_state(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections
-            .is_all_senders_in_mute_state(kind, direction, mute_state)
+            .is_all_tracks_in_mute_state(kind, direction, mute_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].

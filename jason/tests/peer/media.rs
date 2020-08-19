@@ -3,7 +3,9 @@
 use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{ClientTrackPatch, PeerId, TrackId};
+use medea_client_api_proto::{
+    ClientTrackPatch, PeerId, ServerTrackPatch, TrackId,
+};
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager},
     peer::{
@@ -16,6 +18,7 @@ use wasm_bindgen_test::*;
 use crate::{
     get_media_stream_settings, get_test_unrequired_tracks, local_constraints,
 };
+use medea_jason::peer::MuteableTrack;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -37,6 +40,7 @@ async fn get_test_media_connections(
         .create_tracks(
             vec![audio_track, video_track],
             &get_media_stream_settings(!enabled_audio, !enabled_video).into(),
+            &Rc::default(),
         )
         .unwrap();
     let request = media_connections.get_stream_request().unwrap();
@@ -77,6 +81,7 @@ fn get_stream_request1() {
         .create_tracks(
             vec![audio_track, video_track],
             &local_constraints(true, true),
+            &Rc::default(),
         )
         .unwrap();
     let request = media_connections.get_stream_request();
@@ -93,7 +98,11 @@ fn get_stream_request2() {
         tx,
     );
     media_connections
-        .create_tracks(Vec::new(), &LocalStreamConstraints::default())
+        .create_tracks(
+            Vec::new(),
+            &LocalStreamConstraints::default(),
+            &Rc::default(),
+        )
         .unwrap();
     let request = media_connections.get_stream_request();
     assert!(request.is_none());
@@ -125,9 +134,10 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ClientTrackPatch {
+        .patch_tracks(vec![ServerTrackPatch {
             id: audio_track_id,
-            is_muted: Some(true),
+            is_muted_general: Some(true),
+            is_muted_individual: Some(true),
         }])
         .unwrap();
     assert!(audio_track.is_muted());
@@ -137,9 +147,10 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ClientTrackPatch {
+        .patch_tracks(vec![ServerTrackPatch {
             id: video_track_id,
-            is_muted: Some(true),
+            is_muted_general: Some(true),
+            is_muted_individual: Some(true),
         }])
         .unwrap();
     assert!(audio_track.is_muted());
@@ -149,9 +160,10 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::NotMuted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ClientTrackPatch {
+        .patch_tracks(vec![ServerTrackPatch {
             id: audio_track_id,
-            is_muted: Some(false),
+            is_muted_individual: Some(false),
+            is_muted_general: Some(false),
         }])
         .unwrap();
     assert!(!audio_track.is_muted());
@@ -161,9 +173,10 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::NotMuted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ClientTrackPatch {
+        .patch_tracks(vec![ServerTrackPatch {
             id: video_track_id,
-            is_muted: Some(false),
+            is_muted_individual: Some(false),
+            is_muted_general: Some(false),
         }])
         .unwrap();
     assert!(!audio_track.is_muted());
@@ -219,9 +232,10 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&ClientTrackPatch {
+        sender.update(&ServerTrackPatch {
             id: TrackId(track_id.0 + 100),
-            is_muted: Some(true),
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
         });
 
         assert!(!sender.is_muted());
@@ -230,9 +244,10 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&ClientTrackPatch {
+        sender.update(&ServerTrackPatch {
             id: track_id,
-            is_muted: Some(true),
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
         });
 
         assert!(sender.is_muted());
@@ -241,9 +256,10 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn unmute_unmuted() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&ClientTrackPatch {
+        sender.update(&ServerTrackPatch {
             id: track_id,
-            is_muted: Some(false),
+            is_muted_individual: Some(false),
+            is_muted_general: Some(false),
         });
 
         assert!(!sender.is_muted());
@@ -252,15 +268,17 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute_muted() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&ClientTrackPatch {
+        sender.update(&ServerTrackPatch {
             id: track_id,
-            is_muted: Some(true),
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
         });
         assert!(sender.is_muted());
 
-        sender.update(&ClientTrackPatch {
+        sender.update(&ServerTrackPatch {
             id: track_id,
-            is_muted: Some(true),
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
         });
 
         assert!(sender.is_muted());
@@ -269,9 +287,10 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (sender, track_id) = get_sender().await;
-        sender.update(&ClientTrackPatch {
+        sender.update(&ServerTrackPatch {
             id: track_id,
-            is_muted: None,
+            is_muted_individual: None,
+            is_muted_general: None,
         });
 
         assert!(!sender.is_muted());

@@ -164,12 +164,6 @@ impl Receiver {
                 .mute_state_controller
                 .update_individual(is_muted);
         }
-        if let Some(is_muted_general) = track_patch.is_muted_general {
-            self.0
-                .borrow()
-                .mute_state_controller
-                .update_general(is_muted_general);
-        }
     }
 
     /// Checks underlying transceiver direction returning `true` if its
@@ -196,6 +190,7 @@ impl Receiver {
 }
 
 impl InnerReceiver {
+    /// Returns `true` if this [`Receiver`] is receives media data.
     fn is_receiving(&self) -> bool {
         if self.mute_state_controller.is_muted() {
             return false;
@@ -211,6 +206,8 @@ impl InnerReceiver {
         }
     }
 
+    /// Sends [`PeerEvent::NewRemoteTrack`] to the
+    /// [`InnerReceiver::peer_events_sender`] if it's needed.
     fn maybe_notify_track(&mut self) {
         if self.notified_track {
             return;

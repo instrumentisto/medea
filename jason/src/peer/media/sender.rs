@@ -193,6 +193,7 @@ impl Sender {
         self.transceiver_direction.set(direction);
     }
 
+    /// Disables this [`Sender`].
     async fn disable(&self) {
         self.set_transceiver_direction(TransceiverDirection::Inactive);
         self.track.borrow_mut().take();
@@ -202,6 +203,8 @@ impl Sender {
             .unwrap();
     }
 
+    /// Sends [`PeerEvent::NewLocalStreamRequired`] to the
+    /// [`Sender::peer_events_sender`].
     fn request_track(&self) {
         let _ = self.peer_events_sender.unbounded_send(
             PeerEvent::NewLocalStreamRequired {
@@ -225,6 +228,7 @@ impl Track for Sender {
 }
 
 impl HasMuteStateController for Sender {
+    /// Returns reference to the [`MuteStateController`] of this [`Sender`].
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         self.mute_state_controller.clone()
     }

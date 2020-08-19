@@ -136,7 +136,7 @@ async fn add_endpoints_synchronization() {
                     .enumerate()
                     .map(|(mid, id)| (id, mid.to_string()))
                     .collect(),
-                senders_statuses: HashMap::new(),
+                transceiver_statuses: HashMap::new(),
             };
             second.send(SendCommand(make_offer)).await.unwrap();
             break;

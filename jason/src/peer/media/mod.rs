@@ -65,7 +65,7 @@ mod has_mute_state_controller {
 pub trait MuteableTrack: Track + HasMuteStateController {
     /// Returns [`MuteState`] of this [`Sender`].
     fn mute_state(&self) -> MuteState {
-        self.mute_state_controller().mute_state()
+        self.mute_state_controller().individual_mute_state()
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
@@ -316,7 +316,7 @@ impl MediaConnections {
 
     /// Returns `true` if all [`Sender`]s with provided [`TransceiverKind`] is
     /// in provided [`MuteState`].
-    pub fn is_all_senders_in_mute_state(
+    pub fn is_all_tracks_in_mute_state(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,

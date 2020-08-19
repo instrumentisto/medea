@@ -17,7 +17,7 @@ use medea_client_api_proto::{
         RtcStatsType, StatId, TrackStat, TrackStatKind,
     },
     AudioSettings, ClientTrackPatch, Direction, IceConnectionState, MediaType,
-    MemberId, PeerId, Track, TrackId, VideoSettings,
+    MemberId, PeerId, ServerTrackPatch, Track, TrackId, VideoSettings,
 };
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager},
@@ -31,18 +31,20 @@ use crate::{
     delay_for, get_media_stream_settings, get_test_unrequired_tracks,
     local_constraints, timeout,
 };
+use medea_jason::{media::RecvConstraints, peer::TrackDirection};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
 fn toggle_mute_tracks_updates(
     tracks_ids: &[u32],
     is_muted: bool,
-) -> Vec<ClientTrackPatch> {
+) -> Vec<ServerTrackPatch> {
     tracks_ids
         .into_iter()
-        .map(|track_id| ClientTrackPatch {
+        .map(|track_id| ServerTrackPatch {
             id: TrackId(*track_id),
-            is_muted: Some(is_muted),
+            is_muted_individual: Some(is_muted),
+            is_muted_general: Some(is_muted),
         })
         .collect()
 }
@@ -62,6 +64,7 @@ async fn mute_unmute_audio() {
         manager,
         false,
         local_constraints(true, true),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
 
@@ -95,6 +98,7 @@ async fn mute_unmute_video() {
         manager,
         false,
         local_constraints(true, true),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -127,6 +131,7 @@ async fn new_with_mute_audio() {
         manager,
         false,
         get_media_stream_settings(true, false).into(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
 
@@ -150,6 +155,7 @@ async fn new_with_mute_video() {
         manager,
         false,
         get_media_stream_settings(false, true).into(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -173,6 +179,7 @@ async fn add_candidates_to_answerer_before_offer() {
         Rc::clone(&manager),
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
 
@@ -183,6 +190,7 @@ async fn add_candidates_to_answerer_before_offer() {
         manager,
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -212,6 +220,7 @@ async fn add_candidates_to_offerer_before_answer() {
             Rc::clone(&manager),
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap(),
     );
@@ -223,6 +232,7 @@ async fn add_candidates_to_offerer_before_answer() {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap(),
     );
@@ -253,6 +263,7 @@ async fn normal_exchange_of_candidates() {
         Rc::clone(&manager),
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -262,6 +273,7 @@ async fn normal_exchange_of_candidates() {
         manager,
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -325,6 +337,7 @@ async fn send_event_on_new_local_stream() {
         manager,
         false,
         get_media_stream_settings(false, true).into(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -358,6 +371,7 @@ async fn ice_connection_state_changed_is_emitted() {
         Rc::clone(&manager),
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -367,6 +381,7 @@ async fn ice_connection_state_changed_is_emitted() {
         manager,
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -469,6 +484,7 @@ impl InterconnectedPeers {
             Rc::clone(&manager),
             false,
             local_constraints(true, true),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
         let peer2 = PeerConnection::new(
@@ -478,6 +494,7 @@ impl InterconnectedPeers {
             manager,
             false,
             local_constraints(true, true),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
@@ -712,6 +729,7 @@ mod peer_stats_caching {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
@@ -758,6 +776,7 @@ mod peer_stats_caching {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
@@ -806,6 +825,7 @@ mod peer_stats_caching {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
@@ -855,6 +875,7 @@ async fn reset_transition_timers() {
         manager,
         false,
         local_constraints(true, true),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -862,9 +883,15 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_muteable_tracks(TransceiverKind::Audio)
+        peer.get_muteable_tracks(TransceiverKind::Audio, TrackDirection::Send)
             .into_iter()
-            .chain(peer.get_muteable_tracks(TransceiverKind::Video).into_iter())
+            .chain(
+                peer.get_muteable_tracks(
+                    TransceiverKind::Video,
+                    TrackDirection::Send,
+                )
+                .into_iter(),
+            )
             .map(|s| {
                 s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 

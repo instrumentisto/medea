@@ -413,7 +413,7 @@ impl TrackChangeHandler for Peer<Stable> {
         &mut self,
         mut patch: ServerTrackPatch,
     ) -> Self::Output {
-        if patch.is_muted_individual.is_some() {
+        if let Some(is_muted_individual) = patch.is_muted_individual {
             let track = self
                 .senders()
                 .get(&patch.id)
@@ -421,8 +421,10 @@ impl TrackChangeHandler for Peer<Stable> {
                 .cloned();
 
             if let Some(track) = track {
-                patch.is_muted_general = Some(track.is_muted());
                 patch.is_muted_individual = None;
+                if is_muted_individual == track.is_muted() {
+                    patch.is_muted_general = Some(track.is_muted());
+                }
             }
         }
 
