@@ -4,6 +4,8 @@ const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
 let remote_videos = {};
+window.receivers = [];
+window.senders = [];
 
 let joinCallerButton = document.getElementById('connection-settings__connect');
 let usernameInput = document.getElementById('connection-settings__username');

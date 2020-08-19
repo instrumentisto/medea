@@ -148,6 +148,8 @@ impl Sender {
             }
         }
 
+        set_sender(new_track.as_ref());
+
         // no-op if transceiver is not NotMuted
         if let MuteState::Stable(StableMuteState::NotMuted) =
             sender.mute_state()
@@ -254,4 +256,11 @@ impl MuteableTrack for Sender {
             Ok(())
         }
     }
+}
+
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(inline_js = "export function set_sender(conn) { window.senders.push(conn); }")]
+extern "C" {
+    fn set_sender(conn: &JsValue);
 }

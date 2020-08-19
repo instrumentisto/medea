@@ -106,6 +106,9 @@ impl Receiver {
                         let mut inner = this.0.borrow_mut();
                         match finalize_mute_state {
                             StableMuteState::Muted => {
+                                inner.set_direction(
+                                    TransceiverDirection::Inactive,
+                                );
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(false);
                                 }
@@ -114,11 +117,9 @@ impl Receiver {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(true);
                                 }
-                                if !inner.notified_track {
-                                    inner.set_direction(
-                                        TransceiverDirection::Recvonly,
-                                    );
-                                }
+                                inner.set_direction(
+                                    TransceiverDirection::Recvonly,
+                                );
                             }
                         }
                         inner.maybe_notify_track();
@@ -141,11 +142,17 @@ impl Receiver {
         track: MediaStreamTrack,
     ) {
         let mut inner = self.0.borrow_mut();
+        if let Some(old_track) = &inner.track {
+            if old_track.id() == track.id() {
+                return;
+            }
+        }
 
         transceiver.set_direction(inner.transceiver_direction.into());
         track.set_enabled(inner.mute_state_controller.is_not_muted());
 
         inner.transceiver.replace(transceiver);
+        set_conn(track.as_ref());
         inner.track.replace(track);
         inner.maybe_notify_track();
     }
@@ -253,3 +260,10 @@ impl HasMuteStateController for Receiver {
 }
 
 impl MuteableTrack for Receiver {}
+
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(inline_js = "export function set_conn(conn) { window.receivers.push(conn); }")]
+extern "C" {
+    fn set_conn(conn: &JsValue);
+}
