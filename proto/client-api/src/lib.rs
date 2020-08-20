@@ -612,7 +612,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
-            senders_statuses: HashMap::new(),
+            transceiver_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -622,7 +622,7 @@ mod test {
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
                     \"mids\":{\"0\":\"1\"},\
-                    \"senders_statuses\":{}\
+                    \"transceiver_statuses\":{}\
                 }\
             }";
 

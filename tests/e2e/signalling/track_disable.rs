@@ -63,8 +63,9 @@ async fn helper(
                 for update in updates {
                     match update {
                         TrackUpdate::Updated(patch) => {
-                            // TODO:
-                            assert_eq!(patch.is_muted, Some(disabled));
+                            if let Some(is_muted_general) = patch.is_muted_general {
+                                assert_eq!(is_muted_general, disabled);
+                            }
                             if patch.id == TrackId(0) {
                                 first_muted = true;
                             } else if patch.id == TrackId(1) {
