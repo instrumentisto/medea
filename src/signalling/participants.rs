@@ -15,9 +15,7 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{
-    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
-};
+use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{CloseDescription, CloseReason, Event, MemberId};
 
 use crate::{
@@ -184,17 +182,21 @@ impl ParticipantService {
     }
 
     /// Sends [`Event`] to specified remote [`Member`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::ConnectionNotExists`] if unable to find
+    /// [`Connection`] with specified [`Member`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> LocalBoxFuture<'static, Result<(), RoomError>> {
+    ) -> Result<(), RoomError> {
         if let Some(conn) = self.connections.get(&member_id) {
-            conn.send_event(event)
-                .map_err(move |_| RoomError::UnableToSendEvent(member_id))
-                .boxed_local()
+            conn.send_event(event);
+            Ok(())
         } else {
-            future::err(RoomError::ConnectionNotExists(member_id)).boxed_local()
+            Err(RoomError::ConnectionNotExists(member_id))
         }
     }
 

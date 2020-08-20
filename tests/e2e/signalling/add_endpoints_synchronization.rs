@@ -1,7 +1,7 @@
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{Command, Direction, Event, TrackUpdate};
+use medea_client_api_proto::{Direction, Event, TrackUpdate};
 use medea_control_api_proto::grpc::api::{self as proto};
 use tokio::time::delay_for;
 
@@ -10,10 +10,10 @@ use crate::{
         ControlClient, MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
         WebRtcPublishEndpointBuilder,
     },
-    signalling::{SendCommand, TestMember},
+    signalling::{handle_peer_created, TestMember},
 };
 
-/// Creates Room with two Member's with WebRtcPublishEndpoint's.
+/// Creates Room with two Member's with `WebRtcPublishEndpoint`'s.
 pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
     RoomBuilder::default()
         .id(room_id.to_string())
@@ -101,7 +101,7 @@ async fn add_endpoints_synchronization() {
     loop {
         if let Event::PeerCreated {
             peer_id,
-            negotiation_role: _,
+            negotiation_role,
             tracks,
             ..
         } = second_rx.select_next_some().await
@@ -127,18 +127,10 @@ async fn add_endpoints_synchronization() {
             assert_eq!(count_send_tracks, 2);
             assert_eq!(tracks.len(), 2);
 
-            let make_offer = Command::MakeSdpOffer {
-                peer_id,
-                sdp_offer: "caller_offer".into(),
-                mids: tracks
-                    .iter()
-                    .map(|t| t.id)
-                    .enumerate()
-                    .map(|(mid, id)| (id, mid.to_string()))
-                    .collect(),
-                transceiver_statuses: HashMap::new(),
-            };
-            second.send(SendCommand(make_offer)).await.unwrap();
+            second
+                .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
+                .await
+                .unwrap();
             break;
         }
     }

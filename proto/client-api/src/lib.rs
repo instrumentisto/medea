@@ -366,8 +366,9 @@ impl Track {
 }
 
 /// Path to existing [`Track`] and field which can be updated.
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Eq, PartialEq)]
 pub struct ClientTrackPatch {
     pub id: TrackId,
     pub is_muted: Option<bool>,
@@ -387,6 +388,37 @@ impl From<ClientTrackPatch> for ServerTrackPatch {
             id: from.id,
             is_muted_individual: from.is_muted,
             is_muted_general: None,
+        }
+    }
+}
+
+impl ServerTrackPatch {
+    /// Returns new empty [`TrackPatch`] with a provided [`TrackId`].
+    #[inline]
+    #[must_use]
+    pub fn new(id: TrackId) -> Self {
+        Self {
+            id,
+            is_muted_general: None,
+            is_muted_individual: None,
+        }
+    }
+
+    /// Merges this [`TrackPatch`] with a provided [`TrackPatch`].
+    ///
+    /// Does nothing if [`TrackId`] of this [`TrackPatch`] and the provided
+    /// [`TrackPatch`] are different.
+    pub fn merge(&mut self, another: &Self) {
+        if self.id != another.id {
+            return;
+        }
+
+        if let Some(is_muted_general) = another.is_muted_general {
+            self.is_muted_general = Some(is_muted_general);
+        }
+
+        if let Some(is_muted_individual) = another.is_muted_individual {
+            self.is_muted_individual = Some(is_muted_individual);
         }
     }
 }
@@ -682,5 +714,98 @@ mod test {
             serde_json::from_str(&serde_json::to_string(&pong).unwrap())
                 .unwrap()
         )
+    }
+
+    #[test]
+    fn track_patch_merge() {
+        for (track_patches, result) in vec![
+            (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(false),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                ],
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+            ),
+            (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                ],
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+            ),
+            (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    },
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                ],
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+            ),
+            (
+                vec![
+                    TrackPatch {
+                        id: TrackId(1),
+                        is_muted: None,
+                    },
+                    TrackPatch {
+                        id: TrackId(2),
+                        is_muted: Some(true),
+                    },
+                ],
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: None,
+                },
+            ),
+        ] {
+            let mut merge_track_patch = TrackPatch::new(TrackId(1));
+            for track_patch in &track_patches {
+                merge_track_patch.merge(track_patch);
+            }
+
+            assert_eq!(
+                result, merge_track_patch,
+                "track patches: {:?}",
+                track_patches
+            );
+        }
     }
 }
