@@ -109,16 +109,17 @@ impl Receiver {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(false);
                                 }
+                                inner.set_direction(
+                                    TransceiverDirection::Inactive,
+                                );
                             }
                             StableMuteState::NotMuted => {
                                 if let Some(track) = &inner.track {
                                     track.set_enabled(true);
                                 }
-                                if !inner.notified_track {
-                                    inner.set_direction(
-                                        TransceiverDirection::Recvonly,
-                                    );
-                                }
+                                inner.set_direction(
+                                    TransceiverDirection::Recvonly,
+                                );
                             }
                         }
                         inner.maybe_notify_track();
