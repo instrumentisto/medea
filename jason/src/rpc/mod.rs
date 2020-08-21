@@ -28,7 +28,7 @@ use crate::{
     utils::{JasonError, JsCaused, JsError},
 };
 
-use websocket::TransportState;
+use self::websocket::TransportState;
 
 #[doc(inline)]
 pub use self::{

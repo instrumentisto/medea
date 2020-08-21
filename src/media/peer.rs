@@ -430,6 +430,9 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::AddRecvTrack(track)
     }
 
+    // TODO: when mute states from the [`ServerTrackPatch`] will be stabilized -
+    // update docs.
+    /// Updates general mute state of the [`Track`] (if it needed).
     fn on_track_patch(&mut self, mut patch: ServerTrackPatch) -> Self::Output {
         if let Some(is_muted) = patch.is_muted_individual {
             let track = self
@@ -455,6 +458,8 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::TrackPatch(patch)
     }
 
+    // TODO: when mute states from the [`ServerTrackPatch`] will be stabilized -
+    // write docs.
     fn on_partner_track_patch(
         &mut self,
         mut patch: ServerTrackPatch,
@@ -904,15 +909,15 @@ pub struct PeerChangesScheduler<'a> {
 }
 
 impl<'a> PeerChangesScheduler<'a> {
-    /// Schedules provided [`TrackPatch`]s.
-    ///
-    /// Provided [`TrackPatch`]s will be sent to the client on (re)negotiation.
+    /// Schedules provided [`ClientTrackPatch`]s as [`TrackChange::TrackPatch`].
     pub fn patch_tracks(&mut self, patches: Vec<ClientTrackPatch>) {
         for patch in patches {
             self.schedule_change(TrackChange::TrackPatch(patch.into()));
         }
     }
 
+    /// Schedules provided [`ClientTrackPatch`] as
+    /// [`TrackChange::PartnerTrackPatch`].
     pub fn partner_patch_tracks(&mut self, patches: Vec<ClientTrackPatch>) {
         for patch in patches {
             self.schedule_change(TrackChange::PartnerTrackPatch(patch.into()));
@@ -1163,11 +1168,11 @@ pub mod tests {
         let mut peer = peer.start_as_offerer();
 
         peer.as_changes_scheduler().patch_tracks(vec![
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(0),
                 is_muted: Some(true),
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(1),
                 is_muted: Some(true),
             },
@@ -1205,31 +1210,31 @@ pub mod tests {
         );
 
         let patches = vec![
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(1),
                 is_muted: Some(true),
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(2),
                 is_muted: None,
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(1),
                 is_muted: Some(false),
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(2),
                 is_muted: Some(true),
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(2),
                 is_muted: Some(false),
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(2),
                 is_muted: None,
             },
-            TrackPatch {
+            ClientTrackPatch {
                 id: TrackId(1),
                 is_muted: None,
             },
@@ -1257,10 +1262,10 @@ pub mod tests {
             .collect();
 
         let second_track_patch = track_patches_after.pop().unwrap();
-        assert_eq!(second_track_patch.is_muted, Some(false));
+        assert_eq!(second_track_patch.is_muted_individual, Some(false));
 
         let first_track_patch = track_patches_after.pop().unwrap();
-        assert_eq!(first_track_patch.is_muted, Some(false));
+        assert_eq!(first_track_patch.is_muted_general, None);
 
         assert!(track_patches_after.is_empty());
     }

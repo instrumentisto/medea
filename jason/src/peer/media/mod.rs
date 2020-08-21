@@ -46,6 +46,10 @@ pub trait Track {
     fn kind(&self) -> TransceiverKind;
 }
 
+/// Contains [`HasMuteStateController`] trait.
+///
+/// This module is needed because [`HasMuteStateController`] should be
+/// accessible only in the [`media`] module.
 mod has_mute_state_controller {
     use std::rc::Rc;
 
@@ -56,7 +60,8 @@ mod has_mute_state_controller {
     ///
     /// Needed for the [`MuteableTrack`] default implementation.
     pub trait HasMuteStateController {
-        /// Returns reference to the [`MuteStateController`] from this object.
+        /// Returns reference to the [`MuteStateController`] from his
+        /// implementation.
         fn mute_state_controller(&self) -> Rc<MuteStateController>;
     }
 }
@@ -624,6 +629,8 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
+    /// Returns all references to the [`MuteableTrack`]s from this
+    /// [`MediaConnections`].
     fn get_all_muteable_tracks(&self) -> Vec<Rc<dyn MuteableTrack>> {
         let inner = self.0.borrow();
         inner
@@ -639,14 +646,14 @@ impl MediaConnections {
             .collect()
     }
 
-    /// Stops all [`Sender`]s state transitions expiry timers.
+    /// Stops all [`MuteableTrack`]s state transitions expiry timers.
     pub fn stop_state_transitions_timers(&self) {
         self.get_all_muteable_tracks()
             .into_iter()
             .for_each(|t| t.stop_mute_state_transition_timeout())
     }
 
-    /// Resets all [`Sender`]s state transitions expiry timers.
+    /// Resets all [`MuteableTrack`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
         self.get_all_muteable_tracks()
             .into_iter()

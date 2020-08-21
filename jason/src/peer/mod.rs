@@ -220,6 +220,7 @@ pub struct PeerConnection {
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalStreamConstraints,
 
+    /// Constraints for the [`Receiver`]s from this [`PeerConnection`].
     recv_constraints: Rc<RecvConstraints>,
 }
 
@@ -409,9 +410,9 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    // TODO: upd docs
-    /// Returns `true` if all [`Sender`]s of this [`PeerConnection`] is in
-    /// the provided `mute_state`.
+    /// Returns `true` if all [`MuteableTrack`]s with a provided
+    /// [`TransceiverKind`] and [`TrackDirection`] is in the provided
+    /// [`StableMuteState`].
     #[inline]
     pub fn is_all_tracks_in_mute_state(
         &self,

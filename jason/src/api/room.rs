@@ -627,6 +627,7 @@ struct InnerRoom {
     /// Local media stream for injecting into new created [`PeerConnection`]s.
     send_constraints: LocalStreamConstraints,
 
+    /// Constraints for the [`Receiver`]s.
     recv_constraints: Rc<RecvConstraints>,
 
     /// [`PeerConnection`] repository.
@@ -692,6 +693,9 @@ impl InnerRoom {
         }
     }
 
+    /// Toggles [`InnerRoom::recv_constraints`] or
+    /// [`InnerRoom::send_constraints`] mute status based on the provided
+    /// [`TransceiverDirection`] and [`TransceiverKind`].
     fn toggle_disable_constraints(
         &self,
         is_muted: bool,

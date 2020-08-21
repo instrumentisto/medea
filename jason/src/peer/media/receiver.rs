@@ -41,6 +41,9 @@ struct InnerReceiver {
 }
 
 impl InnerReceiver {
+    /// Sets this [`Receiver`]'s [`TransceiverDirection`] to the provided one.
+    ///
+    /// Tries to update underlying [`RtcRtpTransceiver`] if it present.
     fn set_direction(&mut self, direction: TransceiverDirection) {
         self.transceiver_direction = direction;
         if let Some(transceiver) = &self.transceiver {
@@ -247,6 +250,7 @@ impl Track for Receiver {
 }
 
 impl HasMuteStateController for Receiver {
+    /// Returns reference to the [`MuteStateController`] from this [`Receiver`].
     #[inline]
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         self.0.borrow().mute_state_controller.clone()

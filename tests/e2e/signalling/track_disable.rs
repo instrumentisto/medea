@@ -6,7 +6,8 @@ use futures::{
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatch, TrackUpdate,
+    ClientTrackPatch, Command, Event, NegotiationRole, PeerId, TrackId,
+    TrackUpdate,
 };
 use medea_control_api_proto::grpc::api as proto;
 use tokio::time::timeout;
@@ -173,7 +174,7 @@ async fn track_disables_and_enables_are_instant() {
                                 updates.pop().unwrap()
                             {
                                 Some((
-                                    patch.is_muted.unwrap(),
+                                    patch.is_muted_individual.unwrap(),
                                     negotiation_role,
                                 ))
                             } else {
@@ -227,7 +228,7 @@ async fn track_disables_and_enables_are_instant() {
                 mutes_sent.push(is_muted);
                 publisher.do_send(SendCommand(Command::UpdateTracks {
                     peer_id: PeerId(0),
-                    tracks_patches: vec![TrackPatch {
+                    tracks_patches: vec![ClientTrackPatch {
                         id: TrackId(0),
                         is_muted: Some(is_muted),
                     }],
@@ -368,7 +369,7 @@ async fn track_disables_and_enables_are_instant2() {
     first
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![ClientTrackPatch {
                 id: TrackId(0),
                 is_muted: Some(true),
             }],
@@ -390,7 +391,7 @@ async fn track_disables_and_enables_are_instant2() {
     second
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(1),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![ClientTrackPatch {
                 id: TrackId(2),
                 is_muted: Some(true),
             }],
@@ -436,7 +437,7 @@ async fn force_update_works() {
                 Event::IceCandidateDiscovered { peer_id, .. } => {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: *peer_id,
-                        tracks_patches: vec![TrackPatch {
+                        tracks_patches: vec![ClientTrackPatch {
                             is_muted: Some(true),
                             id: TrackId(0),
                         }],
@@ -454,7 +455,7 @@ async fn force_update_works() {
                     } else {
                         ctx.notify(SendCommand(Command::UpdateTracks {
                             peer_id: *peer_id,
-                            tracks_patches: vec![TrackPatch {
+                            tracks_patches: vec![ClientTrackPatch {
                                 is_muted: Some(true),
                                 id: TrackId(0),
                             }],
@@ -491,7 +492,7 @@ async fn force_update_works() {
             Event::IceCandidateDiscovered { .. } => {
                 ctx.notify(SendCommand(Command::UpdateTracks {
                     peer_id: pub_peer_id.unwrap(),
-                    tracks_patches: vec![TrackPatch {
+                    tracks_patches: vec![ClientTrackPatch {
                         is_muted: Some(true),
                         id: track_id.unwrap(),
                     }],
@@ -507,7 +508,7 @@ async fn force_update_works() {
                 } else {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: pub_peer_id.unwrap(),
-                        tracks_patches: vec![TrackPatch {
+                        tracks_patches: vec![ClientTrackPatch {
                             is_muted: Some(true),
                             id: track_id.unwrap(),
                         }],
