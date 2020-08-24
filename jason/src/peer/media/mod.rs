@@ -16,7 +16,7 @@ use tracerr::Traced;
 use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
-    media::{LocalStreamConstraints, MediaStreamTrack, RecvConstraints},
+    media::{LocalStreamConstraints, RecvConstraints},
     peer::{media::mute_state::MuteStateController, PeerEvent},
     utils::{JsCaused, JsError},
 };

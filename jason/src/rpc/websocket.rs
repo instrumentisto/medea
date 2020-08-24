@@ -12,7 +12,7 @@ use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    log::console_error,
+    log::{console_error, prelude::*},
     utils::{
         EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
         JsonParseError,
@@ -349,11 +349,11 @@ impl WebSocketRpcTransport {
                 this_mut.on_message_subs.iter().for_each(|on_message| {
                     on_message.unbounded_send(msg.clone()).unwrap_or_else(
                         |e| {
-                            console_error(format!(
+                            log_error!(
                                 "WebSocket's 'on_message' callback receiver \
                                  unexpectedly gone. {:?}",
                                 e
-                            ))
+                            )
                         },
                     );
                 })

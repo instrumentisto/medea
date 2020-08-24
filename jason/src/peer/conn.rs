@@ -16,7 +16,7 @@ use web_sys::{
 };
 
 use crate::{
-    log::console_error,
+    log::{console_error, prelude::*},
     media::TrackConstraints,
     peer::stats::{RtcStats, RtcStatsError},
     utils::{
@@ -479,11 +479,11 @@ impl RtcPeerConnection {
                                     "failed" => PeerConnectionState::Failed,
                                     "closed" => PeerConnectionState::Closed,
                                     _ => {
-                                        console_error(format!(
+                                        log_error!(
                                             "Unknown RTCPeerConnection \
                                              connection state: {}.",
-                                            state,
-                                        ));
+                                            state
+                                        );
                                         return;
                                     }
                                 };

@@ -57,6 +57,8 @@ impl<'a> SenderBuilder<'a> {
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
         let mut finalized_mute_state_rx = mute_state_observer.on_finalized();
+        let mut individual_mute_state_rx =
+            mute_state_observer.on_individual_update();
         let this = Rc::new(Sender {
             peer_id: self.peer_id,
             track_id: self.track_id,
@@ -83,8 +85,29 @@ impl<'a> SenderBuilder<'a> {
                                 this.request_track();
                             }
                             StableMuteState::Muted => {
+                                this.set_transceiver_direction(
+                                    TransceiverDirection::Inactive,
+                                );
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
+        spawn_local({
+            let weak_this = Rc::downgrade(&this);
+            async move {
+                while let Some(individual_mute_state) =
+                    individual_mute_state_rx.next().await
+                {
+                    if let Some(this) = weak_this.upgrade() {
+                        match individual_mute_state {
+                            StableMuteState::Muted => {
                                 this.disable().await;
                             }
+                            _ => (),
                         }
                     } else {
                         break;
@@ -195,7 +218,6 @@ impl Sender {
 
     /// Disables this [`Sender`].
     async fn disable(&self) {
-        self.set_transceiver_direction(TransceiverDirection::Inactive);
         self.track.borrow_mut().take();
         // cannot fail
         let _ = JsFuture::from(self.transceiver.sender().replace_track(None))

@@ -430,8 +430,6 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::AddRecvTrack(track)
     }
 
-    // TODO: when mute states from the [`ServerTrackPatch`] will be stabilized -
-    // update docs.
     /// Updates general mute state of the [`Track`] (if it needed).
     fn on_track_patch(&mut self, mut patch: ServerTrackPatch) -> Self::Output {
         if let Some(is_muted) = patch.is_muted_individual {
@@ -458,8 +456,12 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::TrackPatch(patch)
     }
 
-    // TODO: when mute states from the [`ServerTrackPatch`] will be stabilized -
-    // write docs.
+    /// Doesn't updates anything.
+    ///
+    /// Resets `is_muted_individual` to `None`.
+    ///
+    /// Sets `is_muted_general` to `Some` if provided `is_muted_individual` is
+    /// equal to the real general mute state.
     fn on_partner_track_patch(
         &mut self,
         mut patch: ServerTrackPatch,

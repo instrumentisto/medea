@@ -26,13 +26,10 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
-use web_sys::{
-    MediaStreamTrack as RtcMediaStreamTrack, RtcIceConnectionState,
-    RtcTrackEvent,
-};
+use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    log::console_error,
+    log::prelude::*,
     media::{
         LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
         MediaStreamTrack, RecvConstraints,
@@ -490,7 +487,7 @@ impl PeerConnection {
             S::Disconnected => IceConnectionState::Disconnected,
             S::Closed => IceConnectionState::Closed,
             S::__Nonexhaustive => {
-                console_error("Unknown ICE connection state");
+                log_error!("Unknown ICE connection state");
                 return;
             }
         };
@@ -510,10 +507,10 @@ impl PeerConnection {
         track_event: &RtcTrackEvent,
     ) -> Result<()> {
         let transceiver = track_event.transceiver();
-        // let track = MediaStreamTrack::from(track_event.track());
         media_connections
             .add_remote_track(transceiver, track_event.track())
             .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
     }
 

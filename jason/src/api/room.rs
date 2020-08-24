@@ -21,7 +21,7 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     api::connection::Connections,
-    log::console_error,
+    log::{console_error, prelude::*},
     media::{
         LocalStreamConstraints, MediaStream, MediaStreamSettings,
         MediaStreamTrack, RecvConstraints,
@@ -535,7 +535,7 @@ impl Room {
 
                 match inner.upgrade() {
                     None => {
-                        console_error("Inner Room dropped unexpectedly");
+                        log_error!("Inner Room dropped unexpectedly");
                         break;
                     }
                     Some(inner) => {

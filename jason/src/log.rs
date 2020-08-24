@@ -30,6 +30,16 @@ where
     web_sys::console::debug_1(&msg.into());
 }
 
+/// Formats log message.
+///
+/// Use it same as [`std::format`] macro.
+#[macro_export]
+macro_rules! format_log {
+    ($($arg:tt)*) => {
+        format!("[{}:{}]: ", module_path!(), line!()) + &format!($($arg)*)
+    };
+}
+
 /// Prints provided message same as [`format`] macro with a [`console_debug`]
 /// function.
 ///
@@ -37,9 +47,7 @@ where
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
-        $crate::log::console_debug(
-            format!("[{}:{}]: ", module_path!(), line!()) + &format!($($arg)*)
-        );
+        $crate::log::console_debug($crate::format_log!($($arg)*));
     };
 }
 
@@ -50,8 +58,6 @@ macro_rules! log_debug {
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
-        $crate::log::console_error(
-            format!("[{}:{}]: ", module_path!(), line!()) + &format!($($arg)*)
-        );
+        $crate::log::console_error($crate::format_log!($($arg)*));
     };
 }

@@ -31,6 +31,8 @@ pub struct MuteStateController {
     /// All subscribers on the [`MuteStateController::general_mute_state`]
     /// changes.
     on_finalized_subs: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
+
+    on_individual_update: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
 }
 
 impl MuteStateController {
@@ -45,6 +47,7 @@ impl MuteStateController {
             general_mute_state: ObservableCell::new(mute_state),
             individual_mute_state: ObservableCell::new(mute_state.into()),
             on_finalized_subs: RefCell::default(),
+            on_individual_update: RefCell::default(),
             mute_timeout_handle: RefCell::new(None),
         });
         this.clone().spawn();
@@ -65,6 +68,26 @@ impl MuteStateController {
     fn send_finalized_state(&self, state: StableMuteState) {
         let mut on_finalize_subs = self.on_finalized_subs.borrow_mut();
         *on_finalize_subs = on_finalize_subs
+            .drain(..)
+            .filter(|s| s.unbounded_send(state).is_ok())
+            .collect();
+    }
+
+    /// Returns [`Stream`] to which all
+    /// [`MuteStateController::individual_mute_state`]s will be sent.
+    pub fn on_individual_update(
+        &self,
+    ) -> LocalBoxStream<'static, StableMuteState> {
+        let (tx, rx) = mpsc::unbounded();
+        self.on_individual_update.borrow_mut().push(tx);
+
+        Box::pin(rx)
+    }
+
+    /// Sends [`MuteStateController::individual_mute_state`] update.
+    fn send_individual_update(&self, state: StableMuteState) {
+        let mut on_individual_update = self.on_individual_update.borrow_mut();
+        *on_individual_update = on_individual_update
             .drain(..)
             .filter(|s| s.unbounded_send(state).is_ok())
             .collect();
@@ -94,7 +117,9 @@ impl MuteStateController {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     match mute_state {
-                        MuteState::Stable(_) => (),
+                        MuteState::Stable(upd) => {
+                            this.send_individual_update(upd);
+                        }
                         MuteState::Transition(_) => {
                             let weak_this = Rc::downgrade(&this);
                             spawn_local(async move {

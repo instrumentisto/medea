@@ -24,7 +24,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
 use crate::{
-    log::console_error,
+    log::{console_error, prelude::*},
     utils::{JasonError, JsCaused, JsError},
 };
 
@@ -400,11 +400,11 @@ impl WebSocketRpcClient {
                             sub.send(CloseReason::ByServer(reason)).err()
                         })
                         .for_each(|reason| {
-                            console_error(format!(
+                            log_error!(
                                 "Failed to send reason of Jason close to \
                                  subscriber: {:?}",
                                 reason
-                            ))
+                            )
                         });
                 }
             },

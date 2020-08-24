@@ -6,9 +6,8 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 use web_sys::MediaStreamTrackState;
 
-// TODO: do something with it
 /// Assert that track is stopped when all strong refs are dropped.
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn track_autostop() {
     let media_manager = MediaManager::default();
     let mut caps = MediaStreamSettings::new();

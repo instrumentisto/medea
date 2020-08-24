@@ -8,7 +8,7 @@ use medea_client_api_proto::{ClientMsg, ServerMsg};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    log::console_error,
+    log::{console_error, prelude::*},
     rpc::{RpcTransport, TransportError},
     utils::{delay_for, JasonError, JsCaused, JsDuration, JsError, TaskHandle},
 };
@@ -144,11 +144,11 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
                 .iter()
                 .filter_map(|sub| sub.unbounded_send(()).err())
                 .for_each(|err| {
-                    console_error(format!(
+                    log_error!(
                         "Heartbeat::on_idle subscriber has gone unexpectedly: \
                          {:?}",
                         err,
-                    ))
+                    );
                 });
         });
 
