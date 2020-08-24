@@ -649,18 +649,28 @@ impl<T> Peer<T> {
     fn dedup_track_patches(&mut self) {
         let mut grouped_patches: HashMap<TrackId, ServerTrackPatch> =
             HashMap::new();
+        let mut grouped_partner_patches = HashMap::new();
         let mut track_changes = Vec::new();
 
         for track_change in
             std::mem::take(&mut self.context.pending_track_updates)
         {
-            if let TrackChange::TrackPatch(patch) = track_change {
-                grouped_patches
-                    .entry(patch.id)
-                    .or_insert_with(|| ServerTrackPatch::new(patch.id))
-                    .merge(&patch);
-            } else {
-                track_changes.push(track_change);
+            match track_change {
+                TrackChange::TrackPatch(patch) => {
+                    grouped_patches
+                        .entry(patch.id)
+                        .or_insert_with(|| ServerTrackPatch::new(patch.id))
+                        .merge(&patch);
+                }
+                TrackChange::PartnerTrackPatch(patch) => {
+                    grouped_partner_patches
+                        .entry(patch.id)
+                        .or_insert_with(|| ServerTrackPatch::new(patch.id))
+                        .merge(&patch);
+                }
+                _ => {
+                    track_changes.push(track_change);
+                }
             }
         }
 
@@ -668,6 +678,11 @@ impl<T> Peer<T> {
             grouped_patches
                 .into_iter()
                 .map(|(_, patch)| TrackChange::TrackPatch(patch)),
+        );
+        track_changes.extend(
+            grouped_partner_patches
+                .into_iter()
+                .map(|(_, patch)| TrackChange::PartnerTrackPatch(patch)),
         );
 
         self.context.pending_track_updates = track_changes;

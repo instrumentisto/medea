@@ -7,7 +7,7 @@ use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, ServerTrackPatch};
 use proto::TrackId;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::RtcRtpTransceiver;
+use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
@@ -142,9 +142,17 @@ impl Receiver {
     pub fn set_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
-        track: MediaStreamTrack,
+        track: RtcMediaStreamTrack,
     ) {
         let mut inner = self.0.borrow_mut();
+
+        if let Some(old_track) = &inner.track {
+            if old_track.id() == track.id() {
+                return;
+            }
+        }
+
+        let track = MediaStreamTrack::from(track);
 
         transceiver.set_direction(inner.transceiver_direction.into());
         track.set_enabled(inner.mute_state_controller.is_not_muted());

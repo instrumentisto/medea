@@ -201,9 +201,7 @@ impl Drop for MediaStreamTrack {
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
         if Rc::strong_count(&self.0) == 1 {
-            // TODO (evdokimovs): THIS IS BUG
-            //                    Maybe some stopping mechanism is needed.
-            // self.0.track.stop();
+            self.0.track.stop();
         }
     }
 }

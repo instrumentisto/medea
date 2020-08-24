@@ -333,7 +333,7 @@ pub enum TrackUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
 
-    /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
+    /// [`Track`] should be updated by this [`ServerTrackPatch`] in the `Peer`.
     /// Can only refer tracks already known to the `Peer`.
     Updated(ServerTrackPatch),
 }
@@ -393,7 +393,7 @@ impl From<ClientTrackPatch> for ServerTrackPatch {
 }
 
 impl ServerTrackPatch {
-    /// Returns new empty [`TrackPatch`] with a provided [`TrackId`].
+    /// Returns new empty [`ServerTrackPatch`] with a provided [`TrackId`].
     #[inline]
     #[must_use]
     pub fn new(id: TrackId) -> Self {
@@ -404,10 +404,10 @@ impl ServerTrackPatch {
         }
     }
 
-    /// Merges this [`TrackPatch`] with a provided [`TrackPatch`].
+    /// Merges this [`ServerTrackPatch`] with a provided [`ServerTrackPatch`].
     ///
-    /// Does nothing if [`TrackId`] of this [`TrackPatch`] and the provided
-    /// [`TrackPatch`] are different.
+    /// Does nothing if [`TrackId`] of this [`ServerTrackPatch`] and the
+    /// provided [`ServerTrackPatch`] are different.
     pub fn merge(&mut self, another: &Self) {
         if self.id != another.id {
             return;
@@ -721,82 +721,97 @@ mod test {
         for (track_patches, result) in vec![
             (
                 vec![
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: Some(true),
+                        is_muted_general: Some(true),
+                        is_muted_individual: Some(true),
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: Some(false),
+                        is_muted_general: Some(false),
+                        is_muted_individual: Some(false),
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: None,
+                        is_muted_general: None,
+                        is_muted_individual: None,
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: Some(true),
+                        is_muted_general: Some(true),
+                        is_muted_individual: Some(true),
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: Some(true),
+                        is_muted_general: Some(true),
+                        is_muted_individual: Some(true),
                     },
                 ],
-                TrackPatch {
+                ServerTrackPatch {
                     id: TrackId(1),
-                    is_muted: Some(true),
+                    is_muted_general: Some(true),
+                    is_muted_individual: Some(true),
                 },
             ),
             (
                 vec![
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: None,
+                        is_muted_general: None,
+                        is_muted_individual: None,
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: Some(true),
+                        is_muted_general: Some(true),
+                        is_muted_individual: Some(true),
                     },
                 ],
-                TrackPatch {
+                ServerTrackPatch {
                     id: TrackId(1),
-                    is_muted: Some(true),
+                    is_muted_general: Some(true),
+                    is_muted_individual: Some(true),
                 },
             ),
             (
                 vec![
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: Some(true),
+                        is_muted_general: Some(true),
+                        is_muted_individual: Some(true),
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: None,
+                        is_muted_general: None,
+                        is_muted_individual: None,
                     },
                 ],
-                TrackPatch {
+                ServerTrackPatch {
                     id: TrackId(1),
-                    is_muted: Some(true),
+                    is_muted_general: Some(true),
+                    is_muted_individual: Some(true),
                 },
             ),
             (
                 vec![
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(1),
-                        is_muted: None,
+                        is_muted_general: None,
+                        is_muted_individual: None,
                     },
-                    TrackPatch {
+                    ServerTrackPatch {
                         id: TrackId(2),
-                        is_muted: Some(true),
+                        is_muted_general: Some(true),
+                        is_muted_individual: Some(true),
                     },
                 ],
-                TrackPatch {
+                ServerTrackPatch {
                     id: TrackId(1),
-                    is_muted: None,
+                    is_muted_general: None,
+                    is_muted_individual: None,
                 },
             ),
         ] {
-            let mut merge_track_patch = TrackPatch::new(TrackId(1));
+            let mut merge_track_patch = ServerTrackPatch::new(TrackId(1));
             for track_patch in &track_patches {
                 merge_track_patch.merge(track_patch);
             }

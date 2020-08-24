@@ -174,7 +174,7 @@ async fn track_disables_and_enables_are_instant() {
                                 updates.pop().unwrap()
                             {
                                 Some((
-                                    patch.is_muted_individual.unwrap(),
+                                    patch.is_muted_general?,
                                     negotiation_role,
                                 ))
                             } else {

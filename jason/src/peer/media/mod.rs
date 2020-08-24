@@ -13,7 +13,7 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
-use web_sys::RtcRtpTransceiver;
+use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
     media::{LocalStreamConstraints, MediaStreamTrack, RecvConstraints},
@@ -605,7 +605,7 @@ impl MediaConnections {
     pub fn add_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
-        track: MediaStreamTrack,
+        track: RtcMediaStreamTrack,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         if let Some(mid) = transceiver.mid() {
