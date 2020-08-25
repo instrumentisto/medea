@@ -179,6 +179,27 @@ pub fn get_test_tracks(
     )
 }
 
+pub fn get_test_recv_tracks() -> (Track, Track) {
+    (
+        Track {
+            id: TrackId(0),
+            direction: Direction::Recv {
+                sender: "bob".into(),
+                mid: Some("mid0".to_string()),
+            },
+            media_type: MediaType::Audio(AudioSettings { is_required: false }),
+        },
+        Track {
+            id: TrackId(1),
+            direction: Direction::Recv {
+                sender: "bob".into(),
+                mid: Some("mid1".to_string()),
+            },
+            media_type: MediaType::Video(VideoSettings { is_required: false }),
+        },
+    )
+}
+
 /// Resolves after provided number of milliseconds.
 pub async fn delay_for(delay_ms: i32) {
     JsFuture::from(Promise::new(&mut |yes, _| {

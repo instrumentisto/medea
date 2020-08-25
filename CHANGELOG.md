@@ -38,7 +38,9 @@ All user visible changes to this project will be documented in this file. This p
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Emit `TracksApplied` event to create new and update existing tracks ([#105]);
-    - `PeerConnection` renegotiation functionality ([#105]).
+    - `PeerConnection` renegotiation functionality ([#105]);
+    - Individual and general mute state managing ([#127]);
+    - Recv `MediaTrack` muting/unmuting ([#127]);
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -73,6 +75,7 @@ All user visible changes to this project will be documented in this file. This p
 [#95]: /../../pull/95
 [#98]: /../../pull/98
 [#105]: /../../pull/105
+[#127]: /../../pull/127
 
 
 

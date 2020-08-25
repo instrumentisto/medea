@@ -27,7 +27,7 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_test_required_tracks, get_test_tracks,
+    delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, MockNavigator,
 };
@@ -1141,4 +1141,38 @@ mod patches_generation {
             }
         );
     }
+}
+
+#[wasm_bindgen_test]
+async fn remote_mute_unmute_audio() {
+    let (audio_track, video_track) = get_test_recv_tracks();
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    let handle = room.new_handle();
+    assert!(JsFuture::from(handle.mute_remote_audio()).await.is_ok());
+    assert!(!peer.is_recv_audio_enabled());
+    assert!(JsFuture::from(handle.unmute_remote_audio()).await.is_ok());
+    assert!(peer.is_recv_audio_enabled());
+}
+
+#[wasm_bindgen_test]
+async fn remote_mute_unmute_video() {
+    let (audio_track, video_track) = get_test_recv_tracks();
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    let handle = room.new_handle();
+    assert!(JsFuture::from(handle.mute_remote_video()).await.is_ok());
+    assert!(!peer.is_recv_video_enabled());
+    assert!(JsFuture::from(handle.unmute_remote_video()).await.is_ok());
+    assert!(peer.is_recv_video_enabled());
 }

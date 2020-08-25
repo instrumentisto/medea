@@ -553,9 +553,9 @@ async fn individual_and_general_mute_states_works() {
         credentials.get("responder").unwrap(),
         Some({
             let test_finish_tx = test_finish_tx.clone();
-            let mut stage1 = false;
-            let mut stage2 = false;
-            let mut stage3 = false;
+            let mut is_stage1_finished = false;
+            let mut is_stage2_finished = false;
+            let mut is_stage3_finished = false;
 
             Box::new(move |event, ctx, _| match event {
                 Event::TracksApplied {
@@ -566,7 +566,7 @@ async fn individual_and_general_mute_states_works() {
                     match update {
                         TrackUpdate::Updated(patch) => {
                             if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
-                                && !stage1
+                                && !is_stage1_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(patch.is_muted_general, Some(true));
@@ -585,10 +585,10 @@ async fn individual_and_general_mute_states_works() {
                                 ));
 
                                 STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                stage1 = true;
+                                is_stage1_finished = true;
                             } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
                                 < 2
-                                && !stage2
+                                && !is_stage2_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(patch.is_muted_general, Some(true));
@@ -598,10 +598,10 @@ async fn individual_and_general_mute_states_works() {
                                 );
 
                                 STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                stage2 = true;
+                                is_stage2_finished = true;
                             } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
                                 < 2
-                                && !stage3
+                                && !is_stage3_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(patch.is_muted_general, None);
@@ -620,7 +620,7 @@ async fn individual_and_general_mute_states_works() {
                                 ));
 
                                 STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                stage3 = true;
+                                is_stage3_finished = true;
                             } else {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(patch.is_muted_general, Some(false));
@@ -649,9 +649,9 @@ async fn individual_and_general_mute_states_works() {
         Some(Box::new({
             let mut is_inited = false;
             let mut is_individual_muted = false;
-            let mut stage1 = false;
-            let mut stage2 = false;
-            let mut stage3 = false;
+            let mut is_stage1_finished = false;
+            let mut is_stage2_finished = false;
+            let mut is_stage3_finished = false;
 
             move |event, ctx, _| match event {
                 Event::IceCandidateDiscovered { peer_id, .. } => {
@@ -672,7 +672,7 @@ async fn individual_and_general_mute_states_works() {
                     match update {
                         TrackUpdate::Updated(patch) => {
                             if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
-                                && !stage1
+                                && !is_stage1_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(
@@ -682,10 +682,10 @@ async fn individual_and_general_mute_states_works() {
                                 assert_eq!(patch.is_muted_general, Some(true));
 
                                 STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                stage1 = true;
+                                is_stage1_finished = true;
                             } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
                                 < 2
-                                && !stage2
+                                && !is_stage2_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(patch.is_muted_individual, None);
@@ -704,10 +704,10 @@ async fn individual_and_general_mute_states_works() {
                                 ));
 
                                 STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                stage2 = true;
+                                is_stage2_finished = true;
                             } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
                                 < 2
-                                && stage3
+                                && is_stage3_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(
@@ -717,7 +717,7 @@ async fn individual_and_general_mute_states_works() {
                                 assert_eq!(patch.is_muted_general, None);
 
                                 STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                stage3 = true;
+                                is_stage3_finished = true;
                             } else {
                                 assert_eq!(patch.id, TrackId(0));
                                 if !is_individual_muted {

@@ -524,6 +524,16 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
+    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.media_connections.is_recv_audio_enabled()
+    }
+
+    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.media_connections.is_recv_video_enabled()
+    }
+
     /// Returns all [`MuteableTrack`]s from this [`PeerConnection`] with
     /// provided [`TransceiverKind`] and [`TrackDirection`].
     #[inline]

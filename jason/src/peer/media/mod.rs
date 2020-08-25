@@ -377,6 +377,26 @@ impl MediaConnections {
             .is_none()
     }
 
+    /// Returns `true` if all [`Receiver`]s with
+    /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(TransceiverKind::Video)
+            .find(|s| s.is_individual_muted())
+            .is_none()
+    }
+
+    /// Returns `true` if all [`Receiver`]s with
+    /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(TransceiverKind::Audio)
+            .find(|s| s.is_individual_muted())
+            .is_none()
+    }
+
     /// Returns mapping from a [`MediaStreamTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     ///

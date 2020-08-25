@@ -6,18 +6,6 @@ use std::cell::{Cell, RefCell};
 
 use medea_client_api_proto::{MediaType, TrackId as Id};
 
-/// Representation of [MediaStreamTrack][1] object.
-///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-#[derive(Debug)]
-pub struct MediaTrack {
-    pub id: Id,
-    mid: RefCell<Option<String>>,
-    pub media_type: MediaType,
-    enabled: Cell<bool>,
-    mute_state: RefCell<MuteState>,
-}
-
 /// Mute state of the [`MediaTrack`].
 ///
 /// Contains mute state for the `Send` and `Recv` side.
@@ -64,6 +52,18 @@ impl MuteState {
     pub fn set_send(&mut self, is_muted: bool) {
         self.send_muted = is_muted;
     }
+}
+
+/// Representation of [MediaStreamTrack][1] object.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+#[derive(Debug)]
+pub struct MediaTrack {
+    pub id: Id,
+    mid: RefCell<Option<String>>,
+    pub media_type: MediaType,
+    enabled: Cell<bool>,
+    mute_state: RefCell<MuteState>,
 }
 
 impl MediaTrack {
