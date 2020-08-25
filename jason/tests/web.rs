@@ -1,7 +1,5 @@
 #![cfg(target_arch = "wasm32")]
 
-// TODO: add mute recv tests
-
 /// Analog for [`assert_eq`] but for [`js_callback`] macro.
 /// Simply use it as [`assert_eq`]. For use cases and reasons
 /// just read [`js_callback`]'s docs.

@@ -56,8 +56,7 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
-        let mut finalized_mute_state_rx =
-            mute_state_observer.on_general_update();
+        let mut general_mute_state_rx = mute_state_observer.on_general_update();
         let mut individual_mute_state_rx =
             mute_state_observer.on_individual_update();
         let this = Rc::new(Sender {
@@ -75,7 +74,7 @@ impl<'a> SenderBuilder<'a> {
             let weak_this = Rc::downgrade(&this);
             async move {
                 while let Some(finalized_mute_state) =
-                    finalized_mute_state_rx.next().await
+                    general_mute_state_rx.next().await
                 {
                     if let Some(this) = weak_this.upgrade() {
                         match finalized_mute_state {
@@ -174,7 +173,7 @@ impl Sender {
 
         // no-op if transceiver is not NotMuted
         if let MuteState::Stable(StableMuteState::NotMuted) =
-            sender.mute_state()
+            sender.individual_mute_state()
         {
             JsFuture::from(
                 sender

@@ -535,9 +535,11 @@ async fn force_update_works() {
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
+/// Checks that server validly switches individual and general mute states based
+/// on client's commands.
 #[actix_rt::test]
-async fn individual_mutes_works_fine() {
-    const TEST_NAME: &str = "individual_mutes_works_fine";
+async fn individual_and_general_mute_states_works() {
+    const TEST_NAME: &str = "individual_and_general_mute_states_works";
     const STAGE1_PROGRESS: AtomicU8 = AtomicU8::new(0);
     const STAGE2_PROGRESS: AtomicU8 = AtomicU8::new(0);
     const STAGE3_PROGRESS: AtomicU8 = AtomicU8::new(0);
@@ -545,9 +547,9 @@ async fn individual_mutes_works_fine() {
     let mut client = ControlClient::new().await;
     let credentials = client.create(create_room_req(TEST_NAME)).await;
 
-    let (test_finish_tx, mut test_finish_rx) = mpsc::unbounded();
+    let (test_finish_tx, test_finish_rx) = mpsc::unbounded();
 
-    let responder = TestMember::connect(
+    let _responder = TestMember::connect(
         credentials.get("responder").unwrap(),
         Some({
             let test_finish_tx = test_finish_tx.clone();
@@ -642,7 +644,7 @@ async fn individual_mutes_works_fine() {
         true,
     )
     .await;
-    let publisher = TestMember::connect(
+    let _publisher = TestMember::connect(
         credentials.get("publisher").unwrap(),
         Some(Box::new({
             let mut is_inited = false;

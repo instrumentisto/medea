@@ -1,4 +1,4 @@
-//! Controller of the [`MuteState`] for the all [`Track`]s.
+//! Controller of the [`MuteState`] for the all [`MuteableTrack`]s.
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
@@ -21,7 +21,13 @@ pub struct MuteStateController {
     /// General [`StableMuteState`] between `Recv` and `Send` [`Track`]s.
     general_mute_state: ObservableCell<StableMuteState>,
 
-    /// [`MuteState`] of the local [`Track`].
+    /// Mute state of this `Member`.
+    ///
+    /// This state doesn't indicates that connection with partner client are
+    /// really muted. This is intention of this client.
+    ///
+    /// On this mute, client __should__ replace `MediaStreamTrack` with `None`
+    /// in the `Transceiver` for the `Send` direction.
     individual_mute_state: ObservableCell<MuteState>,
 
     /// Timeout of the [`MuteStateController::individual_mute_state`]
@@ -170,13 +176,27 @@ impl MuteStateController {
         });
     }
 
-    /// Checks whether [`MuteStateController`] is in [`MuteState::Muted`].
-    pub fn is_muted(&self) -> bool {
+    /// Checks whether [`MuteStateController`]'s general mute state is in
+    /// [`MuteState::Muted`].
+    pub fn is_general_muted(&self) -> bool {
+        self.general_mute_state.get() == StableMuteState::Muted
+    }
+
+    /// Checks whether [`MuteStateController`]'s general mute state is in
+    /// [`MuteState::NotMuted`].
+    pub fn is_not_general_muted(&self) -> bool {
+        self.general_mute_state.get() == StableMuteState::NotMuted
+    }
+
+    /// Checks whether [`MuteStateController`]'s individual mute state is in
+    /// [`MuteState::Muted`].
+    pub fn is_individual_muted(&self) -> bool {
         self.individual_mute_state.get() == StableMuteState::Muted.into()
     }
 
-    /// Checks whether [`MuteStateController`] is in [`MuteState::NotMuted`].
-    pub fn is_not_muted(&self) -> bool {
+    /// Checks whether [`MuteStateController`]'s individual mute state is in
+    /// [`MuteState::NotMuted`].
+    pub fn is_not_individual_muted(&self) -> bool {
         self.individual_mute_state.get() == StableMuteState::NotMuted.into()
     }
 

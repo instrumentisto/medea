@@ -737,7 +737,7 @@ impl InnerRoom {
                 let senders = peer.get_muteable_tracks(kind, direction);
 
                 let senders_to_mute = senders.into_iter().filter(|sender| {
-                    match sender.mute_state() {
+                    match sender.individual_mute_state() {
                         MuteState::Transition(t) => {
                             t.intended() != desired_state
                         }

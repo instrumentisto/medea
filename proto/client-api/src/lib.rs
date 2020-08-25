@@ -140,8 +140,12 @@ pub enum ClientMsg {
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
+        /// [`PeerId`] of the `Peer` for which Web Client sends SDP Offer.
         peer_id: PeerId,
+
+        /// SDP Offer of the `Peer`.
         sdp_offer: String,
+
         /// Associations between [`Track`] and transceiver's
         /// [media description][1].
         ///
@@ -149,15 +153,20 @@ pub enum Command {
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
-        /// Publishing statuses of the senders from this Peer.
+
+        /// Statuses of the transceivers.
         transceiver_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
+        /// [`PeerId`] of the `Peer` for which Web Client sends SDP Answer.
         peer_id: PeerId,
+
+        /// SDP Answer of the `Peer`.
         sdp_answer: String,
-        /// Publishing statuses of the senders from this Peer.
+
+        /// Statuses of the transceivers.
         transceiver_statuses: HashMap<TrackId, bool>,
     },
 
@@ -365,7 +374,8 @@ impl Track {
     }
 }
 
-/// Path to existing [`Track`] and field which can be updated.
+/// Patch of the [`Track`] which client can request with
+/// [`Command::UpdateTracks`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[derive(Eq, PartialEq)]
@@ -374,11 +384,32 @@ pub struct ClientTrackPatch {
     pub is_muted: Option<bool>,
 }
 
+/// Patch of the [`Track`] which server can send with [`Event::TracksApplied`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct ServerTrackPatch {
+    /// Id of the [`Track`] which should be patched.
     pub id: TrackId,
+
+    /// Mute state of the concrete `Member`.
+    ///
+    /// This state doesn't indicates that connection between two `Member`s are
+    /// really muted. This is intention of this `Member`.
+    ///
+    /// On this mute, client __should__ replace `MediaStreamTrack` with `None`
+    /// in the `Transceiver` for the send direction.
     pub is_muted_individual: Option<bool>,
+
+    /// Mute state of the connection between `Member`s.
+    ///
+    /// This state indicates real mute state between `Member`s. But this state
+    /// doesn't changes intention of this `Member`.
+    ///
+    /// So intention of this `Member` (`is_muted_individual`) can be `false`,
+    /// but real mute state can be `true`.
+    ///
+    /// On this mute, client should __not__ replace `MediaStreamTrack` with
+    /// `None` in the `Transceiver` for the send direction.
     pub is_muted_general: Option<bool>,
 }
 

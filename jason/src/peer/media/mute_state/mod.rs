@@ -1,4 +1,4 @@
-//! [`PeerConnection`]s [`Sender`] mute state.
+//! [`PeerConnection`]s [`MuteableTrack`] mute state.
 //!
 //! [`PeerConnection`]: crate::peer::PeerConnection
 
@@ -8,9 +8,9 @@ use derive_more::From;
 
 pub use self::controller::MuteStateController;
 
-/// All mute states in which [`Sender`] can be.
+/// All mute states in which [`MuteableTrack`] can be.
 ///
-/// [`Sender`]: super::Sender
+/// [`MuteableTrack`]: super::MuteableTrack
 #[derive(Clone, Copy, Debug, From, Eq, PartialEq)]
 pub enum MuteState {
     /// State of transition.
@@ -71,14 +71,14 @@ impl MuteState {
 /// Stable [`MuteState`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMuteState {
-    /// [`Sender`] is not muted.
+    /// [`MuteableTrack`] is not muted.
     ///
-    /// [`Sender`]: super::Sender
+    /// [`MuteableTrack`]: super::MuteableTrack
     NotMuted,
 
-    /// [`Sender`] is muted.
+    /// [`MuteableTrack`] is muted.
     ///
-    /// [`Sender`]: super::Sender
+    /// [`MuteableTrack`]: super::MuteableTrack
     Muted,
 }
 
@@ -116,14 +116,14 @@ impl From<bool> for StableMuteState {
 /// [`StableMuteState`] will be applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MuteStateTransition {
-    /// [`Sender`] should be unmuted, but awaits server permission.
+    /// [`MuteableTrack`] should be unmuted, but awaits server permission.
     ///
-    /// [`Sender`]: super::Sender
+    /// [`MuteableTrack`]: super::MuteableTrack
     Unmuting(StableMuteState),
 
-    /// [`Sender`] should be muted, but awaits server permission.
+    /// [`MuteableTrack`] should be muted, but awaits server permission.
     ///
-    /// [`Sender`]: super::Sender
+    /// [`MuteableTrack`]: super::MuteableTrack
     Muting(StableMuteState),
 }
 

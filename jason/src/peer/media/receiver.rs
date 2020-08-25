@@ -143,23 +143,24 @@ impl Receiver {
     pub fn set_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
-        track: RtcMediaStreamTrack,
+        new_track: RtcMediaStreamTrack,
     ) {
         let mut inner = self.0.borrow_mut();
 
         if let Some(old_track) = &inner.track {
-            if old_track.id() == track.id() {
+            if old_track.id() == new_track.id() {
                 return;
             }
         }
 
-        let track = MediaStreamTrack::from(track);
+        let new_track = MediaStreamTrack::from(new_track);
 
         transceiver.set_direction(inner.transceiver_direction.into());
-        track.set_enabled(inner.mute_state_controller.is_not_muted());
+        new_track
+            .set_enabled(inner.mute_state_controller.is_not_general_muted());
 
         inner.transceiver.replace(transceiver);
-        inner.track.replace(track);
+        inner.track.replace(new_track);
         inner.maybe_notify_track();
     }
 
@@ -203,7 +204,7 @@ impl Receiver {
 impl InnerReceiver {
     /// Returns `true` if this [`Receiver`] is receives media data.
     fn is_receiving(&self) -> bool {
-        if self.mute_state_controller.is_muted() {
+        if self.mute_state_controller.is_general_muted() {
             return false;
         }
         if self.transceiver.is_none() {
@@ -226,7 +227,7 @@ impl InnerReceiver {
         if !self.is_receiving() {
             return;
         }
-        if self.mute_state_controller.is_muted() {
+        if self.mute_state_controller.is_general_muted() {
             return;
         }
         if let Some(track) = &self.track {

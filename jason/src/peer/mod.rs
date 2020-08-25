@@ -524,8 +524,8 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
-    /// [`TransceiverKind`].
+    /// Returns all [`MuteableTrack`]s from this [`PeerConnection`] with
+    /// provided [`TransceiverKind`] and [`TrackDirection`].
     #[inline]
     pub fn get_muteable_tracks(
         &self,
