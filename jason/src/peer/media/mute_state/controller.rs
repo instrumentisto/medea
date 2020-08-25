@@ -30,9 +30,13 @@ pub struct MuteStateController {
 
     /// All subscribers on the [`MuteStateController::general_mute_state`]
     /// changes.
-    on_finalized_subs: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
+    on_general_update_subs:
+        RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
 
-    on_individual_update: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
+    /// All subscribers on the [`MuteStateController::individual_mute_state`]
+    /// changes.
+    on_individual_update_subs:
+        RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
 }
 
 impl MuteStateController {
@@ -46,8 +50,8 @@ impl MuteStateController {
         let this = Rc::new(Self {
             general_mute_state: ObservableCell::new(mute_state),
             individual_mute_state: ObservableCell::new(mute_state.into()),
-            on_finalized_subs: RefCell::default(),
-            on_individual_update: RefCell::default(),
+            on_general_update_subs: RefCell::default(),
+            on_individual_update_subs: RefCell::default(),
             mute_timeout_handle: RefCell::new(None),
         });
         this.clone().spawn();
@@ -57,16 +61,18 @@ impl MuteStateController {
 
     /// Returns [`Stream`] to which all
     /// [`MuteStateController::general_mute_state`]s will be sent.
-    pub fn on_finalized(&self) -> LocalBoxStream<'static, StableMuteState> {
+    pub fn on_general_update(
+        &self,
+    ) -> LocalBoxStream<'static, StableMuteState> {
         let (tx, rx) = mpsc::unbounded();
-        self.on_finalized_subs.borrow_mut().push(tx);
+        self.on_general_update_subs.borrow_mut().push(tx);
 
         Box::pin(rx)
     }
 
     /// Sends [`MuteStateController::general_mute_state`] update.
-    fn send_finalized_state(&self, state: StableMuteState) {
-        let mut on_finalize_subs = self.on_finalized_subs.borrow_mut();
+    fn send_general_update(&self, state: StableMuteState) {
+        let mut on_finalize_subs = self.on_general_update_subs.borrow_mut();
         *on_finalize_subs = on_finalize_subs
             .drain(..)
             .filter(|s| s.unbounded_send(state).is_ok())
@@ -79,14 +85,15 @@ impl MuteStateController {
         &self,
     ) -> LocalBoxStream<'static, StableMuteState> {
         let (tx, rx) = mpsc::unbounded();
-        self.on_individual_update.borrow_mut().push(tx);
+        self.on_individual_update_subs.borrow_mut().push(tx);
 
         Box::pin(rx)
     }
 
     /// Sends [`MuteStateController::individual_mute_state`] update.
     fn send_individual_update(&self, state: StableMuteState) {
-        let mut on_individual_update = self.on_individual_update.borrow_mut();
+        let mut on_individual_update =
+            self.on_individual_update_subs.borrow_mut();
         *on_individual_update = on_individual_update
             .drain(..)
             .filter(|s| s.unbounded_send(state).is_ok())
@@ -108,7 +115,7 @@ impl MuteStateController {
                     general_mute_state_changes.next().await
                 {
                     if let Some(this) = weak_this.upgrade() {
-                        this.send_finalized_state(mute_state);
+                        this.send_general_update(mute_state);
                     }
                 }
             }

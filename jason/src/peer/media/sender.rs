@@ -56,7 +56,8 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
-        let mut finalized_mute_state_rx = mute_state_observer.on_finalized();
+        let mut finalized_mute_state_rx =
+            mute_state_observer.on_general_update();
         let mut individual_mute_state_rx =
             mute_state_observer.on_individual_update();
         let this = Rc::new(Sender {
@@ -107,7 +108,7 @@ impl<'a> SenderBuilder<'a> {
                             StableMuteState::Muted => {
                                 this.disable().await;
                             }
-                            _ => (),
+                            StableMuteState::NotMuted => (),
                         }
                     } else {
                         break;

@@ -296,3 +296,97 @@ mod sender_patch {
         assert!(!sender.is_muted());
     }
 }
+
+mod receiver_patch {
+    use medea_jason::peer::{PeerEvent, Receiver};
+
+    use super::*;
+    use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
+    use medea_jason::media::RecvConstraints;
+
+    const TRACK_ID: TrackId = TrackId(0);
+    const MID: &str = "mid";
+    const SENDER_ID: &str = "sender";
+
+    fn get_receiver() -> (Rc<Receiver>, mpsc::UnboundedReceiver<PeerEvent>) {
+        let (tx, rx) = mpsc::unbounded();
+        let recv = Receiver::new(
+            TRACK_ID,
+            &(MediaType::Audio(AudioSettings { is_required: true }).into()),
+            MemberId(SENDER_ID.to_string()),
+            &Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
+            Some(MID.to_string()),
+            tx,
+            &RecvConstraints::default(),
+        );
+
+        (recv, rx)
+    }
+
+    #[wasm_bindgen_test]
+    async fn wrong_track_id() {
+        let (receiver, _tx) = get_receiver();
+        receiver.update(&ServerTrackPatch {
+            id: TrackId(TRACK_ID.0 + 100),
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
+        });
+
+        assert!(!receiver.is_muted());
+    }
+
+    #[wasm_bindgen_test]
+    async fn mute() {
+        let (receiver, _tx) = get_receiver();
+        receiver.update(&ServerTrackPatch {
+            id: TRACK_ID,
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
+        });
+
+        assert!(receiver.is_muted());
+    }
+
+    #[wasm_bindgen_test]
+    async fn unmute_unmuted() {
+        let (receiver, _tx) = get_receiver();
+        receiver.update(&ServerTrackPatch {
+            id: TRACK_ID,
+            is_muted_individual: Some(false),
+            is_muted_general: Some(false),
+        });
+
+        assert!(!receiver.is_muted());
+    }
+
+    #[wasm_bindgen_test]
+    async fn mute_muted() {
+        let (receiver, _tx) = get_receiver();
+        receiver.update(&ServerTrackPatch {
+            id: TRACK_ID,
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
+        });
+        assert!(receiver.is_muted());
+
+        receiver.update(&ServerTrackPatch {
+            id: TRACK_ID,
+            is_muted_individual: Some(true),
+            is_muted_general: Some(true),
+        });
+
+        assert!(receiver.is_muted());
+    }
+
+    #[wasm_bindgen_test]
+    async fn empty_patch() {
+        let (receiver, _tx) = get_receiver();
+        receiver.update(&ServerTrackPatch {
+            id: TRACK_ID,
+            is_muted_individual: None,
+            is_muted_general: None,
+        });
+
+        assert!(!receiver.is_muted());
+    }
+}

@@ -60,7 +60,7 @@ impl Receiver {
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
-    pub(super) fn new(
+    pub fn new(
         track_id: TrackId,
         caps: &TrackConstraints,
         sender_id: MemberId,
@@ -84,7 +84,8 @@ impl Receiver {
             Some(_) => None,
         };
         let mute_state_controller = MuteStateController::new(muted.into());
-        let mut on_finalized_mute_state = mute_state_controller.on_finalized();
+        let mut on_finalized_mute_state =
+            mute_state_controller.on_general_update();
         let this: Rc<Self> = Rc::new(Self(RefCell::new(InnerReceiver {
             track_id,
             sender_id,
@@ -164,17 +165,15 @@ impl Receiver {
 
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
     pub fn update(&self, track_patch: &ServerTrackPatch) {
+        let inner = self.0.borrow();
+        if inner.track_id != track_patch.id {
+            return;
+        }
         if let Some(is_muted_general) = track_patch.is_muted_general {
-            self.0
-                .borrow()
-                .mute_state_controller
-                .update_general(is_muted_general);
+            inner.mute_state_controller.update_general(is_muted_general);
         }
         if let Some(is_muted) = track_patch.is_muted_individual {
-            self.0
-                .borrow()
-                .mute_state_controller
-                .update_individual(is_muted);
+            inner.mute_state_controller.update_individual(is_muted);
         }
     }
 

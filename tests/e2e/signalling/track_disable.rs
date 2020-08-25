@@ -1,6 +1,6 @@
 use std::{cell::Cell, rc::Rc, time::Duration};
 
-use actix::{Addr, AsyncContext};
+use actix::{ActorContext, Addr, AsyncContext};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver},
     future, Stream, StreamExt,
@@ -113,7 +113,7 @@ async fn track_disables_and_enables() {
             publisher_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -124,7 +124,7 @@ async fn track_disables_and_enables() {
             subscriber_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -199,7 +199,7 @@ async fn track_disables_and_enables_are_instant() {
             let _ = publisher_tx.unbounded_send(event.clone());
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -211,7 +211,7 @@ async fn track_disables_and_enables_are_instant() {
             let _ = subscriber_tx.unbounded_send(event.clone());
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -311,7 +311,7 @@ async fn track_disables_and_enables_are_instant2() {
             first_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         false,
     )
     .await;
@@ -323,7 +323,7 @@ async fn track_disables_and_enables_are_instant2() {
             second_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         false,
     )
     .await;
@@ -471,7 +471,7 @@ async fn force_update_works() {
                 pub_con_established_tx.unbounded_send(()).unwrap()
             }
         })),
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -519,7 +519,7 @@ async fn force_update_works() {
             _ => {}
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -531,4 +531,228 @@ async fn force_update_works() {
     .await;
     force_update.unwrap().unwrap();
     renegotiation_update.unwrap().unwrap();
+}
+
+use std::sync::atomic::{AtomicU8, Ordering};
+
+#[actix_rt::test]
+async fn individual_mutes_works_fine() {
+    const TEST_NAME: &str = "individual_mutes_works_fine";
+    const STAGE1_PROGRESS: AtomicU8 = AtomicU8::new(0);
+    const STAGE2_PROGRESS: AtomicU8 = AtomicU8::new(0);
+    const STAGE3_PROGRESS: AtomicU8 = AtomicU8::new(0);
+
+    let mut client = ControlClient::new().await;
+    let credentials = client.create(create_room_req(TEST_NAME)).await;
+
+    let (test_finish_tx, mut test_finish_rx) = mpsc::unbounded();
+
+    let responder = TestMember::connect(
+        credentials.get("responder").unwrap(),
+        Some({
+            let test_finish_tx = test_finish_tx.clone();
+            let mut stage1 = false;
+            let mut stage2 = false;
+            let mut stage3 = false;
+
+            Box::new(move |event, ctx, _| match event {
+                Event::TracksApplied {
+                    peer_id, updates, ..
+                } => {
+                    assert_eq!(peer_id, &PeerId(1));
+                    let update = updates.last().unwrap();
+                    match update {
+                        TrackUpdate::Updated(patch) => {
+                            if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
+                                && !stage1
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, Some(true));
+                                assert_eq!(patch.is_muted_individual, None);
+
+                                ctx.notify(SendCommand(
+                                    Command::UpdateTracks {
+                                        peer_id: PeerId(1),
+                                        tracks_patches: vec![
+                                            ClientTrackPatch {
+                                                id: TrackId(0),
+                                                is_muted: Some(true),
+                                            },
+                                        ],
+                                    },
+                                ));
+
+                                STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                stage1 = true;
+                            } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && !stage2
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, Some(true));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(true)
+                                );
+
+                                STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                stage2 = true;
+                            } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && !stage3
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, None);
+                                assert_eq!(patch.is_muted_individual, None);
+
+                                ctx.notify(SendCommand(
+                                    Command::UpdateTracks {
+                                        peer_id: PeerId(1),
+                                        tracks_patches: vec![
+                                            ClientTrackPatch {
+                                                id: TrackId(0),
+                                                is_muted: Some(false),
+                                            },
+                                        ],
+                                    },
+                                ));
+
+                                STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                stage3 = true;
+                            } else {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, Some(false));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(false)
+                                );
+
+                                test_finish_tx.unbounded_send(()).unwrap();
+                                ctx.stop();
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            })
+        }),
+        None,
+        TestMember::DEFAULT_DEADLINE,
+        true,
+    )
+    .await;
+    let publisher = TestMember::connect(
+        credentials.get("publisher").unwrap(),
+        Some(Box::new({
+            let mut is_inited = false;
+            let mut is_individual_muted = false;
+            let mut stage1 = false;
+            let mut stage2 = false;
+            let mut stage3 = false;
+
+            move |event, ctx, _| match event {
+                Event::IceCandidateDiscovered { peer_id, .. } => {
+                    assert_eq!(peer_id, &PeerId(0));
+                    if !is_inited {
+                        ctx.notify(SendCommand(Command::UpdateTracks {
+                            peer_id: PeerId(0),
+                            tracks_patches: vec![ClientTrackPatch {
+                                id: TrackId(0),
+                                is_muted: Some(true),
+                            }],
+                        }));
+                        is_inited = true;
+                    }
+                }
+                Event::TracksApplied { updates, .. } => {
+                    let update = updates.last().unwrap();
+                    match update {
+                        TrackUpdate::Updated(patch) => {
+                            if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
+                                && !stage1
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(true)
+                                );
+                                assert_eq!(patch.is_muted_general, Some(true));
+
+                                STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                stage1 = true;
+                            } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && !stage2
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_individual, None);
+                                assert_eq!(patch.is_muted_general, Some(true));
+
+                                ctx.notify(SendCommand(
+                                    Command::UpdateTracks {
+                                        peer_id: PeerId(0),
+                                        tracks_patches: vec![
+                                            ClientTrackPatch {
+                                                id: TrackId(0),
+                                                is_muted: Some(false),
+                                            },
+                                        ],
+                                    },
+                                ));
+
+                                STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                stage2 = true;
+                            } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && stage3
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(false)
+                                );
+                                assert_eq!(patch.is_muted_general, None);
+
+                                STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                stage3 = true;
+                            } else {
+                                assert_eq!(patch.id, TrackId(0));
+                                if !is_individual_muted {
+                                    assert_eq!(
+                                        patch.is_muted_individual,
+                                        Some(false)
+                                    );
+                                    assert_eq!(
+                                        patch.is_muted_general,
+                                        Some(true)
+                                    );
+
+                                    is_individual_muted = true;
+                                } else {
+                                    assert_eq!(
+                                        patch.is_muted_general,
+                                        Some(false)
+                                    );
+                                    assert_eq!(patch.is_muted_individual, None);
+
+                                    test_finish_tx.unbounded_send(()).unwrap();
+
+                                    ctx.stop();
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            }
+        })),
+        None,
+        TestMember::DEFAULT_DEADLINE,
+        true,
+    )
+    .await;
+
+    test_finish_rx.skip(1).next().await.unwrap();
 }
