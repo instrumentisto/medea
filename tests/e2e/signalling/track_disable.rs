@@ -1,6 +1,7 @@
 use std::{cell::Cell, rc::Rc, time::Duration};
 
 use actix::{ActorContext, Addr, AsyncContext};
+use function_name::named;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver},
     future, Stream, StreamExt,
@@ -20,6 +21,7 @@ use crate::{
     signalling::{
         handle_peer_created, ConnectionEvent, SendCommand, TestMember,
     },
+    test_name,
 };
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
@@ -100,11 +102,10 @@ async fn helper(
 /// Creates `pub => sub` `Room`, and publisher disables and enables his tracks
 /// multiple times.
 #[actix_rt::test]
+#[named]
 async fn track_disables_and_enables() {
-    const TEST_NAME: &str = "track_disable";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -148,8 +149,8 @@ async fn track_disables_and_enables() {
 /// Tests that track disabled and enables will be performed instantly and will
 /// not wait for renegotiation finish.
 #[actix_rt::test]
+#[named]
 async fn track_disables_and_enables_are_instant() {
-    const TEST_NAME: &str = "track_disables_and_enables_are_instant";
     const EVENTS_COUNT: usize = 100;
 
     fn filter_events(
@@ -190,7 +191,7 @@ async fn track_disables_and_enables_are_instant() {
     }
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -278,11 +279,10 @@ async fn track_disables_and_enables_are_instant() {
 }
 
 #[actix_rt::test]
+#[named]
 async fn track_disables_and_enables_are_instant2() {
-    const TEST_NAME: &str = "track_disables_and_enables_are_instant2";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
     client
         .create(
             WebRtcPublishEndpointBuilder::default()
@@ -290,17 +290,17 @@ async fn track_disables_and_enables_are_instant2() {
                 .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
                 .build()
                 .unwrap()
-                .build_request(format!("{}/responder", TEST_NAME)),
+                .build_request(format!("{}/responder", test_name!())),
         )
         .await;
     client
         .create(
             WebRtcPlayEndpointBuilder::default()
                 .id("play")
-                .src(format!("local://{}/responder/publish", TEST_NAME))
+                .src(format!("local://{}/responder/publish", test_name!()))
                 .build()
                 .unwrap()
-                .build_request(format!("{}/publisher", TEST_NAME)),
+                .build_request(format!("{}/publisher", test_name!())),
         )
         .await;
 
@@ -415,11 +415,10 @@ async fn track_disables_and_enables_are_instant2() {
 /// Checks that force update mechanism works for muting and renegotiation after
 /// force update will be performed.
 #[actix_rt::test]
+#[named]
 async fn force_update_works() {
-    const TEST_NAME: &str = "force_update_works";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (pub_con_established_tx, mut pub_con_established_rx) =
         mpsc::unbounded();
@@ -538,14 +537,14 @@ use std::sync::atomic::{AtomicU8, Ordering};
 /// Checks that server validly switches individual and general mute states based
 /// on client's commands.
 #[actix_rt::test]
+#[named]
 async fn individual_and_general_mute_states_works() {
-    const TEST_NAME: &str = "individual_and_general_mute_states_works";
     const STAGE1_PROGRESS: AtomicU8 = AtomicU8::new(0);
     const STAGE2_PROGRESS: AtomicU8 = AtomicU8::new(0);
     const STAGE3_PROGRESS: AtomicU8 = AtomicU8::new(0);
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (test_finish_tx, test_finish_rx) = mpsc::unbounded();
 

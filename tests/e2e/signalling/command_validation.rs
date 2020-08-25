@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use actix::Context;
+use function_name::named;
 use futures::{channel::mpsc::unbounded, StreamExt as _};
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId};
 use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
@@ -11,18 +12,18 @@ use crate::{
         WebRtcPublishEndpointBuilder,
     },
     signalling::{SendCommand, TestMember},
+    test_name,
 };
 
 /// Tests server commands validation, sending multiple invalid messages and
 /// asserting that they were not relayed to other users.
 #[actix_rt::test]
+#[named]
 async fn command_validation() {
-    const TEST_NAME: &str = "command_validation";
-
     let control_client = Rc::new(RefCell::new(ControlClient::new().await));
 
     let create_room = RoomBuilder::default()
-        .id(TEST_NAME)
+        .id(test_name!())
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -44,7 +45,10 @@ async fn command_validation() {
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
-                        .src(format!("local://{}/publisher/publish", TEST_NAME))
+                        .src(format!(
+                            "local://{}/publisher/publish",
+                            test_name!()
+                        ))
                         .build()
                         .unwrap(),
                 )
@@ -60,7 +64,7 @@ async fn command_validation() {
     let (tx1, mut rx1) = unbounded();
     let deadline = Some(std::time::Duration::from_secs(5));
     let member1 = TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
+        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(
             move |event: &Event,
                   _: &mut Context<TestMember>,
@@ -76,7 +80,7 @@ async fn command_validation() {
 
     let (tx2, mut rx2) = unbounded();
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME),
+        format!("ws://127.0.0.1:8080/ws/{}/responder/test", test_name!()),
         Some(Box::new(
             move |event: &Event,
                   _: &mut Context<TestMember>,
