@@ -9,7 +9,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
@@ -38,7 +38,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use futures::future::LocalBoxFuture;
 
 /// Jason's `MediaStreamTrack` representation.
 pub trait Track {
@@ -300,10 +299,7 @@ impl MediaConnections {
             TrackDirection::Send => {
                 collect_muteable_tracks(inner.senders.values(), kind)
             }
-            TrackDirection::Recv => {
-                todo!()
-                // collect_muteable_tracks(inner.receivers.values(), kind)
-            }
+            TrackDirection::Recv => todo!(),
         }
     }
 
@@ -324,15 +320,7 @@ impl MediaConnections {
                     }
                 }
             }
-            TrackDirection::Recv => {
-                todo!()
-                // for receiver in
-                // self.0.borrow().iter_receivers_with_kind(kind) {
-                //     if receiver.individual_mute_state() != mute_state.into()
-                // {         return false;
-                //     }
-                // }
-            }
+            TrackDirection::Recv => todo!(),
         }
 
         true

@@ -17,7 +17,7 @@ use medea_jason::{
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{
         MockPeerRepository, PeerConnection, Repository, StableMuteState,
-        TransceiverKind,
+        TrackDirection, TransceiverKind,
     },
     rpc::MockRpcClient,
     utils::JasonError,
@@ -31,7 +31,6 @@ use crate::{
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, MockNavigator,
 };
-use medea_jason::peer::TrackDirection;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
