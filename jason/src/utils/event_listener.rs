@@ -5,7 +5,10 @@ use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;
 
-use crate::utils::{console_error, errors::JsCaused, JsError};
+use crate::{
+    log::console_error,
+    utils::{errors::JsCaused, JsError},
+};
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///

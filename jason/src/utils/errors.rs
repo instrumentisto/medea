@@ -8,17 +8,9 @@ use derive_more::{Display, From};
 use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
-pub use medea_macro::JsCaused;
+use crate::log::console_error;
 
-/// Prints provided message with [`Console.error()`].
-///
-/// [`Console.error()`]: https://tinyurl.com/psv3wqw
-pub fn console_error<M>(msg: M)
-where
-    M: Into<JsValue>,
-{
-    web_sys::console::error_1(&msg.into());
-}
+pub use medea_macro::JsCaused;
 
 /// Representation of an error which can caused by error returned from the
 /// JS side.

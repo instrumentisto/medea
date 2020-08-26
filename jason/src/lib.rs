@@ -12,6 +12,7 @@
 pub mod utils;
 
 pub mod api;
+pub mod log;
 pub mod media;
 pub mod peer;
 pub mod rpc;

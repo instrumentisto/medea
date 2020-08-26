@@ -20,8 +20,7 @@ use web_sys::Window;
 pub use self::{
     callback::{Callback0, Callback1, Callback2},
     errors::{
-        console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
-        JsonParseError,
+        HandlerDetachedError, JasonError, JsCaused, JsError, JsonParseError,
     },
     event_listener::{EventListener, EventListenerBindError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
