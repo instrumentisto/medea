@@ -92,7 +92,6 @@ impl PeersMetricsEventHandler for Room {
     }
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
-    #[allow(clippy::filter_map)]
     fn on_traffic_flows(
         &mut self,
         _: PeerId,
@@ -110,11 +109,6 @@ impl PeersMetricsEventHandler for Room {
         partner_member_id: MemberId,
         quality_score: EstimatedConnectionQuality,
     ) -> Self::Output {
-        debug!(
-            "[{} <-> {}] Quality score: {}",
-            member_id, partner_member_id, quality_score
-        );
-
         self.members.send_event_to_member(
             member_id,
             Event::QualityScoreUpdated {

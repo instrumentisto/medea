@@ -1,278 +1,116 @@
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     time::{Duration, SystemTime},
 };
 
 use derive_more::Display;
 use medea_client_api_proto::stats::StatId;
 
-/// Burns outdated stats from the provided [`Vec`].
-fn burn<T>(stats: &mut Vec<BurningStat<T>>) {
-    let burned_stats = std::mem::replace(stats, Vec::new());
-
-    *stats = burned_stats
-        .into_iter()
-        .filter(|s| !s.should_be_burned())
-        .collect();
-}
-
 /// Estimated connection quality.
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Display)]
+#[derive(Clone, Copy, Debug, Display, Eq, Ord, PartialEq, PartialOrd)]
 pub enum EstimatedConnectionQuality {
-    /// All users are dissatisfied.
-    AllDissatisfied = 1,
+    /// Nearly all users dissatisfied.
+    Poor = 1,
 
-    /// Many users are dissatisfied.
-    ManyDissatisfied = 2,
+    /// Many users dissatisfied.
+    Low = 2,
 
-    /// Some users are dissatisfied.
-    SomeDissatisfied = 3,
+    /// Some users dissatisfied.
+    Medium = 3,
 
-    /// All users are satisfied.
-    Satisfied = 4,
-}
-
-impl TryFrom<u8> for EstimatedConnectionQuality {
-    type Error = ();
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
-            1 => Self::AllDissatisfied,
-            2 => Self::ManyDissatisfied,
-            3 => Self::SomeDissatisfied,
-            4 => Self::Satisfied,
-            _ => return Err(()),
-        })
-    }
-}
-
-impl EstimatedConnectionQuality {
-    /// Returns average [`EstimatedConnectionQuality`] between two
-    /// [`EstimatedConnectionQuality`].
-    pub fn avg(first: Self, second: Self) -> Self {
-        // Should never panic.
-        Self::try_from(((first as u8) + (second as u8)) / 2).unwrap()
-    }
+    /// Satisfied.
+    High = 4,
 }
 
 /// Calculator of the [`EstimatedConnectionQuality`] score based on RTC stats.
 #[derive(Debug)]
 pub struct QualityMeter {
+    stats_ttl: Duration,
+
     /// Round trip time stats.
-    rtt: Vec<BurningStat<Rtt>>,
+    rtt: Vec<ExpiringStat<Rtt>>,
 
-    /// Jitter stats.
-    ///
-    /// This kind of stats are separated by [`StatId`], but will be united on
-    /// calculation phase.
-    jitter: HashMap<StatId, Vec<BurningStat<Jitter>>>,
+    jitter: Vec<ExpiringStat<Jitter>>,
 
-    /// Packet loss stats in percents (0..100).
-    ///
-    /// This kind of stats are separated by [`StatId`], but will be united on
-    /// calculation phase.
-    ///
-    /// Calculated based on `packetsReceived` and `packetsLost`.
-    packet_loss: HashMap<StatId, Vec<BurningStat<PacketLoss>>>,
+    packets_lost: HashMap<StatId, Vec<ExpiringStat<PacketLost>>>,
 
-    /// Last packets lost count for the all [`StatId`]s.
-    last_packets_lost: HashMap<StatId, u64>,
-
-    /// Last total packets count for the all [`StatId`]s.
-    last_total_packets: HashMap<StatId, u64>,
+    packets_sent: HashMap<StatId, Vec<ExpiringStat<PacketsSent>>>,
 }
 
 impl QualityMeter {
-    const CODEC_DELAY: f64 = 10.0;
-    const JITTER_FACTOR: f64 = 2.0;
+    /// Estimated delay introduced by codec used.
+    const CODEC_DELAY: f64 = 10.;
+    /// Jitter multiplier used when calculation effective latency.
+    const JITTER_FACTOR: f64 = 2.;
+    /// Estimated packet loss multiplier.
     const P_LOSS_FACTOR: f64 = 2.5;
+    /// `R0` is the basic signal to noise ratio, including noise sources such
+    /// as circuit and room noise. However, currently it is really difficult
+    /// to calculate directly. Thus, [ITU-T G.113] provides the common value.
+    ///
+    ///  [ITU-T G.113]: https://www.itu.int/rec/T-REC-G.113
     const R0: f64 = 93.2;
-    const R_LOWER_LIMIT_ALL_DISSATISFIED: f64 = 50.0;
-    const R_LOWER_LIMIT_MANY_DISSATISFIED: f64 = 60.0;
-    const R_LOWER_LIMIT_SOME_DISSATISFIED: f64 = 70.0;
+    /// Relationship between R-value and user's satisfaction is taken from
+    /// [ITU-T G.107].
+    ///
+    /// [ITU-T G.107]: https://www.itu.int/rec/T-REC-G.107
+    const R_LOWER_LIMIT_HIGH: f64 = 80.;
+    const R_LOWER_LIMIT_LOW: f64 = 60.;
+    const R_LOWER_LIMIT_MEDIUM: f64 = 70.;
 
     /// Returns new empty [`QualityMeter`].
-    pub fn new() -> Self {
+    pub fn new(stats_ttl: Duration) -> Self {
         Self {
+            stats_ttl,
             rtt: Vec::new(),
-            jitter: HashMap::new(),
-            packet_loss: HashMap::new(),
-            last_packets_lost: HashMap::new(),
-            last_total_packets: HashMap::new(),
+            jitter: Vec::new(),
+            packets_lost: HashMap::new(),
+            packets_sent: HashMap::new(),
         }
     }
 
     /// Adds new round trip time measurement.
-    pub fn add_rtt(&mut self, timestamp: SystemTime, rtt: u64) {
-        self.rtt.push(BurningStat::new(Rtt(rtt), timestamp));
+    pub fn add_rtt(&mut self, rtt_ms: u64) {
+        self.rtt
+            .push(ExpiringStat::new(Rtt(rtt_ms), self.stats_ttl));
     }
 
     /// Adds new jitter measurement.
-    pub fn add_jitter(
-        &mut self,
-        timestamp: SystemTime,
-        stat_id: StatId,
-        jitter: u64,
-    ) {
+    pub fn add_jitter(&mut self, jitter_ms: u64) {
         self.jitter
+            .push(ExpiringStat::new(Jitter(jitter_ms), self.stats_ttl));
+    }
+
+    /// Adds new packets sent measurement.
+    pub fn add_packets_sent(&mut self, stat_id: StatId, packets_sent: u64) {
+        self.packets_sent
             .entry(stat_id)
             .or_default()
-            .push(BurningStat::new(Jitter(jitter), timestamp));
+            .push(ExpiringStat::new(PacketsSent(packets_sent), self.stats_ttl));
     }
 
-    /// Adds packet loss stat based on the provided `packetsLost` and
-    /// `packetsReceived` stats.
-    pub fn add_packet_loss(
-        &mut self,
-        timestamp: SystemTime,
-        stat_id: StatId,
-        packets_lost: u64,
-        packets_received: u64,
-    ) {
-        let total_packets = packets_received + packets_lost;
-        let last_packets_lost = if let Some(last_packets_lost) =
-            self.last_packets_lost.get(&stat_id)
-        {
-            if *last_packets_lost > packets_lost {
-                return;
-            } else {
-                *last_packets_lost
-            }
-        } else {
-            0
-        };
-        let last_total_packets = if let Some(last_total_packets) =
-            self.last_total_packets.get(&stat_id)
-        {
-            if *last_total_packets > total_packets {
-                return;
-            } else {
-                *last_total_packets
-            }
-        } else {
-            0
-        };
-
-        let packet_loss_at_period = packets_lost - last_packets_lost;
-        let total_packets_at_period = total_packets - last_total_packets;
-        self.last_total_packets
-            .insert(stat_id.clone(), total_packets);
-        self.last_packets_lost.insert(stat_id.clone(), packets_lost);
-        if total_packets_at_period == 0 {
-            return;
-        }
-
-        #[allow(clippy::cast_precision_loss)]
-        let packet_loss =
-            (packet_loss_at_period as f64) / (total_packets_at_period as f64);
-
-        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-        self.packet_loss
+    /// Adds new packets lost measurement.
+    pub fn add_packets_lost(&mut self, stat_id: StatId, packets_lost: u64) {
+        self.packets_lost
             .entry(stat_id)
             .or_default()
-            .push(BurningStat::new(
-                PacketLoss((packet_loss * 100.0) as u64),
-                timestamp,
-            ));
+            .push(ExpiringStat::new(PacketLost(packets_lost), self.stats_ttl));
     }
 
-    /// Burns all outdated stats from this [`QualityMeter`].
-    fn burn_stats(&mut self) {
-        burn(&mut self.rtt);
-        self.jitter.values_mut().for_each(burn);
-        self.packet_loss.values_mut().for_each(burn);
-    }
-
-    /// Returns average round trip time.
+    /// Returns [`EstimatedConnectionQuality`] based on accumulated stats.
+    /// Returns `None` if there are not enough data to make calculations.
     ///
-    /// Returns `None` if [`QualityMeter`] doesn't have any round trip time
-    /// stats.
-    fn average_latency(&self) -> Option<f64> {
-        if self.rtt.is_empty() {
-            return None;
-        }
-
-        #[allow(clippy::cast_precision_loss)]
-        Some(
-            self.rtt.iter().map(|s| s.stat.0 as f64).sum::<f64>()
-                / (self.rtt.len() as f64),
-        )
-    }
-
-    /// Returns average jitter value based on the all jitter stats from
-    /// [`QualityMeter`].
+    /// [Algorithm-MOS] is used to calculate [`EstimatedConnectionQuality`],
+    /// which is derived from E-model, introduced in [ITU-T G.107] with some
+    /// simplifications and tweaks.
     ///
-    /// Returns `None` if [`QualityMeter`] doesn't have any jitter stats.
-    fn jitter(&self) -> Option<f64> {
-        let jitter: Vec<u64> = self
-            .jitter
-            .values()
-            .filter_map(|jitter| {
-                let mut jitter_iter = jitter.iter();
-                let mut prev = jitter_iter.next().map(|s| s.stat.0)?;
-                Some(jitter_iter.map(|j| j.stat.0).fold(0, |acc, val| {
-                    let out = if prev > val {
-                        acc + prev - val
-                    } else {
-                        acc + val - prev
-                    };
-                    prev = val;
-
-                    out
-                }))
-            })
-            .collect();
-
-        let count = jitter.len();
-        if count < 1 {
-            return None;
-        }
-
-        #[allow(clippy::cast_precision_loss)]
-        Some(jitter.into_iter().map(|j| j as f64).sum::<f64>() / count as f64)
-    }
-
-    /// Returns average packet loss based on the al packet loss stats from
-    /// [`QualityMeter`].
-    ///
-    /// Returns `None` if [`QualityMeter`] doesn't have any packet loss stats.
-    fn average_packet_loss(&self) -> Option<f64> {
-        let packet_loss: Vec<_> = self
-            .packet_loss
-            .values()
-            .filter_map(|packet_loss| {
-                if packet_loss.is_empty() {
-                    return None;
-                }
-
-                #[allow(clippy::cast_precision_loss)]
-                Some(
-                    packet_loss.iter().map(|s| s.stat.0 as f64).sum::<f64>()
-                        / (packet_loss.len() as f64),
-                )
-            })
-            .collect();
-
-        let packet_loss_len = packet_loss.len();
-        if packet_loss_len < 1 {
-            return None;
-        }
-
-        #[allow(clippy::cast_precision_loss)]
-        Some(packet_loss.into_iter().sum::<f64>() / packet_loss_len as f64)
-    }
-
-    /// Calculates and returns [`EstimatedConnectionQuality`] based on stats
-    /// from this [`QualityMeter`].
-    ///
-    /// Returns `None` if some of the stats are empty.
+    /// [ITU-T G.107]: https://www.itu.int/rec/T-REC-G.107
+    /// [Algorithm::MOS]: https://tinyurl.com/y3nojmot
+    #[allow(clippy::cast_precision_loss)]
     pub fn calculate(&mut self) -> Option<EstimatedConnectionQuality> {
-        self.burn_stats();
-
-        let latency = self.average_latency()?;
-        let jitter = self.jitter()?;
-        let packet_loss = self.average_packet_loss()?;
+        let latency = self.mean_rtt()? as f64;
+        let jitter = self.mean_jitter()? as f64;
+        let packet_loss = self.mean_packet_loss()?;
 
         let effective_latency =
             jitter * Self::JITTER_FACTOR + latency + Self::CODEC_DELAY;
@@ -280,106 +118,203 @@ impl QualityMeter {
         // Calculate the R-Value (Transmission Rating Factor R) based on
         // Effective Latency. The voice quality drops more significantly
         // over 160ms so the R-Value is penalized more.
-        let r = if effective_latency < 160.0 {
-            Self::R0 - (effective_latency / 40.0)
+        let r = if effective_latency < 160. {
+            Self::R0 - (effective_latency / 40.)
         } else {
-            Self::R0 - (effective_latency - 120.0) / 10.0
+            Self::R0 - (effective_latency - 120.) / 10.
         };
 
         let r = r - (packet_loss * Self::P_LOSS_FACTOR);
-
         {
-            use EstimatedConnectionQuality::{
-                AllDissatisfied, ManyDissatisfied, Satisfied, SomeDissatisfied,
-            };
-            Some(if r < Self::R_LOWER_LIMIT_ALL_DISSATISFIED {
-                AllDissatisfied
-            } else if r < Self::R_LOWER_LIMIT_MANY_DISSATISFIED {
-                ManyDissatisfied
-            } else if r < Self::R_LOWER_LIMIT_SOME_DISSATISFIED {
-                SomeDissatisfied
+            use EstimatedConnectionQuality::{High, Low, Medium, Poor};
+            Some(if r < Self::R_LOWER_LIMIT_LOW {
+                Poor
+            } else if r < Self::R_LOWER_LIMIT_MEDIUM {
+                Low
+            } else if r < Self::R_LOWER_LIMIT_HIGH {
+                Medium
             } else {
-                Satisfied
+                High
             })
+        }
+    }
+
+    /// Returns average round trip time based on accumulated [`Rtt`] stats stats
+    /// filtering out expired measurements. Returns `None` if there are not
+    /// enough data to make calculations.
+    fn mean_rtt(&mut self) -> Option<u64> {
+        remove_expired_stats(&mut self.rtt);
+        if self.rtt.is_empty() {
+            None
+        } else {
+            Some(
+                self.rtt.iter().map(|s| s.stat.0).sum::<u64>()
+                    / (self.rtt.len() as u64),
+            )
+        }
+    }
+
+    /// Returns average jitter based on accumulated [`Jitter`] stats stats
+    /// filtering out expired measurements. Returns `None` if there are not
+    /// enough data to make calculations.
+    fn mean_jitter(&mut self) -> Option<u64> {
+        remove_expired_stats(&mut self.jitter);
+        if self.jitter.is_empty() {
+            None
+        } else {
+            Some(
+                self.jitter.iter().map(|s| s.stat.0).sum::<u64>()
+                    / self.jitter.len() as u64,
+            )
+        }
+    }
+
+    /// Returns average packet loss based on accumulated [`PacketLost`] and
+    /// [`PacketsSent`] stats filtering out expired measurements. Returns `None`
+    /// if there are not enough data to make calculations.
+    fn mean_packet_loss(&mut self) -> Option<f64> {
+        self.packets_lost.retain(|_, row| {
+            remove_expired_stats(row);
+            !row.is_empty()
+        });
+        self.packets_sent.retain(|_, row| {
+            remove_expired_stats(row);
+            !row.is_empty()
+        });
+
+        let mut sum_lost_delta = 0;
+        let mut sum_sent_delta = 0;
+        for (ssrc, lost) in &self.packets_lost {
+            let sent = self.packets_sent.get(ssrc)?;
+
+            let min_lost = lost.iter().map(|s| s.stat.0).min()?;
+            let max_lost = lost.iter().map(|s| s.stat.0).max()?;
+            let min_sent = sent.iter().map(|s| s.stat.0).min()?;
+            let max_sent = sent.iter().map(|s| s.stat.0).max()?;
+
+            sum_lost_delta += max_lost - min_lost;
+            sum_sent_delta += max_sent - min_sent;
+        }
+
+        if sum_sent_delta == 0 {
+            Some(0.)
+        } else if sum_lost_delta > sum_sent_delta {
+            Some(100.)
+        } else {
+            #[allow(clippy::cast_precision_loss)]
+            Some((sum_lost_delta as f64 * 100.) / sum_sent_delta as f64)
         }
     }
 }
 
-/// Stat which can be burned when it will be outdated.
-#[derive(Debug)]
-pub struct BurningStat<T> {
-    /// Timestamp of the RTC stat.
-    timestamp: SystemTime,
+/// Retains [`Vec<ExpiringStat<T>>`]
+fn remove_expired_stats<T>(stats: &mut Vec<ExpiringStat<T>>) {
+    stats.retain(|s| !s.is_expired());
+}
 
+#[derive(Debug)]
+struct ExpiringStat<T> {
+    /// Timestamp when stat was measured.
+    measured_at: SystemTime,
+    /// Stat ttl.
+    ttl: Duration,
     /// Actual stat.
-    pub stat: T,
+    stat: T,
 }
 
-impl<T> BurningStat<T> {
-    /// Returns new stat with a provided [`SystemTime`] as timestamp.
-    pub fn new(stat: T, timestamp: SystemTime) -> Self {
-        Self { timestamp, stat }
+impl<T> ExpiringStat<T> {
+    /// Creates new [`ExpiringStat`].
+    fn new(stat: T, ttl: Duration) -> Self {
+        Self {
+            measured_at: SystemTime::now(),
+            ttl,
+            stat,
+        }
     }
 
-    /// Returns `true` if this [`BurningStat`] is outdated.
-    ///
-    /// If this stat age more that 5 seconds, then this stat will be considered
-    /// as outdated.
-    pub fn should_be_burned(&self) -> bool {
-        (self.timestamp + Duration::from_secs(5)) < SystemTime::now()
+    /// Returns true if `now() - measured_at > ttl`.
+    fn is_expired(&self) -> bool {
+        self.measured_at.elapsed().unwrap() > self.ttl
     }
 }
 
-/// Round trip time stat.
+/// Estimated round trip time for specific SSRC measured in milliseconds
 #[derive(Debug)]
-pub struct Rtt(u64);
+struct Rtt(u64);
 
-/// Jitter stat.
+/// Packet Jitter for specific SSRC measured in milliseconds.
 #[derive(Debug)]
-pub struct Jitter(u64);
+struct Jitter(u64);
 
-/// Packet loss percent stat.
+/// Accumulative number of packets lost for specific SSRC.
 #[derive(Debug)]
-pub struct PacketLoss(u64);
+struct PacketLost(u64);
+
+/// Accumulative number of packets sent for specific SSRC.
+#[derive(Debug)]
+struct PacketsSent(u64);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const STATS_TTL: Duration = Duration::from_secs(5);
+
+    #[test]
+    fn packets_lost() {
+        let mut meter = QualityMeter::new(STATS_TTL);
+        meter.add_packets_sent(StatId::from("audio"), 100);
+        assert_eq!(meter.mean_packet_loss(), Some(0.));
+
+        meter.add_packets_lost(StatId::from("audio"), 33);
+        assert_eq!(meter.mean_packet_loss(), Some(0.));
+
+        meter.add_packets_sent(StatId::from("audio"), 100);
+        assert_eq!(meter.mean_packet_loss(), Some(0.));
+
+        meter.add_packets_lost(StatId::from("audio"), 66);
+        assert_eq!(meter.mean_packet_loss(), Some(0.));
+
+        meter.add_packets_sent(StatId::from("audio"), 500);
+        assert_eq!(meter.mean_packet_loss(), Some(33. * 100. / (400.)));
+
+        meter.add_packets_sent(StatId::from("video"), 0);
+        meter.add_packets_sent(StatId::from("video"), 500);
+        meter.add_packets_lost(StatId::from("video"), 0);
+        assert_eq!(meter.mean_packet_loss(), Some(33. * 100. / (900.)));
+
+        meter.add_packets_lost(StatId::from("video"), 33);
+        assert_eq!(meter.mean_packet_loss(), Some(66. * 100. / (900.)));
+
+        meter.add_packets_lost(StatId::from("audio"), 133);
+        assert_eq!(meter.mean_packet_loss(), Some(133. * 100. / (900.)));
+
+        meter.add_packets_sent(StatId::from("video"), 1000);
+        assert_eq!(meter.mean_packet_loss(), Some(133. * 100. / (1400.)));
+    }
+
     #[test]
     fn very_good_call_quality() {
-        let mut meter = QualityMeter::new();
-        meter.add_packet_loss(
-            SystemTime::now(),
-            StatId("a".to_string()),
-            0,
-            1000,
-        );
-        meter.add_rtt(SystemTime::now(), 0);
+        let mut meter = QualityMeter::new(STATS_TTL);
+        meter.add_packets_lost(StatId::from("111"), 0);
+        meter.add_packets_sent(StatId::from("111"), 1000);
+        meter.add_rtt(0);
         for jitter in &[0, 0, 0] {
-            meter.add_jitter(
-                SystemTime::now(),
-                StatId("a".to_string()),
-                *jitter,
-            );
+            meter.add_jitter(*jitter);
         }
 
         assert_eq!(
             meter.calculate().unwrap(),
-            EstimatedConnectionQuality::Satisfied
+            EstimatedConnectionQuality::High
         );
     }
 
     #[test]
     fn regular_normal_call() {
-        let mut meter = QualityMeter::new();
+        let mut meter = QualityMeter::new(STATS_TTL);
 
-        for jitter in &[0, 0, 0, 1, 3, 3, 0, 5, 0, 6, 0, 5, 0, 4, 2, 5, 2, 8] {
-            meter.add_jitter(
-                SystemTime::now(),
-                StatId("a".to_string()),
-                *jitter,
-            );
+        for jitter in &[0, 10, 12, 10] {
+            meter.add_jitter(*jitter);
         }
         for (packet_lost, packets_received) in &[
             (0, 45),
@@ -389,168 +324,151 @@ mod tests {
             (0, 146),
             (0, 158),
             (0, 197),
-            (0, 217),
-            (0, 248),
-            (0, 279),
-            (0, 279),
-            (0, 299),
-            (0, 336),
-            (0, 349),
-            (0, 396),
-            (0, 401),
-            (0, 452),
-            (0, 457),
-            (0, 503),
-            (0, 528),
-            (0, 600),
         ] {
-            meter.add_packet_loss(
-                SystemTime::now(),
-                StatId("a".to_string()),
-                *packet_lost,
-                *packets_received,
-            );
+            meter.add_packets_lost(StatId::from("a"), *packet_lost);
+            meter.add_packets_sent(StatId::from("a"), *packets_received);
         }
-        for rtt in &[1, 1, 2, 2, 2, 1, 1] {
-            meter.add_rtt(SystemTime::now(), *rtt);
+        for rtt in &[20, 30, 20, 30] {
+            meter.add_rtt(*rtt);
         }
 
         assert_eq!(
             meter.calculate().unwrap(),
-            EstimatedConnectionQuality::Satisfied
+            EstimatedConnectionQuality::High
         );
     }
 
     #[test]
     fn bad_call() {
-        let mut meter = QualityMeter::new();
+        let mut meter = QualityMeter::new(STATS_TTL);
 
-        for jitter in
-            &[0, 3, 5, 1, 7, 40, 15, 1, 43, 5, 0, 30, 3, 4, 9, 40, 5, 8]
-        {
-            meter.add_jitter(
-                SystemTime::now(),
-                StatId("a".to_string()),
-                *jitter,
-            );
+        for jitter in &[10, 20, 15, 16, 11] {
+            meter.add_jitter(*jitter);
         }
-        for (packet_lost, packets_received) in &[
-            (0, 45),
-            (1, 50),
-            (3, 95),
-            (5, 96),
-            (8, 146),
-            (8, 158),
-            (8, 197),
-            (10, 217),
-            (12, 248),
-            (12, 279),
-            (13, 279),
-            (13, 299),
-            (20, 336),
-            (30, 349),
-            (43, 396),
-            (55, 401),
-            (76, 452),
-            (80, 457),
-            (80, 503),
-            (81, 528),
-            (81, 600),
+        for (packet_lost, packets_sent) in &[
+            (3, 45),
+            (6, 50),
+            (7, 95),
+            (7, 96),
+            (11, 146),
+            (12, 158),
+            (15, 197),
+            (19, 217),
         ] {
-            meter.add_packet_loss(
-                SystemTime::now(),
-                StatId("a".to_string()),
-                *packet_lost,
-                *packets_received,
-            );
+            meter.add_packets_lost(StatId::from("a"), *packet_lost);
+            meter.add_packets_sent(StatId::from("a"), *packets_sent);
         }
-        for rtt in &[5, 3, 2, 1, 6, 5, 3] {
-            meter.add_rtt(SystemTime::now(), *rtt);
+        for rtt in &[150, 160, 170, 150] {
+            meter.add_rtt(*rtt);
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::AllDissatisfied
-        );
+        assert_eq!(meter.calculate().unwrap(), EstimatedConnectionQuality::Low);
     }
 
     #[test]
     fn extremely_bad_call() {
-        let mut meter = QualityMeter::new();
-        meter.add_packet_loss(
-            SystemTime::now(),
-            StatId("a".to_string()),
-            100,
-            100,
-        );
-        meter.add_rtt(SystemTime::now(), 1000);
+        let mut meter = QualityMeter::new(STATS_TTL);
+        meter.add_packets_lost(StatId::from("a"), 100);
+        meter.add_packets_sent(StatId::from("a"), 100);
+        meter.add_rtt(1000);
         for jitter in &[10, 1000, 3000] {
-            meter.add_jitter(
-                SystemTime::now(),
-                StatId("a".to_string()),
-                *jitter,
-            );
+            meter.add_jitter(*jitter);
         }
 
         assert_eq!(
             meter.calculate().unwrap(),
-            EstimatedConnectionQuality::AllDissatisfied
+            EstimatedConnectionQuality::Poor
         );
     }
 
     #[test]
-    fn outdated_stats_are_burned() {
-        let mut meter = QualityMeter::new();
+    fn rtt_and_jitter_stats_expire() {
+        let expired = SystemTime::now() - Duration::from_secs(6);
 
-        meter.add_jitter(
-            SystemTime::now() - Duration::from_secs(5),
-            StatId("a".to_string()),
-            0,
-        );
-        meter.add_rtt(SystemTime::now() - Duration::from_secs(5), 0);
-        meter.add_packet_loss(
-            SystemTime::now() - Duration::from_secs(5),
-            StatId("a".to_string()),
-            0,
-            0,
-        );
-        meter.add_jitter(SystemTime::now(), StatId("a".to_string()), 1);
-        meter.add_rtt(SystemTime::now(), 1);
-        meter.add_packet_loss(SystemTime::now(), StatId("a".to_string()), 1, 2);
+        let mut meter = QualityMeter::new(STATS_TTL);
+
+        meter.add_rtt(0);
+        meter.add_jitter(0);
+
+        meter.rtt.get_mut(0).unwrap().measured_at = expired;
+        meter.jitter.get_mut(0).unwrap().measured_at = expired;
+
+        meter.add_rtt(0);
+        meter.add_jitter(0);
+
+        assert_eq!(meter.rtt.len(), 2);
+        assert_eq!(meter.jitter.len(), 2);
 
         meter.calculate();
 
-        let mut jitter = meter.jitter.remove(&StatId("a".to_string())).unwrap();
-        assert_eq!(jitter.len(), 1);
-        assert_eq!(jitter.pop().unwrap().stat.0, 1);
-
         assert_eq!(meter.rtt.len(), 1);
-        assert_eq!(meter.rtt.pop().unwrap().stat.0, 1);
-
-        let mut packet_loss =
-            meter.packet_loss.remove(&StatId("a".to_string())).unwrap();
-        assert_eq!(packet_loss.len(), 1);
-        assert_eq!(packet_loss.pop().unwrap().stat.0, 33);
+        assert_eq!(meter.jitter.len(), 1);
     }
 
     #[test]
-    fn avg_connection_quality() {
-        use EstimatedConnectionQuality::{
-            AllDissatisfied, ManyDissatisfied, Satisfied, SomeDissatisfied,
-        };
+    fn psent_and_plost_stats_expire() {
+        let expired = SystemTime::now() - Duration::from_secs(6);
 
-        for (first, second, result) in &[
-            (Satisfied, Satisfied, Satisfied),
-            (AllDissatisfied, AllDissatisfied, AllDissatisfied),
-            (AllDissatisfied, Satisfied, ManyDissatisfied),
-        ] {
-            assert_eq!(
-                EstimatedConnectionQuality::avg(*first, *second),
-                *result,
-                "{} avg {}",
-                first,
-                second
-            );
-        }
+        let mut meter = QualityMeter::new(STATS_TTL);
+
+        meter.add_rtt(0);
+        meter.add_jitter(0);
+
+        meter.add_packets_sent(StatId::from("a"), 100);
+        meter.add_packets_lost(StatId::from("a"), 20);
+
+        meter
+            .packets_sent
+            .get_mut(&StatId::from("a"))
+            .unwrap()
+            .get_mut(0)
+            .unwrap()
+            .measured_at = expired;
+        meter
+            .packets_lost
+            .get_mut(&StatId::from("a"))
+            .unwrap()
+            .get_mut(0)
+            .unwrap()
+            .measured_at = expired;
+
+        meter.add_packets_sent(StatId::from("a"), 200);
+        meter.add_packets_lost(StatId::from("a"), 40);
+
+        meter.calculate();
+
+        assert_eq!(meter.rtt.len(), 1);
+        assert_eq!(meter.jitter.len(), 1);
+        assert_eq!(meter.packets_sent.len(), 1);
+        assert_eq!(
+            meter.packets_sent.get(&StatId::from("a")).unwrap().len(),
+            1
+        );
+        assert_eq!(meter.packets_lost.len(), 1);
+        assert_eq!(
+            meter.packets_lost.get(&StatId::from("a")).unwrap().len(),
+            1
+        );
+
+        // make sure that entries are completely removed if values are empty
+        meter
+            .packets_sent
+            .get_mut(&StatId::from("a"))
+            .unwrap()
+            .get_mut(0)
+            .unwrap()
+            .measured_at = expired;
+        meter
+            .packets_lost
+            .get_mut(&StatId::from("a"))
+            .unwrap()
+            .get_mut(0)
+            .unwrap()
+            .measured_at = expired;
+
+        meter.calculate();
+
+        assert_eq!(meter.packets_sent.len(), 0);
+        assert_eq!(meter.packets_lost.len(), 0);
     }
 }

@@ -9,6 +9,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 
 /// Enum with which you can try to deserialize some known enum and if it
@@ -32,7 +33,10 @@ pub enum NonExhaustive<T> {
 /// underlying object.
 ///
 /// [RTCStatsReport]: https://w3.org/TR/webrtc/#dom-rtcstatsreport
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(
+    Clone, Display, Debug, Deserialize, Eq, From, Hash, PartialEq, Serialize,
+)]
+#[from(forward)]
 pub struct StatId(pub String);
 
 /// Represents the [stats object] constructed by inspecting a specific
@@ -121,7 +125,7 @@ pub enum RtcStatsType {
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
     /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    RemoteInboundRtp(Box<RemoteInboundRtpStreamStat>),
+    RemoteInboundRtp(Box<RtcRemoteInboundRtpStreamStats>),
 
     /// Statistics for the remote endpoint's outbound [RTP] stream
     /// corresponding to an inbound stream that is currently received with
@@ -550,7 +554,7 @@ pub struct RemoteOutboundRtpStreamStat {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RemoteInboundRtpStreamStat {
+pub struct RtcRemoteInboundRtpStreamStats {
     /// [`localId`] is used for looking up the local
     /// [RTCOutboundRtpStreamStats] object for the same SSRC.
     ///
@@ -560,9 +564,6 @@ pub struct RemoteInboundRtpStreamStat {
 
     /// Packet jitter measured in seconds for this SSRC.
     pub jitter: Option<Float>,
-
-    /// Total number of bytes received for this SSRC.
-    pub bytes_received: Option<u64>,
 
     /// Estimated round trip time for this SSRC based on the RTCP timestamps in
     /// the RTCP Receiver Report (RR) and measured in seconds. Calculated as
@@ -1116,8 +1117,13 @@ pub struct RtcInboundRtpStreamStats {
     /// Total number of RTP packets received for this SSRC.
     pub packets_received: u64,
 
-    /// Total number of RTP packets lost for this SSRC.
-    pub packets_lost: Option<u64>,
+    // The total number of RTP data packets from source SSRC_n that have been
+    // lost since the beginning of reception. This number is defined to be
+    // the number of packets expected less the number of packets actually
+    // received, where the number of packets received includes any which are
+    // late or duplicates.  Thus, packets that arrive late are not counted as
+    // lost, and the loss may be negative if there are duplicates.
+    pub packets_lost: Option<i64>,
 
     /// Packet jitter measured in seconds for this SSRC.
     pub jitter: Option<Float>,
