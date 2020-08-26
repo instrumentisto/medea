@@ -23,6 +23,8 @@ where
 }
 
 /// Prints provided message with [`Console.debug()`].
+///
+/// [`Console.debug()`]: https://tinyurl.com/y5gdw2tf
 pub fn console_debug<M>(msg: M)
 where
     M: Into<JsValue>,
@@ -40,10 +42,10 @@ macro_rules! format_log {
     };
 }
 
-/// Prints provided message same as [`format`] macro with a [`console_debug`]
+/// Prints provided message same as [`println`] macro with a [`console_debug`]
 /// function.
 ///
-/// [`module_path`] and [`line`] will be added to the start of message.
+/// [`module_path`] and [`line`] will be added at the start of message.
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
@@ -51,10 +53,10 @@ macro_rules! log_debug {
     };
 }
 
-/// Prints provided message same as [`format`] macro with a [`console_error`]
+/// Prints provided message same as [`println`] macro with a [`console_error`]
 /// function.
 ///
-/// [`module_path`] and [`line`] will be added to the start of message.
+/// [`module_path`] and [`line`] will be added at the start of message.
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
