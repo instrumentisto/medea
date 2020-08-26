@@ -18,9 +18,6 @@ use super::{MuteState, StableMuteState};
 
 /// Controller of the [`MuteState`]s of the [`Track`]s.
 pub struct MuteStateController {
-    /// General [`StableMuteState`] between `Recv` and `Send` [`Track`]s.
-    general_mute_state: ObservableCell<StableMuteState>,
-
     /// Mute state of this `Member`.
     ///
     /// This state doesn't indicates that connection with partner client are
@@ -33,11 +30,6 @@ pub struct MuteStateController {
     /// Timeout of the [`MuteStateController::individual_mute_state`]
     /// transition.
     mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
-
-    /// All subscribers on the [`MuteStateController::general_mute_state`]
-    /// changes.
-    on_general_update_subs:
-        RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
 
     /// All subscribers on the [`MuteStateController::individual_mute_state`]
     /// changes.
@@ -54,35 +46,13 @@ impl MuteStateController {
     /// Returns new [`MuteStateController`] with a provided [`StableMuteState`].
     pub fn new(mute_state: StableMuteState) -> Rc<Self> {
         let this = Rc::new(Self {
-            general_mute_state: ObservableCell::new(mute_state),
             individual_mute_state: ObservableCell::new(mute_state.into()),
-            on_general_update_subs: RefCell::default(),
             on_individual_update_subs: RefCell::default(),
             mute_timeout_handle: RefCell::new(None),
         });
         this.clone().spawn();
 
         this
-    }
-
-    /// Returns [`Stream`] to which all
-    /// [`MuteStateController::general_mute_state`]s will be sent.
-    pub fn on_general_update(
-        &self,
-    ) -> LocalBoxStream<'static, StableMuteState> {
-        let (tx, rx) = mpsc::unbounded();
-        self.on_general_update_subs.borrow_mut().push(tx);
-
-        Box::pin(rx)
-    }
-
-    /// Sends [`MuteStateController::general_mute_state`] update.
-    fn send_general_update(&self, state: StableMuteState) {
-        let mut on_finalize_subs = self.on_general_update_subs.borrow_mut();
-        *on_finalize_subs = on_finalize_subs
-            .drain(..)
-            .filter(|s| s.unbounded_send(state).is_ok())
-            .collect();
     }
 
     /// Returns [`Stream`] to which all
@@ -112,20 +82,6 @@ impl MuteStateController {
         let mut mute_state_changes =
             self.individual_mute_state.subscribe().skip(1);
         let weak_this = Rc::downgrade(&self);
-        spawn_local({
-            let weak_this = Rc::downgrade(&self);
-            let mut general_mute_state_changes =
-                self.general_mute_state.subscribe().skip(1);
-            async move {
-                while let Some(mute_state) =
-                    general_mute_state_changes.next().await
-                {
-                    if let Some(this) = weak_this.upgrade() {
-                        this.send_general_update(mute_state);
-                    }
-                }
-            }
-        });
         spawn_local(async move {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
@@ -176,18 +132,6 @@ impl MuteStateController {
         });
     }
 
-    /// Checks whether [`MuteStateController`]'s general mute state is in
-    /// [`MuteState::Muted`].
-    pub fn is_general_muted(&self) -> bool {
-        self.general_mute_state.get() == StableMuteState::Muted
-    }
-
-    /// Checks whether [`MuteStateController`]'s general mute state is in
-    /// [`MuteState::NotMuted`].
-    pub fn is_not_general_muted(&self) -> bool {
-        self.general_mute_state.get() == StableMuteState::NotMuted
-    }
-
     /// Checks whether [`MuteStateController`]'s individual mute state is in
     /// [`MuteState::Muted`].
     pub fn is_individual_muted(&self) -> bool {
@@ -212,15 +156,6 @@ impl MuteStateController {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
             timer.reset();
         }
-    }
-
-    /// Updates [`MuteStateController::general_mute_state`].
-    ///
-    /// Real mute/unmute will be performed on this update.
-    ///
-    /// No `Promise`s will be resolved on this state update.
-    pub fn update_general(&self, is_muted: bool) {
-        self.general_mute_state.set(is_muted.into());
     }
 
     /// Updates [`MuteStateController::individual_mute_state`].

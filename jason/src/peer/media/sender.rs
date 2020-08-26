@@ -56,7 +56,6 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
-        let mut general_mute_state_rx = mute_state_observer.on_general_update();
         let mut individual_mute_state_rx =
             mute_state_observer.on_individual_update();
         let this = Rc::new(Sender {
@@ -64,37 +63,12 @@ impl<'a> SenderBuilder<'a> {
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
+            general_mute_state: Cell::new(self.mute_state.into()),
             transceiver,
             mute_state_controller: mute_state_observer,
             is_required: self.is_required,
             transceiver_direction: Cell::new(TransceiverDirection::Inactive),
             peer_events_sender: self.peer_events_sender,
-        });
-        spawn_local({
-            let weak_this = Rc::downgrade(&this);
-            async move {
-                while let Some(finalized_mute_state) =
-                    general_mute_state_rx.next().await
-                {
-                    if let Some(this) = weak_this.upgrade() {
-                        match finalized_mute_state {
-                            StableMuteState::NotMuted => {
-                                this.set_transceiver_direction(
-                                    TransceiverDirection::Sendonly,
-                                );
-                                this.request_track();
-                            }
-                            StableMuteState::Muted => {
-                                this.set_transceiver_direction(
-                                    TransceiverDirection::Inactive,
-                                );
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
         });
         spawn_local({
             let weak_this = Rc::downgrade(&this);
@@ -130,6 +104,7 @@ pub struct Sender {
     transceiver: RtcRtpTransceiver,
     transceiver_direction: Cell<TransceiverDirection>,
     mute_state_controller: Rc<MuteStateController>,
+    general_mute_state: Cell<StableMuteState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
@@ -155,17 +130,49 @@ impl Sender {
         }
     }
 
+    /// Checks whether general mute state of the [`Receiver`] is in
+    /// [`MuteState::Muted`].
+    #[cfg(feature = "mockable")]
+    pub fn is_general_muted(&self) -> bool {
+        self.general_mute_state.get() == StableMuteState::Muted
+    }
+
+    /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
+    /// based on the provided [`StableMuteState`].
+    ///
+    /// Updates [`Sender::general_mute_state`].
+    ///
+    /// If old general mute state same as provided - nothing will be done.
+    fn update_general_mute_state(&self, mute_state: StableMuteState) {
+        if self.general_mute_state.get() != mute_state {
+            self.general_mute_state.set(mute_state);
+            match mute_state {
+                StableMuteState::NotMuted => {
+                    self.set_transceiver_direction(
+                        TransceiverDirection::Sendonly,
+                    );
+                    self.request_track();
+                }
+                StableMuteState::Muted => {
+                    self.set_transceiver_direction(
+                        TransceiverDirection::Inactive,
+                    );
+                }
+            }
+        }
+    }
+
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
     /// transceiver and enables transceivers sender by changing its
     /// direction to `sendonly`.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub(super) async fn insert_track_and_enable(
-        sender: Rc<Self>,
+        self: Rc<Self>,
         new_track: MediaStreamTrack,
     ) -> Result<()> {
         // no-op if we try to insert same track
-        if let Some(current_track) = sender.track.borrow().as_ref() {
+        if let Some(current_track) = self.track.borrow().as_ref() {
             if new_track.id() == current_track.id() {
                 return Ok(());
             }
@@ -173,11 +180,10 @@ impl Sender {
 
         // no-op if transceiver is not NotMuted
         if let MuteState::Stable(StableMuteState::NotMuted) =
-            sender.individual_mute_state()
+            self.individual_mute_state()
         {
             JsFuture::from(
-                sender
-                    .transceiver
+                self.transceiver
                     .sender()
                     .replace_track(Some(new_track.as_ref())),
             )
@@ -186,9 +192,11 @@ impl Sender {
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
             .map_err(tracerr::wrap!())?;
 
-            sender.track.borrow_mut().replace(new_track);
+            self.track.borrow_mut().replace(new_track);
 
-            sender.set_transceiver_direction(TransceiverDirection::Sendonly);
+            if self.general_mute_state.get() == StableMuteState::NotMuted {
+                self.set_transceiver_direction(TransceiverDirection::Sendonly);
+            }
         }
 
         Ok(())
@@ -205,7 +213,7 @@ impl Sender {
             self.mute_state_controller.update_individual(is_muted);
         }
         if let Some(is_muted_general) = track.is_muted_general {
-            self.mute_state_controller.update_general(is_muted_general);
+            self.update_general_mute_state(is_muted_general.into());
         }
     }
 

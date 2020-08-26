@@ -216,19 +216,19 @@ mod sender_patch {
 
     use super::*;
 
-    async fn get_sender() -> (Rc<Sender>, TrackId) {
+    async fn get_sender() -> (Rc<Sender>, TrackId, MediaConnections) {
         let (media_connections, audio_track_id, _) =
             get_test_media_connections(true, false).await;
 
         let audio_track =
             media_connections.get_sender_by_id(audio_track_id).unwrap();
 
-        (audio_track, audio_track_id)
+        (audio_track, audio_track_id, media_connections)
     }
 
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
-        let (sender, track_id) = get_sender().await;
+        let (sender, track_id, _media_connections) = get_sender().await;
         sender.update(&ServerTrackPatch {
             id: TrackId(track_id.0 + 100),
             is_muted_individual: Some(true),
@@ -240,7 +240,7 @@ mod sender_patch {
 
     #[wasm_bindgen_test]
     async fn mute() {
-        let (sender, track_id) = get_sender().await;
+        let (sender, track_id, _media_connections) = get_sender().await;
         sender.update(&ServerTrackPatch {
             id: track_id,
             is_muted_individual: Some(true),
@@ -252,7 +252,7 @@ mod sender_patch {
 
     #[wasm_bindgen_test]
     async fn unmute_unmuted() {
-        let (sender, track_id) = get_sender().await;
+        let (sender, track_id, _media_connections) = get_sender().await;
         sender.update(&ServerTrackPatch {
             id: track_id,
             is_muted_individual: Some(false),
@@ -264,7 +264,7 @@ mod sender_patch {
 
     #[wasm_bindgen_test]
     async fn mute_muted() {
-        let (sender, track_id) = get_sender().await;
+        let (sender, track_id, _media_connections) = get_sender().await;
         sender.update(&ServerTrackPatch {
             id: track_id,
             is_muted_individual: Some(true),
@@ -283,7 +283,7 @@ mod sender_patch {
 
     #[wasm_bindgen_test]
     async fn empty_patch() {
-        let (sender, track_id) = get_sender().await;
+        let (sender, track_id, _media_connections) = get_sender().await;
         sender.update(&ServerTrackPatch {
             id: track_id,
             is_muted_individual: None,

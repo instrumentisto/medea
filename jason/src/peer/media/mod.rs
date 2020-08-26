@@ -125,12 +125,6 @@ pub trait MuteableTrack: Track + HasMuteStateController {
             .reset_mute_state_transition_timeout()
     }
 
-    /// Checks whether general mute state of the [`MuteableTrack`] is in
-    /// [`MuteState::Muted`].
-    fn is_general_muted(&self) -> bool {
-        self.mute_state_controller().is_general_muted()
-    }
-
     /// Checks whether individual mute state of the [`MuteableTrack`] is in
     /// [`MuteState::Muted`].
     fn is_individual_muted(&self) -> bool {

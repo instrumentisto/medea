@@ -2,11 +2,10 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{channel::mpsc, StreamExt as _};
+use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, ServerTrackPatch};
 use proto::TrackId;
-use wasm_bindgen_futures::spawn_local;
 use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
@@ -35,6 +34,7 @@ struct InnerReceiver {
     kind: TransceiverKind,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
+    general_mute_state: StableMuteState,
     notified_track: bool,
     mute_state_controller: Rc<MuteStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -49,6 +49,45 @@ impl InnerReceiver {
         if let Some(transceiver) = &self.transceiver {
             transceiver.set_direction(direction.into());
         }
+    }
+
+    /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
+    /// based on the provided [`StableMuteState`].
+    ///
+    /// Updates [`InnerReceiver::general_mute_state`].
+    ///
+    /// If old general mute state same as provided - nothing will be done.
+    fn update_general_mute_state(&mut self, mute_state: StableMuteState) {
+        if self.general_mute_state != mute_state {
+            self.general_mute_state = mute_state;
+            match mute_state {
+                StableMuteState::Muted => {
+                    if let Some(track) = &self.track {
+                        track.set_enabled(false);
+                    }
+                    self.set_direction(TransceiverDirection::Inactive);
+                }
+                StableMuteState::NotMuted => {
+                    if let Some(track) = &self.track {
+                        track.set_enabled(true);
+                    }
+                    self.set_direction(TransceiverDirection::Recvonly);
+                }
+            }
+            self.maybe_notify_track();
+        }
+    }
+
+    /// Checks whether general mute state of the [`Receiver`] is in
+    /// [`MuteState::NotMuted`].
+    fn is_not_muted(&self) -> bool {
+        self.general_mute_state == StableMuteState::NotMuted.into()
+    }
+
+    /// Checks whether general mute state of the [`Receiver`] is in
+    /// [`MuteState::Muted`].
+    fn is_muted(&self) -> bool {
+        self.general_mute_state == StableMuteState::Muted.into()
     }
 }
 
@@ -84,8 +123,6 @@ impl Receiver {
             Some(_) => None,
         };
         let mute_state_controller = MuteStateController::new(muted.into());
-        let mut on_finalized_mute_state =
-            mute_state_controller.on_general_update();
         let this: Rc<Self> = Rc::new(Self(RefCell::new(InnerReceiver {
             track_id,
             sender_id,
@@ -94,43 +131,11 @@ impl Receiver {
             kind,
             mid,
             mute_state_controller,
+            general_mute_state: muted.into(),
             notified_track: false,
             track: None,
             peer_events_sender,
         })));
-
-        spawn_local({
-            let weak_this = Rc::downgrade(&this);
-
-            async move {
-                while let Some(finalize_mute_state) =
-                    on_finalized_mute_state.next().await
-                {
-                    if let Some(this) = weak_this.upgrade() {
-                        let mut inner = this.0.borrow_mut();
-                        match finalize_mute_state {
-                            StableMuteState::Muted => {
-                                if let Some(track) = &inner.track {
-                                    track.set_enabled(false);
-                                }
-                                inner.set_direction(
-                                    TransceiverDirection::Inactive,
-                                );
-                            }
-                            StableMuteState::NotMuted => {
-                                if let Some(track) = &inner.track {
-                                    track.set_enabled(true);
-                                }
-                                inner.set_direction(
-                                    TransceiverDirection::Recvonly,
-                                );
-                            }
-                        }
-                        inner.maybe_notify_track();
-                    }
-                }
-            }
-        });
 
         this
     }
@@ -156,22 +161,28 @@ impl Receiver {
         let new_track = MediaStreamTrack::from(new_track);
 
         transceiver.set_direction(inner.transceiver_direction.into());
-        new_track
-            .set_enabled(inner.mute_state_controller.is_not_general_muted());
+        new_track.set_enabled(inner.is_not_muted());
 
         inner.transceiver.replace(transceiver);
         inner.track.replace(new_track);
         inner.maybe_notify_track();
     }
 
+    /// Checks whether general mute state of the [`Receiver`] is in
+    /// [`MuteState::Muted`].
+    #[cfg(feature = "mockable")]
+    pub fn is_general_muted(&self) -> bool {
+        self.0.borrow().is_muted()
+    }
+
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
     pub fn update(&self, track_patch: &ServerTrackPatch) {
-        let inner = self.0.borrow();
+        let mut inner = self.0.borrow_mut();
         if inner.track_id != track_patch.id {
             return;
         }
         if let Some(is_muted_general) = track_patch.is_muted_general {
-            inner.mute_state_controller.update_general(is_muted_general);
+            inner.update_general_mute_state(is_muted_general.into());
         }
         if let Some(is_muted) = track_patch.is_muted_individual {
             inner.mute_state_controller.update_individual(is_muted);
@@ -204,7 +215,7 @@ impl Receiver {
 impl InnerReceiver {
     /// Returns `true` if this [`Receiver`] is receives media data.
     fn is_receiving(&self) -> bool {
-        if self.mute_state_controller.is_general_muted() {
+        if self.is_muted() {
             return false;
         }
         if self.transceiver.is_none() {
@@ -227,7 +238,7 @@ impl InnerReceiver {
         if !self.is_receiving() {
             return;
         }
-        if self.mute_state_controller.is_general_muted() {
+        if self.is_muted() {
             return;
         }
         if let Some(track) = &self.track {
