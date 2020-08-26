@@ -893,6 +893,7 @@ mod patches_generation {
         AudioSettings, Direction, MediaType, Track, TrackId, TrackPatch,
         VideoSettings,
     };
+    use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
 
     use crate::timeout;
@@ -951,6 +952,7 @@ mod patches_generation {
                 Rc::new(MediaManager::default()),
                 false,
                 local_stream.into(),
+                Rc::new(RecvConstraints::default()),
             )
             .unwrap();
 

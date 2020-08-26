@@ -17,7 +17,7 @@ use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{LocalStreamConstraints, MediaStreamTrack},
+    media::{LocalStreamConstraints, MediaStreamTrack, RecvConstraints},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
@@ -35,6 +35,16 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+
+/// Direction of the [`Track`].
+#[derive(Debug, Clone, Copy)]
+pub enum TrackDirection {
+    /// Sends media data.
+    Send,
+
+    /// Receives media data.
+    Recv,
+}
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -262,7 +272,8 @@ impl MediaConnections {
     pub fn create_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
-        local_constraints: &LocalStreamConstraints,
+        send_constraints: &LocalStreamConstraints,
+        recv_constraints: &RecvConstraints,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
@@ -270,7 +281,7 @@ impl MediaConnections {
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let mute_state;
-                    if local_constraints.is_enabled(&track.media_type) {
+                    if send_constraints.is_enabled(&track.media_type) {
                         mute_state = StableMuteState::NotMuted;
                     } else if is_required {
                         use MediaConnectionsError as Error;
@@ -302,6 +313,7 @@ impl MediaConnections {
                         &inner.peer,
                         mid,
                         inner.peer_events_sender.clone(),
+                        recv_constraints,
                     );
                     inner.receivers.insert(track.id, recv);
                 }

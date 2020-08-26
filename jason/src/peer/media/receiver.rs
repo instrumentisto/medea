@@ -7,7 +7,7 @@ use proto::TrackId;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
+    media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         PeerEvent,
@@ -44,12 +44,20 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+        recv_constraints: &RecvConstraints,
     ) -> Self {
         let kind = TransceiverKind::from(caps);
+        let muted = match kind {
+            TransceiverKind::Audio => recv_constraints.is_audio_disabled(),
+            TransceiverKind::Video => recv_constraints.is_video_disabled(),
+        };
+        let transceiver_direction = if muted {
+            TransceiverDirection::Inactive
+        } else {
+            TransceiverDirection::Recvonly
+        };
         let transceiver = match mid {
-            None => {
-                Some(peer.add_transceiver(kind, TransceiverDirection::Recvonly))
-            }
+            None => Some(peer.add_transceiver(kind, transceiver_direction)),
             Some(_) => None,
         };
         Self {
@@ -58,7 +66,7 @@ impl Receiver {
             transceiver,
             mid,
             track: None,
-            enabled: true,
+            enabled: !muted,
             peer_events_sender,
         }
     }
@@ -73,6 +81,7 @@ impl Receiver {
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
     ) {
+        transceiver.set_direction(self.get_direction().into());
         self.transceiver.replace(transceiver);
         self.track.replace(track.clone());
         track.set_enabled(self.enabled);
@@ -86,12 +95,24 @@ impl Receiver {
                 });
     }
 
+    /// Returns current [`TransceiverDirection`] of this [`Receiver`].
+    fn get_direction(&self) -> TransceiverDirection {
+        if self.enabled {
+            TransceiverDirection::Recvonly
+        } else {
+            TransceiverDirection::Inactive
+        }
+    }
+
     /// Updates [`Receiver`] with a provided [`TrackPatch`].
     pub fn update(&mut self, track_patch: &TrackPatch) {
         if let Some(is_muted) = track_patch.is_muted {
             self.enabled = !is_muted;
             if let Some(track) = &self.track {
                 track.set_enabled(!is_muted);
+            }
+            if let Some(transceiver) = &self.transceiver {
+                transceiver.set_direction(self.get_direction().into());
             }
         }
     }
