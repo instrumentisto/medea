@@ -18,3 +18,14 @@ macro_rules! enum_eq {
         }
     };
 }
+
+/// Expands to the [`module_path`] and `function_name`, but `::` replaced with
+/// `__`.
+#[macro_export]
+macro_rules! test_name {
+    () => {
+        concat!(module_path!(), "::", function_name!())
+            .replace("::", "__")
+            .as_str()
+    };
+}

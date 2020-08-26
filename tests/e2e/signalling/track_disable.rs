@@ -1,6 +1,7 @@
 use std::{cell::Cell, rc::Rc, time::Duration};
 
 use actix::{Addr, AsyncContext};
+use function_name::named;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver},
     future, Stream, StreamExt,
@@ -19,6 +20,7 @@ use crate::{
     signalling::{
         handle_peer_created, ConnectionEvent, SendCommand, TestMember,
     },
+    test_name,
 };
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
@@ -95,11 +97,10 @@ async fn helper(
 /// Creates `pub => sub` `Room`, and publisher disables and enables his tracks
 /// multiple times.
 #[actix_rt::test]
+#[named]
 async fn track_disables_and_enables() {
-    const TEST_NAME: &str = "track_disable";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -108,7 +109,7 @@ async fn track_disables_and_enables() {
             publisher_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -119,7 +120,7 @@ async fn track_disables_and_enables() {
             subscriber_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -143,8 +144,8 @@ async fn track_disables_and_enables() {
 /// Tests that track disabled and enables will be performed instantly and will
 /// not wait for renegotiation finish.
 #[actix_rt::test]
+#[named]
 async fn track_disables_and_enables_are_instant() {
-    const TEST_NAME: &str = "track_disables_and_enables_are_instant";
     const EVENTS_COUNT: usize = 100;
 
     fn filter_events(
@@ -185,7 +186,7 @@ async fn track_disables_and_enables_are_instant() {
     }
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -194,7 +195,7 @@ async fn track_disables_and_enables_are_instant() {
             let _ = publisher_tx.unbounded_send(event.clone());
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -206,7 +207,7 @@ async fn track_disables_and_enables_are_instant() {
             let _ = subscriber_tx.unbounded_send(event.clone());
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -273,11 +274,10 @@ async fn track_disables_and_enables_are_instant() {
 }
 
 #[actix_rt::test]
+#[named]
 async fn track_disables_and_enables_are_instant2() {
-    const TEST_NAME: &str = "track_disables_and_enables_are_instant2";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
     client
         .create(
             WebRtcPublishEndpointBuilder::default()
@@ -285,17 +285,17 @@ async fn track_disables_and_enables_are_instant2() {
                 .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
                 .build()
                 .unwrap()
-                .build_request(format!("{}/responder", TEST_NAME)),
+                .build_request(format!("{}/responder", test_name!())),
         )
         .await;
     client
         .create(
             WebRtcPlayEndpointBuilder::default()
                 .id("play")
-                .src(format!("local://{}/responder/publish", TEST_NAME))
+                .src(format!("local://{}/responder/publish", test_name!()))
                 .build()
                 .unwrap()
-                .build_request(format!("{}/publisher", TEST_NAME)),
+                .build_request(format!("{}/publisher", test_name!())),
         )
         .await;
 
@@ -306,7 +306,7 @@ async fn track_disables_and_enables_are_instant2() {
             first_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         false,
     )
     .await;
@@ -318,7 +318,7 @@ async fn track_disables_and_enables_are_instant2() {
             second_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         false,
     )
     .await;
@@ -410,11 +410,10 @@ async fn track_disables_and_enables_are_instant2() {
 /// Checks that force update mechanism works for muting and renegotiation after
 /// force update will be performed.
 #[actix_rt::test]
+#[named]
 async fn force_update_works() {
-    const TEST_NAME: &str = "force_update_works";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let (pub_con_established_tx, mut pub_con_established_rx) =
         mpsc::unbounded();
@@ -466,7 +465,7 @@ async fn force_update_works() {
                 pub_con_established_tx.unbounded_send(()).unwrap()
             }
         })),
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -514,7 +513,7 @@ async fn force_update_works() {
             _ => {}
         })),
         None,
-        Some(Duration::from_secs(500)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
