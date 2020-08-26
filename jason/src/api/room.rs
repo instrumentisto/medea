@@ -27,9 +27,9 @@ use crate::{
         MediaStreamTrack,
     },
     peer::{
-        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, Sender, StableMuteState,
-        TransceiverKind,
+        MediaConnectionsError, MuteState, MuteableTrack, PeerConnection,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
+        StableMuteState, TrackDirection, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -257,14 +257,17 @@ impl RoomHandle {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
+        direction: TrackDirection,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
         inner.local_stream_settings.toggle_enable(!is_muted, kind);
-        while !inner
-            .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
-        {
+        while !inner.is_all_peers_in_mute_state(
+            kind,
+            direction,
+            StableMuteState::from(is_muted),
+        ) {
             inner
-                .toggle_mute(is_muted, kind)
+                .toggle_mute(is_muted, kind, direction)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
                     inner.local_stream_settings.toggle_enable(is_muted, kind);
@@ -370,7 +373,12 @@ impl RoomHandle {
     pub fn mute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(true, TransceiverKind::Audio).await?;
+            this.toggle_mute(
+                true,
+                TransceiverKind::Audio,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -379,7 +387,12 @@ impl RoomHandle {
     pub fn unmute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(false, TransceiverKind::Audio).await?;
+            this.toggle_mute(
+                false,
+                TransceiverKind::Audio,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -388,7 +401,12 @@ impl RoomHandle {
     pub fn mute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(true, TransceiverKind::Video).await?;
+            this.toggle_mute(
+                true,
+                TransceiverKind::Video,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -397,7 +415,12 @@ impl RoomHandle {
     pub fn unmute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(false, TransceiverKind::Video).await?;
+            this.toggle_mute(
+                false,
+                TransceiverKind::Video,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -630,6 +653,7 @@ impl InnerRoom {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
+        direction: TrackDirection,
     ) -> Result<(), Traced<RoomError>> {
         let peer_mute_state_changed: Vec<_> = self
             .peers
@@ -637,10 +661,10 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders = peer.get_senders(kind);
+                let senders = peer.get_muteable_tracks(kind, direction);
 
                 let senders_to_mute = senders.into_iter().filter(|sender| {
-                    match sender.mute_state() {
+                    match sender.individual_mute_state() {
                         MuteState::Transition(t) => {
                             t.intended() != desired_state
                         }
@@ -648,7 +672,8 @@ impl InnerRoom {
                     }
                 });
 
-                let mut processed_senders: Vec<Rc<Sender>> = Vec::new();
+                let mut processed_senders: Vec<Rc<dyn MuteableTrack>> =
+                    Vec::new();
                 let mut tracks_patches = Vec::new();
                 for sender in senders_to_mute {
                     if let Err(e) =
@@ -667,9 +692,9 @@ impl InnerRoom {
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_senders(kind)
+                    .get_muteable_tracks(kind, direction)
                     .into_iter()
-                    .map(|sender| sender.when_mute_state_stable(desired_state))
+                    .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
 
                 if !tracks_patches.is_empty() {
@@ -694,12 +719,15 @@ impl InnerRoom {
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
         self.peers
             .get_all()
             .into_iter()
-            .find(|p| !p.is_all_senders_in_mute_state(kind, mute_state))
+            .find(|p| {
+                !p.is_all_tracks_in_mute_state(kind, direction, mute_state)
+            })
             .is_none()
     }
 

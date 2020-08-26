@@ -31,6 +31,7 @@ use crate::{
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, MockNavigator,
 };
+use medea_jason::peer::TrackDirection;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -184,8 +185,9 @@ async fn join_two_audio_mutes() {
     first.unwrap();
     second.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::Muted
     ));
 }
@@ -220,8 +222,9 @@ async fn join_two_video_mutes() {
     first.unwrap();
     second.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Video,
+        TrackDirection::Send,
         StableMuteState::Muted
     ));
 }
@@ -249,8 +252,9 @@ async fn join_mute_and_unmute_audio() {
     )
     .await;
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 
@@ -263,8 +267,9 @@ async fn join_mute_and_unmute_audio() {
     mute_audio_result.unwrap_err();
     unmute_audio_result.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 }
@@ -292,8 +297,9 @@ async fn join_mute_and_unmute_video() {
     )
     .await;
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Video,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 
@@ -306,8 +312,9 @@ async fn join_mute_and_unmute_video() {
     mute_video_result.unwrap_err();
     unmute_video_result.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Video,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 }
@@ -335,16 +342,18 @@ async fn join_unmute_and_mute_audio() {
     )
     .await;
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 
     let handle = room.new_handle();
     JsFuture::from(handle.mute_audio()).await.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::Muted
     ));
 
@@ -356,8 +365,9 @@ async fn join_unmute_and_mute_audio() {
     mute_audio_result.unwrap();
     unmute_audio_result.unwrap();
 
-    assert!(peer.is_all_senders_in_mute_state(
+    assert!(peer.is_all_tracks_in_mute_state(
         TransceiverKind::Audio,
+        TrackDirection::Send,
         StableMuteState::NotMuted
     ));
 }

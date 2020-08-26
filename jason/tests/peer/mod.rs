@@ -31,6 +31,7 @@ use crate::{
     delay_for, get_media_stream_settings, get_test_unrequired_tracks,
     local_constraints, timeout,
 };
+use medea_jason::peer::TrackDirection;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -862,9 +863,15 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_senders(TransceiverKind::Audio)
+        peer.get_muteable_tracks(TransceiverKind::Audio, TrackDirection::Send)
             .into_iter()
-            .chain(peer.get_senders(TransceiverKind::Video).into_iter())
+            .chain(
+                peer.get_muteable_tracks(
+                    TransceiverKind::Video,
+                    TrackDirection::Send,
+                )
+                .into_iter(),
+            )
             .map(|s| {
                 s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 

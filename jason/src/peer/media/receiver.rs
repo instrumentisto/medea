@@ -4,7 +4,7 @@ use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
 use proto::TrackId;
-use web_sys::RtcRtpTransceiver;
+use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
     media::{MediaStreamTrack, TrackConstraints},
@@ -71,18 +71,25 @@ impl Receiver {
     pub fn set_remote_track(
         &mut self,
         transceiver: RtcRtpTransceiver,
-        track: MediaStreamTrack,
+        new_track: RtcMediaStreamTrack,
     ) {
+        if let Some(old_track) = &self.track {
+            if old_track.id() == new_track.id() {
+                return;
+            }
+        }
+
+        let new_track = MediaStreamTrack::from(new_track);
         self.transceiver.replace(transceiver);
-        self.track.replace(track.clone());
-        track.set_enabled(self.enabled);
+        self.track.replace(new_track.clone());
+        new_track.set_enabled(self.enabled);
 
         let _ =
             self.peer_events_sender
                 .unbounded_send(PeerEvent::NewRemoteTrack {
                     sender_id: self.sender_id.clone(),
                     track_id: self.track_id,
-                    track,
+                    track: new_track,
                 });
     }
 
