@@ -36,7 +36,7 @@ pub use self::{
     sender::Sender,
 };
 
-/// Direction of the [`Track`].
+/// Direction of the `MediaTrack`.
 #[derive(Debug, Clone, Copy)]
 pub enum TrackDirection {
     /// Sends media data.

@@ -118,8 +118,8 @@ impl LocalStreamConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
-        self.0.borrow_mut().toggle_enable(is_enabled, kind);
+    pub fn toggle_disable(&self, is_disabled: bool, kind: TransceiverKind) {
+        self.0.borrow_mut().toggle_disable(is_disabled, kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -291,13 +291,13 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn toggle_enable(&mut self, is_enabled: bool, kind: TransceiverKind) {
+    pub fn toggle_disable(&mut self, is_disabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
-                self.toggle_publish_audio(is_enabled);
+                self.toggle_publish_audio(!is_disabled);
             }
             TransceiverKind::Video => {
-                self.toggle_publish_video(is_enabled);
+                self.toggle_publish_video(!is_disabled);
             }
         }
     }

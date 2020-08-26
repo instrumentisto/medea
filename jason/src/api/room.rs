@@ -571,6 +571,8 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
 
     /// Local media stream for injecting into new created [`PeerConnection`]s.
+    ///
+    /// This constraints will be used for the [`Sender`]s.
     send_constraints: LocalStreamConstraints,
 
     /// Constraints for the [`Receiver`]s.
@@ -651,7 +653,7 @@ impl InnerRoom {
         if let TrackDirection::Recv = direction {
             self.recv_constraints.toggle_disable(is_muted, kind);
         } else {
-            self.send_constraints.toggle_enable(!is_muted, kind);
+            self.send_constraints.toggle_disable(is_muted, kind);
         }
     }
 

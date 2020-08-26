@@ -941,8 +941,8 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::new();
-            local_stream.toggle_enable(
-                !(audio_track_muted_state_fn)(i),
+            local_stream.toggle_disable(
+                (audio_track_muted_state_fn)(i),
                 TransceiverKind::Audio,
             );
             let peer = PeerConnection::new(

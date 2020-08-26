@@ -145,8 +145,8 @@ pub fn get_media_stream_settings(
     is_video_muted: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.toggle_enable(!is_audio_muted, TransceiverKind::Audio);
-    settings.toggle_enable(!is_video_muted, TransceiverKind::Video);
+    settings.toggle_disable(is_audio_muted, TransceiverKind::Audio);
+    settings.toggle_disable(is_video_muted, TransceiverKind::Video);
 
     settings
 }
