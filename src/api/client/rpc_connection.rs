@@ -56,8 +56,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Sends [`Event`] to remote [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_event(&self, msg: Event)
-        -> LocalBoxFuture<'static, Result<(), ()>>;
+    fn send_event(&self, msg: Event);
 }
 
 /// Settings of [`WsSession`].

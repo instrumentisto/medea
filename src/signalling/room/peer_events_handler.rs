@@ -25,19 +25,18 @@ use crate::{
 impl Room {
     /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
     /// will be changed to a [`WaitLocalSdp`] state.
-    fn send_peer_created(
-        &mut self,
-        peer_id: PeerId,
-    ) -> ActFuture<Result<(), RoomError>> {
-        let peer: Peer<Stable> =
-            actix_try!(self.peers.take_inner_peer(peer_id));
+    fn send_peer_created(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
+        let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
+        let partner_peer: Peer<Stable> =
+            self.peers.take_inner_peer(peer.partner_peer_id())?;
 
-        let peer = peer.start();
+        let peer = peer.start_as_offerer();
+        let partner_peer = partner_peer.start_as_answerer();
+
         let member_id = peer.member_id();
         let ice_servers = peer
             .ice_servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()));
-        let ice_servers = actix_try!(ice_servers);
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             negotiation_role: NegotiationRole::Offerer,
@@ -45,12 +44,11 @@ impl Room {
             ice_servers,
             force_relay: peer.is_force_relayed(),
         };
+
         self.peers.add_peer(peer);
-        Box::new(
-            self.members
-                .send_event_to_member(member_id, peer_created)
-                .into_actor(self),
-        )
+        self.peers.add_peer(partner_peer);
+
+        self.members.send_event_to_member(member_id, peer_created)
     }
 }
 
@@ -74,12 +72,12 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 
 impl StreamHandler<PeersMetricsEvent> for Room {
     fn handle(&mut self, event: PeersMetricsEvent, ctx: &mut Self::Context) {
-        ctx.spawn(event.dispatch_with(self));
+        event.dispatch_with(self);
     }
 }
 
 impl PeersMetricsEventHandler for Room {
-    type Output = ActFuture<()>;
+    type Output = ();
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial media traffic
     /// stopping.
@@ -90,7 +88,6 @@ impl PeersMetricsEventHandler for Room {
         _: MediaType,
         _: MediaDirection,
     ) -> Self::Output {
-        Box::new(actix::fut::ready(()))
     }
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
@@ -101,7 +98,6 @@ impl PeersMetricsEventHandler for Room {
         _: MediaType,
         _: MediaDirection,
     ) -> Self::Output {
-        Box::new(actix::fut::ready(()))
     }
 
     /// Sends [`Event::QualityScoreUpdated`] to the [`Member`] with a provided
@@ -117,7 +113,7 @@ impl PeersMetricsEventHandler for Room {
             member_id, partner_member_id, quality_score
         );
 
-        let fut = self.members.send_event_to_member(
+        let send_event_res = self.members.send_event_to_member(
             member_id,
             Event::QualityScoreUpdated {
                 partner_member_id,
@@ -125,17 +121,9 @@ impl PeersMetricsEventHandler for Room {
             },
         );
 
-        Box::new(
-            async move {
-                if let Err(e) = fut.await {
-                    error!(
-                        "Failed to send quality score to the client: {:?}",
-                        e
-                    );
-                }
-            }
-            .into_actor(self),
-        )
+        if let Err(e) = send_event_res {
+            error!("Failed to send quality score to the client: {:?}", e);
+        }
     }
 }
 
@@ -204,7 +192,7 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
 }
 
 /// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
-/// be updated with a provided [`TrackUpdate`]s, but without renegotiation.
+/// be updated with provided [`TrackUpdate`]s without negotiation.
 ///
 /// Can be done in any [`Peer`] state.
 #[derive(Message, Clone, Debug)]
@@ -212,7 +200,7 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
 pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
 
 impl Handler<ForceUpdate> for Room {
-    type Result = ActFuture<Result<(), RoomError>>;
+    type Result = Result<(), RoomError>;
 
     /// Gets [`MemberId`] of the provided [`Peer`] and sends all provided
     /// [`TrackUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
@@ -221,20 +209,16 @@ impl Handler<ForceUpdate> for Room {
         msg: ForceUpdate,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let member_id = actix_try!(self
+        let member_id = self
             .peers
-            .map_peer_by_id(msg.0, PeerStateMachine::member_id));
-        Box::new(
-            self.members
-                .send_event_to_member(
-                    member_id,
-                    Event::TracksApplied {
-                        peer_id: msg.0,
-                        updates: msg.1,
-                        negotiation_role: None,
-                    },
-                )
-                .into_actor(self),
+            .map_peer_by_id(msg.0, PeerStateMachine::member_id)?;
+        self.members.send_event_to_member(
+            member_id,
+            Event::TracksApplied {
+                peer_id: msg.0,
+                updates: msg.1,
+                negotiation_role: None,
+            },
         )
     }
 }
@@ -249,7 +233,7 @@ impl Handler<ForceUpdate> for Room {
 pub struct NegotiationNeeded(pub PeerId);
 
 impl Handler<NegotiationNeeded> for Room {
-    type Result = ActFuture<Result<(), RoomError>>;
+    type Result = Result<(), RoomError>;
 
     /// Starts negotiation for the [`Peer`] with provided [`PeerId`].
     ///
@@ -267,16 +251,16 @@ impl Handler<NegotiationNeeded> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let peer_id = msg.0;
-        actix_try!(self.peers.update_peer_tracks(peer_id));
+        self.peers.update_peer_tracks(peer_id)?;
 
         // Make sure that both peers are in stable state, if that is not the
         // case then we just skip this iteration, and wait for next
         // proc.
-        let mut peer: Peer<Stable> =
+        let peer: Peer<Stable> =
             if let Ok(peer) = self.peers.take_inner_peer(msg.0) {
                 peer
             } else {
-                return Box::new(fut::ok(()));
+                return Ok(());
             };
         let is_partner_stable = match self
             .peers
@@ -286,28 +270,20 @@ impl Handler<NegotiationNeeded> for Room {
             Err(e) => {
                 self.peers.add_peer(peer);
 
-                return Box::new(fut::err(e));
+                return Err(e);
             }
         };
         let is_known_to_remote = peer.is_known_to_remote();
-        let partner_peer_id = peer.partner_peer_id();
-        peer.negotiation_in_progress();
         self.peers.add_peer(peer);
 
         if is_partner_stable {
-            actix_try!(self.peers.map_peer_by_id_mut(
-                partner_peer_id,
-                |peer| {
-                    peer.negotiation_in_progress();
-                }
-            ));
             if is_known_to_remote {
                 self.send_tracks_applied(peer_id)
             } else {
                 self.send_peer_created(peer_id)
             }
         } else {
-            Box::new(fut::ok(()))
+            Ok(())
         }
     }
 }

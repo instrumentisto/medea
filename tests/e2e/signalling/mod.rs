@@ -26,7 +26,7 @@ use awc::{
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
     ClientMsg, Command, Event, IceCandidate, NegotiationRole, PeerId,
-    RpcSettings, ServerMsg, TrackId, TrackUpdate,
+    RpcSettings, ServerMsg, Track, TrackId, TrackUpdate,
 };
 
 pub type MessageHandler =
@@ -408,4 +408,31 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
 
         ctx.stop()
     }
+}
+
+/// Helper function that handles `Event::PeerCreated` returning
+/// `Command::MakeSdpOffer` or `Command::MakeSdpAnswer`.
+pub fn handle_peer_created(
+    peer_id: PeerId,
+    negotiation_role: &NegotiationRole,
+    tracks: &[Track],
+) -> SendCommand {
+    SendCommand(match negotiation_role {
+        NegotiationRole::Offerer => Command::MakeSdpOffer {
+            peer_id,
+            sdp_offer: "caller_offer".into(),
+            mids: tracks
+                .iter()
+                .map(|t| t.id)
+                .enumerate()
+                .map(|(mid, id)| (id, mid.to_string()))
+                .collect(),
+            senders_statuses: HashMap::new(),
+        },
+        NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
+            peer_id,
+            sdp_answer: "responder_answer".into(),
+            senders_statuses: HashMap::new(),
+        },
+    })
 }

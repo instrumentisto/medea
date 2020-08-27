@@ -1,24 +1,24 @@
-use std::{cell::Cell, collections::HashMap, rc::Rc, time::Duration};
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 use actix::{Addr, AsyncContext};
 use futures::{
-    channel::{
-        mpsc::{self, UnboundedReceiver},
-        oneshot,
-    },
-    future, StreamExt,
+    channel::mpsc::{self, UnboundedReceiver},
+    future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
     Command, Event, NegotiationRole, PeerId, TrackId, TrackPatch, TrackUpdate,
 };
 use medea_control_api_proto::grpc::api as proto;
+use tokio::time::timeout;
 
 use crate::{
     grpc_control_api::{
         create_room_req, ControlClient, WebRtcPlayEndpointBuilder,
         WebRtcPublishEndpointBuilder,
     },
-    signalling::{ConnectionEvent, SendCommand, TestMember},
+    signalling::{
+        handle_peer_created, ConnectionEvent, SendCommand, TestMember,
+    },
 };
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
@@ -145,67 +145,53 @@ async fn track_disables_and_enables() {
 #[actix_rt::test]
 async fn track_disables_and_enables_are_instant() {
     const TEST_NAME: &str = "track_disables_and_enables_are_instant";
+    const EVENTS_COUNT: usize = 100;
+
+    fn filter_events(
+        rx: UnboundedReceiver<Event>,
+    ) -> impl Stream<Item = (bool, Option<NegotiationRole>)> {
+        rx.filter_map(|val| async {
+            match val {
+                Event::TracksApplied {
+                    mut updates,
+                    negotiation_role,
+                    ..
+                } => {
+                    match updates.len() {
+                        0 => {
+                            // 0 updates means that TracksApplied must proc
+                            // negotiation
+                            negotiation_role.unwrap();
+                            None
+                        }
+                        1 => {
+                            if let TrackUpdate::Updated(patch) =
+                                updates.pop().unwrap()
+                            {
+                                Some((
+                                    patch.is_muted.unwrap(),
+                                    negotiation_role,
+                                ))
+                            } else {
+                                unreachable!();
+                            }
+                        }
+                        _ => unreachable!("patches dedup failed"),
+                    }
+                }
+                _ => None,
+            }
+        })
+    }
 
     let mut client = ControlClient::new().await;
     let credentials = client.create(create_room_req(TEST_NAME)).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
-    let _publisher = TestMember::connect(
+    let publisher = TestMember::connect(
         credentials.get("publisher").unwrap(),
-        Some(Box::new(move |event, ctx, _| {
-            if let Event::SdpAnswerMade { peer_id, .. } = event {
-                for i in 0..20 {
-                    let mut tracks_patches = Vec::new();
-                    tracks_patches.push(TrackPatch {
-                        id: TrackId(0),
-                        is_muted: Some(i % 2 == 0),
-                    });
-                    ctx.notify(SendCommand(Command::UpdateTracks {
-                        peer_id: *peer_id,
-                        tracks_patches,
-                    }));
-                }
-            }
-            publisher_tx.unbounded_send(event.clone()).unwrap();
-        })),
-        None,
-        Some(Duration::from_secs(500)),
-        true,
-    )
-    .await;
-    let (force_update_received_tx, force_update_received_rx) =
-        oneshot::channel();
-    let mut force_update_received_tx = Some(force_update_received_tx);
-    let (all_renegotiations_performed_tx, all_renegotiations_performed_rx) =
-        oneshot::channel();
-    let mut all_renegotiations_performed_tx =
-        Some(all_renegotiations_performed_tx);
-    let pub_peer_id = Rc::new(Cell::new(None));
-    let _subscriber = TestMember::connect(
-        credentials.get("responder").unwrap(),
-        Some(Box::new({
-            let pub_peer_id = Rc::clone(&pub_peer_id);
-            move |event, _, _| match event {
-                Event::PeerCreated { peer_id, .. } => {
-                    pub_peer_id.set(Some(*peer_id));
-                }
-                Event::TracksApplied {
-                    negotiation_role, ..
-                } => {
-                    if negotiation_role.is_none() {
-                        if let Some(force_update_received_tx) =
-                            force_update_received_tx.take()
-                        {
-                            let _ = force_update_received_tx.send(());
-                        }
-                    } else if let Some(all_renegotiations_performed_tx) =
-                        all_renegotiations_performed_tx.take()
-                    {
-                        all_renegotiations_performed_tx.send(()).unwrap();
-                    }
-                }
-                _ => {}
-            }
+        Some(Box::new(move |event, _, _| {
+            let _ = publisher_tx.unbounded_send(event.clone());
         })),
         None,
         Some(Duration::from_secs(500)),
@@ -213,37 +199,77 @@ async fn track_disables_and_enables_are_instant() {
     )
     .await;
 
-    // wait until initial negotiation finishes
+    let (subscriber_tx, subscriber_rx) = mpsc::unbounded();
+    let _subscriber = TestMember::connect(
+        credentials.get("responder").unwrap(),
+        Some(Box::new(move |event, _, _| {
+            let _ = subscriber_tx.unbounded_send(event.clone());
+        })),
+        None,
+        Some(Duration::from_secs(500)),
+        true,
+    )
+    .await;
+
+    // wait until initial negotiation finishes, and send a bunch of
+    // UpdateTracks
+    let mut mutes_sent = Vec::with_capacity(EVENTS_COUNT);
     loop {
         if let Event::SdpAnswerMade { .. } =
             publisher_rx.select_next_some().await
         {
+            for i in 0..EVENTS_COUNT {
+                let is_muted = i % 2 == 1;
+                mutes_sent.push(is_muted);
+                publisher.do_send(SendCommand(Command::UpdateTracks {
+                    peer_id: PeerId(0),
+                    tracks_patches: vec![TrackPatch {
+                        id: TrackId(0),
+                        is_muted: Some(is_muted),
+                    }],
+                }));
+            }
             break;
         };
     }
 
-    let (force_update_received, all_renegotiations_performed) =
-        tokio::time::timeout(
-            Duration::from_secs(30),
-            future::join(
-                tokio::time::timeout(
-                    Duration::from_secs(10),
-                    force_update_received_rx,
-                ),
-                tokio::time::timeout(
-                    Duration::from_secs(10),
-                    all_renegotiations_performed_rx,
-                ),
-            ),
-        )
-        .await
-        .unwrap();
-    force_update_received
-        .expect("force_update_received")
-        .unwrap();
-    all_renegotiations_performed
-        .expect("all_renegotiations_performed")
-        .unwrap();
+    // we dont know how many events we will receive, so gather events they
+    // stop going
+    let mut mutes_received_by_pub: Vec<_> = tokio::stream::StreamExt::timeout(
+        filter_events(publisher_rx),
+        Duration::from_secs(3),
+    )
+    .take_while(|val| future::ready(val.is_ok()))
+    .map(Result::unwrap)
+    .map(|val| val.0)
+    .collect()
+    .await;
+
+    let mut mutes_received_by_sub: Vec<_> = tokio::stream::StreamExt::timeout(
+        filter_events(subscriber_rx),
+        Duration::from_secs(3),
+    )
+    .take_while(|val| future::ready(val.is_ok()))
+    .map(Result::unwrap)
+    .collect()
+    .await;
+
+    let mutes_received_by_pub_len = mutes_received_by_pub.len();
+    assert!(mutes_sent.len() >= mutes_received_by_pub_len);
+
+    // make sure that there are no consecutive repeated elements
+    mutes_received_by_pub.dedup();
+    assert_eq!(mutes_received_by_pub.len(), mutes_received_by_pub_len);
+
+    // make sure that all TracksApplied events received by sub have
+    // Some(NegotiationRole), meaning that there no point to force push
+    // TracksApplied to other member
+    assert!(mutes_received_by_sub.iter().all(|val| val.1.is_some()));
+
+    assert_eq!(
+        mutes_sent.pop().unwrap(),
+        mutes_received_by_sub.pop().unwrap().0
+    );
 }
 
 #[actix_rt::test]
@@ -305,25 +331,10 @@ async fn track_disables_and_enables_are_instant2() {
             ..
         } = first_rx.select_next_some().await
         {
-            let answer = match negotiation_role {
-                NegotiationRole::Offerer => Command::MakeSdpOffer {
-                    peer_id,
-                    sdp_offer: "offer".into(),
-                    mids: tracks
-                        .iter()
-                        .map(|t| t.id)
-                        .enumerate()
-                        .map(|(mid, id)| (id, mid.to_string()))
-                        .collect(),
-                    senders_statuses: HashMap::new(),
-                },
-                NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
-                    peer_id,
-                    sdp_answer: "answer".into(),
-                    senders_statuses: HashMap::new(),
-                },
-            };
-            first.send(SendCommand(answer)).await.unwrap();
+            first
+                .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
+                .await
+                .unwrap();
             break;
         }
     }
@@ -336,28 +347,20 @@ async fn track_disables_and_enables_are_instant2() {
             ..
         } = second_rx.select_next_some().await
         {
-            let answer = match negotiation_role {
-                NegotiationRole::Offerer => Command::MakeSdpOffer {
-                    peer_id,
-                    sdp_offer: "offer".into(),
-                    mids: tracks
-                        .iter()
-                        .map(|t| t.id)
-                        .enumerate()
-                        .map(|(mid, id)| (id, mid.to_string()))
-                        .collect(),
-                    senders_statuses: HashMap::new(),
-                },
-                NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
-                    peer_id,
-                    sdp_answer: "answer".into(),
-                    senders_statuses: HashMap::new(),
-                },
-            };
-            second.send(SendCommand(answer)).await.unwrap();
+            second
+                .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
+                .await
+                .unwrap();
             break;
         }
     }
+    // wait until initial negotiation finishes
+    loop {
+        if let Event::SdpAnswerMade { .. } = first_rx.select_next_some().await {
+            break;
+        };
+    }
+
     first
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
@@ -413,19 +416,16 @@ async fn force_update_works() {
     let mut client = ControlClient::new().await;
     let credentials = client.create(create_room_req(TEST_NAME)).await;
 
-    let (
-        publisher_connection_established_tx,
-        mut publisher_connection_established_rx,
-    ) = mpsc::unbounded();
+    let (pub_con_established_tx, mut pub_con_established_rx) =
+        mpsc::unbounded();
     let (force_update_tx, mut force_update_rx) = mpsc::unbounded();
     let (renegotiation_update_tx, mut renegotiation_update_rx) =
         mpsc::unbounded();
-    let is_renegotiation_happened = Rc::new(Cell::new(false));
+    let renegotiation_done = Rc::new(Cell::new(false));
     let _publisher = TestMember::connect(
         credentials.get("publisher").unwrap(),
         Some(Box::new({
-            let is_renegotiation_happened =
-                Rc::clone(&is_renegotiation_happened);
+            let renegotiation_done = Rc::clone(&renegotiation_done);
             let renegotiation_update_tx = renegotiation_update_tx.clone();
             let force_update_tx = force_update_tx.clone();
             move |event, ctx, _| match &event {
@@ -445,7 +445,7 @@ async fn force_update_works() {
                 } => {
                     if negotiation_role.is_none() {
                         force_update_tx.unbounded_send(()).unwrap();
-                    } else if is_renegotiation_happened.get() {
+                    } else if renegotiation_done.get() {
                         renegotiation_update_tx.unbounded_send(()).unwrap();
                     } else {
                         ctx.notify(SendCommand(Command::UpdateTracks {
@@ -455,7 +455,7 @@ async fn force_update_works() {
                                 id: TrackId(0),
                             }],
                         }));
-                        is_renegotiation_happened.set(true);
+                        renegotiation_done.set(true);
                     }
                 }
                 _ => {}
@@ -463,9 +463,7 @@ async fn force_update_works() {
         })),
         Some(Box::new(move |event| {
             if let ConnectionEvent::Started = event {
-                publisher_connection_established_tx
-                    .unbounded_send(())
-                    .unwrap()
+                pub_con_established_tx.unbounded_send(()).unwrap()
             }
         })),
         Some(Duration::from_secs(500)),
@@ -473,7 +471,7 @@ async fn force_update_works() {
     )
     .await;
 
-    publisher_connection_established_rx.next().await.unwrap();
+    pub_con_established_rx.next().await.unwrap();
 
     let mut pub_peer_id = None;
     let mut track_id = None;
@@ -500,7 +498,7 @@ async fn force_update_works() {
             } => {
                 if negotiation_role.is_none() {
                     force_update_tx.unbounded_send(()).unwrap();
-                } else if is_renegotiation_happened.get() {
+                } else if renegotiation_done.get() {
                     renegotiation_update_tx.unbounded_send(()).unwrap();
                 } else {
                     ctx.notify(SendCommand(Command::UpdateTracks {
@@ -510,7 +508,7 @@ async fn force_update_works() {
                             id: track_id.unwrap(),
                         }],
                     }));
-                    is_renegotiation_happened.set(true);
+                    renegotiation_done.set(true);
                 }
             }
             _ => {}
@@ -522,11 +520,8 @@ async fn force_update_works() {
     .await;
 
     let (force_update, renegotiation_update) = future::join(
-        tokio::time::timeout(Duration::from_secs(10), force_update_rx.next()),
-        tokio::time::timeout(
-            Duration::from_secs(10),
-            renegotiation_update_rx.next(),
-        ),
+        timeout(Duration::from_secs(10), force_update_rx.next()),
+        timeout(Duration::from_secs(10), renegotiation_update_rx.next()),
     )
     .await;
     force_update.unwrap().unwrap();
