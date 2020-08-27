@@ -191,6 +191,42 @@ impl From<MediaConnectionsError> for RoomError {
     }
 }
 
+/// Stores and provides information about call quality received from server.
+///
+/// Will be provided to the [`RoomHandle::on_quality_score_update`] callback.
+#[wasm_bindgen]
+pub struct QualityScoreUpdate {
+    /// Average quality score with all partners.
+    avg_quality_score: f32,
+
+    /// Individual quality scores for all partners.
+    ///
+    /// Score will be in range from 1 to 4.
+    quality_scores: HashMap<MemberId, u8>,
+}
+
+#[wasm_bindgen]
+impl QualityScoreUpdate {
+    /// Returns average quality score with all partners.
+    ///
+    /// Score will be in range from 1 to 4.
+    pub fn avg_quality_score(&self) -> f32 {
+        self.avg_quality_score
+    }
+
+    /// Returns individual quality scores for all partners.
+    ///
+    /// Score will be in range from 1 to 4.
+    pub fn quality_scores(&self) -> Map {
+        let map = Map::new();
+        for (member_id, score) in &self.quality_scores {
+            map.set(&(member_id.0.clone()).into(), &(*score).into());
+        }
+
+        map
+    }
+}
+
 /// JS side handle to `Room` where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
@@ -316,7 +352,9 @@ impl RoomHandle {
     }
 
     /// Sets `on_quality_score_update` callback, which will be invoked when
-    /// connection quality score will be update by server.
+    /// connection quality score will be updated by server.
+    ///
+    /// [`QualityScoreUpdate`] will be provided into this callback.
     pub fn on_quality_score_update(
         &self,
         f: js_sys::Function,
@@ -549,30 +587,6 @@ impl Room {
         peer_id: PeerId,
     ) -> Option<Rc<PeerConnection>> {
         self.0.peers.get(peer_id)
-    }
-}
-
-#[wasm_bindgen]
-pub struct QualityScoreUpdate {
-    avg_quality_score: f32,
-    quality_scores: HashMap<MemberId, u8>,
-}
-
-#[wasm_bindgen]
-impl QualityScoreUpdate {
-    /// Returns average quality score.
-    pub fn avg_quality_score(&self) -> f32 {
-        self.avg_quality_score
-    }
-
-    /// Returns all quality scores from this [`Room`].
-    pub fn quality_scores(&self) -> Map {
-        let map = Map::new();
-        for (member_id, score) in &self.quality_scores {
-            map.set(&(member_id.0.clone()).into(), &(*score).into());
-        }
-
-        map
     }
 }
 
@@ -980,6 +994,7 @@ impl EventHandler for InnerRoom {
         self.quality_scores
             .borrow_mut()
             .insert(partner_member_id, quality_score);
+
         #[allow(clippy::cast_precision_loss)]
         let avg_quality_score = {
             let quality_scores = self.quality_scores.borrow();
@@ -987,11 +1002,11 @@ impl EventHandler for InnerRoom {
                 quality_scores.values().copied().map(u16::from).sum::<u16>(),
             ) / quality_scores.len() as f32
         };
+
         let update = QualityScoreUpdate {
             avg_quality_score,
             quality_scores: self.quality_scores.borrow().clone(),
         };
-
         self.on_quality_score_update.call(update);
 
         Ok(())

@@ -572,7 +572,7 @@ pub struct RtcRemoteInboundRtpStreamStats {
     /// left undefined.
     ///
     /// [1]: https://tools.ietf.org/html/rfc3550#section-6.4.1
-    pub round_trip_time: Option<HighResTimeStamp>,
+    pub round_trip_time: Option<Float>,
 
     /// Fraction packet loss reported for this SSRC. Calculated as defined in
     /// [Section 6.4.1 of RFC 3550][1] and [Appendix A.3][2].

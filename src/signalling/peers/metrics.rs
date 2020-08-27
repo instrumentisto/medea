@@ -717,6 +717,9 @@ impl PeerStat {
         receiver.update(upd);
     }
 
+    /// Updates inbound rtp stats based on the partner outbound stats.
+    ///
+    /// This stats should be received from the partner `Peer`.
     fn update_outbound_from_partners_inbound(
         &mut self,
         stat_id: StatId,
@@ -739,13 +742,12 @@ impl PeerStat {
         upd: &RtcRemoteInboundRtpStreamStats,
     ) {
         if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             self.quality_meter
-                .add_jitter((jitter * 1000.).round() as u64);
+                .add_jitter(Duration::from_secs_f64(jitter));
         }
-        if let Some(rtt) = upd.round_trip_time.filter(|t| t.0 > 0.) {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            self.quality_meter.add_rtt((rtt.0 * 1000.).round() as u64);
+        if let Some(rtt) = upd.round_trip_time.map(|f| f.0).filter(|t| *t > 0.)
+        {
+            self.quality_meter.add_rtt(Duration::from_secs_f64(rtt));
         }
     }
 

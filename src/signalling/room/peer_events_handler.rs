@@ -69,6 +69,8 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 }
 
 impl StreamHandler<PeersMetricsEvent> for Room {
+    /// Dispatches received [`PeerMetricsEvent`] with [`Room`]'s
+    /// [`PeerMetricsEventHandler`] implementation.
     fn handle(&mut self, event: PeersMetricsEvent, _: &mut Self::Context) {
         if let Err(err) = event.dispatch_with(self) {
             error!("Error handling PeersMetricsEvent: {:?}", err);
@@ -79,8 +81,7 @@ impl StreamHandler<PeersMetricsEvent> for Room {
 impl PeersMetricsEventHandler for Room {
     type Output = Result<(), RoomError>;
 
-    /// Notifies [`Room`] about [`PeerConnection`]'s partial media traffic
-    /// stopping.
+    /// Does nothing atm.
     fn on_no_traffic_flow(
         &mut self,
         _: PeerId,
@@ -91,7 +92,7 @@ impl PeersMetricsEventHandler for Room {
         Ok(())
     }
 
-    /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
+    /// Does nothing atm.
     fn on_traffic_flows(
         &mut self,
         _: PeerId,
