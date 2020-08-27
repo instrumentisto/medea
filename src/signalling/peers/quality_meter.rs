@@ -27,6 +27,7 @@ pub enum EstimatedConnectionQuality {
 /// Calculator of the [`EstimatedConnectionQuality`] score based on RTC stats.
 #[derive(Debug)]
 pub struct QualityMeter {
+    /// TTL of the all [`ExpiringStat`]s from this [`QualityMeter`].
     stats_ttl: Duration,
 
     /// Round trip time stats.
@@ -118,7 +119,7 @@ impl QualityMeter {
     /// simplifications and tweaks.
     ///
     /// [ITU-T G.107]: https://www.itu.int/rec/T-REC-G.107
-    /// [Algorithm::MOS]: https://tinyurl.com/y3nojmot
+    /// [Algorithm-MOS]: https://tinyurl.com/y3nojmot
     #[allow(clippy::cast_precision_loss)]
     pub fn calculate(&mut self) -> Option<EstimatedConnectionQuality> {
         let latency = self.mean_rtt()?.as_millis() as f64;
@@ -185,8 +186,9 @@ impl QualityMeter {
     }
 
     /// Returns average packet loss based on accumulated [`PacketLost`] and
-    /// [`PacketsSent`] stats filtering out expired measurements. Returns `None`
-    /// if there are not enough data to make calculations.
+    /// [`PacketsSent`] stats filtering out expired measurements.
+    ///
+    /// Returns `None` if there are not enough data to make calculations.
     fn mean_packet_loss(&mut self) -> Option<f64> {
         self.packets_lost.retain(|_, row| {
             remove_expired_stats(row);

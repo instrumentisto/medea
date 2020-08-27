@@ -197,7 +197,7 @@ impl From<MediaConnectionsError> for RoomError {
 #[wasm_bindgen]
 pub struct QualityScoreUpdate {
     /// Average quality score with all partners.
-    avg_quality_score: f32,
+    avg_quality_score: u8,
 
     /// Individual quality scores for all partners.
     ///
@@ -210,7 +210,7 @@ impl QualityScoreUpdate {
     /// Returns average quality score with all partners.
     ///
     /// Score will be in range from 1 to 4.
-    pub fn avg_quality_score(&self) -> f32 {
+    pub fn avg_quality_score(&self) -> u8 {
         self.avg_quality_score
     }
 
@@ -995,12 +995,11 @@ impl EventHandler for InnerRoom {
             .borrow_mut()
             .insert(partner_member_id, quality_score);
 
-        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::cast_possible_truncation)]
         let avg_quality_score = {
             let quality_scores = self.quality_scores.borrow();
-            f32::from(
-                quality_scores.values().copied().map(u16::from).sum::<u16>(),
-            ) / quality_scores.len() as f32
+            (quality_scores.values().copied().map(u16::from).sum::<u16>()
+                / quality_scores.len() as u16) as u8
         };
 
         let update = QualityScoreUpdate {

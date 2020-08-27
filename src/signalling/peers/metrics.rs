@@ -359,7 +359,7 @@ impl PeersMetricsService {
 
     /// Sends [`EstimatedQualityScore`] to the [`PeerMetricsEvent`]s subscriber.
     ///
-    /// Will be sent average score of the [`Peer`]s pair.
+    /// Will be sent minimum score of the [`Peer`]s pair.
     fn send_quality_score(&self, peer: &mut PeerStat) {
         if let Some(sender) = &self.events_tx {
             let partner_score = peer
@@ -379,6 +379,7 @@ impl PeersMetricsService {
                 if quality_score == peer.last_quality_score {
                     return;
                 }
+
                 peer.last_quality_score = quality_score;
                 if let Some(partner_member_id) = peer.get_partner_member_id() {
                     let _ = sender.unbounded_send(

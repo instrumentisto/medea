@@ -551,7 +551,7 @@ impl PeersService {
             .add_stats(peer_id, stats);
     }
 
-    /// Runs [`Peer`]s stats validation in the underlying [`PeerMetricsEvent`]s.
+    /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
     ///
     /// This task should be ran every second.
     pub fn check_peers(&self) {
