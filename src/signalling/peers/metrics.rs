@@ -24,10 +24,9 @@ use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, Stream};
 use medea_client_api_proto::{
     stats::{
-        HighResTimeStamp, RemoteInboundRtpStreamStat,
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
-        RtcStatsType, StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
+        RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
     },
     MediaType as MediaTypeProto, MemberId, PeerId,
 };
@@ -185,8 +184,8 @@ impl PeersMetricsService {
             state: PeerStatState::Connecting,
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
-            quality_meter: QualityMeter::new(),
-            last_quality_score: EstimatedConnectionQuality::ManyDissatisfied,
+            quality_meter: QualityMeter::new(Duration::from_secs(5)),
+            last_quality_score: EstimatedConnectionQuality::Low,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
@@ -222,27 +221,22 @@ impl PeersMetricsService {
             for stat in stats {
                 match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
-                        peer_ref.update_receiver(
-                            stat.timestamp,
-                            stat.id,
-                            inbound,
-                        );
-                    }
-                    RtcStatsType::OutboundRtp(outbound) => {
-                        peer_ref.update_sender(stat.id, outbound);
-                    }
-                    RtcStatsType::RemoteInboundRtp(remote_inbound) => {
+                        peer_ref.update_inbound_rtp(stat.id.clone(), inbound);
                         if let Some(partner_peer) =
                             peer_ref.partner_peer.upgrade()
                         {
-                            let mut partner_peer_ref =
-                                partner_peer.borrow_mut();
-                            partner_peer_ref.update_remote_inbound_rtp(
-                                stat.id.clone(),
-                                stat.timestamp,
-                                remote_inbound,
-                            );
+                            partner_peer
+                                .borrow_mut()
+                                .update_outbound_from_partners_inbound(
+                                    stat.id, inbound,
+                                );
                         }
+                    }
+                    RtcStatsType::OutboundRtp(outbound) => {
+                        peer_ref.update_outbound_rtp(stat.id, outbound);
+                    }
+                    RtcStatsType::RemoteInboundRtp(remote_inbound) => {
+                        peer_ref.update_remote_inbound_rtp(remote_inbound);
                     }
                     _ => (),
                 }
@@ -363,7 +357,7 @@ impl PeersMetricsService {
         }
     }
 
-    /// Sends [`EstimatedQualityScore`] to the [`PeerMetricsEvent`]s subsciber.
+    /// Sends [`EstimatedQualityScore`] to the [`PeerMetricsEvent`]s subscriber.
     ///
     /// Will be sent average score of the [`Peer`]s pair.
     fn send_quality_score(&self, peer: &mut PeerStat) {
@@ -376,12 +370,7 @@ impl PeersMetricsService {
                 .calculate()
                 .and_then(|score| {
                     partner_score
-                        .map(|partner_score| {
-                            EstimatedConnectionQuality::avg(
-                                score,
-                                partner_score,
-                            )
-                        })
+                        .map(|partner_score| score.min(partner_score))
                         .or_else(|| Some(score))
                 })
                 .or_else(|| partner_score);
@@ -689,7 +678,7 @@ impl PeerStat {
     /// [`RtcOutboundRtpStreamStats`].
     ///
     /// Updates [`MediaTrafficState`] of the [`Send`] direction.
-    fn update_sender(
+    fn update_outbound_rtp(
         &mut self,
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
@@ -709,41 +698,54 @@ impl PeerStat {
     /// [`RtcInboundRtpStreamStats`].
     ///
     /// Updates [`MediaTrafficState`] of the [`Recv`] direction.
-    fn update_receiver(
+    fn update_inbound_rtp(
         &mut self,
-        timestamp: HighResTimeStamp,
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
     ) {
         self.last_update = Utc::now();
         let ttl = self.stats_ttl;
         let receiver =
-            self.receivers.entry(stat_id.clone()).or_insert_with(|| {
-                TrackStat {
-                    updated_at: Instant::now(),
-                    ttl,
-                    direction: Recv {
-                        packets_received: 0,
-                    },
-                    media_type: TrackMediaType::from(&upd.media_specific_stats),
-                }
+            self.receivers.entry(stat_id).or_insert_with(|| TrackStat {
+                updated_at: Instant::now(),
+                ttl,
+                direction: Recv {
+                    packets_received: 0,
+                },
+                media_type: TrackMediaType::from(&upd.media_specific_stats),
             });
         receiver.update(upd);
-        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.0) {
+    }
+
+    fn update_outbound_from_partners_inbound(
+        &mut self,
+        stat_id: StatId,
+        upd: &RtcInboundRtpStreamStats,
+    ) {
+        #[allow(clippy::cast_sign_loss)]
+        let packets_lost =
+            upd.packets_lost.map_or(0, |plost| plost.max(0)) as u64;
+        self.quality_meter
+            .add_packets_lost(stat_id.clone(), packets_lost);
+        self.quality_meter
+            .add_packets_sent(stat_id, upd.packets_received + packets_lost);
+    }
+
+    /// Updates remote inbound rtp stats.
+    ///
+    /// Adds round trip time stats to the [`QualityMeter`].
+    fn update_remote_inbound_rtp(
+        &mut self,
+        upd: &RtcRemoteInboundRtpStreamStats,
+    ) {
+        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            self.quality_meter.add_jitter(
-                timestamp.into(),
-                stat_id.clone(),
-                (jitter * 1000.0) as u64,
-            );
+            self.quality_meter
+                .add_jitter((jitter * 1000.).round() as u64);
         }
-        if let Some(packets_lost) = upd.packets_lost {
-            self.quality_meter.add_packet_loss(
-                timestamp.into(),
-                stat_id,
-                packets_lost,
-                upd.packets_received,
-            );
+        if let Some(rtt) = upd.round_trip_time.filter(|t| t.0 > 0.) {
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            self.quality_meter.add_rtt((rtt.0 * 1000.).round() as u64);
         }
     }
 
@@ -752,30 +754,6 @@ impl PeerStat {
     /// Returns `None` if partner [`PeerStat`] weak reference can't be upgraded.
     fn partner_peer(&self) -> Option<Rc<RefCell<PeerStat>>> {
         self.partner_peer.upgrade()
-    }
-
-    /// Updates remote inbond rtp stats.
-    ///
-    /// Adds round trip time stats to the [`QualityMeter`].
-    fn update_remote_inbound_rtp(
-        &mut self,
-        stat_id: StatId,
-        timestamp: HighResTimeStamp,
-        upd: &RemoteInboundRtpStreamStat,
-    ) {
-        if let Some(rtt) = upd.round_trip_time.filter(|t| t.0 > 0.0) {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            let rtt = (rtt.0 * 1000.0) as u64;
-            self.quality_meter.add_rtt(timestamp.into(), rtt);
-        }
-        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.0) {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            self.quality_meter.add_jitter(
-                timestamp.into(),
-                stat_id,
-                (jitter * 1000.0) as u64,
-            );
-        }
     }
 
     /// Updates `recv_traffic_state` based on current `receivers` state.

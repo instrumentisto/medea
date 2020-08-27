@@ -1,8 +1,6 @@
 //! [`PeerConnectionStateEventsHandler`] implementation for [`Room`].
 
-use actix::{
-    fut, AsyncContext, Handler, Message, StreamHandler, WeakAddr, WrapFuture,
-};
+use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
     Event, MemberId, NegotiationRole, PeerId, TrackUpdate,
@@ -17,7 +15,7 @@ use crate::{
             EstimatedConnectionQuality, PeerConnectionStateEventsHandler,
             PeersMetricsEvent, PeersMetricsEventHandler,
         },
-        room::{ActFuture, RoomError},
+        room::RoomError,
         Room,
     },
 };
@@ -71,13 +69,15 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 }
 
 impl StreamHandler<PeersMetricsEvent> for Room {
-    fn handle(&mut self, event: PeersMetricsEvent, ctx: &mut Self::Context) {
-        event.dispatch_with(self);
+    fn handle(&mut self, event: PeersMetricsEvent, _: &mut Self::Context) {
+        if let Err(err) = event.dispatch_with(self) {
+            error!("Error handling PeersMetricsEvent: {:?}", err);
+        }
     }
 }
 
 impl PeersMetricsEventHandler for Room {
-    type Output = ();
+    type Output = Result<(), RoomError>;
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial media traffic
     /// stopping.
@@ -88,16 +88,17 @@ impl PeersMetricsEventHandler for Room {
         _: MediaType,
         _: MediaDirection,
     ) -> Self::Output {
+        Ok(())
     }
 
     /// Notifies [`Room`] about [`PeerConnection`]'s partial traffic starting.
-    #[allow(clippy::filter_map)]
     fn on_traffic_flows(
         &mut self,
         _: PeerId,
         _: MediaType,
         _: MediaDirection,
     ) -> Self::Output {
+        Ok(())
     }
 
     /// Sends [`Event::QualityScoreUpdated`] to the [`Member`] with a provided
@@ -108,22 +109,13 @@ impl PeersMetricsEventHandler for Room {
         partner_member_id: MemberId,
         quality_score: EstimatedConnectionQuality,
     ) -> Self::Output {
-        debug!(
-            "[{} <-> {}] Quality score: {}",
-            member_id, partner_member_id, quality_score
-        );
-
-        let send_event_res = self.members.send_event_to_member(
+        self.members.send_event_to_member(
             member_id,
             Event::QualityScoreUpdated {
                 partner_member_id,
                 quality_score: quality_score as u8,
             },
-        );
-
-        if let Err(e) = send_event_res {
-            error!("Failed to send quality score to the client: {:?}", e);
-        }
+        )
     }
 }
 
