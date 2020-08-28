@@ -6,7 +6,7 @@
 mod flowing_detector;
 mod quality_meter;
 
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, stream::LocalBoxStream};
@@ -102,6 +102,33 @@ pub enum PeersMetricsEvent {
     },
 }
 
+/// An interface for dealing with [`RtcStat`]s handlers.
+trait MetricHandler: Debug {
+    /// [`PeerMetricsService`] notifies [`MetricHandler`] about new
+    /// `PeerConnection`s creation.
+    fn register_peer(&mut self, peer_id: &PeerStateMachine);
+
+    /// [`MetricHandler`] should stop tracking provided [`Peer`]s.
+    fn unregister_peers(&mut self, peers_ids: &[PeerId]);
+
+    /// [`MetricHandler`] can update [`PeerStateMachine`]s internal
+    /// representation.
+    ///
+    /// Must be called each time [`PeerStateMachine`] tracks set changes (some
+    /// track was added or removed).
+    fn update_peer(&mut self, peer: &PeerStateMachine);
+
+    /// [`MetricHandler`] can process all collected stats, re-calculate metrics
+    /// and send [`PeerMetricsEvent`] (if it's needed).
+    ///
+    /// Will be called periodically by [`PeerMetricsService`].
+    fn check(&mut self);
+
+    /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
+    /// [`MetricHandler`].
+    fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+}
+
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
 pub struct PeerMetricsService {
@@ -159,7 +186,7 @@ impl PeerMetricsService {
 
     /// Calls [`MetricHandler::unregister_peer`] on the all registered
     /// [`MetricsHandler`]s.
-    pub fn unregister_peers(&mut self, peers_ids: &Vec<PeerId>) {
+    pub fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         for handler in &mut self.handlers {
             handler.unregister_peers(peers_ids);
         }
@@ -175,36 +202,9 @@ impl PeerMetricsService {
 
     /// Calls [`MetricHandler::add_stats`] on the all registered
     /// [`MetricsHandler`]s.
-    pub fn add_stats(&mut self, peer_id: PeerId, stats: &Vec<RtcStat>) {
+    pub fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         for handler in &mut self.handlers {
             handler.add_stat(peer_id, stats);
         }
     }
-}
-
-/// An interface for dealing with [`RtcStat`]s handlers.
-trait MetricHandler: std::fmt::Debug {
-    /// [`PeerMetricsService`] notifies [`MetricHandler`] about new
-    /// `PeerConnection`s creation.
-    fn register_peer(&mut self, peer_id: &PeerStateMachine);
-
-    /// [`MetricHandler`] should stop tracking provided [`Peer`]s.
-    fn unregister_peers(&mut self, peers_ids: &Vec<PeerId>);
-
-    /// [`MetricHandler`] can update [`PeerStateMachine`]s internal
-    /// representation.
-    ///
-    /// Must be called each time [`PeerStateMachine`] tracks set changes (some
-    /// track was added or removed).
-    fn update_peer(&mut self, peer: &PeerStateMachine);
-
-    /// [`MetricHandler`] can process all collected stats, re-calculate metrics
-    /// and send [`PeerMetricsEvent`] (if it's needed).
-    ///
-    /// Will be called periodically by [`PeerMetricsService`].
-    fn check(&mut self);
-
-    /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
-    /// [`MetricHandler`].
-    fn add_stat(&mut self, peer_id: PeerId, stats: &Vec<RtcStat>);
 }

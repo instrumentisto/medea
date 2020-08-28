@@ -134,7 +134,7 @@ impl QualityMeterService {
 
                 peer.last_quality_score = quality_score;
                 if let Some(partner_member_id) = peer.get_partner_member_id() {
-                    let _ = self.event_tx.send_event(
+                    self.event_tx.send_event(
                         PeersMetricsEvent::QualityMeterUpdate {
                             member_id: peer.member_id.clone(),
                             partner_member_id,
@@ -173,7 +173,7 @@ impl MetricHandler for QualityMeterService {
     }
 
     /// Removes provided [`PeerMetric`]s with the [`PeerId`]s.
-    fn unregister_peers(&mut self, peers_ids: &Vec<PeerId>) {
+    fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         for peer_id in peers_ids {
             self.peers.remove(peer_id);
         }
@@ -195,7 +195,7 @@ impl MetricHandler for QualityMeterService {
 
     /// Provides needed stats to the [`QualityMeter`] of the [`PeerMetric`] with
     /// a provided [`PeerId`].
-    fn add_stat(&mut self, peer_id: PeerId, stats: &Vec<RtcStat>) {
+    fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
             for stat in stats {

@@ -78,7 +78,7 @@ impl MetricHandler for FlowingDetector {
         self.register_peer(peer, Duration::from_secs(5));
     }
 
-    fn unregister_peers(&mut self, peers_ids: &Vec<PeerId>) {
+    fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         // TODO: Fix this please
         self.unregister_peers(peers_ids);
     }
@@ -91,9 +91,9 @@ impl MetricHandler for FlowingDetector {
         self.check_peers();
     }
 
-    fn add_stat(&mut self, peer_id: PeerId, stats: &Vec<RtcStat>) {
+    fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         // TODO: remove clone
-        self.add_stats(peer_id, stats.clone());
+        self.add_stats(peer_id, stats);
     }
 }
 
@@ -216,7 +216,7 @@ impl FlowingDetector {
     /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
     /// TrackTrafficStarted`] to the [`Room`] if some
     /// [`MediaType`]/[`Direction`] was stopped.
-    fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
@@ -233,7 +233,7 @@ impl FlowingDetector {
                         peer_ref.update_inbound_rtp(stat.id.clone(), inbound);
                     }
                     RtcStatsType::OutboundRtp(outbound) => {
-                        peer_ref.update_outbound_rtp(stat.id, outbound);
+                        peer_ref.update_outbound_rtp(stat.id.clone(), outbound);
                     }
                     _ => (),
                 }

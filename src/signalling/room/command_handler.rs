@@ -141,7 +141,7 @@ impl CommandHandler for Room {
     ) -> Self::Output {
         match metrics {
             PeerMetrics::RtcStats(stats) => {
-                self.peers.add_stats(peer_id, stats);
+                self.peers.add_stats(peer_id, &stats);
             }
             _ => (),
         }

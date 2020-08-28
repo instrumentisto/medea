@@ -541,7 +541,7 @@ impl PeersService {
     }
 
     /// Propagates stats to [`PeersMetricsService`].
-    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    pub fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
         self.peer_metrics_service
             .borrow_mut()
             .add_stats(peer_id, &stats);
