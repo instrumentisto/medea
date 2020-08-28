@@ -81,6 +81,13 @@ pub struct QualityMeterService {
 }
 
 impl QualityMeterService {
+    pub fn new(event_tx: EventSender) -> Self {
+        Self {
+            peers: HashMap::new(),
+            event_tx,
+        }
+    }
+
     fn update_quality_score(&self, peer: &mut Peer) {
         if self.event_tx.is_connected() {
             let partner_score = peer

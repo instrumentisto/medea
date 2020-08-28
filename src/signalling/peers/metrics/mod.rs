@@ -21,6 +21,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::signalling::peers::metrics::quality_meter::QualityMeterService;
 pub use quality_meter::EstimatedConnectionQuality;
 
 #[derive(Debug, Clone)]
@@ -100,12 +101,14 @@ impl PeerMetricsService {
         use self::flowing_detector::FlowingDetector;
 
         let event_tx = EventSender::new();
-        let handlers: Vec<Box<dyn MetricHandler>> =
-            vec![Box::new(FlowingDetector::new(
+        let handlers: Vec<Box<dyn MetricHandler>> = vec![
+            Box::new(FlowingDetector::new(
                 room_id,
                 event_tx.clone(),
                 peers_traffic_watcher,
-            ))];
+            )),
+            Box::new(QualityMeterService::new(event_tx.clone())),
+        ];
 
         Self { event_tx, handlers }
     }
