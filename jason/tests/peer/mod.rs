@@ -20,7 +20,7 @@ use medea_client_api_proto::{
     Track, TrackId, TrackPatch, VideoSettings,
 };
 use medea_jason::{
-    media::{LocalStreamConstraints, MediaManager, RecvConstraints},
+    media::{LocalStreamConstraints, MediaManager, RecvConstraints, TrackKind},
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
     },
@@ -128,7 +128,7 @@ async fn new_with_mute_audio() {
         Vec::new(),
         manager,
         false,
-        get_media_stream_settings(true, false).into(),
+        get_media_stream_settings(false, true).into(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -152,7 +152,7 @@ async fn new_with_mute_video() {
         Vec::new(),
         manager,
         false,
-        get_media_stream_settings(false, true).into(),
+        get_media_stream_settings(true, false).into(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -334,7 +334,7 @@ async fn send_event_on_new_local_stream() {
         Vec::new(),
         manager,
         false,
-        get_media_stream_settings(false, true).into(),
+        get_media_stream_settings(true, false).into(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -902,4 +902,102 @@ async fn reset_transition_timers() {
     peer.reset_state_transitions_timers();
 
     timeout(600, all_unmuted).await.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn new_remote_track() {
+    let (tx1, _rx1) = mpsc::unbounded();
+    let (tx2, mut rx2) = mpsc::unbounded();
+
+    let manager = Rc::new(MediaManager::default());
+    let sender_peer = PeerConnection::new(
+        PeerId(1),
+        tx1,
+        Vec::new(),
+        Rc::clone(&manager),
+        false,
+        LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
+    )
+    .unwrap();
+
+    let rcv_caps = RecvConstraints::default();
+    rcv_caps.set_enabled(false, TransceiverKind::Audio);
+    let rcvr_peer = PeerConnection::new(
+        PeerId(2),
+        tx2,
+        Vec::new(),
+        manager,
+        false,
+        LocalStreamConstraints::default(),
+        Rc::new(rcv_caps),
+    )
+    .unwrap();
+    let (audio_track, video_track) = get_test_unrequired_tracks();
+
+    let offer = sender_peer
+        .get_offer(vec![audio_track.clone(), video_track.clone()])
+        .await
+        .unwrap();
+    let answer = rcvr_peer
+        .process_offer(
+            offer,
+            vec![
+                Track {
+                    id: TrackId(1),
+                    direction: Direction::Recv {
+                        sender: MemberId::from("whatever"),
+                        mid: Some(String::from("0")),
+                    },
+                    media_type: MediaType::Audio(AudioSettings {
+                        is_required: true,
+                    }),
+                },
+                Track {
+                    id: TrackId(2),
+                    direction: Direction::Recv {
+                        sender: MemberId::from("whatever"),
+                        mid: Some(String::from("1")),
+                    },
+                    media_type: MediaType::Video(VideoSettings {
+                        is_required: true,
+                    }),
+                },
+            ],
+        )
+        .await
+        .unwrap();
+    sender_peer.set_remote_answer(answer).await.unwrap();
+
+    while let Some(event) = rx2.next().await {
+        match event {
+            PeerEvent::NewRemoteTrack {
+                sender_id,
+                track_id,
+                track,
+            } => {
+                assert_eq!(sender_id, MemberId::from("whatever"));
+                assert_eq!(track_id, TrackId(2));
+                assert_eq!(track.kind(), TrackKind::Video);
+                break;
+            }
+            PeerEvent::NewLocalStream { .. } => {}
+            _ => unreachable!(),
+        }
+    }
+
+    // no more PeerEvent::NewRemoteTrack are fired
+    assert!(timeout(
+        300,
+        rx2.filter(|event| {
+            if let PeerEvent::NewRemoteTrack { .. } = event {
+                future::ready(true)
+            } else {
+                future::ready(false)
+            }
+        })
+        .next()
+    )
+    .await
+    .is_err());
 }

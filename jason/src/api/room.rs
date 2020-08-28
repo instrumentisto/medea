@@ -29,7 +29,7 @@ use crate::{
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
         PeerEventHandler, PeerRepository, RtcStats, Sender, StableMuteState,
-        TrackDirection, TransceiverKind,
+        TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -195,7 +195,6 @@ impl From<MediaConnectionsError> for RoomError {
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
-// TODO: get rid of this RefCell.
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<InnerRoom>);
 
@@ -251,25 +250,23 @@ impl RoomHandle {
         Ok(())
     }
 
-    /// Calls [`InnerRoom::toggle_mute`] until all [`PeerConnection`]s of this
-    /// [`Room`] will have same [`MuteState`] as requested.
-    async fn toggle_mute(
+    /// Enables or disable specified media type publish in all
+    /// [`PeerConnection`]s.
+    async fn set_send_track_enabled(
         &self,
-        is_muted: bool,
+        enabled: bool,
         kind: TransceiverKind,
-        direction: TrackDirection,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.toggle_disable_constraints(is_muted, kind, direction);
+        inner.send_constraints.set_enabled(enabled, kind);
         while !inner
-            .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
+            .is_all_peers_in_mute_state(kind, StableMuteState::from(!enabled))
         {
             inner
-                .toggle_mute(is_muted, kind)
+                .toggle_mute(!enabled, kind)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    inner
-                        .toggle_disable_constraints(!is_muted, kind, direction);
+                    inner.send_constraints.set_enabled(enabled, kind);
                     tracerr::new!(e)
                 })?;
         }
@@ -372,12 +369,8 @@ impl RoomHandle {
     pub fn mute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(
-                true,
-                TransceiverKind::Audio,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(false, TransceiverKind::Audio)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -386,12 +379,8 @@ impl RoomHandle {
     pub fn unmute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(
-                false,
-                TransceiverKind::Audio,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(true, TransceiverKind::Audio)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -400,12 +389,8 @@ impl RoomHandle {
     pub fn mute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(
-                true,
-                TransceiverKind::Video,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(false, TransceiverKind::Video)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -414,12 +399,52 @@ impl RoomHandle {
     pub fn unmute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.toggle_mute(
-                false,
-                TransceiverKind::Video,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(true, TransceiverKind::Video)
+                .await?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Mutes inbound audio in this [`Room`].
+    pub fn mute_remote_audio(&self) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        future_to_promise(async move {
+            inner?
+                .recv_constraints
+                .set_enabled(false, TransceiverKind::Audio);
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Unmutes inbound audio in this [`Room`].
+    pub fn unmute_remote_audio(&self) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        future_to_promise(async move {
+            inner?
+                .recv_constraints
+                .set_enabled(true, TransceiverKind::Audio);
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Mutes inbound video in this [`Room`].
+    pub fn mute_remote_video(&self) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        future_to_promise(async move {
+            inner?
+                .recv_constraints
+                .set_enabled(false, TransceiverKind::Video);
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Unmutes inbound video in this [`Room`].
+    pub fn unmute_remote_video(&self) -> Promise {
+        let inner = upgrade_or_detached!(self.0, JasonError);
+        future_to_promise(async move {
+            inner?
+                .recv_constraints
+                .set_enabled(true, TransceiverKind::Video);
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -461,12 +486,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = Rc::new(InnerRoom::new(
-            rpc,
-            peers,
-            tx,
-            LocalStreamConstraints::default(),
-        ));
+        let room = Rc::new(InnerRoom::new(rpc, peers, tx));
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -570,12 +590,12 @@ struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcClient>,
 
-    /// Local media stream for injecting into new created [`PeerConnection`]s.
-    ///
-    /// This constraints will be used for the [`Sender`]s.
+    /// Constraints to local [`MediaStream`] that is being published by
+    /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalStreamConstraints,
 
-    /// Constraints for the [`Receiver`]s.
+    /// Constraints to the [`MediaStream`]s received by [`PeerConnection`]s in
+    /// this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
     /// [`PeerConnection`] repository.
@@ -621,11 +641,10 @@ impl InnerRoom {
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-        send_constraints: LocalStreamConstraints,
     ) -> Self {
         Self {
             rpc,
-            send_constraints,
+            send_constraints: LocalStreamConstraints::default(),
             recv_constraints: Rc::new(RecvConstraints::default()),
             peers,
             peer_event_sender,
@@ -638,22 +657,6 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
-        }
-    }
-
-    /// Toggles [`InnerRoom::recv_constraints`] or
-    /// [`InnerRoom::send_constraints`] mute status based on the provided
-    /// [`TransceiverDirection`] and [`TransceiverKind`].
-    fn toggle_disable_constraints(
-        &self,
-        is_muted: bool,
-        kind: TransceiverKind,
-        direction: TrackDirection,
-    ) {
-        if let TrackDirection::Recv = direction {
-            self.recv_constraints.toggle_disable(is_muted, kind);
-        } else {
-            self.send_constraints.toggle_disable(is_muted, kind);
         }
     }
 
@@ -809,11 +812,10 @@ impl InnerRoom {
                     .map_err(tracerr::map_from_and_wrap!())?;
                 let mids =
                     peer.get_mids().map_err(tracerr::map_from_and_wrap!())?;
-                let senders_statuses = peer.get_senders_statuses();
                 self.rpc.send_command(Command::MakeSdpOffer {
                     peer_id: peer.id(),
                     sdp_offer,
-                    senders_statuses,
+                    transceivers_statuses: peer.get_transceivers_statuses(),
                     mids,
                 });
             }
@@ -822,11 +824,10 @@ impl InnerRoom {
                     .process_offer(offer, tracks)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
-                let senders_statuses = peer.get_senders_statuses();
                 self.rpc.send_command(Command::MakeSdpAnswer {
                     peer_id: peer.id(),
                     sdp_answer,
-                    senders_statuses,
+                    transceivers_statuses: peer.get_transceivers_statuses(),
                 });
             }
         };

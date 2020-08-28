@@ -149,16 +149,18 @@ pub enum Command {
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
-        /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
         peer_id: PeerId,
         sdp_answer: String,
-        /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends Ice Candidate.
@@ -618,7 +620,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -628,7 +630,7 @@ mod test {
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
                     \"mids\":{\"0\":\"1\"},\
-                    \"senders_statuses\":{}\
+                    \"transceivers_statuses\":{}\
                 }\
             }";
 

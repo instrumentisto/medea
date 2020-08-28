@@ -250,14 +250,17 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    /// Returns publishing statuses of the all [`Sender`]s from this
-    /// [`MediaConnections`].
-    pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
+    /// Returns activity statuses of the all [`Sender`]s and [`Receiver`]s from
+    /// this [`MediaConnections`].
+    pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
 
         let mut out = HashMap::new();
         for (track_id, sender) in &inner.senders {
             out.insert(*track_id, sender.is_publishing());
+        }
+        for (track_id, receiver) in &inner.receivers {
+            out.insert(*track_id, receiver.is_receiving());
         }
         out
     }

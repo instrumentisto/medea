@@ -21,20 +21,13 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 #[derive(Clone, Debug, Default)]
 pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
 
-/// Constraints for the [`Receiver`]s.
+/// Constraints to the media received from remote. Used to disable or enable
+/// media receiving.
 pub struct RecvConstraints {
-    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Audio`]
-    /// in this [`Room`].
-    ///
-    /// Based on this value, new [`Receiver`]s will be muted (or not) on
-    /// [`Event::PeerCreated`].
+    /// Is audio receiving enabled.
     is_audio_enabled: Cell<bool>,
 
-    /// Current mute state of the [`Receiver`]s with [`TransceiverKind::Video`]
-    /// in this [`Room`].
-    ///
-    /// Based on this value, new [`Receiver`]s will be muted (or not) on
-    /// [`Event::PeerCreated`].
+    /// Is video receiving enabled.
     is_video_enabled: Cell<bool>,
 }
 
@@ -48,37 +41,26 @@ impl Default for RecvConstraints {
 }
 
 impl RecvConstraints {
-    /// Sets [`RecvConstraints::is_audio_enabled`] or
-    /// [`RecvConstraints::is_video_enabled`] (based on [`TransceiverKind`]) to
-    /// the provided `is_enabled`.
-    pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
+    /// Enables or disables audio or video receiving.
+    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
-                self.is_audio_enabled.set(is_enabled);
+                self.is_audio_enabled.set(enabled);
             }
             TransceiverKind::Video => {
-                self.is_video_enabled.set(is_enabled);
+                self.is_video_enabled.set(enabled);
             }
         }
     }
 
-    /// Sets [`RecvConstraints::is_audio_enabled`] or
-    /// [`RecvConstraints::is_video_enabled`] (based on [`TransceiverKind`]) to
-    /// the opposite to the provided `is_disabled`.
-    pub fn toggle_disable(&self, is_disabled: bool, kind: TransceiverKind) {
-        self.toggle_enable(!is_disabled, kind);
+    /// Returns is audio receiving is enabled.
+    pub fn is_audio_enabled(&self) -> bool {
+        self.is_audio_enabled.get()
     }
 
-    /// Returns `true` if [`TransceiverKind::Audio`] is disabled in this
-    /// [`RecvConstraints`].
-    pub fn is_audio_disabled(&self) -> bool {
-        !self.is_audio_enabled.get()
-    }
-
-    /// Returns `true` if [`TransceiverKind::Audio`] is disabled in this
-    /// [`RecvConstraints`].
-    pub fn is_video_disabled(&self) -> bool {
-        !self.is_video_enabled.get()
+    /// Returns is video receiving is enabled.
+    pub fn is_video_enabled(&self) -> bool {
+        self.is_video_enabled.get()
     }
 }
 
@@ -118,8 +100,8 @@ impl LocalStreamConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn toggle_disable(&self, is_disabled: bool, kind: TransceiverKind) {
-        self.0.borrow_mut().toggle_disable(is_disabled, kind);
+    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
+        self.0.borrow_mut().set_track_enabled(enabled, kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -291,13 +273,13 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn toggle_disable(&mut self, is_disabled: bool, kind: TransceiverKind) {
+    pub fn set_track_enabled(&mut self, enabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
-                self.toggle_publish_audio(!is_disabled);
+                self.toggle_publish_audio(enabled);
             }
             TransceiverKind::Video => {
-                self.toggle_publish_video(!is_disabled);
+                self.toggle_publish_video(enabled);
             }
         }
     }

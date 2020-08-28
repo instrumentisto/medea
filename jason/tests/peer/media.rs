@@ -36,7 +36,7 @@ async fn get_test_media_connections(
     media_connections
         .create_tracks(
             vec![audio_track, video_track],
-            &get_media_stream_settings(!enabled_audio, !enabled_video).into(),
+            &get_media_stream_settings(enabled_audio, enabled_video).into(),
             &RecvConstraints::default(),
         )
         .unwrap();

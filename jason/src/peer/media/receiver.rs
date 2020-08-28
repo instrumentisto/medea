@@ -1,5 +1,7 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
+use std::cell::Cell;
+
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
@@ -23,6 +25,7 @@ pub struct Receiver {
     track_id: TrackId,
     sender_id: MemberId,
     transceiver: Option<RtcRtpTransceiver>,
+    transceiver_direction: Cell<TransceiverDirection>,
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
     enabled: bool,
@@ -33,6 +36,10 @@ impl Receiver {
     /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
     /// creates [`Receiver`] without [`RtcRtpTransceiver`]. It will be injected
     /// when [`MediaStreamTrack`] arrives.
+    ///
+    /// Created [`RtcRtpTransceiver`] direction is set to
+    /// [`TransceiverDirection::Inactive`] if media receiving is disabled in
+    /// provided [`RecvConstraints`].
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
@@ -47,14 +54,14 @@ impl Receiver {
         recv_constraints: &RecvConstraints,
     ) -> Self {
         let kind = TransceiverKind::from(caps);
-        let muted = match kind {
-            TransceiverKind::Audio => recv_constraints.is_audio_disabled(),
-            TransceiverKind::Video => recv_constraints.is_video_disabled(),
+        let enabled = match kind {
+            TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
+            TransceiverKind::Video => recv_constraints.is_video_enabled(),
         };
-        let transceiver_direction = if muted {
-            TransceiverDirection::Inactive
-        } else {
+        let transceiver_direction = if enabled {
             TransceiverDirection::Recvonly
+        } else {
+            TransceiverDirection::Inactive
         };
         let transceiver = match mid {
             None => Some(peer.add_transceiver(kind, transceiver_direction)),
@@ -64,9 +71,10 @@ impl Receiver {
             track_id,
             sender_id,
             transceiver,
+            transceiver_direction: Cell::new(transceiver_direction),
             mid,
             track: None,
-            enabled: !muted,
+            enabled,
             peer_events_sender,
         }
     }
@@ -81,26 +89,18 @@ impl Receiver {
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
     ) {
-        transceiver.set_direction(self.get_direction().into());
         self.transceiver.replace(transceiver);
         self.track.replace(track.clone());
         track.set_enabled(self.enabled);
 
-        let _ =
-            self.peer_events_sender
-                .unbounded_send(PeerEvent::NewRemoteTrack {
+        if self.is_receiving() {
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::NewRemoteTrack {
                     sender_id: self.sender_id.clone(),
                     track_id: self.track_id,
                     track,
-                });
-    }
-
-    /// Returns current [`TransceiverDirection`] of this [`Receiver`].
-    fn get_direction(&self) -> TransceiverDirection {
-        if self.enabled {
-            TransceiverDirection::Recvonly
-        } else {
-            TransceiverDirection::Inactive
+                },
+            );
         }
     }
 
@@ -111,9 +111,17 @@ impl Receiver {
             if let Some(track) = &self.track {
                 track.set_enabled(!is_muted);
             }
-            if let Some(transceiver) = &self.transceiver {
-                transceiver.set_direction(self.get_direction().into());
+        }
+    }
+
+    /// Returns `true` if current [`RtcRtpTransceiver`]s direction is
+    /// [`TransceiverDirection::Recvonly`].
+    pub fn is_receiving(&self) -> bool {
+        match self.transceiver_direction.get() {
+            TransceiverDirection::Sendonly | TransceiverDirection::Inactive => {
+                false
             }
+            TransceiverDirection::Recvonly => true,
         }
     }
 
@@ -121,7 +129,7 @@ impl Receiver {
     ///
     /// Tries to fetch it from the underlying [`RtcRtpTransceiver`] if current
     /// value is `None`.
-    pub(crate) fn mid(&mut self) -> Option<&str> {
+    pub fn mid(&mut self) -> Option<&str> {
         if self.mid.is_none() && self.transceiver.is_some() {
             self.mid = self.transceiver.as_ref().unwrap().mid()
         }

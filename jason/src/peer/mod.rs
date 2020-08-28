@@ -218,7 +218,8 @@ pub struct PeerConnection {
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalStreamConstraints,
 
-    /// Constraints for the [`Receiver`]s from this [`PeerConnection`].
+    /// Constraints to the [`MediaStream`]s received by this
+    /// [`PeerConnection`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 }
 
@@ -548,8 +549,8 @@ impl PeerConnection {
 
     /// Returns publishing statuses of the all [`Sender`]s from this
     /// [`MediaConnections`].
-    pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
-        self.media_connections.get_senders_statuses()
+    pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
+        self.media_connections.get_transceivers_statuses()
     }
 
     /// Syncs provided tracks creating all required `Sender`s and `Receiver`s,
