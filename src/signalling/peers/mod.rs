@@ -1,7 +1,6 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
 mod media_traffic_state;
-mod metric;
 mod metrics;
 mod quality_meter;
 mod traffic_watcher;
@@ -36,10 +35,10 @@ use crate::{
     turn::{TurnAuthService, UnreachablePolicy},
 };
 
-use self::metric::Metrics;
+use self::metrics::PeerMetricsService;
 
 pub use self::{
-    metric::{PeersMetricsEvent, PeersMetricsEventHandler},
+    metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     quality_meter::EstimatedConnectionQuality,
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource,
@@ -79,7 +78,7 @@ pub struct PeersService {
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: RefCell<Metrics>,
+    peer_metrics_service: RefCell<PeerMetricsService>,
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
@@ -142,7 +141,7 @@ impl PeersService {
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_traffic_watcher: peers_traffic_watcher.clone(),
-            peer_metrics_service: RefCell::new(Metrics::new(
+            peer_metrics_service: RefCell::new(PeerMetricsService::new(
                 room_id,
                 peers_traffic_watcher,
             )),

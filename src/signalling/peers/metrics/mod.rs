@@ -1,4 +1,4 @@
-mod flow_detector;
+mod flowing_detector;
 
 use crate::{
     api::control::{
@@ -84,21 +84,21 @@ pub enum PeersMetricsEvent {
 }
 
 #[derive(Debug)]
-pub struct Metrics {
+pub struct PeerMetricsService {
     event_tx: EventSender,
     handlers: Vec<Box<dyn MetricHandler>>,
 }
 
-impl Metrics {
+impl PeerMetricsService {
     pub fn new(
         room_id: RoomId,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Self {
-        use self::flow_detector::PeersMetricsService;
+        use self::flowing_detector::FlowingDetector;
 
         let event_tx = EventSender::new();
         let handlers: Vec<Box<dyn MetricHandler>> =
-            vec![Box::new(PeersMetricsService::new(
+            vec![Box::new(FlowingDetector::new(
                 room_id,
                 event_tx.clone(),
                 peers_traffic_watcher,

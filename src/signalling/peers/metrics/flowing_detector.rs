@@ -55,13 +55,13 @@ use super::super::{
 };
 use crate::{
     media::PeerStateMachine,
-    signalling::peers::metric::{EventSender, MetricHandler},
+    signalling::peers::metrics::{EventSender, MetricHandler},
 };
 use std::collections::HashSet;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
-pub struct PeersMetricsService {
+pub struct FlowingDetector {
     /// [`RoomId`] of Room to which this [`PeersMetricsService`] belongs
     /// to.
     room_id: RoomId,
@@ -81,7 +81,7 @@ pub struct PeersMetricsService {
     event_tx: EventSender,
 }
 
-impl super::MetricHandler for PeersMetricsService {
+impl super::MetricHandler for FlowingDetector {
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         // TODO: provide stats_ttl to the Context
         self.register_peer(peer, Duration::from_secs(5));
@@ -106,7 +106,7 @@ impl super::MetricHandler for PeersMetricsService {
     }
 }
 
-impl PeersMetricsService {
+impl FlowingDetector {
     pub fn new(
         room_id: RoomId,
         event_tx: EventSender,
@@ -972,9 +972,9 @@ mod tests {
         },
     };
 
-    use super::PeersMetricsService;
+    use super::FlowingDetector;
 
-    impl PeersMetricsService {
+    impl FlowingDetector {
         /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
         /// registered in the [`PeersMetricsService`].
         #[inline]
@@ -1089,7 +1089,7 @@ mod tests {
         peer_events_stream: LocalBoxStream<'static, PeersMetricsEvent>,
 
         /// Actual [`PeerMetricsService`].
-        metrics: PeersMetricsService,
+        metrics: FlowingDetector,
     }
 
     impl Helper {
@@ -1114,7 +1114,7 @@ mod tests {
                 traffic_stopped_tx.unbounded_send(()).unwrap();
             });
 
-            let mut metrics = PeersMetricsService::new(
+            let mut metrics = FlowingDetector::new(
                 "test".to_string().into(),
                 Arc::new(watcher),
             );
