@@ -44,15 +44,13 @@ use crate::{
         media_traffic_state::{
             get_diff_added, get_diff_removed, MediaTrafficState,
         },
-        quality_meter::EstimatedConnectionQuality,
+        traffic_watcher::PeerTrafficWatcher,
         FlowMetricSource,
     },
     utils::instant_into_utc,
 };
 
-use super::super::{
-    quality_meter::QualityMeter, traffic_watcher::PeerTrafficWatcher,
-};
+use super::quality_meter::{EstimatedConnectionQuality, QualityMeter};
 use crate::{
     media::PeerStateMachine,
     signalling::peers::metrics::{EventSender, MetricHandler},

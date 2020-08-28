@@ -2,7 +2,6 @@
 
 mod media_traffic_state;
 mod metrics;
-mod quality_meter;
 mod traffic_watcher;
 
 use std::{
@@ -38,8 +37,9 @@ use crate::{
 use self::metrics::PeerMetricsService;
 
 pub use self::{
-    metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
-    quality_meter::EstimatedConnectionQuality,
+    metrics::{
+        EstimatedConnectionQuality, PeersMetricsEvent, PeersMetricsEventHandler,
+    },
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource,
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,

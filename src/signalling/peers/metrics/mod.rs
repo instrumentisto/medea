@@ -1,4 +1,5 @@
 mod flowing_detector;
+mod quality_meter;
 
 use crate::{
     api::control::{
@@ -6,7 +7,7 @@ use crate::{
         RoomId,
     },
     media::{Peer, PeerStateMachine},
-    signalling::peers::{EstimatedConnectionQuality, PeerTrafficWatcher},
+    signalling::peers::PeerTrafficWatcher,
 };
 use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, stream::LocalBoxStream};
@@ -19,6 +20,8 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
+
+pub use quality_meter::EstimatedConnectionQuality;
 
 #[derive(Debug, Clone)]
 pub struct EventSender(

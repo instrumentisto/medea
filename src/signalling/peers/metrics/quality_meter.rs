@@ -5,8 +5,182 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use crate::{
+    media::PeerStateMachine,
+    signalling::peers::{metrics::EventSender, PeersMetricsEvent},
+};
 use derive_more::Display;
-use medea_client_api_proto::stats::StatId;
+use medea_client_api_proto::{
+    stats::{
+        RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
+        RtcStatsType, StatId,
+    },
+    MemberId, PeerId,
+};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
+
+#[derive(Debug)]
+struct Peer {
+    id: PeerId,
+    member_id: MemberId,
+    partner_peer: Weak<RefCell<Peer>>,
+    quality_meter: QualityMeter,
+    last_quality_score: EstimatedConnectionQuality,
+}
+
+impl Peer {
+    /// Updates remote inbound rtp stats.
+    ///
+    /// Adds round trip time stats to the [`QualityMeter`].
+    fn update_remote_inbound_rtp(
+        &mut self,
+        upd: &RtcRemoteInboundRtpStreamStats,
+    ) {
+        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
+            self.quality_meter
+                .add_jitter(Duration::from_secs_f64(jitter));
+        }
+        if let Some(rtt) = upd.round_trip_time.map(|f| f.0).filter(|t| *t > 0.)
+        {
+            self.quality_meter.add_rtt(Duration::from_secs_f64(rtt));
+        }
+    }
+
+    /// Updates inbound rtp stats based on the partner outbound stats.
+    ///
+    /// This stats should be received from the partner `Peer`.
+    fn update_outbound_from_partners_inbound(
+        &mut self,
+        stat_id: StatId,
+        upd: &RtcInboundRtpStreamStats,
+    ) {
+        #[allow(clippy::cast_sign_loss)]
+        let packets_lost =
+            upd.packets_lost.map_or(0, |plost| plost.max(0)) as u64;
+        self.quality_meter
+            .add_packets_lost(stat_id.clone(), packets_lost);
+        self.quality_meter
+            .add_packets_sent(stat_id, upd.packets_received + packets_lost);
+    }
+
+    /// Returns [`MemberId`] of the partner [`Member`].
+    fn get_partner_member_id(&self) -> Option<MemberId> {
+        self.partner_peer
+            .upgrade()
+            .map(|partner_peer| partner_peer.borrow().member_id.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct QualityMeterService {
+    peers: HashMap<PeerId, Rc<RefCell<Peer>>>,
+    event_tx: EventSender,
+}
+
+impl QualityMeterService {
+    fn update_quality_score(&self, peer: &mut Peer) {
+        if self.event_tx.is_connected() {
+            let partner_score = peer
+                .partner_peer
+                .upgrade()
+                .and_then(|p| p.borrow_mut().quality_meter.calculate());
+            let score = peer
+                .quality_meter
+                .calculate()
+                .and_then(|score| {
+                    partner_score
+                        .map(|partner_score| score.min(partner_score))
+                        .or_else(|| Some(score))
+                })
+                .or_else(|| partner_score);
+
+            if let Some(quality_score) = score {
+                if quality_score == peer.last_quality_score {
+                    return;
+                }
+
+                peer.last_quality_score = quality_score;
+                if let Some(partner_member_id) = peer.get_partner_member_id() {
+                    let _ = self.event_tx.send_event(
+                        PeersMetricsEvent::QualityMeterUpdate {
+                            member_id: peer.member_id.clone(),
+                            partner_member_id,
+                            quality_score,
+                        },
+                    );
+                }
+            }
+        }
+    }
+}
+
+impl super::MetricHandler for QualityMeterService {
+    fn register_peer(&mut self, peer: &PeerStateMachine) {
+        let id = peer.id();
+        let partner_peer_id = peer.partner_peer_id();
+        let partner_peer = self
+            .peers
+            .get(&partner_peer_id)
+            .map(Rc::downgrade)
+            .unwrap_or_default();
+        let peer_metric = Rc::new(RefCell::new(Peer {
+            id,
+            member_id: peer.member_id(),
+            partner_peer,
+            quality_meter: QualityMeter::new(Duration::from_secs(5)),
+            last_quality_score: EstimatedConnectionQuality::Low,
+        }));
+        self.peers.insert(peer.id(), peer_metric.clone());
+
+        if let Some(partner_peer) = self.peers.get(&partner_peer_id) {
+            partner_peer.borrow_mut().partner_peer =
+                Rc::downgrade(&peer_metric);
+        }
+    }
+
+    fn unregister_peers(&mut self, peers_ids: &Vec<PeerId>) {
+        for peer_id in peers_ids {
+            self.peers.remove(peer_id);
+        }
+    }
+
+    fn update_peer(&mut self, peer: &PeerStateMachine) {}
+
+    fn check(&mut self) {
+        for peer in self.peers.values() {
+            self.update_quality_score(&mut peer.borrow_mut());
+        }
+    }
+
+    fn add_stat(&mut self, peer_id: PeerId, stats: &Vec<RtcStat>) {
+        if let Some(peer) = self.peers.get(&peer_id) {
+            let mut peer_ref = peer.borrow_mut();
+            for stat in stats {
+                match &stat.stats {
+                    RtcStatsType::InboundRtp(inbound) => {
+                        if let Some(partner_peer) =
+                            peer_ref.partner_peer.upgrade()
+                        {
+                            partner_peer
+                                .borrow_mut()
+                                .update_outbound_from_partners_inbound(
+                                    stat.id.clone(),
+                                    inbound,
+                                );
+                        }
+                    }
+                    RtcStatsType::RemoteInboundRtp(remote_inbound) => {
+                        peer_ref.update_remote_inbound_rtp(remote_inbound);
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+}
 
 /// Estimated connection quality.
 #[derive(Clone, Copy, Debug, Display, Eq, Ord, PartialEq, PartialOrd)]
