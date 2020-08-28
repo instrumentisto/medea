@@ -1,4 +1,5 @@
-//! [`EstimatedConnectionQuality`] score calculator implementation.
+//! [`EstimatedConnectionQuality`] score calculator and [`RtcStat`]s extractor
+//! implementation.
 
 use std::{
     cell::RefCell,
@@ -23,16 +24,28 @@ use crate::{
 
 use super::MetricHandler;
 
+/// [`PeerStateMachine`] representation for the [`QualityMeterService`].
 #[derive(Debug)]
-struct Peer {
+struct PeerMetric {
+    /// ID of [`PeerStateMachine`] for which this [`PeerMetric`] was created.
     id: PeerId,
+
+    /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
     member_id: MemberId,
-    partner_peer: Weak<RefCell<Peer>>,
+
+    /// Weak reference to a [`PeerMetric`] which represents a partner
+    /// [`PeerStateMachine`].
+    partner_peer: Weak<RefCell<PeerMetric>>,
+
+    /// [`EstimatedConnectionQuality`] score calculator for this
+    /// [`PeerMetric`].
     quality_meter: QualityMeter,
+
+    /// Last calculated [`EstimatedConnectionQuality`].
     last_quality_score: EstimatedConnectionQuality,
 }
 
-impl Peer {
+impl PeerMetric {
     /// Updates remote inbound rtp stats.
     ///
     /// Adds round trip time stats to the [`QualityMeter`].
@@ -75,13 +88,19 @@ impl Peer {
     }
 }
 
+/// Service responsible for needed [`RtcStat`]s handling and
+/// [`PeerMetricsEvent`]s sending.
 #[derive(Debug)]
 pub struct QualityMeterService {
-    peers: HashMap<PeerId, Rc<RefCell<Peer>>>,
+    /// All [`PeerMetric`]s registered in this [`QualityMeterService`].
+    peers: HashMap<PeerId, Rc<RefCell<PeerMetric>>>,
+
+    /// Sender for the [`PeerMetricsEvent`]s.
     event_tx: EventSender,
 }
 
 impl QualityMeterService {
+    /// Returns new empty [`QualityMeterService`].
     pub fn new(event_tx: EventSender) -> Self {
         Self {
             peers: HashMap::new(),
@@ -89,7 +108,10 @@ impl QualityMeterService {
         }
     }
 
-    fn update_quality_score(&self, peer: &mut Peer) {
+    /// Recalculates [`EstimatedConnectionQuality`] for the provided
+    /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
+    /// recalculated score is not equal to the previous calculated score.
+    fn update_quality_score(&self, peer: &mut PeerMetric) {
         if self.event_tx.is_connected() {
             let partner_score = peer
                 .partner_peer
@@ -126,6 +148,7 @@ impl QualityMeterService {
 }
 
 impl MetricHandler for QualityMeterService {
+    /// Creates new [`PeerMetric`] for the provided [`PeerStateMachine`].
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let id = peer.id();
         let partner_peer_id = peer.partner_peer_id();
@@ -134,7 +157,7 @@ impl MetricHandler for QualityMeterService {
             .get(&partner_peer_id)
             .map(Rc::downgrade)
             .unwrap_or_default();
-        let peer_metric = Rc::new(RefCell::new(Peer {
+        let peer_metric = Rc::new(RefCell::new(PeerMetric {
             id,
             member_id: peer.member_id(),
             partner_peer,
@@ -149,20 +172,29 @@ impl MetricHandler for QualityMeterService {
         }
     }
 
+    /// Removes provided [`PeerMetric`]s with the [`PeerId`]s.
     fn unregister_peers(&mut self, peers_ids: &Vec<PeerId>) {
         for peer_id in peers_ids {
             self.peers.remove(peer_id);
         }
     }
 
+    /// Does nothing.
     fn update_peer(&mut self, _: &PeerStateMachine) {}
 
+    /// Sends [`PeersMetricsEvent::QualityMeterUpdate`] for the all
+    /// [`PeerMetric`]s.
+    ///
+    /// Wouldn't send quality update if [`EstimatedConnectionQuality`] is the
+    /// same as previous.
     fn check(&mut self) {
         for peer in self.peers.values() {
             self.update_quality_score(&mut peer.borrow_mut());
         }
     }
 
+    /// Provides needed stats to the [`QualityMeter`] of the [`PeerMetric`] with
+    /// a provided [`PeerId`].
     fn add_stat(&mut self, peer_id: PeerId, stats: &Vec<RtcStat>) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
