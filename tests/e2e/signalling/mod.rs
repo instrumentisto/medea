@@ -84,6 +84,8 @@ pub struct TestMember {
 }
 
 impl TestMember {
+    pub const DEFAULT_DEADLINE: Option<Duration> = Some(Duration::from_secs(5));
+
     /// Sends command to the server.
     fn send_command(&mut self, msg: Command) {
         executor::block_on(async move {
