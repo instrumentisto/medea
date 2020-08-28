@@ -260,13 +260,13 @@ async fn get_audio_track() -> MediaStreamTrack {
 /// provided `timeout` time this [`LocalBoxFuture`] won'tbe resolved, then
 /// `Err(String)` will be returned, otherwise a result of the provided
 /// [`LocalBoxFuture`] will be returned.
-async fn timeout<T>(timeout: i32, future: T) -> Result<T::Output, String>
+async fn timeout<T>(timeout_ms: i32, future: T) -> Result<T::Output, String>
 where
     T: Future,
 {
     match futures::future::select(
         Box::pin(future),
-        Box::pin(delay_for(timeout)),
+        Box::pin(delay_for(timeout_ms)),
     )
     .await
     {
