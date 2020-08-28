@@ -127,6 +127,12 @@ trait MetricHandler: Debug {
     /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
     /// [`MetricHandler`].
     fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+
+    #[cfg(test)]
+    fn is_peer_registered(&self, peer_id: PeerId) -> Option<bool>;
+
+    #[cfg(test)]
+    fn peer_tracks_count(&self, peer_id: PeerId) -> Option<usize>;
 }
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
@@ -206,5 +212,29 @@ impl PeerMetricsService {
         for handler in &mut self.handlers {
             handler.add_stat(peer_id, stats);
         }
+    }
+    
+    #[cfg(test)]
+    pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
+        let mut is_peer_registered = false;
+        for handler in &self.handlers {
+            if let Some(is_reg) = handler.is_peer_registered(peer_id) {
+                is_peer_registered |= is_reg;
+            }
+        }
+
+        is_peer_registered
+    }
+
+    #[cfg(test)]
+    pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
+        let mut peer_tracks_count = 0;
+        for handler in &self.handlers {
+            if let Some(count) = handler.peer_tracks_count(peer_id) {
+                peer_tracks_count += count;
+            }
+        }
+
+        peer_tracks_count
     }
 }

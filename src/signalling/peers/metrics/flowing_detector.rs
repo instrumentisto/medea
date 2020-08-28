@@ -95,6 +95,16 @@ impl MetricHandler for FlowingDetector {
         // TODO: remove clone
         self.add_stats(peer_id, stats);
     }
+
+    #[cfg(test)]
+    fn is_peer_registered(&self, peer_id: PeerId) -> Option<bool> {
+        Some(self.is_peer_registered(peer_id))
+    }
+
+    #[cfg(test)]
+    fn peer_tracks_count(&self, peer_id: PeerId) -> Option<usize> {
+        Some(self.peer_tracks_count(peer_id))
+    }
 }
 
 impl FlowingDetector {
@@ -872,6 +882,7 @@ mod tests {
     };
 
     use super::FlowingDetector;
+    use crate::signalling::peers::metrics::EventSender;
 
     impl FlowingDetector {
         /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
@@ -1013,15 +1024,17 @@ mod tests {
                 traffic_stopped_tx.unbounded_send(()).unwrap();
             });
 
-            let mut metrics = FlowingDetector::new(
+            let event_tx = EventSender::new();
+            let metrics = FlowingDetector::new(
                 "test".to_string().into(),
+                event_tx.clone(),
                 Arc::new(watcher),
             );
 
             Self {
                 traffic_flows_stream: Box::pin(traffic_flows_rx),
                 traffic_stopped_stream: Box::pin(traffic_stopped_rx),
-                peer_events_stream: Box::pin(metrics.subscribe()),
+                peer_events_stream: Box::pin(event_tx.subscribe()),
                 metrics,
             }
         }
@@ -1095,7 +1108,7 @@ mod tests {
                 })
             }
 
-            self.metrics.add_stats(PeerId(1), stats);
+            self.metrics.add_stats(PeerId(1), &stats);
         }
 
         /// Waits for `traffic_flows()` invocation on inner

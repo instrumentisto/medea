@@ -220,6 +220,16 @@ impl MetricHandler for QualityMeterService {
             }
         }
     }
+
+    #[cfg(test)]
+    fn is_peer_registered(&self, _: PeerId) -> Option<bool> {
+        None
+    }
+
+    #[cfg(test)]
+    fn peer_tracks_count(&self, _: PeerId) -> Option<usize> {
+        None
+    }
 }
 
 /// Estimated connection quality.
