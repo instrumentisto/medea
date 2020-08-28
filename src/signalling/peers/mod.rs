@@ -1,6 +1,7 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
 mod media_traffic_state;
+mod metric;
 mod metrics;
 mod quality_meter;
 mod traffic_watcher;
@@ -17,7 +18,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
-    stats::RtcStat, Incrementable, MemberId, PeerId, TrackId,
+    stats::RtcStat, Incrementable, MemberId, PeerId, PeerMetrics, TrackId,
 };
 
 use crate::{
@@ -35,16 +36,18 @@ use crate::{
     turn::{TurnAuthService, UnreachablePolicy},
 };
 
-use self::metrics::PeersMetricsService;
+use self::metric::Metrics;
 
 pub use self::{
-    metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
+    metric::{PeersMetricsEvent, PeersMetricsEventHandler},
     quality_meter::EstimatedConnectionQuality,
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource,
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
+use futures::stream::LocalBoxStream;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {
@@ -76,7 +79,7 @@ pub struct PeersService {
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: RefCell<PeersMetricsService>,
+    peer_metrics_service: RefCell<Metrics>,
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
@@ -139,7 +142,7 @@ impl PeersService {
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_traffic_watcher: peers_traffic_watcher.clone(),
-            peer_metrics_service: RefCell::new(PeersMetricsService::new(
+            peer_metrics_service: RefCell::new(Metrics::new(
                 room_id,
                 peers_traffic_watcher,
             )),
@@ -236,10 +239,10 @@ impl PeersService {
 
         self.peer_metrics_service
             .borrow_mut()
-            .register_peer(&src_peer, self.peer_stats_ttl);
+            .register_peer(&src_peer);
         self.peer_metrics_service
             .borrow_mut()
-            .register_peer(&sink_peer, self.peer_stats_ttl);
+            .register_peer(&sink_peer);
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -497,9 +500,7 @@ impl PeersService {
     /// exist in [`PeerRepository`].
     pub fn update_peer_tracks(&self, peer_id: PeerId) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
-            self.peer_metrics_service
-                .borrow_mut()
-                .update_peer_tracks(peer);
+            self.peer_metrics_service.borrow_mut().update_peer(peer);
         })?;
 
         Ok(())
@@ -529,9 +530,7 @@ impl PeersService {
     /// exist in [`PeerRepository`].
     pub fn sync_peer_spec(&self, peer_id: PeerId) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
-            self.peer_metrics_service
-                .borrow_mut()
-                .update_peer_tracks(&peer);
+            self.peer_metrics_service.borrow_mut().update_peer(&peer);
         })?;
         Ok(())
     }
@@ -540,7 +539,7 @@ impl PeersService {
     /// [`PeerMetricsService`].
     pub fn subscribe_to_metrics_events(
         &self,
-    ) -> impl Stream<Item = PeersMetricsEvent> {
+    ) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.peer_metrics_service.borrow_mut().subscribe()
     }
 
@@ -548,14 +547,14 @@ impl PeersService {
     pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
         self.peer_metrics_service
             .borrow_mut()
-            .add_stats(peer_id, stats);
+            .add_stats(peer_id, &stats);
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
     ///
     /// This task should be ran every second.
     pub fn check_peers(&self) {
-        self.peer_metrics_service.borrow_mut().check_peers();
+        self.peer_metrics_service.borrow_mut().check();
     }
 }
 
