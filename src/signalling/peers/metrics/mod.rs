@@ -1,27 +1,26 @@
 mod flowing_detector;
 mod quality_meter;
 
+use std::{cell::RefCell, rc::Rc, sync::Arc};
+
+use chrono::{DateTime, Utc};
+use futures::{channel::mpsc, stream::LocalBoxStream};
+use medea_client_api_proto::{stats::RtcStat, MemberId, PeerId};
+use medea_macro::dispatchable;
+
 use crate::{
     api::control::{
         callback::{MediaDirection, MediaType},
         RoomId,
     },
-    media::{Peer, PeerStateMachine},
-    signalling::peers::PeerTrafficWatcher,
-};
-use chrono::{DateTime, Utc};
-use futures::{channel::mpsc, stream::LocalBoxStream};
-use medea_client_api_proto::{stats::RtcStat, MemberId, PeerId};
-use medea_macro::dispatchable;
-use std::{
-    any::TypeId,
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-    sync::Arc,
+    media::PeerStateMachine,
+    signalling::peers::{
+        metrics::quality_meter::QualityMeterService, PeerTrafficWatcher,
+    },
 };
 
-use crate::signalling::peers::metrics::quality_meter::QualityMeterService;
+use self::flowing_detector::FlowingDetector;
+
 pub use quality_meter::EstimatedConnectionQuality;
 
 #[derive(Debug, Clone)]
@@ -98,8 +97,6 @@ impl PeerMetricsService {
         room_id: RoomId,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Self {
-        use self::flowing_detector::FlowingDetector;
-
         let event_tx = EventSender::new();
         let handlers: Vec<Box<dyn MetricHandler>> = vec![
             Box::new(FlowingDetector::new(

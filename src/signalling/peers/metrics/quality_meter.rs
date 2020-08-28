@@ -1,14 +1,12 @@
 //! [`EstimatedConnectionQuality`] score calculator implementation.
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
+    rc::{Rc, Weak},
     time::{Duration, SystemTime},
 };
 
-use crate::{
-    media::PeerStateMachine,
-    signalling::peers::{metrics::EventSender, PeersMetricsEvent},
-};
 use derive_more::Display;
 use medea_client_api_proto::{
     stats::{
@@ -17,10 +15,13 @@ use medea_client_api_proto::{
     },
     MemberId, PeerId,
 };
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
+
+use crate::{
+    media::PeerStateMachine,
+    signalling::peers::{metrics::EventSender, PeersMetricsEvent},
 };
+
+use super::MetricHandler;
 
 #[derive(Debug)]
 struct Peer {
@@ -124,7 +125,7 @@ impl QualityMeterService {
     }
 }
 
-impl super::MetricHandler for QualityMeterService {
+impl MetricHandler for QualityMeterService {
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let id = peer.id();
         let partner_peer_id = peer.partner_peer_id();
@@ -154,7 +155,7 @@ impl super::MetricHandler for QualityMeterService {
         }
     }
 
-    fn update_peer(&mut self, peer: &PeerStateMachine) {}
+    fn update_peer(&mut self, _: &PeerStateMachine) {}
 
     fn check(&mut self) {
         for peer in self.peers.values() {

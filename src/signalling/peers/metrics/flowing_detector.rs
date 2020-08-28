@@ -20,18 +20,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::PeersMetricsEvent;
 use chrono::{DateTime, Utc};
-use futures::{channel::mpsc, Stream};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
-        RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
+        RtcStatsType, StatId,
     },
     MediaType as MediaTypeProto, MemberId, PeerId,
 };
-use medea_macro::dispatchable;
 
 use crate::{
     api::control::{
@@ -39,23 +36,19 @@ use crate::{
         RoomId,
     },
     log::prelude::*,
-    media::PeerStateMachine as Peer,
+    media::{PeerStateMachine as Peer, PeerStateMachine},
     signalling::peers::{
         media_traffic_state::{
             get_diff_added, get_diff_removed, MediaTrafficState,
         },
+        metrics::{EventSender, MetricHandler},
         traffic_watcher::PeerTrafficWatcher,
         FlowMetricSource,
     },
     utils::instant_into_utc,
 };
 
-use super::quality_meter::{EstimatedConnectionQuality, QualityMeter};
-use crate::{
-    media::PeerStateMachine,
-    signalling::peers::metrics::{EventSender, MetricHandler},
-};
-use std::collections::HashSet;
+use super::PeersMetricsEvent;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
@@ -79,7 +72,7 @@ pub struct FlowingDetector {
     event_tx: EventSender,
 }
 
-impl super::MetricHandler for FlowingDetector {
+impl MetricHandler for FlowingDetector {
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         // TODO: provide stats_ttl to the Context
         self.register_peer(peer, Duration::from_secs(5));

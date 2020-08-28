@@ -14,9 +14,9 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{future, Stream};
+use futures::{future, stream::LocalBoxStream};
 use medea_client_api_proto::{
-    stats::RtcStat, Incrementable, MemberId, PeerId, PeerMetrics, TrackId,
+    stats::RtcStat, Incrementable, MemberId, PeerId, TrackId,
 };
 
 use crate::{
@@ -45,8 +45,6 @@ pub use self::{
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
     },
 };
-use futures::stream::LocalBoxStream;
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PeersService {
