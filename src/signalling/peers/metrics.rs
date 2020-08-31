@@ -28,7 +28,7 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
         RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
     },
-    MediaType as MediaTypeProto, MemberId, PeerId,
+    ConnectionQualityScore, MediaType as MediaTypeProto, MemberId, PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -43,7 +43,6 @@ use crate::{
         media_traffic_state::{
             get_diff_added, get_diff_removed, MediaTrafficState,
         },
-        quality_meter::EstimatedConnectionQuality,
         FlowMetricSource,
     },
     utils::instant_into_utc,
@@ -185,7 +184,7 @@ impl PeersMetricsService {
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
             quality_meter: QualityMeter::new(Duration::from_secs(5)),
-            last_quality_score: EstimatedConnectionQuality::Low,
+            last_quality_score: None,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
@@ -376,11 +375,11 @@ impl PeersMetricsService {
                 .or_else(|| partner_score);
 
             if let Some(quality_score) = score {
-                if quality_score == peer.last_quality_score {
+                if peer.last_quality_score == Some(quality_score) {
                     return;
                 }
+                peer.last_quality_score.replace(quality_score);
 
-                peer.last_quality_score = quality_score;
                 if let Some(partner_member_id) = peer.get_partner_member_id() {
                     let _ = sender.unbounded_send(
                         PeersMetricsEvent::QualityMeterUpdate {
@@ -457,17 +456,17 @@ pub enum PeersMetricsEvent {
         direction: MediaDirection,
     },
 
-    /// [`EstimatedConnectionQuality`] updated.
+    /// [`ConnectionQualityScore`] updated.
     QualityMeterUpdate {
-        /// [`MemberId`] of the [`Peer`] which's [`EstimatedConnectionQuality`]
+        /// [`MemberId`] of the [`Peer`] which's [`ConnectionQualityScore`]
         /// was updated.
         member_id: MemberId,
 
         /// [`MemberId`] of the partner [`Peer`].
         partner_member_id: MemberId,
 
-        /// Actual [`EstimatedConnectionQuality`].
-        quality_score: EstimatedConnectionQuality,
+        /// Actual [`ConnectionQualityScore`].
+        quality_score: ConnectionQualityScore,
     },
 }
 
@@ -667,11 +666,11 @@ struct PeerStat {
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
 
-    /// [`EstimatedConnectionQuality`] score calculator for this [`PeerStat`].
+    /// [`ConnectionQualityScore`] score calculator for this [`PeerStat`].
     quality_meter: QualityMeter,
 
-    /// Last calculated [`EstimatedConnectionQuality`].
-    last_quality_score: EstimatedConnectionQuality,
+    /// Last calculated [`ConnectionQualityScore`].
+    last_quality_score: Option<ConnectionQualityScore>,
 }
 
 impl PeerStat {

@@ -378,7 +378,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                 peer_id, ..
                             } => assert!(self.known_peers.contains(peer_id)),
                             Event::PeersRemoved { .. }
-                            | Event::QualityScoreUpdated { .. } => (),
+                            | Event::ConnectionQualityUpdated { .. } => (),
                         }
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();

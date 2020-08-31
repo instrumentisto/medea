@@ -39,7 +39,6 @@ use self::metrics::PeersMetricsService;
 
 pub use self::{
     metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
-    quality_meter::EstimatedConnectionQuality,
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource,
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,

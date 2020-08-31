@@ -1,12 +1,14 @@
 //! Connection with specific remote `Member`.
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{MemberId, PeerId, TrackId};
+use medea_client_api_proto::{
+    ConnectionQualityScore, MemberId, PeerId, TrackId,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -102,9 +104,13 @@ struct InnerConnection {
     /// [`PeerMediaStream`] received from remote member.
     remote_stream: RefCell<Option<PeerMediaStream>>,
 
+    quality_score: Cell<Option<ConnectionQualityScore>>,
+
     /// JS callback, that will be invoked when remote [`PeerMediaStream`] is
     /// received.
     on_remote_stream: Callback1<RemoteMediaStream>,
+
+    on_quality_score_update: Callback1<u8>,
 
     /// JS callback, that will be invoked when this connection is closed.
     on_close: Callback0,
@@ -132,6 +138,16 @@ impl ConnectionHandle {
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
     }
+
+    /// Sets callback, which will be invoked when connection quality score will
+    /// be updated by server.
+    pub fn on_quality_score_update(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.on_quality_score_update.set_func(f))
+    }
 }
 
 /// Connection with a specific remote [`Member`], that is used on Rust side.
@@ -146,8 +162,10 @@ impl Connection {
     pub fn new(remote_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
-            remote_stream: RefCell::new(None),
+            remote_stream: RefCell::default(),
+            quality_score: Cell::default(),
             on_remote_stream: Callback1::default(),
+            on_quality_score_update: Callback1::default(),
             on_close: Callback0::default(),
         }))
     }
@@ -172,5 +190,11 @@ impl Connection {
     #[inline]
     pub fn new_handle(&self) -> ConnectionHandle {
         ConnectionHandle(Rc::downgrade(&self.0))
+    }
+
+    pub fn update_quality_score(&self, score: ConnectionQualityScore) {
+        if self.0.quality_score.replace(Some(score)) == Some(score) {
+            self.0.quality_score.set(Some(score));
+        }
     }
 }

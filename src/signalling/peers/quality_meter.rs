@@ -1,30 +1,13 @@
-//! [`EstimatedConnectionQuality`] score calculator implementation.
+//! [`ConnectionQualityScore`] score calculator implementation.
 
 use std::{
     collections::HashMap,
     time::{Duration, SystemTime},
 };
 
-use derive_more::Display;
-use medea_client_api_proto::stats::StatId;
+use medea_client_api_proto::{stats::StatId, ConnectionQualityScore};
 
-/// Estimated connection quality.
-#[derive(Clone, Copy, Debug, Display, Eq, Ord, PartialEq, PartialOrd)]
-pub enum EstimatedConnectionQuality {
-    /// Nearly all users dissatisfied.
-    Poor = 1,
-
-    /// Many users dissatisfied.
-    Low = 2,
-
-    /// Some users dissatisfied.
-    Medium = 3,
-
-    /// Satisfied.
-    High = 4,
-}
-
-/// Calculator of the [`EstimatedConnectionQuality`] score based on RTC stats.
+/// Calculator of the [`ConnectionQualityScore`] score based on RTC stats.
 #[derive(Debug)]
 pub struct QualityMeter {
     /// TTL of the all [`ExpiringStat`]s from this [`QualityMeter`].
@@ -52,7 +35,7 @@ pub struct QualityMeter {
 impl QualityMeter {
     /// Estimated delay introduced by codec used.
     const CODEC_DELAY: f64 = 10.;
-    /// Jitter multiplier used when calculation effective latency.
+    /// Jitter multiplier used in effective latency calculation.
     const JITTER_FACTOR: f64 = 2.;
     /// Estimated packet loss multiplier.
     const P_LOSS_FACTOR: f64 = 2.5;
@@ -111,17 +94,17 @@ impl QualityMeter {
             .push(ExpiringStat::new(PacketLost(packets_lost), self.stats_ttl));
     }
 
-    /// Returns [`EstimatedConnectionQuality`] based on accumulated stats.
+    /// Returns [`ConnectionQualityScore`] based on accumulated stats.
     /// Returns `None` if there are not enough data to make calculations.
     ///
-    /// [Algorithm-MOS] is used to calculate [`EstimatedConnectionQuality`],
+    /// [Algorithm-MOS] is used to calculate [`ConnectionQualityScore`],
     /// which is derived from E-model, introduced in [ITU-T G.107] with some
     /// simplifications and tweaks.
     ///
     /// [ITU-T G.107]: https://www.itu.int/rec/T-REC-G.107
     /// [Algorithm-MOS]: https://tinyurl.com/y3nojmot
     #[allow(clippy::cast_precision_loss)]
-    pub fn calculate(&mut self) -> Option<EstimatedConnectionQuality> {
+    pub fn calculate(&mut self) -> Option<ConnectionQualityScore> {
         let latency = self.mean_rtt()?.as_millis() as f64;
         let jitter = self.mean_jitter()?.as_millis() as f64;
         let packet_loss = self.mean_packet_loss()?;
@@ -140,7 +123,7 @@ impl QualityMeter {
 
         let r = r - (packet_loss * Self::P_LOSS_FACTOR);
         {
-            use EstimatedConnectionQuality::{High, Low, Medium, Poor};
+            use ConnectionQualityScore::{High, Low, Medium, Poor};
             Some(if r < Self::R_LOWER_LIMIT_LOW {
                 Poor
             } else if r < Self::R_LOWER_LIMIT_MEDIUM {
@@ -331,10 +314,7 @@ mod tests {
             meter.add_jitter(Duration::from_millis(*jitter));
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::High
-        );
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::High);
     }
 
     #[test]
@@ -360,10 +340,7 @@ mod tests {
             meter.add_rtt(Duration::from_millis(*rtt));
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::High
-        );
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::High);
     }
 
     #[test]
@@ -390,7 +367,7 @@ mod tests {
             meter.add_rtt(Duration::from_millis(*rtt));
         }
 
-        assert_eq!(meter.calculate().unwrap(), EstimatedConnectionQuality::Low);
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::Low);
     }
 
     #[test]
@@ -403,10 +380,7 @@ mod tests {
             meter.add_jitter(Duration::from_millis(*jitter));
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::Poor
-        );
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::Poor);
     }
 
     #[test]
