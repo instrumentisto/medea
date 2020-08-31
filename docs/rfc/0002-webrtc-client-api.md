@@ -703,7 +703,7 @@ It's recommended to cache `Peer` ID and `Member` ID relations in `Web Client`'s 
 ```
 </details>
 
-#### 10. QualityScoreUpdated
+#### 10. ConnectionQualityUpdated
 
 ```rust
 pub enum ConnectionQualityScore {
@@ -713,7 +713,7 @@ pub enum ConnectionQualityScore {
     High = 4,
 }
 
-struct QualityScoreUpdated {
+struct ConnectionQualityUpdated {
     partner_member_id: MemberId,
     quality_score: ConnectionQualityScore,
 }

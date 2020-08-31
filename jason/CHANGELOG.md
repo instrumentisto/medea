@@ -66,7 +66,7 @@ All user visible changes to this project will be documented in this file. This p
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
         - `TracksApplied` ([#105]);
-        - `QualityScoreUpdated` ([#132]).
+        - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
