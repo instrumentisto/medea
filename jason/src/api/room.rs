@@ -926,8 +926,8 @@ impl EventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Calculates average score and calls `on_quality_score_update` callback
-    /// with a calculated values.
+    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
+    /// [`Connection::update_quality_score`].
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,

@@ -1122,7 +1122,7 @@ pub struct RtcInboundRtpStreamStats {
     // the number of packets expected less the number of packets actually
     // received, where the number of packets received includes any which are
     // late or duplicates.  Thus, packets that arrive late are not counted as
-    // lost, and the loss may be negative if there are duplicates.
+    // lost, and the loss __may be negative__ if there are duplicates.
     pub packets_lost: Option<i64>,
 
     /// Packet jitter measured in seconds for this SSRC.

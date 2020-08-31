@@ -914,8 +914,7 @@ impl PeerStat {
 
     /// Returns [`MemberId`] of the partner [`Member`].
     fn get_partner_member_id(&self) -> Option<MemberId> {
-        self.partner_peer
-            .upgrade()
+        self.partner_peer()
             .map(|partner_peer| partner_peer.borrow().get_member_id())
     }
 

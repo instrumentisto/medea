@@ -104,12 +104,17 @@ struct InnerConnection {
     /// [`PeerMediaStream`] received from remote member.
     remote_stream: RefCell<Option<PeerMediaStream>>,
 
+    /// Current [`ConnectionQualityScore`] of this [`Connection`].
+    ///
+    /// `None` if no [`Event::ConnectionQualityUpdated`] was received.
     quality_score: Cell<Option<ConnectionQualityScore>>,
 
     /// JS callback, that will be invoked when remote [`PeerMediaStream`] is
     /// received.
     on_remote_stream: Callback1<RemoteMediaStream>,
 
+    /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
+    /// be updated.
     on_quality_score_update: Callback1<u8>,
 
     /// JS callback, that will be invoked when this connection is closed.
@@ -192,9 +197,10 @@ impl Connection {
         ConnectionHandle(Rc::downgrade(&self.0))
     }
 
+    /// Updates [`ConnectionQualityScore`] of this [`Connection`].
     pub fn update_quality_score(&self, score: ConnectionQualityScore) {
-        if self.0.quality_score.replace(Some(score)) == Some(score) {
-            self.0.quality_score.set(Some(score));
+        if self.0.quality_score.replace(Some(score)) != Some(score) {
+            self.0.on_quality_score_update.call(score as u8);
         }
     }
 }
