@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use actix::{clock::delay_for, Addr, Context};
 use actix_http::ws::CloseCode;
+use function_name::named;
 use medea_client_api_proto::Event as RpcEvent;
 use medea_control_api_proto::grpc::callback as proto;
 use proto::request::Event;
@@ -12,6 +13,7 @@ use crate::{
     callbacks::{GetCallbacks, GrpcCallbackServer},
     grpc_control_api::{ControlClient, MemberBuilder, RoomBuilder},
     signalling::{CloseSocket, TestMember},
+    test_name,
 };
 
 /// Type for [`Future`] item in `callback_test` function.
@@ -33,7 +35,7 @@ type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
 /// Then, returns [`Future`] which resolves with [`TestMember`]
 /// connected to created `Room` and [`GrpcCallbackServer`] which
 /// will receive all callbacks from Medea.
-async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
+async fn callback_test(name: &str, port: u16) -> CallbackTestItem {
     let callback_server = super::run(port);
     let mut control_client = ControlClient::new().await;
     let member = RoomBuilder::default()
@@ -53,12 +55,11 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
 
     let on_event =
         move |_: &RpcEvent, _: &mut Context<TestMember>, _: Vec<&RpcEvent>| {};
-    let deadline = Some(Duration::from_secs(5));
     let client = TestMember::connect(
         create_response.get(name).unwrap(),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -75,10 +76,9 @@ async fn callback_test(name: &'static str, port: u16) -> CallbackTestItem {
 ///
 /// 3. Check that test callback server receives `on_join` callback.
 #[actix_rt::test]
+#[named]
 async fn on_join() {
-    const TEST_NAME: &str = "member_callback_on_join";
-
-    let (_, callback_server) = callback_test(TEST_NAME, 9096).await;
+    let (_, callback_server) = callback_test(test_name!(), 9096).await;
     delay_for(Duration::from_millis(500)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
     let on_joins_count = callbacks
@@ -107,10 +107,9 @@ async fn on_join() {
 /// 4. Check that test callback server receives `on_leave` callback with
 /// [`proto::on_leave::Reason::DISONNECTED`].
 #[actix_rt::test]
+#[named]
 async fn on_leave_normally_disconnected() {
-    const TEST_NAME: &str = "member_callback_on_leave";
-
-    let (client, callback_server) = callback_test(TEST_NAME, 9097).await;
+    let (client, callback_server) = callback_test(test_name!(), 9097).await;
     client.send(CloseSocket(CloseCode::Normal)).await.unwrap();
     delay_for(Duration::from_millis(500)).await;
 
@@ -145,10 +144,9 @@ async fn on_leave_normally_disconnected() {
 /// 4. Check that test callback server receives `on_leave` callback with
 /// [`proto::on_leave::Reason::LOST_CONNECTION`].
 #[actix_rt::test]
+#[named]
 async fn on_leave_on_connection_loss() {
-    const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";
-
-    let (client, callback_server) = callback_test(TEST_NAME, 9098).await;
+    let (client, callback_server) = callback_test(test_name!(), 9098).await;
 
     client.send(CloseSocket(CloseCode::Abnormal)).await.unwrap();
     delay_for(Duration::from_millis(500)).await;
