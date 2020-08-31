@@ -66,6 +66,7 @@ use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::PublishPolicy,
+    log::prelude::*,
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
@@ -357,6 +358,18 @@ enum TrackChange {
 }
 
 impl TrackChange {
+    fn id(&self) -> u8 {
+        match self {
+            TrackChange::TrackPatch(_) => 0,
+            TrackChange::AddRecvTrack(_) => 1,
+            TrackChange::AddSendTrack(_) => 2,
+        }
+    }
+
+    fn enum_eq(&self, another: &TrackChange) -> bool {
+        self.id() == another.id()
+    }
+
     /// Tries to return new [`Track`] based on this [`TrackChange`].
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
@@ -553,6 +566,19 @@ impl<T> Peer<T> {
             }
         }
         self.context.track_changes_queue = filtered_changes_queue;
+
+        let pending_track_updates =
+            std::mem::take(&mut self.context.pending_track_updates);
+        let mut cleaned_pending_track_updates = Vec::new();
+        'outer: for pending_track_update in pending_track_updates {
+            for forcible_change in &forcible_changes {
+                if !pending_track_update.enum_eq(forcible_change) {
+                    cleaned_pending_track_updates.push(pending_track_update);
+                    continue 'outer;
+                }
+            }
+        }
+        self.context.pending_track_updates = cleaned_pending_track_updates;
 
         let mut updates = Vec::new();
         for change in forcible_changes {
