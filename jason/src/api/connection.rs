@@ -105,8 +105,6 @@ struct InnerConnection {
     remote_stream: RefCell<Option<PeerMediaStream>>,
 
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
-    ///
-    /// `None` if no [`Event::ConnectionQualityUpdated`] was received.
     quality_score: Cell<Option<ConnectionQualityScore>>,
 
     /// JS callback, that will be invoked when remote [`PeerMediaStream`] is

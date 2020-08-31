@@ -551,8 +551,6 @@ impl PeersService {
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
-    ///
-    /// This task should be ran every second.
     pub fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check_peers();
     }

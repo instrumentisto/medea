@@ -33,10 +33,10 @@ pub struct QualityMeter {
 }
 
 impl QualityMeter {
-    /// Estimated delay introduced by codec used.
-    const CODEC_DELAY: f64 = 10.;
     /// Jitter multiplier used in effective latency calculation.
-    const JITTER_FACTOR: f64 = 2.;
+    const JITTER_FACTOR: f64 = 2.5;
+    /// Latency multiplier used in effective latency calculation.
+    const LATENCY_FACTOR: f64 = 0.7;
     /// Estimated packet loss multiplier.
     const P_LOSS_FACTOR: f64 = 2.5;
     /// `R0` is the basic signal to noise ratio, including noise sources such
@@ -110,7 +110,7 @@ impl QualityMeter {
         let packet_loss = self.mean_packet_loss()?;
 
         let effective_latency =
-            jitter * Self::JITTER_FACTOR + latency + Self::CODEC_DELAY;
+            jitter * Self::JITTER_FACTOR + latency * Self::LATENCY_FACTOR;
 
         // Calculate the R-Value (Transmission Rating Factor R) based on
         // Effective Latency. The voice quality drops more significantly

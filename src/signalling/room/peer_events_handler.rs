@@ -103,6 +103,7 @@ impl PeersMetricsEventHandler for Room {
         Ok(())
     }
 
+    /// Sends received [`ConnectionQualityScore`] to member.
     fn on_quality_meter_update(
         &mut self,
         member_id: MemberId,
