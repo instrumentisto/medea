@@ -24,10 +24,10 @@ use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
-        RtcStatsType, StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
+        RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
     },
-    MediaType as MediaTypeProto, MemberId, PeerId,
+    ConnectionQualityScore, MediaType as MediaTypeProto, MemberId, PeerId,
 };
 
 use crate::{
@@ -1129,9 +1129,7 @@ mod tests {
                     direction,
                 } = event
                 {
-                    break (peer_id, was_flowing_at, media_type, direction);
-                } else {
-                    continue;
+                    return (peer_id, was_flowing_at, media_type, direction);
                 }
             }
         }

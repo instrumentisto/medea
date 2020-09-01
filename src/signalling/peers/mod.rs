@@ -2,6 +2,7 @@
 
 mod media_traffic_state;
 mod metrics;
+mod quality_meter;
 mod traffic_watcher;
 
 use std::{
@@ -14,9 +15,10 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{future, stream::LocalBoxStream};
+use futures::{future, Stream};
 use medea_client_api_proto::{
-    stats::RtcStat, Incrementable, MemberId, PeerId, TrackId,
+    stats::RtcStat, ConnectionQualityScore, Incrementable, MemberId, PeerId,
+    TrackId,
 };
 
 use crate::{
@@ -37,9 +39,7 @@ use crate::{
 use self::metrics::PeerMetricsService;
 
 pub use self::{
-    metrics::{
-        EstimatedConnectionQuality, PeersMetricsEvent, PeersMetricsEventHandler,
-    },
+    metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
     traffic_watcher::{
         build_peers_traffic_watcher, FlowMetricSource,
         PeerConnectionStateEventsHandler, PeerTrafficWatcher,
@@ -536,20 +536,18 @@ impl PeersService {
     /// [`PeerMetricsService`].
     pub fn subscribe_to_metrics_events(
         &self,
-    ) -> LocalBoxStream<'static, PeersMetricsEvent> {
+    ) -> impl Stream<Item = PeersMetricsEvent> {
         self.peer_metrics_service.borrow_mut().subscribe()
     }
 
     /// Propagates stats to [`PeersMetricsService`].
-    pub fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
+    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
         self.peer_metrics_service
             .borrow_mut()
             .add_stats(peer_id, &stats);
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
-    ///
-    /// This task should be ran every second.
     pub fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check();
     }

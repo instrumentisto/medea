@@ -506,7 +506,6 @@ window.onload = async function() {
   };
 
   async function newRoom() {
-    jason = new rust.Jason();
     room = await jason.init_room();
 
     try {
@@ -516,21 +515,6 @@ window.onload = async function() {
     } catch (e) {
       console.error("Init local video failed: " + e);
     }
-
-    room.on_quality_score_update((update) => {
-      for (const [key, value] of update.quality_scores().entries()) {
-        let videoDiv = remote_videos[key];
-        let el = videoDiv.getElementsByClassName('quality-score');
-
-        if (el[0] === undefined) {
-          let qualityEl = document.createElement('span');
-          qualityEl.innerHTML = value;
-          qualityEl.className = 'quality-score';
-          remote_videos[key].appendChild(qualityEl);
-        }
-        el[0].innerHTML = value;
-      }
-    });
 
     room.on_new_connection( (connection) => {
       let remoteMemberId = connection.get_remote_member_id();
@@ -579,6 +563,19 @@ window.onload = async function() {
         remote_videos[remoteMemberId].remove();
         delete remote_videos[remoteMemberId];
       });
+
+      connection.on_quality_score_update((score) => {
+        let videoDiv = remote_videos[remoteMemberId];
+        let el = videoDiv.getElementsByClassName('quality-score');
+
+        if (el[0] === undefined) {
+          let qualityEl = document.createElement('span');
+          qualityEl.innerHTML = score;
+          qualityEl.className = 'quality-score';
+          videoDiv.appendChild(qualityEl);
+        }
+        el[0].innerHTML = score;
+      })
     });
 
     room.on_local_stream((stream) => {

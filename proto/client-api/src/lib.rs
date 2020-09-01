@@ -308,12 +308,12 @@ pub enum Event {
     },
 
     /// Media Server notifies about connection quality score update.
-    QualityScoreUpdated {
+    ConnectionQualityUpdated {
         /// Partner [`MemberId`] of the [`Peer`].
         partner_member_id: MemberId,
 
-        /// Score (in range 1..4) of the call.
-        quality_score: u8,
+        /// Estimated connection quality.
+        quality_score: ConnectionQualityScore,
     },
 }
 
@@ -472,6 +472,27 @@ pub struct VideoSettings {
     ///
     /// If `false` then video may be not published.
     pub is_required: bool,
+}
+
+/// Estimated connection quality.
+#[cfg_attr(
+    feature = "medea",
+    derive(Serialize, Display, Eq, Ord, PartialEq, PartialOrd)
+)]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Copy, Debug)]
+pub enum ConnectionQualityScore {
+    /// Nearly all users dissatisfied.
+    Poor = 1,
+
+    /// Many users dissatisfied.
+    Low = 2,
+
+    /// Some users dissatisfied.
+    Medium = 3,
+
+    /// Satisfied.
+    High = 4,
 }
 
 #[cfg(feature = "jason")]

@@ -55,7 +55,7 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
         - `ConnectionHandle.on_close` callback ([#120]);
         - `ConnectionHandle.get_remote_member_id` method ([#124]);
-        - `Room.on_quality_score_update` callback for quality score updates received from server ([#132]).
+        - `ConnectionHandle.on_quality_score_update` callback for quality score updates received from server ([#132]).
 - RPC messaging:
     - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
     - `RpcClient` and `RpcTransport` reconnection ([#75]).
@@ -66,7 +66,7 @@ All user visible changes to this project will be documented in this file. This p
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
         - `TracksApplied` ([#105]);
-        - `QualityScoreUpdated` ([#132]).
+        - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])

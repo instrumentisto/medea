@@ -1,4 +1,4 @@
-//! [`EstimatedConnectionQuality`] score calculator and [`RtcStat`]s extractor
+//! [`ConnectionQualityScore`] score calculator and [`RtcStat`]s extractor
 //! implementation.
 
 use std::{
@@ -14,7 +14,7 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    MemberId, PeerId,
+    ConnectionQualityScore, MemberId, PeerId,
 };
 
 use crate::{
@@ -37,12 +37,12 @@ struct PeerMetric {
     /// [`PeerStateMachine`].
     partner_peer: Weak<RefCell<PeerMetric>>,
 
-    /// [`EstimatedConnectionQuality`] score calculator for this
+    /// [`ConnectionQualityScore`] score calculator for this
     /// [`PeerMetric`].
     quality_meter: QualityMeter,
 
-    /// Last calculated [`EstimatedConnectionQuality`].
-    last_quality_score: EstimatedConnectionQuality,
+    /// Last calculated [`ConnectionQualityScore`].
+    last_quality_score: ConnectionQualityScore,
 }
 
 impl PeerMetric {
@@ -108,7 +108,7 @@ impl QualityMeterService {
         }
     }
 
-    /// Recalculates [`EstimatedConnectionQuality`] for the provided
+    /// Recalculates [`ConnectionQualityScore`] for the provided
     /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
     /// recalculated score is not equal to the previous calculated score.
     fn update_quality_score(&self, peer: &mut PeerMetric) {
@@ -162,7 +162,7 @@ impl MetricHandler for QualityMeterService {
             member_id: peer.member_id(),
             partner_peer,
             quality_meter: QualityMeter::new(Duration::from_secs(5)),
-            last_quality_score: EstimatedConnectionQuality::Low,
+            last_quality_score: ConnectionQualityScore::Low,
         }));
         self.peers.insert(peer.id(), peer_metric.clone());
 
@@ -185,7 +185,7 @@ impl MetricHandler for QualityMeterService {
     /// Sends [`PeersMetricsEvent::QualityMeterUpdate`] for the all
     /// [`PeerMetric`]s.
     ///
-    /// Wouldn't send quality update if [`EstimatedConnectionQuality`] is the
+    /// Wouldn't send quality update if [`ConnectionQualityScore`] is the
     /// same as previous.
     fn check(&mut self) {
         for peer in self.peers.values() {
@@ -232,64 +232,50 @@ impl MetricHandler for QualityMeterService {
     }
 }
 
-/// Estimated connection quality.
-#[derive(Clone, Copy, Debug, Display, Eq, Ord, PartialEq, PartialOrd)]
-pub enum EstimatedConnectionQuality {
-    /// Nearly all users dissatisfied.
-    Poor = 1,
-
-    /// Many users dissatisfied.
-    Low = 2,
-
-    /// Some users dissatisfied.
-    Medium = 3,
-
-    /// Satisfied.
-    High = 4,
-}
-
-/// Calculator of the [`EstimatedConnectionQuality`] score based on RTC stats.
+/// Calculator of the [`ConnectionQualityScore`] score based on RTC stats.
 #[derive(Debug)]
 pub struct QualityMeter {
     /// TTL of the all [`ExpiringStat`]s from this [`QualityMeter`].
     stats_ttl: Duration,
 
     /// Round trip time stats.
+    ///
+    /// Expired values will be automatically removed.
     rtt: Vec<ExpiringStat<Rtt>>,
 
     /// All jitter values added to this [`QualityMeter`].
     ///
-    /// Expired stats will be automatically removed.
+    /// Expired values will be automatically removed.
     jitter: Vec<ExpiringStat<Jitter>>,
 
-    /// Stores packets lost stats separated by [`StatId`].
+    /// Packets lost stats by [`StatId`].
     ///
     /// Expired stats will be automatically removed.
     packets_lost: HashMap<StatId, Vec<ExpiringStat<PacketLost>>>,
 
-    /// Stores packets sent stats separated by [`StatId`].
+    /// Packets sent stats by [`StatId`].
     ///
     /// Expired stats will be automatically removed.
     packets_sent: HashMap<StatId, Vec<ExpiringStat<PacketsSent>>>,
 }
 
 impl QualityMeter {
-    /// Estimated delay introduced by codec used.
-    const CODEC_DELAY: f64 = 10.;
-    /// Jitter multiplier used when calculation effective latency.
-    const JITTER_FACTOR: f64 = 2.;
+    /// Jitter multiplier used in effective latency calculation.
+    const JITTER_FACTOR: f64 = 2.5;
+    /// Latency multiplier used in effective latency calculation.
+    const LATENCY_FACTOR: f64 = 0.7;
     /// Estimated packet loss multiplier.
     const P_LOSS_FACTOR: f64 = 2.5;
     /// `R0` is the basic signal to noise ratio, including noise sources such
     /// as circuit and room noise. However, currently it is really difficult
     /// to calculate directly. Thus, [ITU-T G.113] provides the common value.
     ///
-    ///  [ITU-T G.113]: https://www.itu.int/rec/T-REC-G.113
+    /// [ITU-T G.113]: https://itu.int/rec/T-REC-G.113
     const R0: f64 = 93.2;
     /// Relationship between R-value and user's satisfaction is taken from
     /// [ITU-T G.107].
     ///
-    /// [ITU-T G.107]: https://www.itu.int/rec/T-REC-G.107
+    /// [ITU-T G.107]: https://itu.int/rec/T-REC-G.107
     const R_LOWER_LIMIT_HIGH: f64 = 80.;
     const R_LOWER_LIMIT_LOW: f64 = 60.;
     const R_LOWER_LIMIT_MEDIUM: f64 = 70.;
@@ -335,23 +321,23 @@ impl QualityMeter {
             .push(ExpiringStat::new(PacketLost(packets_lost), self.stats_ttl));
     }
 
-    /// Returns [`EstimatedConnectionQuality`] based on accumulated stats.
+    /// Returns [`ConnectionQualityScore`] based on accumulated stats.
     /// Returns `None` if there are not enough data to make calculations.
     ///
-    /// [Algorithm-MOS] is used to calculate [`EstimatedConnectionQuality`],
-    /// which is derived from E-model, introduced in [ITU-T G.107] with some
+    /// [Algorithm-MOS] is used to calculate [`ConnectionQualityScore`], which
+    /// is derived from E-model, introduced in [ITU-T G.107] with some
     /// simplifications and tweaks.
     ///
-    /// [ITU-T G.107]: https://www.itu.int/rec/T-REC-G.107
+    /// [ITU-T G.107]: https://itu.int/rec/T-REC-G.107
     /// [Algorithm-MOS]: https://tinyurl.com/y3nojmot
     #[allow(clippy::cast_precision_loss)]
-    pub fn calculate(&mut self) -> Option<EstimatedConnectionQuality> {
+    pub fn calculate(&mut self) -> Option<ConnectionQualityScore> {
         let latency = self.mean_rtt()?.as_millis() as f64;
         let jitter = self.mean_jitter()?.as_millis() as f64;
         let packet_loss = self.mean_packet_loss()?;
 
         let effective_latency =
-            jitter * Self::JITTER_FACTOR + latency + Self::CODEC_DELAY;
+            jitter * Self::JITTER_FACTOR + latency * Self::LATENCY_FACTOR;
 
         // Calculate the R-Value (Transmission Rating Factor R) based on
         // Effective Latency. The voice quality drops more significantly
@@ -364,7 +350,8 @@ impl QualityMeter {
 
         let r = r - (packet_loss * Self::P_LOSS_FACTOR);
         {
-            use EstimatedConnectionQuality::{High, Low, Medium, Poor};
+            use ConnectionQualityScore::{High, Low, Medium, Poor};
+
             Some(if r < Self::R_LOWER_LIMIT_LOW {
                 Poor
             } else if r < Self::R_LOWER_LIMIT_MEDIUM {
@@ -378,8 +365,9 @@ impl QualityMeter {
     }
 
     /// Returns average round trip time based on accumulated [`Rtt`] stats stats
-    /// filtering out expired measurements. Returns `None` if there are not
-    /// enough data to make calculations.
+    /// filtering out expired measurements.
+    ///
+    /// Returns `None` if there are not enough data to make calculations.
     fn mean_rtt(&mut self) -> Option<Duration> {
         remove_expired_stats(&mut self.rtt);
         if self.rtt.is_empty() {
@@ -394,8 +382,9 @@ impl QualityMeter {
     }
 
     /// Returns average jitter based on accumulated [`Jitter`] stats stats
-    /// filtering out expired measurements. Returns `None` if there are not
-    /// enough data to make calculations.
+    /// filtering out expired measurements.
+    ///
+    /// Returns `None` if there are not enough data to make calculations.
     fn mean_jitter(&mut self) -> Option<Duration> {
         remove_expired_stats(&mut self.jitter);
         if self.jitter.is_empty() {
@@ -457,16 +446,18 @@ fn remove_expired_stats<T>(stats: &mut Vec<ExpiringStat<T>>) {
 
 /// Wrapper around stat which implements expiration logic.
 ///
-/// Periodically storage of the [`ExpiringStat`]s should check all stored values
-/// by calling [`ExpiringStat::is_expired`] and if it returns `true`, remove
-/// this stat from the storage.
+/// Periodically, storage of the [`ExpiringStat`]s should check all stored
+/// values by calling [`ExpiringStat::is_expired`] and if it returns `true`,
+/// remove this stat from the storage.
 #[derive(Debug)]
 struct ExpiringStat<T> {
-    /// Timestamp when stat was measured.
+    /// Timestamp when this [`ExpiringStat`] was measured.
     measured_at: SystemTime,
-    /// Stat TTL.
+
+    /// TTL (time to live) for this [`ExpiringStat`].
     ttl: Duration,
-    /// Actual stat.
+
+    /// Actual value of this [`ExpiringStat`].
     stat: T,
 }
 
@@ -483,7 +474,7 @@ impl<T> ExpiringStat<T> {
         }
     }
 
-    /// Returns `true` if this [`ExpiringStat`] was considered as expired and
+    /// Indicates whether this [`ExpiringStat`] was considered as expired and
     /// should be removed from the storage.
     fn is_expired(&self) -> bool {
         self.measured_at.elapsed().unwrap() > self.ttl
@@ -494,15 +485,17 @@ impl<T> ExpiringStat<T> {
 #[derive(Debug)]
 struct Rtt(Duration);
 
-/// Packet Jitter for specific SSRC measured in milliseconds.
+/// Packet jitter for specific SSRC measured in milliseconds.
+///
+/// [jitter]: https://en.wikipedia.org/wiki/Jitter
 #[derive(Debug)]
 struct Jitter(Duration);
 
-/// Accumulative number of packets lost for specific SSRC.
+/// Accumulated number of packets lost for specific SSRC.
 #[derive(Debug)]
 struct PacketLost(u64);
 
-/// Accumulative number of packets sent for specific SSRC.
+/// Accumulated number of packets sent for specific SSRC.
 #[derive(Debug)]
 struct PacketsSent(u64);
 
@@ -555,10 +548,7 @@ mod tests {
             meter.add_jitter(Duration::from_millis(*jitter));
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::High
-        );
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::High);
     }
 
     #[test]
@@ -584,10 +574,7 @@ mod tests {
             meter.add_rtt(Duration::from_millis(*rtt));
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::High
-        );
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::High);
     }
 
     #[test]
@@ -614,7 +601,7 @@ mod tests {
             meter.add_rtt(Duration::from_millis(*rtt));
         }
 
-        assert_eq!(meter.calculate().unwrap(), EstimatedConnectionQuality::Low);
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::Low);
     }
 
     #[test]
@@ -627,10 +614,7 @@ mod tests {
             meter.add_jitter(Duration::from_millis(*jitter));
         }
 
-        assert_eq!(
-            meter.calculate().unwrap(),
-            EstimatedConnectionQuality::Poor
-        );
+        assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::Poor);
     }
 
     #[test]

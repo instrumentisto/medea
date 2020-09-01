@@ -132,20 +132,16 @@ impl CommandHandler for Room {
 
     /// Adds new [`Peer`] connection metrics.
     ///
-    /// Provides received [`PeerMetrics::RtcStats`] to the [`PeersService`]
-    #[allow(clippy::single_match)]
+    /// Passes [`PeerMetrics::RtcStats`] to [`PeersService`] for the further
+    /// analysis.
     fn on_add_peer_connection_metrics(
         &mut self,
         peer_id: PeerId,
         metrics: PeerMetrics,
     ) -> Self::Output {
-        match metrics {
-            PeerMetrics::RtcStats(stats) => {
-                self.peers.add_stats(peer_id, &stats);
-            }
-            _ => (),
+        if let PeerMetrics::RtcStats(stats) = metrics {
+            self.peers.add_stats(peer_id, stats);
         }
-
         Ok(())
     }
 

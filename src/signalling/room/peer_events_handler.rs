@@ -3,7 +3,8 @@
 use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
-    Event, MemberId, NegotiationRole, PeerId, TrackUpdate,
+    ConnectionQualityScore, Event, MemberId, NegotiationRole, PeerId,
+    TrackUpdate,
 };
 
 use crate::{
@@ -12,8 +13,8 @@ use crate::{
     media::{peer::PeerUpdatesSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
         peers::{
-            EstimatedConnectionQuality, PeerConnectionStateEventsHandler,
-            PeersMetricsEvent, PeersMetricsEventHandler,
+            PeerConnectionStateEventsHandler, PeersMetricsEvent,
+            PeersMetricsEventHandler,
         },
         room::RoomError,
         Room,
@@ -102,19 +103,18 @@ impl PeersMetricsEventHandler for Room {
         Ok(())
     }
 
-    /// Sends [`Event::QualityScoreUpdated`] to the [`Member`] with a provided
-    /// [`MemberId`].
+    /// Sends received [`ConnectionQualityScore`] to member.
     fn on_quality_meter_update(
         &mut self,
         member_id: MemberId,
         partner_member_id: MemberId,
-        quality_score: EstimatedConnectionQuality,
+        quality_score: ConnectionQualityScore,
     ) -> Self::Output {
         self.members.send_event_to_member(
             member_id,
-            Event::QualityScoreUpdated {
+            Event::ConnectionQualityUpdated {
                 partner_member_id,
-                quality_score: quality_score as u8,
+                quality_score,
             },
         )
     }

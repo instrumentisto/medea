@@ -12,10 +12,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::{Map, Promise};
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, MemberId, NegotiationRole,
-    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
-    TrackUpdate,
+    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -191,42 +191,6 @@ impl From<MediaConnectionsError> for RoomError {
     }
 }
 
-/// Stores and provides information about call quality received from server.
-///
-/// Will be provided to the [`RoomHandle::on_quality_score_update`] callback.
-#[wasm_bindgen]
-pub struct QualityScoreUpdate {
-    /// Average quality score with all partners.
-    avg_quality_score: u8,
-
-    /// Individual quality scores for all partners.
-    ///
-    /// Score will be in range from 1 to 4.
-    quality_scores: HashMap<MemberId, u8>,
-}
-
-#[wasm_bindgen]
-impl QualityScoreUpdate {
-    /// Returns average quality score with all partners.
-    ///
-    /// Score will be in range from 1 to 4.
-    pub fn avg_quality_score(&self) -> u8 {
-        self.avg_quality_score
-    }
-
-    /// Returns individual quality scores for all partners.
-    ///
-    /// Score will be in range from 1 to 4.
-    pub fn quality_scores(&self) -> Map {
-        let map = Map::new();
-        for (member_id, score) in &self.quality_scores {
-            map.set(&(member_id.0.clone()).into(), &(*score).into());
-        }
-
-        map
-    }
-}
-
 /// JS side handle to `Room` where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
@@ -349,18 +313,6 @@ impl RoomHandle {
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_failed_local_stream.set_func(f))
-    }
-
-    /// Sets `on_quality_score_update` callback, which will be invoked when
-    /// connection quality score will be updated by server.
-    ///
-    /// [`QualityScoreUpdate`] will be provided into this callback.
-    pub fn on_quality_score_update(
-        &self,
-        f: js_sys::Function,
-    ) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_quality_score_update.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
@@ -609,13 +561,6 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
-    /// Quality scores of the all `Member`s connected with this client.
-    quality_scores: RefCell<HashMap<MemberId, u8>>,
-
-    /// Callback to be invoked when new [`QualityScoreUpdate`] will be received
-    /// from server.
-    on_quality_score_update: Callback1<QualityScoreUpdate>,
-
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
     /// its actual underlying [MediaStream][1] object.
     ///
@@ -658,8 +603,6 @@ impl InnerRoom {
             peers,
             peer_event_sender,
             connections: Connections::default(),
-            quality_scores: RefCell::default(),
-            on_quality_score_update: Callback1::default(),
             on_local_stream: Callback1::default(),
             on_connection_loss: Callback1::default(),
             on_failed_local_stream: Rc::new(Callback1::default()),
@@ -984,29 +927,19 @@ impl EventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Calculates average score and calls `on_quality_score_update` callback
-    /// with a calculated values.
-    async fn on_quality_score_updated(
+    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
+    /// [`Connection::update_quality_score`].
+    async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,
-        quality_score: u8,
+        quality_score: ConnectionQualityScore,
     ) -> Self::Output {
-        self.quality_scores
-            .borrow_mut()
-            .insert(partner_member_id, quality_score);
+        let conn = self
+            .connections
+            .get(&partner_member_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
 
-        #[allow(clippy::cast_possible_truncation)]
-        let avg_quality_score = {
-            let quality_scores = self.quality_scores.borrow();
-            (quality_scores.values().copied().map(u16::from).sum::<u16>()
-                / quality_scores.len() as u16) as u8
-        };
-
-        let update = QualityScoreUpdate {
-            avg_quality_score,
-            quality_scores: self.quality_scores.borrow().clone(),
-        };
-        self.on_quality_score_update.call(update);
+        conn.update_quality_score(quality_score);
 
         Ok(())
     }

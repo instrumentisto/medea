@@ -34,14 +34,14 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCodecStats`;
     - `RtcInboundRtpStreamStats`;
     - `RtcOutboundRtpStreamStats`;
-    - `RemoteInboundRtpStreamStat`;
-    - `RemoteOutboundRtpStreamStat`;
-    - `MediaSourceStat`;
-    - `RtpContributingSourceStat`;
-    - `RtcPeerConnectionStat`;
-    - `DataChannelStat`;
-    - `MediaStreamStat`;
-    - `TrackStat`;
+    - `RtcRemoteInboundRtpStreamStats`;
+    - `RtcRemoteOutboundRtpStreamStats`;
+    - `MediaSourceStats`;
+    - `RtpContributingSourceStats`;
+    - `RtcPeerConnectionStats`;
+    - `DataChannelStats`;
+    - `MediaStreamStats`;
+    - `TrackStats`;
     - `RtcRtpTransceiverStats`;
     - `SenderStatsKind`;
     - `ReceiverStatsKind`;
@@ -54,7 +54,7 @@ All user visible changes to this project will be documented in this file. This p
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
 - `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
 - `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]);
-- `QualityScoreUpdated` event ([#132]).
+- `ConnectionQualityUpdated` event ([#132]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58

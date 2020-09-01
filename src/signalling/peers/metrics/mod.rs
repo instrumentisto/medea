@@ -10,7 +10,9 @@ use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, stream::LocalBoxStream};
-use medea_client_api_proto::{stats::RtcStat, MemberId, PeerId};
+use medea_client_api_proto::{
+    stats::RtcStat, ConnectionQualityScore, MemberId, PeerId,
+};
 use medea_macro::dispatchable;
 
 use crate::{
@@ -25,8 +27,6 @@ use crate::{
 };
 
 use self::flowing_detector::FlowingDetector;
-
-pub use quality_meter::EstimatedConnectionQuality;
 
 /// Sender for the [`PeersMetricsEvent`]s.
 #[derive(Debug, Clone)]
@@ -88,17 +88,17 @@ pub enum PeersMetricsEvent {
         direction: MediaDirection,
     },
 
-    /// [`EstimatedConnectionQuality`] updated.
+    /// [`ConnectionQualityScore`] updated.
     QualityMeterUpdate {
-        /// [`MemberId`] of the [`Peer`] which's [`EstimatedConnectionQuality`]
+        /// [`MemberId`] of the [`Peer`] which's [`ConnectionQualityScore`]
         /// was updated.
         member_id: MemberId,
 
         /// [`MemberId`] of the partner [`Peer`].
         partner_member_id: MemberId,
 
-        /// Actual [`EstimatedConnectionQuality`].
-        quality_score: EstimatedConnectionQuality,
+        /// Actual [`ConnectionQualityScore`].
+        quality_score: ConnectionQualityScore,
     },
 }
 
@@ -213,7 +213,7 @@ impl PeerMetricsService {
             handler.add_stat(peer_id, stats);
         }
     }
-    
+
     #[cfg(test)]
     pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
         let mut is_peer_registered = false;
