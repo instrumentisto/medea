@@ -759,6 +759,7 @@ impl InnerRoom {
                     .map_err(tracerr::map_from_and_wrap!())?;
             }
             Some(NegotiationRole::Offerer) => {
+                crate::utils::delay_for(std::time::Duration::from_secs(3).into()).await;
                 let sdp_offer = peer
                     .get_offer(tracks)
                     .await

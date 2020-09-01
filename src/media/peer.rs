@@ -52,7 +52,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     convert::TryFrom,
-    fmt,
+    fmt, mem,
     rc::Rc,
 };
 
@@ -75,6 +75,7 @@ use crate::{
         peers::Counter,
     },
 };
+use std::collections::HashSet;
 
 /// Subscriber to the events indicating that [`Peer`] was updated.
 #[cfg_attr(test, mockall::automock)]
@@ -358,18 +359,6 @@ enum TrackChange {
 }
 
 impl TrackChange {
-    fn id(&self) -> u8 {
-        match self {
-            TrackChange::TrackPatch(_) => 0,
-            TrackChange::AddRecvTrack(_) => 1,
-            TrackChange::AddSendTrack(_) => 2,
-        }
-    }
-
-    fn enum_eq(&self, another: &TrackChange) -> bool {
-        self.id() == another.id()
-    }
-
     /// Tries to return new [`Track`] based on this [`TrackChange`].
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
@@ -435,6 +424,70 @@ impl<T> TrackChangeHandler for Peer<T> {
     /// Does nothing.
     #[inline]
     fn on_track_patch(&mut self, _: TrackPatch) {}
+}
+
+struct TrackPatchDeduper {
+    merged_patches: HashMap<TrackId, TrackPatch>,
+    whitelist: Option<HashSet<TrackId>>,
+}
+
+impl TrackPatchDeduper {
+    pub fn new() -> Self {
+        Self {
+            merged_patches: HashMap::new(),
+            whitelist: None,
+        }
+    }
+
+    pub fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
+        Self {
+            merged_patches: HashMap::new(),
+            whitelist: Some(whitelist),
+        }
+    }
+
+    fn some_predicate<'a>(&self, patch: &'a TrackChange) -> Option<&'a TrackPatch> {
+        if let TrackChange::TrackPatch(patch) = patch {
+            if let Some(whitelist) = &self.whitelist {
+                if whitelist.contains(&patch.id) {
+                    Some(patch)
+                } else {
+                    None
+                }
+            } else {
+                Some(patch)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn merge(&mut self, patches: &mut Vec<TrackChange>) {
+        let mut i = 0;
+        while i != patches.len() {
+            let is_remove = if let Some(patch) = self.some_predicate(&patches[i]) {
+                self.merged_patches.entry(patch.id)
+                    .or_insert_with(|| TrackPatch::new(patch.id))
+                    .merge(patch);
+
+                true
+            } else {
+                false
+            };
+
+            if is_remove {
+                patches.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    pub fn get_changes(self) -> Vec<TrackChange> {
+        self.merged_patches.into_iter()
+            .map(|(_, patch)| TrackChange::TrackPatch(patch))
+            .collect()
+    }
 }
 
 /// [RTCPeerConnection] representation.
@@ -567,18 +620,44 @@ impl<T> Peer<T> {
         }
         self.context.track_changes_queue = filtered_changes_queue;
 
-        let pending_track_updates =
-            std::mem::take(&mut self.context.pending_track_updates);
-        let mut cleaned_pending_track_updates = Vec::new();
-        'outer: for pending_track_update in pending_track_updates {
-            for forcible_change in &forcible_changes {
-                if !pending_track_update.enum_eq(forcible_change) {
-                    cleaned_pending_track_updates.push(pending_track_update);
-                    continue 'outer;
-                }
+        let pending_track_updates = mem::take(&mut self.context.pending_track_updates);
+
+        let mut merged_patches: HashMap<TrackId, TrackPatch> = HashMap::new();
+        for forcible_update in &forcible_changes {
+            if let TrackChange::TrackPatch(patch) = forcible_update {
+                merged_patches.entry(patch.id)
+                    .or_insert_with(|| TrackPatch::new(patch.id));
             }
         }
-        self.context.pending_track_updates = cleaned_pending_track_updates;
+
+        let mut new_pending_track_updates = Vec::new();
+        for pending_track_update in pending_track_updates {
+            if let TrackChange::TrackPatch(patch) = pending_track_update {
+                if let Some(merge_patch) = merged_patches.get_mut(&patch.id) {
+                    merge_patch.merge(&patch);
+                } else {
+                    new_pending_track_updates.push(TrackChange::TrackPatch(patch));
+                }
+            } else {
+                new_pending_track_updates.push(pending_track_update);
+            }
+        }
+
+        let mut new_forcible_changes = Vec::new();
+        for forcible_change in forcible_changes {
+            if let TrackChange::TrackPatch(patch) = forcible_change {
+                if let Some(merge_patch) = merged_patches.get_mut(&patch.id) {
+                    merge_patch.merge(&patch);
+                } else {
+                    new_forcible_changes.push(TrackChange::TrackPatch(patch));
+                }
+            } else {
+                new_forcible_changes.push(forcible_change);
+            }
+        }
+
+        new_forcible_changes.extend(merged_patches.into_iter().map(|(_, patch)| TrackChange::TrackPatch(patch)));
+        let forcible_changes = new_forcible_changes;
 
         let mut updates = Vec::new();
         for change in forcible_changes {
