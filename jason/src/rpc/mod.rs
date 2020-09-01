@@ -23,7 +23,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{console_error, JasonError, JsCaused, JsError};
+use crate::utils::{JasonError, JsCaused, JsError};
 
 use websocket::TransportState;
 
@@ -424,7 +424,9 @@ impl WebSocketRpcClient {
                     .subs
                     .iter()
                     .filter_map(|sub| sub.unbounded_send(event.clone()).err())
-                    .for_each(|e| console_error(e.to_string()));
+                    .for_each(|e| {
+                        log::error!("Failed to send {:?}: {}", event, e)
+                    });
             }
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
@@ -438,8 +440,9 @@ impl WebSocketRpcClient {
                     ),
                 )
                 .map_err(tracerr::wrap!(=> RpcClientError))
-                .map_err(JasonError::from)
-                .map_err(console_error)
+                .map_err(|e| {
+                    log::error!("Failed to update socket settings: {}", e)
+                })
                 .ok();
             }
             ServerMsg::Ping(_) => {}

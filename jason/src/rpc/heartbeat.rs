@@ -9,10 +9,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{
-        console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
-        TaskHandle,
-    },
+    utils::{delay_for, JsCaused, JsDuration, JsError, TaskHandle},
 };
 
 /// Errors that may occur in [`Heartbeat`].
@@ -64,8 +61,7 @@ impl Inner {
         self.transport
             .send(&ClientMsg::Pong(n))
             .map_err(tracerr::wrap!(=> TransportError))
-            .map_err(JasonError::from)
-            .map_err(console_error)
+            .map_err(|e| log::error!("Failed to send pong: {}", e))
             .ok();
     }
 }

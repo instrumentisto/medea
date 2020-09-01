@@ -12,8 +12,8 @@ use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::utils::{
-    console_error, EventListener, EventListenerBindError, JasonError, JsCaused,
-    JsError, JsonParseError,
+    EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
+    JsonParseError,
 };
 
 use super::{ClientDisconnect, CloseMsg};
@@ -215,7 +215,7 @@ impl Drop for InnerSocket {
             let rsn = serde_json::to_string(&self.close_reason)
                 .expect("Could not serialize close message");
             if let Err(e) = self.socket.close_with_code_and_reason(1000, &rsn) {
-                console_error(e);
+                log::error!("Failed to normally close socket: {:?}", e);
             }
         }
     }

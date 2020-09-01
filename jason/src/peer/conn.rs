@@ -19,8 +19,8 @@ use crate::{
     media::TrackConstraints,
     peer::stats::{RtcStats, RtcStatsError},
     utils::{
-        console_error, get_property_by_name, EventListener,
-        EventListenerBindError, JsCaused, JsError,
+        get_property_by_name, EventListener, EventListenerBindError, JsCaused,
+        JsError,
     },
 };
 
@@ -488,7 +488,7 @@ impl RtcPeerConnection {
                                 };
                                 f(state);
                             } else {
-                                console_error(
+                                log::error!(
                                     "Could not receive RTCPeerConnection \
                                      connection state",
                                 );

@@ -35,10 +35,7 @@ use crate::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
         RpcClientError, TransportError,
     },
-    utils::{
-        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
-    },
+    utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -234,14 +231,14 @@ impl RoomHandle {
         let weak_inner = Rc::downgrade(&inner);
         spawn_local(async move {
             while connection_loss_stream.next().await.is_some() {
-                match upgrade_or_detached!(weak_inner, JsValue) {
+                match upgrade_or_detached!(weak_inner, JasonError) {
                     Ok(inner) => {
                         let reconnect_handle =
                             ReconnectHandle::new(Rc::downgrade(&inner.rpc));
                         inner.on_connection_loss.call(reconnect_handle);
                     }
                     Err(e) => {
-                        console_error(e);
+                        log::error!("Failed to upgrade RoomHandler: {}", e);
                         break;
                     }
                 }
@@ -1059,8 +1056,11 @@ impl Drop for InnerRoom {
             self.rpc.set_close_reason(reason);
         };
 
-        self.on_close
+        if let Some(Err(e)) = self
+            .on_close
             .call(RoomCloseReason::new(*self.close_reason.borrow()))
-            .map(|result| result.map_err(console_error));
+        {
+            log::error!("Failed to call Room::on_close callback: {:?}", e)
+        }
     }
 }
