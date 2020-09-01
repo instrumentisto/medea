@@ -6,7 +6,7 @@
 mod flowing_detector;
 mod quality_meter;
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
+use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::{channel::mpsc, stream::LocalBoxStream};
@@ -126,11 +126,25 @@ trait MetricHandler: Debug {
 
     /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
     /// [`MetricHandler`].
-    fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+    fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
 
+    /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
+    /// registered in the [`MetricHandler`].
+    ///
+    /// Used only for the test purposes.
+    ///
+    /// Returns `None` if [`MetricHandler`] implementor can't return this
+    /// information.
     #[cfg(test)]
     fn is_peer_registered(&self, peer_id: PeerId) -> Option<bool>;
 
+    /// Returns count of the [`MediaTrack`] which are registered in the
+    /// [`MetricHandler`].
+    ///
+    /// Used only for the test purposes.
+    ///
+    /// Returns `None` if [`MetricHandler`] implementor can't return this
+    /// information.
     #[cfg(test)]
     fn peer_tracks_count(&self, peer_id: PeerId) -> Option<usize>;
 }
@@ -151,6 +165,7 @@ impl PeerMetricsService {
     pub fn new(
         room_id: RoomId,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        stats_ttl: Duration,
     ) -> Self {
         let event_tx = EventSender::new();
         let handlers: Vec<Box<dyn MetricHandler>> = vec![
@@ -158,6 +173,7 @@ impl PeerMetricsService {
                 room_id,
                 event_tx.clone(),
                 peers_traffic_watcher,
+                stats_ttl,
             )),
             Box::new(QualityMeterService::new(event_tx.clone())),
         ];
@@ -210,22 +226,24 @@ impl PeerMetricsService {
     /// [`MetricsHandler`]s.
     pub fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         for handler in &mut self.handlers {
-            handler.add_stat(peer_id, stats);
+            handler.add_stats(peer_id, stats);
         }
     }
 
+    /// Returns `true` if at least one [`MetricHandler`] returned `Some(true)`.
     #[cfg(test)]
     pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-        let mut is_peer_registered = false;
-        for handler in &self.handlers {
-            if let Some(is_reg) = handler.is_peer_registered(peer_id) {
-                is_peer_registered |= is_reg;
-            }
-        }
-
-        is_peer_registered
+        self.handlers
+            .iter()
+            .filter_map(|handler| {
+                handler.is_peer_registered(peer_id).filter(|i| *i)
+            })
+            .next()
+            .unwrap_or_default()
     }
 
+    /// Returns count of the registered `MediaTrack`s from the all
+    /// [`MetricHandler`].
     #[cfg(test)]
     pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
         let mut peer_tracks_count = 0;

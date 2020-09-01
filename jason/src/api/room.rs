@@ -2,7 +2,6 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
     ops::Deref as _,
     rc::{Rc, Weak},
 };
@@ -10,7 +9,7 @@ use std::{
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
-use js_sys::{Map, Promise};
+use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,

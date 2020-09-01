@@ -139,7 +139,7 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         metrics: PeerMetrics,
     ) -> Self::Output {
-        if let PeerMetrics::RtcStats(stats) = metrics {
+        if let PeerMetrics::RtcStats(stats) = &metrics {
             self.peers.add_stats(peer_id, stats);
         }
         Ok(())

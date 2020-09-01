@@ -24,10 +24,10 @@ use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
-        RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
+        RtcStatsType, StatId,
     },
-    ConnectionQualityScore, MediaType as MediaTypeProto, MemberId, PeerId,
+    MediaType as MediaTypeProto, MemberId, PeerId,
 };
 
 use crate::{
@@ -65,6 +65,9 @@ pub struct FlowingDetector {
     /// metrics.
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
 
+    /// Duration, after which [`Peer`]s stats will be considered as stale.
+    stats_ttl: Duration,
+
     /// Sender of [`PeerMetricsEvent`]s.
     ///
     /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
@@ -73,51 +76,60 @@ pub struct FlowingDetector {
 }
 
 impl MetricHandler for FlowingDetector {
+    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
+    /// creation.
+    ///
+    /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
     fn register_peer(&mut self, peer: &PeerStateMachine) {
-        // TODO: provide stats_ttl to the Context
-        self.register_peer(peer, Duration::from_secs(5));
+        debug!(
+            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
+             = {}].",
+            peer.id(),
+            self.room_id
+        );
+
+        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
+            peer_id: peer.id(),
+            member_id: peer.member_id(),
+            partner_peer: Weak::new(),
+            last_update: Utc::now(),
+            senders: HashMap::new(),
+            receivers: HashMap::new(),
+            send_traffic_state: MediaTrafficState::new(),
+            recv_traffic_state: MediaTrafficState::new(),
+            state: PeerStatState::Connecting,
+            tracks_spec: PeerTracks::from(peer),
+            stats_ttl: self.stats_ttl,
+        }));
+        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
+        {
+            first_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&partner_peer_stat);
+            partner_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&first_peer_stat);
+        }
+
+        self.peers.insert(peer.id(), first_peer_stat);
     }
 
+    /// Stops tracking provided [`Peer`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
-        // TODO: Fix this please
-        self.unregister_peers(peers_ids);
+        debug!(
+            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
+             the PeerMetricsService.",
+            peers_ids, self.room_id
+        );
+
+        for peer_id in peers_ids {
+            self.peers.remove(peer_id);
+        }
     }
 
+    /// Updates [`Peer`]s internal representation. Must be called each time
+    /// [`Peer`] tracks set changes (some track was added or removed).
     fn update_peer(&mut self, peer: &PeerStateMachine) {
-        self.update_peer_tracks(peer);
-    }
-
-    fn check(&mut self) {
-        self.check_peers();
-    }
-
-    fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
-        // TODO: remove clone
-        self.add_stats(peer_id, stats);
-    }
-
-    #[cfg(test)]
-    fn is_peer_registered(&self, peer_id: PeerId) -> Option<bool> {
-        Some(self.is_peer_registered(peer_id))
-    }
-
-    #[cfg(test)]
-    fn peer_tracks_count(&self, peer_id: PeerId) -> Option<usize> {
-        Some(self.peer_tracks_count(peer_id))
-    }
-}
-
-impl FlowingDetector {
-    pub fn new(
-        room_id: RoomId,
-        event_tx: EventSender,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-    ) -> Self {
-        Self {
-            room_id,
-            peers_traffic_watcher,
-            peers: HashMap::new(),
-            event_tx,
+        if let Some(peer_stat) = self.peers.get(&peer.id()) {
+            peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
         }
     }
 
@@ -127,7 +139,7 @@ impl FlowingDetector {
     ///
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
-    fn check_peers(&self) {
+    fn check(&mut self) {
         for peer in self
             .peers
             .values()
@@ -181,42 +193,6 @@ impl FlowingDetector {
         }
     }
 
-    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
-    /// creation.
-    ///
-    /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
-    fn register_peer(&mut self, peer: &Peer, stats_ttl: Duration) {
-        debug!(
-            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
-             = {}].",
-            peer.id(),
-            self.room_id
-        );
-
-        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: peer.id(),
-            member_id: peer.member_id(),
-            partner_peer: Weak::new(),
-            last_update: Utc::now(),
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-            send_traffic_state: MediaTrafficState::new(),
-            recv_traffic_state: MediaTrafficState::new(),
-            state: PeerStatState::Connecting,
-            tracks_spec: PeerTracks::from(peer),
-            stats_ttl,
-        }));
-        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
-        {
-            first_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&partner_peer_stat);
-            partner_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&first_peer_stat);
-        }
-
-        self.peers.insert(peer.id(), first_peer_stat);
-    }
-
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
     /// [`PeersMetricsService`].
     ///
@@ -226,7 +202,7 @@ impl FlowingDetector {
     /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
     /// TrackTrafficStarted`] to the [`Room`] if some
     /// [`MediaType`]/[`Direction`] was stopped.
-    fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
+    fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
@@ -324,24 +300,47 @@ impl FlowingDetector {
         }
     }
 
-    /// Stops tracking provided [`Peer`]s.
-    fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
-        debug!(
-            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
-             the PeerMetricsService.",
-            peers_ids, self.room_id
-        );
-
-        for peer_id in peers_ids {
-            self.peers.remove(peer_id);
-        }
+    /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
+    /// registered in the [`PeersMetricsService`].
+    #[cfg(test)]
+    #[inline]
+    fn is_peer_registered(&self, peer_id: PeerId) -> Option<bool> {
+        Some(self.peers.contains_key(&peer_id))
     }
 
-    /// Updates [`Peer`]s internal representation. Must be called each time
-    /// [`Peer`] tracks set changes (some track was added or removed).
-    fn update_peer_tracks(&self, peer: &Peer) {
-        if let Some(peer_stat) = self.peers.get(&peer.id()) {
-            peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
+    /// Returns count of the [`MediaTrack`] which are registered in the
+    /// [`PeersMetricsService`].
+    #[cfg(test)]
+    fn peer_tracks_count(&self, peer_id: PeerId) -> Option<usize> {
+        let count = if let Some(peer) = self.peers.get(&peer_id) {
+            let peer_tracks = peer.borrow().tracks_spec;
+            let mut tracks_count = 0;
+            tracks_count += peer_tracks.audio_recv;
+            tracks_count += peer_tracks.video_recv;
+            tracks_count += peer_tracks.audio_send;
+            tracks_count += peer_tracks.video_send;
+            tracks_count
+        } else {
+            0
+        };
+
+        Some(count)
+    }
+}
+
+impl FlowingDetector {
+    pub fn new(
+        room_id: RoomId,
+        event_tx: EventSender,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        stats_ttl: Duration,
+    ) -> Self {
+        Self {
+            room_id,
+            peers_traffic_watcher,
+            peers: HashMap::new(),
+            stats_ttl,
+            event_tx,
         }
     }
 
@@ -877,37 +876,13 @@ mod tests {
         api::control::callback::{MediaDirection, MediaType},
         media::peer::tests::test_peer_from_peer_tracks,
         signalling::peers::{
-            traffic_watcher::MockPeerTrafficWatcher, PeersMetricsEvent,
+            metrics::{EventSender, MetricHandler},
+            traffic_watcher::MockPeerTrafficWatcher,
+            PeersMetricsEvent,
         },
     };
 
     use super::FlowingDetector;
-    use crate::signalling::peers::metrics::EventSender;
-
-    impl FlowingDetector {
-        /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
-        /// registered in the [`PeersMetricsService`].
-        #[inline]
-        pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-            self.peers.contains_key(&peer_id)
-        }
-
-        /// Returns count of the [`MediaTrack`] which are registered in the
-        /// [`PeersMetricsService`].
-        pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
-            if let Some(peer) = self.peers.get(&peer_id) {
-                let peer_tracks = peer.borrow().tracks_spec;
-                let mut tracks_count = 0;
-                tracks_count += peer_tracks.audio_recv;
-                tracks_count += peer_tracks.video_recv;
-                tracks_count += peer_tracks.audio_send;
-                tracks_count += peer_tracks.video_send;
-                tracks_count
-            } else {
-                0
-            }
-        }
-    }
 
     /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
     /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
@@ -1005,7 +980,7 @@ mod tests {
     impl Helper {
         /// Returns new [`Helper`] with [`PeerMetricsService`] in which [`Room`]
         /// with `test` ID was registered.
-        pub fn new() -> Self {
+        pub fn new(stats_ttl: Duration) -> Self {
             let mut watcher = MockPeerTrafficWatcher::new();
             watcher
                 .expect_register_room()
@@ -1029,6 +1004,7 @@ mod tests {
                 "test".to_string().into(),
                 event_tx.clone(),
                 Arc::new(watcher),
+                stats_ttl,
             );
 
             Self {
@@ -1043,24 +1019,20 @@ mod tests {
         /// count.
         pub fn register_peer(
             &mut self,
-            stats_ttl: Duration,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
             recv_video: u32,
         ) {
-            self.metrics.register_peer(
-                &test_peer_from_peer_tracks(
-                    send_audio, send_video, recv_audio, recv_video,
-                ),
-                stats_ttl,
-            );
+            self.metrics.register_peer(&test_peer_from_peer_tracks(
+                send_audio, send_video, recv_audio, recv_video,
+            ));
         }
 
         /// Generates [`RtcStats`] and adds them to inner
         /// [`PeersMetricsService`] for `PeerId(1)`.
         pub fn add_stats(
-            &self,
+            &mut self,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
@@ -1163,8 +1135,8 @@ mod tests {
         }
 
         /// Calls [`PeerMetricsService::check_peers`].
-        pub fn check_peers(&self) {
-            self.metrics.check_peers();
+        pub fn check_peers(&mut self) {
+            self.metrics.check();
         }
 
         /// Calls [`PeerMetricsService::unregister_peers`] with provided
@@ -1221,14 +1193,9 @@ mod tests {
         stats: (u32, u32, u32, u32),
         should_flow: bool,
     ) -> (MergedFlowState, Helper) {
-        let mut helper = Helper::new();
-        helper.register_peer(
-            stats_tll.unwrap_or(Duration::from_secs(999)),
-            spec.0,
-            spec.1,
-            spec.2,
-            spec.3,
-        );
+        let mut helper =
+            Helper::new(stats_tll.unwrap_or(Duration::from_secs(999)));
+        helper.register_peer(spec.0, spec.1, spec.2, spec.3);
         helper.add_stats(stats.0, stats.1, stats.2, stats.3, 100);
 
         let traffic_flow =
@@ -1389,8 +1356,8 @@ mod tests {
     /// anything ([`TrafficStopped`], [`PeerEventsEvent::NoTrafficFlow`] etc.).
     #[actix_rt::test]
     async fn peer_unregister_doesnt_trigger_anything() {
-        let mut helper = Helper::new();
-        helper.register_peer(Duration::from_millis(50), 1, 1, 1, 1);
+        let mut helper = Helper::new(Duration::from_millis(50));
+        helper.register_peer(1, 1, 1, 1);
         helper.add_stats(1, 1, 1, 1, 100);
 
         let mut directions = HashSet::new();
@@ -1441,7 +1408,7 @@ mod tests {
 
         helper
             .metrics
-            .update_peer_tracks(&test_peer_from_peer_tracks(1, 1, 1, 1));
+            .update_peer(&test_peer_from_peer_tracks(1, 1, 1, 1));
         helper.check_peers();
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
@@ -1470,7 +1437,7 @@ mod tests {
 
         helper
             .metrics
-            .update_peer_tracks(&test_peer_from_peer_tracks(1, 1, 1, 1));
+            .update_peer(&test_peer_from_peer_tracks(1, 1, 1, 1));
         helper.add_stats(0, 0, 1, 1, 300);
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await

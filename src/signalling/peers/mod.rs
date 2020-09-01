@@ -2,7 +2,6 @@
 
 mod media_traffic_state;
 mod metrics;
-mod quality_meter;
 mod traffic_watcher;
 
 use std::{
@@ -11,14 +10,12 @@ use std::{
     convert::{TryFrom, TryInto},
     rc::Rc,
     sync::Arc,
-    time::Duration,
 };
 
 use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
-    stats::RtcStat, ConnectionQualityScore, Incrementable, MemberId, PeerId,
-    TrackId,
+    stats::RtcStat, Incrementable, MemberId, PeerId, TrackId,
 };
 
 use crate::{
@@ -77,10 +74,6 @@ pub struct PeersService {
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
     peer_metrics_service: RefCell<PeerMetricsService>,
-
-    /// Duration, after which [`Peer`]s stats will be considered as stale.
-    /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
-    peer_stats_ttl: Duration,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
@@ -142,8 +135,8 @@ impl PeersService {
             peer_metrics_service: RefCell::new(PeerMetricsService::new(
                 room_id,
                 peers_traffic_watcher,
+                media_conf.max_lag,
             )),
-            peer_stats_ttl: media_conf.max_lag,
             negotiation_sub,
         })
     }
@@ -541,10 +534,10 @@ impl PeersService {
     }
 
     /// Propagates stats to [`PeersMetricsService`].
-    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    pub fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
         self.peer_metrics_service
             .borrow_mut()
-            .add_stats(peer_id, &stats);
+            .add_stats(peer_id, stats);
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
@@ -728,7 +721,7 @@ impl PeerRepository {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, time::Duration};
 
     use futures::{channel::mpsc, future, Stream, StreamExt as _};
     use medea_client_api_proto::TrackUpdate;

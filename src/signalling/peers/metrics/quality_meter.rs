@@ -8,7 +8,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use derive_more::Display;
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
@@ -195,7 +194,7 @@ impl MetricHandler for QualityMeterService {
 
     /// Provides needed stats to the [`QualityMeter`] of the [`PeerMetric`] with
     /// a provided [`PeerId`].
-    fn add_stat(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
+    fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
             for stat in stats {
@@ -221,11 +220,13 @@ impl MetricHandler for QualityMeterService {
         }
     }
 
+    /// Returns `None`.
     #[cfg(test)]
     fn is_peer_registered(&self, _: PeerId) -> Option<bool> {
         None
     }
 
+    /// Returns `None`.
     #[cfg(test)]
     fn peer_tracks_count(&self, _: PeerId) -> Option<usize> {
         None
