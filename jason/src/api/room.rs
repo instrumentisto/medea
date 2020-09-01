@@ -231,16 +231,13 @@ impl RoomHandle {
         let weak_inner = Rc::downgrade(&inner);
         spawn_local(async move {
             while connection_loss_stream.next().await.is_some() {
-                match upgrade_or_detached!(weak_inner, JasonError) {
-                    Ok(inner) => {
-                        let reconnect_handle =
-                            ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                        inner.on_connection_loss.call(reconnect_handle);
-                    }
-                    Err(e) => {
-                        log::error!("Failed to upgrade RoomHandler: {}", e);
-                        break;
-                    }
+                if let Some(inner) = weak_inner.upgrade() {
+                    let reconnect_handle =
+                        ReconnectHandle::new(Rc::downgrade(&inner.rpc));
+                    inner.on_connection_loss.call(reconnect_handle);
+                } else {
+                    log::error!("Inner Room dropped unexpectedly");
+                    break;
                 }
             }
         });

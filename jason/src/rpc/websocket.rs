@@ -340,20 +340,9 @@ impl WebSocketRpcTransport {
                     };
 
                 let mut this_mut = this.borrow_mut();
-                this_mut
-                    .on_message_subs
-                    .retain(|on_message| !on_message.is_closed());
-                this_mut.on_message_subs.iter().for_each(|on_message| {
-                    on_message.unbounded_send(msg.clone()).unwrap_or_else(
-                        |e| {
-                            log::error!(
-                                "WebSocket's 'on_message' callback receiver \
-                                 unexpectedly gone. {:?}",
-                                e
-                            )
-                        },
-                    );
-                })
+                this_mut.on_message_subs.retain(|on_message| {
+                    on_message.unbounded_send(msg.clone()).is_ok()
+                });
             },
         )
         .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;

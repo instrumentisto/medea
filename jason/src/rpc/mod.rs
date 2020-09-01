@@ -393,15 +393,8 @@ impl WebSocketRpcClient {
                         .borrow_mut()
                         .on_close_subscribers
                         .drain(..)
-                        .filter_map(|sub| {
-                            sub.send(CloseReason::ByServer(reason)).err()
-                        })
-                        .for_each(|reason| {
-                            log::error!(
-                                "Failed to send reason of Jason close to \
-                                 subscriber: {:?}",
-                                reason
-                            )
+                        .for_each(|sub| {
+                            let _ = sub.send(CloseReason::ByServer(reason));
                         });
                 }
             },
@@ -418,15 +411,10 @@ impl WebSocketRpcClient {
         match msg {
             ServerMsg::Event(event) => {
                 // TODO: filter messages by session
-                self.0.borrow_mut().subs.retain(|sub| !sub.is_closed());
                 self.0
-                    .borrow()
+                    .borrow_mut()
                     .subs
-                    .iter()
-                    .filter_map(|sub| sub.unbounded_send(event.clone()).err())
-                    .for_each(|e| {
-                        log::error!("Failed to send {:?}: {}", event, e)
-                    });
+                    .retain(|sub| sub.unbounded_send(event.clone()).is_ok());
             }
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(

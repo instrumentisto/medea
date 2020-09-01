@@ -136,18 +136,7 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
             delay_for(idle_timeout.0 - wait_for_ping.0).await;
             this.borrow_mut()
                 .on_idle_subs
-                .retain(|sub| !sub.is_closed());
-            this.borrow()
-                .on_idle_subs
-                .iter()
-                .filter_map(|sub| sub.unbounded_send(()).err())
-                .for_each(|err| {
-                    log::error!(
-                        "Heartbeat::on_idle subscriber has gone unexpectedly: \
-                         {:?}",
-                        err,
-                    );
-                });
+                .retain(|sub| sub.unbounded_send(()).is_ok());
         });
 
     spawn_local(async move {

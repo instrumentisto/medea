@@ -12,7 +12,7 @@ pub use medea_macro::JsCaused;
 
 /// Prints provided message with [`Console.error()`].
 ///
-/// Can be used for the development purposes.
+/// May be useful during development.
 ///
 /// __Unavailable in the release builds.__
 ///
