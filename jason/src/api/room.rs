@@ -11,10 +11,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, MemberId, NegotiationRole,
-    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
-    TrackUpdate,
+    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -923,6 +923,23 @@ impl EventHandler for InnerRoom {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
+        Ok(())
+    }
+
+    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
+    /// [`Connection::update_quality_score`].
+    async fn on_connection_quality_updated(
+        &self,
+        partner_member_id: MemberId,
+        quality_score: ConnectionQualityScore,
+    ) -> Self::Output {
+        let conn = self
+            .connections
+            .get(&partner_member_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
+
+        conn.update_quality_score(quality_score);
+
         Ok(())
     }
 }
