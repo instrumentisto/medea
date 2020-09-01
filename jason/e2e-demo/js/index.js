@@ -563,6 +563,19 @@ window.onload = async function() {
         remote_videos[remoteMemberId].remove();
         delete remote_videos[remoteMemberId];
       });
+
+      connection.on_quality_score_update((score) => {
+        let videoDiv = remote_videos[remoteMemberId];
+        let el = videoDiv.getElementsByClassName('quality-score');
+
+        if (el[0] === undefined) {
+          let qualityEl = document.createElement('span');
+          qualityEl.innerHTML = score;
+          qualityEl.className = 'quality-score';
+          videoDiv.appendChild(qualityEl);
+        }
+        el[0].innerHTML = score;
+      })
     });
 
     room.on_local_stream((stream) => {
