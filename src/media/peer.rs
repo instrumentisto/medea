@@ -425,12 +425,19 @@ impl<T> TrackChangeHandler for Peer<T> {
     fn on_track_patch(&mut self, _: TrackPatch) {}
 }
 
+/// Deduper of the [`TrackPatch`]es with whitelisting.
 struct TrackPatchDeduper {
+    /// All merged [`TrackPatch`]es from this [`TrackPatchDeduper`].
     merged_patches: HashMap<TrackId, TrackPatch>,
+
+    /// [`TrackId`]s which are can be merged.
+    ///
+    /// If `None` then all [`TrackPatch`]es can be merged.
     whitelist: Option<HashSet<TrackId>>,
 }
 
 impl TrackPatchDeduper {
+    /// Returns new [`TrackPatchDeduper`] with a disabled whitelisting.
     pub fn new() -> Self {
         Self {
             merged_patches: HashMap::new(),
@@ -438,6 +445,7 @@ impl TrackPatchDeduper {
         }
     }
 
+    /// Returns new [`TrackPatchDeduper`] with a provided whitelist.
     pub fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
         Self {
             merged_patches: HashMap::new(),
@@ -445,6 +453,9 @@ impl TrackPatchDeduper {
         }
     }
 
+    /// Returns `Some(TrackPatch)` if provided [`TrackPatch`] can be merged.
+    ///
+    /// Returns `None` if provided [`TrackPatch`] can't be merged.
     fn filter_patch<'a>(
         &self,
         change: &'a TrackChange,
@@ -468,22 +479,25 @@ impl TrackPatchDeduper {
         }
     }
 
+    /// Merges all mergeable [`TrackPatch`]es to the
+    /// [`TrackPatchDedupper::merged_patches`].
+    ///
+    /// Removes merged [`TrackPatch`]es from the provided [`Vec`].
     pub fn merge(&mut self, changes: &mut Vec<TrackChange>) {
-        let mut i = 0;
-        while i != changes.len() {
-            if let Some(patch) = self.filter_patch(&changes[i]) {
-                self.merged_patches
-                    .entry(patch.id)
-                    .or_insert_with(|| TrackPatch::new(patch.id))
-                    .merge(patch);
-
-                changes.remove(i);
-            } else {
-                i += 1;
-            };
-        }
+        changes.retain(|change| {
+            self.filter_patch(change)
+                .map(|patch| {
+                    self.merged_patches
+                        .entry(patch.id)
+                        .or_insert_with(|| TrackPatch::new(patch.id))
+                        .merge(patch);
+                })
+                .is_none()
+        });
     }
 
+    /// Returns [`Iterator`] with the all merged [`TrackPatch`]es converted to
+    /// the [`TrackChange`].
     pub fn into_track_change_iter(self) -> impl Iterator<Item = TrackChange> {
         self.merged_patches
             .into_iter()
@@ -606,10 +620,8 @@ impl<T> Peer<T> {
     /// Commits all [`TrackChange`]s which are marked as forcible
     /// ([`TrackChange::can_force_apply`]).
     pub fn inner_force_commit_scheduled_changes(&mut self) {
-        let track_changes_queue = std::mem::replace(
-            &mut self.context.track_changes_queue,
-            VecDeque::new(),
-        );
+        let track_changes_queue =
+            std::mem::take(&mut self.context.track_changes_queue);
         let mut forcible_changes = Vec::new();
         let mut filtered_changes_queue = VecDeque::new();
         for track_change in track_changes_queue {
