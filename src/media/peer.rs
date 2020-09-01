@@ -52,7 +52,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     convert::TryFrom,
-    fmt, mem,
+    fmt,
     rc::Rc,
 };
 
@@ -66,7 +66,6 @@ use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::PublishPolicy,
-    log::prelude::*,
     media::{IceUser, MediaTrack},
     signalling::{
         elements::endpoints::{
@@ -446,8 +445,15 @@ impl TrackPatchDeduper {
         }
     }
 
-    fn some_predicate<'a>(&self, patch: &'a TrackChange) -> Option<&'a TrackPatch> {
-        if let TrackChange::TrackPatch(patch) = patch {
+    fn filter_patch<'a>(
+        &self,
+        change: &'a TrackChange,
+    ) -> Option<&'a TrackPatch> {
+        if !change.can_force_apply() {
+            return None;
+        }
+
+        if let TrackChange::TrackPatch(patch) = change {
             if let Some(whitelist) = &self.whitelist {
                 if whitelist.contains(&patch.id) {
                     Some(patch)
@@ -462,31 +468,26 @@ impl TrackPatchDeduper {
         }
     }
 
-    pub fn merge(&mut self, patches: &mut Vec<TrackChange>) {
+    pub fn merge(&mut self, changes: &mut Vec<TrackChange>) {
         let mut i = 0;
-        while i != patches.len() {
-            let is_remove = if let Some(patch) = self.some_predicate(&patches[i]) {
-                self.merged_patches.entry(patch.id)
+        while i != changes.len() {
+            if let Some(patch) = self.filter_patch(&changes[i]) {
+                self.merged_patches
+                    .entry(patch.id)
                     .or_insert_with(|| TrackPatch::new(patch.id))
                     .merge(patch);
 
-                true
-            } else {
-                false
-            };
-
-            if is_remove {
-                patches.remove(i);
+                changes.remove(i);
             } else {
                 i += 1;
-            }
+            };
         }
     }
 
-    pub fn get_changes(self) -> Vec<TrackChange> {
-        self.merged_patches.into_iter()
+    pub fn into_track_change_iter(self) -> impl Iterator<Item = TrackChange> {
+        self.merged_patches
+            .into_iter()
             .map(|(_, patch)| TrackChange::TrackPatch(patch))
-            .collect()
     }
 }
 
@@ -609,55 +610,31 @@ impl<T> Peer<T> {
             &mut self.context.track_changes_queue,
             VecDeque::new(),
         );
-        let mut forcible_changes = VecDeque::new();
+        let mut forcible_changes = Vec::new();
         let mut filtered_changes_queue = VecDeque::new();
         for track_change in track_changes_queue {
             if track_change.can_force_apply() {
-                forcible_changes.push_back(track_change);
+                forcible_changes.push(track_change);
             } else {
                 filtered_changes_queue.push_back(track_change);
             }
         }
         self.context.track_changes_queue = filtered_changes_queue;
 
-        let pending_track_updates = mem::take(&mut self.context.pending_track_updates);
-
-        let mut merged_patches: HashMap<TrackId, TrackPatch> = HashMap::new();
-        for forcible_update in &forcible_changes {
-            if let TrackChange::TrackPatch(patch) = forcible_update {
-                merged_patches.entry(patch.id)
-                    .or_insert_with(|| TrackPatch::new(patch.id));
-            }
-        }
-
-        let mut new_pending_track_updates = Vec::new();
-        for pending_track_update in pending_track_updates {
-            if let TrackChange::TrackPatch(patch) = pending_track_update {
-                if let Some(merge_patch) = merged_patches.get_mut(&patch.id) {
-                    merge_patch.merge(&patch);
+        let whitelist = forcible_changes
+            .iter()
+            .filter_map(|t| {
+                if let TrackChange::TrackPatch(patch) = t {
+                    Some(patch.id)
                 } else {
-                    new_pending_track_updates.push(TrackChange::TrackPatch(patch));
+                    None
                 }
-            } else {
-                new_pending_track_updates.push(pending_track_update);
-            }
-        }
-
-        let mut new_forcible_changes = Vec::new();
-        for forcible_change in forcible_changes {
-            if let TrackChange::TrackPatch(patch) = forcible_change {
-                if let Some(merge_patch) = merged_patches.get_mut(&patch.id) {
-                    merge_patch.merge(&patch);
-                } else {
-                    new_forcible_changes.push(TrackChange::TrackPatch(patch));
-                }
-            } else {
-                new_forcible_changes.push(forcible_change);
-            }
-        }
-
-        new_forcible_changes.extend(merged_patches.into_iter().map(|(_, patch)| TrackChange::TrackPatch(patch)));
-        let forcible_changes = new_forcible_changes;
+            })
+            .collect();
+        let mut deduper = TrackPatchDeduper::with_whitelist(whitelist);
+        deduper.merge(&mut self.context.pending_track_updates);
+        deduper.merge(&mut forcible_changes);
+        forcible_changes.extend(deduper.into_track_change_iter());
 
         let mut updates = Vec::new();
         for change in forcible_changes {
@@ -666,7 +643,7 @@ impl<T> Peer<T> {
             updates.push(track_update);
         }
 
-        self.dedup_track_patches();
+        self.dedup_track_changes();
 
         if !updates.is_empty() {
             self.context
@@ -692,30 +669,13 @@ impl<T> Peer<T> {
     }
 
     /// Deduplicates pending [`TrackChanges`]s.
-    fn dedup_track_patches(&mut self) {
-        let mut grouped_patches: HashMap<TrackId, TrackPatch> = HashMap::new();
-        let mut track_changes = Vec::new();
+    fn dedup_track_changes(&mut self) {
+        let mut deduper = TrackPatchDeduper::new();
+        deduper.merge(&mut self.context.pending_track_updates);
 
-        for track_change in
-            std::mem::take(&mut self.context.pending_track_updates)
-        {
-            if let TrackChange::TrackPatch(patch) = track_change {
-                grouped_patches
-                    .entry(patch.id)
-                    .or_insert_with(|| TrackPatch::new(patch.id))
-                    .merge(&patch);
-            } else {
-                track_changes.push(track_change);
-            }
-        }
-
-        track_changes.extend(
-            grouped_patches
-                .into_iter()
-                .map(|(_, patch)| TrackChange::TrackPatch(patch)),
-        );
-
-        self.context.pending_track_updates = track_changes;
+        self.context
+            .pending_track_updates
+            .extend(deduper.into_track_change_iter());
     }
 }
 
@@ -924,7 +884,7 @@ impl Peer<Stable> {
                 task.dispatch_with(self);
             }
 
-            self.dedup_track_patches();
+            self.dedup_track_changes();
 
             self.context.peer_updates_sub.negotiation_needed(self.id());
         }
