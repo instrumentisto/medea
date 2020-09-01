@@ -458,7 +458,7 @@ pub enum PeersMetricsEvent {
 
     /// [`ConnectionQualityScore`] updated.
     QualityMeterUpdate {
-        /// [`MemberId`] of the [`Peer`] which's [`ConnectionQualityScore`]
+        /// [`MemberId`] of the [`Peer`] whose [`ConnectionQualityScore`]
         /// was updated.
         member_id: MemberId,
 
@@ -717,9 +717,9 @@ impl PeerStat {
         receiver.update(upd);
     }
 
-    /// Updates inbound rtp stats based on the partner outbound stats.
+    /// Updates inbound RTP stats based on the partner outbound stats.
     ///
-    /// This stats should be received from the partner `Peer`.
+    /// This stats should be received from the partner [`Peer`].
     fn update_outbound_from_partners_inbound(
         &mut self,
         stat_id: StatId,
@@ -734,7 +734,7 @@ impl PeerStat {
             .add_packets_sent(stat_id, upd.packets_received + packets_lost);
     }
 
-    /// Updates remote inbound rtp stats.
+    /// Updates remote inbound RTP stats.
     ///
     /// Adds round trip time stats to the [`QualityMeter`].
     fn update_remote_inbound_rtp(
@@ -914,8 +914,7 @@ impl PeerStat {
 
     /// Returns [`MemberId`] of the partner [`Member`].
     fn get_partner_member_id(&self) -> Option<MemberId> {
-        self.partner_peer()
-            .map(|partner_peer| partner_peer.borrow().get_member_id())
+        self.partner_peer().map(|p| p.borrow().get_member_id())
     }
 
     /// Returns [`MemberId`] of this [`PeerStat`].
@@ -1230,9 +1229,7 @@ mod tests {
                     direction,
                 } = event
                 {
-                    break (peer_id, was_flowing_at, media_type, direction);
-                } else {
-                    continue;
+                    return (peer_id, was_flowing_at, media_type, direction);
                 }
             }
         }
