@@ -904,143 +904,157 @@ async fn reset_transition_timers() {
     timeout(600, all_unmuted).await.unwrap();
 }
 
-// #[wasm_bindgen_test]
-// async fn new_remote_track() {
-//     #[derive(Debug, PartialEq)]
-//     struct FinalTrack {
-//         has_audio: bool,
-//         has_video: bool,
-//     }
-//     async fn helper(
-//         audio_tx_enabled: bool,
-//         video_tx_enabled: bool,
-//         audio_rx_enabled: bool,
-//         video_rx_enabled: bool,
-//     ) -> Result<FinalTrack, TrackKind> {
-//         let (tx1, _rx1) = mpsc::unbounded();
-//         let (tx2, mut rx2) = mpsc::unbounded();
-//         let manager = Rc::new(MediaManager::default());
-//
-//         let tx_caps = LocalStreamConstraints::default();
-//         tx_caps.set_enabled(audio_tx_enabled, TransceiverKind::Audio);
-//         tx_caps.set_enabled(video_tx_enabled, TransceiverKind::Video);
-//         let sender_peer = PeerConnection::new(
-//             PeerId(1),
-//             tx1,
-//             Vec::new(),
-//             Rc::clone(&manager),
-//             false,
-//             tx_caps,
-//             Rc::new(RecvConstraints::default()),
-//         )
-//         .unwrap();
-//
-//         let rcv_caps = RecvConstraints::default();
-//         rcv_caps.set_enabled(audio_rx_enabled, TransceiverKind::Audio);
-//         rcv_caps.set_enabled(video_rx_enabled, TransceiverKind::Video);
-//         let rcvr_peer = PeerConnection::new(
-//             PeerId(2),
-//             tx2,
-//             Vec::new(),
-//             manager,
-//             false,
-//             LocalStreamConstraints::default(),
-//             Rc::new(rcv_caps),
-//         )
-//         .unwrap();
-//         let (audio_track, video_track) = get_test_unrequired_tracks();
-//
-//         let offer = sender_peer
-//             .get_offer(vec![audio_track.clone(), video_track.clone()])
-//             .await
-//             .unwrap();
-//         let answer = rcvr_peer
-//             .process_offer(
-//                 offer,
-//                 vec![
-//                     Track {
-//                         id: TrackId(1),
-//                         direction: Direction::Recv {
-//                             sender: MemberId::from("whatever"),
-//                             mid: Some(String::from("0")),
-//                         },
-//                         media_type: MediaType::Audio(AudioSettings {
-//                             is_required: true,
-//                         }),
-//                     },
-//                     Track {
-//                         id: TrackId(2),
-//                         direction: Direction::Recv {
-//                             sender: MemberId::from("whatever"),
-//                             mid: Some(String::from("1")),
-//                         },
-//                         media_type: MediaType::Video(VideoSettings {
-//                             is_required: true,
-//                         }),
-//                     },
-//                 ],
-//             )
-//             .await
-//             .unwrap();
-//         sender_peer.set_remote_answer(answer).await.unwrap();
-//
-//         let mut result = FinalTrack {
-//             has_audio: false,
-//             has_video: false,
-//         };
-//         loop {
-//             match timeout(300, rx2.next()).await {
-//                 Ok(Some(event)) => {
-//                     if let PeerEvent::NewRemoteTrack { track, .. } = event {
-//                         match track.kind() {
-//                             TrackKind::Audio => {
-//                                 if result.has_audio {
-//                                     return Err(TrackKind::Audio);
-//                                 } else {
-//                                     result.has_audio = true;
-//                                 }
-//                             }
-//                             TrackKind::Video => {
-//                                 if result.has_video {
-//                                     return Err(TrackKind::Video);
-//                                 } else {
-//                                     result.has_video = true;
-//                                 }
-//                             }
-//                         }
-//                     }
-//                 }
-//                 Ok(None) | Err(_) => {
-//                     break;
-//                 }
-//             }
-//         }
-//         Ok(result)
-//     }
-//
-//     fn bit_at(input: u32, n: u8) -> bool {
-//         (input >> n) & 1 != 0
-//     }
-//
-//     for i in 0..16 {
-//         let audio_tx_enabled = bit_at(i, 0);
-//         let video_tx_enabled = bit_at(i, 1);
-//         let audio_rx_enabled = bit_at(i, 2);
-//         let video_rx_enabled = bit_at(i, 3);
-//
-//         assert_eq!(
-//             helper(
-//                 audio_tx_enabled,
-//                 video_tx_enabled,
-//                 audio_rx_enabled,
-//                 video_rx_enabled
-//             )
-//             .await
-//             .unwrap(),
-//             FinalTrack {
-//                 has_audio: audio_tx_enabled && audio_rx_enabled,
-//                 has_video: video_tx_enabled && video_rx_enabled,
-//             }
-//         );
-//     }
-// }
+#[wasm_bindgen_test]
+async fn new_remote_track() {
+    #[derive(Debug, PartialEq)]
+    struct FinalTrack {
+        has_audio: bool,
+        has_video: bool,
+    }
+    async fn helper(
+        audio_tx_enabled: bool,
+        video_tx_enabled: bool,
+        audio_rx_enabled: bool,
+        video_rx_enabled: bool,
+    ) -> Result<FinalTrack, TrackKind> {
+        let (tx1, _rx1) = mpsc::unbounded();
+        let (tx2, mut rx2) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+
+        let tx_caps = LocalStreamConstraints::default();
+        tx_caps.set_enabled(audio_tx_enabled, TransceiverKind::Audio);
+        tx_caps.set_enabled(video_tx_enabled, TransceiverKind::Video);
+        let sender_peer = PeerConnection::new(
+            PeerId(1),
+            tx1,
+            Vec::new(),
+            Rc::clone(&manager),
+            false,
+            tx_caps,
+            Rc::new(RecvConstraints::default()),
+        )
+        .unwrap();
+
+        let rcv_caps = RecvConstraints::default();
+        rcv_caps.set_enabled(audio_rx_enabled, TransceiverKind::Audio);
+        rcv_caps.set_enabled(video_rx_enabled, TransceiverKind::Video);
+        let rcvr_peer = PeerConnection::new(
+            PeerId(2),
+            tx2,
+            Vec::new(),
+            manager,
+            false,
+            LocalStreamConstraints::default(),
+            Rc::new(rcv_caps),
+        )
+        .unwrap();
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+
+        let offer = sender_peer
+            .get_offer(vec![audio_track.clone(), video_track.clone()])
+            .await
+            .unwrap();
+        let answer = rcvr_peer
+            .process_offer(
+                offer,
+                vec![
+                    Track {
+                        id: TrackId(1),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("whatever"),
+                            mid: Some(String::from("0")),
+                        },
+                        media_type: MediaType::Audio(AudioSettings {
+                            is_required: true,
+                        }),
+                    },
+                    Track {
+                        id: TrackId(2),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("whatever"),
+                            mid: Some(String::from("1")),
+                        },
+                        media_type: MediaType::Video(VideoSettings {
+                            is_required: true,
+                        }),
+                    },
+                ],
+            )
+            .await
+            .unwrap();
+        sender_peer.set_remote_answer(answer).await.unwrap();
+
+        let mut result = FinalTrack {
+            has_audio: false,
+            has_video: false,
+        };
+        loop {
+            match timeout(300, rx2.next()).await {
+                Ok(Some(event)) => {
+                    if let PeerEvent::NewRemoteTrack { track, .. } = event {
+                        match track.kind() {
+                            TrackKind::Audio => {
+                                if result.has_audio {
+                                    return Err(TrackKind::Audio);
+                                } else {
+                                    result.has_audio = true;
+                                }
+                            }
+                            TrackKind::Video => {
+                                if result.has_video {
+                                    return Err(TrackKind::Video);
+                                } else {
+                                    result.has_video = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(None) | Err(_) => {
+                    break;
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    assert_eq!(
+        helper(
+            true,
+            true,
+            true,
+            true
+        )
+            .await
+            .unwrap(),
+        FinalTrack {
+            has_audio: true,
+            has_video: true,
+        }
+    );
+    // fn bit_at(input: u32, n: u8) -> bool {
+    //     (input >> n) & 1 != 0
+    // }
+    //
+    // for i in 0..16 {
+    //     let audio_tx_enabled = bit_at(i, 0);
+    //     let video_tx_enabled = bit_at(i, 1);
+    //     let audio_rx_enabled = bit_at(i, 2);
+    //     let video_rx_enabled = bit_at(i, 3);
+    //
+    //     assert_eq!(
+    //         helper(
+    //             audio_tx_enabled,
+    //             video_tx_enabled,
+    //             audio_rx_enabled,
+    //             video_rx_enabled
+    //         )
+    //         .await
+    //         .unwrap(),
+    //         FinalTrack {
+    //             has_audio: audio_tx_enabled && audio_rx_enabled,
+    //             has_video: video_tx_enabled && video_rx_enabled,
+    //         }
+    //     );
+    // }
+}
