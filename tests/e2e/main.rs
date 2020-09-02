@@ -19,7 +19,29 @@ macro_rules! enum_eq {
     };
 }
 
-/// Expands to the [`module_path`] + '::' + `function_name`.
+/// Expands to the [`module_path`] and function name, but `::` replaced with
+/// `__`.
+///
+/// Can be used only with [`function_name::named`] macro.
+///
+/// # Example
+///
+/// ```
+/// use function_name::named;
+///
+/// use crate::test_name;
+///
+/// mod foo {
+///     mod bar {
+///         #[named]
+///         fn baz() {
+///             assert_eq!(test_name!(), "e2e__foo__bar__baz");
+///         }
+///     }
+/// }
+///
+/// foo::bar::baz();
+/// ```
 #[macro_export]
 macro_rules! test_name {
     () => {

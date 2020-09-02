@@ -5,10 +5,7 @@ use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;
 
-use crate::{
-    log::console_error,
-    utils::{errors::JsCaused, JsError},
-};
+use super::{errors::JsCaused, JsError};
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///
@@ -107,7 +104,7 @@ where
                 self.closure.as_ref().unchecked_ref(),
             )
         {
-            console_error(err);
+            log::error!("Failed to remove EventListener: {:?}", err);
         }
     }
 }

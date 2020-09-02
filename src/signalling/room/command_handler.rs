@@ -130,12 +130,18 @@ impl CommandHandler for Room {
         self.members.send_event_to_member(to_member_id, event)
     }
 
-    /// Does nothing atm.
+    /// Adds new [`Peer`] connection metrics.
+    ///
+    /// Passes [`PeerMetrics::RtcStats`] to [`PeersService`] for the further
+    /// analysis.
     fn on_add_peer_connection_metrics(
         &mut self,
-        _: PeerId,
-        _: PeerMetrics,
+        peer_id: PeerId,
+        metrics: PeerMetrics,
     ) -> Self::Output {
+        if let PeerMetrics::RtcStats(stats) = metrics {
+            self.peers.add_stats(peer_id, stats);
+        }
         Ok(())
     }
 

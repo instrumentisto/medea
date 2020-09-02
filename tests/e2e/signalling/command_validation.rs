@@ -62,7 +62,6 @@ async fn command_validation() {
     control_client.borrow_mut().create(create_room).await;
 
     let (tx1, mut rx1) = unbounded();
-    let deadline = Some(std::time::Duration::from_secs(5));
     let member1 = TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(
@@ -73,7 +72,7 @@ async fn command_validation() {
             },
         )),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -89,7 +88,7 @@ async fn command_validation() {
             },
         )),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
     );
 
     let correct_peer_id = loop {

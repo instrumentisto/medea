@@ -8,9 +8,22 @@ use derive_more::{Display, From};
 use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
-use crate::log::console_error;
-
 pub use medea_macro::JsCaused;
+
+/// Prints provided message with [`Console.error()`].
+///
+/// May be useful during development.
+///
+/// __Unavailable in the release builds.__
+///
+/// [`Console.error()`]: https://tinyurl.com/psv3wqw
+#[cfg(debug_assertions)]
+pub fn console_error<M>(msg: M)
+where
+    M: Into<JsValue>,
+{
+    web_sys::console::error_1(&msg.into());
+}
 
 /// Representation of an error which can caused by error returned from the
 /// JS side.
@@ -81,7 +94,7 @@ pub struct JasonError {
 impl JasonError {
     /// Prints error information to `console.error()`.
     pub fn print(&self) {
-        console_error(self.to_string());
+        log::error!("{}", self);
     }
 }
 

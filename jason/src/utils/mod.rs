@@ -16,6 +16,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Window;
 
+#[cfg(debug_assertions)]
+pub use self::errors::console_error;
 #[doc(inline)]
 pub use self::{
     callback::{Callback0, Callback1, Callback2},

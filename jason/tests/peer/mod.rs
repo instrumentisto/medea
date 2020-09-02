@@ -14,7 +14,7 @@ use medea_client_api_proto::{
     stats::{
         HighResTimeStamp, KnownIceCandidatePairState, NonExhaustive,
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
-        RtcStatsType, StatId, TrackStat, TrackStatKind,
+        RtcStatsType, StatId, TrackStats, TrackStatsKind,
     },
     AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
     ServerTrackPatch, Track, TrackId, VideoSettings,
@@ -736,10 +736,10 @@ mod peer_stats_caching {
         let stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
             timestamp: HighResTimeStamp(1584373509700.0),
-            stats: RtcStatsType::Track(Box::new(TrackStat {
+            stats: RtcStatsType::Track(Box::new(TrackStats {
                 track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
                     .to_string(),
-                kind: Some(TrackStatKind::Audio),
+                kind: Some(TrackStatsKind::Audio),
                 remote_source: None,
                 ended: Some(false),
             })),
@@ -783,10 +783,10 @@ mod peer_stats_caching {
         let mut stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
             timestamp: HighResTimeStamp(1584373509700.0),
-            stats: RtcStatsType::Track(Box::new(TrackStat {
+            stats: RtcStatsType::Track(Box::new(TrackStats {
                 track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
                     .to_string(),
-                kind: Some(TrackStatKind::Audio),
+                kind: Some(TrackStatsKind::Audio),
                 remote_source: None,
                 ended: Some(false),
             })),
@@ -829,10 +829,10 @@ mod peer_stats_caching {
         )
         .unwrap();
 
-        let mut track_stat = Box::new(TrackStat {
+        let mut track_stat = Box::new(TrackStats {
             track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
                 .to_string(),
-            kind: Some(TrackStatKind::Audio),
+            kind: Some(TrackStatsKind::Audio),
             remote_source: None,
             ended: Some(false),
         });

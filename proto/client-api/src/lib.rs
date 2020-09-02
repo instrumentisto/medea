@@ -315,6 +315,15 @@ pub enum Event {
         /// If `None` then no (re)negotiation should be done.
         negotiation_role: Option<NegotiationRole>,
     },
+
+    /// Media Server notifies about connection quality score update.
+    ConnectionQualityUpdated {
+        /// Partner [`MemberId`] of the [`Peer`].
+        partner_member_id: MemberId,
+
+        /// Estimated connection quality.
+        quality_score: ConnectionQualityScore,
+    },
 }
 
 /// `Peer`'s negotiation role.
@@ -520,6 +529,27 @@ pub struct VideoSettings {
     ///
     /// If `false` then video may be not published.
     pub is_required: bool,
+}
+
+/// Estimated connection quality.
+#[cfg_attr(
+    feature = "medea",
+    derive(Serialize, Display, Eq, Ord, PartialEq, PartialOrd)
+)]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Copy, Debug)]
+pub enum ConnectionQualityScore {
+    /// Nearly all users dissatisfied.
+    Poor = 1,
+
+    /// Many users dissatisfied.
+    Low = 2,
+
+    /// Some users dissatisfied.
+    Medium = 3,
+
+    /// Satisfied.
+    High = 4,
 }
 
 #[cfg(feature = "jason")]

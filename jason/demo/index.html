@@ -483,10 +483,10 @@
           let innerVideoDiv = document.createElement("div");
           innerVideoDiv.className = "col-md-3";
           innerVideoDiv.appendChild(video);
-          let remoteMemberIdEl = document.createElement('p');
-          remoteMemberIdEl.className = 'text-center';
+          let remoteMemberIdEl = document.createElement('span');
           remoteMemberIdEl.innerHTML = remoteMemberId;
           innerVideoDiv.appendChild(remoteMemberIdEl);
+          innerVideoDiv.appendChild(document.createElement('br'));
           remote_videos[remoteMemberId] = innerVideoDiv;
           videoDiv.appendChild(innerVideoDiv);
 
@@ -521,6 +521,19 @@
           remote_videos[remoteMemberId].remove();
           delete remote_videos[remoteMemberId];
         });
+
+        connection.on_quality_score_update((score) => {
+          let videoDiv = remote_videos[remoteMemberId];
+          let el = videoDiv.getElementsByClassName('quality-score');
+
+          if (el[0] === undefined) {
+            let qualityEl = document.createElement('span');
+            qualityEl.innerHTML = score;
+            qualityEl.className = 'quality-score';
+            videoDiv.appendChild(qualityEl);
+          }
+          el[0].innerHTML = score;
+        })
       });
 
       room.on_local_stream((stream) => {
@@ -692,7 +705,7 @@
   </div>
 
   <div id="video-call" style="display: none">
-    <div id="remote-videos" class="row">
+    <div id="remote-videos" class="row text-center">
     </div>
 
     <div class="row h-25 w-75">

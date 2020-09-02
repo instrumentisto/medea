@@ -55,12 +55,11 @@ async fn callback_test(name: &str, port: u16) -> CallbackTestItem {
 
     let on_event =
         move |_: &RpcEvent, _: &mut Context<TestMember>, _: Vec<&RpcEvent>| {};
-    let deadline = Some(Duration::from_secs(5));
     let client = TestMember::connect(
         create_response.get(name).unwrap(),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;

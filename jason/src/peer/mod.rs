@@ -29,7 +29,6 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    log::prelude::*,
     media::{
         LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
         MediaStreamTrack, RecvConstraints,
@@ -487,7 +486,7 @@ impl PeerConnection {
             S::Disconnected => IceConnectionState::Disconnected,
             S::Closed => IceConnectionState::Closed,
             S::__Nonexhaustive => {
-                log_error!("Unknown ICE connection state");
+                log::error!("Unknown ICE connection state");
                 return;
             }
         };

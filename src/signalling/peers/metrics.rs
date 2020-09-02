@@ -25,10 +25,10 @@ use futures::{channel::mpsc, Stream};
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
-        RtcStatsType, StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
+        RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
     },
-    MediaType as MediaTypeProto, PeerId,
+    ConnectionQualityScore, MediaType as MediaTypeProto, MemberId, PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -48,7 +48,7 @@ use crate::{
     utils::instant_into_utc,
 };
 
-use super::traffic_watcher::PeerTrafficWatcher;
+use super::{quality_meter::QualityMeter, traffic_watcher::PeerTrafficWatcher};
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
@@ -111,6 +111,7 @@ impl PeersMetricsService {
             .filter(|peer| peer.borrow().state == PeerStatState::Connected)
         {
             let mut peer_ref = peer.borrow_mut();
+            self.send_quality_score(&mut *peer_ref);
 
             // get state before applying new stats so we can make before-after
             // diff
@@ -172,6 +173,7 @@ impl PeersMetricsService {
 
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: peer.id(),
+            member_id: peer.member_id(),
             partner_peer: Weak::new(),
             last_update: Utc::now(),
             senders: HashMap::new(),
@@ -181,6 +183,8 @@ impl PeersMetricsService {
             state: PeerStatState::Connecting,
             tracks_spec: PeerTracks::from(peer),
             stats_ttl,
+            quality_meter: QualityMeter::new(Duration::from_secs(5)),
+            last_quality_score: None,
         }));
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
@@ -216,10 +220,22 @@ impl PeersMetricsService {
             for stat in stats {
                 match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
-                        peer_ref.update_receiver(stat.id, inbound);
+                        peer_ref.update_inbound_rtp(stat.id.clone(), inbound);
+                        if let Some(partner_peer) =
+                            peer_ref.partner_peer.upgrade()
+                        {
+                            partner_peer
+                                .borrow_mut()
+                                .update_outbound_from_partners_inbound(
+                                    stat.id, inbound,
+                                );
+                        }
                     }
                     RtcStatsType::OutboundRtp(outbound) => {
-                        peer_ref.update_sender(stat.id, outbound);
+                        peer_ref.update_outbound_rtp(stat.id, outbound);
+                    }
+                    RtcStatsType::RemoteInboundRtp(remote_inbound) => {
+                        peer_ref.update_remote_inbound_rtp(remote_inbound);
                     }
                     _ => (),
                 }
@@ -340,6 +356,43 @@ impl PeersMetricsService {
         }
     }
 
+    /// Sends [`EstimatedQualityScore`] to the [`PeerMetricsEvent`]s subscriber.
+    ///
+    /// Will be sent minimum score of the [`Peer`]s pair.
+    fn send_quality_score(&self, peer: &mut PeerStat) {
+        if let Some(sender) = &self.events_tx {
+            let partner_score = peer
+                .partner_peer()
+                .and_then(|p| p.borrow_mut().quality_meter.calculate());
+            let score = peer
+                .quality_meter
+                .calculate()
+                .and_then(|score| {
+                    partner_score
+                        .map(|partner_score| score.min(partner_score))
+                        .or_else(|| Some(score))
+                })
+                .or_else(|| partner_score);
+
+            if let Some(quality_score) = score {
+                if peer.last_quality_score == Some(quality_score) {
+                    return;
+                }
+                peer.last_quality_score.replace(quality_score);
+
+                if let Some(partner_member_id) = peer.get_partner_member_id() {
+                    let _ = sender.unbounded_send(
+                        PeersMetricsEvent::QualityMeterUpdate {
+                            member_id: peer.get_member_id(),
+                            partner_member_id,
+                            quality_score,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
     /// Sends [`PeerMetricsEvent::TrafficFlows`] event to subscriber.
     fn send_traffic_flows(
         &self,
@@ -401,6 +454,19 @@ pub enum PeersMetricsEvent {
         peer_id: PeerId,
         media_type: MediaType,
         direction: MediaDirection,
+    },
+
+    /// [`ConnectionQualityScore`] updated.
+    QualityMeterUpdate {
+        /// [`MemberId`] of the [`Peer`] whose [`ConnectionQualityScore`]
+        /// was updated.
+        member_id: MemberId,
+
+        /// [`MemberId`] of the partner [`Peer`].
+        partner_member_id: MemberId,
+
+        /// Actual [`ConnectionQualityScore`].
+        quality_score: ConnectionQualityScore,
     },
 }
 
@@ -567,6 +633,9 @@ struct PeerStat {
     /// [`PeerId`] of [`Peer`] which this [`PeerStat`] represents.
     peer_id: PeerId,
 
+    /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
+    member_id: MemberId,
+
     /// Weak reference to a [`PeerStat`] which represents a partner
     /// [`Peer`].
     partner_peer: Weak<RefCell<PeerStat>>,
@@ -596,6 +665,12 @@ struct PeerStat {
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
+
+    /// [`ConnectionQualityScore`] score calculator for this [`PeerStat`].
+    quality_meter: QualityMeter,
+
+    /// Last calculated [`ConnectionQualityScore`].
+    last_quality_score: Option<ConnectionQualityScore>,
 }
 
 impl PeerStat {
@@ -603,7 +678,7 @@ impl PeerStat {
     /// [`RtcOutboundRtpStreamStats`].
     ///
     /// Updates [`MediaTrafficState`] of the [`Send`] direction.
-    fn update_sender(
+    fn update_outbound_rtp(
         &mut self,
         stat_id: StatId,
         upd: &RtcOutboundRtpStreamStats,
@@ -623,7 +698,7 @@ impl PeerStat {
     /// [`RtcInboundRtpStreamStats`].
     ///
     /// Updates [`MediaTrafficState`] of the [`Recv`] direction.
-    fn update_receiver(
+    fn update_inbound_rtp(
         &mut self,
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,
@@ -640,6 +715,47 @@ impl PeerStat {
                 media_type: TrackMediaType::from(&upd.media_specific_stats),
             });
         receiver.update(upd);
+    }
+
+    /// Updates inbound RTP stats based on the partner outbound stats.
+    ///
+    /// This stats should be received from the partner [`Peer`].
+    fn update_outbound_from_partners_inbound(
+        &mut self,
+        stat_id: StatId,
+        upd: &RtcInboundRtpStreamStats,
+    ) {
+        #[allow(clippy::cast_sign_loss)]
+        let packets_lost =
+            upd.packets_lost.map_or(0, |plost| plost.max(0)) as u64;
+        self.quality_meter
+            .add_packets_lost(stat_id.clone(), packets_lost);
+        self.quality_meter
+            .add_packets_sent(stat_id, upd.packets_received + packets_lost);
+    }
+
+    /// Updates remote inbound RTP stats.
+    ///
+    /// Adds round trip time stats to the [`QualityMeter`].
+    fn update_remote_inbound_rtp(
+        &mut self,
+        upd: &RtcRemoteInboundRtpStreamStats,
+    ) {
+        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
+            self.quality_meter
+                .add_jitter(Duration::from_secs_f64(jitter));
+        }
+        if let Some(rtt) = upd.round_trip_time.map(|f| f.0).filter(|t| *t > 0.)
+        {
+            self.quality_meter.add_rtt(Duration::from_secs_f64(rtt));
+        }
+    }
+
+    /// Returns partner [`PeerStat`].
+    ///
+    /// Returns `None` if partner [`PeerStat`] weak reference can't be upgraded.
+    fn partner_peer(&self) -> Option<Rc<RefCell<PeerStat>>> {
+        self.partner_peer.upgrade()
     }
 
     /// Updates `recv_traffic_state` based on current `receivers` state.
@@ -794,6 +910,16 @@ impl PeerStat {
         self.partner_peer
             .upgrade()
             .map(|partner_peer| partner_peer.borrow().get_peer_id())
+    }
+
+    /// Returns [`MemberId`] of the partner [`Member`].
+    fn get_partner_member_id(&self) -> Option<MemberId> {
+        self.partner_peer().map(|p| p.borrow().get_member_id())
+    }
+
+    /// Returns [`MemberId`] of this [`PeerStat`].
+    fn get_member_id(&self) -> MemberId {
+        self.member_id.clone()
     }
 
     /// Returns [`PeerId`] of [`Peer`] which this [`PeerStat`]
@@ -1094,17 +1220,17 @@ mod tests {
         pub async fn next_no_traffic_event(
             &mut self,
         ) -> (PeerId, DateTime<Utc>, MediaType, MediaDirection) {
-            let event = self.peer_events_stream.next().await.unwrap();
-            if let PeersMetricsEvent::NoTrafficFlow {
-                peer_id,
-                was_flowing_at,
-                media_type,
-                direction,
-            } = event
-            {
-                (peer_id, was_flowing_at, media_type, direction)
-            } else {
-                unreachable!("Unexpected event received: {:?}.", event)
+            loop {
+                let event = self.peer_events_stream.next().await.unwrap();
+                if let PeersMetricsEvent::NoTrafficFlow {
+                    peer_id,
+                    was_flowing_at,
+                    media_type,
+                    direction,
+                } = event
+                {
+                    return (peer_id, was_flowing_at, media_type, direction);
+                }
             }
         }
 

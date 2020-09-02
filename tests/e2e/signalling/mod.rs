@@ -84,8 +84,7 @@ pub struct TestMember {
 }
 
 impl TestMember {
-    pub const DEFAULT_DEADLINE: Option<Duration> =
-        Some(Duration::from_secs(500));
+    pub const DEFAULT_DEADLINE: Option<Duration> = Some(Duration::from_secs(5));
 
     /// Sends command to the server.
     fn send_command(&mut self, msg: Command) {
@@ -379,7 +378,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             | Event::IceCandidateDiscovered {
                                 peer_id, ..
                             } => assert!(self.known_peers.contains(peer_id)),
-                            Event::PeersRemoved { .. } => {}
+                            Event::PeersRemoved { .. }
+                            | Event::ConnectionQualityUpdated { .. } => (),
                         }
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();

@@ -72,7 +72,7 @@ async fn add_endpoints_synchronization() {
         credentials.get("first").unwrap(),
         None,
         None,
-        Some(Duration::from_secs(5)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -84,7 +84,7 @@ async fn add_endpoints_synchronization() {
             second_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(5)),
+        TestMember::DEFAULT_DEADLINE,
         false,
     )
     .await;

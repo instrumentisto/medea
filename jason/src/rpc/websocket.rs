@@ -11,12 +11,9 @@ use medea_reactive::ObservableCell;
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
-use crate::{
-    log::{console_error, prelude::*},
-    utils::{
-        EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
-        JsonParseError,
-    },
+use crate::utils::{
+    EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
+    JsonParseError,
 };
 
 use super::{ClientDisconnect, CloseMsg};
@@ -218,7 +215,7 @@ impl Drop for InnerSocket {
             let rsn = serde_json::to_string(&self.close_reason)
                 .expect("Could not serialize close message");
             if let Err(e) = self.socket.close_with_code_and_reason(1000, &rsn) {
-                console_error(e);
+                log::error!("Failed to normally close socket: {:?}", e);
             }
         }
     }
@@ -343,20 +340,9 @@ impl WebSocketRpcTransport {
                     };
 
                 let mut this_mut = this.borrow_mut();
-                this_mut
-                    .on_message_subs
-                    .retain(|on_message| !on_message.is_closed());
-                this_mut.on_message_subs.iter().for_each(|on_message| {
-                    on_message.unbounded_send(msg.clone()).unwrap_or_else(
-                        |e| {
-                            log_error!(
-                                "WebSocket's 'on_message' callback receiver \
-                                 unexpectedly gone. {:?}",
-                                e
-                            )
-                        },
-                    );
-                })
+                this_mut.on_message_subs.retain(|on_message| {
+                    on_message.unbounded_send(msg.clone()).is_ok()
+                });
             },
         )
         .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;

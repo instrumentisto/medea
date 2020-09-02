@@ -81,13 +81,12 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
     control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
-    let deadline = Some(Duration::from_secs(5));
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event.clone())),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -111,7 +110,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", test_name!()),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -147,13 +146,12 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
-    let deadline = Some(Duration::from_secs(5));
 
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event.clone())),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -179,7 +177,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", test_name!()),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -216,13 +214,11 @@ async fn signalling_starts_in_loopback_scenario() {
 
     let (on_event, done) = done_on_both_peers_created();
 
-    let deadline = Some(Duration::from_secs(5));
-
     TestMember::connect(
         &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;

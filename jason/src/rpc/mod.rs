@@ -23,10 +23,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::{
-    log::{console_error, prelude::*},
-    utils::{JasonError, JsCaused, JsError},
-};
+use crate::utils::{JasonError, JsCaused, JsError};
 
 use self::websocket::TransportState;
 
@@ -396,15 +393,8 @@ impl WebSocketRpcClient {
                         .borrow_mut()
                         .on_close_subscribers
                         .drain(..)
-                        .filter_map(|sub| {
-                            sub.send(CloseReason::ByServer(reason)).err()
-                        })
-                        .for_each(|reason| {
-                            log_error!(
-                                "Failed to send reason of Jason close to \
-                                 subscriber: {:?}",
-                                reason
-                            )
+                        .for_each(|sub| {
+                            let _ = sub.send(CloseReason::ByServer(reason));
                         });
                 }
             },
@@ -421,13 +411,10 @@ impl WebSocketRpcClient {
         match msg {
             ServerMsg::Event(event) => {
                 // TODO: filter messages by session
-                self.0.borrow_mut().subs.retain(|sub| !sub.is_closed());
                 self.0
-                    .borrow()
+                    .borrow_mut()
                     .subs
-                    .iter()
-                    .filter_map(|sub| sub.unbounded_send(event.clone()).err())
-                    .for_each(|e| console_error(e.to_string()));
+                    .retain(|sub| sub.unbounded_send(event.clone()).is_ok());
             }
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
@@ -441,8 +428,9 @@ impl WebSocketRpcClient {
                     ),
                 )
                 .map_err(tracerr::wrap!(=> RpcClientError))
-                .map_err(JasonError::from)
-                .map_err(console_error)
+                .map_err(|e| {
+                    log::error!("Failed to update socket settings: {}", e)
+                })
                 .ok();
             }
             ServerMsg::Ping(_) => {}
