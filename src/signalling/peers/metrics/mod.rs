@@ -120,13 +120,45 @@ impl PeerMetricsService {
 
         Self { event_tx, handlers }
     }
+}
 
+/// Interface for dealing with [`PeerMetricsService`].
+pub trait MetricsService: RtcStatsHandler {
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///
     /// Creating new subscription will invalidate previous, so there may be only
     /// one subscription. Events are not saved or buffered at sending side, so
     /// you won't receive any events happened before subscription was made.
-    pub fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
+}
+
+#[cfg(test)]
+mockall::mock! {
+    pub MetricsService {}
+
+    pub trait RtcStatsHandler {
+        fn register_peer(&mut self, peer_id: &PeerStateMachine);
+        fn unregister_peers(&mut self, peers_ids: &[PeerId]);
+        fn update_peer(&mut self, peer: &PeerStateMachine);
+        fn check(&mut self);
+        fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+    }
+
+    pub trait MetricsService: RtcStatsHandler {
+        fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
+    }
+}
+
+#[cfg(test)]
+impl_debug_by_struct_name!(MockMetricsService);
+
+impl MetricsService for PeerMetricsService {
+    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
+    ///
+    /// Creating new subscription will invalidate previous, so there may be only
+    /// one subscription. Events are not saved or buffered at sending side, so
+    /// you won't receive any events happened before subscription was made.
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
     }
 }
@@ -205,25 +237,3 @@ impl EventSender {
         Box::pin(rx)
     }
 }
-
-#[cfg(test)]
-mockall::mock! {
-    pub PeerMetricsService {
-        fn new(
-            room_id: RoomId,
-            peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-            stats_ttl: Duration,
-        ) -> Self;
-        fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
-    }
-    trait RtcStatsHandler {
-        fn register_peer(&mut self, peer: &PeerStateMachine);
-        fn unregister_peers(&mut self, peers_ids: &[PeerId]);
-        fn update_peer(&mut self, peer: &PeerStateMachine);
-        fn check(&mut self);
-        fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
-    }
-}
-
-#[cfg(test)]
-impl_debug_by_struct_name!(MockPeerMetricsService);

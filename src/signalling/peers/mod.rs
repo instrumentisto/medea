@@ -28,14 +28,12 @@ use crate::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Endpoint,
         },
+        peers::metrics::MetricsService,
         room::RoomError,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
 
-use self::metrics::RtcStatsHandler;
-
-#[test_double::test_double(MockPeerMetricsService)]
 use self::metrics::PeerMetricsService;
 
 pub use self::{
@@ -76,7 +74,7 @@ pub struct PeersService {
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: RefCell<PeerMetricsService>,
+    peer_metrics_service: RefCell<Box<dyn MetricsService>>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
@@ -128,18 +126,38 @@ impl PeersService {
         media_conf: &conf::Media,
         negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Rc<Self> {
+        let peer_metrics_service = PeerMetricsService::new(
+            room_id.clone(),
+            peers_traffic_watcher.clone(),
+            media_conf.max_lag,
+        );
+
+        Self::with_metrics_service(
+            room_id,
+            turn_service,
+            peers_traffic_watcher,
+            negotiation_sub,
+            Box::new(peer_metrics_service),
+        )
+    }
+
+    /// Returns new [`PeerRepository`] for a [`Room`] with the provided
+    /// [`RoomId`] and [`MetricsService`].
+    fn with_metrics_service(
+        room_id: RoomId,
+        turn_service: Arc<dyn TurnAuthService>,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
+        peer_metrics_service: Box<dyn MetricsService>,
+    ) -> Rc<Self> {
         Rc::new(Self {
-            room_id: room_id.clone(),
+            room_id,
             turn_service,
             peers: PeerRepository::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
-            peers_traffic_watcher: peers_traffic_watcher.clone(),
-            peer_metrics_service: RefCell::new(PeerMetricsService::new(
-                room_id,
-                peers_traffic_watcher,
-                media_conf.max_lag,
-            )),
+            peers_traffic_watcher,
+            peer_metrics_service: RefCell::new(peer_metrics_service),
             negotiation_sub,
         })
     }
@@ -743,7 +761,7 @@ mod tests {
         turn::service::test::new_turn_auth_service_mock,
     };
 
-    use super::*;
+    use super::{metrics::MockMetricsService, *};
 
     /// Mock for the [`PeerUpdatesSubscriber`] trait.
     ///
@@ -799,6 +817,13 @@ mod tests {
         }
     }
 
+    /// Returns [`Fn`] which will return `true` if provided
+    /// [`PeerStateMachine`]'s [`PeerId`] will be equal to the provided into
+    /// [`peer_id_eq`] [`PeerId`].
+    fn peer_id_eq(peer_id: u32) -> impl Fn(&PeerStateMachine) -> bool {
+        move |peer| peer.id() == PeerId(peer_id)
+    }
+
     /// Checks that newly created [`Peer`] will be created in the
     /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
     #[actix_rt::test]
@@ -820,12 +845,34 @@ mod tests {
         let negotiation_sub = NegotiationSubMock::new();
         let negotiations = negotiation_sub.on_negotiation_needed();
 
-        let peers_service = PeersService::new(
+        let mut metrics_service = MockMetricsService::new();
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(0))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(1))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(0))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(1))
+            .times(1)
+            .return_const(());
+
+        let peers_service = PeersService::with_metrics_service(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
-            &conf::Media::default(),
             Rc::new(negotiation_sub),
+            Box::new(metrics_service),
         );
 
         let publisher = Member::new(
@@ -874,17 +921,6 @@ mod tests {
 
         register_peer_done.await.unwrap().unwrap();
 
-        assert!(peers_service
-            .peer_metrics_service
-            .borrow()
-            .is_peer_registered(PeerId(0))
-            .unwrap());
-        assert!(peers_service
-            .peer_metrics_service
-            .borrow()
-            .is_peer_registered(PeerId(1))
-            .unwrap());
-
         let negotiate_peer_ids: HashSet<_> =
             negotiations.take(2).collect().await;
         assert!(negotiate_peer_ids.contains(&PeerId(0)));
@@ -914,12 +950,34 @@ mod tests {
         let negotiation_sub = NegotiationSubMock::new();
         let negotiations = negotiation_sub.on_negotiation_needed();
 
-        let peers_service = PeersService::new(
+        let mut metrics_service = MockMetricsService::new();
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(0))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(1))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(0))
+            .times(2)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(1))
+            .times(2)
+            .return_const(());
+
+        let peers_service = PeersService::with_metrics_service(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
-            &conf::Media::default(),
             Rc::new(negotiation_sub),
+            Box::new(metrics_service),
         );
 
         let publisher = Member::new(
@@ -966,17 +1024,6 @@ mod tests {
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
-        let first_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(0));
-        assert_eq!(first_peer_tracks_count.unwrap(), 2);
-        let second_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(1));
-        assert_eq!(second_peer_tracks_count.unwrap(), 2);
-
         let publish = WebRtcPublishEndpoint::new(
             "publish".to_string().into(),
             P2pMode::Always,
@@ -1004,17 +1051,6 @@ mod tests {
         peers_service.commit_scheduled_changes(src_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
-
-        let first_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(0));
-        assert_eq!(first_peer_tracks_count.unwrap(), 4);
-        let second_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(1));
-        assert_eq!(second_peer_tracks_count.unwrap(), 4);
 
         register_peer_done.await.unwrap();
 

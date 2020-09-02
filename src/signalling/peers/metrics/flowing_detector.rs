@@ -380,6 +380,7 @@ impl PartialEq<MediaType> for TrackMediaType {
 /// This spec is compared with [`Peer`]s actual stats, to calculate difference
 /// between expected and actual [`Peer`] state.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 struct PeerTracks {
     /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
     /// [`MediaType::Audio`].
@@ -846,7 +847,9 @@ mod tests {
         api::control::callback::{MediaDirection, MediaType},
         media::peer::tests::test_peer_from_peer_tracks,
         signalling::peers::{
-            metrics::{EventSender, RtcStatsHandler},
+            metrics::{
+                flowing_detector::PeerTracks, EventSender, RtcStatsHandler,
+            },
             traffic_watcher::MockPeerTrafficWatcher,
             PeersMetricsEvent,
         },
@@ -1114,6 +1117,19 @@ mod tests {
         pub fn unregister_peer(&mut self, peer_id: PeerId) {
             self.metrics.unregister_peers(&[peer_id]);
         }
+
+        /// Returns [`PeerTracks`] of the [`PeerStat`] with a provided
+        /// [`PeerId`].
+        ///
+        /// Will panic if [`PeerStat`] with this [`PeerId`] not exists.
+        pub fn get_tracks_spec(&mut self, peer_id: PeerId) -> PeerTracks {
+            self.metrics
+                .peers
+                .get(&peer_id)
+                .unwrap()
+                .borrow()
+                .tracks_spec
+        }
     }
 
     #[allow(clippy::struct_excessive_bools)]
@@ -1351,6 +1367,7 @@ mod tests {
         }
 
         helper.unregister_peer(PeerId(1));
+        assert_eq!(helper.metrics.peers.len(), 0);
         timeout(Duration::from_millis(10), helper.next_event())
             .await
             .unwrap_err();
@@ -1375,10 +1392,28 @@ mod tests {
                 video_recv: true
             }
         );
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 0,
+                video_send: 0,
+                audio_recv: 1,
+                video_recv: 1,
+            }
+        );
 
         helper
             .metrics
             .update_peer(&test_peer_from_peer_tracks(1, 1, 1, 1));
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 1,
+                video_send: 1,
+                audio_recv: 1,
+                video_recv: 1,
+            }
+        );
         helper.check_peers();
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
@@ -1404,10 +1439,30 @@ mod tests {
                 video_recv: true
             }
         );
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 0,
+                video_send: 0,
+                audio_recv: 1,
+                video_recv: 1,
+            }
+        );
 
         helper
             .metrics
             .update_peer(&test_peer_from_peer_tracks(1, 1, 1, 1));
+
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 1,
+                video_send: 1,
+                audio_recv: 1,
+                video_recv: 1,
+            },
+        );
+
         helper.add_stats(0, 0, 1, 1, 300);
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
