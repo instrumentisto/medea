@@ -44,7 +44,7 @@ jobs:
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script: make cargo.build crate=medea-jason dockerized=no
+      script: make cargo.build crate=medea-jason dockerized=no debug=no
 
     - name: medea docker (stable)
       stage: build

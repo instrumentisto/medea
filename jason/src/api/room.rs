@@ -11,10 +11,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceConnectionState, IceServer, MemberId, NegotiationRole,
-    PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatch,
-    TrackUpdate,
+    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatch, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -35,10 +35,7 @@ use crate::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
         RpcClientError, TransportError,
     },
-    utils::{
-        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
-    },
+    utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -234,16 +231,13 @@ impl RoomHandle {
         let weak_inner = Rc::downgrade(&inner);
         spawn_local(async move {
             while connection_loss_stream.next().await.is_some() {
-                match upgrade_or_detached!(weak_inner, JsValue) {
-                    Ok(inner) => {
-                        let reconnect_handle =
-                            ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                        inner.on_connection_loss.call(reconnect_handle);
-                    }
-                    Err(e) => {
-                        console_error(e);
-                        break;
-                    }
+                if let Some(inner) = weak_inner.upgrade() {
+                    let reconnect_handle =
+                        ReconnectHandle::new(Rc::downgrade(&inner.rpc));
+                    inner.on_connection_loss.call(reconnect_handle);
+                } else {
+                    log::error!("Inner Room dropped unexpectedly");
+                    break;
                 }
             }
         });
@@ -459,7 +453,7 @@ impl Room {
 
                 match inner.upgrade() {
                     None => {
-                        console_error("Inner Room dropped unexpectedly");
+                        log::error!("Inner Room dropped unexpectedly");
                         break;
                     }
                     Some(inner) => {
@@ -925,6 +919,23 @@ impl EventHandler for InnerRoom {
         .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
+
+    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
+    /// [`Connection::update_quality_score`].
+    async fn on_connection_quality_updated(
+        &self,
+        partner_member_id: MemberId,
+        quality_score: ConnectionQualityScore,
+    ) -> Self::Output {
+        let conn = self
+            .connections
+            .get(&partner_member_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
+
+        conn.update_quality_score(quality_score);
+
+        Ok(())
+    }
 }
 
 /// [`PeerEvent`]s handling.
@@ -1059,8 +1070,11 @@ impl Drop for InnerRoom {
             self.rpc.set_close_reason(reason);
         };
 
-        self.on_close
+        if let Some(Err(e)) = self
+            .on_close
             .call(RoomCloseReason::new(*self.close_reason.borrow()))
-            .map(|result| result.map_err(console_error));
+        {
+            log::error!("Failed to call Room::on_close callback: {:?}", e);
+        }
     }
 }

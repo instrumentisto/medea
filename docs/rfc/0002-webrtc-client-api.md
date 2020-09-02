@@ -703,6 +703,24 @@ It's recommended to cache `Peer` ID and `Member` ID relations in `Web Client`'s 
 ```
 </details>
 
+#### 10. ConnectionQualityUpdated
+
+```rust
+pub enum ConnectionQualityScore {
+    Poor = 1,
+    Low = 2,
+    Medium = 3,
+    High = 4,
+}
+
+struct ConnectionQualityUpdated {
+    partner_member_id: MemberId,
+    quality_score: ConnectionQualityScore,
+}
+```
+
+`Media Server` notifies `Web Client` about connection quality score update.
+
 
 ### Commands
 

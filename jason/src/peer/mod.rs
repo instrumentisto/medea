@@ -33,7 +33,7 @@ use crate::{
         LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
         MediaStreamTrack,
     },
-    utils::{console_error, JasonError, JsCaused, JsError},
+    utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
 
@@ -475,7 +475,7 @@ impl PeerConnection {
             S::Disconnected => IceConnectionState::Disconnected,
             S::Closed => IceConnectionState::Closed,
             S::__Nonexhaustive => {
-                console_error("Unknown ICE connection state");
+                log::error!("Unknown ICE connection state");
                 return;
             }
         };

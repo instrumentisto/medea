@@ -10,12 +10,15 @@ use std::{
 };
 
 use actix::{Arbiter, Context};
+use function_name::named;
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::Event;
 use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
 use tokio::time::timeout;
 
-use crate::{grpc_control_api::ControlClient, signalling::TestMember};
+use crate::{
+    grpc_control_api::ControlClient, signalling::TestMember, test_name,
+};
 
 use super::{
     MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
@@ -51,13 +54,12 @@ fn done_on_both_peers_created() -> (
 }
 
 #[actix_rt::test]
+#[named]
 async fn signalling_starts_when_create_play_member_after_pub_member() {
-    const TEST_NAME: &str = "create-play-member-after-pub-member";
-
     let mut control_client = ControlClient::new().await;
 
     let create_room = RoomBuilder::default()
-        .id(TEST_NAME)
+        .id(test_name!())
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -79,13 +81,12 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
     control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
-    let deadline = Some(Duration::from_secs(5));
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
+        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event.clone())),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -96,20 +97,20 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         .add_endpoint(
             WebRtcPlayEndpointBuilder::default()
                 .id("play")
-                .src(format!("local://{}/publisher/publish", TEST_NAME))
+                .src(format!("local://{}/publisher/publish", test_name!()))
                 .build()
                 .unwrap(),
         )
         .build()
         .unwrap()
-        .build_request(TEST_NAME);
+        .build_request(test_name!());
 
     control_client.create(create_play_member).await;
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", TEST_NAME),
+        &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", test_name!()),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -118,14 +119,12 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
 }
 
 #[actix_rt::test]
+#[named]
 async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
-    const TEST_NAME: &str =
-        "signalling_starts_when_create_play_endpoint_after_pub_member";
-
     let mut control_client = ControlClient::new().await;
 
     let create_room = RoomBuilder::default()
-        .id(TEST_NAME)
+        .id(test_name!())
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -147,13 +146,12 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     control_client.create(create_room).await;
 
     let (on_event, done) = done_on_both_peers_created();
-    let deadline = Some(Duration::from_secs(5));
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
+        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event.clone())),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -163,23 +161,23 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         .credentials("qwerty")
         .build()
         .unwrap()
-        .build_request(TEST_NAME);
+        .build_request(test_name!());
     control_client.create(create_second_member).await;
 
     let create_play = WebRtcPlayEndpointBuilder::default()
         .id("play")
-        .src(format!("local://{}/publisher/publish", TEST_NAME))
+        .src(format!("local://{}/publisher/publish", test_name!()))
         .build()
         .unwrap()
-        .build_request(format!("{}/responder", TEST_NAME));
+        .build_request(format!("{}/responder", test_name!()));
 
     control_client.create(create_play).await;
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", TEST_NAME),
+        &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", test_name!()),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -188,13 +186,12 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 }
 
 #[actix_rt::test]
+#[named]
 async fn signalling_starts_in_loopback_scenario() {
-    const TEST_NAME: &str = "signalling_starts_in_loopback_scenario";
-
     let mut control_client = ControlClient::new().await;
 
     let create_room = RoomBuilder::default()
-        .id(TEST_NAME)
+        .id(test_name!())
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -217,23 +214,21 @@ async fn signalling_starts_in_loopback_scenario() {
 
     let (on_event, done) = done_on_both_peers_created();
 
-    let deadline = Some(Duration::from_secs(5));
-
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
+        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event)),
         None,
-        deadline,
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
 
     let create_play = WebRtcPlayEndpointBuilder::default()
         .id("play")
-        .src(format!("local://{}/publisher/publish", TEST_NAME))
+        .src(format!("local://{}/publisher/publish", test_name!()))
         .build()
         .unwrap()
-        .build_request(format!("{}/publisher", TEST_NAME));
+        .build_request(format!("{}/publisher", test_name!()));
 
     control_client.create(create_play).await;
 
@@ -241,13 +236,12 @@ async fn signalling_starts_in_loopback_scenario() {
 }
 
 #[actix_rt::test]
+#[named]
 async fn peers_removed_on_delete_member() {
-    const TEST_NAME: &str = "delete-member-check-peers-removed";
-
     let control_client = Rc::new(RefCell::new(ControlClient::new().await));
 
     let create_room = RoomBuilder::default()
-        .id(TEST_NAME)
+        .id(test_name!())
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -269,7 +263,10 @@ async fn peers_removed_on_delete_member() {
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
-                        .src(format!("local://{}/publisher/publish", TEST_NAME))
+                        .src(format!(
+                            "local://{}/publisher/publish",
+                            test_name!()
+                        ))
                         .build()
                         .unwrap(),
                 )
@@ -283,38 +280,39 @@ async fn peers_removed_on_delete_member() {
     control_client.borrow_mut().create(create_room).await;
 
     let peers_created = Rc::new(Cell::new(0));
-    let on_event =
-        move |event: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {
-            match event {
-                Event::PeerCreated { .. } => {
-                    peers_created.set(peers_created.get() + 1);
-                    if peers_created.get() == 2 {
-                        let client = control_client.clone();
-                        Arbiter::spawn(async move {
-                            client
-                                .borrow_mut()
-                                .delete(&[&format!("{}/responder", TEST_NAME)])
-                                .await
-                                .unwrap();
-                        })
-                    }
+    let on_event = move |event: &Event,
+                         _: &mut Context<TestMember>,
+                         _: Vec<&Event>| {
+        match event {
+            Event::PeerCreated { .. } => {
+                peers_created.set(peers_created.get() + 1);
+                if peers_created.get() == 2 {
+                    let client = control_client.clone();
+                    Arbiter::spawn(async move {
+                        client
+                            .borrow_mut()
+                            .delete(&[&format!("{}/responder", test_name!())])
+                            .await
+                            .unwrap();
+                    })
                 }
-                Event::PeersRemoved { .. } => {
-                    actix::System::current().stop();
-                }
-                _ => {}
             }
-        };
+            Event::PeersRemoved { .. } => {
+                actix::System::current().stop();
+            }
+            _ => {}
+        }
+    };
 
     let deadline = Some(Duration::from_secs(5));
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/publisher/test", TEST_NAME),
+        format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
         Some(Box::new(on_event.clone())),
         None,
         deadline,
     );
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/responder/test", TEST_NAME),
+        format!("ws://127.0.0.1:8080/ws/{}/responder/test", test_name!()),
         Some(Box::new(on_event)),
         None,
         deadline,

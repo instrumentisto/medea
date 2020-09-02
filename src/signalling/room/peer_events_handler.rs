@@ -1,13 +1,23 @@
 //! [`PeerConnectionStateEventsHandler`] implementation for [`Room`].
 
-use actix::{Handler, Message, WeakAddr};
+use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::{Event, NegotiationRole, PeerId, TrackUpdate};
+use medea_client_api_proto::{
+    ConnectionQualityScore, Event, MemberId, NegotiationRole, PeerId,
+    TrackUpdate,
+};
 
 use crate::{
+    api::control::callback::{MediaDirection, MediaType},
+    log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerStateMachine, Stable},
     signalling::{
-        peers::PeerConnectionStateEventsHandler, room::RoomError, Room,
+        peers::{
+            PeerConnectionStateEventsHandler, PeersMetricsEvent,
+            PeersMetricsEventHandler,
+        },
+        room::RoomError,
+        Room,
     },
 };
 
@@ -56,6 +66,57 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
         }
+    }
+}
+
+impl StreamHandler<PeersMetricsEvent> for Room {
+    /// Dispatches received [`PeerMetricsEvent`] with [`Room`]'s
+    /// [`PeerMetricsEventHandler`] implementation.
+    fn handle(&mut self, event: PeersMetricsEvent, _: &mut Self::Context) {
+        if let Err(err) = event.dispatch_with(self) {
+            error!("Error handling PeersMetricsEvent: {:?}", err);
+        }
+    }
+}
+
+impl PeersMetricsEventHandler for Room {
+    type Output = Result<(), RoomError>;
+
+    /// Does nothing atm.
+    fn on_no_traffic_flow(
+        &mut self,
+        _: PeerId,
+        _: DateTime<Utc>,
+        _: MediaType,
+        _: MediaDirection,
+    ) -> Self::Output {
+        Ok(())
+    }
+
+    /// Does nothing atm.
+    fn on_traffic_flows(
+        &mut self,
+        _: PeerId,
+        _: MediaType,
+        _: MediaDirection,
+    ) -> Self::Output {
+        Ok(())
+    }
+
+    /// Sends received [`ConnectionQualityScore`] to member.
+    fn on_quality_meter_update(
+        &mut self,
+        member_id: MemberId,
+        partner_member_id: MemberId,
+        quality_score: ConnectionQualityScore,
+    ) -> Self::Output {
+        self.members.send_event_to_member(
+            member_id,
+            Event::ConnectionQualityUpdated {
+                partner_member_id,
+                quality_score,
+            },
+        )
     }
 }
 
