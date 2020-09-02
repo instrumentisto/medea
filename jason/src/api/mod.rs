@@ -46,6 +46,7 @@ impl Jason {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
+        wasm_logger::init(wasm_logger::Config::default());
         Self::default()
     }
 
