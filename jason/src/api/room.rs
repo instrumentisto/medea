@@ -35,10 +35,7 @@ use crate::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
         RpcClientError, TransportError,
     },
-    utils::{
-        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
-    },
+    utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -233,16 +230,13 @@ impl RoomHandle {
         let weak_inner = Rc::downgrade(&inner);
         spawn_local(async move {
             while connection_loss_stream.next().await.is_some() {
-                match upgrade_or_detached!(weak_inner, JsValue) {
-                    Ok(inner) => {
-                        let reconnect_handle =
-                            ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                        inner.on_connection_loss.call(reconnect_handle);
-                    }
-                    Err(e) => {
-                        console_error(e);
-                        break;
-                    }
+                if let Some(inner) = weak_inner.upgrade() {
+                    let reconnect_handle =
+                        ReconnectHandle::new(Rc::downgrade(&inner.rpc));
+                    inner.on_connection_loss.call(reconnect_handle);
+                } else {
+                    log::error!("Inner Room dropped unexpectedly");
+                    break;
                 }
             }
         });
@@ -501,7 +495,7 @@ impl Room {
 
                 match inner.upgrade() {
                     None => {
-                        console_error("Inner Room dropped unexpectedly");
+                        log::error!("Inner Room dropped unexpectedly");
                         break;
                     }
                     Some(inner) => {
@@ -1123,8 +1117,11 @@ impl Drop for InnerRoom {
             self.rpc.set_close_reason(reason);
         };
 
-        self.on_close
+        if let Some(Err(e)) = self
+            .on_close
             .call(RoomCloseReason::new(*self.close_reason.borrow()))
-            .map(|result| result.map_err(console_error));
+        {
+            log::error!("Failed to call Room::on_close callback: {:?}", e);
+        }
     }
 }

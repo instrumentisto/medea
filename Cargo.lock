@@ -1744,6 +1744,7 @@ dependencies = [
  "fragile",
  "futures 0.3.5",
  "js-sys",
+ "log",
  "medea-client-api-proto",
  "medea-macro",
  "medea-reactive",
@@ -1755,6 +1756,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasm-logger",
  "web-sys",
  "wee_alloc",
 ]
@@ -3457,6 +3459,17 @@ checksum = "51611ce8e84cba89379d91fc5074bacc5530f69da1c09a2853d906129d12b3b8"
 dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
+]
+
+[[package]]
+name = "wasm-logger"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "074649a66bb306c8f2068c9016395fa65d8e08d2affcbf95acf3c24c3ab19718"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
