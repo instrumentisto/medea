@@ -53,12 +53,12 @@ impl RecvConstraints {
         }
     }
 
-    /// Returns is audio receiving is enabled.
+    /// Returns is audio receiving enabled.
     pub fn is_audio_enabled(&self) -> bool {
         self.is_audio_enabled.get()
     }
 
-    /// Returns is video receiving is enabled.
+    /// Returns is video receiving enabled.
     pub fn is_video_enabled(&self) -> bool {
         self.is_video_enabled.get()
     }

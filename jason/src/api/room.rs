@@ -260,7 +260,7 @@ impl RoomHandle {
                 .toggle_mute(!enabled, kind)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    inner.send_constraints.set_enabled(enabled, kind);
+                    inner.send_constraints.set_enabled(!enabled, kind);
                     tracerr::new!(e)
                 })?;
         }
