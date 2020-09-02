@@ -904,16 +904,13 @@ async fn reset_transition_timers() {
     timeout(600, all_unmuted).await.unwrap();
 }
 
-mod new_remote_track {
-
-    use super::*;
-
+#[wasm_bindgen_test]
+async fn new_remote_track() {
     #[derive(Debug, PartialEq)]
     struct FinalTrack {
-        audio: bool,
-        video: bool,
+        has_audio: bool,
+        has_video: bool,
     }
-
     async fn helper(
         audio_tx_enabled: bool,
         video_tx_enabled: bool,
@@ -988,8 +985,8 @@ mod new_remote_track {
         sender_peer.set_remote_answer(answer).await.unwrap();
 
         let mut result = FinalTrack {
-            audio: false,
-            video: false,
+            has_audio: false,
+            has_video: false,
         };
         loop {
             match timeout(300, rx2.next()).await {
@@ -997,17 +994,17 @@ mod new_remote_track {
                     if let PeerEvent::NewRemoteTrack { track, .. } = event {
                         match track.kind() {
                             TrackKind::Audio => {
-                                if result.audio {
+                                if result.has_audio {
                                     return Err(TrackKind::Audio);
                                 } else {
-                                    result.audio = true;
+                                    result.has_audio = true;
                                 }
                             }
                             TrackKind::Video => {
-                                if result.video {
+                                if result.has_video {
                                     return Err(TrackKind::Video);
                                 } else {
-                                    result.video = true;
+                                    result.has_video = true;
                                 }
                             }
                         }
@@ -1021,179 +1018,29 @@ mod new_remote_track {
         Ok(result)
     }
 
-    #[wasm_bindgen_test]
-    async fn all_disabled() {
-        assert_eq!(
-            helper(false, false, false, false).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
+    fn bit_at(input: u32, n: u8) -> bool {
+        (input >> n) & 1 != 0
     }
 
-    #[wasm_bindgen_test]
-    async fn a_tx_enabled() {
-        assert_eq!(
-            helper(true, false, false, false).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
+    for i in 0..16 {
+        let audio_tx_enabled = bit_at(i, 0);
+        let video_tx_enabled = bit_at(i, 1);
+        let audio_rx_enabled = bit_at(i, 2);
+        let video_rx_enabled = bit_at(i, 3);
 
-    #[wasm_bindgen_test]
-    async fn v_tx_enabled() {
         assert_eq!(
-            helper(false, true, false, false).await.unwrap(),
+            helper(
+                audio_tx_enabled,
+                video_tx_enabled,
+                audio_rx_enabled,
+                video_rx_enabled
+            )
+            .await
+            .unwrap(),
             FinalTrack {
-                audio: false,
-                video: false,
+                has_audio: audio_tx_enabled && audio_rx_enabled,
+                has_video: video_tx_enabled && video_rx_enabled,
             }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn tx_enabled() {
-        assert_eq!(
-            helper(true, true, false, false).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_rx_enabled() {
-        assert_eq!(
-            helper(false, false, true, false).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_tx_a_rx_enabled() {
-        assert_eq!(
-            helper(true, false, true, false).await.unwrap(),
-            FinalTrack {
-                audio: true,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn v_tx_a_rx_enabled() {
-        assert_eq!(
-            helper(false, true, true, false).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_tx_v_tx_a_rx_enabled() {
-        assert_eq!(
-            helper(true, true, true, false).await.unwrap(),
-            FinalTrack {
-                audio: true,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn v_rx_enabled() {
-        assert_eq!(
-            helper(false, false, false, true).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_tx_v_rx_enabled() {
-        assert_eq!(
-            helper(true, false, false, true).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn v_tx_v_rx_enabled() {
-        assert_eq!(
-            helper(false, true, false, true).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: true,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_tx_v_tx_v_rx_enabled() {
-        assert_eq!(
-            helper(true, true, false, true).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: true,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_rx_v_rx_enabled() {
-        assert_eq!(
-            helper(false, false, true, true).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn a_tx_a_rx_v_rx_enabled() {
-        assert_eq!(
-            helper(true, false, true, true).await.unwrap(),
-            FinalTrack {
-                audio: true,
-                video: false,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn v_tx_a_rx_v_rx_enabled() {
-        assert_eq!(
-            helper(false, true, true, true).await.unwrap(),
-            FinalTrack {
-                audio: false,
-                video: true,
-            }
-        )
-    }
-
-    #[wasm_bindgen_test]
-    async fn all_enabled() {
-        assert_eq!(
-            helper(true, true, true, true).await.unwrap(),
-            FinalTrack {
-                audio: true,
-                video: true,
-            }
-        )
+        );
     }
 }

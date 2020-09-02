@@ -349,6 +349,8 @@ endif
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 
+export WASM_BINDGEN_TEST_TIMEOUT = 60
+
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
