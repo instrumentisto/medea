@@ -425,6 +425,12 @@ impl<T> TrackChangeHandler for Peer<T> {
 }
 
 /// Deduper of the [`TrackPatch`]es with whitelisting.
+///
+/// This object can merge [`TrackPatch`]es from the different sources (queue,
+/// pending updates) and remove merged [`TrackPatch`]es from this sources.
+///
+/// Also it can ignore all [`TrackChange`]s which are not listed in the
+/// [`TrackPatchDeduper::whitelist`].
 struct TrackPatchDeduper {
     /// All merged [`TrackPatch`]es from this [`TrackPatchDeduper`].
     merged_patches: HashMap<TrackId, TrackPatch>,
@@ -683,7 +689,6 @@ impl<T> Peer<T> {
     fn dedup_track_changes(&mut self) {
         let mut deduper = TrackPatchDeduper::new();
         deduper.merge(&mut self.context.pending_track_updates);
-
         self.context
             .pending_track_updates
             .extend(deduper.into_track_change_iter());
