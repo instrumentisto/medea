@@ -50,7 +50,7 @@
 #![allow(clippy::use_self)]
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     convert::TryFrom,
     fmt,
     rc::Rc,
@@ -74,7 +74,6 @@ use crate::{
         peers::Counter,
     },
 };
-use std::collections::HashSet;
 
 /// Subscriber to the events indicating that [`Peer`] was updated.
 #[cfg_attr(test, mockall::automock)]
