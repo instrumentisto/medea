@@ -33,6 +33,9 @@ use crate::{
     turn::{TurnAuthService, UnreachablePolicy},
 };
 
+use self::metrics::RtcStatsHandler;
+
+#[test_double::test_double(MockPeerMetricsService)]
 use self::metrics::PeerMetricsService;
 
 pub use self::{
@@ -762,9 +765,7 @@ mod tests {
         /// [`Peer`] which are should be renegotiated.
         pub fn on_negotiation_needed(&self) -> impl Stream<Item = PeerId> {
             let (tx, rx) = mpsc::unbounded();
-
             self.0.borrow_mut().push(tx);
-
             rx
         }
 
@@ -775,9 +776,7 @@ mod tests {
             &self,
         ) -> impl Stream<Item = (PeerId, Vec<TrackUpdate>)> {
             let (tx, rx) = mpsc::unbounded();
-
             self.1.borrow_mut().push(tx);
-
             rx
         }
     }
@@ -878,11 +877,13 @@ mod tests {
         assert!(peers_service
             .peer_metrics_service
             .borrow()
-            .is_peer_registered(PeerId(0)));
+            .is_peer_registered(PeerId(0))
+            .unwrap());
         assert!(peers_service
             .peer_metrics_service
             .borrow()
-            .is_peer_registered(PeerId(1)));
+            .is_peer_registered(PeerId(1))
+            .unwrap());
 
         let negotiate_peer_ids: HashSet<_> =
             negotiations.take(2).collect().await;
@@ -969,12 +970,12 @@ mod tests {
             .peer_metrics_service
             .borrow()
             .peer_tracks_count(PeerId(0));
-        assert_eq!(first_peer_tracks_count, 2);
+        assert_eq!(first_peer_tracks_count.unwrap(), 2);
         let second_peer_tracks_count = peers_service
             .peer_metrics_service
             .borrow()
             .peer_tracks_count(PeerId(1));
-        assert_eq!(second_peer_tracks_count, 2);
+        assert_eq!(second_peer_tracks_count.unwrap(), 2);
 
         let publish = WebRtcPublishEndpoint::new(
             "publish".to_string().into(),
@@ -1008,12 +1009,12 @@ mod tests {
             .peer_metrics_service
             .borrow()
             .peer_tracks_count(PeerId(0));
-        assert_eq!(first_peer_tracks_count, 4);
+        assert_eq!(first_peer_tracks_count.unwrap(), 4);
         let second_peer_tracks_count = peers_service
             .peer_metrics_service
             .borrow()
             .peer_tracks_count(PeerId(1));
-        assert_eq!(second_peer_tracks_count, 4);
+        assert_eq!(second_peer_tracks_count.unwrap(), 4);
 
         register_peer_done.await.unwrap();
 

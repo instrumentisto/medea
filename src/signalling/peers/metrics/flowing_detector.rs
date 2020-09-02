@@ -41,7 +41,7 @@ use crate::{
         media_traffic_state::{
             get_diff_added, get_diff_removed, MediaTrafficState,
         },
-        metrics::{EventSender, MetricHandler},
+        metrics::{EventSender, RtcStatsHandler},
         traffic_watcher::PeerTrafficWatcher,
         FlowMetricSource,
     },
@@ -52,7 +52,7 @@ use super::PeersMetricsEvent;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
-pub struct FlowingDetector {
+pub struct TrafficFlowDetector {
     /// [`RoomId`] of Room to which this [`PeersMetricsService`] belongs
     /// to.
     room_id: RoomId,
@@ -75,7 +75,54 @@ pub struct FlowingDetector {
     event_tx: EventSender,
 }
 
-impl MetricHandler for FlowingDetector {
+impl TrafficFlowDetector {
+    pub(super) fn new(
+        room_id: RoomId,
+        event_tx: EventSender,
+        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        stats_ttl: Duration,
+    ) -> Self {
+        Self {
+            room_id,
+            peers_traffic_watcher,
+            peers: HashMap::new(),
+            stats_ttl,
+            event_tx,
+        }
+    }
+
+    /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
+    fn send_no_traffic(
+        &self,
+        peer: &PeerStat,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) {
+        let was_flowing_at = peer.get_tracks_last_update(direction, media_type);
+        self.event_tx.send_event(PeersMetricsEvent::NoTrafficFlow {
+            peer_id: peer.peer_id,
+            was_flowing_at: instant_into_utc(was_flowing_at),
+            media_type,
+            direction,
+        });
+    }
+
+    /// Sends [`PeerMetricsEvent::TrafficFlows`] event to subscriber.
+    fn send_traffic_flows(
+        &self,
+        peer_id: PeerId,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) {
+        self.event_tx.send_event(PeersMetricsEvent::TrafficFlows {
+            peer_id,
+            media_type,
+            direction,
+        });
+    }
+}
+
+impl RtcStatsHandler for TrafficFlowDetector {
     /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
     /// creation.
     ///
@@ -298,83 +345,6 @@ impl MetricHandler for FlowingDetector {
                 }
             }
         }
-    }
-
-    /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
-    /// registered in the [`PeersMetricsService`].
-    #[cfg(test)]
-    #[inline]
-    fn is_peer_registered(&self, peer_id: PeerId) -> Option<bool> {
-        Some(self.peers.contains_key(&peer_id))
-    }
-
-    /// Returns count of the [`MediaTrack`] which are registered in the
-    /// [`PeersMetricsService`].
-    #[cfg(test)]
-    fn peer_tracks_count(&self, peer_id: PeerId) -> Option<usize> {
-        let count = if let Some(peer) = self.peers.get(&peer_id) {
-            let peer_tracks = peer.borrow().tracks_spec;
-            let mut tracks_count = 0;
-            tracks_count += peer_tracks.audio_recv;
-            tracks_count += peer_tracks.video_recv;
-            tracks_count += peer_tracks.audio_send;
-            tracks_count += peer_tracks.video_send;
-            tracks_count
-        } else {
-            0
-        };
-
-        Some(count)
-    }
-}
-
-impl FlowingDetector {
-    pub fn new(
-        room_id: RoomId,
-        event_tx: EventSender,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-        stats_ttl: Duration,
-    ) -> Self {
-        Self {
-            room_id,
-            peers_traffic_watcher,
-            peers: HashMap::new(),
-            stats_ttl,
-            event_tx,
-        }
-    }
-
-    /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
-    fn send_no_traffic(
-        &self,
-        peer: &PeerStat,
-        media_type: MediaType,
-        direction: MediaDirection,
-    ) {
-        if self.event_tx.is_connected() {
-            let was_flowing_at =
-                peer.get_tracks_last_update(direction, media_type);
-            self.event_tx.send_event(PeersMetricsEvent::NoTrafficFlow {
-                peer_id: peer.peer_id,
-                was_flowing_at: instant_into_utc(was_flowing_at),
-                media_type,
-                direction,
-            });
-        }
-    }
-
-    /// Sends [`PeerMetricsEvent::TrafficFlows`] event to subscriber.
-    fn send_traffic_flows(
-        &self,
-        peer_id: PeerId,
-        media_type: MediaType,
-        direction: MediaDirection,
-    ) {
-        self.event_tx.send_event(PeersMetricsEvent::TrafficFlows {
-            peer_id,
-            media_type,
-            direction,
-        });
     }
 }
 
@@ -876,13 +846,13 @@ mod tests {
         api::control::callback::{MediaDirection, MediaType},
         media::peer::tests::test_peer_from_peer_tracks,
         signalling::peers::{
-            metrics::{EventSender, MetricHandler},
+            metrics::{EventSender, RtcStatsHandler},
             traffic_watcher::MockPeerTrafficWatcher,
             PeersMetricsEvent,
         },
     };
 
-    use super::FlowingDetector;
+    use super::TrafficFlowDetector;
 
     /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
     /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
@@ -974,7 +944,7 @@ mod tests {
         peer_events_stream: LocalBoxStream<'static, PeersMetricsEvent>,
 
         /// Actual [`PeerMetricsService`].
-        metrics: FlowingDetector,
+        metrics: TrafficFlowDetector,
     }
 
     impl Helper {
@@ -1000,7 +970,7 @@ mod tests {
             });
 
             let event_tx = EventSender::new();
-            let metrics = FlowingDetector::new(
+            let metrics = TrafficFlowDetector::new(
                 "test".to_string().into(),
                 event_tx.clone(),
                 Arc::new(watcher),

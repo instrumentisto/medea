@@ -18,89 +18,25 @@ use medea_client_api_proto::{
 
 use crate::{
     media::PeerStateMachine,
-    signalling::peers::{metrics::EventSender, PeersMetricsEvent},
+    signalling::peers::metrics::{EventSender, PeersMetricsEvent},
 };
 
-use super::MetricHandler;
-
-/// [`PeerStateMachine`] representation for the [`QualityMeterService`].
-#[derive(Debug)]
-struct PeerMetric {
-    /// ID of [`PeerStateMachine`] for which this [`PeerMetric`] was created.
-    id: PeerId,
-
-    /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
-    member_id: MemberId,
-
-    /// Weak reference to a [`PeerMetric`] which represents a partner
-    /// [`PeerStateMachine`].
-    partner_peer: Weak<RefCell<PeerMetric>>,
-
-    /// [`ConnectionQualityScore`] score calculator for this
-    /// [`PeerMetric`].
-    quality_meter: QualityMeter,
-
-    /// Last calculated [`ConnectionQualityScore`].
-    last_quality_score: ConnectionQualityScore,
-}
-
-impl PeerMetric {
-    /// Updates remote inbound rtp stats.
-    ///
-    /// Adds round trip time stats to the [`QualityMeter`].
-    fn update_remote_inbound_rtp(
-        &mut self,
-        upd: &RtcRemoteInboundRtpStreamStats,
-    ) {
-        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
-            self.quality_meter
-                .add_jitter(Duration::from_secs_f64(jitter));
-        }
-        if let Some(rtt) = upd.round_trip_time.map(|f| f.0).filter(|t| *t > 0.)
-        {
-            self.quality_meter.add_rtt(Duration::from_secs_f64(rtt));
-        }
-    }
-
-    /// Updates inbound rtp stats based on the partner outbound stats.
-    ///
-    /// This stats should be received from the partner `Peer`.
-    fn update_outbound_from_partners_inbound(
-        &mut self,
-        stat_id: StatId,
-        upd: &RtcInboundRtpStreamStats,
-    ) {
-        #[allow(clippy::cast_sign_loss)]
-        let packets_lost =
-            upd.packets_lost.map_or(0, |plost| plost.max(0)) as u64;
-        self.quality_meter
-            .add_packets_lost(stat_id.clone(), packets_lost);
-        self.quality_meter
-            .add_packets_sent(stat_id, upd.packets_received + packets_lost);
-    }
-
-    /// Returns [`MemberId`] of the partner [`Member`].
-    fn get_partner_member_id(&self) -> Option<MemberId> {
-        self.partner_peer
-            .upgrade()
-            .map(|partner_peer| partner_peer.borrow().member_id.clone())
-    }
-}
+use super::RtcStatsHandler;
 
 /// Service responsible for needed [`RtcStat`]s handling and
 /// [`PeerMetricsEvent`]s sending.
 #[derive(Debug)]
-pub struct QualityMeterService {
-    /// All [`PeerMetric`]s registered in this [`QualityMeterService`].
+pub struct QualityMeterStatsHandler {
+    /// All [`PeerMetric`]s registered in this [`QualityMeterStatsHandler`].
     peers: HashMap<PeerId, Rc<RefCell<PeerMetric>>>,
 
     /// Sender for the [`PeerMetricsEvent`]s.
     event_tx: EventSender,
 }
 
-impl QualityMeterService {
-    /// Returns new empty [`QualityMeterService`].
-    pub fn new(event_tx: EventSender) -> Self {
+impl QualityMeterStatsHandler {
+    /// Returns new empty [`QualityMeterStatsHandler`].
+    pub(super) fn new(event_tx: EventSender) -> Self {
         Self {
             peers: HashMap::new(),
             event_tx,
@@ -111,42 +47,40 @@ impl QualityMeterService {
     /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
     /// recalculated score is not equal to the previous calculated score.
     fn update_quality_score(&self, peer: &mut PeerMetric) {
-        if self.event_tx.is_connected() {
-            let partner_score = peer
-                .partner_peer
-                .upgrade()
-                .and_then(|p| p.borrow_mut().quality_meter.calculate());
-            let score = peer
-                .quality_meter
-                .calculate()
-                .and_then(|score| {
-                    partner_score
-                        .map(|partner_score| score.min(partner_score))
-                        .or_else(|| Some(score))
-                })
-                .or_else(|| partner_score);
+        let partner_score = peer
+            .partner_peer
+            .upgrade()
+            .and_then(|p| p.borrow_mut().quality_meter.calculate());
+        let score = peer
+            .quality_meter
+            .calculate()
+            .and_then(|score| {
+                partner_score
+                    .map(|partner_score| score.min(partner_score))
+                    .or_else(|| Some(score))
+            })
+            .or_else(|| partner_score);
 
-            if let Some(quality_score) = score {
-                if quality_score == peer.last_quality_score {
-                    return;
-                }
+        if let Some(quality_score) = score {
+            if quality_score == peer.last_quality_score {
+                return;
+            }
 
-                peer.last_quality_score = quality_score;
-                if let Some(partner_member_id) = peer.get_partner_member_id() {
-                    self.event_tx.send_event(
-                        PeersMetricsEvent::QualityMeterUpdate {
-                            member_id: peer.member_id.clone(),
-                            partner_member_id,
-                            quality_score,
-                        },
-                    );
-                }
+            peer.last_quality_score = quality_score;
+            if let Some(partner_member_id) = peer.get_partner_member_id() {
+                self.event_tx.send_event(
+                    PeersMetricsEvent::QualityMeterUpdate {
+                        member_id: peer.member_id.clone(),
+                        partner_member_id,
+                        quality_score,
+                    },
+                );
             }
         }
     }
 }
 
-impl MetricHandler for QualityMeterService {
+impl RtcStatsHandler for QualityMeterStatsHandler {
     /// Creates new [`PeerMetric`] for the provided [`PeerStateMachine`].
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let id = peer.id();
@@ -219,23 +153,75 @@ impl MetricHandler for QualityMeterService {
             }
         }
     }
+}
 
-    /// Returns `None`.
-    #[cfg(test)]
-    fn is_peer_registered(&self, _: PeerId) -> Option<bool> {
-        None
+/// [`PeerStateMachine`] representation for the [`QualityMeterStatsHandler`].
+#[derive(Debug)]
+struct PeerMetric {
+    /// ID of [`PeerStateMachine`] for which this [`PeerMetric`] was created.
+    id: PeerId,
+
+    /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
+    member_id: MemberId,
+
+    /// Weak reference to a [`PeerMetric`] which represents a partner
+    /// [`PeerStateMachine`].
+    partner_peer: Weak<RefCell<PeerMetric>>,
+
+    /// [`ConnectionQualityScore`] score calculator for this
+    /// [`PeerMetric`].
+    quality_meter: QualityMeter,
+
+    /// Last calculated [`ConnectionQualityScore`].
+    last_quality_score: ConnectionQualityScore,
+}
+
+impl PeerMetric {
+    /// Updates remote inbound rtp stats.
+    ///
+    /// Adds round trip time stats to the [`QualityMeter`].
+    fn update_remote_inbound_rtp(
+        &mut self,
+        upd: &RtcRemoteInboundRtpStreamStats,
+    ) {
+        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
+            self.quality_meter
+                .add_jitter(Duration::from_secs_f64(jitter));
+        }
+        if let Some(rtt) = upd.round_trip_time.map(|f| f.0).filter(|t| *t > 0.)
+        {
+            self.quality_meter.add_rtt(Duration::from_secs_f64(rtt));
+        }
     }
 
-    /// Returns `None`.
-    #[cfg(test)]
-    fn peer_tracks_count(&self, _: PeerId) -> Option<usize> {
-        None
+    /// Updates inbound rtp stats based on the partner outbound stats.
+    ///
+    /// This stats should be received from the partner `Peer`.
+    fn update_outbound_from_partners_inbound(
+        &mut self,
+        stat_id: StatId,
+        upd: &RtcInboundRtpStreamStats,
+    ) {
+        #[allow(clippy::cast_sign_loss)]
+        let packets_lost =
+            upd.packets_lost.map_or(0, |plost| plost.max(0)) as u64;
+        self.quality_meter
+            .add_packets_lost(stat_id.clone(), packets_lost);
+        self.quality_meter
+            .add_packets_sent(stat_id, upd.packets_received + packets_lost);
+    }
+
+    /// Returns [`MemberId`] of the partner [`Member`].
+    fn get_partner_member_id(&self) -> Option<MemberId> {
+        self.partner_peer
+            .upgrade()
+            .map(|partner_peer| partner_peer.borrow().member_id.clone())
     }
 }
 
 /// Calculator of the [`ConnectionQualityScore`] score based on RTC stats.
 #[derive(Debug)]
-pub struct QualityMeter {
+struct QualityMeter {
     /// TTL of the all [`ExpiringStat`]s from this [`QualityMeter`].
     stats_ttl: Duration,
 
@@ -285,7 +271,7 @@ impl QualityMeter {
     ///
     /// Provided stats TTL will be used to decide when [`ExpiringStat`] should
     /// expire.
-    pub fn new(stats_ttl: Duration) -> Self {
+    fn new(stats_ttl: Duration) -> Self {
         Self {
             stats_ttl,
             rtt: Vec::new(),
@@ -296,18 +282,18 @@ impl QualityMeter {
     }
 
     /// Adds new round trip time measurement.
-    pub fn add_rtt(&mut self, rtt: Duration) {
+    fn add_rtt(&mut self, rtt: Duration) {
         self.rtt.push(ExpiringStat::new(Rtt(rtt), self.stats_ttl));
     }
 
     /// Adds new jitter measurement.
-    pub fn add_jitter(&mut self, jitter: Duration) {
+    fn add_jitter(&mut self, jitter: Duration) {
         self.jitter
             .push(ExpiringStat::new(Jitter(jitter), self.stats_ttl));
     }
 
     /// Adds new packets sent measurement.
-    pub fn add_packets_sent(&mut self, stat_id: StatId, packets_sent: u64) {
+    fn add_packets_sent(&mut self, stat_id: StatId, packets_sent: u64) {
         self.packets_sent
             .entry(stat_id)
             .or_default()
@@ -315,7 +301,7 @@ impl QualityMeter {
     }
 
     /// Adds new packets lost measurement.
-    pub fn add_packets_lost(&mut self, stat_id: StatId, packets_lost: u64) {
+    fn add_packets_lost(&mut self, stat_id: StatId, packets_lost: u64) {
         self.packets_lost
             .entry(stat_id)
             .or_default()
@@ -332,7 +318,7 @@ impl QualityMeter {
     /// [ITU-T G.107]: https://itu.int/rec/T-REC-G.107
     /// [Algorithm-MOS]: https://tinyurl.com/y3nojmot
     #[allow(clippy::cast_precision_loss)]
-    pub fn calculate(&mut self) -> Option<ConnectionQualityScore> {
+    fn calculate(&mut self) -> Option<ConnectionQualityScore> {
         let latency = self.mean_rtt()?.as_millis() as f64;
         let jitter = self.mean_jitter()?.as_millis() as f64;
         let packet_loss = self.mean_packet_loss()?;
