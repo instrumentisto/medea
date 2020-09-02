@@ -481,7 +481,7 @@ impl RtcPeerConnection {
                                         log::error!(
                                             "Unknown RTCPeerConnection \
                                              connection state: {}.",
-                                            state
+                                            state,
                                         );
                                         return;
                                     }

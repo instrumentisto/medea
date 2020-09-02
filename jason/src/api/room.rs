@@ -1074,7 +1074,7 @@ impl Drop for InnerRoom {
             .on_close
             .call(RoomCloseReason::new(*self.close_reason.borrow()))
         {
-            log::error!("Failed to call Room::on_close callback: {:?}", e)
+            log::error!("Failed to call Room::on_close callback: {:?}", e);
         }
     }
 }
