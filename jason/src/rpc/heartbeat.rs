@@ -9,10 +9,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{
-        console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
-        TaskHandle,
-    },
+    utils::{delay_for, JsCaused, JsDuration, JsError, TaskHandle},
 };
 
 /// Errors that may occur in [`Heartbeat`].
@@ -64,8 +61,7 @@ impl Inner {
         self.transport
             .send(&ClientMsg::Pong(n))
             .map_err(tracerr::wrap!(=> TransportError))
-            .map_err(JasonError::from)
-            .map_err(console_error)
+            .map_err(|e| log::error!("Failed to send pong: {}", e))
             .ok();
     }
 }
@@ -140,18 +136,7 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
             delay_for(idle_timeout.0 - wait_for_ping.0).await;
             this.borrow_mut()
                 .on_idle_subs
-                .retain(|sub| !sub.is_closed());
-            this.borrow()
-                .on_idle_subs
-                .iter()
-                .filter_map(|sub| sub.unbounded_send(()).err())
-                .for_each(|err| {
-                    console_error(format!(
-                        "Heartbeat::on_idle subscriber has gone unexpectedly: \
-                         {:?}",
-                        err,
-                    ))
-                });
+                .retain(|sub| sub.unbounded_send(()).is_ok());
         });
 
     spawn_local(async move {
