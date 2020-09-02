@@ -512,7 +512,7 @@ window.onload = async function() {
   }
 
   async function newRoom() {
-    room = await jason.init_room();
+    let room = await jason.init_room();
 
     try {
       const constraints = await initLocalStream();
