@@ -877,9 +877,7 @@ impl EventHandler for InnerRoom {
             Some(negotiation_role),
         )
         .await
-        .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].

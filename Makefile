@@ -344,12 +344,13 @@ endif
 # Usage:
 #	make test.unit [( [crate=@all]
 #	                | crate=(medea|<crate-name>)
-#	                | crate=medea-jason [browser=(chrome|firefox|default)] )]
+#	                | crate=medea-jason
+#	                  [browser=(chrome|firefox|default)]
+#	                  [timeout=(60|<seconds>)] )]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
+wasm-bindgen-timeout = $(if $(call eq,$(timeout),),60,$(timeout))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
-
-export WASM_BINDGEN_TEST_TIMEOUT = 60
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -367,12 +368,14 @@ else
 ifeq ($(crate),medea-jason)
 ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
+	WASM_BINDGEN_TEST_TIMEOUT=$(wasm-bindgen-timeout) \
 	cargo test --target wasm32-unknown-unknown --features mockable
 else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
+	WASM_BINDGEN_TEST_TIMEOUT=$(wasm-bindgen-timeout) \
 	cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver browser=$(browser)
 endif
