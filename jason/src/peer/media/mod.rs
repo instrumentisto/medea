@@ -71,8 +71,9 @@ mod has_mute_state_controller {
 /// An interface for dealing with [`Track`]s which are needs muting logic.
 pub trait MuteableTrack: Track + HasMuteStateController {
     /// Returns [`MuteState`] of this [`MuteableTrack`].
+    #[inline]
     fn individual_mute_state(&self) -> MuteState {
-        self.mute_state_controller().individual_mute_state()
+        self.mute_state_controller().mute_state()
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
@@ -81,6 +82,7 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     ///
     /// [`MediaConnectionsError::SenderIsRequired`] is returned if
     /// [`MuteableTrack`] is required for the call and can't be muted.
+    #[inline]
     fn mute_state_transition_to(
         &self,
         desired_state: StableMuteState,
@@ -91,6 +93,7 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     }
 
     /// Cancels [`MuteState`] transition.
+    #[inline]
     fn cancel_transition(&self) {
         self.mute_state_controller().cancel_transition()
     }
@@ -107,6 +110,7 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
     /// returned if [`MuteableTrack`]'s [`MuteState`] transits into the opposite
     /// to the `desired_state`.
+    #[inline]
     fn when_mute_state_stable(
         &self,
         desired_state: StableMuteState,
@@ -116,27 +120,29 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     }
 
     /// Stops mute/unmute timeout of this [`MuteableTrack`].
+    #[inline]
     fn stop_mute_state_transition_timeout(&self) {
-        self.mute_state_controller()
-            .stop_mute_state_transition_timeout()
+        self.mute_state_controller().stop_transition_timeout()
     }
 
     /// Resets mute/unmute timeout of this [`MuteableTrack`].
+    #[inline]
     fn reset_mute_state_transition_timeout(&self) {
-        self.mute_state_controller()
-            .reset_mute_state_transition_timeout()
+        self.mute_state_controller().reset_transition_timeout()
     }
 
     /// Checks whether individual mute state of the [`MuteableTrack`] is in
     /// [`MuteState::Muted`].
+    #[inline]
     fn is_individual_muted(&self) -> bool {
-        self.mute_state_controller().is_individual_muted()
+        self.mute_state_controller().is_muted()
     }
 
     /// Checks whether individual mute state of the [`MuteableTrack`] is in
     /// [`MuteState::NotMuted`].
+    #[inline]
     fn is_not_individual_muted(&self) -> bool {
-        self.mute_state_controller().is_not_individual_muted()
+        self.mute_state_controller().is_not_muted()
     }
 }
 

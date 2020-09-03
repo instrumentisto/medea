@@ -244,7 +244,7 @@ impl RoomHandle {
         Ok(())
     }
 
-    /// Enables or disable specified media type publish in all
+    /// Enables or disables specified media type publishing on receiving in all
     /// [`PeerConnection`]s.
     async fn set_track_enabled(
         &self,
@@ -255,9 +255,12 @@ impl RoomHandle {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
         inner.set_constraints_enabled(enabled, kind, direction);
 
+        // Remove in #127
+        // --------------
         if let TrackDirection::Recv = direction {
             return Ok(());
         }
+        // --------------
 
         while !inner.is_all_peers_in_mute_state(
             kind,
@@ -768,8 +771,9 @@ impl InnerRoom {
         Ok(())
     }
 
-    /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
-    /// [`MuteState`].
+    /// Returns `true` if all [`MuteableTrack`]s with a provided
+    /// [`TrackDirection`] and [`TransceiverKind`] of this [`Room`] is in
+    /// provided [`MuteState`].
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
