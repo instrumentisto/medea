@@ -520,6 +520,22 @@ async fn force_update_works() {
     renegotiation_update.unwrap().unwrap();
 }
 
+/// Checks that bug from [https://github.com/instrumentisto/medea/pull/134]
+/// is fixed.
+///
+/// # Algorithm
+///
+/// 1. Waits for initial negotiation finish
+///
+/// 2. Mutes `Alice`'s `Send` `MediaTrack`
+///
+/// 3. Unmutes `Alice`'s `Send` `MediaTrack`
+///
+/// 4. Mutes `Bob`'s `Send` `MediaTrack`
+///
+/// 5. `Alice` sends SDP offer
+///
+/// 6. `Bob` should receive [`Event::TracksApplied`] with empty updates
 #[actix_rt::test]
 #[named]
 async fn fix_force_update_bug() {
