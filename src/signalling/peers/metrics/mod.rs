@@ -1,5 +1,11 @@
-//! Implementation of the service which will distribute [`RtcStat`]s among other
-//! [`RtcStatsHandler`]s.
+//! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
+//!
+//! At first you must register `Peer` via
+//! [`PeersMetricsService.register_peer()`]. Use [`PeersMetricsService.
+//! subscribe()`] to subscribe to stats processing results. Then provide Peer
+//! metrics to [`PeersMetricsService.add_stats()`]. You should call
+//! [`PeersMetricsService.check_peers()`] with reasonable interval (~1-2 sec),
+//! this will check for stale metrics.
 //!
 //! Stores [`RtcStatsHandler`]s implementors.
 
@@ -101,6 +107,9 @@ pub trait RtcStatsHandler: Debug {
     /// you won't receive any events happened before subscription was made.
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
 }
+
+#[cfg(test)]
+impl_debug_by_struct_name!(MockRtcStatsHandler);
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
@@ -221,6 +230,3 @@ impl EventSender {
         Box::pin(rx)
     }
 }
-
-#[cfg(test)]
-impl_debug_by_struct_name!(MockRtcStatsHandler);

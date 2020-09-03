@@ -1,13 +1,5 @@
-//! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
-//!
-//! At first you must register Peer via [`PeersMetricsService.register_peer()`].
-//! Use [`PeersMetricsService.subscribe()`] to subscribe to stats processing
-//! results. Then provide Peer metrics to [`PeersMetricsService.add_stats()`].
-//! You should call [`PeersMetricsService.check_peers()`] with
-//! reasonable interval (~1-2 sec), this will check for stale metrics.
-//!
-//! This service acts as flow and stop metrics source for the
-//! [`PeerTrafficWatcher`].
+//! Implementation of a service which acts as flow and stop metrics source for
+//! the [`PeerTrafficWatcher`].
 
 // TODO: remove in #91
 #![allow(dead_code)]
@@ -54,7 +46,7 @@ use super::PeersMetricsEvent;
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
 pub struct TrafficFlowDetector {
-    /// [`RoomId`] of Room to which this [`PeersMetricsService`] belongs
+    /// [`RoomId`] of Room to which this [`TrafficFlowDetector`] belongs
     /// to.
     room_id: RoomId,
 
@@ -62,7 +54,7 @@ pub struct TrafficFlowDetector {
     /// sent.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
-    /// All `PeerConnection` for this [`PeersMetricsService`] will process
+    /// All `PeerConnection` for this [`TrafficFlowDetector`] will process
     /// metrics.
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
 
@@ -72,7 +64,7 @@ pub struct TrafficFlowDetector {
     /// Sender of [`PeerMetricsEvent`]s.
     ///
     /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
-    /// [`PeersMetricsService`] belongs to.
+    /// [`TrafficFlowDetector`] belongs to.
     event_tx: EventSender,
 }
 
@@ -123,6 +115,10 @@ impl TrafficFlowDetector {
 }
 
 impl RtcStatsHandler for TrafficFlowDetector {
+    /// Creates new [`PeerStat`] for the provided [`PeerStateMachine`].
+    ///
+    /// Tries to add created [`PeerStat`] to the partner [`PeerStat`] if it
+    /// exists.
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         debug!(
             "Peer [id = {}] was registered in the PeerMetricsService [room_id \
@@ -155,6 +151,7 @@ impl RtcStatsHandler for TrafficFlowDetector {
         self.peers.insert(peer.id(), first_peer_stat);
     }
 
+    /// Removes [`PeerStat`]s with the provided [`PeerId`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         debug!(
             "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
@@ -167,6 +164,10 @@ impl RtcStatsHandler for TrafficFlowDetector {
         }
     }
 
+    /// Updates [`PeerTracks`] of the provided [`PeerStateMachine`].
+    ///
+    /// Does nothing if [`PeerStat`] for the provided [`PeerStateMachine`] not
+    /// exists.
     fn update_peer(&mut self, peer: &PeerStateMachine) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
@@ -234,7 +235,7 @@ impl RtcStatsHandler for TrafficFlowDetector {
     }
 
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
-    /// [`PeersMetricsService`].
+    /// [`TrafficFlowDetector`].
     ///
     /// Notifies [`PeerTrafficWatcher`] about traffic flowing/stopping.
     ///
@@ -777,7 +778,7 @@ impl PeerStat {
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()
-            .map(|partner_peer| partner_peer.borrow().get_member_id())
+            .map(|p| p.borrow().get_member_id())
     }
 
     /// Returns [`MemberId`] of this [`PeerStat`].
@@ -929,11 +930,11 @@ mod tests {
     /// Helper for the all [`metrics`] unit tests.
     struct Helper {
         /// Stream to which will be sent `()` on every [`TrafficFlows`] message
-        /// received from the [`PeersMetricsService`]
+        /// received from the [`TrafficFlowDetector`]
         traffic_flows_stream: LocalBoxStream<'static, ()>,
 
         /// Stream to which will be sent `()` on every [`TrafficStopped`]
-        /// message received from the [`PeersMetricsService`]
+        /// message received from the [`TrafficFlowDetector`]
         traffic_stopped_stream: LocalBoxStream<'static, ()>,
 
         /// Stream to which will [`PeerMetricsService`] will send all his
@@ -995,7 +996,7 @@ mod tests {
         }
 
         /// Generates [`RtcStats`] and adds them to inner
-        /// [`PeersMetricsService`] for `PeerId(1)`.
+        /// [`TrafficFlowDetector`] for `PeerId(1)`.
         pub fn add_stats(
             &mut self,
             send_audio: u32,

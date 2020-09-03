@@ -80,6 +80,10 @@ impl QualityMeterStatsHandler {
 }
 
 impl RtcStatsHandler for QualityMeterStatsHandler {
+    /// Creates [`PeerMetric`] for the provided [`PeerStateMachine`].
+    ///
+    /// Tries to add created [`PeerMetric`] to the partner [`PeerMetric`] if it
+    /// exists.
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let id = peer.id();
         let partner_peer_id = peer.partner_peer_id();
@@ -103,6 +107,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
+    /// Removes [`PeerMetric`]s with the provided [`PeerId`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         for peer_id in peers_ids {
             self.peers.remove(peer_id);
@@ -121,6 +126,10 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
+    /// Tries to add proivded [`RtcStat`]s to the [`QualityMeter`] of the
+    /// [`PeerMetric`] with a provided [`PeerId`].
+    ///
+    /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] not exists.
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
