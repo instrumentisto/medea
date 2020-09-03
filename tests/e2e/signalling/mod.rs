@@ -288,7 +288,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                             mids: self
                                                 .known_tracks_mids
                                                 .clone(),
-                                            senders_statuses: HashMap::new(),
+                                            transceivers_statuses: HashMap::new(
+                                            ),
                                         }),
                                     NegotiationRole::Answerer(sdp_offer) => {
                                         assert_eq!(sdp_offer, "caller_offer");
@@ -297,8 +298,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                 peer_id: *peer_id,
                                                 sdp_answer: "responder_answer"
                                                     .into(),
-                                                senders_statuses: HashMap::new(
-                                                ),
+                                                transceivers_statuses:
+                                                    HashMap::new(),
                                             },
                                         )
                                     }
@@ -352,7 +353,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                     sdp_answer:
                                                         "responder_answer"
                                                             .into(),
-                                                    senders_statuses:
+                                                    transceivers_statuses:
                                                         HashMap::new(),
                                                 },
                                             )
@@ -366,7 +367,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                     mids: self
                                                         .known_tracks_mids
                                                         .clone(),
-                                                    senders_statuses:
+                                                    transceivers_statuses:
                                                         HashMap::new(),
                                                 },
                                             ),
@@ -429,12 +430,12 @@ pub fn handle_peer_created(
                 .enumerate()
                 .map(|(mid, id)| (id, mid.to_string()))
                 .collect(),
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         },
         NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
             peer_id,
             sdp_answer: "responder_answer".into(),
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         },
     })
 }

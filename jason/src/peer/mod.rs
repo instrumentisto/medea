@@ -31,7 +31,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 use crate::{
     media::{
         LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
-        MediaStreamTrack,
+        MediaStreamTrack, RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
@@ -48,7 +48,7 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Sender, StableMuteState,
+        MuteStateTransition, Sender, StableMuteState, TrackDirection,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -216,7 +216,11 @@ pub struct PeerConnection {
     sent_stats_cache: RefCell<HashMap<StatId, u64>>,
 
     /// Local media stream constraints used in this [`PeerConnection`].
-    local_stream_constraints: LocalStreamConstraints,
+    send_constraints: LocalStreamConstraints,
+
+    /// Constraints to the [`MediaStream`]s received by this
+    /// [`PeerConnection`]. Used to disable or enable media receiving.
+    recv_constraints: Rc<RecvConstraints>,
 }
 
 impl PeerConnection {
@@ -240,7 +244,8 @@ impl PeerConnection {
         ice_servers: I,
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
-        local_stream_constraints: LocalStreamConstraints,
+        send_constraints: LocalStreamConstraints,
+        recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
@@ -261,7 +266,8 @@ impl PeerConnection {
             sent_stats_cache: RefCell::new(HashMap::new()),
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
-            local_stream_constraints,
+            send_constraints,
+            recv_constraints,
         };
 
         // Bind to `icecandidate` event.
@@ -543,8 +549,8 @@ impl PeerConnection {
 
     /// Returns publishing statuses of the all [`Sender`]s from this
     /// [`MediaConnections`].
-    pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
-        self.media_connections.get_senders_statuses()
+    pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
+        self.media_connections.get_transceivers_statuses()
     }
 
     /// Syncs provided tracks creating all required `Sender`s and `Receiver`s,
@@ -565,7 +571,11 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn get_offer(&self, tracks: Vec<Track>) -> Result<String> {
         self.media_connections
-            .create_tracks(tracks, &self.local_stream_constraints)
+            .create_tracks(
+                tracks,
+                &self.send_constraints,
+                &self.recv_constraints,
+            )
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream().await.map_err(tracerr::wrap!())?;
@@ -586,7 +596,11 @@ impl PeerConnection {
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
     pub fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
         self.media_connections
-            .create_tracks(tracks, &self.local_stream_constraints)
+            .create_tracks(
+                tracks,
+                &self.send_constraints,
+                &self.recv_constraints,
+            )
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
@@ -640,7 +654,7 @@ impl PeerConnection {
                 .map_err(tracerr::from_and_wrap!())?;
 
             required_caps
-                .merge(self.local_stream_constraints.inner())
+                .merge(self.send_constraints.inner())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             let used_caps = MediaStreamSettings::from(&required_caps);
@@ -783,7 +797,7 @@ impl PeerConnection {
 
         // create receivers
         self.media_connections
-            .create_tracks(recv, &self.local_stream_constraints)
+            .create_tracks(recv, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         // set offer, which will create transceivers and discover remote tracks
@@ -794,7 +808,7 @@ impl PeerConnection {
 
         // create senders
         self.media_connections
-            .create_tracks(send, &self.local_stream_constraints)
+            .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
         self.update_local_stream().await.map_err(tracerr::wrap!())?;
