@@ -1,5 +1,4 @@
-//! [`ConnectionQualityScore`] score calculator and [`RtcStat`]s extractor
-//! implementation.
+//! [`ConnectionQualityScore`] score calculator implementation.
 
 use std::{
     cell::RefCell,
@@ -8,6 +7,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
@@ -18,34 +18,33 @@ use medea_client_api_proto::{
 
 use crate::{
     media::PeerStateMachine,
-    signalling::peers::metrics::{EventSender, PeersMetricsEvent},
+    signalling::peers::metrics::{
+        EventSender, PeersMetricsEvent, RtcStatsHandler,
+    },
 };
 
-use super::RtcStatsHandler;
-
-/// Service responsible for needed [`RtcStat`]s handling and
-/// [`PeerMetricsEvent`]s sending.
+/// [`RtcStatsHandler`] responsible for `Peer` connection quality estimation.
 #[derive(Debug)]
-pub struct QualityMeterStatsHandler {
+pub(super) struct QualityMeterStatsHandler {
     /// All [`PeerMetric`]s registered in this [`QualityMeterStatsHandler`].
     peers: HashMap<PeerId, Rc<RefCell<PeerMetric>>>,
 
-    /// Sender for the [`PeerMetricsEvent`]s.
+    /// [`PeerMetricsEvent`]s sender.
     event_tx: EventSender,
 }
 
 impl QualityMeterStatsHandler {
     /// Returns new empty [`QualityMeterStatsHandler`].
-    pub(super) fn new(event_tx: EventSender) -> Self {
+    pub(super) fn new() -> Self {
         Self {
             peers: HashMap::new(),
-            event_tx,
+            event_tx: EventSender::new(),
         }
     }
 
     /// Recalculates [`ConnectionQualityScore`] for the provided
     /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
-    /// recalculated score is not equal to the previous calculated score.
+    /// new score is not equal to the previously calculated score.
     fn update_quality_score(&self, peer: &mut PeerMetric) {
         let partner_score = peer
             .partner_peer
@@ -81,7 +80,6 @@ impl QualityMeterStatsHandler {
 }
 
 impl RtcStatsHandler for QualityMeterStatsHandler {
-    /// Creates new [`PeerMetric`] for the provided [`PeerStateMachine`].
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let id = peer.id();
         let partner_peer_id = peer.partner_peer_id();
@@ -105,7 +103,6 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
-    /// Removes provided [`PeerMetric`]s with the [`PeerId`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         for peer_id in peers_ids {
             self.peers.remove(peer_id);
@@ -115,19 +112,15 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
     /// Does nothing.
     fn update_peer(&mut self, _: &PeerStateMachine) {}
 
-    /// Sends [`PeersMetricsEvent::QualityMeterUpdate`] for the all
-    /// [`PeerMetric`]s.
-    ///
-    /// Wouldn't send quality update if [`ConnectionQualityScore`] is the
-    /// same as previous.
+    /// Calculates new score for every registered `Peer`, sends
+    /// [`PeersMetricsEvent::QualityMeterUpdate`] if new score is not equal
+    /// to the previously calculated score.
     fn check(&mut self) {
         for peer in self.peers.values() {
             self.update_quality_score(&mut peer.borrow_mut());
         }
     }
 
-    /// Provides needed stats to the [`QualityMeter`] of the [`PeerMetric`] with
-    /// a provided [`PeerId`].
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
@@ -139,19 +132,23 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
                         {
                             partner_peer
                                 .borrow_mut()
-                                .update_outbound_from_partners_inbound(
+                                .add_outbound_from_partners_inbound(
                                     stat.id.clone(),
                                     inbound,
                                 );
                         }
                     }
                     RtcStatsType::RemoteInboundRtp(remote_inbound) => {
-                        peer_ref.update_remote_inbound_rtp(remote_inbound);
+                        peer_ref.add_remote_inbound_rtp(remote_inbound);
                     }
                     _ => (),
                 }
             }
         }
+    }
+
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
+        self.event_tx.subscribe()
     }
 }
 
@@ -177,13 +174,9 @@ struct PeerMetric {
 }
 
 impl PeerMetric {
-    /// Updates remote inbound rtp stats.
-    ///
-    /// Adds round trip time stats to the [`QualityMeter`].
-    fn update_remote_inbound_rtp(
-        &mut self,
-        upd: &RtcRemoteInboundRtpStreamStats,
-    ) {
+    /// Adds rtt and jitter stats from provided
+    /// [`RtcRemoteInboundRtpStreamStats`] stats to the [`QualityMeter`].
+    fn add_remote_inbound_rtp(&mut self, upd: &RtcRemoteInboundRtpStreamStats) {
         if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
             self.quality_meter
                 .add_jitter(Duration::from_secs_f64(jitter));
@@ -194,10 +187,9 @@ impl PeerMetric {
         }
     }
 
-    /// Updates inbound rtp stats based on the partner outbound stats.
-    ///
-    /// This stats should be received from the partner `Peer`.
-    fn update_outbound_from_partners_inbound(
+    /// Adds packets lost and packets sent stats from provided partners
+    /// [`RtcInboundRtpStreamStats`] stats to the [`QualityMeter`].
+    fn add_outbound_from_partners_inbound(
         &mut self,
         stat_id: StatId,
         upd: &RtcInboundRtpStreamStats,

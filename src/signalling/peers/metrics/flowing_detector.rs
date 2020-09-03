@@ -21,6 +21,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
@@ -78,7 +79,6 @@ pub struct TrafficFlowDetector {
 impl TrafficFlowDetector {
     pub(super) fn new(
         room_id: RoomId,
-        event_tx: EventSender,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         stats_ttl: Duration,
     ) -> Self {
@@ -87,7 +87,7 @@ impl TrafficFlowDetector {
             peers_traffic_watcher,
             peers: HashMap::new(),
             stats_ttl,
-            event_tx,
+            event_tx: EventSender::new(),
         }
     }
 
@@ -123,10 +123,6 @@ impl TrafficFlowDetector {
 }
 
 impl RtcStatsHandler for TrafficFlowDetector {
-    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
-    /// creation.
-    ///
-    /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         debug!(
             "Peer [id = {}] was registered in the PeerMetricsService [room_id \
@@ -159,7 +155,6 @@ impl RtcStatsHandler for TrafficFlowDetector {
         self.peers.insert(peer.id(), first_peer_stat);
     }
 
-    /// Stops tracking provided [`Peer`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         debug!(
             "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
@@ -172,8 +167,6 @@ impl RtcStatsHandler for TrafficFlowDetector {
         }
     }
 
-    /// Updates [`Peer`]s internal representation. Must be called each time
-    /// [`Peer`] tracks set changes (some track was added or removed).
     fn update_peer(&mut self, peer: &PeerStateMachine) {
         if let Some(peer_stat) = self.peers.get(&peer.id()) {
             peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
@@ -245,10 +238,9 @@ impl RtcStatsHandler for TrafficFlowDetector {
     ///
     /// Notifies [`PeerTrafficWatcher`] about traffic flowing/stopping.
     ///
-    /// Also, from this function can be sent
-    /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
-    /// TrackTrafficStarted`] to the [`Room`] if some
-    /// [`MediaType`]/[`Direction`] was stopped.
+    /// May emit [`PeersMetricsEvent::WrongTrafficFlowing`] or
+    /// [`PeersMetricsEvent::TrackTrafficStarted`] if some [`MediaType`]/
+    /// [`Direction`] has stopped.
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
@@ -345,6 +337,10 @@ impl RtcStatsHandler for TrafficFlowDetector {
                 }
             }
         }
+    }
+
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
+        self.event_tx.subscribe()
     }
 }
 
@@ -847,9 +843,7 @@ mod tests {
         api::control::callback::{MediaDirection, MediaType},
         media::peer::tests::test_peer_from_peer_tracks,
         signalling::peers::{
-            metrics::{
-                flowing_detector::PeerTracks, EventSender, RtcStatsHandler,
-            },
+            metrics::{flowing_detector::PeerTracks, RtcStatsHandler},
             traffic_watcher::MockPeerTrafficWatcher,
             PeersMetricsEvent,
         },
@@ -972,10 +966,8 @@ mod tests {
                 traffic_stopped_tx.unbounded_send(()).unwrap();
             });
 
-            let event_tx = EventSender::new();
-            let metrics = TrafficFlowDetector::new(
+            let mut metrics = TrafficFlowDetector::new(
                 "test".to_string().into(),
-                event_tx.clone(),
                 Arc::new(watcher),
                 stats_ttl,
             );
@@ -983,7 +975,7 @@ mod tests {
             Self {
                 traffic_flows_stream: Box::pin(traffic_flows_rx),
                 traffic_stopped_stream: Box::pin(traffic_stopped_rx),
-                peer_events_stream: Box::pin(event_tx.subscribe()),
+                peer_events_stream: metrics.subscribe(),
                 metrics,
             }
         }

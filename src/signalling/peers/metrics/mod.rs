@@ -1,7 +1,7 @@
-//! Implementation of the service which will distribute [`RtcStat`]s between
+//! Implementation of the service which will distribute [`RtcStat`]s among other
 //! [`RtcStatsHandler`]s.
 //!
-//! Stores all implementations of the [`RtcStatsHandler`]s.
+//! Stores [`RtcStatsHandler`]s implementors.
 
 mod flowing_detector;
 mod quality_meter;
@@ -9,7 +9,10 @@ mod quality_meter;
 use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
 
 use chrono::{DateTime, Utc};
-use futures::{channel::mpsc, stream::LocalBoxStream};
+use futures::{
+    channel::mpsc,
+    stream::{self, LocalBoxStream, StreamExt as _},
+};
 use medea_client_api_proto::{
     stats::RtcStat, ConnectionQualityScore, MemberId, PeerId,
 };
@@ -22,13 +25,15 @@ use crate::{
     },
     media::PeerStateMachine,
     signalling::peers::{
-        metrics::quality_meter::QualityMeterStatsHandler, PeerTrafficWatcher,
+        metrics::{
+            flowing_detector::TrafficFlowDetector,
+            quality_meter::QualityMeterStatsHandler,
+        },
+        PeerTrafficWatcher,
     },
 };
 
-use self::flowing_detector::TrafficFlowDetector;
-
-/// Events which [`PeersMetricsService`] can send to its subscriber.
+/// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
 #[dispatchable]
 #[derive(Debug, Clone)]
 pub enum PeersMetricsEvent {
@@ -50,7 +55,7 @@ pub enum PeersMetricsEvent {
 
     /// [`ConnectionQualityScore`] updated.
     QualityMeterUpdate {
-        /// [`MemberId`] of the [`Peer`] which's [`ConnectionQualityScore`]
+        /// [`MemberId`] of the [`Peer`] which [`ConnectionQualityScore`]
         /// was updated.
         member_id: MemberId,
 
@@ -62,10 +67,11 @@ pub enum PeersMetricsEvent {
     },
 }
 
-/// An interface for dealing with [`RtcStat`]s handlers.
+/// [`RtcStatsHandler`] performs [`RtcStat`]s analysis.
+#[cfg_attr(test, mockall::automock)]
 pub trait RtcStatsHandler: Debug {
-    /// [`PeerMetricsService`] notifies [`RtcStatsHandler`] about new
-    /// `PeerConnection`s creation.
+    /// Acknowledge [`RtcStatsHandler`] that new `Peer` was created, so
+    /// [`RtcStatsHandler`] should track its [`RtcStat`]s.
     fn register_peer(&mut self, peer_id: &PeerStateMachine);
 
     /// [`RtcStatsHandler`] should stop tracking provided [`Peer`]s.
@@ -87,6 +93,13 @@ pub trait RtcStatsHandler: Debug {
     /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
     /// [`RtcStatsHandler`].
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+
+    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
+    ///
+    /// Creating new subscription will invalidate previous, so there may be only
+    /// one subscription. Events are not saved or buffered at sending side, so
+    /// you won't receive any events happened before subscription was made.
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
 }
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
@@ -111,60 +124,18 @@ impl PeerMetricsService {
         let handlers: Vec<Box<dyn RtcStatsHandler>> = vec![
             Box::new(TrafficFlowDetector::new(
                 room_id,
-                event_tx.clone(),
                 peers_traffic_watcher,
                 stats_ttl,
             )),
-            Box::new(QualityMeterStatsHandler::new(event_tx.clone())),
+            Box::new(QualityMeterStatsHandler::new()),
         ];
 
         Self { event_tx, handlers }
     }
 }
 
-/// Interface for dealing with [`PeerMetricsService`].
-pub trait MetricsService: RtcStatsHandler {
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
-    ///
-    /// Creating new subscription will invalidate previous, so there may be only
-    /// one subscription. Events are not saved or buffered at sending side, so
-    /// you won't receive any events happened before subscription was made.
-    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
-}
-
-#[cfg(test)]
-mockall::mock! {
-    pub MetricsService {}
-
-    pub trait RtcStatsHandler {
-        fn register_peer(&mut self, peer_id: &PeerStateMachine);
-        fn unregister_peers(&mut self, peers_ids: &[PeerId]);
-        fn update_peer(&mut self, peer: &PeerStateMachine);
-        fn check(&mut self);
-        fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
-    }
-
-    pub trait MetricsService: RtcStatsHandler {
-        fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
-    }
-}
-
-#[cfg(test)]
-impl_debug_by_struct_name!(MockMetricsService);
-
-impl MetricsService for PeerMetricsService {
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
-    ///
-    /// Creating new subscription will invalidate previous, so there may be only
-    /// one subscription. Events are not saved or buffered at sending side, so
-    /// you won't receive any events happened before subscription was made.
-    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
-        self.event_tx.subscribe()
-    }
-}
-
 impl RtcStatsHandler for PeerMetricsService {
-    /// Calls [`RtcStatsHandler::register_peer`] on the all registered
+    /// Calls [`RtcStatsHandler::register_peer`] on all registered
     /// [`MetricsHandler`]s.
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         for handler in &mut self.handlers {
@@ -203,9 +174,22 @@ impl RtcStatsHandler for PeerMetricsService {
             handler.add_stats(peer_id, stats);
         }
     }
+
+    /// Calls [`RtcStatsHandler::subscribe`] on the all registered
+    /// [`MetricsHandler`]s returning merged stream.
+    ///
+    /// Creating new subscription will invalidate previous, so there may be only
+    /// one subscription. Events are not saved or buffered at sending side, so
+    /// you won't receive any events happened before subscription was made.
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
+        stream::select_all(
+            self.handlers.iter_mut().map(|handler| handler.subscribe()),
+        )
+        .boxed_local()
+    }
 }
 
-/// Sender for the [`PeersMetricsEvent`]s.
+/// [`PeersMetricsEvent`]s sender.
 #[derive(Debug, Clone)]
 struct EventSender(
     Rc<RefCell<Option<mpsc::UnboundedSender<PeersMetricsEvent>>>>,
@@ -237,3 +221,6 @@ impl EventSender {
         Box::pin(rx)
     }
 }
+
+#[cfg(test)]
+impl_debug_by_struct_name!(MockRtcStatsHandler);

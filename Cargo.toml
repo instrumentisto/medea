@@ -60,7 +60,6 @@ smart-default = "0.6"
 tokio = { version = "0.2", features = ["signal", "time"] }
 toml = "0.5"
 tonic = "0.3"
-test_double = "0.3"
 url = "2.1"
 [dependencies.medea-coturn-telnet-client]
     path = "crates/medea-coturn-telnet-client"

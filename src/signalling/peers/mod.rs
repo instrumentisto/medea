@@ -28,13 +28,11 @@ use crate::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Endpoint,
         },
-        peers::metrics::MetricsService,
+        peers::metrics::{PeerMetricsService, RtcStatsHandler},
         room::RoomError,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
-
-use self::metrics::PeerMetricsService;
 
 pub use self::{
     metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
@@ -74,7 +72,7 @@ pub struct PeersService {
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: RefCell<Box<dyn MetricsService>>,
+    peer_metrics_service: RefCell<Box<dyn RtcStatsHandler>>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
@@ -126,38 +124,20 @@ impl PeersService {
         media_conf: &conf::Media,
         negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Rc<Self> {
-        let peer_metrics_service = PeerMetricsService::new(
-            room_id.clone(),
-            peers_traffic_watcher.clone(),
-            media_conf.max_lag,
-        );
-
-        Self::with_metrics_service(
-            room_id,
-            turn_service,
-            peers_traffic_watcher,
-            negotiation_sub,
-            Box::new(peer_metrics_service),
-        )
-    }
-
-    /// Returns new [`PeerRepository`] for a [`Room`] with the provided
-    /// [`RoomId`] and [`MetricsService`].
-    fn with_metrics_service(
-        room_id: RoomId,
-        turn_service: Arc<dyn TurnAuthService>,
-        peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-        negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
-        peer_metrics_service: Box<dyn MetricsService>,
-    ) -> Rc<Self> {
         Rc::new(Self {
-            room_id,
+            room_id: room_id.clone(),
             turn_service,
             peers: PeerRepository::new(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
-            peers_traffic_watcher,
-            peer_metrics_service: RefCell::new(peer_metrics_service),
+            peers_traffic_watcher: Arc::clone(&peers_traffic_watcher),
+            peer_metrics_service: RefCell::new(Box::new(
+                PeerMetricsService::new(
+                    room_id,
+                    peers_traffic_watcher,
+                    media_conf.max_lag,
+                ),
+            )),
             negotiation_sub,
         })
     }
@@ -761,7 +741,28 @@ mod tests {
         turn::service::test::new_turn_auth_service_mock,
     };
 
-    use super::{metrics::MockMetricsService, *};
+    use super::{metrics::MockRtcStatsHandler, *};
+
+    impl PeersService {
+        fn with_metrics_service(
+            room_id: RoomId,
+            turn_service: Arc<dyn TurnAuthService>,
+            peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+            negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
+            peer_metrics_service: Box<dyn RtcStatsHandler>,
+        ) -> Rc<Self> {
+            Rc::new(Self {
+                room_id,
+                turn_service,
+                peers: PeerRepository::new(),
+                peers_count: Counter::default(),
+                tracks_count: Counter::default(),
+                peers_traffic_watcher,
+                peer_metrics_service: RefCell::new(peer_metrics_service),
+                negotiation_sub,
+            })
+        }
+    }
 
     /// Mock for the [`PeerUpdatesSubscriber`] trait.
     ///
@@ -845,7 +846,7 @@ mod tests {
         let negotiation_sub = NegotiationSubMock::new();
         let negotiations = negotiation_sub.on_negotiation_needed();
 
-        let mut metrics_service = MockMetricsService::new();
+        let mut metrics_service = MockRtcStatsHandler::new();
         metrics_service
             .expect_register_peer()
             .withf(peer_id_eq(0))
@@ -950,7 +951,7 @@ mod tests {
         let negotiation_sub = NegotiationSubMock::new();
         let negotiations = negotiation_sub.on_negotiation_needed();
 
-        let mut metrics_service = MockMetricsService::new();
+        let mut metrics_service = MockRtcStatsHandler::new();
         metrics_service
             .expect_register_peer()
             .withf(peer_id_eq(0))
