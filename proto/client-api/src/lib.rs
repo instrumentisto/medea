@@ -149,16 +149,18 @@ pub enum Command {
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
-        /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
         peer_id: PeerId,
         sdp_answer: String,
-        /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends Ice Candidate.
@@ -305,6 +307,15 @@ pub enum Event {
         ///
         /// If `None` then no (re)negotiation should be done.
         negotiation_role: Option<NegotiationRole>,
+    },
+
+    /// Media Server notifies about connection quality score update.
+    ConnectionQualityUpdated {
+        /// Partner [`MemberId`] of the [`Peer`].
+        partner_member_id: MemberId,
+
+        /// Estimated connection quality.
+        quality_score: ConnectionQualityScore,
     },
 }
 
@@ -465,6 +476,27 @@ pub struct VideoSettings {
     pub is_required: bool,
 }
 
+/// Estimated connection quality.
+#[cfg_attr(
+    feature = "medea",
+    derive(Serialize, Display, Eq, Ord, PartialEq, PartialOrd)
+)]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Copy, Debug)]
+pub enum ConnectionQualityScore {
+    /// Nearly all users dissatisfied.
+    Poor = 1,
+
+    /// Many users dissatisfied.
+    Low = 2,
+
+    /// Some users dissatisfied.
+    Medium = 3,
+
+    /// Satisfied.
+    High = 4,
+}
+
 #[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -618,7 +650,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -628,7 +660,7 @@ mod test {
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
                     \"mids\":{\"0\":\"1\"},\
-                    \"senders_statuses\":{}\
+                    \"transceivers_statuses\":{}\
                 }\
             }";
 

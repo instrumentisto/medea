@@ -84,6 +84,8 @@ pub struct TestMember {
 }
 
 impl TestMember {
+    pub const DEFAULT_DEADLINE: Option<Duration> = Some(Duration::from_secs(5));
+
     /// Sends command to the server.
     fn send_command(&mut self, msg: Command) {
         executor::block_on(async move {
@@ -286,7 +288,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                             mids: self
                                                 .known_tracks_mids
                                                 .clone(),
-                                            senders_statuses: HashMap::new(),
+                                            transceivers_statuses: HashMap::new(
+                                            ),
                                         }),
                                     NegotiationRole::Answerer(sdp_offer) => {
                                         assert_eq!(sdp_offer, "caller_offer");
@@ -295,8 +298,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                 peer_id: *peer_id,
                                                 sdp_answer: "responder_answer"
                                                     .into(),
-                                                senders_statuses: HashMap::new(
-                                                ),
+                                                transceivers_statuses:
+                                                    HashMap::new(),
                                             },
                                         )
                                     }
@@ -350,7 +353,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                     sdp_answer:
                                                         "responder_answer"
                                                             .into(),
-                                                    senders_statuses:
+                                                    transceivers_statuses:
                                                         HashMap::new(),
                                                 },
                                             )
@@ -364,7 +367,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                                     mids: self
                                                         .known_tracks_mids
                                                         .clone(),
-                                                    senders_statuses:
+                                                    transceivers_statuses:
                                                         HashMap::new(),
                                                 },
                                             ),
@@ -375,7 +378,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             | Event::IceCandidateDiscovered {
                                 peer_id, ..
                             } => assert!(self.known_peers.contains(peer_id)),
-                            Event::PeersRemoved { .. } => {}
+                            Event::PeersRemoved { .. }
+                            | Event::ConnectionQualityUpdated { .. } => (),
                         }
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
@@ -426,12 +430,12 @@ pub fn handle_peer_created(
                 .enumerate()
                 .map(|(mid, id)| (id, mid.to_string()))
                 .collect(),
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         },
         NegotiationRole::Answerer(_) => Command::MakeSdpAnswer {
             peer_id,
             sdp_answer: "responder_answer".into(),
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         },
     })
 }

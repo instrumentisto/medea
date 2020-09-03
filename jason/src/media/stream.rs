@@ -137,7 +137,7 @@ impl MediaStreamTrack {
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TrackKind {
     /// Audio track.
     Audio,

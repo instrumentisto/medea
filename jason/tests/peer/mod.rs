@@ -14,13 +14,13 @@ use medea_client_api_proto::{
     stats::{
         HighResTimeStamp, KnownIceCandidatePairState, NonExhaustive,
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
-        RtcStatsType, StatId, TrackStat, TrackStatKind,
+        RtcStatsType, StatId, TrackStats, TrackStatsKind,
     },
     AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
     Track, TrackId, TrackPatch, VideoSettings,
 };
 use medea_jason::{
-    media::{LocalStreamConstraints, MediaManager},
+    media::{LocalStreamConstraints, MediaManager, RecvConstraints, TrackKind},
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
         TransceiverKind,
@@ -63,6 +63,7 @@ async fn mute_unmute_audio() {
         manager,
         false,
         local_constraints(true, true),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
 
@@ -96,6 +97,7 @@ async fn mute_unmute_video() {
         manager,
         false,
         local_constraints(true, true),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -127,7 +129,8 @@ async fn new_with_mute_audio() {
         Vec::new(),
         manager,
         false,
-        get_media_stream_settings(true, false).into(),
+        get_media_stream_settings(false, true).into(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
 
@@ -150,7 +153,8 @@ async fn new_with_mute_video() {
         Vec::new(),
         manager,
         false,
-        get_media_stream_settings(false, true).into(),
+        get_media_stream_settings(true, false).into(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -174,6 +178,7 @@ async fn add_candidates_to_answerer_before_offer() {
         Rc::clone(&manager),
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
 
@@ -184,6 +189,7 @@ async fn add_candidates_to_answerer_before_offer() {
         manager,
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -213,6 +219,7 @@ async fn add_candidates_to_offerer_before_answer() {
             Rc::clone(&manager),
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap(),
     );
@@ -224,6 +231,7 @@ async fn add_candidates_to_offerer_before_answer() {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap(),
     );
@@ -254,6 +262,7 @@ async fn normal_exchange_of_candidates() {
         Rc::clone(&manager),
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -263,6 +272,7 @@ async fn normal_exchange_of_candidates() {
         manager,
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -325,7 +335,8 @@ async fn send_event_on_new_local_stream() {
         Vec::new(),
         manager,
         false,
-        get_media_stream_settings(false, true).into(),
+        get_media_stream_settings(true, false).into(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -359,6 +370,7 @@ async fn ice_connection_state_changed_is_emitted() {
         Rc::clone(&manager),
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let peer2 = PeerConnection::new(
@@ -368,6 +380,7 @@ async fn ice_connection_state_changed_is_emitted() {
         manager,
         false,
         LocalStreamConstraints::default(),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -470,6 +483,7 @@ impl InterconnectedPeers {
             Rc::clone(&manager),
             false,
             local_constraints(true, true),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
         let peer2 = PeerConnection::new(
@@ -479,6 +493,7 @@ impl InterconnectedPeers {
             manager,
             false,
             local_constraints(true, true),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
@@ -713,16 +728,17 @@ mod peer_stats_caching {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
         let stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
             timestamp: HighResTimeStamp(1584373509700.0),
-            stats: RtcStatsType::Track(Box::new(TrackStat {
+            stats: RtcStatsType::Track(Box::new(TrackStats {
                 track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
                     .to_string(),
-                kind: Some(TrackStatKind::Audio),
+                kind: Some(TrackStatsKind::Audio),
                 remote_source: None,
                 ended: Some(false),
             })),
@@ -759,16 +775,17 @@ mod peer_stats_caching {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
         let mut stat = RtcStat {
             id: StatId("2ef2e34c".to_string()),
             timestamp: HighResTimeStamp(1584373509700.0),
-            stats: RtcStatsType::Track(Box::new(TrackStat {
+            stats: RtcStatsType::Track(Box::new(TrackStats {
                 track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
                     .to_string(),
-                kind: Some(TrackStatKind::Audio),
+                kind: Some(TrackStatsKind::Audio),
                 remote_source: None,
                 ended: Some(false),
             })),
@@ -807,13 +824,14 @@ mod peer_stats_caching {
             manager,
             false,
             LocalStreamConstraints::default(),
+            Rc::new(RecvConstraints::default()),
         )
         .unwrap();
 
-        let mut track_stat = Box::new(TrackStat {
+        let mut track_stat = Box::new(TrackStats {
             track_identifier: "0d4f8e05-51d8-4f9b-90b2-453401fc8041"
                 .to_string(),
-            kind: Some(TrackStatKind::Audio),
+            kind: Some(TrackStatsKind::Audio),
             remote_source: None,
             ended: Some(false),
         });
@@ -856,6 +874,7 @@ async fn reset_transition_timers() {
         manager,
         false,
         local_constraints(true, true),
+        Rc::new(RecvConstraints::default()),
     )
     .unwrap();
     peer.get_offer(vec![audio_track, video_track])
@@ -890,4 +909,145 @@ async fn reset_transition_timers() {
     peer.reset_state_transitions_timers();
 
     timeout(600, all_unmuted).await.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn new_remote_track() {
+    #[derive(Debug, PartialEq)]
+    struct FinalTrack {
+        has_audio: bool,
+        has_video: bool,
+    }
+    async fn helper(
+        audio_tx_enabled: bool,
+        video_tx_enabled: bool,
+        audio_rx_enabled: bool,
+        video_rx_enabled: bool,
+    ) -> Result<FinalTrack, TrackKind> {
+        let (tx1, _rx1) = mpsc::unbounded();
+        let (tx2, mut rx2) = mpsc::unbounded();
+        let manager = Rc::new(MediaManager::default());
+
+        let tx_caps = LocalStreamConstraints::default();
+        tx_caps.set_enabled(audio_tx_enabled, TransceiverKind::Audio);
+        tx_caps.set_enabled(video_tx_enabled, TransceiverKind::Video);
+        let sender_peer = PeerConnection::new(
+            PeerId(1),
+            tx1,
+            Vec::new(),
+            Rc::clone(&manager),
+            false,
+            tx_caps,
+            Rc::new(RecvConstraints::default()),
+        )
+        .unwrap();
+
+        let rcv_caps = RecvConstraints::default();
+        rcv_caps.set_enabled(audio_rx_enabled, TransceiverKind::Audio);
+        rcv_caps.set_enabled(video_rx_enabled, TransceiverKind::Video);
+        let rcvr_peer = PeerConnection::new(
+            PeerId(2),
+            tx2,
+            Vec::new(),
+            manager,
+            false,
+            LocalStreamConstraints::default(),
+            Rc::new(rcv_caps),
+        )
+        .unwrap();
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+
+        let offer = sender_peer
+            .get_offer(vec![audio_track.clone(), video_track.clone()])
+            .await
+            .unwrap();
+        let answer = rcvr_peer
+            .process_offer(
+                offer,
+                vec![
+                    Track {
+                        id: TrackId(1),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("whatever"),
+                            mid: Some(String::from("0")),
+                        },
+                        media_type: MediaType::Audio(AudioSettings {
+                            is_required: true,
+                        }),
+                    },
+                    Track {
+                        id: TrackId(2),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("whatever"),
+                            mid: Some(String::from("1")),
+                        },
+                        media_type: MediaType::Video(VideoSettings {
+                            is_required: true,
+                        }),
+                    },
+                ],
+            )
+            .await
+            .unwrap();
+        sender_peer.set_remote_answer(answer).await.unwrap();
+
+        let mut result = FinalTrack {
+            has_audio: false,
+            has_video: false,
+        };
+        loop {
+            match timeout(300, rx2.next()).await {
+                Ok(Some(event)) => {
+                    if let PeerEvent::NewRemoteTrack { track, .. } = event {
+                        match track.kind() {
+                            TrackKind::Audio => {
+                                if result.has_audio {
+                                    return Err(TrackKind::Audio);
+                                } else {
+                                    result.has_audio = true;
+                                }
+                            }
+                            TrackKind::Video => {
+                                if result.has_video {
+                                    return Err(TrackKind::Video);
+                                } else {
+                                    result.has_video = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(None) | Err(_) => {
+                    break;
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    fn bit_at(input: u32, n: u8) -> bool {
+        (input >> n) & 1 != 0
+    }
+
+    for i in 0..16 {
+        let audio_tx_enabled = bit_at(i, 0);
+        let video_tx_enabled = bit_at(i, 1);
+        let audio_rx_enabled = bit_at(i, 2);
+        let video_rx_enabled = bit_at(i, 3);
+
+        assert_eq!(
+            helper(
+                audio_tx_enabled,
+                video_tx_enabled,
+                audio_rx_enabled,
+                video_rx_enabled
+            )
+            .await
+            .unwrap(),
+            FinalTrack {
+                has_audio: audio_tx_enabled && audio_rx_enabled,
+                has_video: video_tx_enabled && video_rx_enabled,
+            }
+        );
+    }
 }

@@ -5,9 +5,12 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+use function_name::named;
 use medea::api::control::error_codes::{
     ErrorCode as MedeaErrorCode, ErrorCode,
 };
+
+use crate::test_name;
 
 use super::{create_room_req, ControlClient};
 
@@ -46,28 +49,28 @@ async fn test_for_delete(
 }
 
 #[actix_rt::test]
+#[named]
 async fn room() {
-    const TEST_NAME: &str = "delete-room";
-    test_for_delete(TEST_NAME, TEST_NAME, ErrorCode::RoomNotFound).await;
+    test_for_delete(test_name!(), test_name!(), ErrorCode::RoomNotFound).await;
 }
 
 #[actix_rt::test]
+#[named]
 async fn member() {
-    const TEST_NAME: &str = "delete-member";
     test_for_delete(
-        TEST_NAME,
-        &format!("{}/publisher", TEST_NAME),
+        test_name!(),
+        &format!("{}/publisher", test_name!()),
         ErrorCode::MemberNotFound,
     )
     .await;
 }
 
 #[actix_rt::test]
+#[named]
 async fn endpoint() {
-    const TEST_NAME: &str = "delete-endpoint";
     test_for_delete(
-        &TEST_NAME,
-        &format!("{}/publisher/publish", TEST_NAME),
+        &test_name!(),
+        &format!("{}/publisher/publish", test_name!()),
         ErrorCode::EndpointNotFound,
     )
     .await;
@@ -110,34 +113,32 @@ async fn test_cascade_delete(
 }
 
 #[actix_rt::test]
+#[named]
 async fn cascade_delete_endpoints_when_deleting_member() {
-    const TEST_NAME: &str = "member-and-endpoint-same-time";
-
     test_cascade_delete(
-        TEST_NAME,
+        test_name!(),
         &[
-            &format!("{}/publisher", TEST_NAME),
-            &format!("{}/publisher/publish", TEST_NAME),
+            &format!("{}/publisher", test_name!()),
+            &format!("{}/publisher/publish", test_name!()),
         ],
         MedeaErrorCode::MemberNotFound,
-        &format!("{}/publisher", TEST_NAME),
+        &format!("{}/publisher", test_name!()),
     )
     .await;
 }
 
 #[actix_rt::test]
+#[named]
 async fn cascade_delete_everything_when_deleting_room() {
-    const TEST_NAME: &str = "room-and-inner-elements-same-time";
-
     test_cascade_delete(
-        TEST_NAME,
+        test_name!(),
         &[
-            &TEST_NAME,
-            &format!("{}/publisher", TEST_NAME),
-            &format!("{}/publisher/publish", TEST_NAME),
+            &test_name!(),
+            &format!("{}/publisher", test_name!()),
+            &format!("{}/publisher/publish", test_name!()),
         ],
         MedeaErrorCode::RoomNotFound,
-        TEST_NAME,
+        test_name!(),
     )
     .await;
 }

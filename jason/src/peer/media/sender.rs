@@ -126,7 +126,7 @@ impl Sender {
         &self.transceiver
     }
 
-    /// Returns `true` if this [`Sender`] is publishes media traffic.
+    /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
         match self.transceiver_direction.get() {
             TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {

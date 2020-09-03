@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use function_name::named;
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{Direction, Event, TrackUpdate};
 use medea_control_api_proto::grpc::api::{self as proto};
@@ -11,6 +12,7 @@ use crate::{
         WebRtcPublishEndpointBuilder,
     },
     signalling::{handle_peer_created, TestMember},
+    test_name,
 };
 
 /// Creates Room with two Member's with `WebRtcPublishEndpoint`'s.
@@ -61,17 +63,16 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
 /// `Event::TracksApplied`, meaning that renegotiation starts only after initial
 /// negotiation finishes.
 #[actix_rt::test]
+#[named]
 async fn add_endpoints_synchronization() {
-    const TEST_NAME: &str = "add_endpoints_synchronization";
-
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(TEST_NAME)).await;
+    let credentials = client.create(create_room_req(test_name!())).await;
 
     let _first = TestMember::connect(
         credentials.get("first").unwrap(),
         None,
         None,
-        Some(Duration::from_secs(5)),
+        TestMember::DEFAULT_DEADLINE,
         true,
     )
     .await;
@@ -83,17 +84,17 @@ async fn add_endpoints_synchronization() {
             second_tx.unbounded_send(event.clone()).unwrap();
         })),
         None,
-        Some(Duration::from_secs(5)),
+        TestMember::DEFAULT_DEADLINE,
         false,
     )
     .await;
 
     let first_play_endpoint = WebRtcPlayEndpointBuilder::default()
         .id("play-second")
-        .src(format!("local://{}/second/publish", TEST_NAME))
+        .src(format!("local://{}/second/publish", test_name!()))
         .build()
         .unwrap()
-        .build_request(format!("{}/first", TEST_NAME));
+        .build_request(format!("{}/first", test_name!()));
     client.create(first_play_endpoint).await;
 
     // Wait for Event::PeerCreated, and create another play endpoint before
@@ -108,10 +109,10 @@ async fn add_endpoints_synchronization() {
         {
             let second_play_endpoint = WebRtcPlayEndpointBuilder::default()
                 .id("play-first")
-                .src(format!("local://{}/first/publish", TEST_NAME))
+                .src(format!("local://{}/first/publish", test_name!()))
                 .build()
                 .unwrap()
-                .build_request(format!("{}/second", TEST_NAME));
+                .build_request(format!("{}/second", test_name!()));
             client.create(second_play_endpoint).await;
 
             delay_for(Duration::from_millis(100)).await;
