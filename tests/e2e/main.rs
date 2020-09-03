@@ -4,6 +4,18 @@ mod callbacks;
 mod grpc_control_api;
 pub mod signalling;
 
+#[macro_export]
+macro_rules! if_let_next {
+    ($pattern:pat = $name:ident $body:block ) => {
+        loop {
+            if let $pattern = $name.select_next_some().await {
+                $body;
+                break;
+            }
+        }
+    };
+}
+
 /// Equality comparisons for the enum variants.
 ///
 /// This macro will ignore all content of the enum, it just compare
