@@ -1,6 +1,10 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{channel::mpsc, future, future::Either, StreamExt};
 use medea_client_api_proto as proto;
@@ -64,7 +68,7 @@ impl<'a> SenderBuilder<'a> {
             mute_state,
             mute_timeout_handle: RefCell::new(None),
             is_required: self.is_required,
-            transceiver_direction: RefCell::new(TransceiverDirection::Inactive),
+            transceiver_direction: Cell::new(TransceiverDirection::Inactive),
         });
 
         let weak_this = Rc::downgrade(&this);
@@ -148,7 +152,7 @@ pub struct Sender {
     pub(super) mute_state: ObservableCell<MuteState>,
     pub(super) mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
     pub(super) is_required: bool,
-    pub(super) transceiver_direction: RefCell<TransceiverDirection>,
+    pub(super) transceiver_direction: Cell<TransceiverDirection>,
 }
 
 impl Sender {
@@ -177,10 +181,9 @@ impl Sender {
         }
     }
 
-    /// Returns `true` if this [`Sender`] is publishes media traffic.
+    /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
-        let transceiver_direction = *self.transceiver_direction.borrow();
-        match transceiver_direction {
+        match self.transceiver_direction.get() {
             TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {
                 false
             }
@@ -249,7 +252,7 @@ impl Sender {
     /// [`TransceiverDirection`].
     fn set_transceiver_direction(&self, direction: TransceiverDirection) {
         self.transceiver.set_direction(direction.into());
-        *self.transceiver_direction.borrow_mut() = direction;
+        self.transceiver_direction.set(direction);
     }
 
     /// Checks whether [`Sender`] is in [`MuteState::Muted`].
