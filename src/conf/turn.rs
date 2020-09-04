@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, time::Duration};
 
+use redis::ConnectionInfo;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -76,6 +77,12 @@ pub struct Redis {
     #[default = 6379]
     pub port: u16,
 
+    /// Username to authenticate on Redis database server with.
+    ///
+    /// Defaults to empty value.
+    #[default = ""]
+    pub username: Cow<'static, str>,
+
     /// Password to authenticate on Redis database server with.
     ///
     /// Defaults to `turn`.
@@ -93,6 +100,20 @@ pub struct Redis {
     #[default(Duration::from_secs(5))]
     #[serde(with = "humantime_serde")]
     pub connect_timeout: Duration,
+}
+
+impl From<&Redis> for ConnectionInfo {
+    fn from(cf: &Redis) -> Self {
+        Self {
+            username: Some(cf.username.to_string()).filter(|u| !u.is_empty()),
+            addr: Box::new(redis::ConnectionAddr::Tcp(
+                cf.host.to_string(),
+                cf.port,
+            )),
+            db: cf.db_number,
+            passwd: Some(cf.pass.to_string()).filter(|p| !p.is_empty()),
+        }
+    }
 }
 
 /// Settings of [Coturn]'s admin interface.
