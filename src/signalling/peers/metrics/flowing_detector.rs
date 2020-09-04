@@ -1,13 +1,5 @@
-//! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
-//!
-//! At first you must register Peer via [`PeersMetricsService.register_peer()`].
-//! Use [`PeersMetricsService.subscribe()`] to subscribe to stats processing
-//! results. Then provide Peer metrics to [`PeersMetricsService.add_stats()`].
-//! You should call [`PeersMetricsService.check_peers()`] with
-//! reasonable interval (~1-2 sec), this will check for stale metrics.
-//!
-//! This service acts as flow and stop metrics source for the
-//! [`PeerTrafficWatcher`].
+//! Implementation of a service which acts as flow and stop metrics source for
+//! the [`PeerTrafficWatcher`].
 
 // TODO: remove in #91
 #![allow(dead_code)]
@@ -21,16 +13,15 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use futures::{channel::mpsc, Stream};
+use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{
     stats::{
         RtcInboundRtpStreamMediaType, RtcInboundRtpStreamStats,
-        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats,
-        RtcRemoteInboundRtpStreamStats, RtcStat, RtcStatsType, StatId,
+        RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
+        RtcStatsType, StatId,
     },
-    ConnectionQualityScore, MediaType as MediaTypeProto, MemberId, PeerId,
+    MediaType as MediaTypeProto, MemberId, PeerId,
 };
-use medea_macro::dispatchable;
 
 use crate::{
     api::control::{
@@ -38,22 +29,24 @@ use crate::{
         RoomId,
     },
     log::prelude::*,
-    media::PeerStateMachine as Peer,
+    media::{PeerStateMachine as Peer, PeerStateMachine},
     signalling::peers::{
         media_traffic_state::{
             get_diff_added, get_diff_removed, MediaTrafficState,
         },
+        metrics::{EventSender, RtcStatsHandler},
+        traffic_watcher::PeerTrafficWatcher,
         FlowMetricSource,
     },
     utils::instant_into_utc,
 };
 
-use super::{quality_meter::QualityMeter, traffic_watcher::PeerTrafficWatcher};
+use super::PeersMetricsEvent;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
-pub struct PeersMetricsService {
-    /// [`RoomId`] of Room to which this [`PeersMetricsService`] belongs
+pub struct TrafficFlowDetector {
+    /// [`RoomId`] of Room to which this [`TrafficFlowDetector`] belongs
     /// to.
     room_id: RoomId,
 
@@ -61,41 +54,124 @@ pub struct PeersMetricsService {
     /// sent.
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
-    /// All `PeerConnection` for this [`PeersMetricsService`] will process
+    /// All `PeerConnection` for this [`TrafficFlowDetector`] will process
     /// metrics.
     peers: HashMap<PeerId, Rc<RefCell<PeerStat>>>,
+
+    /// Duration, after which [`Peer`]s stats will be considered as stale.
+    stats_ttl: Duration,
 
     /// Sender of [`PeerMetricsEvent`]s.
     ///
     /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
-    /// [`PeersMetricsService`] belongs to.
-    events_tx: Option<mpsc::UnboundedSender<PeersMetricsEvent>>,
+    /// [`TrafficFlowDetector`] belongs to.
+    event_tx: EventSender,
 }
 
-impl PeersMetricsService {
-    /// Returns new [`PeersMetricsService`] for a provided [`Room`].
-    pub fn new(
+impl TrafficFlowDetector {
+    pub(super) fn new(
         room_id: RoomId,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+        stats_ttl: Duration,
     ) -> Self {
         Self {
             room_id,
             peers_traffic_watcher,
             peers: HashMap::new(),
-            events_tx: None,
+            stats_ttl,
+            event_tx: EventSender::new(),
         }
     }
 
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
-    ///
-    /// Creating new subscription will invalidate previous, so there may be only
-    /// one subscription. Events are not saved or buffered at sending side, so
-    /// you won't receive any events happened before subscription was made.
-    pub fn subscribe(&mut self) -> impl Stream<Item = PeersMetricsEvent> {
-        let (tx, rx) = mpsc::unbounded();
-        self.events_tx = Some(tx);
+    /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
+    fn send_no_traffic(
+        &self,
+        peer: &PeerStat,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) {
+        let was_flowing_at = peer.get_tracks_last_update(direction, media_type);
+        self.event_tx.send_event(PeersMetricsEvent::NoTrafficFlow {
+            peer_id: peer.peer_id,
+            was_flowing_at: instant_into_utc(was_flowing_at),
+            media_type,
+            direction,
+        });
+    }
 
-        rx
+    /// Sends [`PeerMetricsEvent::TrafficFlows`] event to subscriber.
+    fn send_traffic_flows(
+        &self,
+        peer_id: PeerId,
+        media_type: MediaType,
+        direction: MediaDirection,
+    ) {
+        self.event_tx.send_event(PeersMetricsEvent::TrafficFlows {
+            peer_id,
+            media_type,
+            direction,
+        });
+    }
+}
+
+impl RtcStatsHandler for TrafficFlowDetector {
+    /// Creates new [`PeerStat`] for the provided [`PeerStateMachine`].
+    ///
+    /// Tries to add created [`PeerStat`] to the partner [`PeerStat`] if it
+    /// exists.
+    fn register_peer(&mut self, peer: &PeerStateMachine) {
+        debug!(
+            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
+             = {}].",
+            peer.id(),
+            self.room_id
+        );
+
+        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
+            peer_id: peer.id(),
+            member_id: peer.member_id(),
+            partner_peer: Weak::new(),
+            last_update: Utc::now(),
+            senders: HashMap::new(),
+            receivers: HashMap::new(),
+            send_traffic_state: MediaTrafficState::new(),
+            recv_traffic_state: MediaTrafficState::new(),
+            state: PeerStatState::Connecting,
+            tracks_spec: PeerTracks::from(peer),
+            stats_ttl: self.stats_ttl,
+        }));
+        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
+        {
+            first_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&partner_peer_stat);
+            partner_peer_stat.borrow_mut().partner_peer =
+                Rc::downgrade(&first_peer_stat);
+        }
+
+        self.peers.insert(peer.id(), first_peer_stat);
+    }
+
+    /// Removes [`PeerStat`]s with the provided [`PeerId`]s.
+    fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
+        debug!(
+            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
+             the PeerMetricsService.",
+            peers_ids, self.room_id
+        );
+
+        for peer_id in peers_ids {
+            self.peers.remove(peer_id);
+        }
+    }
+
+    /// Updates [`PeerTracks`] of the provided [`PeerStateMachine`].
+    ///
+    /// Does nothing if [`PeerStat`] for the provided [`PeerStateMachine`] not
+    /// exists.
+    fn update_peer(&mut self, peer: &PeerStateMachine) {
+        if let Some(peer_stat) = self.peers.get(&peer.id()) {
+            peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
+        }
     }
 
     /// Checks that all tracked [`Peer`]s are valid, meaning that all their
@@ -104,14 +180,13 @@ impl PeersMetricsService {
     ///
     /// Sends [`PeersMetricsEvent::NoTrafficFlow`] message if it determines that
     /// some track is not flowing.
-    pub fn check_peers(&self) {
+    fn check(&mut self) {
         for peer in self
             .peers
             .values()
             .filter(|peer| peer.borrow().state == PeerStatState::Connected)
         {
             let mut peer_ref = peer.borrow_mut();
-            self.send_quality_score(&mut *peer_ref);
 
             // get state before applying new stats so we can make before-after
             // diff
@@ -159,54 +234,15 @@ impl PeersMetricsService {
         }
     }
 
-    /// [`Room`] notifies [`PeersMetricsService`] about new `PeerConnection`s
-    /// creation.
-    ///
-    /// Based on the provided [`PeerSpec`]s [`PeerStat`]s will be validated.
-    pub fn register_peer(&mut self, peer: &Peer, stats_ttl: Duration) {
-        debug!(
-            "Peer [id = {}] was registered in the PeerMetricsService [room_id \
-             = {}].",
-            peer.id(),
-            self.room_id
-        );
-
-        let first_peer_stat = Rc::new(RefCell::new(PeerStat {
-            peer_id: peer.id(),
-            member_id: peer.member_id(),
-            partner_peer: Weak::new(),
-            last_update: Utc::now(),
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-            send_traffic_state: MediaTrafficState::new(),
-            recv_traffic_state: MediaTrafficState::new(),
-            state: PeerStatState::Connecting,
-            tracks_spec: PeerTracks::from(peer),
-            stats_ttl,
-            quality_meter: QualityMeter::new(Duration::from_secs(5)),
-            last_quality_score: None,
-        }));
-        if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
-        {
-            first_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&partner_peer_stat);
-            partner_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&first_peer_stat);
-        }
-
-        self.peers.insert(peer.id(), first_peer_stat);
-    }
-
     /// Adds new [`RtcStat`]s for the [`PeerStat`]s from this
-    /// [`PeersMetricsService`].
+    /// [`TrafficFlowDetector`].
     ///
     /// Notifies [`PeerTrafficWatcher`] about traffic flowing/stopping.
     ///
-    /// Also, from this function can be sent
-    /// [`PeersMetricsEvent::WrongTrafficFlowing`] or [`PeersMetricsEvent::
-    /// TrackTrafficStarted`] to the [`Room`] if some
-    /// [`MediaType`]/[`Direction`] was stopped.
-    pub fn add_stats(&self, peer_id: PeerId, stats: Vec<RtcStat>) {
+    /// May emit [`PeersMetricsEvent::WrongTrafficFlowing`] or
+    /// [`PeersMetricsEvent::TrackTrafficStarted`] if some [`MediaType`]/
+    /// [`Direction`] has stopped.
+    fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
 
@@ -221,21 +257,9 @@ impl PeersMetricsService {
                 match &stat.stats {
                     RtcStatsType::InboundRtp(inbound) => {
                         peer_ref.update_inbound_rtp(stat.id.clone(), inbound);
-                        if let Some(partner_peer) =
-                            peer_ref.partner_peer.upgrade()
-                        {
-                            partner_peer
-                                .borrow_mut()
-                                .update_outbound_from_partners_inbound(
-                                    stat.id, inbound,
-                                );
-                        }
                     }
                     RtcStatsType::OutboundRtp(outbound) => {
-                        peer_ref.update_outbound_rtp(stat.id, outbound);
-                    }
-                    RtcStatsType::RemoteInboundRtp(remote_inbound) => {
-                        peer_ref.update_remote_inbound_rtp(remote_inbound);
+                        peer_ref.update_outbound_rtp(stat.id.clone(), outbound);
                     }
                     _ => (),
                 }
@@ -316,97 +340,8 @@ impl PeersMetricsService {
         }
     }
 
-    /// Stops tracking provided [`Peer`]s.
-    pub fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
-        debug!(
-            "Peers [ids = [{:?}]] from Room [id = {}] was unsubscribed from \
-             the PeerMetricsService.",
-            peers_ids, self.room_id
-        );
-
-        for peer_id in peers_ids {
-            self.peers.remove(peer_id);
-        }
-    }
-
-    /// Updates [`Peer`]s internal representation. Must be called each time
-    /// [`Peer`] tracks set changes (some track was added or removed).
-    pub fn update_peer_tracks(&self, peer: &Peer) {
-        if let Some(peer_stat) = self.peers.get(&peer.id()) {
-            peer_stat.borrow_mut().tracks_spec = PeerTracks::from(peer);
-        }
-    }
-
-    /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
-    fn send_no_traffic(
-        &self,
-        peer: &PeerStat,
-        media_type: MediaType,
-        direction: MediaDirection,
-    ) {
-        if let Some(sender) = &self.events_tx {
-            let was_flowing_at =
-                peer.get_tracks_last_update(direction, media_type);
-            let _ = sender.unbounded_send(PeersMetricsEvent::NoTrafficFlow {
-                peer_id: peer.peer_id,
-                was_flowing_at: instant_into_utc(was_flowing_at),
-                media_type,
-                direction,
-            });
-        }
-    }
-
-    /// Sends [`EstimatedQualityScore`] to the [`PeerMetricsEvent`]s subscriber.
-    ///
-    /// Will be sent minimum score of the [`Peer`]s pair.
-    fn send_quality_score(&self, peer: &mut PeerStat) {
-        if let Some(sender) = &self.events_tx {
-            let partner_score = peer
-                .partner_peer()
-                .and_then(|p| p.borrow_mut().quality_meter.calculate());
-            let score = peer
-                .quality_meter
-                .calculate()
-                .and_then(|score| {
-                    partner_score
-                        .map(|partner_score| score.min(partner_score))
-                        .or_else(|| Some(score))
-                })
-                .or_else(|| partner_score);
-
-            if let Some(quality_score) = score {
-                if peer.last_quality_score == Some(quality_score) {
-                    return;
-                }
-                peer.last_quality_score.replace(quality_score);
-
-                if let Some(partner_member_id) = peer.get_partner_member_id() {
-                    let _ = sender.unbounded_send(
-                        PeersMetricsEvent::QualityMeterUpdate {
-                            member_id: peer.get_member_id(),
-                            partner_member_id,
-                            quality_score,
-                        },
-                    );
-                }
-            }
-        }
-    }
-
-    /// Sends [`PeerMetricsEvent::TrafficFlows`] event to subscriber.
-    fn send_traffic_flows(
-        &self,
-        peer_id: PeerId,
-        media_type: MediaType,
-        direction: MediaDirection,
-    ) {
-        if let Some(sender) = &self.events_tx {
-            let _ = sender.unbounded_send(PeersMetricsEvent::TrafficFlows {
-                peer_id,
-                media_type,
-                direction,
-            });
-        }
+    fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
+        self.event_tx.subscribe()
     }
 }
 
@@ -436,46 +371,13 @@ impl PartialEq<MediaType> for TrackMediaType {
     }
 }
 
-/// Events which [`PeersMetricsService`] can send to its subscriber.
-#[dispatchable]
-#[derive(Debug, Clone)]
-pub enum PeersMetricsEvent {
-    /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
-    NoTrafficFlow {
-        peer_id: PeerId,
-        was_flowing_at: DateTime<Utc>,
-        media_type: MediaType,
-        direction: MediaDirection,
-    },
-
-    /// Stopped `MediaTrack` with provided [`MediaType`] and [`MediaDirection`]
-    /// was started after stopping.
-    TrafficFlows {
-        peer_id: PeerId,
-        media_type: MediaType,
-        direction: MediaDirection,
-    },
-
-    /// [`ConnectionQualityScore`] updated.
-    QualityMeterUpdate {
-        /// [`MemberId`] of the [`Peer`] whose [`ConnectionQualityScore`]
-        /// was updated.
-        member_id: MemberId,
-
-        /// [`MemberId`] of the partner [`Peer`].
-        partner_member_id: MemberId,
-
-        /// Actual [`ConnectionQualityScore`].
-        quality_score: ConnectionQualityScore,
-    },
-}
-
 /// Specification of a [`Peer`]s tracks. Contains info about how many tracks of
 /// each kind should this [`Peer`] send/receive.
 ///
 /// This spec is compared with [`Peer`]s actual stats, to calculate difference
 /// between expected and actual [`Peer`] state.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 struct PeerTracks {
     /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
     /// [`MediaType::Audio`].
@@ -665,12 +567,6 @@ struct PeerStat {
 
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
-
-    /// [`ConnectionQualityScore`] score calculator for this [`PeerStat`].
-    quality_meter: QualityMeter,
-
-    /// Last calculated [`ConnectionQualityScore`].
-    last_quality_score: Option<ConnectionQualityScore>,
 }
 
 impl PeerStat {
@@ -715,40 +611,6 @@ impl PeerStat {
                 media_type: TrackMediaType::from(&upd.media_specific_stats),
             });
         receiver.update(upd);
-    }
-
-    /// Updates inbound RTP stats based on the partner outbound stats.
-    ///
-    /// This stats should be received from the partner [`Peer`].
-    fn update_outbound_from_partners_inbound(
-        &mut self,
-        stat_id: StatId,
-        upd: &RtcInboundRtpStreamStats,
-    ) {
-        #[allow(clippy::cast_sign_loss)]
-        let packets_lost =
-            upd.packets_lost.map_or(0, |plost| plost.max(0)) as u64;
-        self.quality_meter
-            .add_packets_lost(stat_id.clone(), packets_lost);
-        self.quality_meter
-            .add_packets_sent(stat_id, upd.packets_received + packets_lost);
-    }
-
-    /// Updates remote inbound RTP stats.
-    ///
-    /// Adds round trip time stats to the [`QualityMeter`].
-    fn update_remote_inbound_rtp(
-        &mut self,
-        upd: &RtcRemoteInboundRtpStreamStats,
-    ) {
-        if let Some(jitter) = upd.jitter.map(|f| f.0).filter(|j| *j > 0.) {
-            self.quality_meter
-                .add_jitter(Duration::from_secs_f64(jitter));
-        }
-        if let Some(rtt) = upd.round_trip_time.map(|f| f.0).filter(|t| *t > 0.)
-        {
-            self.quality_meter.add_rtt(Duration::from_secs_f64(rtt));
-        }
     }
 
     /// Returns partner [`PeerStat`].
@@ -914,7 +776,9 @@ impl PeerStat {
 
     /// Returns [`MemberId`] of the partner [`Member`].
     fn get_partner_member_id(&self) -> Option<MemberId> {
-        self.partner_peer().map(|p| p.borrow().get_member_id())
+        self.partner_peer
+            .upgrade()
+            .map(|p| p.borrow().get_member_id())
     }
 
     /// Returns [`MemberId`] of this [`PeerStat`].
@@ -980,36 +844,13 @@ mod tests {
         api::control::callback::{MediaDirection, MediaType},
         media::peer::tests::test_peer_from_peer_tracks,
         signalling::peers::{
-            traffic_watcher::MockPeerTrafficWatcher, PeersMetricsEvent,
+            metrics::{flowing_detector::PeerTracks, RtcStatsHandler},
+            traffic_watcher::MockPeerTrafficWatcher,
+            PeersMetricsEvent,
         },
     };
 
-    use super::PeersMetricsService;
-
-    impl PeersMetricsService {
-        /// Returns `true` if [`Peer`] with a provided [`PeerId`] isn't
-        /// registered in the [`PeersMetricsService`].
-        #[inline]
-        pub fn is_peer_registered(&self, peer_id: PeerId) -> bool {
-            self.peers.contains_key(&peer_id)
-        }
-
-        /// Returns count of the [`MediaTrack`] which are registered in the
-        /// [`PeersMetricsService`].
-        pub fn peer_tracks_count(&self, peer_id: PeerId) -> usize {
-            if let Some(peer) = self.peers.get(&peer_id) {
-                let peer_tracks = peer.borrow().tracks_spec;
-                let mut tracks_count = 0;
-                tracks_count += peer_tracks.audio_recv;
-                tracks_count += peer_tracks.video_recv;
-                tracks_count += peer_tracks.audio_send;
-                tracks_count += peer_tracks.video_send;
-                tracks_count
-            } else {
-                0
-            }
-        }
-    }
+    use super::TrafficFlowDetector;
 
     /// Returns [`RtcOutboundRtpStreamStats`] with a provided number of
     /// `packets_sent` and [`RtcOutboundRtpStreamMediaType`] based on
@@ -1089,11 +930,11 @@ mod tests {
     /// Helper for the all [`metrics`] unit tests.
     struct Helper {
         /// Stream to which will be sent `()` on every [`TrafficFlows`] message
-        /// received from the [`PeersMetricsService`]
+        /// received from the [`TrafficFlowDetector`]
         traffic_flows_stream: LocalBoxStream<'static, ()>,
 
         /// Stream to which will be sent `()` on every [`TrafficStopped`]
-        /// message received from the [`PeersMetricsService`]
+        /// message received from the [`TrafficFlowDetector`]
         traffic_stopped_stream: LocalBoxStream<'static, ()>,
 
         /// Stream to which will [`PeerMetricsService`] will send all his
@@ -1101,13 +942,13 @@ mod tests {
         peer_events_stream: LocalBoxStream<'static, PeersMetricsEvent>,
 
         /// Actual [`PeerMetricsService`].
-        metrics: PeersMetricsService,
+        metrics: TrafficFlowDetector,
     }
 
     impl Helper {
         /// Returns new [`Helper`] with [`PeerMetricsService`] in which [`Room`]
         /// with `test` ID was registered.
-        pub fn new() -> Self {
+        pub fn new(stats_ttl: Duration) -> Self {
             let mut watcher = MockPeerTrafficWatcher::new();
             watcher
                 .expect_register_room()
@@ -1126,15 +967,16 @@ mod tests {
                 traffic_stopped_tx.unbounded_send(()).unwrap();
             });
 
-            let mut metrics = PeersMetricsService::new(
+            let mut metrics = TrafficFlowDetector::new(
                 "test".to_string().into(),
                 Arc::new(watcher),
+                stats_ttl,
             );
 
             Self {
                 traffic_flows_stream: Box::pin(traffic_flows_rx),
                 traffic_stopped_stream: Box::pin(traffic_stopped_rx),
-                peer_events_stream: Box::pin(metrics.subscribe()),
+                peer_events_stream: metrics.subscribe(),
                 metrics,
             }
         }
@@ -1143,24 +985,20 @@ mod tests {
         /// count.
         pub fn register_peer(
             &mut self,
-            stats_ttl: Duration,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
             recv_video: u32,
         ) {
-            self.metrics.register_peer(
-                &test_peer_from_peer_tracks(
-                    send_audio, send_video, recv_audio, recv_video,
-                ),
-                stats_ttl,
-            );
+            self.metrics.register_peer(&test_peer_from_peer_tracks(
+                send_audio, send_video, recv_audio, recv_video,
+            ));
         }
 
         /// Generates [`RtcStats`] and adds them to inner
-        /// [`PeersMetricsService`] for `PeerId(1)`.
+        /// [`TrafficFlowDetector`] for `PeerId(1)`.
         pub fn add_stats(
-            &self,
+            &mut self,
             send_audio: u32,
             send_video: u32,
             recv_audio: u32,
@@ -1208,7 +1046,7 @@ mod tests {
                 })
             }
 
-            self.metrics.add_stats(PeerId(1), stats);
+            self.metrics.add_stats(PeerId(1), &stats);
         }
 
         /// Waits for `traffic_flows()` invocation on inner
@@ -1263,14 +1101,27 @@ mod tests {
         }
 
         /// Calls [`PeerMetricsService::check_peers`].
-        pub fn check_peers(&self) {
-            self.metrics.check_peers();
+        pub fn check_peers(&mut self) {
+            self.metrics.check();
         }
 
         /// Calls [`PeerMetricsService::unregister_peers`] with provided
         /// [`PeerId`] as argument.
         pub fn unregister_peer(&mut self, peer_id: PeerId) {
             self.metrics.unregister_peers(&[peer_id]);
+        }
+
+        /// Returns [`PeerTracks`] of the [`PeerStat`] with a provided
+        /// [`PeerId`].
+        ///
+        /// Will panic if [`PeerStat`] with this [`PeerId`] not exists.
+        pub fn get_tracks_spec(&mut self, peer_id: PeerId) -> PeerTracks {
+            self.metrics
+                .peers
+                .get(&peer_id)
+                .unwrap()
+                .borrow()
+                .tracks_spec
         }
     }
 
@@ -1321,14 +1172,9 @@ mod tests {
         stats: (u32, u32, u32, u32),
         should_flow: bool,
     ) -> (MergedFlowState, Helper) {
-        let mut helper = Helper::new();
-        helper.register_peer(
-            stats_tll.unwrap_or(Duration::from_secs(999)),
-            spec.0,
-            spec.1,
-            spec.2,
-            spec.3,
-        );
+        let mut helper =
+            Helper::new(stats_tll.unwrap_or(Duration::from_secs(999)));
+        helper.register_peer(spec.0, spec.1, spec.2, spec.3);
         helper.add_stats(stats.0, stats.1, stats.2, stats.3, 100);
 
         let traffic_flow =
@@ -1489,8 +1335,8 @@ mod tests {
     /// anything ([`TrafficStopped`], [`PeerEventsEvent::NoTrafficFlow`] etc.).
     #[actix_rt::test]
     async fn peer_unregister_doesnt_trigger_anything() {
-        let mut helper = Helper::new();
-        helper.register_peer(Duration::from_millis(50), 1, 1, 1, 1);
+        let mut helper = Helper::new(Duration::from_millis(50));
+        helper.register_peer(1, 1, 1, 1);
         helper.add_stats(1, 1, 1, 1, 100);
 
         let mut directions = HashSet::new();
@@ -1514,6 +1360,7 @@ mod tests {
         }
 
         helper.unregister_peer(PeerId(1));
+        assert_eq!(helper.metrics.peers.len(), 0);
         timeout(Duration::from_millis(10), helper.next_event())
             .await
             .unwrap_err();
@@ -1538,10 +1385,28 @@ mod tests {
                 video_recv: true
             }
         );
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 0,
+                video_send: 0,
+                audio_recv: 1,
+                video_recv: 1,
+            }
+        );
 
         helper
             .metrics
-            .update_peer_tracks(&test_peer_from_peer_tracks(1, 1, 1, 1));
+            .update_peer(&test_peer_from_peer_tracks(1, 1, 1, 1));
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 1,
+                video_send: 1,
+                audio_recv: 1,
+                video_recv: 1,
+            }
+        );
         helper.check_peers();
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
@@ -1567,10 +1432,30 @@ mod tests {
                 video_recv: true
             }
         );
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 0,
+                video_send: 0,
+                audio_recv: 1,
+                video_recv: 1,
+            }
+        );
 
         helper
             .metrics
-            .update_peer_tracks(&test_peer_from_peer_tracks(1, 1, 1, 1));
+            .update_peer(&test_peer_from_peer_tracks(1, 1, 1, 1));
+
+        assert_eq!(
+            helper.get_tracks_spec(PeerId(1)),
+            PeerTracks {
+                audio_send: 1,
+                video_send: 1,
+                audio_recv: 1,
+                video_recv: 1,
+            },
+        );
+
         helper.add_stats(0, 0, 1, 1, 300);
         timeout(Duration::from_millis(10), helper.next_no_traffic_event())
             .await
