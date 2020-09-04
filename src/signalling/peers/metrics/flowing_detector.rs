@@ -377,7 +377,7 @@ impl PartialEq<MediaType> for TrackMediaType {
 /// This spec is compared with [`Peer`]s actual stats, to calculate difference
 /// between expected and actual [`Peer`] state.
 #[derive(Clone, Copy, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 struct PeerTracks {
     /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
     /// [`MediaType::Audio`].

@@ -174,8 +174,7 @@ struct PeerMetric {
     /// [`PeerStateMachine`].
     partner_peer: Weak<RefCell<PeerMetric>>,
 
-    /// [`ConnectionQualityScore`] score calculator for this
-    /// [`PeerMetric`].
+    /// [`ConnectionQualityScore`] score calculator for this [`PeerMetric`].
     quality_meter: QualityMeter,
 
     /// Last calculated [`ConnectionQualityScore`].

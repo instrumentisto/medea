@@ -1,11 +1,11 @@
 //! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 //!
-//! At first you must register `Peer` via
-//! [`PeersMetricsService.register_peer()`]. Use [`PeersMetricsService.
-//! subscribe()`] to subscribe to stats processing results. Then provide Peer
-//! metrics to [`PeersMetricsService.add_stats()`]. You should call
-//! [`PeersMetricsService.check_peers()`] with reasonable interval (~1-2 sec),
-//! this will check for stale metrics.
+//! 1. You should register [`Peer`] via [`PeersMetricsService::register_peer`].
+//! 2. Use [`PeersMetricsService::subscribe`] to subscribe to stats processing
+//!    results.
+//! 3. Provide [`Peer`]'s metrics to [`PeersMetricsService::add_stats`].
+//! 4. Call [`PeersMetricsService::check_peers`] with reasonable interval
+//!    (~1-2 sec), to check for stale metrics.
 //!
 //! Stores [`RtcStatsHandler`]s implementors.
 
@@ -212,7 +212,7 @@ impl EventSender {
 
     /// Tries to send provided [`PeersMetricsEvent`] to the subscriber.
     ///
-    /// If no one subscribed - does nothing.
+    /// If no one subscribed, then no-op.
     fn send_event(&self, event: PeersMetricsEvent) {
         if let Some(tx) = self.0.borrow().as_ref() {
             let _ = tx.unbounded_send(event);
