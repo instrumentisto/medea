@@ -15,7 +15,8 @@ use std::{
 use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
-    stats::RtcStat, Incrementable, MemberId, PeerId, TrackId,
+    stats::RtcStat, Incrementable, MemberId, PeerConnectionState, PeerId,
+    TrackId,
 };
 
 use crate::{
@@ -539,6 +540,16 @@ impl PeersService {
         self.peer_metrics_service
             .borrow_mut()
             .add_stats(peer_id, stats);
+    }
+
+    pub fn update_connection_state(
+        &self,
+        peer_id: PeerId,
+        state: PeerConnectionState,
+    ) {
+        self.peer_metrics_service
+            .borrow_mut()
+            .update_connection_state(peer_id, state);
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
