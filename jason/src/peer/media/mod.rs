@@ -17,7 +17,7 @@ use tracerr::Traced;
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{LocalStreamConstraints, MediaStreamTrack},
+    media::{LocalStreamConstraints, MediaStreamTrack, RecvConstraints},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
@@ -35,6 +35,16 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+
+/// Direction of the `MediaTrack`.
+#[derive(Debug, Clone, Copy)]
+pub enum TrackDirection {
+    /// Sends media data.
+    Send,
+
+    /// Receives media data.
+    Recv,
+}
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
@@ -240,14 +250,17 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    /// Returns publishing statuses of the all [`Sender`]s from this
-    /// [`MediaConnections`].
-    pub fn get_senders_statuses(&self) -> HashMap<TrackId, bool> {
+    /// Returns activity statuses of the all [`Sender`]s and [`Receiver`]s from
+    /// this [`MediaConnections`].
+    pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
 
         let mut out = HashMap::new();
         for (track_id, sender) in &inner.senders {
             out.insert(*track_id, sender.is_publishing());
+        }
+        for (track_id, receiver) in &inner.receivers {
+            out.insert(*track_id, receiver.is_receiving());
         }
         out
     }
@@ -262,7 +275,8 @@ impl MediaConnections {
     pub fn create_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
-        local_constraints: &LocalStreamConstraints,
+        send_constraints: &LocalStreamConstraints,
+        recv_constraints: &RecvConstraints,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         for track in tracks {
@@ -270,7 +284,7 @@ impl MediaConnections {
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let mute_state;
-                    if local_constraints.is_enabled(&track.media_type) {
+                    if send_constraints.is_enabled(&track.media_type) {
                         mute_state = StableMuteState::NotMuted;
                     } else if is_required {
                         use MediaConnectionsError as Error;
@@ -302,6 +316,7 @@ impl MediaConnections {
                         &inner.peer,
                         mid,
                         inner.peer_events_sender.clone(),
+                        recv_constraints,
                     );
                     inner.receivers.insert(track.id, recv);
                 }

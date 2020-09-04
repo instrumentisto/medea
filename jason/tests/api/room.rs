@@ -15,10 +15,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
-    peer::{
-        MockPeerRepository, PeerConnection, Repository, StableMuteState,
-        TransceiverKind,
-    },
+    peer::{MockPeerRepository, PeerConnection, Repository, TransceiverKind},
     rpc::MockRpcClient,
     utils::JasonError,
     DeviceVideoTrackConstraints,
@@ -118,348 +115,6 @@ async fn get_test_room_and_exist_peer(
     delay_for(200).await;
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
     (room, peer)
-}
-
-#[wasm_bindgen_test]
-async fn mute_unmute_audio() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    let handle = room.new_handle();
-    assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
-    assert!(!peer.is_send_audio_enabled());
-    assert!(JsFuture::from(handle.unmute_audio()).await.is_ok());
-    assert!(peer.is_send_audio_enabled());
-}
-
-#[wasm_bindgen_test]
-async fn mute_unmute_video() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    let handle = room.new_handle();
-    assert!(JsFuture::from(handle.mute_video()).await.is_ok());
-    assert!(!peer.is_send_video_enabled());
-    assert!(JsFuture::from(handle.unmute_video()).await.is_ok());
-    assert!(peer.is_send_video_enabled());
-}
-
-/// Tests that two simultaneous calls of [`RoomHandle::mute_audio`] method will
-/// be resolved normally.
-///
-/// # Algorithm
-///
-/// 1. Create [`Room`] in [`MuteState::NotMuted`].
-///
-/// 2. Call [`RoomHandle::mute_audio`] simultaneous twice.
-///
-/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
-///    is in [`MuteState::Muted`].
-#[wasm_bindgen_test]
-async fn join_two_audio_mutes() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    let handle = room.new_handle();
-    let (first, second) = futures::future::join(
-        JsFuture::from(handle.mute_audio()),
-        JsFuture::from(handle.mute_audio()),
-    )
-    .await;
-    first.unwrap();
-    second.unwrap();
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Audio,
-        StableMuteState::Muted
-    ));
-}
-
-/// Tests that two simultaneous calls of [`RoomHandle::mute_video`] method will
-/// both be resolved.
-///
-/// # Algorithm
-///
-/// 1. Create [`Room`] in [`MuteState::NotMuted`].
-///
-/// 2. Call [`RoomHandle::mute_video`] simultaneous twice.
-///
-/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
-///    is in [`MuteState::Muted`].
-#[wasm_bindgen_test]
-async fn join_two_video_mutes() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    let handle = room.new_handle();
-    let (first, second) = futures::future::join(
-        JsFuture::from(handle.mute_video()),
-        JsFuture::from(handle.mute_video()),
-    )
-    .await;
-    first.unwrap();
-    second.unwrap();
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Video,
-        StableMuteState::Muted
-    ));
-}
-
-/// Tests that if [`RoomHandle::mute_audio`] and [`RoomHandle::unmute_audio`]
-/// are called simultaneously, then first call will be rejected, and second
-/// resolved.
-///
-/// # Algorithm
-///
-/// 1. Create [`Room`] in [`MuteState::NotMuted`].
-///
-/// 2. Call [`RoomHandle::mute_audio`] and [`RoomHandle::unmute_audio`]
-///    simultaneous.
-///
-/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of [`Room`]
-///    is stayed in [`MuteState::NotMuted`].
-#[wasm_bindgen_test]
-async fn join_mute_and_unmute_audio() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Audio,
-        StableMuteState::NotMuted
-    ));
-
-    let handle = room.new_handle();
-    let (mute_audio_result, unmute_audio_result) = futures::future::join(
-        JsFuture::from(handle.mute_audio()),
-        JsFuture::from(handle.unmute_audio()),
-    )
-    .await;
-    mute_audio_result.unwrap_err();
-    unmute_audio_result.unwrap();
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Audio,
-        StableMuteState::NotMuted
-    ));
-}
-
-/// Tests that if [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
-/// are called simultaneously, then first call will be rejected, and second
-/// resolved.
-///
-/// # Algorithm
-///
-/// 1. Create [`Room`] in [`MuteState::NotMuted`].
-///
-/// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
-///    simultaneous.
-///
-/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
-///    is stayed in [`MuteState::NotMuted`].
-#[wasm_bindgen_test]
-async fn join_mute_and_unmute_video() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Video,
-        StableMuteState::NotMuted
-    ));
-
-    let handle = room.new_handle();
-    let (mute_video_result, unmute_video_result) = futures::future::join(
-        JsFuture::from(handle.mute_video()),
-        JsFuture::from(handle.unmute_video()),
-    )
-    .await;
-    mute_video_result.unwrap_err();
-    unmute_video_result.unwrap();
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Video,
-        StableMuteState::NotMuted
-    ));
-}
-
-/// Tests that simultaneous calls of [`RoomHandle::mute_video`] and
-/// [`RoomHandle::unmute_video`] on [`Room`] with video in
-/// [`MuteState::Muted`] not goes into an infinite loop.
-///
-/// # Algorithm
-///
-/// 1. Create [`Room`] video tracks in [`MuteState::Muted`].
-///
-/// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
-///    simultaneous.
-///
-/// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of [`Room`]
-///    is in [`MuteState::NotMuted`].
-#[wasm_bindgen_test]
-async fn join_unmute_and_mute_audio() {
-    let (audio_track, video_track) = get_test_unrequired_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
-        audio_track,
-        video_track,
-        Some(media_stream_settings(true, true)),
-    )
-    .await;
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Audio,
-        StableMuteState::NotMuted
-    ));
-
-    let handle = room.new_handle();
-    JsFuture::from(handle.mute_audio()).await.unwrap();
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Audio,
-        StableMuteState::Muted
-    ));
-
-    let (mute_audio_result, unmute_audio_result) = futures::future::join(
-        JsFuture::from(handle.mute_audio()),
-        JsFuture::from(handle.unmute_audio()),
-    )
-    .await;
-    mute_audio_result.unwrap();
-    unmute_audio_result.unwrap();
-
-    assert!(peer.is_all_senders_in_mute_state(
-        TransceiverKind::Audio,
-        StableMuteState::NotMuted
-    ));
-}
-
-#[wasm_bindgen_test]
-async fn mute_audio_room_before_init_peer() {
-    let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
-    JsFuture::from(
-        room.new_handle()
-            .set_local_media_settings(&media_stream_settings(true, true)),
-    )
-    .await
-    .unwrap();
-
-    JsFuture::from(room.new_handle().mute_audio())
-        .await
-        .unwrap();
-
-    let (audio_track, video_track) = get_test_tracks(false, false);
-    event_tx
-        .unbounded_send(Event::PeerCreated {
-            peer_id: PeerId(1),
-            negotiation_role: NegotiationRole::Offerer,
-            tracks: vec![audio_track, video_track],
-            ice_servers: Vec::new(),
-            force_relay: false,
-        })
-        .unwrap();
-
-    delay_for(200).await;
-    match commands_rx.next().await.unwrap() {
-        Command::MakeSdpOffer {
-            peer_id,
-            sdp_offer: _,
-            mids,
-            senders_statuses,
-        } => {
-            assert_eq!(peer_id, PeerId(1));
-            assert_eq!(mids.len(), 2);
-            let audio = senders_statuses.get(&TrackId(1)).unwrap();
-            let video = senders_statuses.get(&TrackId(2)).unwrap();
-
-            assert!(!audio); // muted
-            assert!(video); // not muted
-        }
-        _ => unreachable!(),
-    }
-
-    let peer = room.get_peer_by_id(PeerId(1)).unwrap();
-    assert!(peer.is_send_video_enabled());
-    assert!(!peer.is_send_audio_enabled());
-}
-
-#[wasm_bindgen_test]
-async fn mute_video_room_before_init_peer() {
-    let (event_tx, event_rx) = mpsc::unbounded();
-    let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
-    JsFuture::from(
-        room.new_handle()
-            .set_local_media_settings(&media_stream_settings(true, true)),
-    )
-    .await
-    .unwrap();
-
-    JsFuture::from(room.new_handle().mute_video())
-        .await
-        .unwrap();
-
-    let (audio_track, video_track) = get_test_tracks(false, false);
-    event_tx
-        .unbounded_send(Event::PeerCreated {
-            peer_id: PeerId(1),
-            negotiation_role: NegotiationRole::Offerer,
-            tracks: vec![audio_track, video_track],
-            ice_servers: Vec::new(),
-            force_relay: false,
-        })
-        .unwrap();
-
-    delay_for(200).await;
-    match commands_rx.next().await.unwrap() {
-        Command::MakeSdpOffer {
-            peer_id,
-            sdp_offer: _,
-            mids,
-            senders_statuses,
-        } => {
-            assert_eq!(peer_id, PeerId(1));
-            assert_eq!(mids.len(), 2);
-            let audio = senders_statuses.get(&TrackId(1)).unwrap();
-            let video = senders_statuses.get(&TrackId(2)).unwrap();
-
-            assert!(audio); // not muted
-            assert!(!video); // muted
-        }
-        _ => unreachable!(),
-    }
-
-    let peer = room.get_peer_by_id(PeerId(1)).unwrap();
-    assert!(!peer.is_send_video_enabled());
-    assert!(peer.is_send_audio_enabled());
 }
 
 /// Tests RoomHandle::set_local_media_settings before creating PeerConnection.
@@ -689,6 +344,443 @@ async fn error_join_room_without_on_connection_loss_callback() {
     }
 }
 
+mod disable_recv_tracks {
+
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, MemberId, VideoSettings,
+    };
+
+    use super::*;
+
+    #[wasm_bindgen_test]
+    async fn check_transceivers_statuses() {
+        let (event_tx, event_rx) = mpsc::unbounded();
+        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        let room_handle = room.new_handle();
+
+        JsFuture::from(room_handle.mute_remote_audio())
+            .await
+            .unwrap();
+
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![
+                    Track {
+                        id: TrackId(1),
+                        direction: Direction::Send {
+                            receivers: vec![MemberId::from("bob")],
+                            mid: None,
+                        },
+                        media_type: MediaType::Audio(AudioSettings {
+                            is_required: true,
+                        }),
+                    },
+                    Track {
+                        id: TrackId(2),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("bob"),
+                            mid: None,
+                        },
+                        media_type: MediaType::Video(VideoSettings {
+                            is_required: true,
+                        }),
+                    },
+                    Track {
+                        id: TrackId(3),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("bob"),
+                            mid: None,
+                        },
+                        media_type: MediaType::Audio(AudioSettings {
+                            is_required: true,
+                        }),
+                    },
+                ],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer: _,
+                mids,
+                transceivers_statuses,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(mids.len(), 3);
+                let audio_send =
+                    transceivers_statuses.get(&TrackId(1)).unwrap();
+                let video_recv =
+                    transceivers_statuses.get(&TrackId(2)).unwrap();
+                let audio_recv =
+                    transceivers_statuses.get(&TrackId(3)).unwrap();
+
+                assert!(audio_send); // not muted
+                assert!(video_recv); // not muted
+                assert!(!audio_recv); // muted
+            }
+            _ => unreachable!(),
+        }
+
+        // TODO: add is_recv_audio/video asserts
+    }
+}
+
+/// Tests disabling tracks publishing.
+mod disable_send_tracks {
+
+    use medea_jason::peer::{StableMuteState, TransceiverKind};
+
+    use super::*;
+
+    #[wasm_bindgen_test]
+    async fn mute_unmute_audio() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        let handle = room.new_handle();
+        assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
+        assert!(!peer.is_send_audio_enabled());
+        assert!(JsFuture::from(handle.unmute_audio()).await.is_ok());
+        assert!(peer.is_send_audio_enabled());
+    }
+
+    #[wasm_bindgen_test]
+    async fn mute_unmute_video() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        let handle = room.new_handle();
+        assert!(JsFuture::from(handle.mute_video()).await.is_ok());
+        assert!(!peer.is_send_video_enabled());
+        assert!(JsFuture::from(handle.unmute_video()).await.is_ok());
+        assert!(peer.is_send_video_enabled());
+    }
+
+    /// Tests that two simultaneous calls of [`RoomHandle::mute_audio`] method
+    /// will be resolved normally.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    ///
+    /// 2. Call [`RoomHandle::mute_audio`] simultaneous twice.
+    ///
+    /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of
+    /// [`Room`] is in [`MuteState::Muted`].
+    #[wasm_bindgen_test]
+    async fn join_two_audio_mutes() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        let handle = room.new_handle();
+        let (first, second) = futures::future::join(
+            JsFuture::from(handle.mute_audio()),
+            JsFuture::from(handle.mute_audio()),
+        )
+        .await;
+        first.unwrap();
+        second.unwrap();
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Audio,
+            StableMuteState::Muted
+        ));
+    }
+
+    /// Tests that two simultaneous calls of [`RoomHandle::mute_video`] method
+    /// will both be resolved.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    ///
+    /// 2. Call [`RoomHandle::mute_video`] simultaneous twice.
+    ///
+    /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
+    /// [`Room`] is in [`MuteState::Muted`].
+    #[wasm_bindgen_test]
+    async fn join_two_video_mutes() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        let handle = room.new_handle();
+        let (first, second) = futures::future::join(
+            JsFuture::from(handle.mute_video()),
+            JsFuture::from(handle.mute_video()),
+        )
+        .await;
+        first.unwrap();
+        second.unwrap();
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Video,
+            StableMuteState::Muted
+        ));
+    }
+
+    /// Tests that if [`RoomHandle::mute_audio`] and
+    /// [`RoomHandle::unmute_audio`] are called simultaneously, then first
+    /// call will be rejected, and second resolved.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    ///
+    /// 2. Call [`RoomHandle::mute_audio`] and [`RoomHandle::unmute_audio`]
+    ///    simultaneous.
+    ///
+    /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of
+    /// [`Room`] is stayed in [`MuteState::NotMuted`].
+    #[wasm_bindgen_test]
+    async fn join_mute_and_unmute_audio() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Audio,
+            StableMuteState::NotMuted
+        ));
+
+        let handle = room.new_handle();
+        let (mute_audio_result, unmute_audio_result) = futures::future::join(
+            JsFuture::from(handle.mute_audio()),
+            JsFuture::from(handle.unmute_audio()),
+        )
+        .await;
+        mute_audio_result.unwrap_err();
+        unmute_audio_result.unwrap();
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Audio,
+            StableMuteState::NotMuted
+        ));
+    }
+
+    /// Tests that if [`RoomHandle::mute_video`] and
+    /// [`RoomHandle::unmute_video`] are called simultaneously, then first
+    /// call will be rejected, and second resolved.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    ///
+    /// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
+    ///    simultaneous.
+    ///
+    /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
+    /// [`Room`] is stayed in [`MuteState::NotMuted`].
+    #[wasm_bindgen_test]
+    async fn join_mute_and_unmute_video() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Video,
+            StableMuteState::NotMuted
+        ));
+
+        let handle = room.new_handle();
+        let (mute_video_result, unmute_video_result) = futures::future::join(
+            JsFuture::from(handle.mute_video()),
+            JsFuture::from(handle.unmute_video()),
+        )
+        .await;
+        mute_video_result.unwrap_err();
+        unmute_video_result.unwrap();
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Video,
+            StableMuteState::NotMuted
+        ));
+    }
+
+    /// Tests that simultaneous calls of [`RoomHandle::mute_video`] and
+    /// [`RoomHandle::unmute_video`] on [`Room`] with video in
+    /// [`MuteState::Muted`] not goes into an infinite loop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create [`Room`] video tracks in [`MuteState::Muted`].
+    ///
+    /// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
+    ///    simultaneous.
+    ///
+    /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
+    /// [`Room`] is in [`MuteState::NotMuted`].
+    #[wasm_bindgen_test]
+    async fn join_unmute_and_mute_audio() {
+        let (audio_track, video_track) = get_test_unrequired_tracks();
+        let (room, peer) = get_test_room_and_exist_peer(
+            audio_track,
+            video_track,
+            Some(media_stream_settings(true, true)),
+        )
+        .await;
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Audio,
+            StableMuteState::NotMuted
+        ));
+
+        let handle = room.new_handle();
+        JsFuture::from(handle.mute_audio()).await.unwrap();
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Audio,
+            StableMuteState::Muted
+        ));
+
+        let (mute_audio_result, unmute_audio_result) = futures::future::join(
+            JsFuture::from(handle.mute_audio()),
+            JsFuture::from(handle.unmute_audio()),
+        )
+        .await;
+        mute_audio_result.unwrap();
+        unmute_audio_result.unwrap();
+
+        assert!(peer.is_all_senders_in_mute_state(
+            TransceiverKind::Audio,
+            StableMuteState::NotMuted
+        ));
+    }
+
+    #[wasm_bindgen_test]
+    async fn mute_audio_room_before_init_peer() {
+        let (event_tx, event_rx) = mpsc::unbounded();
+        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        JsFuture::from(
+            room.new_handle()
+                .set_local_media_settings(&media_stream_settings(true, true)),
+        )
+        .await
+        .unwrap();
+
+        JsFuture::from(room.new_handle().mute_audio())
+            .await
+            .unwrap();
+
+        let (audio_track, video_track) = get_test_tracks(false, false);
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![audio_track, video_track],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer: _,
+                mids,
+                transceivers_statuses,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(mids.len(), 2);
+                let audio = transceivers_statuses.get(&TrackId(1)).unwrap();
+                let video = transceivers_statuses.get(&TrackId(2)).unwrap();
+
+                assert!(!audio); // muted
+                assert!(video); // not muted
+            }
+            _ => unreachable!(),
+        }
+
+        let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+        assert!(peer.is_send_video_enabled());
+        assert!(!peer.is_send_audio_enabled());
+    }
+
+    #[wasm_bindgen_test]
+    async fn mute_video_room_before_init_peer() {
+        let (event_tx, event_rx) = mpsc::unbounded();
+        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        JsFuture::from(
+            room.new_handle()
+                .set_local_media_settings(&media_stream_settings(true, true)),
+        )
+        .await
+        .unwrap();
+
+        JsFuture::from(room.new_handle().mute_video())
+            .await
+            .unwrap();
+
+        let (audio_track, video_track) = get_test_tracks(false, false);
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![audio_track, video_track],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer: _,
+                mids,
+                transceivers_statuses,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(mids.len(), 2);
+                let audio = transceivers_statuses.get(&TrackId(1)).unwrap();
+                let video = transceivers_statuses.get(&TrackId(2)).unwrap();
+
+                assert!(audio); // not muted
+                assert!(!video); // muted
+            }
+            _ => unreachable!(),
+        }
+
+        let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+        assert!(!peer.is_send_video_enabled());
+        assert!(peer.is_send_audio_enabled());
+    }
+}
+
 /// Tests for `RoomHandle.on_close` JS side callback.
 mod on_close_callback {
     use medea_client_api_proto::CloseReason as CloseByServerReason;
@@ -893,6 +985,7 @@ mod patches_generation {
         AudioSettings, Direction, MediaType, Track, TrackId, TrackPatch,
         VideoSettings,
     };
+    use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
 
     use crate::timeout;
@@ -907,7 +1000,7 @@ mod patches_generation {
     /// for all audio [`Track`]s.
     async fn get_room_and_commands_receiver(
         peers_count: u32,
-        audio_track_muted_state_fn: impl Fn(u32) -> bool,
+        audio_track_enabled_state_fn: impl Fn(u32) -> bool,
     ) -> (Room, mpsc::UnboundedReceiver<Command>) {
         let mut repo = Box::new(MockPeerRepository::new());
 
@@ -940,8 +1033,8 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::new();
-            local_stream.toggle_enable(
-                !(audio_track_muted_state_fn)(i),
+            local_stream.set_track_enabled(
+                (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,
             );
             let peer = PeerConnection::new(
@@ -951,6 +1044,7 @@ mod patches_generation {
                 Rc::new(MediaManager::default()),
                 false,
                 local_stream.into(),
+                Rc::new(RecvConstraints::default()),
             )
             .unwrap();
 
@@ -999,7 +1093,7 @@ mod patches_generation {
     #[wasm_bindgen_test]
     async fn track_patch_for_all_video() {
         let (room, mut command_rx) =
-            get_room_and_commands_receiver(1, |_| false).await;
+            get_room_and_commands_receiver(1, |_| true).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1034,7 +1128,7 @@ mod patches_generation {
     #[wasm_bindgen_test]
     async fn track_patch_for_many_tracks() {
         let (room, mut command_rx) =
-            get_room_and_commands_receiver(2, |_| false).await;
+            get_room_and_commands_receiver(2, |_| true).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1087,7 +1181,7 @@ mod patches_generation {
     #[wasm_bindgen_test]
     async fn try_to_unmute_unmuted() {
         let (room, mut command_rx) =
-            get_room_and_commands_receiver(2, |_| false).await;
+            get_room_and_commands_receiver(2, |_| true).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1112,7 +1206,7 @@ mod patches_generation {
     #[wasm_bindgen_test]
     async fn mute_room_with_one_muted_track() {
         let (room, mut command_rx) =
-            get_room_and_commands_receiver(2, |i| i % 2 == 0).await;
+            get_room_and_commands_receiver(2, |i| i % 2 == 1).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {

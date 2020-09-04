@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
@@ -17,6 +20,49 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
 pub struct LocalStreamConstraints(Rc<RefCell<MediaStreamSettings>>);
+
+/// Constraints to the media received from remote. Used to disable or enable
+/// media receiving.
+pub struct RecvConstraints {
+    /// Is audio receiving enabled.
+    is_audio_enabled: Cell<bool>,
+
+    /// Is video receiving enabled.
+    is_video_enabled: Cell<bool>,
+}
+
+impl Default for RecvConstraints {
+    fn default() -> Self {
+        Self {
+            is_audio_enabled: Cell::new(true),
+            is_video_enabled: Cell::new(true),
+        }
+    }
+}
+
+impl RecvConstraints {
+    /// Enables or disables audio or video receiving.
+    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
+        match kind {
+            TransceiverKind::Audio => {
+                self.is_audio_enabled.set(enabled);
+            }
+            TransceiverKind::Video => {
+                self.is_video_enabled.set(enabled);
+            }
+        }
+    }
+
+    /// Returns is audio receiving enabled.
+    pub fn is_audio_enabled(&self) -> bool {
+        self.is_audio_enabled.get()
+    }
+
+    /// Returns is video receiving enabled.
+    pub fn is_video_enabled(&self) -> bool {
+        self.is_video_enabled.get()
+    }
+}
 
 #[cfg(feature = "mockable")]
 impl From<MediaStreamSettings> for LocalStreamConstraints {
@@ -54,8 +100,8 @@ impl LocalStreamConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn toggle_enable(&self, is_enabled: bool, kind: TransceiverKind) {
-        self.0.borrow_mut().toggle_enable(is_enabled, kind);
+    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
+        self.0.borrow_mut().set_track_enabled(enabled, kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -227,13 +273,13 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn toggle_enable(&mut self, is_enabled: bool, kind: TransceiverKind) {
+    pub fn set_track_enabled(&mut self, enabled: bool, kind: TransceiverKind) {
         match kind {
             TransceiverKind::Audio => {
-                self.toggle_publish_audio(is_enabled);
+                self.toggle_publish_audio(enabled);
             }
             TransceiverKind::Video => {
-                self.toggle_publish_video(is_enabled);
+                self.toggle_publish_video(enabled);
             }
         }
     }
