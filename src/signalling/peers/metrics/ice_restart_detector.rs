@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{PeerConnectionState, PeerId};
 
-use crate::media::PeerStateMachine;
+use crate::{media::PeerStateMachine, signalling::peers::metrics::EventSender};
 
 use super::{PeersMetricsEvent, RtcStatsHandler};
-use crate::signalling::peers::metrics::EventSender;
 
 use self::peer_state::PeerState;
 

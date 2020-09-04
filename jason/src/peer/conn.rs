@@ -1,4 +1,8 @@
-use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    convert::TryFrom as _,
+    rc::Rc,
+};
 
 use derive_more::{Display, From};
 use medea_client_api_proto::{
@@ -25,7 +29,6 @@ use crate::{
 };
 
 use super::ice_server::RtcIceServers;
-use std::cell::Cell;
 
 /// [RTCIceCandidate][1] representation.
 ///
