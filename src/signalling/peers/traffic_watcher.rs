@@ -54,12 +54,7 @@ pub trait PeerConnectionStateEventsHandler: Send + Debug {
 }
 
 #[cfg(test)]
-impl Debug for MockPeerConnectionStateEventsHandler {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("MockPeerConnectionStateEventsHandler")
-            .finish()
-    }
-}
+impl_debug_by_struct_name!(MockPeerConnectionStateEventsHandler);
 
 /// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
 pub fn build_peers_traffic_watcher(
@@ -112,11 +107,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 }
 
 #[cfg(test)]
-impl Debug for MockPeerTrafficWatcher {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("PeerTrafficWatcherMock").finish()
-    }
-}
+impl_debug_by_struct_name!(MockPeerTrafficWatcher);
 
 /// Returns [`FlowMetricSources`], which will be used to emit `Peer` state
 /// events.
