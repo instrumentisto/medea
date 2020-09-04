@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{cell::Cell, collections::HashMap, rc::Rc, time::Duration};
 
 use actix::{Addr, AsyncContext};
 use function_name::named;
@@ -24,7 +24,6 @@ use crate::{
     },
     test_name,
 };
-use std::collections::HashMap;
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
 // Waits for single/multiple TracksApplied with expected track changes on on
@@ -538,7 +537,7 @@ async fn force_update_works() {
 /// 6. `Bob` should receive [`Event::TracksApplied`] with empty updates
 #[actix_rt::test]
 #[named]
-async fn fix_force_update_bug() {
+async fn ordering_on_force_update_is_correct() {
     let mut client = ControlClient::new().await;
     let credentials = client.create(pub_pub_room_req(test_name!())).await;
 

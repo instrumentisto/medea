@@ -8,6 +8,8 @@ pub mod signalling;
 ///
 /// When provided `$pattern` found - executes provided `$body`.
 ///
+/// This macro can be used only in the `async` blocks.
+///
 /// # Usage
 ///
 /// ```ignore

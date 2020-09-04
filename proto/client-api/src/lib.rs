@@ -262,8 +262,8 @@ pub struct CloseDescription {
 
 /// WebSocket message from Medea to Jason.
 #[dispatchable(self: &Self, async_trait(?Send))]
-// TODO: Clone needed for the tests
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
+#[cfg_attr(any(feature = "medea", feature = "mockable"), derive(Clone, Debug))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
