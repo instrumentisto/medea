@@ -10,6 +10,7 @@ use medea_client_api_proto::{MediaType, TrackId as Id};
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 #[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,

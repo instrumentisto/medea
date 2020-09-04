@@ -343,6 +343,7 @@ pub struct Context {
 /// Tracks changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
@@ -1283,5 +1284,173 @@ pub mod tests {
         assert_eq!(first_track_patch.is_muted, Some(false));
 
         assert!(track_patches_after.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod force_update_deduping_tests {
+    use super::*;
+
+    /// Tests for the [`TrackPatchDeduper`].
+    mod track_patch_deduper {
+        use super::*;
+
+        /// Checks that [`TrackPatchDeduper::with_whitelist`] filters
+        /// [`TrackPatch`]es which are not listed in the whitelist.
+        #[test]
+        fn whitelisting_works() {
+            let mut deduper =
+                TrackPatchDeduper::with_whitelist(hashset![TrackId(1)]);
+            let filtered_patch = TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(2),
+                is_muted: Some(true),
+            });
+            let whitelisted_patch = TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            });
+            let mut patches =
+                vec![whitelisted_patch.clone(), filtered_patch.clone()];
+            deduper.merge(&mut patches);
+            assert_eq!(patches.len(), 1);
+            assert_eq!(patches[0], filtered_patch);
+
+            let merged_changes: Vec<_> =
+                deduper.into_track_change_iter().collect();
+            assert_eq!(merged_changes.len(), 1);
+            assert_eq!(merged_changes[0], whitelisted_patch);
+        }
+
+        /// Checks that [`TrackPatchDeduper`] merges [`TrackChange`]s correctly.
+        #[test]
+        fn merging_works() {
+            let mut deduper = TrackPatchDeduper::new();
+
+            let mut changes: Vec<_> = vec![
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(false),
+                },
+                TrackPatch {
+                    id: TrackId(2),
+                    is_muted: Some(true),
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: Some(true),
+                },
+                TrackPatch {
+                    id: TrackId(1),
+                    is_muted: None,
+                },
+                TrackPatch {
+                    id: TrackId(2),
+                    is_muted: Some(false),
+                },
+            ]
+            .into_iter()
+            .map(|p| TrackChange::TrackPatch(p))
+            .collect();
+            let unrelated_change =
+                TrackChange::AddSendTrack(Rc::new(MediaTrack::new(
+                    TrackId(1),
+                    MediaType::Audio(AudioSettings { is_required: true }),
+                )));
+            changes.push(unrelated_change.clone());
+            deduper.merge(&mut changes);
+
+            assert_eq!(changes.len(), 1);
+            assert_eq!(changes[0], unrelated_change);
+
+            let merged_changes: HashMap<_, _> = deduper
+                .into_track_change_iter()
+                .filter_map(|t| {
+                    if let TrackChange::TrackPatch(patch) = t {
+                        Some((patch.id, patch))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            assert_eq!(merged_changes.len(), 2);
+            {
+                let track_1 = merged_changes.get(&TrackId(1)).unwrap();
+                assert_eq!(track_1.is_muted, Some(true));
+            }
+            {
+                let track_2 = merged_changes.get(&TrackId(2)).unwrap();
+                assert_eq!(track_2.is_muted, Some(false));
+            }
+        }
+    }
+
+    /// Checks that [`Peer::inner_force_commit_scheduled_changes`] merges
+    /// changes from the [`Context::inner_force_update`] with a forcible changes
+    /// from the [`Context::track_changes_queue`].
+    #[test]
+    fn force_update_dedups_normally() {
+        let mut peer_updates_sub = MockPeerUpdatesSubscriber::new();
+        peer_updates_sub.expect_force_update().times(1).returning(
+            |peer_id, changes| {
+                assert_eq!(peer_id, PeerId(0));
+                assert_eq!(changes.len(), 1);
+                if let TrackUpdate::Updated(patch) = &changes[0] {
+                    assert_eq!(patch.id, TrackId(0));
+                    assert_eq!(patch.is_muted, Some(true));
+                } else {
+                    unreachable!();
+                }
+            },
+        );
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId::from("alice"),
+            PeerId(1),
+            MemberId::from("bob"),
+            false,
+            Rc::new(peer_updates_sub),
+        );
+        peer.context.pending_track_updates = vec![
+            TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            }),
+            TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(false),
+            }),
+            TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(1),
+                is_muted: Some(true),
+            }),
+        ];
+        peer.as_changes_scheduler().patch_tracks(vec![
+            TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+            TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(false),
+            },
+            TrackPatch {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+        ]);
+        peer.inner_force_commit_scheduled_changes();
+
+        assert_eq!(peer.context.track_changes_queue.len(), 0);
+        assert_eq!(peer.context.pending_track_updates.len(), 1);
+        let filtered_track_change =
+            peer.context.pending_track_updates.pop().unwrap();
+        if let TrackChange::TrackPatch(patch) = filtered_track_change {
+            assert_eq!(patch.id, TrackId(1));
+            assert_eq!(patch.is_muted, Some(true));
+        } else {
+            unreachable!();
+        }
     }
 }
