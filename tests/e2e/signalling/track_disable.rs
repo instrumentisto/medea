@@ -731,7 +731,7 @@ async fn ordering_on_force_update_is_correct() {
         .send(SendCommand(Command::MakeSdpOffer {
             peer_id: alice_peer_id,
             sdp_offer: "sdp_offer".to_string(),
-            senders_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
             mids: alice_mids,
         }))
         .await
