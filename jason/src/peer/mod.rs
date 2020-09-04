@@ -508,6 +508,10 @@ impl PeerConnection {
         Ok(())
     }
 
+    pub fn restart_ice(&self) {
+        self.peer.restart_ice();
+    }
+
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()

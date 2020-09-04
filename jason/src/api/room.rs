@@ -951,6 +951,9 @@ impl EventHandler for InnerRoom {
                 TrackUpdate::Updated(track_patch) => {
                     patches.push(track_patch);
                 }
+                TrackUpdate::IceRestart => {
+                    peer.restart_ice();
+                }
             }
         }
         peer.patch_tracks(patches)

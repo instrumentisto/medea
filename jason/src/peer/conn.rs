@@ -8,7 +8,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
-    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
@@ -25,6 +25,7 @@ use crate::{
 };
 
 use super::ice_server::RtcIceServers;
+use std::cell::Cell;
 
 /// [RTCIceCandidate][1] representation.
 ///
@@ -212,6 +213,8 @@ pub struct RtcPeerConnection {
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
 
+    ice_restart: Cell<bool>,
+
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
     /// [`icecandidate`][3] event. It fires when [RTCPeerConnection][1]
     /// discovers a new [RTCIceCandidate][4].
@@ -286,6 +289,7 @@ impl RtcPeerConnection {
 
         Ok(Self {
             peer: Rc::new(peer),
+            ice_restart: Cell::new(false),
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_connection_state_changed: RefCell::new(None),
@@ -535,6 +539,10 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    pub fn restart_ice(&self) {
+        self.ice_restart.set(true);
+    }
+
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
     /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
     /// description.
@@ -593,11 +601,16 @@ impl RtcPeerConnection {
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(peer.create_offer())
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateOfferFailed)
-            .map_err(tracerr::wrap!())?;
+        let mut offer_options = RtcOfferOptions::new();
+        offer_options.ice_restart(self.ice_restart.get());
+        self.ice_restart.set(false);
+        let create_offer = JsFuture::from(
+            peer.create_offer_with_rtc_offer_options(&offer_options),
+        )
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::CreateOfferFailed)
+        .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);

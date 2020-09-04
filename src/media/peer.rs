@@ -354,6 +354,8 @@ enum TrackChange {
 
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(TrackPatch),
+
+    IceRestart,
 }
 
 impl TrackChange {
@@ -364,7 +366,7 @@ impl TrackChange {
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
         match self.as_track_update(partner_member_id) {
             TrackUpdate::Added(track) => Some(track),
-            TrackUpdate::Updated(_) => None,
+            TrackUpdate::Updated(_) | TrackUpdate::IceRestart => None,
         }
     }
 
@@ -390,15 +392,16 @@ impl TrackChange {
             TrackChange::TrackPatch(track_patch) => {
                 TrackUpdate::Updated(track_patch.clone())
             }
+            TrackChange::IceRestart => TrackUpdate::IceRestart,
         }
     }
 
     /// Returns `true` if this [`TrackChange`] can be forcibly applied.
     fn can_force_apply(&self) -> bool {
         match self {
-            TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
-                false
-            }
+            TrackChange::AddSendTrack(_)
+            | TrackChange::AddRecvTrack(_)
+            | TrackChange::IceRestart => false,
             TrackChange::TrackPatch(_) => true,
         }
     }
@@ -422,6 +425,9 @@ impl<T> TrackChangeHandler for Peer<T> {
     /// Does nothing.
     #[inline]
     fn on_track_patch(&mut self, _: TrackPatch) {}
+
+    #[inline]
+    fn on_ice_restart(&mut self) {}
 }
 
 /// [RTCPeerConnection] representation.
