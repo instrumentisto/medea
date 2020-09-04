@@ -10,6 +10,7 @@
 //! Stores [`RtcStatsHandler`]s implementors.
 
 mod flowing_detector;
+mod ice_restart_detector;
 mod quality_meter;
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
@@ -20,7 +21,8 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    stats::RtcStat, ConnectionQualityScore, MemberId, PeerId,
+    stats::RtcStat, ConnectionQualityScore, MemberId, PeerConnectionState,
+    PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -71,6 +73,10 @@ pub enum PeersMetricsEvent {
         /// Actual [`ConnectionQualityScore`].
         quality_score: ConnectionQualityScore,
     },
+
+    IceRestartNeeded {
+        peer_id: PeerId,
+    },
 }
 
 /// [`RtcStatsHandler`] performs [`RtcStat`]s analysis.
@@ -88,17 +94,23 @@ pub trait RtcStatsHandler: Debug {
     ///
     /// Must be called each time [`PeerStateMachine`] tracks set changes (some
     /// track was added or removed).
-    fn update_peer(&mut self, peer: &PeerStateMachine);
+    #[inline]
+    fn update_peer(&mut self, _: &PeerStateMachine) {}
 
     /// [`RtcStatsHandler`] can process all collected stats, re-calculate
     /// metrics and send [`PeerMetricsEvent`] (if it's needed).
     ///
     /// Will be called periodically by [`PeerMetricsService`].
-    fn check(&mut self);
+    #[inline]
+    fn check(&mut self) {}
 
     /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
     /// [`RtcStatsHandler`].
-    fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+    #[inline]
+    fn add_stats(&mut self, _: PeerId, _: &[RtcStat]) {}
+
+    #[inline]
+    fn update_connection_state(&mut self, _: PeerId, _: PeerConnectionState) {}
 
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///
@@ -181,6 +193,16 @@ impl RtcStatsHandler for PeerMetricsService {
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         for handler in &mut self.handlers {
             handler.add_stats(peer_id, stats);
+        }
+    }
+
+    fn update_connection_state(
+        &mut self,
+        peer_id: PeerId,
+        state: PeerConnectionState,
+    ) {
+        for handler in &mut self.handlers {
+            handler.update_connection_state(peer_id, state);
         }
     }
 

@@ -864,6 +864,10 @@ impl<'a> PeerChangesScheduler<'a> {
         }
     }
 
+    pub fn restart_ice(&mut self) {
+        self.schedule_change(TrackChange::IceRestart);
+    }
+
     /// Schedules `send` tracks adding to `self` and `recv` tracks for this
     /// `send` to `partner_peer`.
     ///

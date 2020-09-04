@@ -114,9 +114,6 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
-    /// Does nothing.
-    fn update_peer(&mut self, _: &PeerStateMachine) {}
-
     /// Calculates new score for every registered `Peer`, sends
     /// [`PeersMetricsEvent::QualityMeterUpdate`] if new score is not equal
     /// to the previously calculated score.
