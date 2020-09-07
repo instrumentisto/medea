@@ -426,6 +426,7 @@ impl<T> TrackChangeHandler for Peer<T> {
     #[inline]
     fn on_track_patch(&mut self, _: TrackPatch) {}
 
+    /// Does nothing.
     #[inline]
     fn on_ice_restart(&mut self) {}
 }
@@ -567,6 +568,7 @@ impl<T> Peer<T> {
             updates.push(track_update);
         }
 
+        self.dedup_ice_restarts();
         self.dedup_track_patches();
 
         if !updates.is_empty() {
@@ -589,6 +591,32 @@ impl<T> Peer<T> {
     pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler {
         PeerChangesScheduler {
             context: &mut self.context,
+        }
+    }
+
+    /// Dedups [`TrackChange::IceRestart`]s.
+    fn dedup_ice_restarts(&mut self) {
+        let ice_restarts_count = self
+            .context
+            .pending_track_updates
+            .iter()
+            .filter(|c| matches!(c, TrackChange::IceRestart))
+            .count();
+        if ice_restarts_count > 1 {
+            let ice_restart_to_remove_count = ice_restarts_count - 1;
+            let mut removed_ice_restarts = 0;
+            self.context.pending_track_updates.retain(|c| {
+                if let TrackChange::IceRestart = c {
+                    if removed_ice_restarts < ice_restart_to_remove_count {
+                        removed_ice_restarts += 1;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            });
         }
     }
 
