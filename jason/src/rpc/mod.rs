@@ -7,6 +7,7 @@ pub mod websocket;
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
+use async_trait::async_trait;
 use derive_more::{Display, From};
 use futures::{
     channel::{mpsc, oneshot},
@@ -200,6 +201,7 @@ pub enum RpcClientError {
 }
 
 /// Client to talk with server via Client API RPC.
+#[async_trait(?Send)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
@@ -216,10 +218,10 @@ pub trait RpcClient {
     ///
     /// If [`RpcClient`] already in [`State::Open`] then this function will be
     /// instantly resolved.
-    fn connect(
+    async fn connect(
         &self,
         token: String,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
+    ) -> Result<(), Traced<RpcClientError>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -239,9 +241,7 @@ pub trait RpcClient {
     /// abnormal close [`RpcClient::on_connection_loss`] will be thrown.
     ///
     /// [`Future`]: std::future::Future
-    fn on_normal_close(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
+    async fn on_normal_close(&self) -> Result<CloseReason, oneshot::Canceled>;
 
     /// Sets reason, that will be passed to underlying transport when this
     /// client will be dropped.
@@ -585,37 +585,29 @@ impl WebSocketRpcClient {
     }
 }
 
+#[async_trait(?Send)]
 impl RpcClient for WebSocketRpcClient {
-    fn connect(
+    async fn connect(
         &self,
         token: String,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-        let weak_inner = Rc::downgrade(&self.0);
-        Box::pin(async move {
-            if let Some(this) = weak_inner.upgrade().map(Self) {
-                let current_token = this.0.borrow().token.clone();
-                if let Some(current_token) = current_token {
-                    if current_token == token {
-                        let state = this.0.borrow().state.borrow().clone();
-                        match state {
-                            ClientState::Open(_) => Ok(()),
-                            ClientState::Connecting => {
-                                this.connecting_result().await
-                            }
-                            ClientState::Closed(_) => {
-                                this.establish_connection(token).await
-                            }
-                        }
-                    } else {
-                        this.establish_connection(token).await
+    ) -> Result<(), Traced<RpcClientError>> {
+        let current_token = self.0.borrow().token.clone();
+        if let Some(current_token) = current_token {
+            if current_token == token {
+                let state = self.0.borrow().state.borrow().clone();
+                match state {
+                    ClientState::Open(_) => Ok(()),
+                    ClientState::Connecting => self.connecting_result().await,
+                    ClientState::Closed(_) => {
+                        self.establish_connection(token).await
                     }
-                } else {
-                    this.establish_connection(token).await
                 }
             } else {
-                Err(tracerr::new!(RpcClientError::NoSocket))
+                self.establish_connection(token).await
             }
-        })
+        } else {
+            self.establish_connection(token).await
+        }
     }
 
     // TODO: proper sub registry
@@ -647,12 +639,10 @@ impl RpcClient for WebSocketRpcClient {
         }
     }
 
-    fn on_normal_close(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
+    async fn on_normal_close(&self) -> Result<CloseReason, oneshot::Canceled> {
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close_subscribers.push(tx);
-        Box::pin(rx)
+        rx.await
     }
 
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
