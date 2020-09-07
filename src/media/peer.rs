@@ -60,7 +60,7 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaType, MemberId, PeerId as Id,
-    PeerId, Track, TrackId, TrackPatch, TrackUpdate, VideoSettings,
+    PeerId, PeerUpdate, Track, TrackId, TrackPatch, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -83,7 +83,7 @@ pub trait PeerUpdatesSubscriber: fmt::Debug {
 
     /// Notifies subscriber that provided [`TrackUpdate`] were forcibly (without
     /// negotiation) applied to [`Peer`].
-    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
+    fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>);
 }
 
 #[cfg(test)]
@@ -183,7 +183,7 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
-    pub fn get_updates(&self) -> Vec<TrackUpdate>
+    pub fn get_updates(&self) -> Vec<PeerUpdate>
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
 #[enum_delegate(fn inner_force_commit_scheduled_changes(&mut self))]
@@ -365,15 +365,15 @@ impl TrackChange {
     /// creation.
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
         match self.as_track_update(partner_member_id) {
-            TrackUpdate::Added(track) => Some(track),
-            TrackUpdate::Updated(_) | TrackUpdate::IceRestart => None,
+            PeerUpdate::Added(track) => Some(track),
+            PeerUpdate::Updated(_) | PeerUpdate::IceRestart => None,
         }
     }
 
     /// Returns [`TrackUpdate`] based on this [`TrackChange`].
-    fn as_track_update(&self, partner_member_id: MemberId) -> TrackUpdate {
+    fn as_track_update(&self, partner_member_id: MemberId) -> PeerUpdate {
         match self {
-            TrackChange::AddSendTrack(track) => TrackUpdate::Added(Track {
+            TrackChange::AddSendTrack(track) => PeerUpdate::Added(Track {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Send {
@@ -381,7 +381,7 @@ impl TrackChange {
                     mid: track.mid(),
                 },
             }),
-            TrackChange::AddRecvTrack(track) => TrackUpdate::Added(Track {
+            TrackChange::AddRecvTrack(track) => PeerUpdate::Added(Track {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Recv {
@@ -390,9 +390,9 @@ impl TrackChange {
                 },
             }),
             TrackChange::TrackPatch(track_patch) => {
-                TrackUpdate::Updated(track_patch.clone())
+                PeerUpdate::Updated(track_patch.clone())
             }
-            TrackChange::IceRestart => TrackUpdate::IceRestart,
+            TrackChange::IceRestart => PeerUpdate::IceRestart,
         }
     }
 
@@ -471,7 +471,7 @@ impl<T> Peer<T> {
 
     /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
     /// client in the [`Event::TracksApplied`].
-    pub fn get_updates(&self) -> Vec<TrackUpdate> {
+    pub fn get_updates(&self) -> Vec<PeerUpdate> {
         self.context
             .pending_track_updates
             .iter()
@@ -1114,7 +1114,7 @@ pub mod tests {
         let (force_update_tx, force_update_rx) = std::sync::mpsc::channel();
         let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub.expect_force_update().returning(
-            move |peer_id: PeerId, changes: Vec<TrackUpdate>| {
+            move |peer_id: PeerId, changes: Vec<PeerUpdate>| {
                 force_update_tx.send((peer_id, changes)).unwrap();
             },
         );
@@ -1168,7 +1168,7 @@ pub mod tests {
         let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_force_update()
-            .returning(move |_: PeerId, _: Vec<TrackUpdate>| {});
+            .returning(move |_: PeerId, _: Vec<PeerUpdate>| {});
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |_: PeerId| {});

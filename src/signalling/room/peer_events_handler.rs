@@ -4,7 +4,7 @@ use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
     ConnectionQualityScore, Event, MemberId, NegotiationRole, PeerId,
-    TrackUpdate,
+    PeerUpdate,
 };
 
 use crate::{
@@ -186,7 +186,7 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
-    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
+    fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(ForceUpdate(peer_id, changes));
         }
@@ -199,7 +199,7 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
 /// Can be done in any [`Peer`] state.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
-pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
+pub struct ForceUpdate(PeerId, Vec<PeerUpdate>);
 
 impl Handler<ForceUpdate> for Room {
     type Result = Result<(), RoomError>;
@@ -216,7 +216,7 @@ impl Handler<ForceUpdate> for Room {
             .map_peer_by_id(msg.0, PeerStateMachine::member_id)?;
         self.members.send_event_to_member(
             member_id,
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 peer_id: msg.0,
                 updates: msg.1,
                 negotiation_role: None,

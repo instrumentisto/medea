@@ -46,7 +46,7 @@ impl CommandHandler for Room {
         })?;
 
         let event = if from_peer.is_known_to_remote() {
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 peer_id: to_peer.id(),
                 negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
                 updates: to_peer.get_updates(),
@@ -146,7 +146,7 @@ impl CommandHandler for Room {
             PeerMetrics::PeerConnectionState(state) => {
                 self.peers.update_connection_state(peer_id, state);
             }
-            _ => (),
+            PeerMetrics::IceConnectionState(_) => (),
         }
         Ok(())
     }

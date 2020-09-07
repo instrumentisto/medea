@@ -26,7 +26,7 @@ use awc::{
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
     ClientMsg, Command, Event, IceCandidate, NegotiationRole, PeerId,
-    RpcSettings, ServerMsg, Track, TrackId, TrackUpdate,
+    PeerUpdate, RpcSettings, ServerMsg, Track, TrackId,
 };
 
 pub type MessageHandler =
@@ -314,7 +314,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     },
                                 });
                             }
-                            Event::TracksApplied {
+                            Event::PeerUpdated {
                                 peer_id,
                                 negotiation_role,
                                 updates,
@@ -322,7 +322,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                 assert!(self.known_peers.contains(peer_id));
                                 updates.iter().for_each(|t| {
                                     use medea_client_api_proto::Direction;
-                                    if let TrackUpdate::Added(track) = t {
+                                    if let PeerUpdate::Added(track) = t {
                                         let mid = match &track.direction {
                                             Direction::Send { mid, .. }
                                             | Direction::Recv { mid, .. } => {

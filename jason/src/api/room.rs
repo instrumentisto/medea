@@ -13,8 +13,8 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
-    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatch, TrackUpdate,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, PeerUpdate,
+    Track, TrackId, TrackPatch,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -930,10 +930,10 @@ impl EventHandler for InnerRoom {
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
-    async fn on_tracks_applied(
+    async fn on_peer_updated(
         &self,
         peer_id: PeerId,
-        updates: Vec<TrackUpdate>,
+        updates: Vec<PeerUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
         let peer = self
@@ -945,13 +945,13 @@ impl EventHandler for InnerRoom {
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => {
+                PeerUpdate::Added(track) => {
                     new_tracks.push(track);
                 }
-                TrackUpdate::Updated(track_patch) => {
+                PeerUpdate::Updated(track_patch) => {
                     patches.push(track_patch);
                 }
-                TrackUpdate::IceRestart => {
+                PeerUpdate::IceRestart => {
                     peer.restart_ice();
                 }
             }

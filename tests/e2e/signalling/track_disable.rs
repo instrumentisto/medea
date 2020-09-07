@@ -7,7 +7,7 @@ use futures::{
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatch, TrackUpdate,
+    Command, Event, NegotiationRole, PeerId, PeerUpdate, TrackId, TrackPatch,
 };
 use medea_control_api_proto::grpc::api as proto;
 use tokio::time::timeout;
@@ -64,14 +64,14 @@ async fn helper(
         let mut first_muted = false;
         let mut second_muted = false;
         loop {
-            if let Event::TracksApplied {
+            if let Event::PeerUpdated {
                 peer_id, updates, ..
             } = rx.select_next_some().await
             {
                 assert_eq!(peer_id, expected_peer_id);
                 for update in updates {
                     match update {
-                        TrackUpdate::Updated(patch) => {
+                        PeerUpdate::Updated(patch) => {
                             assert_eq!(patch.is_muted, Some(disabled));
                             if patch.id == TrackId(0) {
                                 first_muted = true;
@@ -153,7 +153,7 @@ async fn track_disables_and_enables_are_instant() {
     ) -> impl Stream<Item = (bool, Option<NegotiationRole>)> {
         rx.filter_map(|val| async {
             match val {
-                Event::TracksApplied {
+                Event::PeerUpdated {
                     mut updates,
                     negotiation_role,
                     ..
@@ -166,7 +166,7 @@ async fn track_disables_and_enables_are_instant() {
                             None
                         }
                         1 => {
-                            if let TrackUpdate::Updated(patch) =
+                            if let PeerUpdate::Updated(patch) =
                                 updates.pop().unwrap()
                             {
                                 Some((
@@ -372,7 +372,7 @@ async fn track_disables_and_enables_are_instant2() {
         .await
         .unwrap();
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates: _,
             negotiation_role,
@@ -394,7 +394,7 @@ async fn track_disables_and_enables_are_instant2() {
         .await
         .unwrap();
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates: _,
             negotiation_role,
@@ -437,7 +437,7 @@ async fn force_update_works() {
                         }],
                     }));
                 }
-                Event::TracksApplied {
+                Event::PeerUpdated {
                     negotiation_role,
                     peer_id,
                     ..
@@ -492,7 +492,7 @@ async fn force_update_works() {
                     }],
                 }));
             }
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 negotiation_role, ..
             } => {
                 if negotiation_role.is_none() {

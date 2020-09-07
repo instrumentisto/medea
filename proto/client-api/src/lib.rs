@@ -295,12 +295,12 @@ pub enum Event {
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// `Peer`.
-    TracksApplied {
+    PeerUpdated {
         /// [`PeerId`] of `Peer` where [`Track`]s should be updated.
         peer_id: PeerId,
 
         /// List of [`TrackUpdate`]s which should be applied.
-        updates: Vec<TrackUpdate>,
+        updates: Vec<PeerUpdate>,
 
         /// Negotiation role basing on which should be sent
         /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
@@ -337,10 +337,10 @@ pub enum NegotiationRole {
     Answerer(String),
 }
 
-/// [`Track`] update which should be applied to the `Peer`.
+/// Update which should be applied to the `Peer`.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub enum TrackUpdate {
+pub enum PeerUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
 

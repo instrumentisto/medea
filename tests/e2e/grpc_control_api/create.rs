@@ -217,7 +217,7 @@ mod endpoint {
     use std::time::Duration;
 
     use futures::{channel::mpsc, StreamExt as _};
-    use medea_client_api_proto::{Event, TrackUpdate};
+    use medea_client_api_proto::{Event, PeerUpdate};
     use tokio::time::timeout;
 
     use super::*;
@@ -389,10 +389,10 @@ mod endpoint {
             credentials.get("publisher").unwrap(),
             Some(Box::new(move |event, _, _| {
                 match event {
-                    Event::TracksApplied { updates, .. } => {
+                    Event::PeerUpdated { updates, .. } => {
                         if updates
                             .iter()
-                            .any(|u| enum_eq!(TrackUpdate::Added, u))
+                            .any(|u| enum_eq!(PeerUpdate::Added, u))
                         {
                             publisher_tx.unbounded_send(()).unwrap();
                         }
@@ -411,8 +411,8 @@ mod endpoint {
         let _responder = TestMember::connect(
             credentials.get("responder").unwrap(),
             Some(Box::new(move |event, _, events| {
-                if let Event::TracksApplied { updates, .. } = event {
-                    if updates.iter().any(|u| enum_eq!(TrackUpdate::Added, u)) {
+                if let Event::PeerUpdated { updates, .. } = event {
+                    if updates.iter().any(|u| enum_eq!(PeerUpdate::Added, u)) {
                         responder_tx.unbounded_send(()).unwrap();
                         let sdp_answer_made_count = events
                             .iter()

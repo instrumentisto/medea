@@ -90,6 +90,7 @@ impl RtcStatsHandler for IceRestartDetector {
     ///
     /// Tries to add created [`PeerState`] to the partner [`PeerState`] if it
     /// exists.
+    #[allow(clippy::map_entry)]
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let peer_id = peer.id();
         if !self.peers.contains_key(&peer_id) {

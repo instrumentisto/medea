@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use function_name::named;
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{Direction, Event, TrackUpdate};
+use medea_client_api_proto::{Direction, Event, PeerUpdate};
 use medea_control_api_proto::grpc::api::{self as proto};
 use tokio::time::delay_for;
 
@@ -141,7 +141,7 @@ async fn add_endpoints_synchronization() {
         let event = second_rx.select_next_some().await;
         if let Event::SdpAnswerMade { .. } = event {
             break;
-        } else if let Event::TracksApplied { .. } = event {
+        } else if let Event::PeerUpdated { .. } = event {
             panic!("expected Event::SdpAnswerMade");
         }
     }
@@ -150,7 +150,7 @@ async fn add_endpoints_synchronization() {
     // with Direction::Recv
     loop {
         let event = second_rx.select_next_some().await;
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id: _,
             updates,
             ..
@@ -159,7 +159,7 @@ async fn add_endpoints_synchronization() {
             assert_eq!(updates.len(), 2);
             for update in updates {
                 match update {
-                    TrackUpdate::Added(track) => match track.direction {
+                    PeerUpdate::Added(track) => match track.direction {
                         Direction::Recv { .. } => {}
                         _ => panic!("expected Direction::Recv"),
                     },
@@ -167,7 +167,7 @@ async fn add_endpoints_synchronization() {
                 }
             }
             break;
-        } else if let Event::TracksApplied { .. } = event {
+        } else if let Event::PeerUpdated { .. } = event {
             panic!("expected Event::SdpAnswerMade");
         }
     }

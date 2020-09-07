@@ -375,7 +375,7 @@ impl Room {
 
         self.members.send_event_to_member(
             member_id,
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 updates,
                 negotiation_role: Some(NegotiationRole::Offerer),
                 peer_id,

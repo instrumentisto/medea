@@ -10,7 +10,7 @@ use futures::{
     stream::{self, BoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, Track, TrackId, TrackUpdate,
+    Command, Event, NegotiationRole, PeerId, PeerUpdate, Track, TrackId,
 };
 use medea_jason::{
     api::Room,
@@ -78,11 +78,11 @@ async fn get_test_room_and_exist_peer(
             tracks_patches,
         } => {
             event_tx_clone
-                .unbounded_send(Event::TracksApplied {
+                .unbounded_send(Event::PeerUpdated {
                     peer_id,
                     updates: tracks_patches
                         .into_iter()
-                        .map(TrackUpdate::Updated)
+                        .map(PeerUpdate::Updated)
                         .collect(),
                     negotiation_role: None,
                 })
