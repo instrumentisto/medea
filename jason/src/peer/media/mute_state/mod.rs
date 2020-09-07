@@ -1,4 +1,4 @@
-//! [`PeerConnection`]s [`MuteableTrack`] mute state.
+//! [`PeerConnection`]s [`MuteableTransceiverSide`] mute state.
 //!
 //! [`PeerConnection`]: crate::peer::PeerConnection
 
@@ -8,9 +8,9 @@ use derive_more::From;
 
 pub use self::controller::MuteStateController;
 
-/// All mute states in which [`MuteableTrack`] can be.
+/// All mute states in which [`MuteableTransceiverSide`] can be.
 ///
-/// [`MuteableTrack`]: super::MuteableTrack
+/// [`MuteableTransceiverSide`]: super::MuteableTransceiverSide
 #[derive(Clone, Copy, Debug, From, Eq, PartialEq)]
 pub enum MuteState {
     /// State of transition.
@@ -71,14 +71,14 @@ impl MuteState {
 /// Stable [`MuteState`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMuteState {
-    /// [`MuteableTrack`] is not muted.
+    /// [`MuteableTransceiverSide`] is not muted.
     ///
-    /// [`MuteableTrack`]: super::MuteableTrack
+    /// [`MuteableTransceiverSide`]: super::MuteableTransceiverSide
     NotMuted,
 
-    /// [`MuteableTrack`] is muted.
+    /// [`MuteableTransceiverSide`] is muted.
     ///
-    /// [`MuteableTrack`]: super::MuteableTrack
+    /// [`MuteableTransceiverSide`]: super::MuteableTransceiverSide
     Muted,
 }
 
@@ -116,14 +116,16 @@ impl From<bool> for StableMuteState {
 /// [`StableMuteState`] will be applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MuteStateTransition {
-    /// [`MuteableTrack`] should be unmuted, but awaits server permission.
+    /// [`MuteableTransceiverSide`] should be unmuted, but awaits server
+    /// permission.
     ///
-    /// [`MuteableTrack`]: super::MuteableTrack
+    /// [`MuteableTransceiverSide`]: super::MuteableTransceiverSide
     Unmuting(StableMuteState),
 
-    /// [`MuteableTrack`] should be muted, but awaits server permission.
+    /// [`MuteableTransceiverSide`] should be muted, but awaits server
+    /// permission.
     ///
-    /// [`MuteableTrack`]: super::MuteableTrack
+    /// [`MuteableTransceiverSide`]: super::MuteableTransceiverSide
     Muting(StableMuteState),
 }
 

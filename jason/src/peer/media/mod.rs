@@ -34,23 +34,25 @@ pub use self::{
     sender::Sender,
 };
 
+/// Interface for dealing with transceiver sides ([`Sender`] or [`Receiver`]).
 pub trait TransceiverSide {
-    /// Returns [`TrackId`] of this [`Track`].
+    /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
 
-    /// Returns [`TransceiverKind`] of this [`Track`].
+    /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn kind(&self) -> TransceiverKind;
 
-    /// Returns [`TransceiverKind`] of this [`Track`].
+    /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
 }
 
-/// An interface for dealing with [`Track`]s which are needs muting logic.
+/// An interface for dealing with [`TransceiverSide`]s which are needs muting
+/// logic.
 pub trait Muteable {
     /// Returns reference to the [`MuteStateController`].
     fn mute_state_controller(&self) -> Rc<MuteStateController>;
 
-    /// Returns [`MuteState`] of this [`MuteableTrack`].
+    /// Returns [`MuteState`] of this [`MuteableTransceiverSide`].
     #[inline]
     fn mute_state(&self) -> MuteState {
         self.mute_state_controller().mute_state()
@@ -61,7 +63,7 @@ pub trait Muteable {
     /// # Errors
     ///
     /// [`MediaConnectionsError::SenderIsRequired`] is returned if
-    /// [`MuteableTrack`] is required for the call and can't be muted.
+    /// [`MuteableTransceiverSide`] is required for the call and can't be muted.
     #[inline]
     fn mute_state_transition_to(
         &self,
@@ -79,17 +81,17 @@ pub trait Muteable {
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`MuteableTrack`] is
-    /// dropped.
+    /// [`Sender`] will be [`MuteState::Stable`] or the
+    /// [`MuteableTransceiverSide`] is dropped.
     ///
-    /// Succeeds if [`MuteableTrack`]'s [`MuteState`] transits into the
-    /// `desired_state` or the [`MuteableTrack`] is dropped.
+    /// Succeeds if [`MuteableTransceiverSide`]'s [`MuteState`] transits into
+    /// the `desired_state` or the [`MuteableTransceiverSide`] is dropped.
     ///
     /// # Errors
     ///
     /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`MuteableTrack`]'s [`MuteState`] transits into the opposite
-    /// to the `desired_state`.
+    /// returned if [`MuteableTransceiverSide`]'s [`MuteState`] transits into
+    /// the opposite to the `desired_state`.
     #[inline]
     fn when_mute_state_stable(
         &self,
@@ -99,26 +101,26 @@ pub trait Muteable {
             .when_mute_state_stable(desired_state)
     }
 
-    /// Stops mute/unmute timeout of this [`MuteableTrack`].
+    /// Stops mute/unmute timeout of this [`MuteableTransceiverSide`].
     #[inline]
     fn stop_mute_state_transition_timeout(&self) {
         self.mute_state_controller().stop_transition_timeout()
     }
 
-    /// Resets mute/unmute timeout of this [`MuteableTrack`].
+    /// Resets mute/unmute timeout of this [`MuteableTransceiverSide`].
     #[inline]
     fn reset_mute_state_transition_timeout(&self) {
         self.mute_state_controller().reset_transition_timeout()
     }
 
-    /// Checks whether mute state of the [`MuteableTrack`] is in
+    /// Checks whether mute state of the [`MuteableTransceiverSide`] is in
     /// [`MuteState::Muted`].
     #[inline]
     fn is_muted(&self) -> bool {
         self.mute_state_controller().is_muted()
     }
 
-    /// Checks whether mute state of the [`MuteableTrack`] is in
+    /// Checks whether mute state of the [`MuteableTransceiverSide`] is in
     /// [`MuteState::NotMuted`].
     #[inline]
     fn is_not_muted(&self) -> bool {
@@ -260,9 +262,9 @@ impl MediaConnections {
         }))
     }
 
-    /// Returns all [`MuteableTrack`]s from this [`MediaConnections`] with
-    /// provided [`TransceiverKind`] and [`TrackDirection`].
-    pub fn get_muteable_tracks(
+    /// Returns all [`MuteableTransceiverSide`]s from this [`MediaConnections`]
+    /// with provided [`TransceiverKind`] and [`TrackDirection`].
+    pub fn get_muteable_transceiver_sides(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
@@ -271,13 +273,15 @@ impl MediaConnections {
         match direction {
             TrackDirection::Send => inner
                 .iter_senders_with_kind(kind)
-                .map(|sender| Rc::clone(&sender) as Rc<dyn MuteableTransceiverSide>)
+                .map(|sender| {
+                    Rc::clone(&sender) as Rc<dyn MuteableTransceiverSide>
+                })
                 .collect(),
             TrackDirection::Recv => todo!(),
         }
     }
 
-    /// Returns `true` if all [`MuteableTrack`]s with provided
+    /// Returns `true` if all [`MuteableTransceiverSide`]s with provided
     /// [`TransceiverKind`] and [`TrackDirection`] is in provided
     /// [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
@@ -578,27 +582,29 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Returns all references to the [`MuteableTrack`]s from this
+    /// Returns all references to the [`MuteableTransceiverSide`]s from this
     /// [`MediaConnections`].
-    fn get_all_muteable_tracks(&self) -> Vec<Rc<dyn Muteable>> {
+    fn get_all_muteable_transceivers_sides(
+        &self,
+    ) -> Vec<Rc<dyn MuteableTransceiverSide>> {
         let inner = self.0.borrow();
         inner
             .senders
             .values()
-            .map(|s| Rc::clone(s) as Rc<dyn Muteable>)
+            .map(|s| Rc::clone(s) as Rc<dyn MuteableTransceiverSide>)
             .collect()
     }
 
-    /// Stops all [`MuteableTrack`]s state transitions expiry timers.
+    /// Stops all [`MuteableTransceiverSide`]s state transitions expiry timers.
     pub fn stop_state_transitions_timers(&self) {
-        self.get_all_muteable_tracks()
+        self.get_all_muteable_transceivers_sides()
             .into_iter()
             .for_each(|t| t.stop_mute_state_transition_timeout())
     }
 
-    /// Resets all [`MuteableTrack`]s state transitions expiry timers.
+    /// Resets all [`MuteableTransceiverSide`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
-        self.get_all_muteable_tracks()
+        self.get_all_muteable_transceivers_sides()
             .into_iter()
             .for_each(|t| t.reset_mute_state_transition_timeout());
     }

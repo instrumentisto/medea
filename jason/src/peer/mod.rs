@@ -410,11 +410,11 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Returns `true` if all [`MuteableTrack`]s with a provided
+    /// Returns `true` if all [`TransceiverSideTrack`]s with a provided
     /// [`TransceiverKind`] and [`TrackDirection`] is in the provided
     /// [`StableMuteState`].
     #[inline]
-    pub fn is_all_tracks_in_mute_state(
+    pub fn is_all_transceiver_sides_in_mute_state(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
@@ -521,15 +521,16 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    /// Returns all [`MuteableTrack`]s from this [`PeerConnection`] with
-    /// provided [`TransceiverKind`] and [`TrackDirection`].
+    /// Returns all [`MuteableTransceiverSide`]s from this [`PeerConnection`]
+    /// with provided [`TransceiverKind`] and [`TrackDirection`].
     #[inline]
-    pub fn get_muteable_tracks(
+    pub fn get_muteable_transceiver_sides(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn MuteableTransceiverSide>> {
-        self.media_connections.get_muteable_tracks(kind, direction)
+        self.media_connections
+            .get_muteable_transceiver_sides(kind, direction)
     }
 
     /// Track id to mid relations of all send tracks of this

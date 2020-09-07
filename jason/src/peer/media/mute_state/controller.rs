@@ -1,4 +1,4 @@
-//! Controller of the [`MuteState`] for the all [`MuteableTrack`]s.
+//! Controller of the [`MuteState`] for the all [`MuteableTransceiverSide`]s.
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
@@ -43,7 +43,7 @@ impl MuteStateController {
     const MUTE_TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
 
     /// Returns new [`MuteStateController`] with a provided [`StableMuteState`].
-    pub fn new(mute_state: StableMuteState) -> Rc<Self> {
+    pub(in super::super) fn new(mute_state: StableMuteState) -> Rc<Self> {
         let this = Rc::new(Self {
             mute_state: ObservableCell::new(mute_state.into()),
             on_stabilize_subs: RefCell::default(),
@@ -56,7 +56,9 @@ impl MuteStateController {
 
     /// Returns [`Stream`] to which [`StableMuteState`] update will be sent on
     /// [`MuteStateController::mute_state`] stabilization.
-    pub fn on_stabilize(&self) -> LocalBoxStream<'static, StableMuteState> {
+    pub(in super::super) fn on_stabilize(
+        &self,
+    ) -> LocalBoxStream<'static, StableMuteState> {
         let (tx, rx) = mpsc::unbounded();
         self.on_stabilize_subs.borrow_mut().push(tx);
 
@@ -134,14 +136,14 @@ impl MuteStateController {
     }
 
     /// Stops mute/unmute timeout of this [`MuteStateController`].
-    pub fn stop_transition_timeout(&self) {
+    pub(in super::super) fn stop_transition_timeout(&self) {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
             timer.stop();
         }
     }
 
     /// Resets mute/unmute timeout of this [`MuteStateController`].
-    pub fn reset_transition_timeout(&self) {
+    pub(in super::super) fn reset_transition_timeout(&self) {
         if let Some(timer) = &*self.mute_timeout_handle.borrow() {
             timer.reset();
         }
@@ -152,7 +154,7 @@ impl MuteStateController {
     /// Real mute/unmute __wouldn't__ be performed on this update.
     ///
     /// `Room.mute_audio` like `Promise`s will be resolved based on this update.
-    pub fn update(&self, is_muted: bool) {
+    pub(in super::super) fn update(&self, is_muted: bool) {
         let new_mute_state = StableMuteState::from(is_muted);
         let current_mute_state = self.mute_state.get();
 
@@ -177,14 +179,17 @@ impl MuteStateController {
 
     /// Starts transition of the [`MuteStateController::mute_state`] to the
     /// provided one.
-    pub fn transition_to(&self, desired_state: StableMuteState) {
+    pub(in super::super) fn transition_to(
+        &self,
+        desired_state: StableMuteState,
+    ) {
         let current_mute_state = self.mute_state.get();
         self.mute_state
             .set(current_mute_state.transition_to(desired_state));
     }
 
     /// Cancels [`MuteStateController::mute_state`] transition.
-    pub fn cancel_transition(&self) {
+    pub(in super::super) fn cancel_transition(&self) {
         let mute_state = self.mute_state.get();
         self.mute_state.set(mute_state.cancel_transition());
     }

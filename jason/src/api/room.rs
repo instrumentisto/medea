@@ -27,9 +27,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, MuteableTransceiverSide, PeerConnection,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
-        StableMuteState, TrackDirection, TransceiverKind,
+        MediaConnectionsError, MuteState, MuteableTransceiverSide,
+        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        RtcStats, StableMuteState, TrackDirection, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -680,8 +680,8 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders =
-                    peer.get_muteable_tracks(kind, TrackDirection::Send);
+                let senders = peer
+                    .get_muteable_transceiver_sides(kind, TrackDirection::Send);
 
                 let senders_to_mute = senders.into_iter().filter(|sender| {
                     match sender.mute_state() {
@@ -692,8 +692,9 @@ impl InnerRoom {
                     }
                 });
 
-                let mut processed_senders: Vec<Rc<dyn MuteableTransceiverSide>> =
-                    Vec::new();
+                let mut processed_senders: Vec<
+                    Rc<dyn MuteableTransceiverSide>,
+                > = Vec::new();
                 let mut tracks_patches = Vec::new();
                 for sender in senders_to_mute {
                     if let Err(e) =
@@ -712,7 +713,7 @@ impl InnerRoom {
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_muteable_tracks(kind, TrackDirection::Send)
+                    .get_muteable_transceiver_sides(kind, TrackDirection::Send)
                     .into_iter()
                     .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
@@ -734,7 +735,7 @@ impl InnerRoom {
         Ok(())
     }
 
-    /// Returns `true` if all [`MuteableTrack`]s with a provided
+    /// Returns `true` if all [`MuteableTransceiverSide`]s with a provided
     /// [`TrackDirection`] and [`TransceiverKind`] of this [`Room`] is in
     /// provided [`MuteState`].
     pub fn is_all_peers_in_mute_state(
@@ -747,7 +748,9 @@ impl InnerRoom {
             .get_all()
             .into_iter()
             .find(|p| {
-                !p.is_all_tracks_in_mute_state(kind, direction, mute_state)
+                !p.is_all_transceiver_sides_in_mute_state(
+                    kind, direction, mute_state,
+                )
             })
             .is_none()
     }

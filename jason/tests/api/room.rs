@@ -433,7 +433,6 @@ mod disable_recv_tracks {
 
 /// Tests disabling tracks publishing.
 mod disable_send_tracks {
-
     use medea_jason::peer::{StableMuteState, TrackDirection, TransceiverKind};
 
     use super::*;
@@ -502,7 +501,7 @@ mod disable_send_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::Muted
@@ -539,7 +538,7 @@ mod disable_send_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
             StableMuteState::Muted
@@ -569,7 +568,7 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::NotMuted
@@ -584,7 +583,7 @@ mod disable_send_tracks {
         mute_audio_result.unwrap_err();
         unmute_audio_result.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::NotMuted
@@ -614,7 +613,7 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
             StableMuteState::NotMuted
@@ -629,7 +628,7 @@ mod disable_send_tracks {
         mute_video_result.unwrap_err();
         unmute_video_result.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
             StableMuteState::NotMuted
@@ -659,7 +658,7 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::NotMuted
@@ -668,7 +667,7 @@ mod disable_send_tracks {
         let handle = room.new_handle();
         JsFuture::from(handle.mute_audio()).await.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::Muted
@@ -682,7 +681,7 @@ mod disable_send_tracks {
         mute_audio_result.unwrap();
         unmute_audio_result.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::NotMuted
