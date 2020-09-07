@@ -482,7 +482,7 @@ mod disable_send_tracks {
     /// 2. Call [`RoomHandle::mute_audio`] simultaneous twice.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of
-    /// [`Room`]    is in [`MuteState::Muted`].
+    /// [`Room`] is in [`MuteState::Muted`].
     #[wasm_bindgen_test]
     async fn join_two_audio_mutes() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -519,7 +519,7 @@ mod disable_send_tracks {
     /// 2. Call [`RoomHandle::mute_video`] simultaneous twice.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
-    /// [`Room`]    is in [`MuteState::Muted`].
+    /// [`Room`] is in [`MuteState::Muted`].
     #[wasm_bindgen_test]
     async fn join_two_video_mutes() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -558,7 +558,7 @@ mod disable_send_tracks {
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of
-    /// [`Room`]    is stayed in [`MuteState::NotMuted`].
+    /// [`Room`] is stayed in [`MuteState::NotMuted`].
     #[wasm_bindgen_test]
     async fn join_mute_and_unmute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -603,7 +603,7 @@ mod disable_send_tracks {
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
-    /// [`Room`]    is stayed in [`MuteState::NotMuted`].
+    /// [`Room`] is stayed in [`MuteState::NotMuted`].
     #[wasm_bindgen_test]
     async fn join_mute_and_unmute_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -648,7 +648,7 @@ mod disable_send_tracks {
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
-    /// [`Room`]    is in [`MuteState::NotMuted`].
+    /// [`Room`] is in [`MuteState::NotMuted`].
     #[wasm_bindgen_test]
     async fn join_unmute_and_mute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();

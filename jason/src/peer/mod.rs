@@ -48,8 +48,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, MuteableTrack, Sender, StableMuteState,
-        TrackDirection,
+        MuteStateTransition, Muteable, MuteableTransceiverSide, Sender,
+        StableMuteState, TrackDirection,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -504,8 +504,9 @@ impl PeerConnection {
         track_event: &RtcTrackEvent,
     ) -> Result<()> {
         let transceiver = track_event.transceiver();
+        let track = MediaStreamTrack::from(track_event.track());
         media_connections
-            .add_remote_track(transceiver, track_event.track())
+            .add_remote_track(transceiver, track)
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
@@ -527,7 +528,7 @@ impl PeerConnection {
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
-    ) -> Vec<Rc<dyn MuteableTrack>> {
+    ) -> Vec<Rc<dyn MuteableTransceiverSide>> {
         self.media_connections.get_muteable_tracks(kind, direction)
     }
 

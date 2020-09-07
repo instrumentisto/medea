@@ -15,14 +15,14 @@ use crate::{
     media::{MediaStreamTrack, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        media::TransceiverSide,
         PeerEvent,
     },
 };
 
 use super::{
     mute_state::{MuteState, MuteStateController, StableMuteState},
-    HasMuteStateController, MediaConnectionsError, MuteableTrack, Result,
-    Track,
+    MediaConnectionsError, Muteable, Result,
 };
 
 /// Builder of the [`Sender`].
@@ -56,14 +56,14 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
-        let mut individual_mute_state_rx = mute_state_observer.on_stabilize();
+        let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
             peer_id: self.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
             transceiver,
-            individual_mute_state: mute_state_observer,
+            mute_state: mute_state_observer,
             is_required: self.is_required,
             transceiver_direction: Cell::new(TransceiverDirection::Inactive),
             peer_events_sender: self.peer_events_sender,
@@ -71,11 +71,9 @@ impl<'a> SenderBuilder<'a> {
         spawn_local({
             let weak_this = Rc::downgrade(&this);
             async move {
-                while let Some(individual_mute_state) =
-                    individual_mute_state_rx.next().await
-                {
+                while let Some(mute_state) = mute_state_rx.next().await {
                     if let Some(this) = weak_this.upgrade() {
-                        match individual_mute_state {
+                        match mute_state {
                             StableMuteState::NotMuted => {
                                 this.set_transceiver_direction(
                                     TransceiverDirection::Sendonly,
@@ -109,7 +107,7 @@ pub struct Sender {
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
     transceiver_direction: Cell<TransceiverDirection>,
-    individual_mute_state: Rc<MuteStateController>,
+    mute_state: Rc<MuteStateController>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
@@ -121,12 +119,6 @@ impl Sender {
         &self.caps
     }
 
-    /// Returns [`RtcRtpTransceiver`] of this [`Sender`].
-    #[inline]
-    pub fn transceiver(&self) -> &RtcRtpTransceiver {
-        &self.transceiver
-    }
-
     /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
         match self.transceiver_direction.get() {
@@ -135,14 +127,6 @@ impl Sender {
             }
             TransceiverDirection::Sendonly => true,
         }
-    }
-
-    /// Checks whether general mute state of the [`Receiver`] is in
-    /// [`MuteState::Muted`].
-    #[cfg(feature = "mockable")]
-    #[inline]
-    pub fn is_muted(&self) -> bool {
-        self.individual_mute_state.is_muted()
     }
 
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
@@ -162,8 +146,7 @@ impl Sender {
         }
 
         // no-op if transceiver is not NotMuted
-        if let MuteState::Stable(StableMuteState::NotMuted) =
-            self.individual_mute_state()
+        if let MuteState::Stable(StableMuteState::NotMuted) = self.mute_state()
         {
             JsFuture::from(
                 self.transceiver
@@ -191,7 +174,7 @@ impl Sender {
         }
 
         if let Some(is_muted) = track.is_muted {
-            self.individual_mute_state.update(is_muted);
+            self.mute_state.update(is_muted);
         }
     }
 
@@ -222,29 +205,27 @@ impl Sender {
     }
 }
 
-impl Track for Sender {
-    /// Returns [`TrackId`] of this [`Sender`].
-    #[inline]
+impl TransceiverSide for Sender {
     fn track_id(&self) -> TrackId {
         self.track_id
     }
 
-    /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
-    #[inline]
     fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
     }
-}
 
-impl HasMuteStateController for Sender {
-    /// Returns reference to the [`MuteStateController`] of this [`Sender`].
-    #[inline]
-    fn mute_state_controller(&self) -> Rc<MuteStateController> {
-        self.individual_mute_state.clone()
+    fn mid(&self) -> Option<String> {
+        self.transceiver.mid()
     }
 }
 
-impl MuteableTrack for Sender {
+impl Muteable for Sender {
+    /// Returns reference to the [`MuteStateController`] of this [`Sender`].
+    #[inline]
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        self.mute_state.clone()
+    }
+
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
     ///
     /// # Errors
@@ -260,7 +241,7 @@ impl MuteableTrack for Sender {
                 MediaConnectionsError::CannotDisableRequiredSender
             ))
         } else {
-            self.individual_mute_state.transition_to(desired_state);
+            self.mute_state.transition_to(desired_state);
             Ok(())
         }
     }

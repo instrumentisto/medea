@@ -1,17 +1,18 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatch};
 use proto::TrackId;
-use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
+use web_sys::RtcRtpTransceiver;
 
 use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        media::TransceiverSide,
         PeerEvent,
     },
 };
@@ -23,10 +24,11 @@ use crate::{
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
+    caps: TrackConstraints,
     sender_id: MemberId,
     transceiver: Option<RtcRtpTransceiver>,
     transceiver_direction: Cell<TransceiverDirection>,
-    mid: Option<String>,
+    mid: RefCell<Option<String>>,
     track: Option<MediaStreamTrack>,
     enabled: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -46,14 +48,14 @@ impl Receiver {
     /// arrives.
     pub(super) fn new(
         track_id: TrackId,
-        caps: &TrackConstraints,
+        caps: TrackConstraints,
         sender_id: MemberId,
         peer: &RtcPeerConnection,
         mid: Option<String>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         recv_constraints: &RecvConstraints,
     ) -> Self {
-        let kind = TransceiverKind::from(caps);
+        let kind = TransceiverKind::from(&caps);
         let enabled = match kind {
             TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
             TransceiverKind::Video => recv_constraints.is_video_enabled(),
@@ -69,10 +71,11 @@ impl Receiver {
         };
         Self {
             track_id,
+            caps,
             sender_id,
             transceiver,
             transceiver_direction: Cell::new(transceiver_direction),
-            mid,
+            mid: RefCell::new(mid),
             track: None,
             enabled,
             peer_events_sender,
@@ -87,25 +90,18 @@ impl Receiver {
     pub fn set_remote_track(
         &mut self,
         transceiver: RtcRtpTransceiver,
-        new_track: RtcMediaStreamTrack,
+        track: MediaStreamTrack,
     ) {
-        if let Some(old_track) = &self.track {
-            if old_track.id() == new_track.id() {
-                return;
-            }
-        }
-
-        let new_track = MediaStreamTrack::from(new_track);
         self.transceiver.replace(transceiver);
-        self.track.replace(new_track.clone());
-        new_track.set_enabled(self.enabled);
+        self.track.replace(track.clone());
+        track.set_enabled(self.enabled);
 
         if self.is_receiving() {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::NewRemoteTrack {
                     sender_id: self.sender_id.clone(),
                     track_id: self.track_id,
-                    track: new_track,
+                    track,
                 },
             );
         }
@@ -131,15 +127,25 @@ impl Receiver {
             TransceiverDirection::Recvonly => true,
         }
     }
+}
+
+impl TransceiverSide for Receiver {
+    fn track_id(&self) -> TrackId {
+        self.track_id
+    }
+
+    fn kind(&self) -> TransceiverKind {
+        TransceiverKind::from(&self.caps)
+    }
 
     /// Returns `mid` of this [`Receiver`].
     ///
     /// Tries to fetch it from the underlying [`RtcRtpTransceiver`] if current
     /// value is `None`.
-    pub fn mid(&mut self) -> Option<&str> {
-        if self.mid.is_none() && self.transceiver.is_some() {
-            self.mid = self.transceiver.as_ref().unwrap().mid()
+    fn mid(&self) -> Option<String> {
+        if self.mid.borrow().is_none() && self.transceiver.is_some() {
+            self.mid.replace(self.transceiver.as_ref().unwrap().mid());
         }
-        self.mid.as_deref()
+        self.mid.borrow().clone()
     }
 }

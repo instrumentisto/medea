@@ -27,7 +27,7 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, MuteableTrack, PeerConnection,
+        MediaConnectionsError, MuteState, MuteableTransceiverSide, PeerConnection,
         PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
         StableMuteState, TrackDirection, TransceiverKind,
     },
@@ -244,34 +244,25 @@ impl RoomHandle {
         Ok(())
     }
 
-    /// Enables or disables specified media type publishing on receiving in all
+    /// Enables or disables specified media type publish in all
     /// [`PeerConnection`]s.
-    async fn set_track_enabled(
+    async fn set_send_track_enabled(
         &self,
         enabled: bool,
         kind: TransceiverKind,
-        direction: TrackDirection,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.set_constraints_enabled(enabled, kind, direction);
-
-        // Remove in #127
-        // --------------
-        if let TrackDirection::Recv = direction {
-            return Ok(());
-        }
-        // --------------
-
+        inner.send_constraints.set_enabled(enabled, kind);
         while !inner.is_all_peers_in_mute_state(
             kind,
-            direction,
+            TrackDirection::Send,
             StableMuteState::from(!enabled),
         ) {
             inner
-                .toggle_mute(!enabled, kind, direction)
+                .toggle_mute(!enabled, kind)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    inner.set_constraints_enabled(!enabled, kind, direction);
+                    inner.send_constraints.set_enabled(!enabled, kind);
                     tracerr::new!(e)
                 })?;
         }
@@ -374,12 +365,8 @@ impl RoomHandle {
     pub fn mute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                TransceiverKind::Audio,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(false, TransceiverKind::Audio)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -388,12 +375,8 @@ impl RoomHandle {
     pub fn unmute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                TransceiverKind::Audio,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(true, TransceiverKind::Audio)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -402,12 +385,8 @@ impl RoomHandle {
     pub fn mute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                TransceiverKind::Video,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(false, TransceiverKind::Video)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -416,68 +395,52 @@ impl RoomHandle {
     pub fn unmute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                TransceiverKind::Video,
-                TrackDirection::Send,
-            )
-            .await?;
+            this.set_send_track_enabled(true, TransceiverKind::Video)
+                .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Mutes inbound audio in this [`Room`].
     pub fn mute_remote_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
+        let inner = upgrade_or_detached!(self.0, JasonError);
         future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                TransceiverKind::Audio,
-                TrackDirection::Recv,
-            )
-            .await?;
+            inner?
+                .recv_constraints
+                .set_enabled(false, TransceiverKind::Audio);
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Unmutes inbound audio in this [`Room`].
     pub fn unmute_remote_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
+        let inner = upgrade_or_detached!(self.0, JasonError);
         future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                TransceiverKind::Audio,
-                TrackDirection::Recv,
-            )
-            .await?;
+            inner?
+                .recv_constraints
+                .set_enabled(true, TransceiverKind::Audio);
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Mutes inbound video in this [`Room`].
     pub fn mute_remote_video(&self) -> Promise {
-        let this = Self(self.0.clone());
+        let inner = upgrade_or_detached!(self.0, JasonError);
         future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                TransceiverKind::Video,
-                TrackDirection::Recv,
-            )
-            .await?;
+            inner?
+                .recv_constraints
+                .set_enabled(false, TransceiverKind::Video);
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Unmutes inbound video in this [`Room`].
     pub fn unmute_remote_video(&self) -> Promise {
-        let this = Self(self.0.clone());
+        let inner = upgrade_or_detached!(self.0, JasonError);
         future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                TransceiverKind::Video,
-                TrackDirection::Recv,
-            )
-            .await?;
+            inner?
+                .recv_constraints
+                .set_enabled(true, TransceiverKind::Video);
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -710,7 +673,6 @@ impl InnerRoom {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
-        direction: TrackDirection,
     ) -> Result<(), Traced<RoomError>> {
         let peer_mute_state_changed: Vec<_> = self
             .peers
@@ -718,10 +680,11 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders = peer.get_muteable_tracks(kind, direction);
+                let senders =
+                    peer.get_muteable_tracks(kind, TrackDirection::Send);
 
                 let senders_to_mute = senders.into_iter().filter(|sender| {
-                    match sender.individual_mute_state() {
+                    match sender.mute_state() {
                         MuteState::Transition(t) => {
                             t.intended() != desired_state
                         }
@@ -729,7 +692,7 @@ impl InnerRoom {
                     }
                 });
 
-                let mut processed_senders: Vec<Rc<dyn MuteableTrack>> =
+                let mut processed_senders: Vec<Rc<dyn MuteableTransceiverSide>> =
                     Vec::new();
                 let mut tracks_patches = Vec::new();
                 for sender in senders_to_mute {
@@ -749,7 +712,7 @@ impl InnerRoom {
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_muteable_tracks(kind, direction)
+                    .get_muteable_tracks(kind, TrackDirection::Send)
                     .into_iter()
                     .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
@@ -871,24 +834,6 @@ impl InnerRoom {
             }
         };
         Ok(())
-    }
-
-    /// Sets enabled state of the constraints for the provided
-    /// [`TrackDirection`] and [`TransceiverKind`].
-    fn set_constraints_enabled(
-        &self,
-        enabled: bool,
-        kind: TransceiverKind,
-        direction: TrackDirection,
-    ) {
-        match direction {
-            TrackDirection::Send => {
-                self.send_constraints.set_enabled(enabled, kind);
-            }
-            TrackDirection::Recv => {
-                self.recv_constraints.set_enabled(enabled, kind);
-            }
-        }
     }
 }
 
