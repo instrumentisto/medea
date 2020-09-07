@@ -5,7 +5,6 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::FutureExt as _;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
