@@ -348,6 +348,7 @@ pub enum TrackUpdate {
     /// Can only refer tracks already known to the `Peer`.
     Updated(TrackPatch),
 
+    /// [`Peer`] should start ICE restart process on the next renegotiation.
     IceRestart,
 }
 

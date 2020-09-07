@@ -74,7 +74,10 @@ pub enum PeersMetricsEvent {
         quality_score: ConnectionQualityScore,
     },
 
+    /// ICE restart is needed for the `PeerConnection` with a provided
+    /// [`PeerId`].
     IceRestartNeeded {
+        /// [`PeerId`] of `PeerConnection` which should start ICE restart.
         peer_id: PeerId,
     },
 }

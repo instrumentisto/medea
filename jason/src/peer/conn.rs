@@ -542,6 +542,10 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Tells the [`RtcPeerConnection`] to start ICE restart on renegotiation.
+    ///
+    /// After this function will be called, the offer returned by the next call
+    /// to createOffer() is automatically configured to trigger ICE restart.
     pub fn restart_ice(&self) {
         self.ice_restart.set(true);
     }
