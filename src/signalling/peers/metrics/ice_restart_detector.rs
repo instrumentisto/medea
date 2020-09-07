@@ -10,6 +10,7 @@ use crate::{media::PeerStateMachine, signalling::peers::metrics::EventSender};
 use super::{PeersMetricsEvent, RtcStatsHandler};
 
 use self::peer_state::PeerState;
+use medea_client_api_proto::stats::RtcStat;
 
 /// Implementation of the ICE connection state of `PeerConnection`.
 mod peer_state {
@@ -111,6 +112,15 @@ impl RtcStatsHandler for IceRestartDetector {
             }
         }
     }
+
+    #[inline]
+    fn update_peer(&mut self, _: &PeerStateMachine) {}
+
+    #[inline]
+    fn check(&mut self) {}
+
+    #[inline]
+    fn add_stats(&mut self, _: PeerId, _: &[RtcStat]) {}
 
     /// Updates [`PeerConnectionState`] in the [`PeerState`] with a provided
     /// [`PeerId`].

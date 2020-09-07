@@ -97,23 +97,25 @@ pub trait RtcStatsHandler: Debug {
     ///
     /// Must be called each time [`PeerStateMachine`] tracks set changes (some
     /// track was added or removed).
-    #[inline]
-    fn update_peer(&mut self, _: &PeerStateMachine) {}
+    fn update_peer(&mut self, peer: &PeerStateMachine);
 
     /// [`RtcStatsHandler`] can process all collected stats, re-calculate
     /// metrics and send [`PeerMetricsEvent`] (if it's needed).
     ///
     /// Will be called periodically by [`PeerMetricsService`].
-    #[inline]
-    fn check(&mut self) {}
+    fn check(&mut self);
 
     /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
     /// [`RtcStatsHandler`].
-    #[inline]
-    fn add_stats(&mut self, _: PeerId, _: &[RtcStat]) {}
+    fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
 
-    #[inline]
-    fn update_connection_state(&mut self, _: PeerId, _: PeerConnectionState) {}
+    /// [`PeerMetricService`] provides [`PeerConnectionState`] update for the
+    /// [`RtcStatsHandler`].
+    fn update_connection_state(
+        &mut self,
+        peer_id: PeerId,
+        state: PeerConnectionState,
+    );
 
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///

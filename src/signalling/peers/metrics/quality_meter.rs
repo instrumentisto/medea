@@ -13,7 +13,7 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    ConnectionQualityScore, MemberId, PeerId,
+    ConnectionQualityScore, MemberId, PeerConnectionState, PeerId,
 };
 
 use crate::{
@@ -114,6 +114,9 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
+    #[inline]
+    fn update_peer(&mut self, _: &PeerStateMachine) {}
+
     /// Calculates new score for every registered `Peer`, sends
     /// [`PeersMetricsEvent::QualityMeterUpdate`] if new score is not equal
     /// to the previously calculated score.
@@ -152,6 +155,9 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
             }
         }
     }
+
+    #[inline]
+    fn update_connection_state(&mut self, _: PeerId, _: PeerConnectionState) {}
 
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
