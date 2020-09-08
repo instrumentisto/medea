@@ -521,8 +521,8 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    /// Returns all [`TransceiverSide`]s from this [`PeerConnection`]
-    /// with provided [`TransceiverKind`] and [`TrackDirection`].
+    /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
+    /// provided [`TransceiverKind`] and [`TrackDirection`].
     #[inline]
     pub fn get_transceivers_sides(
         &self,

@@ -115,14 +115,12 @@ impl From<bool> for StableMuteState {
 /// [`StableMuteState`] will be applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MuteStateTransition {
-    /// [`Muteable`] should be unmuted, but awaits server
-    /// permission.
+    /// [`Muteable`] should be unmuted, but awaits server permission.
     ///
     /// [`Muteable`]: super::Muteable
     Unmuting(StableMuteState),
 
-    /// [`Muteable`] should be muted, but awaits server
-    /// permission.
+    /// [`Muteable`] should be muted, but awaits server permission.
     ///
     /// [`Muteable`]: super::Muteable
     Muting(StableMuteState),
