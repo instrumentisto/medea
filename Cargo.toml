@@ -37,7 +37,7 @@ bytes = "0.5"
 chrono = "0.4"
 config = "0.10"
 deadpool = "0.5"
-deadpool-redis = "=0.6.0"
+deadpool-redis = "0.6"
 derive_more = "0.99"
 dotenv = "0.15"
 failure = "0.1"
@@ -69,18 +69,18 @@ url = "2.1"
     features = ["release_max_level_trace", "max_level_trace"]
 [dependencies.redis]
     package = "redis"
-    version = "0.16"
+    version = "0.17"
     default-features = false
     features = ["tokio-comp"]
 
 [dev-dependencies]
+# TODO: Upgrade this dependency when `awc` 2.0 will be released.
 actix-codec = "0.2"
 actix-rt = "1.0"
 awc = "1.0"
 derive_builder = "0.9"
 function_name = "0.2"
 lazy_static = "1.4"
-mockall = "0.7"
-serial_test = "0.4"
-serial_test_derive = "0.4"
+mockall = "0.8"
+serial_test = "0.5"
 tempfile = "3.1"
