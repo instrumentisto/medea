@@ -27,9 +27,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, MuteableTransceiverSide,
-        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, StableMuteState, TrackDirection, TransceiverKind,
+        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
+        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
+        TrackDirection, TransceiverKind, TransceiverSide,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -679,8 +679,8 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders = peer
-                    .get_muteable_transceiver_sides(kind, TrackDirection::Send);
+                let senders =
+                    peer.get_transceivers_sides(kind, TrackDirection::Send);
 
                 let senders_to_mute = senders.into_iter().filter(|sender| {
                     match sender.mute_state() {
@@ -691,9 +691,8 @@ impl InnerRoom {
                     }
                 });
 
-                let mut processed_senders: Vec<
-                    Rc<dyn MuteableTransceiverSide>,
-                > = Vec::new();
+                let mut processed_senders: Vec<Rc<dyn TransceiverSide>> =
+                    Vec::new();
                 let mut tracks_patches = Vec::new();
                 for sender in senders_to_mute {
                     if let Err(e) =
@@ -712,7 +711,7 @@ impl InnerRoom {
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_muteable_transceiver_sides(kind, TrackDirection::Send)
+                    .get_transceivers_sides(kind, TrackDirection::Send)
                     .into_iter()
                     .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
@@ -734,9 +733,8 @@ impl InnerRoom {
         Ok(())
     }
 
-    /// Returns `true` if all [`MuteableTransceiverSide`]s with a provided
-    /// [`TrackDirection`] and [`TransceiverKind`] of this [`Room`] is in
-    /// provided [`MuteState`].
+    /// Returns `true` if all [`Sender`]s or [`Receivers`] with a provided
+    /// [`TransceiverKind`] of this [`Room`] is in provided [`MuteState`].
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,

@@ -1,10 +1,9 @@
-//! Controller of the [`MuteState`] for the all [`MuteableTransceiverSide`]s.
+//! Component that manages [`MuteState`].
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{
-    channel::mpsc, future, future::Either, stream::LocalBoxStream, FutureExt,
-    StreamExt,
+    future, future::Either, stream::LocalBoxStream, FutureExt, StreamExt,
 };
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
@@ -16,24 +15,14 @@ use crate::{
 
 use super::{MuteState, StableMuteState};
 
-/// Controller of the [`MuteState`]s of the [`Track`]s.
+/// Component that manages [`MuteState`].
 pub struct MuteStateController {
-    /// Mute state of `Member`.
-    ///
-    /// This state doesn't indicates that connection with partner client are
-    /// really muted. This is intention of this client.
-    ///
-    /// On this mute, client __should__ replace `MediaStreamTrack` with `None`
-    /// in the `Transceiver` for the `Send` direction.
+    /// Actual [`MuteState`].
     mute_state: ObservableCell<MuteState>,
 
     /// Timeout of the [`MuteStateController::mute_state`]
     /// transition.
     mute_timeout_handle: RefCell<Option<ResettableDelayHandle>>,
-
-    /// All subscribers on the [`MuteStateController::mute_state`]
-    /// changes.
-    on_stabilize_subs: RefCell<Vec<mpsc::UnboundedSender<StableMuteState>>>,
 }
 
 impl MuteStateController {
@@ -46,7 +35,6 @@ impl MuteStateController {
     pub(in super::super) fn new(mute_state: StableMuteState) -> Rc<Self> {
         let this = Rc::new(Self {
             mute_state: ObservableCell::new(mute_state.into()),
-            on_stabilize_subs: RefCell::default(),
             mute_timeout_handle: RefCell::new(None),
         });
         this.clone().spawn();
@@ -59,16 +47,17 @@ impl MuteStateController {
     pub(in super::super) fn on_stabilize(
         &self,
     ) -> LocalBoxStream<'static, StableMuteState> {
-        let (tx, rx) = mpsc::unbounded();
-        self.on_stabilize_subs.borrow_mut().push(tx);
-
-        Box::pin(rx)
-    }
-
-    /// Sends finalized [`MuteStateController::mute_state`] update.
-    fn send_mute_state_stabilized(&self, state: StableMuteState) {
-        let mut on_stabilize_subs = self.on_stabilize_subs.borrow_mut();
-        on_stabilize_subs.retain(|s| s.unbounded_send(state).is_ok());
+        self.mute_state
+            .subscribe()
+            .skip(1)
+            .filter_map(|state| async move {
+                if let MuteState::Stable(state) = state {
+                    Some(state)
+                } else {
+                    None
+                }
+            })
+            .boxed_local()
     }
 
     /// Spawns all needed [`Stream`] listeners for this [`MuteStateController`].
@@ -79,42 +68,36 @@ impl MuteStateController {
         spawn_local(async move {
             while let Some(mute_state) = mute_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    match mute_state {
-                        MuteState::Stable(upd) => {
-                            this.send_mute_state_stabilized(upd);
-                        }
-                        MuteState::Transition(_) => {
-                            let weak_this = Rc::downgrade(&this);
-                            spawn_local(async move {
-                                let mut transitions =
-                                    this.mute_state.subscribe().skip(1);
-                                let (timeout, timeout_handle) =
-                                    resettable_delay_for(
-                                        Self::MUTE_TRANSITION_TIMEOUT,
-                                    );
-                                this.mute_timeout_handle
-                                    .borrow_mut()
-                                    .replace(timeout_handle);
-                                match future::select(
-                                    transitions.next(),
-                                    Box::pin(timeout),
-                                )
-                                .await
-                                {
-                                    Either::Left(_) => (),
-                                    Either::Right(_) => {
-                                        if let Some(this) = weak_this.upgrade()
-                                        {
-                                            let stable = this
-                                                .mute_state
-                                                .get()
-                                                .cancel_transition();
-                                            this.mute_state.set(stable);
-                                        }
+                    if let MuteState::Transition(_) = mute_state {
+                        let weak_this = Rc::downgrade(&this);
+                        spawn_local(async move {
+                            let mut transitions =
+                                this.mute_state.subscribe().skip(1);
+                            let (timeout, timeout_handle) =
+                                resettable_delay_for(
+                                    Self::MUTE_TRANSITION_TIMEOUT,
+                                );
+                            this.mute_timeout_handle
+                                .borrow_mut()
+                                .replace(timeout_handle);
+                            match future::select(
+                                transitions.next(),
+                                Box::pin(timeout),
+                            )
+                            .await
+                            {
+                                Either::Left(_) => (),
+                                Either::Right(_) => {
+                                    if let Some(this) = weak_this.upgrade() {
+                                        let stable = this
+                                            .mute_state
+                                            .get()
+                                            .cancel_transition();
+                                        this.mute_state.set(stable);
                                     }
                                 }
-                            });
-                        }
+                            }
+                        });
                     }
                 } else {
                     break;

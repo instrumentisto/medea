@@ -1,6 +1,9 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
-use std::cell::{Cell, RefCell};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
@@ -12,8 +15,8 @@ use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-        media::TransceiverSide,
-        PeerEvent,
+        media::{mute_state::MuteStateController, TransceiverSide},
+        Muteable, PeerEvent,
     },
 };
 
@@ -147,5 +150,11 @@ impl TransceiverSide for Receiver {
             self.mid.replace(self.transceiver.as_ref().unwrap().mid());
         }
         self.mid.borrow().clone()
+    }
+}
+
+impl Muteable for Receiver {
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        todo!()
     }
 }
