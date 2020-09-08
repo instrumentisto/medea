@@ -5,7 +5,6 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::FutureExt as _;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -52,34 +51,37 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = WebSocketRpcClient::new(Box::new(|token| {
+        let rpc = Rc::new(WebSocketRpcClient::new(Box::new(|token| {
             Box::pin(async move {
                 let ws = WebSocketRpcTransport::new(&token)
                     .await
                     .map_err(|e| tracerr::new!(e))?;
                 Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
             })
-        }));
+        })));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
 
-        let inner = self.0.clone();
-        spawn_local(rpc.on_normal_close().map(move |res| {
-            // TODO: Don't close all rooms when multiple rpc connections
-            //       will be supported.
-            let reason = res.unwrap_or_else(|_| {
-                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
-            });
-            inner
-                .borrow_mut()
-                .rooms
-                .drain(..)
-                .for_each(|room| room.close(reason));
-            inner.borrow_mut().media_manager = Rc::default();
-        }));
+        spawn_local({
+            let rpc = Rc::clone(&rpc);
+            let inner = Rc::clone(&self.0);
+            async move {
+                let reason = rpc.on_normal_close().await.unwrap_or_else(|_| {
+                    ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+                });
+                // TODO: Don't close all rooms when multiple RPC connections
+                //       will be supported.
+                inner
+                    .borrow_mut()
+                    .rooms
+                    .drain(..)
+                    .for_each(|room| room.close(reason));
+                inner.borrow_mut().media_manager = Rc::default();
+            }
+        });
 
-        let room = Room::new(Rc::new(rpc), peer_repository);
+        let room = Room::new(rpc, peer_repository);
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle
