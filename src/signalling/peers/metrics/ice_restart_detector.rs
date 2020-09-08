@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{stats::RtcStat, PeerConnectionState, PeerId};
 
-use crate::{media::PeerStateMachine, signalling::peers::metrics::EventSender};
+use crate::{
+    log::prelude::*, media::PeerStateMachine,
+    signalling::peers::metrics::EventSender,
+};
 
 use super::{PeersMetricsEvent, RtcStatsHandler};
 
@@ -85,6 +88,16 @@ pub struct IceRestartDetector {
     event_tx: EventSender,
 }
 
+impl IceRestartDetector {
+    /// Returns new [`IceRestartDetector`].
+    pub fn new() -> Self {
+        IceRestartDetector {
+            peers: HashMap::new(),
+            event_tx: EventSender::new(),
+        }
+    }
+}
+
 impl RtcStatsHandler for IceRestartDetector {
     /// Creates [`PeerState`] for the provided [`PeerStateMachine`].
     ///
@@ -133,6 +146,10 @@ impl RtcStatsHandler for IceRestartDetector {
         peer_id: PeerId,
         new_state: PeerConnectionState,
     ) {
+        debug!(
+            "Receiver Peer [id = {}] connection state update: {:?}",
+            peer_id, new_state
+        );
         if let Some(peer) = self.peers.get(&peer_id) {
             if let PeerConnectionState::Failed = new_state {
                 let old_state = peer.connection_state();
@@ -142,6 +159,10 @@ impl RtcStatsHandler for IceRestartDetector {
                         let partner_state =
                             peer.partner_peer().connection_state();
                         if let PeerConnectionState::Failed = partner_state {
+                            debug!(
+                                "Sending ICE restart for the Peer [id = {}].",
+                                peer_id
+                            );
                             self.event_tx.send_event(
                                 PeersMetricsEvent::IceRestartNeeded { peer_id },
                             );
@@ -151,6 +172,8 @@ impl RtcStatsHandler for IceRestartDetector {
                 }
             }
             peer.update_connection_state(new_state);
+        } else {
+            warn!("Peer [id = {}] not found in IceRestartDetector.", peer_id);
         }
     }
 

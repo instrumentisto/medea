@@ -355,6 +355,7 @@ enum TrackChange {
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(TrackPatch),
 
+    /// ICE restart request.
     IceRestart,
 }
 

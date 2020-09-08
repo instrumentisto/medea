@@ -35,6 +35,7 @@ use crate::{
     signalling::peers::{
         metrics::{
             flowing_detector::TrafficFlowDetector,
+            ice_restart_detector::IceRestartDetector,
             quality_meter::QualityMeterStatsHandler,
         },
         PeerTrafficWatcher,
@@ -154,6 +155,7 @@ impl PeerMetricsService {
                 stats_ttl,
             )),
             Box::new(QualityMeterStatsHandler::new()),
+            Box::new(IceRestartDetector::new()),
         ];
 
         Self { event_tx, handlers }
