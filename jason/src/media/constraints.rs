@@ -633,6 +633,9 @@ pub struct DeviceVideoTrackConstraints {
     /// session can't be started.
     is_required: bool,
 
+    /// [facingMode][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y2ks2mjj
     facing_mode: StringConstrain<FacingMode>,
 }
 
@@ -675,21 +678,34 @@ impl DeviceVideoTrackConstraints {
         self.device_id = Some(device_id);
     }
 
-    /// Sets [facingMode][1] constraint.
+    /// Sets exact [facingMode][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2ks2mjj
     pub fn exact_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode.set_exact(facing_mode);
     }
 
+    /// Sets ideal [facingMode][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y2ks2mjj
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode.set_ideal(facing_mode);
     }
 }
 
+/// Representation of the [`ConstrainDOMString`].
+///
+/// Can set exact and ideal constrain value.
+///
+/// [`ConstrainDOMString`]: https://tinyurl.com/y6qkebfk
 #[derive(Clone, Copy, Debug)]
 struct StringConstrain<T> {
+    /// If the property can't be set to one of the listed values, matching will
+    /// fail.
     exact: Option<T>,
+
+    /// If possible, one of the listed values will be used, but if it's not
+    /// possible, the user agent will use the closest possible match.
     ideal: Option<T>,
 }
 

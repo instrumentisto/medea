@@ -11,7 +11,7 @@ mod stream;
 pub use self::{
     constraints::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
-        DisplayVideoTrackConstraints, LocalStreamConstraints,
+        DisplayVideoTrackConstraints, FacingMode, LocalStreamConstraints,
         MediaStreamSettings, MultiSourceMediaStreamConstraints,
         RecvConstraints, TrackConstraints, VideoTrackConstraints,
     },
