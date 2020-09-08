@@ -65,7 +65,7 @@ impl Jason {
 
         spawn_local({
             let rpc = Rc::clone(&rpc);
-            let inner = self.0.clone();
+            let inner = Rc::clone(&self.0);
             async move {
                 let reason = rpc.on_normal_close().await.unwrap_or_else(|_| {
                     ClientDisconnect::RpcClientUnexpectedlyDropped.into()

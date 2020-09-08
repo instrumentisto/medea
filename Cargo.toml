@@ -74,7 +74,7 @@ url = "2.1"
     features = ["tokio-comp"]
 
 [dev-dependencies]
-# TODO: upgrade this dependency when awc will be updated
+# TODO: upgrade this dependency when awc 2.0 will be released
 actix-codec = "0.2"
 actix-rt = "1.0"
 awc = "1.0"
@@ -83,5 +83,4 @@ function_name = "0.2"
 lazy_static = "1.4"
 mockall = "0.8"
 serial_test = "0.5"
-serial_test_derive = "0.5"
 tempfile = "3.1"

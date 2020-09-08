@@ -112,7 +112,7 @@ pub struct Server {
 mod client_http_spec {
     use std::net::Ipv4Addr;
 
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 
@@ -151,7 +151,7 @@ mod client_http_spec {
 mod control_grpc_spec {
     use std::net::Ipv4Addr;
 
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 

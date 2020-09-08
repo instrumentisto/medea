@@ -207,7 +207,7 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
 
 #[cfg(test)]
 mod spec {
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 

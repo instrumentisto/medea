@@ -105,7 +105,7 @@ mod tests {
     use std::{convert::TryFrom as _, time::Duration};
 
     use futures::{future, FutureExt};
-    use serial_test_derive::serial;
+    use serial_test::serial;
     use tokio::time;
 
     use crate::api::control::callback::{
