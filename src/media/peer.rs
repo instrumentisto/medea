@@ -1243,4 +1243,46 @@ pub mod tests {
 
         assert!(track_patches_after.is_empty());
     }
+
+    #[test]
+    fn dedup_ice_restarts() {
+        let changes = vec![
+            TrackChange::IceRestart,
+            TrackChange::IceRestart,
+            TrackChange::IceRestart,
+            TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(0),
+                is_muted: None,
+            }),
+            TrackChange::IceRestart,
+            TrackChange::TrackPatch(TrackPatch {
+                id: TrackId(0),
+                is_muted: None,
+            }),
+        ];
+
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub
+            .expect_force_update()
+            .returning(move |_: PeerId, _: Vec<PeerUpdate>| {});
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |_: PeerId| {});
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId("member-1".to_string()),
+            PeerId(1),
+            MemberId("member-2".to_string()),
+            false,
+            Rc::new(negotiation_sub),
+        );
+
+        peer.context.pending_track_updates = changes;
+
+        peer.dedup_ice_restarts();
+
+        let deduped_track_updates = peer.context.pending_track_updates;
+        assert_eq!(deduped_track_updates.len(), 3);
+        assert!(matches!(deduped_track_updates[1], TrackChange::IceRestart));
+    }
 }
