@@ -3,6 +3,7 @@ use std::{
     rc::Rc,
 };
 
+use derive_more::Display;
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
     MediaType, VideoSettings as ProtoVideoConstraints,
@@ -10,6 +11,7 @@ use medea_client_api_proto::{
 use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
+    ConstrainDomStringParameters as SysConstrainDomStringParameters,
     MediaStreamConstraints as SysMediaStreamConstraints,
     MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
     MediaTrackConstraints as SysMediaTrackConstraints,
@@ -631,7 +633,7 @@ pub struct DeviceVideoTrackConstraints {
     /// session can't be started.
     is_required: bool,
 
-    facing_mode: FacingMode,
+    facing_mode: StringConstrain<FacingMode>,
 }
 
 impl DeviceVideoTrackConstraints {
@@ -676,14 +678,62 @@ impl DeviceVideoTrackConstraints {
     /// Sets [facingMode][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2ks2mjj
-    pub fn facing_mode(&mut self, facing_mode: FacingMode) {}
+    pub fn exact_facing_mode(&mut self, facing_mode: FacingMode) {
+        self.facing_mode.set_exact(facing_mode);
+    }
+
+    pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
+        self.facing_mode.set_ideal(facing_mode);
+    }
 }
 
-struct Range<T> {
-    min: T,
-    max: T,
-    ideal: T,
-    exact: T,
+#[derive(Clone, Copy, Debug)]
+struct StringConstrain<T> {
+    exact: Option<T>,
+    ideal: Option<T>,
+}
+
+impl<T> Default for StringConstrain<T> {
+    fn default() -> Self {
+        Self {
+            exact: None,
+            ideal: None,
+        }
+    }
+}
+
+impl<T> StringConstrain<T>
+where
+    T: ToString,
+{
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_ideal(&mut self, ideal: T) {
+        self.ideal = Some(ideal);
+    }
+
+    pub fn set_exact(&mut self, exact: T) {
+        self.exact = Some(exact);
+    }
+}
+
+impl<T> From<&StringConstrain<T>> for SysConstrainDomStringParameters
+where
+    T: ToString,
+{
+    fn from(from: &StringConstrain<T>) -> Self {
+        let mut constrain = SysConstrainDomStringParameters::new();
+        if let Some(ideal) = &from.ideal {
+            constrain.ideal(&(ideal.to_string().into()));
+        }
+        if let Some(exact) = &from.exact {
+            constrain.exact(&(exact.to_string().into()));
+        }
+
+        constrain
+    }
 }
 
 /// Describes the directions that the camera can face, as seen from the user's
@@ -691,14 +741,22 @@ struct Range<T> {
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
-enum FacingMode {
+#[derive(Clone, Copy, PartialEq, Display, Debug)]
+pub enum FacingMode {
     /// The source is facing toward the user (a self-view camera).
+    #[display(fmt = "user")]
     User,
+
     ///  The source is facing away from the user (viewing the environment).
+    #[display(fmt = "environment")]
     Environment,
+
     /// The source is facing to the left of the user.
+    #[display(fmt = "left")]
     Left,
+
     /// The source is facing to the right of the user.
+    #[display(fmt = "right")]
     Right,
 }
 
@@ -822,6 +880,9 @@ impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
             val.exact(&(device_id.into()));
             constraints.device_id(&(val.into()));
         }
+        constraints.facing_mode(&SysConstrainDomStringParameters::from(
+            &track_constraints.facing_mode,
+        ));
 
         constraints
     }
