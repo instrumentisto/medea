@@ -51,7 +51,7 @@ All user visible changes to this project will be documented in this file. This p
     - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
         - `max_lag`;
         - `init_timeout`.
-    - `turn.db.redis.username` option to configure username to authenticate on Redis database server with ([#135]).
+    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s Redis database server as ([#135]).
 - Testing:
     - E2E tests for signalling ([#28]).
 

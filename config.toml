@@ -117,11 +117,11 @@
 # Default:
 #   port = 6379
 
-# Username to authenticate on Redis database server with.
+# User to authenticate on Coturn's Redis database server as.
 #
 # Env var: MEDEA_TURN__DB__REDIS__USERNAME
 # Default:
-#   username = ""
+#   user = ""
 
 # Password to authenticate on Coturn's Redis database server with.
 #

@@ -70,7 +70,7 @@ impl Jason {
                 let reason = rpc.on_normal_close().await.unwrap_or_else(|_| {
                     ClientDisconnect::RpcClientUnexpectedlyDropped.into()
                 });
-                // TODO: Don't close all rooms when multiple rpc connections
+                // TODO: Don't close all rooms when multiple RPC connections
                 //       will be supported.
                 inner
                     .borrow_mut()

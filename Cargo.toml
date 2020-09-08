@@ -74,7 +74,7 @@ url = "2.1"
     features = ["tokio-comp"]
 
 [dev-dependencies]
-# TODO: upgrade this dependency when awc 2.0 will be released
+# TODO: Upgrade this dependency when `awc` 2.0 will be released.
 actix-codec = "0.2"
 actix-rt = "1.0"
 awc = "1.0"

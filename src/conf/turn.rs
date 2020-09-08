@@ -77,11 +77,11 @@ pub struct Redis {
     #[default = 6379]
     pub port: u16,
 
-    /// Username to authenticate on Redis database server with.
+    /// User to authenticate on Redis database server as.
     ///
     /// Defaults to empty value.
     #[default = ""]
-    pub username: Cow<'static, str>,
+    pub user: Cow<'static, str>,
 
     /// Password to authenticate on Redis database server with.
     ///
@@ -105,7 +105,7 @@ pub struct Redis {
 impl From<&Redis> for ConnectionInfo {
     fn from(cf: &Redis) -> Self {
         Self {
-            username: Some(cf.username.to_string()).filter(|u| !u.is_empty()),
+            username: Some(cf.user.to_string()).filter(|u| !u.is_empty()),
             addr: Box::new(redis::ConnectionAddr::Tcp(
                 cf.host.to_string(),
                 cf.port,
