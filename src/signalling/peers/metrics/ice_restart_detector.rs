@@ -3,14 +3,13 @@
 use std::collections::HashMap;
 
 use futures::stream::LocalBoxStream;
-use medea_client_api_proto::{PeerConnectionState, PeerId};
+use medea_client_api_proto::{stats::RtcStat, PeerConnectionState, PeerId};
 
 use crate::{media::PeerStateMachine, signalling::peers::metrics::EventSender};
 
 use super::{PeersMetricsEvent, RtcStatsHandler};
 
 use self::peer_state::PeerState;
-use medea_client_api_proto::stats::RtcStat;
 
 /// Implementation of the ICE connection state of `PeerConnection`.
 mod peer_state {

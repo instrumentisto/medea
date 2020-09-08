@@ -201,6 +201,8 @@ impl RtcStatsHandler for PeerMetricsService {
         }
     }
 
+    /// Calls [`RtcStatsHandler::update_connection_state`] on the registered
+    /// [`RtcStatsHandler`]s,
     fn update_connection_state(
         &mut self,
         peer_id: PeerId,

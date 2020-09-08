@@ -542,6 +542,7 @@ impl PeersService {
             .add_stats(peer_id, stats);
     }
 
+    /// Propagates [`PeerConnectionState`] to [`PeersMetricsService`].
     pub fn update_connection_state(
         &self,
         peer_id: PeerId,

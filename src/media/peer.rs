@@ -892,6 +892,7 @@ impl<'a> PeerChangesScheduler<'a> {
         }
     }
 
+    /// Schedules [`TrackChange::IceRestart`].
     pub fn restart_ice(&mut self) {
         self.schedule_change(TrackChange::IceRestart);
     }

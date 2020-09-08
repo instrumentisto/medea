@@ -119,6 +119,7 @@ impl PeersMetricsEventHandler for Room {
         )
     }
 
+    /// Schedules ICE restart and commits scheduled changes.
     fn on_ice_restart_needed(&mut self, peer_id: PeerId) -> Self::Output {
         self.peers.map_peer_by_id_mut(peer_id, |peer| {
             peer.as_changes_scheduler().restart_ice();

@@ -340,9 +340,11 @@ impl RtcStatsHandler for TrafficFlowDetector {
         }
     }
 
+    /// Does nothing.
     #[inline]
     fn update_connection_state(&mut self, _: PeerId, _: PeerConnectionState) {}
 
+    /// Does nothing.
     #[inline]
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
