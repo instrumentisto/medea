@@ -171,7 +171,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                 .subscribers
                                 .lock()
                                 .unwrap()
-                                .get_mut(&self.room_id)
+                                .get(&self.room_id)
                             {
                                 subs.iter()
                                     .filter(|sub| **sub != this)
