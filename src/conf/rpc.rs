@@ -46,7 +46,7 @@ pub struct Rpc {
 mod spec {
     use std::{fs, time::Duration};
 
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{
         conf::{Conf, APP_CONF_PATH_ENV_VAR_NAME},
