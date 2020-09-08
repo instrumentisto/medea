@@ -515,10 +515,10 @@ impl WebSocketRpcClient {
 
         // subscribe to transport close
         let mut transport_state_changes = transport.on_state_change();
-        let weak_inner = Rc::downgrade(&self);
+        let weak_this = Rc::downgrade(&self);
         spawn_local(async move {
             while let Some(state) = transport_state_changes.next().await {
-                if let Some(this) = weak_inner.upgrade() {
+                if let Some(this) = weak_this.upgrade() {
                     if let TransportState::Closed(msg) = state {
                         this.handle_close_message(msg);
                     }
@@ -527,11 +527,11 @@ impl WebSocketRpcClient {
         });
 
         // subscribe to transport message received
-        let this_clone = Rc::downgrade(&self);
+        let weak_this = Rc::downgrade(&self);
         let mut on_socket_message = transport.on_message();
         spawn_local(async move {
             while let Some(msg) = on_socket_message.next().await {
-                if let Some(this) = this_clone.upgrade() {
+                if let Some(this) = weak_this.upgrade() {
                     this.on_transport_message(msg)
                 }
             }
