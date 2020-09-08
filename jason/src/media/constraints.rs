@@ -630,6 +630,8 @@ pub struct DeviceVideoTrackConstraints {
     /// If `true` then without this [`DeviceVideoTrackConstraints`] call
     /// session can't be started.
     is_required: bool,
+
+    facing_mode: FacingMode,
 }
 
 impl DeviceVideoTrackConstraints {
@@ -670,6 +672,34 @@ impl DeviceVideoTrackConstraints {
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(device_id);
     }
+
+    /// Sets [facingMode][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y2ks2mjj
+    pub fn facing_mode(&mut self, facing_mode: FacingMode) {}
+}
+
+struct Range<T> {
+    min: T,
+    max: T,
+    ideal: T,
+    exact: T,
+}
+
+/// Describes the directions that the camera can face, as seen from the user's
+/// perspective. Representation of [VideoFacingModeEnum][1].
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
+#[wasm_bindgen]
+enum FacingMode {
+    /// The source is facing toward the user (a self-view camera).
+    User,
+    ///  The source is facing away from the user (viewing the environment).
+    Environment,
+    /// The source is facing to the left of the user.
+    Left,
+    /// The source is facing to the right of the user.
+    Right,
 }
 
 /// Constraints applicable to video tracks sourced from screen capture.
