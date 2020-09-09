@@ -1045,6 +1045,8 @@ async fn new_remote_track() {
     }
 }
 
+/// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
+/// `ice-ufrag` IDs will be updated in the SDP offer.
 #[wasm_bindgen_test]
 async fn ice_restart_works() {
     fn get_ice_pwds(offer: &str) -> Vec<&str> {

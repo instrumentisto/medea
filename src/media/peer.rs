@@ -1248,6 +1248,7 @@ pub mod tests {
         assert!(track_patches_after.is_empty());
     }
 
+    /// Checks that [`PeerChange::IceRestart`] correctly dedups.
     #[test]
     fn ice_restart_dedupping_works() {
         let changes = vec![
