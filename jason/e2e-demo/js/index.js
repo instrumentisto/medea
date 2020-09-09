@@ -475,6 +475,7 @@ window.onload = async function() {
         video_select.append(option);
       }
     }
+
     const screen = document.createElement('option');
     screen.value = "screen";
     screen.text = "screen";
