@@ -81,13 +81,13 @@ impl InnerReceiver {
     /// Checks whether general mute state of the [`Receiver`] is in
     /// [`MuteState::NotMuted`].
     fn is_not_muted(&self) -> bool {
-        self.general_mute_state == StableMuteState::NotMuted.into()
+        self.general_mute_state == StableMuteState::NotMuted
     }
 
     /// Checks whether general mute state of the [`Receiver`] is in
     /// [`MuteState::Muted`].
     fn is_muted(&self) -> bool {
-        self.general_mute_state == StableMuteState::Muted.into()
+        self.general_mute_state == StableMuteState::Muted
     }
 }
 
@@ -95,6 +95,10 @@ impl Receiver {
     /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
     /// creates [`Receiver`] without [`RtcRtpTransceiver`]. It will be injected
     /// when [`MediaStreamTrack`] arrives.
+    ///
+    /// Created [`RtcRtpTransceiver`] direction is set to
+    /// [`TransceiverDirection::Inactive`] if media receiving is disabled in
+    /// provided [`RecvConstraints`].
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
@@ -109,20 +113,21 @@ impl Receiver {
         recv_constraints: &RecvConstraints,
     ) -> Rc<Self> {
         let kind = TransceiverKind::from(caps);
-        let muted = match kind {
-            TransceiverKind::Audio => recv_constraints.is_audio_disabled(),
-            TransceiverKind::Video => recv_constraints.is_video_disabled(),
+        let is_enabled = match kind {
+            TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
+            TransceiverKind::Video => recv_constraints.is_video_enabled(),
         };
-        let transceiver_direction = if muted {
-            TransceiverDirection::Inactive
-        } else {
+        let transceiver_direction = if is_enabled {
             TransceiverDirection::Recvonly
+        } else {
+            TransceiverDirection::Inactive
         };
         let transceiver = match mid {
             None => Some(peer.add_transceiver(kind, transceiver_direction)),
             Some(_) => None,
         };
-        let mute_state_controller = MuteStateController::new(muted.into());
+        let mute_state_controller =
+            MuteStateController::new(StableMuteState::from(!is_enabled));
         let this: Rc<Self> = Rc::new(Self(RefCell::new(InnerReceiver {
             track_id,
             sender_id,
@@ -131,7 +136,7 @@ impl Receiver {
             kind,
             mid,
             mute_state_controller,
-            general_mute_state: muted.into(),
+            general_mute_state: StableMuteState::from(!is_enabled),
             notified_track: false,
             track: None,
             peer_events_sender,

@@ -20,8 +20,8 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.45
-CHROME_VERSION := 83.0
+RUST_VER := 1.46
+CHROME_VERSION := 85.0
 # TODO: Use latest geckodriver when wasm-bindgen is fixed:
 #       https://github.com/rustwasm/wasm-bindgen/issues/2261
 FIREFOX_VERSION := 79.0-driver0.26.0
@@ -344,9 +344,12 @@ endif
 # Usage:
 #	make test.unit [( [crate=@all]
 #	                | crate=(medea|<crate-name>)
-#	                | crate=medea-jason [browser=(chrome|firefox|default)] )]
+#	                | crate=medea-jason
+#	                  [browser=(chrome|firefox|default)]
+#	                  [timeout=(60|<seconds>)] )]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
+wasm-bindgen-timeout = $(if $(call eq,$(timeout),),60,$(timeout))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 
 test.unit:
@@ -365,12 +368,14 @@ else
 ifeq ($(crate),medea-jason)
 ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
+	WASM_BINDGEN_TEST_TIMEOUT=$(wasm-bindgen-timeout) \
 	cargo test --target wasm32-unknown-unknown --features mockable
 else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
+	WASM_BINDGEN_TEST_TIMEOUT=$(wasm-bindgen-timeout) \
 	cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver browser=$(browser)
 endif

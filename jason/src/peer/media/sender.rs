@@ -63,7 +63,7 @@ impl<'a> SenderBuilder<'a> {
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
-            general_mute_state: Cell::new(self.mute_state.into()),
+            general_mute_state: Cell::new(self.mute_state),
             transceiver,
             mute_state_controller: mute_state_observer,
             is_required: self.is_required,
@@ -120,7 +120,7 @@ impl Sender {
         &self.transceiver
     }
 
-    /// Returns `true` if this [`Sender`] is publishes media traffic.
+    /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
         match self.transceiver_direction.get() {
             TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {

@@ -219,7 +219,8 @@ pub struct PeerConnection {
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalStreamConstraints,
 
-    /// Constraints for the [`Receiver`]s from this [`PeerConnection`].
+    /// Constraints to the [`MediaStream`]s received by this
+    /// [`PeerConnection`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 }
 

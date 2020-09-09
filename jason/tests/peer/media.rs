@@ -5,7 +5,7 @@ use std::{convert::TryFrom, mem, rc::Rc};
 use futures::channel::mpsc;
 use medea_client_api_proto::{PeerId, ServerTrackPatch, TrackId};
 use medea_jason::{
-    media::{LocalStreamConstraints, MediaManager},
+    media::{LocalStreamConstraints, MediaManager, RecvConstraints},
     peer::{
         MediaConnections, MuteableTrack, RtcPeerConnection,
         SimpleStreamRequest, StableMuteState,
@@ -36,8 +36,8 @@ async fn get_test_media_connections(
     media_connections
         .create_tracks(
             vec![audio_track, video_track],
-            &get_media_stream_settings(!enabled_audio, !enabled_video).into(),
-            &Rc::default(),
+            &get_media_stream_settings(enabled_audio, enabled_video).into(),
+            &RecvConstraints::default(),
         )
         .unwrap();
     let request = media_connections.get_stream_request().unwrap();
@@ -78,7 +78,7 @@ fn get_stream_request1() {
         .create_tracks(
             vec![audio_track, video_track],
             &local_constraints(true, true),
-            &Rc::default(),
+            &RecvConstraints::default(),
         )
         .unwrap();
     let request = media_connections.get_stream_request();
@@ -98,7 +98,7 @@ fn get_stream_request2() {
         .create_tracks(
             Vec::new(),
             &LocalStreamConstraints::default(),
-            &Rc::default(),
+            &RecvConstraints::default(),
         )
         .unwrap();
     let request = media_connections.get_stream_request();

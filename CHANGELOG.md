@@ -49,10 +49,11 @@ All user visible changes to this project will be documented in this file. This p
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
-    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
+    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]);
     - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
         - `max_lag`;
         - `init_timeout`.
+    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s Redis database server as ([#135]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -78,6 +79,7 @@ All user visible changes to this project will be documented in this file. This p
 [#105]: /../../pull/105
 [#127]: /../../pull/127
 [#132]: /../../pull/132
+[#135]: /../../pull/135
 
 
 

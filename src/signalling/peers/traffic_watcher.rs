@@ -35,8 +35,8 @@ use std::{
 use actix::{
     Actor, Addr, AsyncContext, Handler, MailboxError, Message, SpawnHandle,
 };
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::PeerId;
 
 use crate::{
@@ -54,12 +54,7 @@ pub trait PeerConnectionStateEventsHandler: Send + Debug {
 }
 
 #[cfg(test)]
-impl Debug for MockPeerConnectionStateEventsHandler {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("MockPeerConnectionStateEventsHandler")
-            .finish()
-    }
-}
+impl_debug_by_struct_name!(MockPeerConnectionStateEventsHandler);
 
 /// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
 pub fn build_peers_traffic_watcher(
@@ -69,16 +64,17 @@ pub fn build_peers_traffic_watcher(
 }
 
 /// Consumes `Peer` traffic metrics for further processing.
+#[async_trait(?Send)]
 #[cfg_attr(test, mockall::automock)]
 pub trait PeerTrafficWatcher: Debug + Send + Sync {
     /// Registers provided [`PeerConnectionStateEventsHandler`] as `Peer`s state
     /// messages listener, preparing [`PeerTrafficWatcher`] for registering
     /// `Peer`s from this [`PeerConnectionStateEventsHandler`].
-    fn register_room(
+    async fn register_room(
         &self,
         room_id: RoomId,
         handler: Box<dyn PeerConnectionStateEventsHandler>,
-    ) -> LocalBoxFuture<'static, Result<(), MailboxError>>;
+    ) -> Result<(), MailboxError>;
 
     /// Unregisters [`Room`] as `Peer`s state messages listener.
     ///
@@ -87,12 +83,12 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 
     /// Registers `Peer`, so that [`PeerTrafficWatcher`] will be able to
     /// process traffic flow events of this `Peer`.
-    fn register_peer(
+    async fn register_peer(
         &self,
         room_id: RoomId,
         peer_id: PeerId,
         should_watch_turn: bool,
-    ) -> LocalBoxFuture<'static, Result<(), MailboxError>>;
+    ) -> Result<(), MailboxError>;
 
     /// Unregisters `Peer`s, so that [`PeerTrafficWatcher`] will not be able
     /// to process traffic flow events of this `Peer` anymore.
@@ -112,11 +108,7 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
 }
 
 #[cfg(test)]
-impl Debug for MockPeerTrafficWatcher {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("PeerTrafficWatcherMock").finish()
-    }
-}
+impl_debug_by_struct_name!(MockPeerTrafficWatcher);
 
 /// Returns [`FlowMetricSources`], which will be used to emit `Peer` state
 /// events.
@@ -134,15 +126,16 @@ fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
     sources
 }
 
+#[async_trait(?Send)]
 impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     /// Sends [`RegisterRoom`] message to the [`PeersTrafficWatcherImpl`]
     /// returning send result.
-    fn register_room(
+    async fn register_room(
         &self,
         room_id: RoomId,
         handler: Box<dyn PeerConnectionStateEventsHandler>,
-    ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
-        Box::pin(self.send(RegisterRoom { room_id, handler }))
+    ) -> Result<(), MailboxError> {
+        self.send(RegisterRoom { room_id, handler }).await
     }
 
     /// Sends [`UnregisterRoom`] message to [`PeersTrafficWatcherImpl`].
@@ -152,17 +145,18 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
 
     /// Sends [`RegisterPeer`] message to [`PeersTrafficWatcherImpl`] returning
     /// send result.
-    fn register_peer(
+    async fn register_peer(
         &self,
         room_id: RoomId,
         peer_id: PeerId,
         should_watch_turn: bool,
-    ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
-        Box::pin(self.send(RegisterPeer {
+    ) -> Result<(), MailboxError> {
+        self.send(RegisterPeer {
             room_id,
             peer_id,
             flow_metrics_sources: build_flow_sources(should_watch_turn),
-        }))
+        })
+        .await
     }
 
     /// Sends [`UnregisterPeers`] message to [`PeersTrafficWatcherImpl`].

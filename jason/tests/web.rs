@@ -141,12 +141,12 @@ pub fn get_test_unrequired_tracks() -> (Track, Track) {
 }
 
 pub fn get_media_stream_settings(
-    is_audio_muted: bool,
-    is_video_muted: bool,
+    audio_enabled: bool,
+    video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.toggle_enable(!is_audio_muted, TransceiverKind::Audio);
-    settings.toggle_enable(!is_video_muted, TransceiverKind::Video);
+    settings.set_track_enabled(audio_enabled, TransceiverKind::Audio);
+    settings.set_track_enabled(video_enabled, TransceiverKind::Video);
 
     settings
 }
@@ -281,13 +281,13 @@ async fn get_audio_track() -> MediaStreamTrack {
 /// provided `timeout` time this [`LocalBoxFuture`] won'tbe resolved, then
 /// `Err(String)` will be returned, otherwise a result of the provided
 /// [`LocalBoxFuture`] will be returned.
-async fn timeout<T>(timeout: i32, future: T) -> Result<T::Output, String>
+async fn timeout<T>(timeout_ms: i32, future: T) -> Result<T::Output, String>
 where
     T: Future,
 {
     match futures::future::select(
         Box::pin(future),
-        Box::pin(delay_for(timeout)),
+        Box::pin(delay_for(timeout_ms)),
     )
     .await
     {

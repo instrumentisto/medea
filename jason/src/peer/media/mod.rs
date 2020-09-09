@@ -138,7 +138,7 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     }
 }
 
-/// Direction of the [`Track`].
+/// Direction of the `MediaTrack`.
 #[derive(Debug, Clone, Copy)]
 pub enum TrackDirection {
     /// Sends media data.

@@ -154,8 +154,8 @@ pub enum Command {
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
 
-        /// Statuses of the transceivers.
-        transceiver_statuses: HashMap<TrackId, bool>,
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
@@ -166,8 +166,8 @@ pub enum Command {
         /// SDP Answer of the `Peer`.
         sdp_answer: String,
 
-        /// Statuses of the transceivers.
-        transceiver_statuses: HashMap<TrackId, bool>,
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends Ice Candidate.
@@ -705,7 +705,7 @@ mod test {
             peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
-            transceiver_statuses: HashMap::new(),
+            transceivers_statuses: HashMap::new(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -715,7 +715,7 @@ mod test {
                     \"peer_id\":77,\
                     \"sdp_offer\":\"offer\",\
                     \"mids\":{\"0\":\"1\"},\
-                    \"transceiver_statuses\":{}\
+                    \"transceivers_statuses\":{}\
                 }\
             }";
 
