@@ -144,21 +144,27 @@ async fn ice_restart() {
         .await
         .unwrap();
 
-    match responder_rx.next().await.unwrap() {
-        Event::PeerUpdated {
-            peer_id,
-            updates,
-            negotiation_role,
-        } => {
-            assert_eq!(peer_id, responder_peer_id);
-            assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
-            let is_ice_restart = updates
-                .iter()
-                .find(|upd| matches!(upd, PeerUpdate::IceRestart))
-                .is_some();
-            assert!(is_ice_restart);
+    {
+        let event = responder_rx.next().await.unwrap();
+        match event {
+            Event::PeerUpdated {
+                peer_id,
+                updates,
+                negotiation_role,
+            } => {
+                assert_eq!(peer_id, responder_peer_id);
+                assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
+                let is_ice_restart = updates
+                    .iter()
+                    .find(|upd| matches!(upd, PeerUpdate::IceRestart))
+                    .is_some();
+                assert!(is_ice_restart);
+            }
+            _ => unreachable!(
+                "Received {:?} instead of Event::PeerCreated",
+                event
+            ),
         }
-        _ => unreachable!(),
     }
 
     responder
@@ -174,24 +180,31 @@ async fn ice_restart() {
         .await
         .unwrap();
 
-    match publisher_rx.next().await.unwrap() {
-        Event::PeerUpdated {
-            peer_id,
-            updates: _,
-            negotiation_role,
-        } => {
-            assert_eq!(peer_id, publisher_peer_id);
-            if let Some(NegotiationRole::Answerer(sdp_offer)) = negotiation_role
-            {
-                assert_eq!(sdp_offer, String::from("offer"));
-            } else {
-                panic!(
-                    "Negotiation role is not Asnwerer: {:?}",
+    {
+        let event = publisher_rx.next().await.unwrap();
+        match event {
+            Event::PeerUpdated {
+                peer_id,
+                updates: _,
+                negotiation_role,
+            } => {
+                assert_eq!(peer_id, publisher_peer_id);
+                if let Some(NegotiationRole::Answerer(sdp_offer)) =
                     negotiation_role
-                );
+                {
+                    assert_eq!(sdp_offer, String::from("offer"));
+                } else {
+                    panic!(
+                        "Negotiation role is not Asnwerer: {:?}",
+                        negotiation_role
+                    );
+                }
             }
+            _ => unreachable!(
+                "Received {:?} instead of Event::PeerCreated",
+                event
+            ),
         }
-        _ => unreachable!(),
     }
 
     // first peer answers with SDP answer
@@ -205,14 +218,20 @@ async fn ice_restart() {
         .unwrap();
 
     // second peer receives answer
-    match responder_rx.next().await.unwrap() {
-        Event::SdpAnswerMade {
-            peer_id,
-            sdp_answer,
-        } => {
-            assert_eq!(peer_id, responder_peer_id);
-            assert_eq!(sdp_answer, String::from("answer"));
+    {
+        let event = responder_rx.next().await.unwrap();
+        match event {
+            Event::SdpAnswerMade {
+                peer_id,
+                sdp_answer,
+            } => {
+                assert_eq!(peer_id, responder_peer_id);
+                assert_eq!(sdp_answer, String::from("answer"));
+            }
+            _ => unreachable!(
+                "Received {:?} instead of Event::PeerCreated",
+                event
+            ),
         }
-        _ => unreachable!(),
     }
 }
