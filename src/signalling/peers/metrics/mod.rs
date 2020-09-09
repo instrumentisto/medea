@@ -78,7 +78,7 @@ pub enum PeersMetricsEvent {
     /// ICE restart is needed for the `PeerConnection` with a provided
     /// [`PeerId`].
     IceRestartNeeded {
-        /// [`PeerId`] of `PeerConnection` which should start ICE restart.
+        /// [`PeerId`] of `PeerConnection` which should perform ICE restart.
         peer_id: PeerId,
     },
 }
@@ -112,7 +112,7 @@ pub trait RtcStatsHandler: Debug {
 
     /// [`PeerMetricService`] provides [`PeerConnectionState`] update for the
     /// [`RtcStatsHandler`].
-    fn update_connection_state(
+    fn update_peer_connection_state(
         &mut self,
         peer_id: PeerId,
         state: PeerConnectionState,
@@ -203,15 +203,15 @@ impl RtcStatsHandler for PeerMetricsService {
         }
     }
 
-    /// Calls [`RtcStatsHandler::update_connection_state`] on the registered
-    /// [`RtcStatsHandler`]s,
-    fn update_connection_state(
+    /// Calls [`RtcStatsHandler::update_peer_connection_state`] on the
+    /// registered [`RtcStatsHandler`]s,
+    fn update_peer_connection_state(
         &mut self,
         peer_id: PeerId,
         state: PeerConnectionState,
     ) {
         for handler in &mut self.handlers {
-            handler.update_connection_state(peer_id, state);
+            handler.update_peer_connection_state(peer_id, state);
         }
     }
 

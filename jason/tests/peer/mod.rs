@@ -1059,6 +1059,7 @@ async fn ice_restart_works() {
             })
             .collect()
     }
+
     fn get_ice_ufrags(offer: &str) -> Vec<&str> {
         offer
             .lines()

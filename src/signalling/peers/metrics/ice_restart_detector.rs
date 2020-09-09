@@ -23,10 +23,17 @@ mod peer_state {
 
     use medea_client_api_proto::{PeerConnectionState, PeerId};
 
+    /// Inner of the [`PeerState`].
     #[derive(Debug)]
     struct Inner {
+        /// [`PeerId`] of `PeerConnection` to which this [`PeerState`] belongs
+        /// to.
         id: PeerId,
+
+        /// Weak reference to the partner [`PeerState`].
         partner_peer: Weak<RefCell<Inner>>,
+
+        /// Current [`PeerConnectionState`] of this `PeerConnection`.
         connection_state: PeerConnectionState,
     }
 
@@ -99,10 +106,11 @@ impl IceRestartDetector {
 }
 
 impl RtcStatsHandler for IceRestartDetector {
-    /// Creates [`PeerState`] for the provided [`PeerStateMachine`].
+    /// Creates [`PeerState`] pair for the provided [`PeerStateMachine`] and
+    /// it's partner [`PeerStateMachine`].
     ///
-    /// Tries to add created [`PeerState`] to the partner [`PeerState`] if it
-    /// exists.
+    /// If [`PeerState`] pair for the provided [`PeerStateMachine`] already
+    /// exist, then nothing will be done.
     #[allow(clippy::map_entry)]
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         let peer_id = peer.id();
@@ -125,12 +133,15 @@ impl RtcStatsHandler for IceRestartDetector {
         }
     }
 
+    /// Does nothing.
     #[inline]
     fn update_peer(&mut self, _: &PeerStateMachine) {}
 
+    /// Does nothing.
     #[inline]
     fn check(&mut self) {}
 
+    /// Does nothing.
     #[inline]
     fn add_stats(&mut self, _: PeerId, _: &[RtcStat]) {}
 
@@ -141,7 +152,7 @@ impl RtcStatsHandler for IceRestartDetector {
     /// goes to [`PeerConnectionState::Failed`] from
     /// [`PeerConnectionState::Connected`] or
     /// [`PeerConnectionState::Disconnected`].
-    fn update_connection_state(
+    fn update_peer_connection_state(
         &mut self,
         peer_id: PeerId,
         new_state: PeerConnectionState,
@@ -173,7 +184,7 @@ impl RtcStatsHandler for IceRestartDetector {
             }
             peer.update_connection_state(new_state);
         } else {
-            warn!("Peer [id = {}] not found in IceRestartDetector.", peer_id);
+            warn!("Peer [id = {}] not found.", peer_id);
         }
     }
 

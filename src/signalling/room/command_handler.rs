@@ -144,14 +144,14 @@ impl CommandHandler for Room {
                 self.peers.add_stats(peer_id, stats);
             }
             PeerMetrics::PeerConnectionState(state) => {
-                self.peers.update_connection_state(peer_id, state);
+                self.peers.update_peer_connection_state(peer_id, state);
             }
             PeerMetrics::IceConnectionState(_) => (),
         }
         Ok(())
     }
 
-    /// Sends [`Event::TracksApplied`] with data from the received
+    /// Sends [`Event::PeerUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
     /// Starts renegotiation process.

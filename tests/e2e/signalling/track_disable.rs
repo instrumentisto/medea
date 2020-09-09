@@ -24,9 +24,9 @@ use crate::{
 };
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
-// Waits for single/multiple TracksApplied with expected track changes on on
+// Waits for single/multiple PeerUpdated with expected track changes on on
 // `publisher_rx`.
-// Waits for single/multiple TracksApplied with expected track
+// Waits for single/multiple PeerUpdated with expected track
 // changes on on `subscriber_rx`.
 async fn helper(
     disabled: bool,
@@ -160,7 +160,7 @@ async fn track_disables_and_enables_are_instant() {
                 } => {
                     match updates.len() {
                         0 => {
-                            // 0 updates means that TracksApplied must proc
+                            // 0 updates means that PeerUpdated must proc
                             // negotiation
                             negotiation_role.unwrap();
                             None
@@ -262,9 +262,9 @@ async fn track_disables_and_enables_are_instant() {
     mutes_received_by_pub.dedup();
     assert_eq!(mutes_received_by_pub.len(), mutes_received_by_pub_len);
 
-    // make sure that all TracksApplied events received by sub have
+    // make sure that all PeerUpdated events received by sub have
     // Some(NegotiationRole), meaning that there no point to force push
-    // TracksApplied to other member
+    // PeerUpdated to other member
     assert!(mutes_received_by_sub.iter().all(|val| val.1.is_some()));
 
     assert_eq!(

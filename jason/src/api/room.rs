@@ -925,7 +925,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
-    /// [`TrackUpdate`]s.
+    /// [`PeerUpdate`]s.
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.

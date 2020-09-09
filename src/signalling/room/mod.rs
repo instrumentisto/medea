@@ -349,7 +349,7 @@ impl Room {
         )
     }
 
-    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
+    /// Sends [`Event::PeerUpdated`] with latest [`Peer`] changes to specified
     /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
     /// [`NegotiationRole::Offerer`].
     ///

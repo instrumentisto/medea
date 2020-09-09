@@ -114,6 +114,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
+    /// Does nothing.
     #[inline]
     fn update_peer(&mut self, _: &PeerStateMachine) {}
 
@@ -156,8 +157,14 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
+    /// Does nothing.
     #[inline]
-    fn update_connection_state(&mut self, _: PeerId, _: PeerConnectionState) {}
+    fn update_peer_connection_state(
+        &mut self,
+        _: PeerId,
+        _: PeerConnectionState,
+    ) {
+    }
 
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()

@@ -1,3 +1,5 @@
+//! Tests for the ICE restart mechanism.
+
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use actix::Context;
@@ -15,6 +17,8 @@ use crate::{
     test_name,
 };
 
+/// Checks that ICE restarts when `RTCPeerConnection.connectionState` goes to
+/// the `Failed` state.
 #[actix_rt::test]
 #[named]
 async fn ice_restart() {

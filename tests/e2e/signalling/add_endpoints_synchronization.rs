@@ -60,7 +60,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
 /// 5. Add second `WebRtcPlayEndpoint`.
 /// 6. Answer `Event::PeerCreated` with `Command::MakeSdpOffer`.
 /// 7. Make sure that `Event::SdpAnswerMade` is received before
-/// `Event::TracksApplied`, meaning that renegotiation starts only after initial
+/// `Event::PeerUpdated`, meaning that renegotiation starts only after initial
 /// negotiation finishes.
 #[actix_rt::test]
 #[named]
@@ -136,7 +136,7 @@ async fn add_endpoints_synchronization() {
         }
     }
 
-    // Event::SdpAnswerMade must be received before Event::TracksApplied
+    // Event::SdpAnswerMade must be received before Event::PeerUpdated
     loop {
         let event = second_rx.select_next_some().await;
         if let Event::SdpAnswerMade { .. } = event {
@@ -146,7 +146,7 @@ async fn add_endpoints_synchronization() {
         }
     }
 
-    // And now we must receive Event::TracksApplied with 2 TrackUpdate::Added
+    // And now we must receive Event::PeerUpdated with 2 PeerUpdate::Added
     // with Direction::Recv
     loop {
         let event = second_rx.select_next_some().await;
@@ -163,7 +163,7 @@ async fn add_endpoints_synchronization() {
                         Direction::Recv { .. } => {}
                         _ => panic!("expected Direction::Recv"),
                     },
-                    _ => panic!("expected TrackUpdate::Added"),
+                    _ => panic!("expected PeerUpdate::Added"),
                 }
             }
             break;

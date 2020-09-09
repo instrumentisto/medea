@@ -216,6 +216,8 @@ pub struct RtcPeerConnection {
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
 
+    /// Flag which indicates that ICE restart will be performed on next
+    /// [`RtcPeerConnection::create_and_set_offer`] call.
     ice_restart: Cell<bool>,
 
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
@@ -545,7 +547,8 @@ impl RtcPeerConnection {
     /// Tells the [`RtcPeerConnection`] to start ICE restart on renegotiation.
     ///
     /// After this function will be called, the offer returned by the next call
-    /// to createOffer() is automatically configured to trigger ICE restart.
+    /// to [`RtcPeerConnection::create_and_set_offer`] is automatically
+    /// configured to trigger ICE restart.
     pub fn restart_ice(&self) {
         self.ice_restart.set(true);
     }

@@ -195,7 +195,7 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
 }
 
 /// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
-/// be updated with provided [`TrackUpdate`]s without negotiation.
+/// be updated with provided [`PeerUpdate`]s without negotiation.
 ///
 /// Can be done in any [`Peer`] state.
 #[derive(Message, Clone, Debug)]
@@ -206,7 +206,7 @@ impl Handler<ForceUpdate> for Room {
     type Result = Result<(), RoomError>;
 
     /// Gets [`MemberId`] of the provided [`Peer`] and sends all provided
-    /// [`TrackUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
+    /// [`PeerUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
     fn handle(
         &mut self,
         msg: ForceUpdate,
@@ -247,7 +247,7 @@ impl Handler<NegotiationNeeded> for Room {
     /// side.
     ///
     /// If this [`Peer`] or it's partner not [`Stable`] then forcible
-    /// [`TrackChange`]s will be committed.
+    /// [`PeerChange`]s will be committed.
     fn handle(
         &mut self,
         msg: NegotiationNeeded,

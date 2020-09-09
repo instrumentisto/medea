@@ -543,14 +543,14 @@ impl PeersService {
     }
 
     /// Propagates [`PeerConnectionState`] to [`PeersMetricsService`].
-    pub fn update_connection_state(
+    pub fn update_peer_connection_state(
         &self,
         peer_id: PeerId,
         state: PeerConnectionState,
     ) {
         self.peer_metrics_service
             .borrow_mut()
-            .update_connection_state(peer_id, state);
+            .update_peer_connection_state(peer_id, state);
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
@@ -801,7 +801,7 @@ mod tests {
         }
 
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
-        /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly updated.
+        /// [`PeerUpdate`]s of [`Peer`] which are should be forcibly updated.
         #[allow(dead_code)]
         pub fn on_force_update(
             &self,

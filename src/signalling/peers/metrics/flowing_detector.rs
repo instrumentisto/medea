@@ -342,7 +342,12 @@ impl RtcStatsHandler for TrafficFlowDetector {
 
     /// Does nothing.
     #[inline]
-    fn update_connection_state(&mut self, _: PeerId, _: PeerConnectionState) {}
+    fn update_peer_connection_state(
+        &mut self,
+        _: PeerId,
+        _: PeerConnectionState,
+    ) {
+    }
 
     /// Does nothing.
     #[inline]
