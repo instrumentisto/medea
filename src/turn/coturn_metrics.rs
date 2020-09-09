@@ -11,7 +11,7 @@ use actix::{
     fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, StreamExt as _};
-use redis::{ConnectionAddr, ConnectionInfo, RedisError};
+use redis::{ConnectionInfo, RedisError};
 
 use crate::{
     log::prelude::*,
@@ -55,19 +55,7 @@ impl CoturnMetricsService {
         cf: &crate::conf::turn::Turn,
         peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RedisError> {
-        let connection_info = ConnectionInfo {
-            addr: Box::new(ConnectionAddr::Tcp(
-                cf.db.redis.host.to_string(),
-                cf.db.redis.port,
-            )),
-            db: cf.db.redis.db_number,
-            passwd: if cf.db.redis.pass.is_empty() {
-                None
-            } else {
-                Some(cf.db.redis.pass.to_string())
-            },
-        };
-        let client = redis::Client::open(connection_info)?;
+        let client = redis::Client::open(ConnectionInfo::from(&cf.db.redis))?;
 
         Ok(Self {
             client,

@@ -4,6 +4,7 @@ pub mod grpc;
 
 use std::{fmt, sync::Arc};
 
+use async_trait::async_trait;
 use derive_more::From;
 use futures::future::{FutureExt, LocalBoxFuture};
 
@@ -24,13 +25,11 @@ pub enum CallbackClientError {
     TonicTransport(tonic::transport::Error),
 }
 
+#[async_trait(?Send)]
 #[cfg_attr(test, mockall::automock)]
 pub trait CallbackClient: fmt::Debug + Send + Sync {
     /// Sends provided [`CallbackRequest`].
-    fn send(
-        &self,
-        request: CallbackRequest,
-    ) -> LocalBoxFuture<'static, Result<()>>;
+    async fn send(&self, request: CallbackRequest) -> Result<()>;
 }
 
 #[cfg(test)]
