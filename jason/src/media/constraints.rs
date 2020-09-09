@@ -618,6 +618,95 @@ pub struct VideoTrackConstraints {
     is_required: bool,
 }
 
+/// Representation of the [`ConstrainDOMString`].
+///
+/// Can set exact and ideal constrain value.
+///
+/// [`ConstrainDOMString`]: https://tinyurl.com/y6qkebfk
+#[derive(Clone, Copy, Debug)]
+struct StringConstrain<T> {
+    /// If the property can't be set to one of the listed values, matching will
+    /// fail.
+    exact: Option<T>,
+
+    /// If possible, one of the listed values will be used, but if it's not
+    /// possible, the user agent will use the closest possible match.
+    ideal: Option<T>,
+}
+
+impl<T> Default for StringConstrain<T> {
+    fn default() -> Self {
+        Self {
+            exact: None,
+            ideal: None,
+        }
+    }
+}
+
+impl<T> StringConstrain<T> {
+    /// Sets `ideal` property of the constrain.
+    ///
+    /// If the property can't be set to one of the listed values, matching will
+    /// fail.
+    pub fn set_ideal(&mut self, ideal: T) {
+        self.ideal = Some(ideal);
+    }
+
+    /// Sets `exact` property of the constrain.
+    ///
+    /// If possible, one of the listed values will be used, but if it's not
+    /// possible, the user agent will use the closest possible match.
+    pub fn set_exact(&mut self, exact: T) {
+        self.exact = Some(exact);
+    }
+
+    /// Returns `true` if nothing was set in this [`StringConstrain`].
+    pub fn is_empty(&self) -> bool {
+        self.exact.is_none() && self.ideal.is_none()
+    }
+}
+
+impl<T> From<&StringConstrain<T>> for SysConstrainDomStringParameters
+where
+    T: ToString,
+{
+    fn from(from: &StringConstrain<T>) -> Self {
+        let mut constrain = SysConstrainDomStringParameters::new();
+        if let Some(ideal) = &from.ideal {
+            constrain.ideal(&(ideal.to_string().into()));
+        }
+        if let Some(exact) = &from.exact {
+            constrain.exact(&(exact.to_string().into()));
+        }
+
+        constrain
+    }
+}
+
+/// Describes the directions that the camera can face, as seen from the user's
+/// perspective. Representation of [VideoFacingModeEnum][1].
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
+#[wasm_bindgen]
+#[derive(Clone, Copy, PartialEq, Display, Debug)]
+pub enum FacingMode {
+    /// The source is facing toward the user (a self-view camera).
+    #[display(fmt = "user")]
+    User,
+
+    ///  The source is facing away from the user (viewing the environment).
+    #[display(fmt = "environment")]
+    Environment,
+
+    /// The source is facing to the left of the user.
+    #[display(fmt = "left")]
+    Left,
+
+    /// The source is facing to the right of the user.
+    #[display(fmt = "right")]
+    Right,
+}
+
 /// Constraints applicable to video tracks that are sourced from some media
 /// device.
 #[wasm_bindgen]
@@ -691,89 +780,6 @@ impl DeviceVideoTrackConstraints {
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode.set_ideal(facing_mode);
     }
-}
-
-/// Representation of the [`ConstrainDOMString`].
-///
-/// Can set exact and ideal constrain value.
-///
-/// [`ConstrainDOMString`]: https://tinyurl.com/y6qkebfk
-#[derive(Clone, Copy, Debug)]
-struct StringConstrain<T> {
-    /// If the property can't be set to one of the listed values, matching will
-    /// fail.
-    exact: Option<T>,
-
-    /// If possible, one of the listed values will be used, but if it's not
-    /// possible, the user agent will use the closest possible match.
-    ideal: Option<T>,
-}
-
-impl<T> Default for StringConstrain<T> {
-    fn default() -> Self {
-        Self {
-            exact: None,
-            ideal: None,
-        }
-    }
-}
-
-impl<T> StringConstrain<T>
-where
-    T: ToString,
-{
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn set_ideal(&mut self, ideal: T) {
-        self.ideal = Some(ideal);
-    }
-
-    pub fn set_exact(&mut self, exact: T) {
-        self.exact = Some(exact);
-    }
-}
-
-impl<T> From<&StringConstrain<T>> for SysConstrainDomStringParameters
-where
-    T: ToString,
-{
-    fn from(from: &StringConstrain<T>) -> Self {
-        let mut constrain = SysConstrainDomStringParameters::new();
-        if let Some(ideal) = &from.ideal {
-            constrain.ideal(&(ideal.to_string().into()));
-        }
-        if let Some(exact) = &from.exact {
-            constrain.exact(&(exact.to_string().into()));
-        }
-
-        constrain
-    }
-}
-
-/// Describes the directions that the camera can face, as seen from the user's
-/// perspective. Representation of [VideoFacingModeEnum][1].
-///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
-#[wasm_bindgen]
-#[derive(Clone, Copy, PartialEq, Display, Debug)]
-pub enum FacingMode {
-    /// The source is facing toward the user (a self-view camera).
-    #[display(fmt = "user")]
-    User,
-
-    ///  The source is facing away from the user (viewing the environment).
-    #[display(fmt = "environment")]
-    Environment,
-
-    /// The source is facing to the left of the user.
-    #[display(fmt = "left")]
-    Left,
-
-    /// The source is facing to the right of the user.
-    #[display(fmt = "right")]
-    Right,
 }
 
 /// Constraints applicable to video tracks sourced from screen capture.
@@ -896,9 +902,11 @@ impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
             val.exact(&(device_id.into()));
             constraints.device_id(&(val.into()));
         }
-        constraints.facing_mode(&SysConstrainDomStringParameters::from(
-            &track_constraints.facing_mode,
-        ));
+        if !track_constraints.facing_mode.is_empty() {
+            constraints.facing_mode(&SysConstrainDomStringParameters::from(
+                &track_constraints.facing_mode,
+            ));
+        }
 
         constraints
     }
