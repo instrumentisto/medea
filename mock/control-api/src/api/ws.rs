@@ -187,7 +187,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         Err(err) => error!(
                             "Received broadcast message but it is not a valid \
                              JSON: {:?}",
-                            err
+                            err,
                         ),
                     }
                 }

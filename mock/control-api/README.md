@@ -90,13 +90,13 @@ Currently, it supports two kinds of events (`Created` and `Deleted`) with the fo
 }
 ```
 
-Additionally, [WebSocket] clients can send arbitrary messages, and those will be broadcasted to other [WebSocket] clients that subscribed to same `room_id`. The only validation that app makes is that message is a valid JSON.
+#### 3. `Broadcast` event
 
-Broadcast messages has `method` field set to `Broadcast`, and original message goes to `payload`, i.e.: 
+Additionally, [WebSocket] clients can send arbitrary messages, and those will be broadcast to other [WebSocket] clients that subscribed to the same `room_id`. The only validation that app performs is that message is a valid JSON.
 
 ```json
 {
-    "method":"Broadcast",
+    "method": "Broadcast",
     "payload": {
         "anything": "that other user sent",
         "asd": 123 
