@@ -688,7 +688,7 @@ where
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
-#[derive(Clone, Copy, PartialEq, Display, Debug)]
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum FacingMode {
     /// The source is facing toward the user (a self-view camera).
     #[display(fmt = "user")]
