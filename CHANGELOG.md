@@ -39,7 +39,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Emit `PeerUpdated` event to create new and update existing tracks ([#105]);
     - `PeerConnection` renegotiation functionality ([#105]);
-    - Calculate and send call quality score based on RTC stats ([#132]).
+    - Calculate and send call quality score based on RTC stats ([#132]);
+    - Send `PeerUpdate::IceRestart` on `PeerConnection.connectionState` `Failed` ([#138]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -77,6 +78,7 @@ All user visible changes to this project will be documented in this file. This p
 [#105]: /../../pull/105
 [#132]: /../../pull/132
 [#135]: /../../pull/135
+[#138]: /../../pull/138
 
 
 

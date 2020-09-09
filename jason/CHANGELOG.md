@@ -66,7 +66,8 @@ All user visible changes to this project will be documented in this file. This p
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
         - `PeerUpdated` ([#105]);
-        - `ConnectionQualityUpdated` ([#132]).
+        - `ConnectionQualityUpdated` ([#132]);
+        - `PeerUpdated` with `PeerUpdate::IceRestart` ([#138]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -95,6 +96,7 @@ All user visible changes to this project will be documented in this file. This p
 [#123]: /../../pull/123
 [#124]: /../../pull/124
 [#132]: /../../pull/132
+[#138]: /../../pull/138
 
 
 
