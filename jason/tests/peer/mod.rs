@@ -897,7 +897,7 @@ async fn reset_transition_timers() {
         .map(|s| {
             s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 
-            s.when_mute_state_stable(StableMuteState::NotMuted)
+            s.when_mute_state_stable(StableMuteState::Unmuted)
         }),
     )
     .map(|_| ())

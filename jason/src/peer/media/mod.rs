@@ -34,8 +34,7 @@ pub use self::{
     sender::Sender,
 };
 
-/// Represents sending ([`Sender`]) or receiving ([`Receiver`]) side of
-/// transceiver.
+/// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
@@ -47,8 +46,8 @@ pub trait TransceiverSide: Muteable {
     fn mid(&self) -> Option<String>;
 }
 
-/// Provides default functions for dealing with [`MuteStateController`] for
-/// objects that use it.
+/// Default functions for dealing with [`MuteStateController`] for objects that
+/// use it.
 pub trait Muteable {
     /// Returns reference to the [`MuteStateController`].
     fn mute_state_controller(&self) -> Rc<MuteStateController>;
@@ -110,18 +109,18 @@ pub trait Muteable {
         self.mute_state_controller().reset_transition_timeout()
     }
 
-    /// Checks whether mute state of the [`Muteable`] is in
+    /// Indicates whether mute state of the [`Muteable`] is in
     /// [`MuteState::Muted`].
     #[inline]
     fn is_muted(&self) -> bool {
         self.mute_state_controller().is_muted()
     }
 
-    /// Checks whether mute state of the [`Muteable`] is in
-    /// [`MuteState::NotMuted`].
+    /// Indicates whether mute state of the [`Muteable`] is in
+    /// [`MuteState::Unmuted`].
     #[inline]
-    fn is_not_muted(&self) -> bool {
-        self.mute_state_controller().is_not_muted()
+    fn is_unmuted(&self) -> bool {
+        self.mute_state_controller().is_unmuted()
     }
 }
 
@@ -272,8 +271,7 @@ impl MediaConnections {
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`TransceiverKind`] and [`TrackDirection`] is in provided
-    /// [`MuteState`].
+    /// [`TransceiverKind`] and [`TrackDirection`] is in provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
         &self,
         kind: TransceiverKind,
@@ -387,7 +385,7 @@ impl MediaConnections {
                 Direction::Send { mid, .. } => {
                     let mute_state;
                     if send_constraints.is_enabled(&track.media_type) {
-                        mute_state = StableMuteState::NotMuted;
+                        mute_state = StableMuteState::Unmuted;
                     } else if is_required {
                         use MediaConnectionsError as Error;
                         return Err(tracerr::new!(
@@ -455,7 +453,7 @@ impl MediaConnections {
     pub fn get_stream_request(&self) -> Option<StreamRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            if let MuteState::Stable(StableMuteState::NotMuted) =
+            if let MuteState::Stable(StableMuteState::Unmuted) =
                 sender.mute_state()
             {
                 stream_request
@@ -500,8 +498,8 @@ impl MediaConnections {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         for sender in inner.senders.values() {
-            // skip senders that are not NotMuted
-            if !sender.is_not_muted() {
+            // skip senders that are not Unmuted
+            if !sender.is_unmuted() {
                 continue;
             }
 

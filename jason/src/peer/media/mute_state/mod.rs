@@ -1,6 +1,7 @@
 //! [`Muteable`]s mute state.
 //!
 //! [`Muteable`]: super::Muteable
+
 mod controller;
 
 use derive_more::From;
@@ -73,7 +74,7 @@ pub enum StableMuteState {
     /// [`Muteable`] is not muted.
     ///
     /// [`Muteable`]: super::Muteable
-    NotMuted,
+    Unmuted,
 
     /// [`Muteable`] is muted.
     ///
@@ -84,13 +85,13 @@ pub enum StableMuteState {
 impl StableMuteState {
     /// Converts this [`StableMuteState`] into [`MuteStateTransition`].
     ///
-    /// [`StableMuteState::NotMuted`] => [`MuteStateTransition::Muting`].
+    /// [`StableMuteState::Unmuted`] => [`MuteStateTransition::Muting`].
     ///
     /// [`StableMuteState::Muted`] => [`MuteStateTransition::Unmuting`].
     #[inline]
     pub fn start_transition(self) -> MuteStateTransition {
         match self {
-            Self::NotMuted => MuteStateTransition::Muting(self),
+            Self::Unmuted => MuteStateTransition::Muting(self),
             Self::Muted => MuteStateTransition::Unmuting(self),
         }
     }
@@ -102,7 +103,7 @@ impl From<bool> for StableMuteState {
         if is_muted {
             Self::Muted
         } else {
-            Self::NotMuted
+            Self::Unmuted
         }
     }
 }
@@ -131,7 +132,7 @@ impl MuteStateTransition {
     #[inline]
     pub fn intended(self) -> StableMuteState {
         match self {
-            Self::Unmuting(_) => StableMuteState::NotMuted,
+            Self::Unmuting(_) => StableMuteState::Unmuted,
             Self::Muting(_) => StableMuteState::Muted,
         }
     }
@@ -159,29 +160,29 @@ mod test {
     use super::*;
 
     const MUTED: MuteState = MuteState::Stable(StableMuteState::Muted);
-    const NOT_MUTED: MuteState = MuteState::Stable(StableMuteState::NotMuted);
+    const NOT_MUTED: MuteState = MuteState::Stable(StableMuteState::Unmuted);
     const UNMUTING_MUTED: MuteState = MuteState::Transition(
         MuteStateTransition::Unmuting(StableMuteState::Muted),
     );
     const UNMUTING_NOT_MUTED: MuteState = MuteState::Transition(
-        MuteStateTransition::Unmuting(StableMuteState::NotMuted),
+        MuteStateTransition::Unmuting(StableMuteState::Unmuted),
     );
     const MUTING_MUTED: MuteState = MuteState::Transition(
         MuteStateTransition::Muting(StableMuteState::Muted),
     );
     const MUTING_NOT_MUTED: MuteState = MuteState::Transition(
-        MuteStateTransition::Muting(StableMuteState::NotMuted),
+        MuteStateTransition::Muting(StableMuteState::Unmuted),
     );
 
     #[test]
     fn transition_to() {
         assert_eq!(MUTED.transition_to(StableMuteState::Muted), MUTED);
         assert_eq!(
-            MUTED.transition_to(StableMuteState::NotMuted),
+            MUTED.transition_to(StableMuteState::Unmuted),
             UNMUTING_MUTED
         );
         assert_eq!(
-            NOT_MUTED.transition_to(StableMuteState::NotMuted),
+            NOT_MUTED.transition_to(StableMuteState::Unmuted),
             NOT_MUTED
         );
         assert_eq!(
@@ -194,7 +195,7 @@ mod test {
             MUTING_MUTED
         );
         assert_eq!(
-            UNMUTING_MUTED.transition_to(StableMuteState::NotMuted),
+            UNMUTING_MUTED.transition_to(StableMuteState::Unmuted),
             UNMUTING_MUTED
         );
         assert_eq!(
@@ -202,7 +203,7 @@ mod test {
             MUTING_NOT_MUTED
         );
         assert_eq!(
-            MUTING_NOT_MUTED.transition_to(StableMuteState::NotMuted),
+            MUTING_NOT_MUTED.transition_to(StableMuteState::Unmuted),
             UNMUTING_NOT_MUTED
         );
         assert_eq!(
@@ -210,7 +211,7 @@ mod test {
             MUTING_MUTED
         );
         assert_eq!(
-            MUTING_MUTED.transition_to(StableMuteState::NotMuted),
+            MUTING_MUTED.transition_to(StableMuteState::Unmuted),
             UNMUTING_MUTED
         );
         assert_eq!(
@@ -218,7 +219,7 @@ mod test {
             MUTING_NOT_MUTED
         );
         assert_eq!(
-            UNMUTING_NOT_MUTED.transition_to(StableMuteState::NotMuted),
+            UNMUTING_NOT_MUTED.transition_to(StableMuteState::Unmuted),
             UNMUTING_NOT_MUTED
         );
     }

@@ -74,7 +74,7 @@ impl<'a> SenderBuilder<'a> {
                 while let Some(mute_state) = mute_state_rx.next().await {
                     if let Some(this) = weak_this.upgrade() {
                         match mute_state {
-                            StableMuteState::NotMuted => {
+                            StableMuteState::Unmuted => {
                                 this.set_transceiver_direction(
                                     TransceiverDirection::Sendonly,
                                 );
@@ -145,9 +145,8 @@ impl Sender {
             }
         }
 
-        // no-op if transceiver is not NotMuted
-        if let MuteState::Stable(StableMuteState::NotMuted) = self.mute_state()
-        {
+        // no-op if transceiver is not Unmuted
+        if let MuteState::Stable(StableMuteState::Unmuted) = self.mute_state() {
             JsFuture::from(
                 self.transceiver
                     .sender()

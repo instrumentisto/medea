@@ -734,7 +734,7 @@ impl InnerRoom {
     }
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
-    /// [`TransceiverKind`] of this [`Room`] are in provided [`MuteState`].
+    /// [`TransceiverKind`] of this [`Room`] are in the provided `mute_state`.
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
