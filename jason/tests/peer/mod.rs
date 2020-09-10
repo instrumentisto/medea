@@ -22,7 +22,8 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager, RecvConstraints, TrackKind},
     peer::{
-        PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
+        PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
+        TransceiverKind,
     },
 };
 use wasm_bindgen_test::*;
@@ -881,14 +882,23 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_senders(TransceiverKind::Audio)
-            .into_iter()
-            .chain(peer.get_senders(TransceiverKind::Video).into_iter())
-            .map(|s| {
-                s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+        peer.get_transceivers_sides(
+            TransceiverKind::Audio,
+            TrackDirection::Send,
+        )
+        .into_iter()
+        .chain(
+            peer.get_transceivers_sides(
+                TransceiverKind::Video,
+                TrackDirection::Send,
+            )
+            .into_iter(),
+        )
+        .map(|s| {
+            s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 
-                s.when_mute_state_stable(StableMuteState::NotMuted)
-            }),
+            s.when_mute_state_stable(StableMuteState::Unmuted)
+        }),
     )
     .map(|_| ())
     .shared();

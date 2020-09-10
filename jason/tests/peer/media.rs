@@ -7,7 +7,7 @@ use medea_client_api_proto::{PeerId, TrackId, TrackPatch};
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager, RecvConstraints},
     peer::{
-        MediaConnections, RtcPeerConnection, SimpleStreamRequest,
+        MediaConnections, Muteable, RtcPeerConnection, SimpleStreamRequest,
         StableMuteState,
     },
 };
@@ -152,7 +152,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_muted());
 
     audio_track
-        .mute_state_transition_to(StableMuteState::NotMuted)
+        .mute_state_transition_to(StableMuteState::Unmuted)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatch {
@@ -164,7 +164,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_muted());
 
     video_track
-        .mute_state_transition_to(StableMuteState::NotMuted)
+        .mute_state_transition_to(StableMuteState::Unmuted)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatch {
