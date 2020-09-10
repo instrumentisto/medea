@@ -48,7 +48,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Sender, StableMuteState, TrackDirection,
+        MuteStateTransition, Muteable, Sender, StableMuteState, TrackDirection,
+        TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -409,16 +410,18 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Returns `true` if all [`Sender`]s of this [`PeerConnection`] is in
-    /// the provided `mute_state`.
+    /// Returns `true` if all [`TransceiverSide`]s with a provided
+    /// [`TransceiverKind`] and [`TrackDirection`] is in the provided
+    /// [`StableMuteState`].
     #[inline]
-    pub fn is_all_senders_in_mute_state(
+    pub fn is_all_transceiver_sides_in_mute_state(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections
-            .is_all_senders_in_mute_state(kind, mute_state)
+            .is_all_tracks_in_mute_state(kind, direction, mute_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
@@ -503,7 +506,7 @@ impl PeerConnection {
         let transceiver = track_event.transceiver();
         let track = MediaStreamTrack::from(track_event.track());
         media_connections
-            .add_remote_track(transceiver, Clone::clone(&track))
+            .add_remote_track(transceiver, track)
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
@@ -527,11 +530,16 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
-    /// [`TransceiverKind`].
+    /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
+    /// provided [`TransceiverKind`] and [`TrackDirection`].
     #[inline]
-    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
-        self.media_connections.get_senders(kind)
+    pub fn get_transceivers_sides(
+        &self,
+        kind: TransceiverKind,
+        direction: TrackDirection,
+    ) -> Vec<Rc<dyn TransceiverSide>> {
+        self.media_connections
+            .get_transceivers_sides(kind, direction)
     }
 
     /// Track id to mid relations of all send tracks of this
