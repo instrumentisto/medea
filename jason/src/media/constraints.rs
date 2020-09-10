@@ -1,9 +1,11 @@
+// TODO: Split to multiple modules.
+
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
 
-use derive_more::Display;
+use derive_more::AsRef;
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
     MediaType, VideoSettings as ProtoVideoConstraints,
@@ -11,7 +13,6 @@ use medea_client_api_proto::{
 use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
-    ConstrainDomStringParameters as SysConstrainDomStringParameters,
     MediaStreamConstraints as SysMediaStreamConstraints,
     MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
     MediaTrackConstraints as SysMediaTrackConstraints,
@@ -437,26 +438,6 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
     }
 }
 
-/// Checks that the [MediaStreamTrack][1] is taken from a device
-/// with given [deviceId][2].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-/// [2]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
-fn satisfies_by_device_id(
-    device_id: &Option<String>,
-    track: &SysMediaStreamTrack,
-) -> bool {
-    match device_id {
-        None => true,
-        Some(device_id) => {
-            get_property_by_name(&track.get_settings(), "deviceId", |v| {
-                v.as_string()
-            })
-            .map_or(false, |id| id.as_str() == device_id)
-        }
-    }
-}
-
 /// Wrapper around [MediaTrackConstraints][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#media-track-constraints
@@ -514,7 +495,7 @@ impl From<ProtoTrackConstraints> for TrackConstraints {
 pub struct AudioTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
-    device_id: Option<String>,
+    device_id: Option<ConstrainString<DeviceId>>,
 
     /// Importance of this [`AudioTrackConstraints`].
     ///
@@ -531,11 +512,11 @@ impl AudioTrackConstraints {
         Self::default()
     }
 
-    /// Sets [deviceId][1] constraint.
+    /// Sets exact [deviceId][1] constraint.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
-        self.device_id = Some(device_id);
+        self.device_id = Some(ConstrainString::Exact(DeviceId(device_id)));
     }
 }
 
@@ -554,7 +535,7 @@ impl AudioTrackConstraints {
             return false;
         }
 
-        satisfies_by_device_id(&self.device_id, track)
+        ConstrainString::satisfies(&self.device_id, track)
         // TODO returns Result<bool, Error>
     }
 
@@ -594,9 +575,8 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
         let mut constraints = Self::new();
 
         if let Some(device_id) = track_constraints.device_id {
-            let mut val = ConstrainDomStringParameters::new();
-            val.exact(&(device_id.into()));
-            constraints.device_id(&(val.into()));
+            constraints
+                .device_id(&ConstrainDomStringParameters::from(&device_id));
         }
 
         constraints
@@ -618,68 +598,29 @@ pub struct VideoTrackConstraints {
     is_required: bool,
 }
 
-/// Representation of the [`ConstrainDOMString`].
+/// Constraints applicable to [MediaStreamTrack][1].
 ///
-/// Can set exact and ideal constrain value.
+/// Constraints provide a general control surface that allows applications to
+/// both select an appropriate source for a track and, once selected, to
+/// influence how a source operates.
 ///
-/// [`ConstrainDOMString`]: https://tinyurl.com/y6qkebfk
-#[derive(Clone, Copy, Debug)]
-struct StringConstrain<T> {
-    /// If the property can't be set to one of the listed values, matching will
-    /// fail.
-    exact: Option<T>,
-
-    /// If possible, one of the listed values will be used, but if it's not
-    /// possible, the user agent will use the closest possible match.
-    ideal: Option<T>,
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+trait Constraint {
+    /// Returns constrained parameter field name.
+    fn track_settings_field_name() -> &'static str;
 }
 
-impl<T> Default for StringConstrain<T> {
-    fn default() -> Self {
-        Self {
-            exact: None,
-            ideal: None,
-        }
-    }
-}
+/// The identifier of the device generating the content of the
+/// [MediaStreamTrack][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+#[derive(AsRef, Clone, Debug)]
+#[as_ref(forward)]
+struct DeviceId(String);
 
-impl<T> StringConstrain<T> {
-    /// Sets `ideal` property of the constrain.
-    ///
-    /// If the property can't be set to one of the listed values, matching will
-    /// fail.
-    pub fn set_ideal(&mut self, ideal: T) {
-        self.ideal = Some(ideal);
-    }
-
-    /// Sets `exact` property of the constrain.
-    ///
-    /// If possible, one of the listed values will be used, but if it's not
-    /// possible, the user agent will use the closest possible match.
-    pub fn set_exact(&mut self, exact: T) {
-        self.exact = Some(exact);
-    }
-
-    /// Returns `true` if nothing was set in this [`StringConstrain`].
-    pub fn is_empty(&self) -> bool {
-        self.exact.is_none() && self.ideal.is_none()
-    }
-}
-
-impl<T> From<&StringConstrain<T>> for SysConstrainDomStringParameters
-where
-    T: ToString,
-{
-    fn from(from: &StringConstrain<T>) -> Self {
-        let mut constrain = SysConstrainDomStringParameters::new();
-        if let Some(ideal) = &from.ideal {
-            constrain.ideal(&(ideal.to_string().into()));
-        }
-        if let Some(exact) = &from.exact {
-            constrain.exact(&(exact.to_string().into()));
-        }
-
-        constrain
+impl Constraint for DeviceId {
+    fn track_settings_field_name() -> &'static str {
+        "deviceId"
     }
 }
 
@@ -688,23 +629,78 @@ where
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Display, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FacingMode {
     /// The source is facing toward the user (a self-view camera).
-    #[display(fmt = "user")]
     User,
 
-    ///  The source is facing away from the user (viewing the environment).
-    #[display(fmt = "environment")]
+    /// The source is facing away from the user (viewing the environment).
     Environment,
 
     /// The source is facing to the left of the user.
-    #[display(fmt = "left")]
     Left,
 
     /// The source is facing to the right of the user.
-    #[display(fmt = "right")]
     Right,
+}
+
+impl AsRef<str> for FacingMode {
+    fn as_ref(&self) -> &str {
+        match self {
+            FacingMode::User => "user",
+            FacingMode::Environment => "environment",
+            FacingMode::Left => "left",
+            FacingMode::Right => "right",
+        }
+    }
+}
+
+impl Constraint for FacingMode {
+    fn track_settings_field_name() -> &'static str {
+        "facingMode"
+    }
+}
+
+/// Representation of the [ConstrainDOMString].
+///
+/// Can set exact(must be the parameter's value) and ideal(should be used if
+/// possible) constrain.
+///
+/// [ConstrainDOMString]: https://tinyurl.com/y6qkebfk
+#[derive(Clone, Copy, Debug)]
+enum ConstrainString<T> {
+    Exact(T),
+    Ideal(T),
+}
+
+impl<T: Constraint + AsRef<str>> ConstrainString<T> {
+    fn satisfies(this: &Option<Self>, track: &SysMediaStreamTrack) -> bool {
+        match this {
+            None | Some(ConstrainString::Ideal(_)) => true,
+            Some(ConstrainString::Exact(constrain)) => get_property_by_name(
+                &track.get_settings(),
+                T::track_settings_field_name(),
+                |v| v.as_string(),
+            )
+            .map_or(false, |id| id.as_str() == constrain.as_ref()),
+        }
+    }
+}
+
+impl<T: AsRef<str>> From<&ConstrainString<T>> for ConstrainDomStringParameters {
+    fn from(from: &ConstrainString<T>) -> Self {
+        let mut constraint = ConstrainDomStringParameters::new();
+        match from {
+            ConstrainString::Exact(val) => {
+                constraint.exact(&JsValue::from_str(val.as_ref()))
+            }
+            ConstrainString::Ideal(val) => {
+                constraint.ideal(&JsValue::from_str(val.as_ref()))
+            }
+        };
+
+        constraint
+    }
 }
 
 /// Constraints applicable to video tracks that are sourced from some media
@@ -712,20 +708,19 @@ pub enum FacingMode {
 #[wasm_bindgen]
 #[derive(Clone, Debug, Default)]
 pub struct DeviceVideoTrackConstraints {
-    /// The identifier of the device generating the content for the media
-    /// track.
-    device_id: Option<String>,
-
     /// Importance of this [`DeviceVideoTrackConstraints`].
     ///
     /// If `true` then without this [`DeviceVideoTrackConstraints`] call
     /// session can't be started.
     is_required: bool,
 
-    /// [facingMode][1] constraint.
-    ///
-    /// [1]: https://tinyurl.com/y2ks2mjj
-    facing_mode: StringConstrain<FacingMode>,
+    /// The identifier of the device generating the content for the media
+    /// track.
+    device_id: Option<ConstrainString<DeviceId>>,
+
+    /// Describes the directions that the camera can face, as seen from the
+    /// user's perspective.
+    facing_mode: Option<ConstrainString<FacingMode>>,
 }
 
 impl DeviceVideoTrackConstraints {
@@ -738,6 +733,9 @@ impl DeviceVideoTrackConstraints {
         }
         if !self.is_required && another.is_required {
             self.is_required = another.is_required;
+        }
+        if self.facing_mode.is_none() && another.facing_mode.is_some() {
+            self.facing_mode = another.facing_mode;
         }
     }
 
@@ -760,25 +758,25 @@ impl DeviceVideoTrackConstraints {
         Self::default()
     }
 
-    /// Sets [deviceId][1] constraint.
+    /// Sets exact [deviceId][1] constraint.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
-        self.device_id = Some(device_id);
+        self.device_id = Some(ConstrainString::Exact(DeviceId(device_id)));
     }
 
     /// Sets exact [facingMode][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2ks2mjj
     pub fn exact_facing_mode(&mut self, facing_mode: FacingMode) {
-        self.facing_mode.set_exact(facing_mode);
+        self.facing_mode = Some(ConstrainString::Exact(facing_mode));
     }
 
     /// Sets ideal [facingMode][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2ks2mjj
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
-        self.facing_mode.set_ideal(facing_mode);
+        self.facing_mode = Some(ConstrainString::Ideal(facing_mode));
     }
 }
 
@@ -825,7 +823,11 @@ impl VideoTrackConstraints {
         match &self.constraints {
             None => true,
             Some(StreamSource::Device(constraints)) => {
-                satisfies_by_device_id(&constraints.device_id, track)
+                ConstrainString::satisfies(&constraints.device_id, track)
+                    && ConstrainString::satisfies(
+                        &constraints.facing_mode,
+                        track,
+                    )
                     && !Self::guess_is_from_display(&track)
             }
             Some(StreamSource::Display(_)) => {
@@ -898,14 +900,12 @@ impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
         let mut constraints = Self::new();
 
         if let Some(device_id) = track_constraints.device_id {
-            let mut val = ConstrainDomStringParameters::new();
-            val.exact(&(device_id.into()));
-            constraints.device_id(&(val.into()));
+            constraints
+                .device_id(&ConstrainDomStringParameters::from(&device_id));
         }
-        if !track_constraints.facing_mode.is_empty() {
-            constraints.facing_mode(&SysConstrainDomStringParameters::from(
-                &track_constraints.facing_mode,
-            ));
+        if let Some(facing_mode) = track_constraints.facing_mode {
+            constraints
+                .facing_mode(&ConstrainDomStringParameters::from(&facing_mode));
         }
 
         constraints
