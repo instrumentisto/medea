@@ -258,9 +258,9 @@
           } else {
             let video = new DeviceVideoTrackConstraints();
             if (videoSource.value === 'facingModeUser') {
-              video.ideal_facing_mode(FacingMode.User);
+              video.exact_facing_mode(FacingMode.User);
             } else if (videoSource.value === 'facingModeEnvironment') {
-              video.ideal_facing_mode(FacingMode.Environment);
+              video.exact_facing_mode(FacingMode.Environment);
             } else {
               video.device_id(videoSource.value);
             }

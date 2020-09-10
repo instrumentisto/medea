@@ -512,9 +512,9 @@ window.onload = async function() {
         } else {
           let video = new rust.DeviceVideoTrackConstraints();
           if (videoSource.value === 'facingModeUser') {
-            video.ideal_facing_mode(rust.FacingMode.User);
+            video.exact_facing_mode(rust.FacingMode.User);
           } else if (videoSource.value === 'facingModeEnvironment') {
-            video.ideal_facing_mode(rust.FacingMode.Environment);
+            video.exact_facing_mode(rust.FacingMode.Environment);
           } else {
             video.device_id(videoSource.value);
           }
