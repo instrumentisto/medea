@@ -563,6 +563,7 @@ impl RtcPeerConnection {
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
         desc.sdp(&answer);
+
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
@@ -601,6 +602,7 @@ impl RtcPeerConnection {
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
         desc.sdp(&offer);
+
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
@@ -637,6 +639,7 @@ impl RtcPeerConnection {
                 desc
             }
         };
+
         JsFuture::from(self.peer.set_remote_description(&description))
             .await
             .map_err(Into::into)

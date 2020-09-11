@@ -262,6 +262,12 @@ impl Muteable for Sender {
         self.mute_state.clone()
     }
 
+    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    ///
+    /// # Errors
+    ///
+    /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
+    /// required for the call and can't be muted.
     fn mute_state_transition_to(
         &self,
         desired_state: StableMuteState,

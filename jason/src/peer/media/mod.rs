@@ -629,7 +629,7 @@ impl MediaConnections {
 
     /// Returns all references to the [`MuteableTrack`]s from this
     /// [`MediaConnections`].
-    fn get_all_muteable_tracks(&self) -> Vec<Rc<dyn TransceiverSide>> {
+    fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {
         let inner = self.0.borrow();
         inner
             .senders
@@ -646,14 +646,14 @@ impl MediaConnections {
 
     /// Stops all [`MuteableTrack`]s state transitions expiry timers.
     pub fn stop_state_transitions_timers(&self) {
-        self.get_all_muteable_tracks()
+        self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.stop_mute_state_transition_timeout())
     }
 
     /// Resets all [`MuteableTrack`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
-        self.get_all_muteable_tracks()
+        self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.reset_mute_state_transition_timeout());
     }
