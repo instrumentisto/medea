@@ -627,20 +627,20 @@ impl Constraint for DeviceId {
 /// Describes the directions that the camera can face, as seen from the user's
 /// perspective. Representation of [VideoFacingModeEnum][1].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FacingMode {
-    /// The source is facing toward the user (a self-view camera).
+    /// Facing toward the user (a self-view camera).
     User,
 
-    /// The source is facing away from the user (viewing the environment).
+    /// Facing away from the user (viewing the environment).
     Environment,
 
-    /// The source is facing to the left of the user.
+    /// Facing to the left of the user.
     Left,
 
-    /// The source is facing to the right of the user.
+    /// Facing to the right of the user.
     Right,
 }
 
@@ -661,12 +661,12 @@ impl Constraint for FacingMode {
     }
 }
 
-/// Representation of the [ConstrainDOMString].
+/// Representation of the [ConstrainDOMString][1].
 ///
-/// Can set exact(must be the parameter's value) and ideal(should be used if
+/// Can set exact (must be the parameter's value) and ideal (should be used if
 /// possible) constrain.
 ///
-/// [ConstrainDOMString]: https://tinyurl.com/y6qkebfk
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
 #[derive(Clone, Copy, Debug)]
 enum ConstrainString<T> {
     Exact(T),
@@ -767,14 +767,14 @@ impl DeviceVideoTrackConstraints {
 
     /// Sets exact [facingMode][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y2ks2mjj
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
     pub fn exact_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode = Some(ConstrainString::Exact(facing_mode));
     }
 
     /// Sets ideal [facingMode][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y2ks2mjj
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode = Some(ConstrainString::Ideal(facing_mode));
     }
