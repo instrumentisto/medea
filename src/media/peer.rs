@@ -602,26 +602,18 @@ impl<T> Peer<T> {
 
     /// Dedups [`PeerChange::IceRestart`]s.
     fn dedup_ice_restarts(&mut self) {
-        let ice_restarts_count = self
-            .context
-            .pending_peer_updates
+        let vec = &mut self.context.pending_peer_updates;
+        let index = vec
             .iter()
-            .filter(|c| matches!(c, PeerChange::IceRestart))
-            .count();
-        if ice_restarts_count > 1 {
-            let ice_restart_to_remove_count = ice_restarts_count - 1;
-            let mut removed_ice_restarts = 0;
-            self.context.pending_peer_updates.retain(|c| {
-                if let PeerChange::IceRestart = c {
-                    if removed_ice_restarts < ice_restart_to_remove_count {
-                        removed_ice_restarts += 1;
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
+            .rev()
+            .position(|item| matches!(item, PeerChange::IceRestart));
+        if let Some(index) = index {
+            // get non-reversed index
+            let index = vec.len() - 1 - index;
+            let mut i = 0;
+            vec.retain(|item| {
+                let is_ice_restart = matches!(item, PeerChange::IceRestart);
+                (!is_ice_restart || (is_ice_restart && i == index), i += 1).0
             });
         }
     }

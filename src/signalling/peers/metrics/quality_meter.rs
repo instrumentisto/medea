@@ -164,6 +164,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         _: PeerId,
         _: PeerConnectionState,
     ) {
+        // TODO: we should use states when calculating quality score
     }
 
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {

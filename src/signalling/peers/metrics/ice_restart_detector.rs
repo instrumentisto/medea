@@ -175,7 +175,9 @@ impl RtcStatsHandler for IceRestartDetector {
                                 peer_id
                             );
                             self.event_tx.send_event(
-                                PeersMetricsEvent::IceRestartNeeded { peer_id },
+                                PeersMetricsEvent::PeerConnectionFailed {
+                                    peer_id,
+                                },
                             );
                         }
                     }
