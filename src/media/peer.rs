@@ -602,18 +602,22 @@ impl<T> Peer<T> {
 
     /// Dedups [`PeerChange::IceRestart`]s.
     fn dedup_ice_restarts(&mut self) {
-        let vec = &mut self.context.pending_peer_updates;
-        let index = vec
+        let pending_peer_updates = &mut self.context.pending_peer_updates;
+        let last_ice_restart_rev_index = pending_peer_updates
             .iter()
             .rev()
             .position(|item| matches!(item, PeerChange::IceRestart));
-        if let Some(index) = index {
-            // get non-reversed index
-            let index = vec.len() - 1 - index;
-            let mut i = 0;
-            vec.retain(|item| {
-                let is_ice_restart = matches!(item, PeerChange::IceRestart);
-                (!is_ice_restart || (is_ice_restart && i == index), i += 1).0
+        if let Some(last_ice_restart_rev_index) = last_ice_restart_rev_index {
+            let last_ice_restart_index =
+                pending_peer_updates.len() - 1 - last_ice_restart_rev_index;
+            pending_peer_updates.retain({
+                let mut i = 0;
+                move |item| {
+                    let is_last_ice_restart = i == last_ice_restart_index;
+                    i += 1;
+                    !matches!(item, PeerChange::IceRestart)
+                        || is_last_ice_restart
+                }
             });
         }
     }

@@ -42,30 +42,18 @@ impl QualityMeterStatsHandler {
         }
     }
 
-    /// Recalculates [`ConnectionQualityScore`] for the provided
-    /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
-    /// new score is not equal to the previously calculated score.
-    fn update_quality_score(&self, peer: &mut PeerMetric) {
-        let partner_score = peer
-            .partner_peer
-            .upgrade()
-            .and_then(|p| p.borrow_mut().quality_meter.calculate());
-        let score = peer
-            .quality_meter
-            .calculate()
-            .and_then(|score| {
-                partner_score
-                    .map(|partner_score| score.min(partner_score))
-                    .or_else(|| Some(score))
-            })
-            .or_else(|| partner_score);
-
-        if let Some(quality_score) = score {
-            if quality_score == peer.last_quality_score {
-                return;
-            }
-
+    /// Sends [`ConnectionQualityScore`] update with a [`EventSender`].
+    ///
+    /// Doesn't sends anything if [`PeerMetric::last_quality_score`] equals to
+    /// the provided [`ConnectionQualityScore`].
+    fn send_quality_score_update(
+        &self,
+        peer: &mut PeerMetric,
+        quality_score: ConnectionQualityScore,
+    ) {
+        if quality_score == peer.last_quality_score {
             peer.last_quality_score = quality_score;
+
             if let Some(partner_member_id) = peer.get_partner_member_id() {
                 self.event_tx.send_event(
                     PeersMetricsEvent::QualityMeterUpdate {
@@ -75,6 +63,39 @@ impl QualityMeterStatsHandler {
                     },
                 );
             }
+        }
+    }
+
+    /// Calculates [`ConnectionQualityScore`] with [`Peer`]'s and partner
+    /// [`Peer`]'s [`QualityMeter`].
+    fn calculate_quality_score_based_on_rtc_stats(
+        &self,
+        peer: &mut PeerMetric,
+    ) -> Option<ConnectionQualityScore> {
+        let partner_score = peer
+            .partner_peer
+            .upgrade()
+            .and_then(|p| p.borrow_mut().quality_meter.calculate());
+        peer.quality_meter
+            .calculate()
+            .and_then(|score| {
+                partner_score
+                    .map(|partner_score| score.min(partner_score))
+                    .or_else(|| Some(score))
+            })
+            .or_else(|| partner_score)
+    }
+
+    /// Recalculates [`ConnectionQualityScore`] for the provided
+    /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
+    /// new score is not equal to the previously calculated score.
+    fn update_quality_score(&self, peer: &mut PeerMetric) {
+        let score = peer
+            .calculate_quality_score_based_on_connection_state()
+            .or_else(|| self.calculate_quality_score_based_on_rtc_stats(peer));
+
+        if let Some(quality_score) = score {
+            self.send_quality_score_update(peer, quality_score);
         }
     }
 }
@@ -97,6 +118,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
             member_id: peer.member_id(),
             partner_peer,
             quality_meter: QualityMeter::new(Duration::from_secs(5)),
+            last_connection_state: PeerConnectionState::New,
             last_quality_score: ConnectionQualityScore::Low,
         }));
         self.peers.insert(peer.id(), peer_metric.clone());
@@ -157,14 +179,16 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
-    /// Does nothing.
+    /// Updates [`PeerMetric::last_connection_state`].
     #[inline]
     fn update_peer_connection_state(
         &mut self,
-        _: PeerId,
-        _: PeerConnectionState,
+        peer_id: PeerId,
+        connection_state: PeerConnectionState,
     ) {
-        // TODO: we should use states when calculating quality score
+        if let Some(peer) = self.peers.get(&peer_id) {
+            peer.borrow_mut().last_connection_state = connection_state;
+        }
     }
 
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
@@ -190,6 +214,9 @@ struct PeerMetric {
 
     /// Last calculated [`ConnectionQualityScore`].
     last_quality_score: ConnectionQualityScore,
+
+    /// Last receiver [`PeerConnectionState`].
+    last_connection_state: PeerConnectionState,
 }
 
 impl PeerMetric {
@@ -227,6 +254,21 @@ impl PeerMetric {
         self.partner_peer
             .upgrade()
             .map(|partner_peer| partner_peer.borrow().member_id.clone())
+    }
+
+    /// Calculates [`ConnectionQualityScore`] based on the
+    /// [`PeerMetric::last_connection_state`].
+    ///
+    /// Returns `Some(ConnectionQualityScore::Poor` if
+    /// [`PeerMetric::last_connection_state`] is
+    /// [`PeerConnectionState::Failed`].
+    fn calculate_quality_score_based_on_connection_state(
+        &self,
+    ) -> Option<ConnectionQualityScore> {
+        match self.last_connection_state {
+            PeerConnectionState::Failed => Some(ConnectionQualityScore::Poor),
+            _ => None,
+        }
     }
 }
 
