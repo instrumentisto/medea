@@ -27,9 +27,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, MuteableTrack, PeerConnection,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
-        StableMuteState, TrackDirection, TransceiverKind,
+        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
+        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
+        TrackDirection, TransceiverKind, TransceiverSide,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -243,7 +243,7 @@ impl RoomHandle {
         Ok(())
     }
 
-    /// Enables or disable specified media type publish in all
+    /// Enables or disables specified media type publish in all
     /// [`PeerConnection`]s.
     async fn set_track_enabled(
         &self,
@@ -708,8 +708,8 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
-    /// [`PeerConnection`]s in this [`Room`].
+    /// Toggles [`TransceiverSide`]s [`MuteState`] by provided
+    /// [`TransceiverKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     #[allow(clippy::filter_map)]
@@ -725,38 +725,43 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders = peer.get_muteable_tracks(kind, direction);
+                let transceivers_sides =
+                    peer.get_transceivers_sides(kind, direction);
 
-                let senders_to_mute = senders.into_iter().filter(|sender| {
-                    match sender.individual_mute_state() {
-                        MuteState::Transition(t) => {
-                            t.intended() != desired_state
+                let transceivers_sides_to_mute =
+                    transceivers_sides.into_iter().filter(|transceiver_side| {
+                        match transceiver_side.mute_state() {
+                            MuteState::Transition(t) => {
+                                t.intended() != desired_state
+                            }
+                            MuteState::Stable(s) => s != desired_state,
                         }
-                        MuteState::Stable(s) => s != desired_state,
-                    }
-                });
+                    });
 
-                let mut processed_senders: Vec<Rc<dyn MuteableTrack>> =
-                    Vec::new();
+                let mut processed_transceivers_sides: Vec<
+                    Rc<dyn TransceiverSide>,
+                > = Vec::new();
                 let mut tracks_patches = Vec::new();
-                for sender in senders_to_mute {
-                    if let Err(e) =
-                        sender.mute_state_transition_to(desired_state)
+                for transceiver_side_to_mute in transceivers_sides_to_mute {
+                    if let Err(e) = transceiver_side_to_mute
+                        .mute_state_transition_to(desired_state)
                     {
-                        for processed_sender in processed_senders {
-                            processed_sender.cancel_transition();
+                        for processed_transceiver_side in
+                            processed_transceivers_sides
+                        {
+                            processed_transceiver_side.cancel_transition();
                         }
                         return Either::Left(future::err(tracerr::new!(e)));
                     }
                     tracks_patches.push(ClientTrackPatch {
-                        id: sender.track_id(),
+                        id: transceiver_side_to_mute.track_id(),
                         is_muted: Some(is_muted),
                     });
-                    processed_senders.push(sender);
+                    processed_transceivers_sides.push(transceiver_side_to_mute);
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_muteable_tracks(kind, direction)
+                    .get_transceivers_sides(kind, direction)
                     .into_iter()
                     .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
@@ -778,8 +783,8 @@ impl InnerRoom {
         Ok(())
     }
 
-    /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
-    /// [`MuteState`].
+    /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
+    /// [`TransceiverKind`] of this [`Room`] are in the provided `mute_state`.
     pub fn is_all_peers_in_mute_state(
         &self,
         kind: TransceiverKind,
@@ -790,7 +795,9 @@ impl InnerRoom {
             .get_all()
             .into_iter()
             .find(|p| {
-                !p.is_all_tracks_in_mute_state(kind, direction, mute_state)
+                !p.is_all_transceiver_sides_in_mute_state(
+                    kind, direction, mute_state,
+                )
             })
             .is_none()
     }

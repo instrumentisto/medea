@@ -7,8 +7,8 @@ use medea_client_api_proto::{PeerId, ServerTrackPatch, TrackId};
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager, RecvConstraints},
     peer::{
-        MediaConnections, MuteableTrack, RtcPeerConnection,
-        SimpleStreamRequest, StableMuteState,
+        MediaConnections, Muteable, RtcPeerConnection, SimpleStreamRequest,
+        StableMuteState,
     },
 };
 use wasm_bindgen_test::*;
@@ -154,7 +154,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_general_muted());
 
     audio_track
-        .mute_state_transition_to(StableMuteState::NotMuted)
+        .mute_state_transition_to(StableMuteState::Unmuted)
         .unwrap();
     media_connections
         .patch_tracks(vec![ServerTrackPatch {
@@ -167,7 +167,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_general_muted());
 
     video_track
-        .mute_state_transition_to(StableMuteState::NotMuted)
+        .mute_state_transition_to(StableMuteState::Unmuted)
         .unwrap();
     media_connections
         .patch_tracks(vec![ServerTrackPatch {
@@ -311,7 +311,7 @@ mod receiver_patch {
         let (tx, rx) = mpsc::unbounded();
         let recv = Receiver::new(
             TRACK_ID,
-            &(MediaType::Audio(AudioSettings { is_required: true }).into()),
+            MediaType::Audio(AudioSettings { is_required: true }).into(),
             MemberId(SENDER_ID.to_string()),
             &Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
             Some(MID.to_string()),
@@ -319,7 +319,7 @@ mod receiver_patch {
             &RecvConstraints::default(),
         );
 
-        (recv, rx)
+        (Rc::new(recv), rx)
     }
 
     #[wasm_bindgen_test]

@@ -7,8 +7,7 @@ mod sender;
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
 use derive_more::Display;
-use future::LocalBoxFuture;
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
@@ -17,7 +16,7 @@ use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
     media::{LocalStreamConstraints, RecvConstraints},
-    peer::{media::mute_state::MuteStateController, PeerEvent},
+    peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
 
@@ -27,9 +26,7 @@ use super::{
     stream_request::StreamRequest,
 };
 
-use self::{
-    has_mute_state_controller::HasMuteStateController, sender::SenderBuilder,
-};
+use self::{mute_state::MuteStateController, sender::SenderBuilder};
 
 pub use self::{
     mute_state::{MuteState, MuteStateTransition, StableMuteState},
@@ -37,48 +34,37 @@ pub use self::{
     sender::Sender,
 };
 
-/// Jason's `MediaStreamTrack` representation.
-pub trait Track {
-    /// Returns [`TrackId`] of this [`Track`].
+/// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
+pub trait TransceiverSide: Muteable {
+    /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
 
-    /// Returns [`TransceiverKind`] of this [`Track`].
+    /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn kind(&self) -> TransceiverKind;
+
+    /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
+    fn mid(&self) -> Option<String>;
 }
 
-/// Contains [`HasMuteStateController`] trait.
-///
-/// This module is needed because [`HasMuteStateController`] should be
-/// accessible only in the [`media`] module.
-mod has_mute_state_controller {
-    use std::rc::Rc;
+/// Default functions for dealing with [`MuteStateController`] for objects that
+/// use it.
+pub trait Muteable {
+    /// Returns reference to the [`MuteStateController`].
+    fn mute_state_controller(&self) -> Rc<MuteStateController>;
 
-    use super::MuteStateController;
-
-    /// An interface for dealing with objects which are uses
-    /// [`MuteStateController`].
-    ///
-    /// Needed for the [`MuteableTrack`] default implementation.
-    pub trait HasMuteStateController {
-        /// Returns reference to the [`MuteStateController`] from his
-        /// implementation.
-        fn mute_state_controller(&self) -> Rc<MuteStateController>;
-    }
-}
-
-/// An interface for dealing with [`Track`]s which are needs muting logic.
-pub trait MuteableTrack: Track + HasMuteStateController {
-    /// Returns [`MuteState`] of this [`MuteableTrack`].
-    fn individual_mute_state(&self) -> MuteState {
-        self.mute_state_controller().individual_mute_state()
+    /// Returns [`MuteState`] of this [`Muteable`].
+    #[inline]
+    fn mute_state(&self) -> MuteState {
+        self.mute_state_controller().mute_state()
     }
 
     /// Sets current [`MuteState`] to [`MuteState::Transition`].
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::SenderIsRequired`] is returned if
-    /// [`MuteableTrack`] is required for the call and can't be muted.
+    /// Implementors might return [`MediaConnectionsError`] if transition could
+    /// not be made for some reason.
+    #[inline]
     fn mute_state_transition_to(
         &self,
         desired_state: StableMuteState,
@@ -89,22 +75,20 @@ pub trait MuteableTrack: Track + HasMuteStateController {
     }
 
     /// Cancels [`MuteState`] transition.
+    #[inline]
     fn cancel_transition(&self) {
         self.mute_state_controller().cancel_transition()
     }
 
     /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Sender`] will be [`MuteState::Stable`] or the [`MuteableTrack`] is
-    /// dropped.
-    ///
-    /// Succeeds if [`MuteableTrack`]'s [`MuteState`] transits into the
-    /// `desired_state` or the [`MuteableTrack`] is dropped.
+    /// [`Muteable`] will be [`MuteState::Stable`] or it is dropped.
     ///
     /// # Errors
     ///
     /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`MuteableTrack`]'s [`MuteState`] transits into the opposite
-    /// to the `desired_state`.
+    /// returned if [`MuteState`] transits into the opposite to the
+    /// `desired_state`.
+    #[inline]
     fn when_mute_state_stable(
         &self,
         desired_state: StableMuteState,
@@ -113,28 +97,30 @@ pub trait MuteableTrack: Track + HasMuteStateController {
             .when_mute_state_stable(desired_state)
     }
 
-    /// Stops mute/unmute timeout of this [`MuteableTrack`].
+    /// Stops state transition timer of this [`Muteable`].
+    #[inline]
     fn stop_mute_state_transition_timeout(&self) {
-        self.mute_state_controller()
-            .stop_mute_state_transition_timeout()
+        self.mute_state_controller().stop_transition_timeout()
     }
 
-    /// Resets mute/unmute timeout of this [`MuteableTrack`].
+    /// Resets state transition timer of this [`Muteable`].
+    #[inline]
     fn reset_mute_state_transition_timeout(&self) {
-        self.mute_state_controller()
-            .reset_mute_state_transition_timeout()
+        self.mute_state_controller().reset_transition_timeout()
     }
 
-    /// Checks whether individual mute state of the [`MuteableTrack`] is in
+    /// Indicates whether mute state of the [`Muteable`] is in
     /// [`MuteState::Muted`].
-    fn is_individual_muted(&self) -> bool {
-        self.mute_state_controller().is_individual_muted()
+    #[inline]
+    fn is_muted(&self) -> bool {
+        self.mute_state_controller().is_muted()
     }
 
-    /// Checks whether individual mute state of the [`MuteableTrack`] is in
-    /// [`MuteState::NotMuted`].
-    fn is_not_individual_muted(&self) -> bool {
-        self.mute_state_controller().is_not_individual_muted()
+    /// Indicates whether mute state of the [`Muteable`] is in
+    /// [`MuteState::Unmuted`].
+    #[inline]
+    fn is_unmuted(&self) -> bool {
+        self.mute_state_controller().is_unmuted()
     }
 }
 
@@ -276,24 +262,24 @@ impl MediaConnections {
         }))
     }
 
-    /// Returns all [`MuteableTrack`]s from this [`MediaConnections`] with
-    /// provided [`TransceiverKind`] and [`TrackDirection`].
-    pub fn get_muteable_tracks(
+    /// Returns all [`Sender`]s and [`Receiver`]s from this [`MediaConnections`]
+    /// with provided [`TransceiverKind`] and [`TrackDirection`].
+    pub fn get_transceivers_sides(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
-    ) -> Vec<Rc<dyn MuteableTrack>> {
+    ) -> Vec<Rc<dyn TransceiverSide>> {
         fn collect_muteable_tracks<'a, I, T>(
             i: I,
             kind: TransceiverKind,
-        ) -> Vec<Rc<dyn MuteableTrack>>
+        ) -> Vec<Rc<dyn TransceiverSide>>
         where
             I: Iterator<Item = &'a Rc<T>> + 'a,
-            T: MuteableTrack + 'static,
+            T: TransceiverSide + 'static,
         {
             i.filter_map(|t| {
                 if t.kind() == kind {
-                    Some(Rc::clone(&t) as Rc<dyn MuteableTrack>)
+                    Some(Rc::clone(&t) as Rc<dyn TransceiverSide>)
                 } else {
                     None
                 }
@@ -312,19 +298,8 @@ impl MediaConnections {
         }
     }
 
-    /// Returns all [`Receiver`]s from this [`MediaConnections`] with provided
-    /// [`TransceiverKind`].
-    pub fn get_receivers(&self, kind: TransceiverKind) -> Vec<Rc<Receiver>> {
-        self.0
-            .borrow()
-            .iter_receivers_with_kind(kind)
-            .cloned()
-            .collect()
-    }
-
-    /// Returns `true` if all [`MuteableTrack`]s with provided
-    /// [`TransceiverKind`] and [`TrackDirection`] is in provided
-    /// [`MuteState`].
+    /// Returns `true` if all [`TransceiverSide`]s with provided
+    /// [`TransceiverKind`] and [`TrackDirection`] is in provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
         &self,
         kind: TransceiverKind,
@@ -334,14 +309,14 @@ impl MediaConnections {
         match direction {
             TrackDirection::Send => {
                 for sender in self.0.borrow().iter_senders_with_kind(kind) {
-                    if sender.individual_mute_state() != mute_state.into() {
+                    if sender.mute_state() != mute_state.into() {
                         return false;
                     }
                 }
             }
             TrackDirection::Recv => {
                 for receiver in self.0.borrow().iter_receivers_with_kind(kind) {
-                    if receiver.individual_mute_state() != mute_state.into() {
+                    if receiver.mute_state() != mute_state.into() {
                         return false;
                     }
                 }
@@ -357,7 +332,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Audio)
-            .find(|s| s.is_individual_muted())
+            .find(|s| s.is_muted())
             .is_none()
     }
 
@@ -367,7 +342,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind(TransceiverKind::Video)
-            .find(|s| s.is_individual_muted())
+            .find(|s| s.is_muted())
             .is_none()
     }
 
@@ -377,7 +352,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(TransceiverKind::Video)
-            .find(|s| s.is_individual_muted())
+            .find(|s| s.is_muted())
             .is_none()
     }
 
@@ -387,7 +362,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(TransceiverKind::Audio)
-            .find(|s| s.is_individual_muted())
+            .find(|s| s.is_muted())
             .is_none()
     }
 
@@ -412,7 +387,6 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 sender
-                    .transceiver()
                     .mid()
                     .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
@@ -465,7 +439,7 @@ impl MediaConnections {
                 Direction::Send { mid, .. } => {
                     let mute_state;
                     if send_constraints.is_enabled(&track.media_type) {
-                        mute_state = StableMuteState::NotMuted;
+                        mute_state = StableMuteState::Unmuted;
                     } else if is_required {
                         use MediaConnectionsError as Error;
                         return Err(tracerr::new!(
@@ -489,15 +463,15 @@ impl MediaConnections {
                     inner.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
-                    let recv = Receiver::new(
+                    let recv = Rc::new(Receiver::new(
                         track.id,
-                        &(track.media_type.into()),
+                        track.media_type.into(),
                         sender,
                         &inner.peer,
                         mid,
                         inner.peer_events_sender.clone(),
                         recv_constraints,
-                    );
+                    ));
                     inner.receivers.insert(track.id, recv);
                 }
             }
@@ -536,8 +510,8 @@ impl MediaConnections {
     pub fn get_stream_request(&self) -> Option<StreamRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            if let MuteState::Stable(StableMuteState::NotMuted) =
-                sender.individual_mute_state()
+            if let MuteState::Stable(StableMuteState::Unmuted) =
+                sender.mute_state()
             {
                 stream_request
                     .get_or_insert_with(StreamRequest::default)
@@ -581,8 +555,8 @@ impl MediaConnections {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         for sender in inner.senders.values() {
-            // skip senders that are not NotMuted
-            if !sender.is_not_individual_muted() {
+            // skip senders that are not Unmuted
+            if !sender.is_unmuted() {
                 continue;
             }
 
@@ -655,17 +629,17 @@ impl MediaConnections {
 
     /// Returns all references to the [`MuteableTrack`]s from this
     /// [`MediaConnections`].
-    fn get_all_muteable_tracks(&self) -> Vec<Rc<dyn MuteableTrack>> {
+    fn get_all_muteable_tracks(&self) -> Vec<Rc<dyn TransceiverSide>> {
         let inner = self.0.borrow();
         inner
             .senders
             .values()
-            .map(|s| Rc::clone(s) as Rc<dyn MuteableTrack>)
+            .map(|s| Rc::clone(s) as Rc<dyn TransceiverSide>)
             .chain(
                 inner
                     .receivers
                     .values()
-                    .map(|r| Rc::clone(&r) as Rc<dyn MuteableTrack>),
+                    .map(|r| Rc::clone(&r) as Rc<dyn TransceiverSide>),
             )
             .collect()
     }

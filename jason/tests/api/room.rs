@@ -348,6 +348,95 @@ async fn error_join_room_without_on_connection_loss_callback() {
 }
 
 mod disable_recv_tracks {
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, MemberId, VideoSettings,
+    };
+
+    use super::*;
+
+    #[wasm_bindgen_test]
+    async fn check_transceivers_statuses() {
+        let (event_tx, event_rx) = mpsc::unbounded();
+        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        let room_handle = room.new_handle();
+
+        JsFuture::from(room_handle.mute_remote_audio())
+            .await
+            .unwrap();
+
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![
+                    Track {
+                        id: TrackId(1),
+                        direction: Direction::Send {
+                            receivers: vec![MemberId::from("bob")],
+                            mid: None,
+                        },
+                        media_type: MediaType::Audio(AudioSettings {
+                            is_required: true,
+                        }),
+                    },
+                    Track {
+                        id: TrackId(2),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("bob"),
+                            mid: None,
+                        },
+                        media_type: MediaType::Video(VideoSettings {
+                            is_required: true,
+                        }),
+                    },
+                    Track {
+                        id: TrackId(3),
+                        direction: Direction::Recv {
+                            sender: MemberId::from("bob"),
+                            mid: None,
+                        },
+                        media_type: MediaType::Audio(AudioSettings {
+                            is_required: true,
+                        }),
+                    },
+                ],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer: _,
+                mids,
+                transceivers_statuses,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(mids.len(), 3);
+                let audio_send =
+                    transceivers_statuses.get(&TrackId(1)).unwrap();
+                let video_recv =
+                    transceivers_statuses.get(&TrackId(2)).unwrap();
+                let audio_recv =
+                    transceivers_statuses.get(&TrackId(3)).unwrap();
+
+                assert!(audio_send); // not muted
+                assert!(video_recv); // not muted
+                assert!(!audio_recv); // muted
+            }
+            _ => unreachable!(),
+        }
+
+        // TODO: add is_recv_audio/video asserts
+    }
+}
+
+/// Tests disabling tracks publishing.
+mod disable_send_tracks {
+    use medea_jason::peer::{StableMuteState, TrackDirection, TransceiverKind};
+
     use super::*;
 
     #[wasm_bindgen_test]
@@ -389,7 +478,7 @@ mod disable_recv_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    /// 1. Create [`Room`] in [`MuteState::Unmuted`].
     ///
     /// 2. Call [`RoomHandle::mute_audio`] simultaneous twice.
     ///
@@ -414,7 +503,7 @@ mod disable_recv_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::Muted
@@ -426,7 +515,7 @@ mod disable_recv_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    /// 1. Create [`Room`] in [`MuteState::Unmuted`].
     ///
     /// 2. Call [`RoomHandle::mute_video`] simultaneous twice.
     ///
@@ -451,7 +540,7 @@ mod disable_recv_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
             StableMuteState::Muted
@@ -464,13 +553,13 @@ mod disable_recv_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    /// 1. Create [`Room`] in [`MuteState::Unmuted`].
     ///
     /// 2. Call [`RoomHandle::mute_audio`] and [`RoomHandle::unmute_audio`]
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Audio`] of
-    /// [`Room`]    is stayed in [`MuteState::NotMuted`].
+    /// [`Room`] is stayed in [`MuteState::Unmuted`].
     #[wasm_bindgen_test]
     async fn join_mute_and_unmute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -481,10 +570,10 @@ mod disable_recv_tracks {
         )
         .await;
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
-            StableMuteState::NotMuted
+            StableMuteState::Unmuted
         ));
 
         let handle = room.new_handle();
@@ -496,10 +585,10 @@ mod disable_recv_tracks {
         mute_audio_result.unwrap_err();
         unmute_audio_result.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
-            StableMuteState::NotMuted
+            StableMuteState::Unmuted
         ));
     }
 
@@ -509,13 +598,13 @@ mod disable_recv_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MuteState::NotMuted`].
+    /// 1. Create [`Room`] in [`MuteState::Unmuted`].
     ///
     /// 2. Call [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`]
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
-    /// [`Room`]    is stayed in [`MuteState::NotMuted`].
+    /// [`Room`] is stayed in [`MuteState::Unmuted`].
     #[wasm_bindgen_test]
     async fn join_mute_and_unmute_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -526,10 +615,10 @@ mod disable_recv_tracks {
         )
         .await;
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
-            StableMuteState::NotMuted
+            StableMuteState::Unmuted
         ));
 
         let handle = room.new_handle();
@@ -541,10 +630,10 @@ mod disable_recv_tracks {
         mute_video_result.unwrap_err();
         unmute_video_result.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
-            StableMuteState::NotMuted
+            StableMuteState::Unmuted
         ));
     }
 
@@ -560,7 +649,7 @@ mod disable_recv_tracks {
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`TransceiverKind::Video`] of
-    /// [`Room`]    is in [`MuteState::NotMuted`].
+    /// [`Room`] is in [`MuteState::Unmuted`].
     #[wasm_bindgen_test]
     async fn join_unmute_and_mute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -571,16 +660,16 @@ mod disable_recv_tracks {
         )
         .await;
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
-            StableMuteState::NotMuted
+            StableMuteState::Unmuted
         ));
 
         let handle = room.new_handle();
         JsFuture::from(handle.mute_audio()).await.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
             StableMuteState::Muted
@@ -594,10 +683,10 @@ mod disable_recv_tracks {
         mute_audio_result.unwrap();
         unmute_audio_result.unwrap();
 
-        assert!(peer.is_all_tracks_in_mute_state(
+        assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
-            StableMuteState::NotMuted
+            StableMuteState::Unmuted
         ));
     }
 

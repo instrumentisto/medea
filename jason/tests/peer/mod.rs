@@ -883,20 +883,23 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_muteable_tracks(TransceiverKind::Audio, TrackDirection::Send)
-            .into_iter()
-            .chain(
-                peer.get_muteable_tracks(
-                    TransceiverKind::Video,
-                    TrackDirection::Send,
-                )
-                .into_iter(),
+        peer.get_transceivers_sides(
+            TransceiverKind::Audio,
+            TrackDirection::Send,
+        )
+        .into_iter()
+        .chain(
+            peer.get_transceivers_sides(
+                TransceiverKind::Video,
+                TrackDirection::Send,
             )
-            .map(|s| {
-                s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+            .into_iter(),
+        )
+        .map(|s| {
+            s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 
-                s.when_mute_state_stable(StableMuteState::NotMuted)
-            }),
+            s.when_mute_state_stable(StableMuteState::Unmuted)
+        }),
     )
     .map(|_| ())
     .shared();
