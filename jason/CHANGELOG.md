@@ -37,7 +37,9 @@ All user visible changes to this project will be documented in this file. This p
             - `MediaManager.init_local_stream()`.
         - Local media stream constraints:
             - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
-            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]).
+            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
+            - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
+            - `FacingMode` enum ([#137]).
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`;
@@ -96,6 +98,7 @@ All user visible changes to this project will be documented in this file. This p
 [#123]: /../../pull/123
 [#124]: /../../pull/124
 [#132]: /../../pull/132
+[#137]: /../../pull/137
 [#138]: /../../pull/138
 
 
