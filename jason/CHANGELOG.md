@@ -38,7 +38,7 @@ All user visible changes to this project will be documented in this file. This p
         - Local media stream constraints:
             - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
             - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
-            - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` ([#137]);
+            - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
             - `FacingMode` enum ([#137]).
         - Room initialization ([#46]):
             - `Jason.init_room()`;
