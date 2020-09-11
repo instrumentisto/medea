@@ -341,7 +341,6 @@ pub struct Context {
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
 }
 
-// TODO: Do something with a visibility.
 /// Tracks changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
 #[derive(Clone, Debug)]
@@ -357,6 +356,8 @@ pub enum TrackChange {
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(ServerTrackPatch),
 
+    /// Changes to some [`MediaTrack`], that __partner__ remote Peer is not
+    /// aware of.
     PartnerTrackPatch(ServerTrackPatch),
 }
 
@@ -458,10 +459,11 @@ impl<T> TrackChangeHandler for Peer<T> {
 
     /// Doesn't updates anything.
     ///
-    /// Resets `is_muted_individual` to `None`.
+    /// Resets [`ServerTrackPatch::is_muted_individual`] to `None`.
     ///
-    /// Sets `is_muted_general` to `Some` if provided `is_muted_individual` is
-    /// equal to the real general mute state.
+    /// Sets [`ServerTrackPatch::is_muted_general`] to `Some` if provided
+    /// [`ServerTrackPatch::is_muted_individual`] is equal to the real
+    /// general mute state.
     fn on_partner_track_patch(
         &mut self,
         mut patch: ServerTrackPatch,

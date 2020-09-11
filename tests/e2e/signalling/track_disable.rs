@@ -1,4 +1,9 @@
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{
+    cell::Cell,
+    rc::Rc,
+    sync::atomic::{AtomicU8, Ordering},
+    time::Duration,
+};
 
 use actix::{ActorContext, Addr, AsyncContext};
 use function_name::named;
@@ -531,8 +536,6 @@ async fn force_update_works() {
     force_update.unwrap().unwrap();
     renegotiation_update.unwrap().unwrap();
 }
-
-use std::sync::atomic::{AtomicU8, Ordering};
 
 /// Checks that server validly switches individual and general mute states based
 /// on client's commands.

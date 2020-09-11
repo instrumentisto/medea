@@ -15,10 +15,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
-    peer::{
-        MockPeerRepository, PeerConnection, Repository, StableMuteState,
-        TrackDirection, TransceiverKind,
-    },
+    peer::{MockPeerRepository, PeerConnection, Repository, TransceiverKind},
     rpc::MockRpcClient,
     utils::JasonError,
     DeviceVideoTrackConstraints,
@@ -1236,6 +1233,7 @@ mod patches_generation {
     }
 }
 
+/// Tests that muting and unmuting of remote audio works.
 #[wasm_bindgen_test]
 async fn remote_mute_unmute_audio() {
     let (audio_track, video_track) = get_test_recv_tracks();
@@ -1253,6 +1251,7 @@ async fn remote_mute_unmute_audio() {
     assert!(peer.is_recv_audio_enabled());
 }
 
+/// Tests that muting and unmuting of remote video works.
 #[wasm_bindgen_test]
 async fn remote_mute_unmute_video() {
     let (audio_track, video_track) = get_test_recv_tracks();

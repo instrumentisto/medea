@@ -179,6 +179,10 @@ pub fn get_test_tracks(
     )
 }
 
+/// Returns [`Track`]s with a [`Direction::Recv`].
+///
+/// First [`Track`] will be [`MediaType::Audio`] and second will be
+/// [`MediaType::Video`].
 pub fn get_test_recv_tracks() -> (Track, Track) {
     (
         Track {

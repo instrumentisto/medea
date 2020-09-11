@@ -28,12 +28,13 @@ struct InnerReceiver {
     mid: Option<String>,
     track: Option<MediaStreamTrack>,
     general_mute_state: StableMuteState,
-    notified_track: bool,
+    is_track_notified: bool,
     mute_state_controller: Rc<MuteStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
 impl InnerReceiver {
+    /// Read outer doc ([`Receiver::new`]).
     fn new(
         track_id: TrackId,
         caps: TrackConstraints,
@@ -69,12 +70,13 @@ impl InnerReceiver {
             mid,
             track: None,
             general_mute_state: StableMuteState::from(!enabled),
-            notified_track: false,
+            is_track_notified: false,
             mute_state_controller,
             peer_events_sender,
         }
     }
 
+    /// Read outer doc ([`Receiver::set_remote_track`]).
     fn set_remote_track(
         &mut self,
         transceiver: RtcRtpTransceiver,
@@ -96,11 +98,13 @@ impl InnerReceiver {
         self.maybe_notify_track();
     }
 
+    /// Read outer doc ([`Receiver::is_general_muted`]).
     #[cfg(feature = "mockable")]
     fn is_general_muted(&self) -> bool {
         self.general_mute_state == StableMuteState::Muted
     }
 
+    /// Read outer doc ([`Receiver::update`]).
     fn update(&mut self, track_patch: &ServerTrackPatch) {
         if self.track_id != track_patch.id {
             return;
@@ -113,6 +117,7 @@ impl InnerReceiver {
         }
     }
 
+    /// Read outer doc ([`Receiver::mid`]).
     fn mid(&mut self) -> Option<String> {
         if self.mid.is_none() && self.transceiver.is_some() {
             if let Some(transceiver) = self.transceiver.as_ref() {
@@ -125,7 +130,7 @@ impl InnerReceiver {
     /// Sends [`PeerEvent::NewRemoteTrack`] to the
     /// [`InnerReceiver::peer_events_sender`] if it's needed.
     fn maybe_notify_track(&mut self) {
-        if self.notified_track {
+        if self.is_track_notified {
             return;
         }
         if !self.is_receiving() {
@@ -142,7 +147,7 @@ impl InnerReceiver {
                     track: track.clone(),
                 },
             );
-            self.notified_track = true;
+            self.is_track_notified = true;
         }
     }
 
@@ -189,6 +194,7 @@ impl InnerReceiver {
         self.general_mute_state == StableMuteState::Unmuted
     }
 
+    /// Read outer doc ([`Receiver::is_receiving`]).
     pub fn is_receiving(&self) -> bool {
         if self.is_muted() {
             return false;

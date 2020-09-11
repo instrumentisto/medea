@@ -269,7 +269,7 @@ impl MediaConnections {
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn TransceiverSide>> {
-        fn collect_muteable_tracks<'a, I, T>(
+        fn collect_transceivers_sides<'a, I, T>(
             i: I,
             kind: TransceiverKind,
         ) -> Vec<Rc<dyn TransceiverSide>>
@@ -290,10 +290,10 @@ impl MediaConnections {
         let inner = self.0.borrow();
         match direction {
             TrackDirection::Send => {
-                collect_muteable_tracks(inner.senders.values(), kind)
+                collect_transceivers_sides(inner.senders.values(), kind)
             }
             TrackDirection::Recv => {
-                collect_muteable_tracks(inner.receivers.values(), kind)
+                collect_transceivers_sides(inner.receivers.values(), kind)
             }
         }
     }
@@ -380,7 +380,7 @@ impl MediaConnections {
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
-        let inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
         let mut mids =
             HashMap::with_capacity(inner.senders.len() + inner.receivers.len());
         for (track_id, sender) in &inner.senders {
@@ -404,7 +404,7 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    /// Returns publishing statuses of the all [`MuteableTrack`]s from this
+    /// Returns publishing statuses of the all [`TransceiverSide`]s from this
     /// [`MediaConnections`].
     pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
@@ -627,7 +627,7 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Returns all references to the [`MuteableTrack`]s from this
+    /// Returns all references to the [`TransceiverSide`]s from this
     /// [`MediaConnections`].
     fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {
         let inner = self.0.borrow();
@@ -644,14 +644,14 @@ impl MediaConnections {
             .collect()
     }
 
-    /// Stops all [`MuteableTrack`]s state transitions expiry timers.
+    /// Stops all [`TransceiverSide`]s state transitions expiry timers.
     pub fn stop_state_transitions_timers(&self) {
         self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.stop_mute_state_transition_timeout())
     }
 
-    /// Resets all [`MuteableTrack`]s state transitions expiry timers.
+    /// Resets all [`TransceiverSide`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
         self.get_all_transceivers_sides()
             .into_iter()
