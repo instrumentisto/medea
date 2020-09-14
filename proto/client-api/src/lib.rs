@@ -176,7 +176,7 @@ pub enum Command {
     },
 
     /// Web Client asks permission to update [`Track`]s in specified Peer.
-    /// Media Server gives permission by sending [`Event::PeerUpdated`].
+    /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatch>,
@@ -293,13 +293,14 @@ pub enum Event {
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
 
-    /// Media Server notifies about necessity to update `Peer`.
-    PeerUpdated {
-        /// [`PeerId`] of `Peer` which should be updated.
+    /// Media Server notifies about necessity to update [`Track`]s in specified
+    /// `Peer`.
+    TracksApplied {
+        /// [`PeerId`] of `Peer` where [`Track`]s should be updated.
         peer_id: PeerId,
 
-        /// List of [`PeerUpdate`]s which should be applied.
-        updates: Vec<PeerUpdate>,
+        /// List of [`TrackUpdate`]s which should be applied.
+        updates: Vec<TrackUpdate>,
 
         /// Negotiation role basing on which should be sent
         /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
@@ -336,10 +337,10 @@ pub enum NegotiationRole {
     Answerer(String),
 }
 
-/// Update which should be applied to the `Peer`.
+/// [`Track`] update which should be applied to the `Peer`.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub enum PeerUpdate {
+pub enum TrackUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
 
@@ -429,7 +430,7 @@ pub struct IceServer {
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-// TODO: Use different struct without mids in PeerUpdated event.
+// TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
         receivers: Vec<MemberId>,

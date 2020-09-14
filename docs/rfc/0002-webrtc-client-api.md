@@ -194,7 +194,7 @@ struct VideoSettings {}
 
 [WebSocket] messages from `Media Server` to `Web Client`.
 
-The naming for `Event` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `PeerUpdated`, `PeersRemoved`.
+The naming for `Event` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
 
 The format of `Event` [WebSocket] message may be implemented as the following:
 ```rust
@@ -386,34 +386,21 @@ struct PeersRemoved {
 ```
 </details>
 
-#### 3. PeerUpdated
+#### 3. TracksApplied
 
 ```rust
-pub enum NegotiationRole {
-    Offerer,
-    Answerer(String),
-}
-
-enum PeerUpdate {
-    Added(Track),
-    Updated(TrackPatch),
-    IceRestart,
-}
-
-struct PeerUpdated {
+struct TracksApplied {
     peer_id: u64,
-    updates: Vec<PeerUpdate>,
-    negotiation_role: Option<NegotiationRole>,
+    tracks: Vec<Track>,
 }
 ```
 
-`Media Server` notifies about necessity to update specified `Peer`.
+`Media Server` notifies about necessity to update `Track`s in specified `Peer`.
 
 It can be used to:
 1. Add new `Track`.
 2. Update existing `Track` settings (e.g. change to lower video resolution, mute audio).
 3. Update `send` `Track` receivers list (add/remove).
-4. Perform ICE restart.
 
 ##### Examples 
 
@@ -787,7 +774,7 @@ struct ApplyTracks {
 }
 ```
 
-`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `PeerUpdated` event.
+`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `TracksApplied` event.
 
 It can be used to express `Web Client`'s intentions to:
 1. Update existing `Track` settings.
@@ -897,7 +884,7 @@ struct MakeSdpOffer {
 
 `Web Client` can send it:
 1. As reaction to `PeerCreated {sdp_offer: None}` event.
-2. As reaction to `PeerUpdated` event if update requires SDP re-negotiation.
+2. As reaction to `TracksApplied` event if update requires SDP re-negotiation.
 
 ##### Examples
 
@@ -1000,7 +987,7 @@ enum RemotePeerTrackType {
 }
 ```
 
-`Web Client` asks permission to send or receive media to/from specified remote `Peer`. `Media Server` may gives permission by sending `PeerUpdated` event.
+`Web Client` asks permission to send or receive media to/from specified remote `Peer`. `Media Server` may gives permission by sending `TracksApplied` event.
 
 Params:
 1. `peer_id`: if `Some`, then `Web Client` wants to connect specified local `Peer` to remote one; if `None`, then `Media Server`
@@ -1120,7 +1107,7 @@ Metrics list will be extended as needed.
 
 #### 10. UpdateTracks
 
-`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `Event::PeerUpdated`.
+`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `Event::TracksApplied`.
 
 ```rust
 struct UpdateTracks {
@@ -1500,7 +1487,7 @@ struct TrackPatch {
 
     ```json
     {
-      "event": "PeerUpdated",
+      "event": "TracksApplied",
       "data": {
         "peer_id": 2,
         "tracks": [{
@@ -1532,7 +1519,7 @@ struct TrackPatch {
 
     ```json
     {
-      "event": "PeerUpdated",
+      "event": "TracksApplied",
       "data": {
         "peer_id": 1,
         "tracks": [{
@@ -1797,7 +1784,7 @@ struct TrackPatch {
 
     ```json
     {
-      "event": "PeerUpdated",
+      "event": "TracksApplied",
       "data": {
         "peer_id": 1,
         "tracks": [{
@@ -1943,7 +1930,7 @@ struct TrackPatch {
 
     ```json
     {
-      "event": "PeerUpdated",
+      "event": "TracksApplied",
       "data": {
         "peer_id": 1,
         "tracks": [{

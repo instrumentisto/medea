@@ -37,10 +37,10 @@ All user visible changes to this project will be documented in this file. This p
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
-    - Emit `PeerUpdated` event to create new and update existing tracks ([#105]);
+    - Emit `TracksApplied` event to create new and update existing tracks ([#105]);
     - `PeerConnection` renegotiation functionality ([#105]);
     - Calculate and send call quality score based on RTC stats ([#132]);
-    - Send `PeerUpdate::IceRestart` on `PeerConnection.connectionState` `Failed` ([#138]).
+    - Send `TrackUpdate::IceRestart` on `PeerConnection.connectionState` `Failed` ([#138]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).

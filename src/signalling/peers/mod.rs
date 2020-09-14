@@ -737,7 +737,7 @@ mod tests {
     use std::{collections::HashSet, time::Duration};
 
     use futures::{channel::mpsc, future, Stream, StreamExt as _};
-    use medea_client_api_proto::PeerUpdate;
+    use medea_client_api_proto::TrackUpdate;
     use tokio::time::timeout;
 
     use crate::{
@@ -783,7 +783,7 @@ mod tests {
     #[derive(Debug, Clone)]
     struct NegotiationSubMock(
         Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>,
-        Rc<RefCell<Vec<mpsc::UnboundedSender<(PeerId, Vec<PeerUpdate>)>>>>,
+        Rc<RefCell<Vec<mpsc::UnboundedSender<(PeerId, Vec<TrackUpdate>)>>>>,
     );
 
     impl NegotiationSubMock {
@@ -801,11 +801,11 @@ mod tests {
         }
 
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
-        /// [`PeerUpdate`]s of [`Peer`] which are should be forcibly updated.
+        /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly updated.
         #[allow(dead_code)]
         pub fn on_force_update(
             &self,
-        ) -> impl Stream<Item = (PeerId, Vec<PeerUpdate>)> {
+        ) -> impl Stream<Item = (PeerId, Vec<TrackUpdate>)> {
             let (tx, rx) = mpsc::unbounded();
             self.1.borrow_mut().push(tx);
             rx
@@ -823,7 +823,7 @@ mod tests {
 
         /// Sends [`PeerId`] to the [`NegotiationSubMock::on_force_update`]
         /// [`Stream`].
-        fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>) {
+        fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
             self.1.borrow().iter().for_each(|sender| {
                 let _ = sender.unbounded_send((peer_id, changes.clone()));
             })

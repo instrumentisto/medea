@@ -4,7 +4,7 @@ use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
     ConnectionQualityScore, Event, MemberId, NegotiationRole, PeerId,
-    PeerUpdate,
+    TrackUpdate,
 };
 
 use crate::{
@@ -187,7 +187,7 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
-    fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>) {
+    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(ForceUpdate(peer_id, changes));
         }
@@ -195,18 +195,18 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
 }
 
 /// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
-/// be updated with provided [`PeerUpdate`]s without negotiation.
+/// be updated with provided [`TrackUpdate`]s without negotiation.
 ///
 /// Can be done in any [`Peer`] state.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
-pub struct ForceUpdate(PeerId, Vec<PeerUpdate>);
+pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
 
 impl Handler<ForceUpdate> for Room {
     type Result = Result<(), RoomError>;
 
     /// Gets [`MemberId`] of the provided [`Peer`] and sends all provided
-    /// [`PeerUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
+    /// [`TrackUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
     fn handle(
         &mut self,
         msg: ForceUpdate,
@@ -217,7 +217,7 @@ impl Handler<ForceUpdate> for Room {
             .map_peer_by_id(msg.0, PeerStateMachine::member_id)?;
         self.members.send_event_to_member(
             member_id,
-            Event::PeerUpdated {
+            Event::TracksApplied {
                 peer_id: msg.0,
                 updates: msg.1,
                 negotiation_role: None,
@@ -247,7 +247,7 @@ impl Handler<NegotiationNeeded> for Room {
     /// side.
     ///
     /// If this [`Peer`] or it's partner not [`Stable`] then forcible
-    /// [`PeerChange`]s will be committed.
+    /// [`TrackChange`]s will be committed.
     fn handle(
         &mut self,
         msg: NegotiationNeeded,

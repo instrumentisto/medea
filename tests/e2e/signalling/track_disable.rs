@@ -7,7 +7,7 @@ use futures::{
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, PeerUpdate, TrackId, TrackPatch,
+    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatch, TrackUpdate,
 };
 use medea_control_api_proto::grpc::api as proto;
 use tokio::time::timeout;
@@ -24,9 +24,9 @@ use crate::{
 };
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
-// Waits for single/multiple PeerUpdated with expected track changes on on
+// Waits for single/multiple TracksApplied with expected track changes on on
 // `publisher_rx`.
-// Waits for single/multiple PeerUpdated with expected track
+// Waits for single/multiple TracksApplied with expected track
 // changes on on `subscriber_rx`.
 async fn helper(
     disabled: bool,
@@ -64,14 +64,14 @@ async fn helper(
         let mut first_muted = false;
         let mut second_muted = false;
         loop {
-            if let Event::PeerUpdated {
+            if let Event::TracksApplied {
                 peer_id, updates, ..
             } = rx.select_next_some().await
             {
                 assert_eq!(peer_id, expected_peer_id);
                 for update in updates {
                     match update {
-                        PeerUpdate::Updated(patch) => {
+                        TrackUpdate::Updated(patch) => {
                             assert_eq!(patch.is_muted, Some(disabled));
                             if patch.id == TrackId(0) {
                                 first_muted = true;
@@ -153,20 +153,20 @@ async fn track_disables_and_enables_are_instant() {
     ) -> impl Stream<Item = (bool, Option<NegotiationRole>)> {
         rx.filter_map(|val| async {
             match val {
-                Event::PeerUpdated {
+                Event::TracksApplied {
                     mut updates,
                     negotiation_role,
                     ..
                 } => {
                     match updates.len() {
                         0 => {
-                            // 0 updates means that PeerUpdated must proc
+                            // 0 updates means that TracksApplied must proc
                             // negotiation
                             negotiation_role.unwrap();
                             None
                         }
                         1 => {
-                            if let PeerUpdate::Updated(patch) =
+                            if let TrackUpdate::Updated(patch) =
                                 updates.pop().unwrap()
                             {
                                 Some((
@@ -262,9 +262,9 @@ async fn track_disables_and_enables_are_instant() {
     mutes_received_by_pub.dedup();
     assert_eq!(mutes_received_by_pub.len(), mutes_received_by_pub_len);
 
-    // make sure that all PeerUpdated events received by sub have
+    // make sure that all TracksApplied events received by sub have
     // Some(NegotiationRole), meaning that there no point to force push
-    // PeerUpdated to other member
+    // TracksApplied to other member
     assert!(mutes_received_by_sub.iter().all(|val| val.1.is_some()));
 
     assert_eq!(
@@ -372,7 +372,7 @@ async fn track_disables_and_enables_are_instant2() {
         .await
         .unwrap();
     loop {
-        if let Event::PeerUpdated {
+        if let Event::TracksApplied {
             peer_id,
             updates: _,
             negotiation_role,
@@ -394,7 +394,7 @@ async fn track_disables_and_enables_are_instant2() {
         .await
         .unwrap();
     loop {
-        if let Event::PeerUpdated {
+        if let Event::TracksApplied {
             peer_id,
             updates: _,
             negotiation_role,
@@ -437,7 +437,7 @@ async fn force_update_works() {
                         }],
                     }));
                 }
-                Event::PeerUpdated {
+                Event::TracksApplied {
                     negotiation_role,
                     peer_id,
                     ..
@@ -492,7 +492,7 @@ async fn force_update_works() {
                     }],
                 }));
             }
-            Event::PeerUpdated {
+            Event::TracksApplied {
                 negotiation_role, ..
             } => {
                 if negotiation_role.is_none() {

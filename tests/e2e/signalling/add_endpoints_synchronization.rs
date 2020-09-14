@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use function_name::named;
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{Direction, Event, PeerUpdate};
+use medea_client_api_proto::{Direction, Event, TrackUpdate};
 use medea_control_api_proto::grpc::api::{self as proto};
 use tokio::time::delay_for;
 
@@ -60,7 +60,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
 /// 5. Add second `WebRtcPlayEndpoint`.
 /// 6. Answer `Event::PeerCreated` with `Command::MakeSdpOffer`.
 /// 7. Make sure that `Event::SdpAnswerMade` is received before
-/// `Event::PeerUpdated`, meaning that renegotiation starts only after initial
+/// `Event::TracksApplied`, meaning that renegotiation starts only after initial
 /// negotiation finishes.
 #[actix_rt::test]
 #[named]
@@ -136,21 +136,21 @@ async fn add_endpoints_synchronization() {
         }
     }
 
-    // Event::SdpAnswerMade must be received before Event::PeerUpdated
+    // Event::SdpAnswerMade must be received before Event::TracksApplied
     loop {
         let event = second_rx.select_next_some().await;
         if let Event::SdpAnswerMade { .. } = event {
             break;
-        } else if let Event::PeerUpdated { .. } = event {
+        } else if let Event::TracksApplied { .. } = event {
             panic!("expected Event::SdpAnswerMade");
         }
     }
 
-    // And now we must receive Event::PeerUpdated with 2 PeerUpdate::Added
+    // And now we must receive Event::TracksApplied with 2 TrackUpdate::Added
     // with Direction::Recv
     loop {
         let event = second_rx.select_next_some().await;
-        if let Event::PeerUpdated {
+        if let Event::TracksApplied {
             peer_id: _,
             updates,
             ..
@@ -159,15 +159,15 @@ async fn add_endpoints_synchronization() {
             assert_eq!(updates.len(), 2);
             for update in updates {
                 match update {
-                    PeerUpdate::Added(track) => match track.direction {
+                    TrackUpdate::Added(track) => match track.direction {
                         Direction::Recv { .. } => {}
                         _ => panic!("expected Direction::Recv"),
                     },
-                    _ => panic!("expected PeerUpdate::Added"),
+                    _ => panic!("expected TrackUpdate::Added"),
                 }
             }
             break;
-        } else if let Event::PeerUpdated { .. } = event {
+        } else if let Event::TracksApplied { .. } = event {
             panic!("expected Event::SdpAnswerMade");
         }
     }

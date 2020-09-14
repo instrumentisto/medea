@@ -67,9 +67,9 @@ All user visible changes to this project will be documented in this file. This p
         - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
-        - `PeerUpdated` ([#105]);
+        - `TracksApplied` ([#105]);
         - `ConnectionQualityUpdated` ([#132]);
-        - `PeerUpdated` with `PeerUpdate::IceRestart` ([#138]).
+        - `TracksApplied` with `TrackUpdate::IceRestart` ([#138]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])

@@ -349,7 +349,7 @@ impl Room {
         )
     }
 
-    /// Sends [`Event::PeerUpdated`] with latest [`Peer`] changes to specified
+    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
     /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
     /// [`NegotiationRole::Offerer`].
     ///
@@ -375,7 +375,7 @@ impl Room {
 
         self.members.send_event_to_member(
             member_id,
-            Event::PeerUpdated {
+            Event::TracksApplied {
                 updates,
                 negotiation_role: Some(NegotiationRole::Offerer),
                 peer_id,
