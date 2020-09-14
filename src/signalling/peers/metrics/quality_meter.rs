@@ -66,33 +66,13 @@ impl QualityMeterStatsHandler {
         }
     }
 
-    /// Calculates [`ConnectionQualityScore`] with [`Peer`]'s and partner
-    /// [`Peer`]'s [`QualityMeter`].
-    fn calculate_quality_score_based_on_rtc_stats(
-        &self,
-        peer: &mut PeerMetric,
-    ) -> Option<ConnectionQualityScore> {
-        let partner_score = peer
-            .partner_peer
-            .upgrade()
-            .and_then(|p| p.borrow_mut().quality_meter.calculate());
-        peer.quality_meter
-            .calculate()
-            .and_then(|score| {
-                partner_score
-                    .map(|partner_score| score.min(partner_score))
-                    .or_else(|| Some(score))
-            })
-            .or_else(|| partner_score)
-    }
-
     /// Recalculates [`ConnectionQualityScore`] for the provided
     /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
     /// new score is not equal to the previously calculated score.
     fn update_quality_score(&self, peer: &mut PeerMetric) {
         let score = peer
             .calculate_quality_score_based_on_connection_state()
-            .or_else(|| self.calculate_quality_score_based_on_rtc_stats(peer));
+            .or_else(|| peer.calculate_quality_score_based_on_rtc_stats());
 
         if let Some(quality_score) = score {
             self.send_quality_score_update(peer, quality_score);
@@ -215,7 +195,7 @@ struct PeerMetric {
     /// Last calculated [`ConnectionQualityScore`].
     last_quality_score: ConnectionQualityScore,
 
-    /// Last receiver [`PeerConnectionState`].
+    /// Last received [`PeerConnectionState`].
     last_connection_state: PeerConnectionState,
 }
 
@@ -269,6 +249,25 @@ impl PeerMetric {
             PeerConnectionState::Failed => Some(ConnectionQualityScore::Poor),
             _ => None,
         }
+    }
+
+    /// Calculates [`ConnectionQualityScore`] with [`Peer`]'s and partner
+    /// [`Peer`]'s [`QualityMeter`].
+    fn calculate_quality_score_based_on_rtc_stats(
+        &mut self,
+    ) -> Option<ConnectionQualityScore> {
+        let partner_score = self
+            .partner_peer
+            .upgrade()
+            .and_then(|p| p.borrow_mut().quality_meter.calculate());
+        self.quality_meter
+            .calculate()
+            .and_then(|score| {
+                partner_score
+                    .map(|partner_score| score.min(partner_score))
+                    .or_else(|| Some(score))
+            })
+            .or_else(|| partner_score)
     }
 }
 
