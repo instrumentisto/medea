@@ -160,6 +160,8 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
     }
 
     /// Updates [`PeerMetric::last_connection_state`].
+    ///
+    /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] is not exists.
     #[inline]
     fn update_peer_connection_state(
         &mut self,
@@ -239,7 +241,7 @@ impl PeerMetric {
     /// Calculates [`ConnectionQualityScore`] based on the
     /// [`PeerMetric::last_connection_state`].
     ///
-    /// Returns `Some(ConnectionQualityScore::Poor` if
+    /// Returns `Some(ConnectionQualityScore::Poor)` if
     /// [`PeerMetric::last_connection_state`] is
     /// [`PeerConnectionState::Failed`].
     fn calculate_quality_score_based_on_connection_state(
