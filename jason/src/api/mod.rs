@@ -5,6 +5,7 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
+use futures::FutureExt as _;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -63,23 +64,20 @@ impl Jason {
             &self.0.borrow().media_manager,
         )));
 
-        spawn_local({
-            let rpc = Rc::clone(&rpc);
-            let inner = Rc::clone(&self.0);
-            async move {
-                let reason = rpc.on_normal_close().await.unwrap_or_else(|_| {
-                    ClientDisconnect::RpcClientUnexpectedlyDropped.into()
-                });
-                // TODO: Don't close all rooms when multiple RPC connections
-                //       will be supported.
-                inner
-                    .borrow_mut()
-                    .rooms
-                    .drain(..)
-                    .for_each(|room| room.close(reason));
-                inner.borrow_mut().media_manager = Rc::default();
-            }
-        });
+        let inner = self.0.clone();
+        spawn_local(rpc.on_normal_close().map(move |res| {
+            // TODO: Don't close all rooms when multiple rpc connections
+            //       will be supported.
+            let reason = res.unwrap_or_else(|_| {
+                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+            });
+            inner
+                .borrow_mut()
+                .rooms
+                .drain(..)
+                .for_each(|room| room.close(reason));
+            inner.borrow_mut().media_manager = Rc::default();
+        }));
 
         let room = Room::new(rpc, peer_repository);
         let handle = room.new_handle();
