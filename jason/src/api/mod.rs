@@ -13,7 +13,7 @@ use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
     rpc::{
-        ClientDisconnect, RpcClient as _, RpcTransport, WebSocketRpcClient,
+        ClientDisconnect, RpcClient, RpcTransport, WebSocketRpcClient,
         WebSocketRpcTransport,
     },
     set_panic_hook,
@@ -60,6 +60,27 @@ impl Jason {
                 Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
             })
         })));
+        self.inner_init_room(rpc)
+    }
+
+    /// Returns handle to [`MediaManager`].
+    pub fn media_manager(&self) -> MediaManagerHandle {
+        self.0.borrow().media_manager.new_handle()
+    }
+
+    /// Drops [`Jason`] API object, so all related objects (rooms, connections,
+    /// streams etc.) respectively. All objects related to this [`Jason`] API
+    /// object will be detached (you will still hold them, but unable to use).
+    pub fn dispose(self) {
+        self.0.borrow_mut().rooms.drain(..).for_each(|room| {
+            room.close(ClientDisconnect::RoomClosed.into());
+        });
+    }
+}
+
+impl Jason {
+    /// Returns [`RoomHandle`] for [`Room`].
+    pub fn inner_init_room(&self, rpc: Rc<dyn RpcClient>) -> RoomHandle {
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
@@ -83,19 +104,5 @@ impl Jason {
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle
-    }
-
-    /// Returns handle to [`MediaManager`].
-    pub fn media_manager(&self) -> MediaManagerHandle {
-        self.0.borrow().media_manager.new_handle()
-    }
-
-    /// Drops [`Jason`] API object, so all related objects (rooms, connections,
-    /// streams etc.) respectively. All objects related to this [`Jason`] API
-    /// object will be detached (you will still hold them, but unable to use).
-    pub fn dispose(self) {
-        self.0.borrow_mut().rooms.drain(..).for_each(|room| {
-            room.close(ClientDisconnect::RoomClosed.into());
-        });
     }
 }
