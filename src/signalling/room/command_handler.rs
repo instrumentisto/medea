@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use medea_client_api_proto::{
-    ClientTrackPatch, CommandHandler, Event, IceCandidate, NegotiationRole,
-    PeerId, PeerMetrics, TrackId,
+    CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
+    TrackId, TrackPatchCommand,
 };
 
 use crate::{
@@ -154,7 +154,7 @@ impl CommandHandler for Room {
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
-        tracks_patches: Vec<ClientTrackPatch>,
+        tracks_patches: Vec<TrackPatchCommand>,
     ) -> Self::Output {
         // Note, that we force committing changes to `Member` that send
         // `UpdateTracks` request, so response will be sent immediately,

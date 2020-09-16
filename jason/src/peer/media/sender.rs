@@ -6,8 +6,7 @@ use std::{
 };
 
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto as proto;
-use proto::{PeerId, TrackId};
+use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
@@ -21,7 +20,7 @@ use crate::{
 };
 
 use super::{
-    mute_state::{MuteState, MuteStateController, StableMuteState},
+    mute_state::{MuteStateController, StableMuteState},
     MediaConnectionsError, Muteable, Result,
 };
 
@@ -76,16 +75,10 @@ impl<'a> SenderBuilder<'a> {
                     if let Some(this) = weak_this.upgrade() {
                         match mute_state {
                             StableMuteState::Unmuted => {
-                                this.set_transceiver_direction(
-                                    TransceiverDirection::Sendonly,
-                                );
-                                this.request_track();
+                                this.maybe_request_track();
                             }
                             StableMuteState::Muted => {
-                                this.set_transceiver_direction(
-                                    TransceiverDirection::Inactive,
-                                );
-                                this.disable().await;
+                                this.remove_track().await;
                             }
                         }
                     } else {
@@ -131,28 +124,22 @@ impl Sender {
         }
     }
 
-    /// Checks whether general mute state of the [`Receiver`] is in
-    /// [`MuteState::Muted`].
-    #[cfg(feature = "mockable")]
-    pub fn is_general_muted(&self) -> bool {
-        self.general_mute_state.get() == StableMuteState::Muted
-    }
-
-    /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
-    /// based on the provided [`StableMuteState`].
+    /// Updates [`Sender`]s general mute state based on the provided
+    /// [`StableMuteState`].
     ///
-    /// Updates [`Sender::general_mute_state`].
+    /// Sets [`Sender`]s underlying transceiver direction to
+    /// [`TransceiverDirection::Inactive`] if provided mute state is
+    /// [`StableMuteState::Muted`].
     ///
-    /// If old general mute state same as provided - nothing will be done.
+    /// Emits [`PeerEvent::NewLocalStreamRequired`] if new state is
+    /// [`StableMuteState::Unmuted`] and [`Sender`] does not have a track to
+    /// send.
     fn update_general_mute_state(&self, mute_state: StableMuteState) {
         if self.general_mute_state.get() != mute_state {
             self.general_mute_state.set(mute_state);
             match mute_state {
                 StableMuteState::Unmuted => {
-                    self.set_transceiver_direction(
-                        TransceiverDirection::Sendonly,
-                    );
-                    self.request_track();
+                    self.maybe_request_track();
                 }
                 StableMuteState::Muted => {
                     self.set_transceiver_direction(
@@ -164,11 +151,9 @@ impl Sender {
     }
 
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
-    /// transceiver and enables transceivers sender by changing its
-    /// direction to `sendonly`.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    pub(super) async fn insert_track_and_enable(
+    /// transceiver. No-op if provided track already being used by this
+    /// [`Sender`].
+    pub(super) async fn insert_track(
         self: Rc<Self>,
         new_track: MediaStreamTrack,
     ) -> Result<()> {
@@ -179,29 +164,24 @@ impl Sender {
             }
         }
 
-        // no-op if transceiver is not Unmuted
-        if let MuteState::Stable(StableMuteState::Unmuted) = self.mute_state() {
-            JsFuture::from(
-                self.transceiver
-                    .sender()
-                    .replace_track(Some(new_track.as_ref())),
-            )
-            .await
-            .map_err(Into::into)
-            .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
-            .map_err(tracerr::wrap!())?;
+        JsFuture::from(
+            self.transceiver
+                .sender()
+                .replace_track(Some(new_track.as_ref())),
+        )
+        .await
+        .map_err(Into::into)
+        .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
+        .map_err(tracerr::wrap!())?;
 
-            self.track.borrow_mut().replace(new_track);
-
-            self.set_transceiver_direction(TransceiverDirection::Sendonly);
-        }
+        self.track.borrow_mut().replace(new_track);
 
         Ok(())
     }
 
     /// Updates this [`Sender`]s tracks based on the provided
-    /// [`proto::TrackPatch`].
-    pub fn update(&self, track: &proto::ServerTrackPatch) {
+    /// [`TrackPatchEvent`].
+    pub fn update(&self, track: &TrackPatchEvent) {
         if track.id != self.track_id {
             return;
         }
@@ -214,6 +194,31 @@ impl Sender {
         }
     }
 
+    /// Changes underlying transceiver direction to
+    /// [`TransceiverDirection::Sendonly`] if this [`Receiver`]s general mute
+    /// state is [`StableMuteState::Unmuted`].
+    pub fn maybe_enable(&self) {
+        if self.is_general_unmuted()
+            && self.transceiver_direction.get()
+                != TransceiverDirection::Sendonly
+        {
+            self.set_transceiver_direction(TransceiverDirection::Sendonly);
+        }
+    }
+
+    /// Checks whether general mute state of the [`Sender`] is in
+    /// [`StableMuteState::Muted`].
+    #[cfg(feature = "mockable")]
+    pub fn is_general_muted(&self) -> bool {
+        self.general_mute_state.get() == StableMuteState::Muted
+    }
+
+    /// Checks whether general mute state of the [`Sender`] is in
+    /// [`MuteState::Unmuted`].
+    fn is_general_unmuted(&self) -> bool {
+        self.general_mute_state.get() == StableMuteState::Unmuted
+    }
+
     /// Sets provided [`TransceiverDirection`] of this [`Sender`]'s
     /// [`RtcRtpTransceiver`].
     fn set_transceiver_direction(&self, direction: TransceiverDirection) {
@@ -221,23 +226,26 @@ impl Sender {
         self.transceiver_direction.set(direction);
     }
 
-    /// Disables this [`Sender`].
-    async fn disable(&self) {
+    /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by
+    /// sending side of inner transceiver to `None`.
+    async fn remove_track(&self) {
         self.track.borrow_mut().take();
         // cannot fail
-        let _ = JsFuture::from(self.transceiver.sender().replace_track(None))
+        JsFuture::from(self.transceiver.sender().replace_track(None))
             .await
             .unwrap();
     }
 
-    /// Sends [`PeerEvent::NewLocalStreamRequired`] to the
-    /// [`Sender::peer_events_sender`].
-    fn request_track(&self) {
-        let _ = self.peer_events_sender.unbounded_send(
-            PeerEvent::NewLocalStreamRequired {
-                peer_id: self.peer_id,
-            },
-        );
+    /// Emits [`PeerEvent::NewLocalStreamRequired`] if [`Sender`] does not have
+    /// a track to send.
+    fn maybe_request_track(&self) {
+        if self.track.borrow().is_none() {
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::NewLocalStreamRequired {
+                    peer_id: self.peer_id,
+                },
+            );
+        }
     }
 }
 
@@ -256,7 +264,6 @@ impl TransceiverSide for Sender {
 }
 
 impl Muteable for Sender {
-    /// Returns reference to the [`MuteStateController`] of this [`Sender`].
     #[inline]
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         self.mute_state.clone()

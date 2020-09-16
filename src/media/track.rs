@@ -6,54 +6,6 @@ use std::cell::{Cell, RefCell};
 
 use medea_client_api_proto::{MediaType, TrackId as Id};
 
-/// Mute state of the [`MediaTrack`].
-///
-/// Contains mute state for the `Send` and `Recv` side.
-#[derive(Clone, Copy, Debug)]
-struct MuteState {
-    /// Mute state of the `Send` side.
-    ///
-    /// If `true` then sender is muted.
-    send_muted: bool,
-
-    /// Mute state of the `Recv` side.
-    ///
-    /// If `true` then receiver is muted.
-    recv_muted: bool,
-}
-
-impl Default for MuteState {
-    fn default() -> Self {
-        Self {
-            send_muted: false,
-            recv_muted: false,
-        }
-    }
-}
-
-impl MuteState {
-    /// Returns new default [`MuteState`].
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Returns `true` if [`MuteState::send_muted`] or [`MuteState::recv_muted`]
-    /// are `true`.
-    pub fn is_muted(self) -> bool {
-        self.send_muted || self.recv_muted
-    }
-
-    /// Sets mute state for the `Recv` side of [`MediaTrack`].
-    pub fn set_recv(&mut self, is_muted: bool) {
-        self.recv_muted = is_muted;
-    }
-
-    /// Sets mute state for the `Send` side of the [`MediaTrack`].
-    pub fn set_send(&mut self, is_muted: bool) {
-        self.send_muted = is_muted;
-    }
-}
-
 /// Representation of [MediaStreamTrack][1] object.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
@@ -110,23 +62,50 @@ impl MediaTrack {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Mute state of the [`MediaTrack`].
+///
+/// Contains mute state for the `Send` and `Recv` side.
+#[derive(Clone, Copy, Debug)]
+struct MuteState {
+    /// Mute state of the `Send` side.
+    ///
+    /// If `true` then sender is muted.
+    send_muted: bool,
 
-    #[test]
-    fn is_enabled() {
-        for (send, recv, result) in &[
-            (false, false, false),
-            (true, false, true),
-            (true, true, true),
-            (false, true, true),
-        ] {
-            let mut state = MuteState::new();
-            state.set_send(*send);
-            state.set_recv(*recv);
+    /// Mute state of the `Recv` side.
+    ///
+    /// If `true` then receiver is muted.
+    recv_muted: bool,
+}
 
-            assert_eq!(state.is_muted(), *result);
+impl Default for MuteState {
+    fn default() -> Self {
+        Self {
+            send_muted: false,
+            recv_muted: false,
         }
+    }
+}
+
+impl MuteState {
+    /// Returns new default [`MuteState`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns `true` if [`MuteState::send_muted`] or [`MuteState::recv_muted`]
+    /// are `true`.
+    pub fn is_muted(self) -> bool {
+        self.send_muted || self.recv_muted
+    }
+
+    /// Sets mute state for the `Recv` side of [`MediaTrack`].
+    pub fn set_recv(&mut self, is_muted: bool) {
+        self.recv_muted = is_muted;
+    }
+
+    /// Sets mute state for the `Send` side of the [`MediaTrack`].
+    pub fn set_send(&mut self, is_muted: bool) {
+        self.send_muted = is_muted;
     }
 }

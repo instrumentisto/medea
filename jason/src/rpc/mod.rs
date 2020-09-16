@@ -26,7 +26,7 @@ use web_sys::CloseEvent;
 
 use crate::utils::{JasonError, JsCaused, JsError};
 
-use self::websocket::TransportState;
+use websocket::TransportState;
 
 #[doc(inline)]
 pub use self::{

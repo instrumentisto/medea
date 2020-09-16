@@ -12,7 +12,7 @@ use futures::{
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    ClientTrackPatch, Command, Event, NegotiationRole, PeerId, TrackId,
+    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatchCommand,
     TrackUpdate,
 };
 use medea_control_api_proto::grpc::api as proto;
@@ -44,7 +44,7 @@ async fn helper(
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![ClientTrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_muted: Some(disabled),
             }],
@@ -54,7 +54,7 @@ async fn helper(
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![ClientTrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: Some(disabled),
             }],
@@ -234,7 +234,7 @@ async fn track_disables_and_enables_are_instant() {
                 mutes_sent.push(is_muted);
                 publisher.do_send(SendCommand(Command::UpdateTracks {
                     peer_id: PeerId(0),
-                    tracks_patches: vec![ClientTrackPatch {
+                    tracks_patches: vec![TrackPatchCommand {
                         id: TrackId(0),
                         is_muted: Some(is_muted),
                     }],
@@ -374,7 +374,7 @@ async fn track_disables_and_enables_are_instant2() {
     first
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![ClientTrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_muted: Some(true),
             }],
@@ -396,7 +396,7 @@ async fn track_disables_and_enables_are_instant2() {
     second
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(1),
-            tracks_patches: vec![ClientTrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: Some(true),
             }],
@@ -441,7 +441,7 @@ async fn force_update_works() {
                 Event::IceCandidateDiscovered { peer_id, .. } => {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: *peer_id,
-                        tracks_patches: vec![ClientTrackPatch {
+                        tracks_patches: vec![TrackPatchCommand {
                             is_muted: Some(true),
                             id: TrackId(0),
                         }],
@@ -459,7 +459,7 @@ async fn force_update_works() {
                     } else {
                         ctx.notify(SendCommand(Command::UpdateTracks {
                             peer_id: *peer_id,
-                            tracks_patches: vec![ClientTrackPatch {
+                            tracks_patches: vec![TrackPatchCommand {
                                 is_muted: Some(true),
                                 id: TrackId(0),
                             }],
@@ -496,7 +496,7 @@ async fn force_update_works() {
             Event::IceCandidateDiscovered { .. } => {
                 ctx.notify(SendCommand(Command::UpdateTracks {
                     peer_id: pub_peer_id.unwrap(),
-                    tracks_patches: vec![ClientTrackPatch {
+                    tracks_patches: vec![TrackPatchCommand {
                         is_muted: Some(true),
                         id: track_id.unwrap(),
                     }],
@@ -512,7 +512,7 @@ async fn force_update_works() {
                 } else {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: pub_peer_id.unwrap(),
-                        tracks_patches: vec![ClientTrackPatch {
+                        tracks_patches: vec![TrackPatchCommand {
                             is_muted: Some(true),
                             id: track_id.unwrap(),
                         }],
@@ -578,7 +578,7 @@ async fn individual_and_general_mute_states_works() {
                                     Command::UpdateTracks {
                                         peer_id: PeerId(1),
                                         tracks_patches: vec![
-                                            ClientTrackPatch {
+                                            TrackPatchCommand {
                                                 id: TrackId(0),
                                                 is_muted: Some(true),
                                             },
@@ -613,7 +613,7 @@ async fn individual_and_general_mute_states_works() {
                                     Command::UpdateTracks {
                                         peer_id: PeerId(1),
                                         tracks_patches: vec![
-                                            ClientTrackPatch {
+                                            TrackPatchCommand {
                                                 id: TrackId(0),
                                                 is_muted: Some(false),
                                             },
@@ -661,7 +661,7 @@ async fn individual_and_general_mute_states_works() {
                     if !is_inited {
                         ctx.notify(SendCommand(Command::UpdateTracks {
                             peer_id: PeerId(0),
-                            tracks_patches: vec![ClientTrackPatch {
+                            tracks_patches: vec![TrackPatchCommand {
                                 id: TrackId(0),
                                 is_muted: Some(true),
                             }],
@@ -697,7 +697,7 @@ async fn individual_and_general_mute_states_works() {
                                     Command::UpdateTracks {
                                         peer_id: PeerId(0),
                                         tracks_patches: vec![
-                                            ClientTrackPatch {
+                                            TrackPatchCommand {
                                                 id: TrackId(0),
                                                 is_muted: Some(false),
                                             },

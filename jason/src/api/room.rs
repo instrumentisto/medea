@@ -11,10 +11,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    ClientTrackPatch, Command, ConnectionQualityScore, Direction,
-    Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, MemberId, NegotiationRole, PeerConnectionState, PeerId,
-    PeerMetrics, Track, TrackId, TrackUpdate,
+    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatchCommand, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -243,7 +243,7 @@ impl RoomHandle {
         Ok(())
     }
 
-    /// Enables or disables specified media type publish in all
+    /// Enables or disables specified media type publish or receival in all
     /// [`PeerConnection`]s.
     async fn set_track_enabled(
         &self,
@@ -686,7 +686,7 @@ impl InnerRoom {
 
     /// Toggles [`InnerRoom::recv_constraints`] or
     /// [`InnerRoom::send_constraints`] mute status based on the provided
-    /// [`TransceiverDirection`] and [`TransceiverKind`].
+    /// [`TrackDirection`] and [`TransceiverKind`].
     fn toggle_enable_constraints(
         &self,
         enabled: bool,
@@ -725,39 +725,33 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let transceivers_sides =
-                    peer.get_transceivers_sides(kind, direction);
-
-                let transceivers_sides_to_mute =
-                    transceivers_sides.into_iter().filter(|transceiver_side| {
-                        match transceiver_side.mute_state() {
-                            MuteState::Transition(t) => {
-                                t.intended() != desired_state
-                            }
-                            MuteState::Stable(s) => s != desired_state,
+                let trnscvrs = peer
+                    .get_transceivers_sides(kind, direction)
+                    .into_iter()
+                    .filter(|trnscvr| match trnscvr.mute_state() {
+                        MuteState::Transition(t) => {
+                            t.intended() != desired_state
                         }
+                        MuteState::Stable(s) => s != desired_state,
                     });
 
-                let mut processed_transceivers_sides: Vec<
-                    Rc<dyn TransceiverSide>,
-                > = Vec::new();
+                let mut processed_trnscvrs: Vec<Rc<dyn TransceiverSide>> =
+                    Vec::new();
                 let mut tracks_patches = Vec::new();
-                for transceiver_side_to_mute in transceivers_sides_to_mute {
-                    if let Err(e) = transceiver_side_to_mute
-                        .mute_state_transition_to(desired_state)
+                for trnscvr in trnscvrs {
+                    if let Err(e) =
+                        trnscvr.mute_state_transition_to(desired_state)
                     {
-                        for processed_transceiver_side in
-                            processed_transceivers_sides
-                        {
-                            processed_transceiver_side.cancel_transition();
-                        }
+                        processed_trnscvrs
+                            .iter()
+                            .for_each(|trnscvr| trnscvr.cancel_transition());
                         return Either::Left(future::err(tracerr::new!(e)));
                     }
-                    tracks_patches.push(ClientTrackPatch {
-                        id: transceiver_side_to_mute.track_id(),
+                    tracks_patches.push(TrackPatchCommand {
+                        id: trnscvr.track_id(),
                         is_muted: Some(is_muted),
                     });
-                    processed_transceivers_sides.push(transceiver_side_to_mute);
+                    processed_trnscvrs.push(trnscvr);
                 }
 
                 let wait_state_change: Vec<_> = peer

@@ -439,7 +439,7 @@ impl PeerConnection {
     /// provided [`proto::TrackPatch`] contains unknown ID.
     pub fn patch_tracks(
         &self,
-        tracks: Vec<proto::ServerTrackPatch>,
+        tracks: Vec<proto::TrackPatchEvent>,
     ) -> Result<()> {
         Ok(self
             .media_connections

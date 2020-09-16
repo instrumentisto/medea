@@ -186,7 +186,7 @@ pub enum Command {
     /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
-        tracks_patches: Vec<ClientTrackPatch>,
+        tracks_patches: Vec<TrackPatchCommand>,
     },
 }
 
@@ -351,9 +351,9 @@ pub enum TrackUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
 
-    /// [`Track`] should be updated by this [`ServerTrackPatch`] in the `Peer`.
+    /// [`Track`] should be updated by this [`TrackPatchEvent`] in the `Peer`.
     /// Can only refer tracks already known to the `Peer`.
-    Updated(ServerTrackPatch),
+    Updated(TrackPatchEvent),
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -388,7 +388,7 @@ impl Track {
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[derive(Eq, PartialEq)]
-pub struct ClientTrackPatch {
+pub struct TrackPatchCommand {
     pub id: TrackId,
     pub is_muted: Option<bool>,
 }
@@ -396,7 +396,7 @@ pub struct ClientTrackPatch {
 /// Patch of the [`Track`] which server can send with [`Event::TracksApplied`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct ServerTrackPatch {
+pub struct TrackPatchEvent {
     /// Id of the [`Track`] which should be patched.
     pub id: TrackId,
 
@@ -404,9 +404,6 @@ pub struct ServerTrackPatch {
     ///
     /// This state doesn't indicates that connection between two `Member`s are
     /// really muted. This is intention of this `Member`.
-    ///
-    /// On this mute, client __should__ replace `MediaStreamTrack` with `None`
-    /// in the `Transceiver` for the send direction.
     pub is_muted_individual: Option<bool>,
 
     /// Mute state of the connection between `Member`s.
@@ -416,14 +413,11 @@ pub struct ServerTrackPatch {
     ///
     /// So intention of this `Member` (`is_muted_individual`) can be `false`,
     /// but real mute state can be `true`.
-    ///
-    /// On this mute, client should __not__ replace `MediaStreamTrack` with
-    /// `None` in the `Transceiver` for the send direction.
     pub is_muted_general: Option<bool>,
 }
 
-impl From<ClientTrackPatch> for ServerTrackPatch {
-    fn from(from: ClientTrackPatch) -> Self {
+impl From<TrackPatchCommand> for TrackPatchEvent {
+    fn from(from: TrackPatchCommand) -> Self {
         Self {
             id: from.id,
             is_muted_individual: from.is_muted,
@@ -432,8 +426,8 @@ impl From<ClientTrackPatch> for ServerTrackPatch {
     }
 }
 
-impl ServerTrackPatch {
-    /// Returns new empty [`ServerTrackPatch`] with a provided [`TrackId`].
+impl TrackPatchEvent {
+    /// Returns new empty [`TrackPatchEvent`] with a provided [`TrackId`].
     #[inline]
     #[must_use]
     pub fn new(id: TrackId) -> Self {
@@ -444,10 +438,10 @@ impl ServerTrackPatch {
         }
     }
 
-    /// Merges this [`ServerTrackPatch`] with a provided [`ServerTrackPatch`].
+    /// Merges this [`TrackPatchEvent`] with a provided [`TrackPatchEvent`].
     ///
-    /// Does nothing if [`TrackId`] of this [`ServerTrackPatch`] and the
-    /// provided [`ServerTrackPatch`] are different.
+    /// Does nothing if [`TrackId`] of this [`TrackPatchEvent`] and the
+    /// provided [`TrackPatchEvent`] are different.
     pub fn merge(&mut self, another: &Self) {
         if self.id != another.id {
             return;
@@ -782,33 +776,33 @@ mod test {
         for (track_patches, result) in vec![
             (
                 vec![
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: Some(true),
                         is_muted_individual: Some(true),
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: Some(false),
                         is_muted_individual: Some(false),
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: None,
                         is_muted_individual: None,
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: Some(true),
                         is_muted_individual: Some(true),
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: Some(true),
                         is_muted_individual: Some(true),
                     },
                 ],
-                ServerTrackPatch {
+                TrackPatchEvent {
                     id: TrackId(1),
                     is_muted_general: Some(true),
                     is_muted_individual: Some(true),
@@ -816,18 +810,18 @@ mod test {
             ),
             (
                 vec![
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: None,
                         is_muted_individual: None,
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: Some(true),
                         is_muted_individual: Some(true),
                     },
                 ],
-                ServerTrackPatch {
+                TrackPatchEvent {
                     id: TrackId(1),
                     is_muted_general: Some(true),
                     is_muted_individual: Some(true),
@@ -835,18 +829,18 @@ mod test {
             ),
             (
                 vec![
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: Some(true),
                         is_muted_individual: Some(true),
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: None,
                         is_muted_individual: None,
                     },
                 ],
-                ServerTrackPatch {
+                TrackPatchEvent {
                     id: TrackId(1),
                     is_muted_general: Some(true),
                     is_muted_individual: Some(true),
@@ -854,25 +848,25 @@ mod test {
             ),
             (
                 vec![
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(1),
                         is_muted_general: None,
                         is_muted_individual: None,
                     },
-                    ServerTrackPatch {
+                    TrackPatchEvent {
                         id: TrackId(2),
                         is_muted_general: Some(true),
                         is_muted_individual: Some(true),
                     },
                 ],
-                ServerTrackPatch {
+                TrackPatchEvent {
                     id: TrackId(1),
                     is_muted_general: None,
                     is_muted_individual: None,
                 },
             ),
         ] {
-            let mut merge_track_patch = ServerTrackPatch::new(TrackId(1));
+            let mut merge_track_patch = TrackPatchEvent::new(TrackId(1));
             for track_patch in &track_patches {
                 merge_track_patch.merge(track_patch);
             }

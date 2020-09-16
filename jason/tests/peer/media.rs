@@ -3,7 +3,7 @@
 use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{PeerId, ServerTrackPatch, TrackId};
+use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager, RecvConstraints},
     peer::{
@@ -131,7 +131,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ServerTrackPatch {
+        .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
             is_muted_general: Some(true),
             is_muted_individual: Some(true),
@@ -144,7 +144,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Muted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ServerTrackPatch {
+        .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
             is_muted_general: Some(true),
             is_muted_individual: Some(true),
@@ -157,7 +157,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Unmuted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ServerTrackPatch {
+        .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
             is_muted_individual: Some(false),
             is_muted_general: Some(false),
@@ -170,7 +170,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
         .mute_state_transition_to(StableMuteState::Unmuted)
         .unwrap();
     media_connections
-        .patch_tracks(vec![ServerTrackPatch {
+        .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
             is_muted_individual: Some(false),
             is_muted_general: Some(false),
@@ -229,7 +229,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&ServerTrackPatch {
+        sender.update(&TrackPatchEvent {
             id: TrackId(track_id.0 + 100),
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
@@ -241,7 +241,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&ServerTrackPatch {
+        sender.update(&TrackPatchEvent {
             id: track_id,
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
@@ -253,7 +253,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn unmute_unmuted() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&ServerTrackPatch {
+        sender.update(&TrackPatchEvent {
             id: track_id,
             is_muted_individual: Some(false),
             is_muted_general: Some(false),
@@ -265,14 +265,14 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute_muted() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&ServerTrackPatch {
+        sender.update(&TrackPatchEvent {
             id: track_id,
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
         });
         assert!(sender.is_general_muted());
 
-        sender.update(&ServerTrackPatch {
+        sender.update(&TrackPatchEvent {
             id: track_id,
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
@@ -284,7 +284,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&ServerTrackPatch {
+        sender.update(&TrackPatchEvent {
             id: track_id,
             is_muted_individual: None,
             is_muted_general: None,
@@ -325,7 +325,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (receiver, _tx) = get_receiver();
-        receiver.update(&ServerTrackPatch {
+        receiver.update(&TrackPatchEvent {
             id: TrackId(TRACK_ID.0 + 100),
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
@@ -337,7 +337,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn mute() {
         let (receiver, _tx) = get_receiver();
-        receiver.update(&ServerTrackPatch {
+        receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
@@ -349,7 +349,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn unmute_unmuted() {
         let (receiver, _tx) = get_receiver();
-        receiver.update(&ServerTrackPatch {
+        receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
             is_muted_individual: Some(false),
             is_muted_general: Some(false),
@@ -361,14 +361,14 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn mute_muted() {
         let (receiver, _tx) = get_receiver();
-        receiver.update(&ServerTrackPatch {
+        receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
         });
         assert!(receiver.is_general_muted());
 
-        receiver.update(&ServerTrackPatch {
+        receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
             is_muted_individual: Some(true),
             is_muted_general: Some(true),
@@ -380,7 +380,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (receiver, _tx) = get_receiver();
-        receiver.update(&ServerTrackPatch {
+        receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
             is_muted_individual: None,
             is_muted_general: None,

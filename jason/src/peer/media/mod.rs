@@ -12,7 +12,7 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
-use web_sys::{MediaStreamTrack as RtcMediaStreamTrack, RtcRtpTransceiver};
+use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
     media::{LocalStreamConstraints, RecvConstraints},
@@ -224,7 +224,7 @@ struct InnerMediaConnections {
 
 impl InnerMediaConnections {
     /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`].
-    pub fn iter_senders_with_kind(
+    fn iter_senders_with_kind(
         &self,
         kind: TransceiverKind,
     ) -> impl Iterator<Item = &Rc<Sender>> {
@@ -233,11 +233,30 @@ impl InnerMediaConnections {
 
     /// Returns [`Iterator`] over [`Receiver`]s with provided
     /// [`TransceiverKind`].
-    pub fn iter_receivers_with_kind(
+    fn iter_receivers_with_kind(
         &self,
         kind: TransceiverKind,
     ) -> impl Iterator<Item = &Rc<Receiver>> {
         self.receivers.values().filter(move |s| s.kind() == kind)
+    }
+
+    /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`] and
+    /// [`TransceiverKind`].
+    fn get_transceivers_by_direction_and_kind(
+        &self,
+        direction: TrackDirection,
+        kind: TransceiverKind,
+    ) -> Vec<Rc<dyn TransceiverSide>> {
+        match direction {
+            TrackDirection::Send => self
+                .iter_senders_with_kind(kind)
+                .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
+                .collect(),
+            TrackDirection::Recv => self
+                .iter_receivers_with_kind(kind)
+                .map(|rx| Rc::clone(&rx) as Rc<dyn TransceiverSide>)
+                .collect(),
+        }
     }
 }
 
@@ -269,33 +288,9 @@ impl MediaConnections {
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn TransceiverSide>> {
-        fn collect_transceivers_sides<'a, I, T>(
-            i: I,
-            kind: TransceiverKind,
-        ) -> Vec<Rc<dyn TransceiverSide>>
-        where
-            I: Iterator<Item = &'a Rc<T>> + 'a,
-            T: TransceiverSide + 'static,
-        {
-            i.filter_map(|t| {
-                if t.kind() == kind {
-                    Some(Rc::clone(&t) as Rc<dyn TransceiverSide>)
-                } else {
-                    None
-                }
-            })
-            .collect()
-        }
-
-        let inner = self.0.borrow();
-        match direction {
-            TrackDirection::Send => {
-                collect_transceivers_sides(inner.senders.values(), kind)
-            }
-            TrackDirection::Recv => {
-                collect_transceivers_sides(inner.receivers.values(), kind)
-            }
-        }
+        self.0
+            .borrow()
+            .get_transceivers_by_direction_and_kind(direction, kind)
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
@@ -306,20 +301,13 @@ impl MediaConnections {
         direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
-        match direction {
-            TrackDirection::Send => {
-                for sender in self.0.borrow().iter_senders_with_kind(kind) {
-                    if sender.mute_state() != mute_state.into() {
-                        return false;
-                    }
-                }
-            }
-            TrackDirection::Recv => {
-                for receiver in self.0.borrow().iter_receivers_with_kind(kind) {
-                    if receiver.mute_state() != mute_state.into() {
-                        return false;
-                    }
-                }
+        let transceivers = self
+            .0
+            .borrow()
+            .get_transceivers_by_direction_and_kind(direction, kind);
+        for transceiver in transceivers {
+            if transceiver.mute_state() != mute_state.into() {
+                return false;
             }
         }
 
@@ -404,8 +392,8 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    /// Returns publishing statuses of the all [`TransceiverSide`]s from this
-    /// [`MediaConnections`].
+    /// Returns activity statuses of the all [`Sender`]s and [`Receiver`]s from
+    /// this [`MediaConnections`].
     pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
 
@@ -488,7 +476,7 @@ impl MediaConnections {
     /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
     pub fn patch_tracks(
         &self,
-        tracks: Vec<proto::ServerTrackPatch>,
+        tracks: Vec<proto::TrackPatchEvent>,
     ) -> Result<()> {
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
@@ -576,8 +564,10 @@ impl MediaConnections {
         }
 
         future::try_join_all(sender_and_track.into_iter().map(
-            |(sender, track)| {
-                Sender::insert_track_and_enable(Rc::clone(sender), track)
+            |(sender, track)| async move {
+                Rc::clone(sender).insert_track(track).await?;
+                sender.maybe_enable();
+                Ok::<(), Traced<MediaConnectionsError>>(())
             },
         ))
         .await?;
@@ -603,11 +593,11 @@ impl MediaConnections {
     pub fn add_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
-        track: RtcMediaStreamTrack,
+        track: SysMediaStreamTrack,
     ) -> Result<()> {
-        let mut inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
         if let Some(mid) = transceiver.mid() {
-            for receiver in &mut inner.receivers.values_mut() {
+            for receiver in inner.receivers.values() {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
                         receiver.set_remote_track(transceiver, track);

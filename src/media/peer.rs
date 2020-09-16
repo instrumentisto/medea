@@ -59,8 +59,8 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, ClientTrackPatch, Direction, IceServer, MediaType, MemberId,
-    PeerId as Id, PeerId, ServerTrackPatch, Track, TrackId, TrackUpdate,
+    AudioSettings, Direction, IceServer, MediaType, MemberId, PeerId as Id,
+    PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent, TrackUpdate,
     VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
@@ -354,11 +354,11 @@ pub enum TrackChange {
     AddRecvTrack(Rc<MediaTrack>),
 
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
-    TrackPatch(ServerTrackPatch),
+    TrackPatch(TrackPatchEvent),
 
-    /// Changes to some [`MediaTrack`], that __partner__ remote Peer is not
-    /// aware of.
-    PartnerTrackPatch(ServerTrackPatch),
+    /// Changes to some [`MediaTrack`] made by this [`Peer`]s parnter [`Peer`],
+    /// that remote Peer is not aware of.
+    PartnerTrackPatch(TrackPatchEvent),
 }
 
 impl TrackChange {
@@ -431,59 +431,45 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::AddRecvTrack(track)
     }
 
-    /// Updates general mute state of the [`Track`] (if it needed).
-    fn on_track_patch(&mut self, mut patch: ServerTrackPatch) -> Self::Output {
+    /// Applies provided [`TrackPatchEvent`] to [`Peer`]s [`Track`].
+    fn on_track_patch(&mut self, mut patch: TrackPatchEvent) -> Self::Output {
         if let Some(is_muted) = patch.is_muted_individual {
-            let track = self
-                .senders()
-                .get(&patch.id)
-                .cloned()
-                .map(|t| (t, true))
-                .or_else(|| {
-                    self.receivers().get(&patch.id).cloned().map(|t| (t, false))
-                });
-            if let Some((track, is_sender)) = track {
-                if is_sender {
-                    track.set_send_mute_state(is_muted);
-                } else {
-                    track.set_recv_mute_state(is_muted);
-                }
-
-                let is_muted_general = track.is_muted();
-                patch.is_muted_general = Some(is_muted_general);
-            }
+            if let Some(tx) = self.senders().get(&patch.id) {
+                tx.set_send_mute_state(is_muted);
+                patch.is_muted_general = Some(tx.is_muted());
+            } else if let Some(rx) = self.receivers().get(&patch.id) {
+                rx.set_recv_mute_state(is_muted);
+                patch.is_muted_general = Some(rx.is_muted());
+            };
         }
 
         TrackChange::TrackPatch(patch)
     }
 
-    /// Doesn't updates anything.
-    ///
-    /// Resets [`ServerTrackPatch::is_muted_individual`] to `None`.
-    ///
-    /// Sets [`ServerTrackPatch::is_muted_general`] to `Some` if provided
-    /// [`ServerTrackPatch::is_muted_individual`] is equal to the real
-    /// general mute state.
+    /// Applies provided [`TrackPatchEvent`] that is sourced from this [`Peer`]s
+    /// partner [`Peer`] to some shared [`Track`].
     fn on_partner_track_patch(
         &mut self,
-        mut patch: ServerTrackPatch,
+        mut patch: TrackPatchEvent,
     ) -> Self::Output {
         if let Some(is_muted_individual) = patch.is_muted_individual {
+            // Resets `is_muted_individual` to `None`. Sets `is_muted_general`
+            // to `Some` if provided `is_muted_individual` is equal to the real
+            // general mute state.
+            patch.is_muted_individual = None;
             let track = self
                 .senders()
                 .get(&patch.id)
-                .or_else(|| self.receivers().get(&patch.id))
-                .cloned();
+                .or_else(|| self.receivers().get(&patch.id));
 
             if let Some(track) = track {
-                patch.is_muted_individual = None;
                 if is_muted_individual == track.is_muted() {
                     patch.is_muted_general = Some(track.is_muted());
                 }
             }
         }
 
-        TrackChange::PartnerTrackPatch(patch)
+        TrackChange::TrackPatch(patch)
     }
 }
 
@@ -624,7 +610,7 @@ impl<T> Peer<T> {
             updates.push(track_update);
         }
 
-        self.dedup_track_patches();
+        self.dedup_pending_track_updates();
 
         if !updates.is_empty() {
             self.context
@@ -649,27 +635,21 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Deduplicates pending [`TrackChanges`]s.
-    fn dedup_track_patches(&mut self) {
-        let mut grouped_patches: HashMap<TrackId, ServerTrackPatch> =
+    /// Deduplicates pending [`TrackChange`]s.
+    fn dedup_pending_track_updates(&mut self) {
+        let mut grouped_patches: HashMap<TrackId, TrackPatchEvent> =
             HashMap::new();
-        let mut grouped_partner_patches = HashMap::new();
         let mut track_changes = Vec::new();
 
         for track_change in
             std::mem::take(&mut self.context.pending_track_updates)
         {
             match track_change {
-                TrackChange::TrackPatch(patch) => {
+                TrackChange::TrackPatch(patch)
+                | TrackChange::PartnerTrackPatch(patch) => {
                     grouped_patches
                         .entry(patch.id)
-                        .or_insert_with(|| ServerTrackPatch::new(patch.id))
-                        .merge(&patch);
-                }
-                TrackChange::PartnerTrackPatch(patch) => {
-                    grouped_partner_patches
-                        .entry(patch.id)
-                        .or_insert_with(|| ServerTrackPatch::new(patch.id))
+                        .or_insert_with(|| TrackPatchEvent::new(patch.id))
                         .merge(&patch);
                 }
                 _ => {
@@ -682,11 +662,6 @@ impl<T> Peer<T> {
             grouped_patches
                 .into_iter()
                 .map(|(_, patch)| TrackChange::TrackPatch(patch)),
-        );
-        track_changes.extend(
-            grouped_partner_patches
-                .into_iter()
-                .map(|(_, patch)| TrackChange::PartnerTrackPatch(patch)),
         );
 
         self.context.pending_track_updates = track_changes;
@@ -898,7 +873,7 @@ impl Peer<Stable> {
                 self.context.pending_track_updates.push(change);
             }
 
-            self.dedup_track_patches();
+            self.dedup_pending_track_updates();
 
             self.context.peer_updates_sub.negotiation_needed(self.id());
         }
@@ -928,16 +903,17 @@ pub struct PeerChangesScheduler<'a> {
 }
 
 impl<'a> PeerChangesScheduler<'a> {
-    /// Schedules provided [`ClientTrackPatch`]s as [`TrackChange::TrackPatch`].
-    pub fn patch_tracks(&mut self, patches: Vec<ClientTrackPatch>) {
+    /// Schedules provided [`TrackPatchCommand`]s as
+    /// [`TrackChange::TrackPatch`].
+    pub fn patch_tracks(&mut self, patches: Vec<TrackPatchCommand>) {
         for patch in patches {
             self.schedule_change(TrackChange::TrackPatch(patch.into()));
         }
     }
 
-    /// Schedules provided [`ClientTrackPatch`] as
+    /// Schedules provided [`TrackPatchCommand`] as
     /// [`TrackChange::PartnerTrackPatch`].
-    pub fn partner_patch_tracks(&mut self, patches: Vec<ClientTrackPatch>) {
+    pub fn partner_patch_tracks(&mut self, patches: Vec<TrackPatchCommand>) {
         for patch in patches {
             self.schedule_change(TrackChange::PartnerTrackPatch(patch.into()));
         }
@@ -1187,11 +1163,11 @@ pub mod tests {
         let mut peer = peer.start_as_offerer();
 
         peer.as_changes_scheduler().patch_tracks(vec![
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(0),
                 is_muted: Some(true),
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: Some(true),
             },
@@ -1229,31 +1205,31 @@ pub mod tests {
         );
 
         let patches = vec![
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: Some(true),
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: None,
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: Some(false),
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: Some(true),
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: Some(false),
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: None,
             },
-            ClientTrackPatch {
+            TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: None,
             },
