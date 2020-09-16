@@ -24,36 +24,36 @@ use crate::timeout;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+/// [`ServerMsg::RpcSettings`] which will be sent in the all tests from this
+/// module.
+const RPC_SETTINGS: ServerMsg = ServerMsg::RpcSettings(RpcSettings {
+    idle_timeout_ms: 5_000,
+    ping_interval_ms: 2_000,
+});
+
 /// Checks that only one [`Rc`] to the [`RpcClient`] exists.
 #[wasm_bindgen_test]
 async fn only_one_strong_rpc_rc_exists() {
     let jason = Jason::default();
-    let ws = Rc::new(WebSocketRpcClient::new(Box::new(move |_| {
-        Box::pin(async move {
-            let mut transport = MockRpcTransport::new();
-            transport
-                .expect_on_message()
-                .times(3)
-                .returning_st(move || {
-                    Box::pin(stream::once(async {
-                        ServerMsg::RpcSettings(RpcSettings {
-                            idle_timeout_ms: 5_000,
-                            ping_interval_ms: 2_000,
-                        })
-                    }))
+    let ws =
+        Rc::new(WebSocketRpcClient::new(Box::new(move |_| {
+            Box::pin(async move {
+                let mut transport = MockRpcTransport::new();
+                transport.expect_on_message().times(3).returning_st(
+                    move || Box::pin(stream::once(async { RPC_SETTINGS })),
+                );
+                transport.expect_send().return_once(|_| Ok(()));
+                transport
+                    .expect_set_close_reason()
+                    .times(1)
+                    .return_once(|_| ());
+                transport.expect_on_state_change().return_once_st(move || {
+                    Box::pin(stream::once(async { TransportState::Open }))
                 });
-            transport.expect_send().return_once(|_| Ok(()));
-            transport
-                .expect_set_close_reason()
-                .times(1)
-                .return_once(|_| ());
-            transport.expect_on_state_change().return_once_st(move || {
-                Box::pin(stream::once(async { TransportState::Open }))
-            });
-            let transport = Rc::new(transport);
-            Ok(transport as Rc<dyn RpcTransport>)
-        })
-    })));
+                let transport = Rc::new(transport);
+                Ok(transport as Rc<dyn RpcTransport>)
+            })
+        })));
 
     let room = jason.inner_init_room(ws.clone());
     room.on_failed_local_stream(Closure::once_into_js(|| {}).into())
@@ -72,34 +72,27 @@ async fn only_one_strong_rpc_rc_exists() {
 async fn rpc_dropped_on_jason_dispose() {
     let jason = Jason::default();
     let (test_tx, mut test_rx) = mpsc::unbounded();
-    let ws = Rc::new(WebSocketRpcClient::new(Box::new(move |_| {
-        let test_tx = test_tx.clone();
-        Box::pin(async move {
-            let mut transport = MockRpcTransport::new();
-            transport
-                .expect_on_message()
-                .times(3)
-                .returning_st(move || {
-                    Box::pin(stream::once(async {
-                        ServerMsg::RpcSettings(RpcSettings {
-                            idle_timeout_ms: 5_000,
-                            ping_interval_ms: 2_000,
-                        })
-                    }))
+    let ws =
+        Rc::new(WebSocketRpcClient::new(Box::new(move |_| {
+            let test_tx = test_tx.clone();
+            Box::pin(async move {
+                let mut transport = MockRpcTransport::new();
+                transport.expect_on_message().times(3).returning_st(
+                    move || Box::pin(stream::once(async { RPC_SETTINGS })),
+                );
+                transport.expect_send().return_once(|_| Ok(()));
+                transport.expect_set_close_reason().times(1).return_once(
+                    move |reason| {
+                        test_tx.unbounded_send(reason).unwrap();
+                    },
+                );
+                transport.expect_on_state_change().return_once_st(move || {
+                    Box::pin(stream::once(async { TransportState::Open }))
                 });
-            transport.expect_send().return_once(|_| Ok(()));
-            transport.expect_set_close_reason().times(1).return_once(
-                move |reason| {
-                    test_tx.unbounded_send(reason).unwrap();
-                },
-            );
-            transport.expect_on_state_change().return_once_st(move || {
-                Box::pin(stream::once(async { TransportState::Open }))
-            });
-            let transport = Rc::new(transport);
-            Ok(transport as Rc<dyn RpcTransport>)
-        })
-    })));
+                let transport = Rc::new(transport);
+                Ok(transport as Rc<dyn RpcTransport>)
+            })
+        })));
 
     let room = jason.inner_init_room(ws);
     room.on_failed_local_stream(Closure::once_into_js(|| {}).into())
@@ -128,14 +121,7 @@ async fn room_closes_on_rpc_transport_close() {
             Box::pin(async move {
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().times(3).returning_st(
-                    move || {
-                        Box::pin(stream::once(async {
-                            ServerMsg::RpcSettings(RpcSettings {
-                                idle_timeout_ms: 5_000,
-                                ping_interval_ms: 2_000,
-                            })
-                        }))
-                    },
+                    move || Box::pin(stream::once(async { RPC_SETTINGS })),
                 );
                 transport.expect_send().return_once(|_| Ok(()));
                 transport.expect_set_close_reason().return_once(|_| ());
