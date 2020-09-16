@@ -67,7 +67,7 @@ All user visible changes to this project will be documented in this file. This p
         - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
-        - `TracksApplied` ([#105]);
+        - `TracksApplied` with `TrackUpdate::Added` and `TrackUpdate::Updated` ([#105]);
         - `ConnectionQualityUpdated` ([#132]);
         - `TracksApplied` with `TrackUpdate::IceRestart` ([#138]).
 - Error handling:

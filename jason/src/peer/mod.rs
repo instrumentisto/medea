@@ -511,11 +511,11 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Tells the [`RtcPeerConnection`] to start ICE restart on renegotiation.
+    /// Marks [`PeerConnection`] to trigger ICE restart.
     ///
-    /// After this function will be called, the offer returned by the next call
-    /// to [`PeerConnection::get_offer`] is automatically configured to trigger
-    /// ICE restart.
+    /// After this function returns, the offer returned by the next call to
+    /// [`PeerConnection::get_offer`] is automatically configured to trigger ICE
+    /// restart.
     pub fn restart_ice(&self) {
         self.peer.restart_ice();
     }
