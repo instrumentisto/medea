@@ -11,7 +11,7 @@ use medea_client_api_proto::{CloseReason, RpcSettings, ServerMsg};
 use medea_jason::{
     rpc::{
         websocket::{MockRpcTransport, TransportState},
-        CloseMsg, RpcClient, RpcTransport, WebSocketRpcClient,
+        CloseMsg, RpcTransport, WebSocketRpcClient,
     },
     Jason,
 };
@@ -101,7 +101,7 @@ async fn rpc_dropped_on_jason_dispose() {
         })
     })));
 
-    let mut room = jason.inner_init_room(ws);
+    let room = jason.inner_init_room(ws);
     room.on_failed_local_stream(Closure::once_into_js(|| {}).into())
         .unwrap();
     room.on_connection_loss(Closure::once_into_js(|| {}).into())
