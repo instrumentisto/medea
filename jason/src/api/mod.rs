@@ -5,6 +5,7 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
+use futures::FutureExt as _;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -12,7 +13,7 @@ use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
     rpc::{
-        ClientDisconnect, RpcClient as _, RpcTransport, WebSocketRpcClient,
+        ClientDisconnect, RpcClient, RpcTransport, WebSocketRpcClient,
         WebSocketRpcTransport,
     },
     set_panic_hook,
@@ -59,32 +60,7 @@ impl Jason {
                 Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
             })
         })));
-        let peer_repository = Box::new(peer::Repository::new(Rc::clone(
-            &self.0.borrow().media_manager,
-        )));
-
-        spawn_local({
-            let rpc = Rc::clone(&rpc);
-            let inner = Rc::clone(&self.0);
-            async move {
-                let reason = rpc.on_normal_close().await.unwrap_or_else(|_| {
-                    ClientDisconnect::RpcClientUnexpectedlyDropped.into()
-                });
-                // TODO: Don't close all rooms when multiple RPC connections
-                //       will be supported.
-                inner
-                    .borrow_mut()
-                    .rooms
-                    .drain(..)
-                    .for_each(|room| room.close(reason));
-                inner.borrow_mut().media_manager = Rc::default();
-            }
-        });
-
-        let room = Room::new(rpc, peer_repository);
-        let handle = room.new_handle();
-        self.0.borrow_mut().rooms.push(room);
-        handle
+        self.inner_init_room(rpc)
     }
 
     /// Returns handle to [`MediaManager`].
@@ -99,5 +75,34 @@ impl Jason {
         self.0.borrow_mut().rooms.drain(..).for_each(|room| {
             room.close(ClientDisconnect::RoomClosed.into());
         });
+    }
+}
+
+impl Jason {
+    /// Returns [`RoomHandle`] for [`Room`].
+    pub fn inner_init_room(&self, rpc: Rc<dyn RpcClient>) -> RoomHandle {
+        let peer_repository = Box::new(peer::Repository::new(Rc::clone(
+            &self.0.borrow().media_manager,
+        )));
+
+        let inner = self.0.clone();
+        spawn_local(rpc.on_normal_close().map(move |res| {
+            // TODO: Don't close all rooms when multiple rpc connections
+            //       will be supported.
+            let reason = res.unwrap_or_else(|_| {
+                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+            });
+            inner
+                .borrow_mut()
+                .rooms
+                .drain(..)
+                .for_each(|room| room.close(reason));
+            inner.borrow_mut().media_manager = Rc::default();
+        }));
+
+        let room = Room::new(rpc, peer_repository);
+        let handle = room.new_handle();
+        self.0.borrow_mut().rooms.push(room);
+        handle
     }
 }
