@@ -1112,10 +1112,10 @@ Metrics list will be extended as needed.
 ```rust
 struct UpdateTracks {
     peer_id: PeerId,
-    tracks_patches: Vec<TrackPatchCommand>,
+    tracks_patches: Vec<TrackPatch>,
 }
 
-struct TrackPatchCommand {
+struct TrackPatch {
     pub id: TrackId,
     pub is_muted: Option<bool>,
 }
