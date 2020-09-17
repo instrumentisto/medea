@@ -241,7 +241,9 @@ pub trait RpcClient {
     /// abnormal close [`RpcClient::on_connection_loss`] will be thrown.
     ///
     /// [`Future`]: std::future::Future
-    async fn on_normal_close(&self) -> Result<CloseReason, oneshot::Canceled>;
+    fn on_normal_close(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
 
     /// Sets reason, that will be passed to underlying transport when this
     /// client will be dropped.
@@ -640,10 +642,12 @@ impl RpcClient for WebSocketRpcClient {
         }
     }
 
-    async fn on_normal_close(&self) -> Result<CloseReason, oneshot::Canceled> {
+    fn on_normal_close(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close_subscribers.push(tx);
-        rx.await
+        Box::pin(rx)
     }
 
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {

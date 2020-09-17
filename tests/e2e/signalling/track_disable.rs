@@ -1,13 +1,19 @@
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{
+    cell::Cell,
+    rc::Rc,
+    sync::atomic::{AtomicU8, Ordering},
+    time::Duration,
+};
 
-use actix::{Addr, AsyncContext};
+use actix::{ActorContext, Addr, AsyncContext};
 use function_name::named;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver},
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatch, TrackUpdate,
+    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatchCommand,
+    TrackUpdate,
 };
 use medea_control_api_proto::grpc::api as proto;
 use tokio::time::timeout;
@@ -38,7 +44,7 @@ async fn helper(
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_muted: Some(disabled),
             }],
@@ -48,7 +54,7 @@ async fn helper(
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: Some(disabled),
             }],
@@ -72,7 +78,11 @@ async fn helper(
                 for update in updates {
                     match update {
                         TrackUpdate::Updated(patch) => {
-                            assert_eq!(patch.is_muted, Some(disabled));
+                            if let Some(is_muted_general) =
+                                patch.is_muted_general
+                            {
+                                assert_eq!(is_muted_general, disabled);
+                            }
                             if patch.id == TrackId(0) {
                                 first_muted = true;
                             } else if patch.id == TrackId(1) {
@@ -170,7 +180,7 @@ async fn track_disables_and_enables_are_instant() {
                                 updates.pop().unwrap()
                             {
                                 Some((
-                                    patch.is_muted.unwrap(),
+                                    patch.is_muted_general?,
                                     negotiation_role,
                                 ))
                             } else {
@@ -224,7 +234,7 @@ async fn track_disables_and_enables_are_instant() {
                 mutes_sent.push(is_muted);
                 publisher.do_send(SendCommand(Command::UpdateTracks {
                     peer_id: PeerId(0),
-                    tracks_patches: vec![TrackPatch {
+                    tracks_patches: vec![TrackPatchCommand {
                         id: TrackId(0),
                         is_muted: Some(is_muted),
                     }],
@@ -364,7 +374,7 @@ async fn track_disables_and_enables_are_instant2() {
     first
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_muted: Some(true),
             }],
@@ -386,7 +396,7 @@ async fn track_disables_and_enables_are_instant2() {
     second
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(1),
-            tracks_patches: vec![TrackPatch {
+            tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: Some(true),
             }],
@@ -431,7 +441,7 @@ async fn force_update_works() {
                 Event::IceCandidateDiscovered { peer_id, .. } => {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: *peer_id,
-                        tracks_patches: vec![TrackPatch {
+                        tracks_patches: vec![TrackPatchCommand {
                             is_muted: Some(true),
                             id: TrackId(0),
                         }],
@@ -449,7 +459,7 @@ async fn force_update_works() {
                     } else {
                         ctx.notify(SendCommand(Command::UpdateTracks {
                             peer_id: *peer_id,
-                            tracks_patches: vec![TrackPatch {
+                            tracks_patches: vec![TrackPatchCommand {
                                 is_muted: Some(true),
                                 id: TrackId(0),
                             }],
@@ -486,7 +496,7 @@ async fn force_update_works() {
             Event::IceCandidateDiscovered { .. } => {
                 ctx.notify(SendCommand(Command::UpdateTracks {
                     peer_id: pub_peer_id.unwrap(),
-                    tracks_patches: vec![TrackPatch {
+                    tracks_patches: vec![TrackPatchCommand {
                         is_muted: Some(true),
                         id: track_id.unwrap(),
                     }],
@@ -502,7 +512,7 @@ async fn force_update_works() {
                 } else {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: pub_peer_id.unwrap(),
-                        tracks_patches: vec![TrackPatch {
+                        tracks_patches: vec![TrackPatchCommand {
                             is_muted: Some(true),
                             id: track_id.unwrap(),
                         }],
@@ -525,4 +535,228 @@ async fn force_update_works() {
     .await;
     force_update.unwrap().unwrap();
     renegotiation_update.unwrap().unwrap();
+}
+
+/// Checks that server validly switches individual and general mute states based
+/// on client's commands.
+#[actix_rt::test]
+#[named]
+async fn individual_and_general_mute_states_works() {
+    const STAGE1_PROGRESS: AtomicU8 = AtomicU8::new(0);
+    const STAGE2_PROGRESS: AtomicU8 = AtomicU8::new(0);
+    const STAGE3_PROGRESS: AtomicU8 = AtomicU8::new(0);
+
+    let mut client = ControlClient::new().await;
+    let credentials = client.create(create_room_req(test_name!())).await;
+
+    let (test_finish_tx, test_finish_rx) = mpsc::unbounded();
+
+    let _responder = TestMember::connect(
+        credentials.get("responder").unwrap(),
+        Some({
+            let test_finish_tx = test_finish_tx.clone();
+            let mut is_stage1_finished = false;
+            let mut is_stage2_finished = false;
+            let mut is_stage3_finished = false;
+
+            Box::new(move |event, ctx, _| match event {
+                Event::TracksApplied {
+                    peer_id, updates, ..
+                } => {
+                    assert_eq!(peer_id, &PeerId(1));
+                    let update = updates.last().unwrap();
+                    match update {
+                        TrackUpdate::Updated(patch) => {
+                            if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
+                                && !is_stage1_finished
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, Some(true));
+                                assert_eq!(patch.is_muted_individual, None);
+
+                                ctx.notify(SendCommand(
+                                    Command::UpdateTracks {
+                                        peer_id: PeerId(1),
+                                        tracks_patches: vec![
+                                            TrackPatchCommand {
+                                                id: TrackId(0),
+                                                is_muted: Some(true),
+                                            },
+                                        ],
+                                    },
+                                ));
+
+                                STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                is_stage1_finished = true;
+                            } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && !is_stage2_finished
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, Some(true));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(true)
+                                );
+
+                                STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                is_stage2_finished = true;
+                            } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && !is_stage3_finished
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, None);
+                                assert_eq!(patch.is_muted_individual, None);
+
+                                ctx.notify(SendCommand(
+                                    Command::UpdateTracks {
+                                        peer_id: PeerId(1),
+                                        tracks_patches: vec![
+                                            TrackPatchCommand {
+                                                id: TrackId(0),
+                                                is_muted: Some(false),
+                                            },
+                                        ],
+                                    },
+                                ));
+
+                                STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                is_stage3_finished = true;
+                            } else {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_general, Some(false));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(false)
+                                );
+
+                                test_finish_tx.unbounded_send(()).unwrap();
+                                ctx.stop();
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            })
+        }),
+        None,
+        TestMember::DEFAULT_DEADLINE,
+        true,
+    )
+    .await;
+    let _publisher = TestMember::connect(
+        credentials.get("publisher").unwrap(),
+        Some(Box::new({
+            let mut is_inited = false;
+            let mut is_individual_muted = false;
+            let mut is_stage1_finished = false;
+            let mut is_stage2_finished = false;
+            let mut is_stage3_finished = false;
+
+            move |event, ctx, _| match event {
+                Event::IceCandidateDiscovered { peer_id, .. } => {
+                    assert_eq!(peer_id, &PeerId(0));
+                    if !is_inited {
+                        ctx.notify(SendCommand(Command::UpdateTracks {
+                            peer_id: PeerId(0),
+                            tracks_patches: vec![TrackPatchCommand {
+                                id: TrackId(0),
+                                is_muted: Some(true),
+                            }],
+                        }));
+                        is_inited = true;
+                    }
+                }
+                Event::TracksApplied { updates, .. } => {
+                    let update = updates.last().unwrap();
+                    match update {
+                        TrackUpdate::Updated(patch) => {
+                            if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
+                                && !is_stage1_finished
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(true)
+                                );
+                                assert_eq!(patch.is_muted_general, Some(true));
+
+                                STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                is_stage1_finished = true;
+                            } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && !is_stage2_finished
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.is_muted_individual, None);
+                                assert_eq!(patch.is_muted_general, Some(true));
+
+                                ctx.notify(SendCommand(
+                                    Command::UpdateTracks {
+                                        peer_id: PeerId(0),
+                                        tracks_patches: vec![
+                                            TrackPatchCommand {
+                                                id: TrackId(0),
+                                                is_muted: Some(false),
+                                            },
+                                        ],
+                                    },
+                                ));
+
+                                STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                is_stage2_finished = true;
+                            } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
+                                < 2
+                                && is_stage3_finished
+                            {
+                                assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(
+                                    patch.is_muted_individual,
+                                    Some(false)
+                                );
+                                assert_eq!(patch.is_muted_general, None);
+
+                                STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
+                                is_stage3_finished = true;
+                            } else {
+                                assert_eq!(patch.id, TrackId(0));
+                                if !is_individual_muted {
+                                    assert_eq!(
+                                        patch.is_muted_individual,
+                                        Some(false)
+                                    );
+                                    assert_eq!(
+                                        patch.is_muted_general,
+                                        Some(true)
+                                    );
+
+                                    is_individual_muted = true;
+                                } else {
+                                    assert_eq!(
+                                        patch.is_muted_general,
+                                        Some(false)
+                                    );
+                                    assert_eq!(patch.is_muted_individual, None);
+
+                                    test_finish_tx.unbounded_send(()).unwrap();
+
+                                    ctx.stop();
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            }
+        })),
+        None,
+        TestMember::DEFAULT_DEADLINE,
+        true,
+    )
+    .await;
+
+    test_finish_rx.skip(1).next().await.unwrap();
 }

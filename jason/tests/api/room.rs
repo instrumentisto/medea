@@ -24,7 +24,7 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_test_required_tracks, get_test_tracks,
+    delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, MockNavigator,
 };
@@ -82,7 +82,7 @@ async fn get_test_room_and_exist_peer(
                     peer_id,
                     updates: tracks_patches
                         .into_iter()
-                        .map(TrackUpdate::Updated)
+                        .map(|p| TrackUpdate::Updated(p.into()))
                         .collect(),
                     negotiation_role: None,
                 })
@@ -345,7 +345,6 @@ async fn error_join_room_without_on_connection_loss_callback() {
 }
 
 mod disable_recv_tracks {
-
     use medea_client_api_proto::{
         AudioSettings, Direction, MediaType, MemberId, VideoSettings,
     };
@@ -990,7 +989,7 @@ mod patches_generation {
 
     use futures::StreamExt;
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatch,
+        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatchCommand,
         VideoSettings,
     };
     use medea_jason::media::RecvConstraints;
@@ -1112,7 +1111,7 @@ mod patches_generation {
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
                 peer_id: PeerId(1),
-                tracks_patches: vec![TrackPatch {
+                tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(1),
                     is_muted: Some(true),
                 }]
@@ -1159,7 +1158,7 @@ mod patches_generation {
 
         assert_eq!(
             commands.remove(&PeerId(1)).unwrap(),
-            vec![TrackPatch {
+            vec![TrackPatchCommand {
                 id: TrackId(1),
                 is_muted: Some(true),
             }]
@@ -1167,7 +1166,7 @@ mod patches_generation {
 
         assert_eq!(
             commands.remove(&PeerId(2)).unwrap(),
-            vec![TrackPatch {
+            vec![TrackPatchCommand {
                 id: TrackId(2),
                 is_muted: Some(true),
             }]
@@ -1225,11 +1224,47 @@ mod patches_generation {
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
                 peer_id: PeerId(2),
-                tracks_patches: vec![TrackPatch {
+                tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(2),
                     is_muted: Some(true),
                 }]
             }
         );
     }
+}
+
+/// Tests that muting and unmuting of remote audio works.
+#[wasm_bindgen_test]
+async fn remote_mute_unmute_audio() {
+    let (audio_track, video_track) = get_test_recv_tracks();
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    let handle = room.new_handle();
+    assert!(JsFuture::from(handle.mute_remote_audio()).await.is_ok());
+    assert!(!peer.is_recv_audio_enabled());
+    assert!(JsFuture::from(handle.unmute_remote_audio()).await.is_ok());
+    assert!(peer.is_recv_audio_enabled());
+}
+
+/// Tests that muting and unmuting of remote video works.
+#[wasm_bindgen_test]
+async fn remote_mute_unmute_video() {
+    let (audio_track, video_track) = get_test_recv_tracks();
+    let (room, peer) = get_test_room_and_exist_peer(
+        audio_track,
+        video_track,
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    let handle = room.new_handle();
+    assert!(JsFuture::from(handle.mute_remote_video()).await.is_ok());
+    assert!(!peer.is_recv_video_enabled());
+    assert!(JsFuture::from(handle.unmute_remote_video()).await.is_ok());
+    assert!(peer.is_recv_video_enabled());
 }

@@ -12,10 +12,10 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
-use web_sys::RtcRtpTransceiver;
+use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
-    media::{LocalStreamConstraints, MediaStreamTrack, RecvConstraints},
+    media::{LocalStreamConstraints, RecvConstraints},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
@@ -219,16 +219,44 @@ struct InnerMediaConnections {
     senders: HashMap<TrackId, Rc<Sender>>,
 
     /// [`TrackId`] to its [`Receiver`].
-    receivers: HashMap<TrackId, Receiver>,
+    receivers: HashMap<TrackId, Rc<Receiver>>,
 }
 
 impl InnerMediaConnections {
     /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`].
-    pub fn iter_senders_with_kind(
+    fn iter_senders_with_kind(
         &self,
         kind: TransceiverKind,
     ) -> impl Iterator<Item = &Rc<Sender>> {
         self.senders.values().filter(move |s| s.kind() == kind)
+    }
+
+    /// Returns [`Iterator`] over [`Receiver`]s with provided
+    /// [`TransceiverKind`].
+    fn iter_receivers_with_kind(
+        &self,
+        kind: TransceiverKind,
+    ) -> impl Iterator<Item = &Rc<Receiver>> {
+        self.receivers.values().filter(move |s| s.kind() == kind)
+    }
+
+    /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`] and
+    /// [`TransceiverKind`].
+    fn get_transceivers_by_direction_and_kind(
+        &self,
+        direction: TrackDirection,
+        kind: TransceiverKind,
+    ) -> Vec<Rc<dyn TransceiverSide>> {
+        match direction {
+            TrackDirection::Send => self
+                .iter_senders_with_kind(kind)
+                .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
+                .collect(),
+            TrackDirection::Recv => self
+                .iter_receivers_with_kind(kind)
+                .map(|rx| Rc::clone(&rx) as Rc<dyn TransceiverSide>)
+                .collect(),
+        }
     }
 }
 
@@ -260,14 +288,9 @@ impl MediaConnections {
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn TransceiverSide>> {
-        let inner = self.0.borrow();
-        match direction {
-            TrackDirection::Send => inner
-                .iter_senders_with_kind(kind)
-                .map(|sender| Rc::clone(&sender) as Rc<dyn TransceiverSide>)
-                .collect(),
-            TrackDirection::Recv => todo!(),
-        }
+        self.0
+            .borrow()
+            .get_transceivers_by_direction_and_kind(direction, kind)
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
@@ -278,15 +301,14 @@ impl MediaConnections {
         direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
-        match direction {
-            TrackDirection::Send => {
-                for sender in self.0.borrow().iter_senders_with_kind(kind) {
-                    if sender.mute_state() != mute_state.into() {
-                        return false;
-                    }
-                }
+        let transceivers = self
+            .0
+            .borrow()
+            .get_transceivers_by_direction_and_kind(direction, kind);
+        for transceiver in transceivers {
+            if transceiver.mute_state() != mute_state.into() {
+                return false;
             }
-            TrackDirection::Recv => todo!(),
         }
 
         true
@@ -312,6 +334,26 @@ impl MediaConnections {
             .is_none()
     }
 
+    /// Returns `true` if all [`Receiver`]s with [`TransceiverKind::Video`] are
+    /// enabled or `false` otherwise.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(TransceiverKind::Video)
+            .find(|s| s.is_muted())
+            .is_none()
+    }
+
+    /// Returns `true` if all [`Receiver`]s with [`TransceiverKind::Audio`] are
+    /// enabled or `false` otherwise.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(TransceiverKind::Audio)
+            .find(|s| s.is_muted())
+            .is_none()
+    }
+
     /// Returns mapping from a [`MediaStreamTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     ///
@@ -326,7 +368,7 @@ impl MediaConnections {
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
-        let mut inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
         let mut mids =
             HashMap::with_capacity(inner.senders.len() + inner.receivers.len());
         for (track_id, sender) in &inner.senders {
@@ -338,7 +380,7 @@ impl MediaConnections {
                     .map_err(tracerr::wrap!())?,
             );
         }
-        for (track_id, receiver) in &mut inner.receivers {
+        for (track_id, receiver) in &inner.receivers {
             mids.insert(
                 *track_id,
                 receiver
@@ -409,7 +451,7 @@ impl MediaConnections {
                     inner.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
-                    let recv = Receiver::new(
+                    let recv = Rc::new(Receiver::new(
                         track.id,
                         track.media_type.into(),
                         sender,
@@ -417,7 +459,7 @@ impl MediaConnections {
                         mid,
                         inner.peer_events_sender.clone(),
                         recv_constraints,
-                    );
+                    ));
                     inner.receivers.insert(track.id, recv);
                 }
             }
@@ -432,7 +474,10 @@ impl MediaConnections {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
-    pub fn patch_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn patch_tracks(
+        &self,
+        tracks: Vec<proto::TrackPatchEvent>,
+    ) -> Result<()> {
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
                 sender.update(&track_proto);
@@ -519,8 +564,10 @@ impl MediaConnections {
         }
 
         future::try_join_all(sender_and_track.into_iter().map(
-            |(sender, track)| {
-                Sender::insert_track_and_enable(Rc::clone(sender), track)
+            |(sender, track)| async move {
+                Rc::clone(sender).insert_track(track).await?;
+                sender.maybe_enable();
+                Ok::<(), Traced<MediaConnectionsError>>(())
             },
         ))
         .await?;
@@ -546,11 +593,11 @@ impl MediaConnections {
     pub fn add_remote_track(
         &self,
         transceiver: RtcRtpTransceiver,
-        track: MediaStreamTrack,
+        track: SysMediaStreamTrack,
     ) -> Result<()> {
-        let mut inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
         if let Some(mid) = transceiver.mid() {
-            for receiver in &mut inner.receivers.values_mut() {
+            for receiver in inner.receivers.values() {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
                         receiver.set_remote_track(transceiver, track);
@@ -570,21 +617,34 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Stops all [`TransceiverSide`]s state transitions expiry timers.
-    pub fn stop_state_transitions_timers(&self) {
-        self.0
-            .borrow()
+    /// Returns all references to the [`TransceiverSide`]s from this
+    /// [`MediaConnections`].
+    fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {
+        let inner = self.0.borrow();
+        inner
             .senders
             .values()
-            .for_each(|sender| sender.stop_mute_state_transition_timeout());
+            .map(|s| Rc::clone(s) as Rc<dyn TransceiverSide>)
+            .chain(
+                inner
+                    .receivers
+                    .values()
+                    .map(|r| Rc::clone(&r) as Rc<dyn TransceiverSide>),
+            )
+            .collect()
+    }
+
+    /// Stops all [`TransceiverSide`]s state transitions expiry timers.
+    pub fn stop_state_transitions_timers(&self) {
+        self.get_all_transceivers_sides()
+            .into_iter()
+            .for_each(|t| t.stop_mute_state_transition_timeout())
     }
 
     /// Resets all [`TransceiverSide`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
-        self.0
-            .borrow()
-            .senders
-            .values()
-            .for_each(|sender| sender.reset_mute_state_transition_timeout());
+        self.get_all_transceivers_sides()
+            .into_iter()
+            .for_each(|t| t.reset_mute_state_transition_timeout());
     }
 }

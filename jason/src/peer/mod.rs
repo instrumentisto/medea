@@ -22,7 +22,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MemberId, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -48,8 +48,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Sender, StableMuteState, TrackDirection,
-        TransceiverSide,
+        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
+        TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -437,7 +437,10 @@ impl PeerConnection {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// provided [`proto::TrackPatch`] contains unknown ID.
-    pub fn patch_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn patch_tracks(
+        &self,
+        tracks: Vec<proto::TrackPatchEvent>,
+    ) -> Result<()> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
@@ -504,10 +507,10 @@ impl PeerConnection {
         track_event: &RtcTrackEvent,
     ) -> Result<()> {
         let transceiver = track_event.transceiver();
-        let track = MediaStreamTrack::from(track_event.track());
         media_connections
-            .add_remote_track(transceiver, track)
+            .add_remote_track(transceiver, track_event.track())
             .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
     }
 
@@ -528,6 +531,16 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
+    }
+
+    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.media_connections.is_recv_audio_enabled()
+    }
+
+    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.media_connections.is_recv_video_enabled()
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
@@ -586,7 +599,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(&self, tracks: Vec<Track>) -> Result<String> {
+    pub async fn get_offer(&self, tracks: Vec<proto::Track>) -> Result<String> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -611,7 +624,7 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+    pub fn create_tracks(&self, tracks: Vec<proto::Track>) -> Result<()> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -803,7 +816,7 @@ impl PeerConnection {
     pub async fn process_offer(
         &self,
         offer: String,
-        tracks: Vec<Track>,
+        tracks: Vec<proto::Track>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =

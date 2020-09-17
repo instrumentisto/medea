@@ -545,6 +545,7 @@ window.onload = async function() {
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
+        video.playsinline = "true";
         video.controls = "true";
         video.srcObject = stream.get_media_stream();
         let innerVideoDiv = document.createElement("div");
@@ -562,7 +563,7 @@ window.onload = async function() {
         stream.on_track_added( (track) => {
           // switch controls off and on, cause controls are not updated
           // automatically
-          let video = remote_videos[connection.get_remote_id()]
+          let video = remote_videos[connection.get_remote_member_id()]
             .getElementsByTagName("video")[0];
           video.controls = false;
           video.controls = true;
