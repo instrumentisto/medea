@@ -379,7 +379,7 @@ impl TrackChange {
     /// Returns [`TrackUpdate`] based on this [`TrackChange`].
     fn as_track_update(&self, partner_member_id: MemberId) -> TrackUpdate {
         match self {
-            Self::AddSendTrack(track) => Self::Added(Track {
+            Self::AddSendTrack(track) => TrackUpdate::Added(Track {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Send {
@@ -399,7 +399,7 @@ impl TrackChange {
             | Self::PartnerTrackPatch(track_patch) => {
                 TrackUpdate::Updated(track_patch.clone())
             }
-            TrackChange::IceRestart => TrackUpdate::IceRestart,
+            Self::IceRestart => TrackUpdate::IceRestart,
         }
     }
 
@@ -409,8 +409,7 @@ impl TrackChange {
             Self::AddSendTrack(_)
             | Self::AddRecvTrack(_)
             | Self::IceRestart => false,
-            Self::TrackPatch(_)
-            | Self::PartnerTrackPatch(_) => true,
+            Self::TrackPatch(_) | Self::PartnerTrackPatch(_) => true,
         }
     }
 }
@@ -644,11 +643,12 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Dedups [`TrackChange`]s from this [`Peer`].
-    fn dedup_track_changes(&mut self) {
+    /// Deduplicates pending [`TrackChange`]s.
+    fn dedup_pending_track_updates(&mut self) {
         self.dedup_ice_restarts();
         self.dedup_track_patches();
     }
+
 
     /// Dedups [`TrackChange::IceRestart`]s.
     fn dedup_ice_restarts(&mut self) {
@@ -672,8 +672,8 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Deduplicates pending [`TrackChange`]s.
-    fn dedup_pending_track_updates(&mut self) {
+    /// Dedups [`TrackChange`]s from this [`Peer`].
+    fn dedup_track_patches(&mut self) {
         let mut grouped_patches: HashMap<TrackId, TrackPatchEvent> =
             HashMap::new();
         let mut track_changes = Vec::new();
@@ -1314,14 +1314,16 @@ pub mod tests {
             TrackChange::IceRestart,
             TrackChange::IceRestart,
             TrackChange::IceRestart,
-            TrackChange::TrackPatch(TrackPatch {
+            TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_muted: None,
+                is_muted_individual: None,
+                is_muted_general: None,
             }),
             TrackChange::IceRestart,
-            TrackChange::TrackPatch(TrackPatch {
+            TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_muted: None,
+                is_muted_individual: None,
+                is_muted_general: None,
             }),
         ];
 
