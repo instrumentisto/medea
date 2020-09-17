@@ -14,7 +14,7 @@ use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
     NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatch, TrackUpdate,
+    TrackPatchCommand, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -243,25 +243,26 @@ impl RoomHandle {
         Ok(())
     }
 
-    /// Enables or disables specified media type publish in all
+    /// Enables or disables specified media type publish or receival in all
     /// [`PeerConnection`]s.
-    async fn set_send_track_enabled(
+    async fn set_track_enabled(
         &self,
         enabled: bool,
         kind: TransceiverKind,
+        direction: TrackDirection,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.send_constraints.set_enabled(enabled, kind);
+        inner.toggle_enable_constraints(enabled, kind, direction);
         while !inner.is_all_peers_in_mute_state(
             kind,
-            TrackDirection::Send,
+            direction,
             StableMuteState::from(!enabled),
         ) {
             inner
-                .toggle_mute(!enabled, kind)
+                .toggle_mute(!enabled, kind, direction)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    inner.send_constraints.set_enabled(!enabled, kind);
+                    inner.toggle_enable_constraints(!enabled, kind, direction);
                     tracerr::new!(e)
                 })?;
         }
@@ -364,8 +365,12 @@ impl RoomHandle {
     pub fn mute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_send_track_enabled(false, TransceiverKind::Audio)
-                .await?;
+            this.set_track_enabled(
+                false,
+                TransceiverKind::Audio,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -374,8 +379,12 @@ impl RoomHandle {
     pub fn unmute_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_send_track_enabled(true, TransceiverKind::Audio)
-                .await?;
+            this.set_track_enabled(
+                true,
+                TransceiverKind::Audio,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -384,8 +393,12 @@ impl RoomHandle {
     pub fn mute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_send_track_enabled(false, TransceiverKind::Video)
-                .await?;
+            this.set_track_enabled(
+                false,
+                TransceiverKind::Video,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -394,52 +407,68 @@ impl RoomHandle {
     pub fn unmute_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_send_track_enabled(true, TransceiverKind::Video)
-                .await?;
+            this.set_track_enabled(
+                true,
+                TransceiverKind::Video,
+                TrackDirection::Send,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Mutes inbound audio in this [`Room`].
     pub fn mute_remote_audio(&self) -> Promise {
-        let inner = upgrade_or_detached!(self.0, JasonError);
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            inner?
-                .recv_constraints
-                .set_enabled(false, TransceiverKind::Audio);
-            Ok(JsValue::UNDEFINED)
-        })
-    }
-
-    /// Unmutes inbound audio in this [`Room`].
-    pub fn unmute_remote_audio(&self) -> Promise {
-        let inner = upgrade_or_detached!(self.0, JasonError);
-        future_to_promise(async move {
-            inner?
-                .recv_constraints
-                .set_enabled(true, TransceiverKind::Audio);
+            this.set_track_enabled(
+                false,
+                TransceiverKind::Audio,
+                TrackDirection::Recv,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Mutes inbound video in this [`Room`].
     pub fn mute_remote_video(&self) -> Promise {
-        let inner = upgrade_or_detached!(self.0, JasonError);
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            inner?
-                .recv_constraints
-                .set_enabled(false, TransceiverKind::Video);
+            this.set_track_enabled(
+                false,
+                TransceiverKind::Video,
+                TrackDirection::Recv,
+            )
+            .await?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Unmutes inbound audio in this [`Room`].
+    pub fn unmute_remote_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_enabled(
+                true,
+                TransceiverKind::Audio,
+                TrackDirection::Recv,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Unmutes inbound video in this [`Room`].
     pub fn unmute_remote_video(&self) -> Promise {
-        let inner = upgrade_or_detached!(self.0, JasonError);
+        let this = Self(self.0.clone());
         future_to_promise(async move {
-            inner?
-                .recv_constraints
-                .set_enabled(true, TransceiverKind::Video);
+            this.set_track_enabled(
+                true,
+                TransceiverKind::Video,
+                TrackDirection::Recv,
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -655,6 +684,22 @@ impl InnerRoom {
         }
     }
 
+    /// Toggles [`InnerRoom::recv_constraints`] or
+    /// [`InnerRoom::send_constraints`] mute status based on the provided
+    /// [`TrackDirection`] and [`TransceiverKind`].
+    fn toggle_enable_constraints(
+        &self,
+        enabled: bool,
+        kind: TransceiverKind,
+        direction: TrackDirection,
+    ) {
+        if let TrackDirection::Recv = direction {
+            self.recv_constraints.set_enabled(enabled, kind);
+        } else {
+            self.send_constraints.set_enabled(enabled, kind);
+        }
+    }
+
     /// Sets `close_reason` of [`InnerRoom`].
     ///
     /// [`Drop`] implementation of [`InnerRoom`] is supposed
@@ -663,8 +708,8 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
-    /// [`PeerConnection`]s in this [`Room`].
+    /// Toggles [`TransceiverSide`]s [`MuteState`] by provided
+    /// [`TransceiverKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     #[allow(clippy::filter_map)]
@@ -672,6 +717,7 @@ impl InnerRoom {
         &self,
         is_muted: bool,
         kind: TransceiverKind,
+        direction: TrackDirection,
     ) -> Result<(), Traced<RoomError>> {
         let peer_mute_state_changed: Vec<_> = self
             .peers
@@ -679,39 +725,37 @@ impl InnerRoom {
             .iter()
             .map(|peer| {
                 let desired_state = StableMuteState::from(is_muted);
-                let senders =
-                    peer.get_transceivers_sides(kind, TrackDirection::Send);
-
-                let senders_to_mute = senders.into_iter().filter(|sender| {
-                    match sender.mute_state() {
+                let trnscvrs = peer
+                    .get_transceivers_sides(kind, direction)
+                    .into_iter()
+                    .filter(|trnscvr| match trnscvr.mute_state() {
                         MuteState::Transition(t) => {
                             t.intended() != desired_state
                         }
                         MuteState::Stable(s) => s != desired_state,
-                    }
-                });
+                    });
 
-                let mut processed_senders: Vec<Rc<dyn TransceiverSide>> =
+                let mut processed_trnscvrs: Vec<Rc<dyn TransceiverSide>> =
                     Vec::new();
                 let mut tracks_patches = Vec::new();
-                for sender in senders_to_mute {
+                for trnscvr in trnscvrs {
                     if let Err(e) =
-                        sender.mute_state_transition_to(desired_state)
+                        trnscvr.mute_state_transition_to(desired_state)
                     {
-                        for processed_sender in processed_senders {
-                            processed_sender.cancel_transition();
-                        }
+                        processed_trnscvrs
+                            .iter()
+                            .for_each(|trnscvr| trnscvr.cancel_transition());
                         return Either::Left(future::err(tracerr::new!(e)));
                     }
-                    tracks_patches.push(TrackPatch {
-                        id: sender.track_id(),
+                    tracks_patches.push(TrackPatchCommand {
+                        id: trnscvr.track_id(),
                         is_muted: Some(is_muted),
                     });
-                    processed_senders.push(sender);
+                    processed_trnscvrs.push(trnscvr);
                 }
 
                 let wait_state_change: Vec<_> = peer
-                    .get_transceivers_sides(kind, TrackDirection::Send)
+                    .get_transceivers_sides(kind, direction)
                     .into_iter()
                     .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
@@ -925,7 +969,6 @@ impl EventHandler for InnerRoom {
 
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
-        // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.connections.close_connection(*id);
             self.peers.remove(*id);
