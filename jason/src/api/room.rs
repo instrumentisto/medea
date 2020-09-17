@@ -18,7 +18,7 @@ use medea_client_api_proto::{
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
-use wasm_bindgen_futures::{future_to_promise, spawn_local};
+use wasm_bindgen_futures::{future_to_promise, spawn_local, JsFuture};
 
 use crate::{
     api::connection::Connections,
@@ -512,6 +512,7 @@ impl Room {
 
         let room = Rc::new(InnerRoom::new(rpc, peers, tx));
         let inner = Rc::downgrade(&room);
+        room.handle.replace(Some(RoomHandle(Weak::clone(&inner))));
 
         spawn_local(async move {
             loop {
@@ -656,6 +657,8 @@ struct InnerRoom {
     /// Note that `None` will be considered as error and `is_err` will be
     /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
+
+    handle: RefCell<Option<RoomHandle>>,
 }
 
 impl InnerRoom {
@@ -681,6 +684,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
+            handle: RefCell::new(None)
         }
     }
 
@@ -866,6 +870,11 @@ impl InnerRoom {
                 });
             }
             Some(NegotiationRole::Answerer(offer)) => {
+                if let Some(handle) = self.handle.borrow_mut().take() {
+                    spawn_local(async move {
+                       JsFuture::from(handle.mute_remote_video()).await.unwrap();
+                    });
+                }
                 let sdp_answer = peer
                     .process_offer(offer, tracks)
                     .await
