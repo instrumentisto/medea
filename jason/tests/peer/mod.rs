@@ -17,12 +17,13 @@ use medea_client_api_proto::{
         RtcStatsType, StatId, TrackStats, TrackStatsKind,
     },
     AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
-    Track, TrackId, TrackPatch, VideoSettings,
+    Track, TrackId, TrackPatchEvent, VideoSettings,
 };
 use medea_jason::{
     media::{LocalStreamConstraints, MediaManager, RecvConstraints, TrackKind},
     peer::{
-        PeerConnection, PeerEvent, RtcStats, StableMuteState, TransceiverKind,
+        PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
+        TransceiverKind,
     },
 };
 use wasm_bindgen_test::*;
@@ -37,12 +38,13 @@ wasm_bindgen_test_configure!(run_in_browser);
 fn toggle_mute_tracks_updates(
     tracks_ids: &[u32],
     is_muted: bool,
-) -> Vec<TrackPatch> {
+) -> Vec<TrackPatchEvent> {
     tracks_ids
         .into_iter()
-        .map(|track_id| TrackPatch {
+        .map(|track_id| TrackPatchEvent {
             id: TrackId(*track_id),
-            is_muted: Some(is_muted),
+            is_muted_individual: Some(is_muted),
+            is_muted_general: Some(is_muted),
         })
         .collect()
 }
@@ -881,14 +883,23 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_senders(TransceiverKind::Audio)
-            .into_iter()
-            .chain(peer.get_senders(TransceiverKind::Video).into_iter())
-            .map(|s| {
-                s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+        peer.get_transceivers_sides(
+            TransceiverKind::Audio,
+            TrackDirection::Send,
+        )
+        .into_iter()
+        .chain(
+            peer.get_transceivers_sides(
+                TransceiverKind::Video,
+                TrackDirection::Send,
+            )
+            .into_iter(),
+        )
+        .map(|s| {
+            s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 
-                s.when_mute_state_stable(StableMuteState::NotMuted)
-            }),
+            s.when_mute_state_stable(StableMuteState::Unmuted)
+        }),
     )
     .map(|_| ())
     .shared();

@@ -90,6 +90,20 @@ Currently, it supports two kinds of events (`Created` and `Deleted`) with the fo
 }
 ```
 
+#### 3. `Broadcast` event
+
+Additionally, [WebSocket] clients can send arbitrary messages, and those will be broadcast to other [WebSocket] clients that subscribed to the same `room_id`. The only validation that app performs is that message is a valid JSON.
+
+```json
+{
+    "method": "Broadcast",
+    "payload": {
+        "anything": "that other user sent",
+        "asd": 123 
+    }
+}
+```
+
 
 
 

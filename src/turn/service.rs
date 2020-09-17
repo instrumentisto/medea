@@ -162,18 +162,7 @@ pub fn new_turn_auth_service<'a>(
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
     let turn_db = TurnDatabase::new(
         cf.db.redis.connect_timeout,
-        ConnectionInfo {
-            addr: Box::new(redis::ConnectionAddr::Tcp(
-                cf.db.redis.host.to_string(),
-                cf.db.redis.port,
-            )),
-            db: cf.db.redis.db_number,
-            passwd: if cf.db.redis.pass.is_empty() {
-                None
-            } else {
-                Some(cf.db.redis.pass.to_string())
-            },
-        },
+        ConnectionInfo::from(&cf.db.redis),
     )?;
 
     let coturn_cli = CoturnTelnetClient::new(

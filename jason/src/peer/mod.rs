@@ -22,7 +22,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MemberId, PeerConnectionState, PeerId as Id, PeerId, Track, TrackId,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -48,7 +48,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Sender, StableMuteState, TrackDirection,
+        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
+        TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -409,16 +410,18 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Returns `true` if all [`Sender`]s of this [`PeerConnection`] is in
-    /// the provided `mute_state`.
+    /// Returns `true` if all [`TransceiverSide`]s with a provided
+    /// [`TransceiverKind`] and [`TrackDirection`] is in the provided
+    /// [`StableMuteState`].
     #[inline]
-    pub fn is_all_senders_in_mute_state(
+    pub fn is_all_transceiver_sides_in_mute_state(
         &self,
         kind: TransceiverKind,
+        direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections
-            .is_all_senders_in_mute_state(kind, mute_state)
+            .is_all_tracks_in_mute_state(kind, direction, mute_state)
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
@@ -434,7 +437,10 @@ impl PeerConnection {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// provided [`proto::TrackPatch`] contains unknown ID.
-    pub fn patch_tracks(&self, tracks: Vec<proto::TrackPatch>) -> Result<()> {
+    pub fn patch_tracks(
+        &self,
+        tracks: Vec<proto::TrackPatchEvent>,
+    ) -> Result<()> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
@@ -501,10 +507,10 @@ impl PeerConnection {
         track_event: &RtcTrackEvent,
     ) -> Result<()> {
         let transceiver = track_event.transceiver();
-        let track = MediaStreamTrack::from(track_event.track());
         media_connections
-            .add_remote_track(transceiver, Clone::clone(&track))
+            .add_remote_track(transceiver, track_event.track())
             .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
     }
 
@@ -518,11 +524,26 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled()
     }
 
-    /// Returns all [`Sender`]s from this [`PeerConnection`] with provided
-    /// [`TransceiverKind`].
+    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.media_connections.is_recv_audio_enabled()
+    }
+
+    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.media_connections.is_recv_video_enabled()
+    }
+
+    /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
+    /// provided [`TransceiverKind`] and [`TrackDirection`].
     #[inline]
-    pub fn get_senders(&self, kind: TransceiverKind) -> Vec<Rc<Sender>> {
-        self.media_connections.get_senders(kind)
+    pub fn get_transceivers_sides(
+        &self,
+        kind: TransceiverKind,
+        direction: TrackDirection,
+    ) -> Vec<Rc<dyn TransceiverSide>> {
+        self.media_connections
+            .get_transceivers_sides(kind, direction)
     }
 
     /// Track id to mid relations of all send tracks of this
@@ -569,7 +590,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(&self, tracks: Vec<Track>) -> Result<String> {
+    pub async fn get_offer(&self, tracks: Vec<proto::Track>) -> Result<String> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -594,7 +615,7 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::TransceiverNotFound`] if could not create
     /// new [`Sender`] because transceiver with specified `mid` doesn't exist.
-    pub fn create_tracks(&self, tracks: Vec<Track>) -> Result<()> {
+    pub fn create_tracks(&self, tracks: Vec<proto::Track>) -> Result<()> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -786,7 +807,7 @@ impl PeerConnection {
     pub async fn process_offer(
         &self,
         offer: String,
-        tracks: Vec<Track>,
+        tracks: Vec<proto::Track>,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =

@@ -475,10 +475,21 @@ window.onload = async function() {
         video_select.append(option);
       }
     }
-    const option = document.createElement('option');
-    option.value = "screen";
-    option.text = "screen";
-    video_select.append(option);
+
+    const screen = document.createElement('option');
+    screen.value = "screen";
+    screen.text = "screen";
+    video_select.append(screen);
+
+    const facingModeUser = document.createElement('option');
+    facingModeUser.value = "facingModeUser";
+    facingModeUser.text = "Facing user";
+    video_select.append(facingModeUser);
+
+    const facingModeEnvironment = document.createElement('option');
+    facingModeEnvironment.value = 'facingModeEnvironment';
+    facingModeEnvironment.text = "Facing environment";
+    video_select.append(facingModeEnvironment);
   }
 
   async function build_constraints(audio_select, video_select) {
@@ -500,7 +511,13 @@ window.onload = async function() {
           constraints.display_video(video);
         } else {
           let video = new rust.DeviceVideoTrackConstraints();
-          video.device_id(videoSource.value);
+          if (videoSource.value === 'facingModeUser') {
+            video.exact_facing_mode(rust.FacingMode.User);
+          } else if (videoSource.value === 'facingModeEnvironment') {
+            video.exact_facing_mode(rust.FacingMode.Environment);
+          } else {
+            video.device_id(videoSource.value);
+          }
           constraints.device_video(video);
         }
       } else {
@@ -528,6 +545,7 @@ window.onload = async function() {
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
+        video.playsinline = "true";
         video.controls = "true";
         video.srcObject = stream.get_media_stream();
         let innerVideoDiv = document.createElement("div");
@@ -545,7 +563,7 @@ window.onload = async function() {
         stream.on_track_added( (track) => {
           // switch controls off and on, cause controls are not updated
           // automatically
-          let video = remote_videos[connection.get_remote_id()]
+          let video = remote_videos[connection.get_remote_member_id()]
             .getElementsByTagName("video")[0];
           video.controls = false;
           video.controls = true;

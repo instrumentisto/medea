@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use medea_client_api_proto::{
     CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
-    TrackId, TrackPatch,
+    TrackId, TrackPatchCommand,
 };
 
 use crate::{
@@ -154,7 +154,7 @@ impl CommandHandler for Room {
     fn on_update_tracks(
         &mut self,
         peer_id: PeerId,
-        tracks_patches: Vec<TrackPatch>,
+        tracks_patches: Vec<TrackPatchCommand>,
     ) -> Self::Output {
         // Note, that we force committing changes to `Member` that send
         // `UpdateTracks` request, so response will be sent immediately,
@@ -169,7 +169,8 @@ impl CommandHandler for Room {
                 peer.partner_peer_id()
             })?;
         self.peers.map_peer_by_id_mut(partner_peer_id, |peer| {
-            peer.as_changes_scheduler().patch_tracks(tracks_patches);
+            peer.as_changes_scheduler()
+                .partner_patch_tracks(tracks_patches);
             peer.commit_scheduled_changes();
         })?;
 

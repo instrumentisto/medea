@@ -39,7 +39,8 @@ All user visible changes to this project will be documented in this file. This p
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Emit `TracksApplied` event to create new and update existing tracks ([#105]);
     - `PeerConnection` renegotiation functionality ([#105]);
-    - Calculate and send call quality score based on RTC stats ([#132]).
+    - Calculate and send call quality score based on RTC stats ([#132]);
+    - Muting/unmuting `MediaTrack`s by receiver ([#127]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -47,10 +48,11 @@ All user visible changes to this project will be documented in this file. This p
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
-    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
+    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]);
     - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
         - `max_lag`;
         - `init_timeout`.
+    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s Redis database server as ([#135]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -74,7 +76,9 @@ All user visible changes to this project will be documented in this file. This p
 [#95]: /../../pull/95
 [#98]: /../../pull/98
 [#105]: /../../pull/105
+[#127]: /../../pull/127
 [#132]: /../../pull/132
+[#135]: /../../pull/135
 
 
 
