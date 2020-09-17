@@ -356,8 +356,8 @@ pub enum TrackChange {
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(TrackPatchEvent),
 
-    /// Changes to some [`MediaTrack`] made by this [`Peer`]s parnter [`Peer`],
-    /// that remote Peer is not aware of.
+    /// Changes to some [`MediaTrack`] made by this [`Peer`]s partner [`Peer`],
+    /// that remote [`Peer`] is not aware of.
     PartnerTrackPatch(TrackPatchEvent),
 }
 
@@ -376,7 +376,7 @@ impl TrackChange {
     /// Returns [`TrackUpdate`] based on this [`TrackChange`].
     fn as_track_update(&self, partner_member_id: MemberId) -> TrackUpdate {
         match self {
-            TrackChange::AddSendTrack(track) => TrackUpdate::Added(Track {
+            Self::AddSendTrack(track) => TrackUpdate::Added(Track {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Send {
@@ -384,7 +384,7 @@ impl TrackChange {
                     mid: track.mid(),
                 },
             }),
-            TrackChange::AddRecvTrack(track) => TrackUpdate::Added(Track {
+            Self::AddRecvTrack(track) => TrackUpdate::Added(Track {
                 id: track.id,
                 media_type: track.media_type.clone(),
                 direction: Direction::Recv {
@@ -392,8 +392,8 @@ impl TrackChange {
                     mid: track.mid(),
                 },
             }),
-            TrackChange::TrackPatch(track_patch)
-            | TrackChange::PartnerTrackPatch(track_patch) => {
+            Self::TrackPatch(track_patch)
+            | Self::PartnerTrackPatch(track_patch) => {
                 TrackUpdate::Updated(track_patch.clone())
             }
         }
@@ -402,12 +402,8 @@ impl TrackChange {
     /// Returns `true` if this [`TrackChange`] can be forcibly applied.
     fn can_force_apply(&self) -> bool {
         match self {
-            TrackChange::AddSendTrack(_) | TrackChange::AddRecvTrack(_) => {
-                false
-            }
-            TrackChange::TrackPatch(_) | TrackChange::PartnerTrackPatch(_) => {
-                true
-            }
+            Self::AddSendTrack(_) | Self::AddRecvTrack(_) => false,
+            Self::TrackPatch(_) | Self::PartnerTrackPatch(_) => true,
         }
     }
 }

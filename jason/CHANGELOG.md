@@ -49,7 +49,7 @@ All user visible changes to this project will be documented in this file. This p
         - `RemoteMediaStream.on_track_enabled` and `RemoteMediaStream.on_track_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123]);
         - `RemoteMediaStream.on_track_added` callback being called when new receiver `MediaTrack` is added ([#123]);
         - `RemoteMediaStream.has_active_audio` and `RemoteMediaStream.has_active_video` methods returning current state of the receivers ([#123]);
-        - Mute/unmute remote video/audio ([#127]):
+        - Muting/unmuting remote video/audio ([#127]):
             - `Room.mute_remote_audio`;
             - `Room.unmute_remote_audio`;
             - `Room.mute_remote_video`;

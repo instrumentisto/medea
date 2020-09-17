@@ -334,8 +334,8 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Returns `true` if all [`Receiver`]s with
-    /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
+    /// Returns `true` if all [`Receiver`]s with [`TransceiverKind::Video`] are
+    /// enabled or `false` otherwise.
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -344,8 +344,8 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Returns `true` if all [`Receiver`]s with
-    /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
+    /// Returns `true` if all [`Receiver`]s with [`TransceiverKind::Audio`] are
+    /// enabled or `false` otherwise.
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
             .borrow()

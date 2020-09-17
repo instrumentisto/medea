@@ -140,7 +140,7 @@ pub enum ClientMsg {
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
-        /// [`PeerId`] of the `Peer` for which Web Client sends SDP Offer.
+        /// ID of the `Peer` for which Web Client sends SDP Offer.
         peer_id: PeerId,
 
         /// SDP Offer of the `Peer`.
@@ -160,7 +160,7 @@ pub enum Command {
 
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
-        /// [`PeerId`] of the `Peer` for which Web Client sends SDP Answer.
+        /// ID of the `Peer` for which Web Client sends SDP Answer.
         peer_id: PeerId,
 
         /// SDP Answer of the `Peer`.
@@ -383,7 +383,7 @@ impl Track {
     }
 }
 
-/// Patch of the [`Track`] which client can request with
+/// Patch of the [`Track`] which Web Client can request with
 /// [`Command::UpdateTracks`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
@@ -393,11 +393,12 @@ pub struct TrackPatchCommand {
     pub is_muted: Option<bool>,
 }
 
-/// Patch of the [`Track`] which server can send with [`Event::TracksApplied`].
+/// Patch of the [`Track`] which Media Server can send with
+/// [`Event::TracksApplied`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct TrackPatchEvent {
-    /// Id of the [`Track`] which should be patched.
+    /// ID of the [`Track`] which should be patched.
     pub id: TrackId,
 
     /// Mute state of the concrete `Member`.
