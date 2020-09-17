@@ -470,20 +470,25 @@ impl<T> TrackChangeHandler for Peer<T> {
     }
 }
 
-/// Deduper of the [`TrackPatch`]es with whitelisting.
+/// Deduper of the [`TrackPatchEvent`]s with whitelisting.
 ///
-/// This object can merge [`TrackPatch`]es from the different sources (queue,
-/// pending updates) and remove merged [`TrackPatch`]es from this sources.
+/// This object can merge [`TrackPatchEvent`]s from the different sources
+/// (queue, pending updates) and remove merged [`TrackPatchEvent`]s from this
+/// sources.
 ///
 /// Also it can ignore all [`TrackChange`]s which are not listed in the
 /// [`TrackPatchDeduper::whitelist`].
 struct TrackPatchDeduper {
-    /// All merged [`TrackPatch`]es from this [`TrackPatchDeduper`].
+    /// All merged [`TrackPatchEvent`]s from this [`TrackPatchDeduper`].
     merged_patches: HashMap<TrackId, TrackPatchEvent>,
+
+    /// All merged partner [`TrackPatchEvent`]s from this
+    /// [`TrakcPatchDeduper`].
+    merged_partner_patches: HashMap<TrackId, TrackPatchEvent>,
 
     /// [`TrackId`]s which are can be merged.
     ///
-    /// If `None` then all [`TrackPatch`]es can be merged.
+    /// If `None` then all [`TrackPatchEvent`]s can be merged.
     whitelist: Option<HashSet<TrackId>>,
 }
 
@@ -492,6 +497,7 @@ impl TrackPatchDeduper {
     pub fn new() -> Self {
         Self {
             merged_patches: HashMap::new(),
+            merged_partner_patches: HashMap::new(),
             whitelist: None,
         }
     }
@@ -500,47 +506,60 @@ impl TrackPatchDeduper {
     pub fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
         Self {
             merged_patches: HashMap::new(),
+            merged_partner_patches: HashMap::new(),
             whitelist: Some(whitelist),
         }
     }
 
-    /// Returns `Some(TrackPatch)` if provided [`TrackPatch`] can be merged.
+    /// Returns `Some(TrackPatch, bool)` if provided [`TrackPatchEvent`] can be
+    /// merged.
     ///
-    /// Returns `None` if provided [`TrackPatch`] can't be merged.
+    /// Second tuple value is flag which indicates that this [`TrackPatchEvent`]
+    /// is obtained from [`TrackChange::PartnerTrackPatch`].
+    ///
+    /// Returns `None` if provided [`TrackPatchEvent`] can't be merged.
     fn filter_patch<'a>(
         &self,
         change: &'a TrackChange,
-    ) -> Option<&'a TrackPatchEvent> {
+    ) -> Option<(&'a TrackPatchEvent, bool)> {
         if !change.can_force_apply() {
             return None;
         }
 
+        let is_partner = matches!(change, TrackChange::PartnerTrackPatch(_));
         match change {
             TrackChange::TrackPatch(patch)
             | TrackChange::PartnerTrackPatch(patch) => {
                 if let Some(whitelist) = &self.whitelist {
                     if whitelist.contains(&patch.id) {
-                        Some(patch)
+                        Some((patch, is_partner))
                     } else {
                         None
                     }
                 } else {
-                    Some(patch)
+                    Some((patch, is_partner))
                 }
             }
             _ => None,
         }
     }
 
-    /// Merges all mergeable [`TrackPatch`]es to the
+    /// Merges all mergeable [`TrackPatchEvent`]s to the
     /// [`TrackPatchDedupper::merged_patches`].
     ///
-    /// Removes merged [`TrackPatch`]es from the provided [`Vec`].
+    /// Removes merged [`TrackPatchEvent`]s from the provided [`Vec`].
     pub fn merge(&mut self, changes: &mut Vec<TrackChange>) {
         changes.retain(|change| {
             self.filter_patch(change)
-                .map(|patch| {
-                    self.merged_patches
+                .map(|(patch, is_partner)| {
+                    let storage = {
+                        if is_partner {
+                            &mut self.merged_partner_patches
+                        } else {
+                            &mut self.merged_patches
+                        }
+                    };
+                    storage
                         .entry(patch.id)
                         .or_insert_with(|| TrackPatchEvent::new(patch.id))
                         .merge(patch);
@@ -549,12 +568,17 @@ impl TrackPatchDeduper {
         });
     }
 
-    /// Returns [`Iterator`] with the all merged [`TrackPatch`]es converted to
-    /// the [`TrackChange`].
+    /// Returns [`Iterator`] with the all merged [`TrackPatchEvent`]s converted
+    /// to the [`TrackChange`].
     pub fn into_track_change_iter(self) -> impl Iterator<Item = TrackChange> {
         self.merged_patches
             .into_iter()
             .map(|(_, patch)| TrackChange::TrackPatch(patch))
+            .chain(
+                self.merged_partner_patches
+                    .into_iter()
+                    .map(|(_, patch)| TrackChange::PartnerTrackPatch(patch)),
+            )
     }
 }
 
@@ -688,12 +712,10 @@ impl<T> Peer<T> {
 
         let whitelist = forcible_changes
             .iter()
-            .filter_map(|t| {
-                if let TrackChange::TrackPatch(patch) = t {
-                    Some(patch.id)
-                } else {
-                    None
-                }
+            .filter_map(|t| match t {
+                TrackChange::TrackPatch(patch)
+                | TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                _ => None,
             })
             .collect();
         let mut deduper = TrackPatchDeduper::with_whitelist(whitelist);
@@ -703,8 +725,8 @@ impl<T> Peer<T> {
 
         let mut updates = Vec::new();
         for change in forcible_changes {
+            let change = change.dispatch_with(self);
             let track_update = change.as_track_update(self.partner_member_id());
-            change.dispatch_with(self);
             updates.push(track_update);
         }
 
@@ -1350,7 +1372,7 @@ mod force_update_deduping_tests {
         use super::*;
 
         /// Checks that [`TrackPatchDeduper::with_whitelist`] filters
-        /// [`TrackPatch`]es which are not listed in the whitelist.
+        /// [`TrackPatchEvent`]s which are not listed in the whitelist.
         #[test]
         fn whitelisting_works() {
             let mut deduper =
