@@ -482,10 +482,6 @@ struct TrackPatchDeduper {
     /// All merged [`TrackPatchEvent`]s from this [`TrackPatchDeduper`].
     merged_patches: HashMap<TrackId, TrackPatchEvent>,
 
-    /// All merged partner [`TrackPatchEvent`]s from this
-    /// [`TrakcPatchDeduper`].
-    merged_partner_patches: HashMap<TrackId, TrackPatchEvent>,
-
     /// [`TrackId`]s which are can be merged.
     ///
     /// If `None` then all [`TrackPatchEvent`]s can be merged.
@@ -497,7 +493,6 @@ impl TrackPatchDeduper {
     pub fn new() -> Self {
         Self {
             merged_patches: HashMap::new(),
-            merged_partner_patches: HashMap::new(),
             whitelist: None,
         }
     }
@@ -506,38 +501,32 @@ impl TrackPatchDeduper {
     pub fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
         Self {
             merged_patches: HashMap::new(),
-            merged_partner_patches: HashMap::new(),
             whitelist: Some(whitelist),
         }
     }
 
-    /// Returns `Some(TrackPatch, bool)` if provided [`TrackPatchEvent`] can be
+    /// Returns `Some(TrackPatchEvent)` if provided [`TrackPatchEvent`] can be
     /// merged.
-    ///
-    /// Second tuple value is flag which indicates that this [`TrackPatchEvent`]
-    /// is obtained from [`TrackChange::PartnerTrackPatch`].
     ///
     /// Returns `None` if provided [`TrackPatchEvent`] can't be merged.
     fn filter_patch<'a>(
         &self,
         change: &'a TrackChange,
-    ) -> Option<(&'a TrackPatchEvent, bool)> {
+    ) -> Option<&'a TrackPatchEvent> {
         if !change.can_force_apply() {
             return None;
         }
 
-        let is_partner = matches!(change, TrackChange::PartnerTrackPatch(_));
         match change {
-            TrackChange::TrackPatch(patch)
-            | TrackChange::PartnerTrackPatch(patch) => {
+            TrackChange::TrackPatch(patch) => {
                 if let Some(whitelist) = &self.whitelist {
                     if whitelist.contains(&patch.id) {
-                        Some((patch, is_partner))
+                        Some(patch)
                     } else {
                         None
                     }
                 } else {
-                    Some((patch, is_partner))
+                    Some(patch)
                 }
             }
             _ => None,
@@ -551,15 +540,8 @@ impl TrackPatchDeduper {
     pub fn merge(&mut self, changes: &mut Vec<TrackChange>) {
         changes.retain(|change| {
             self.filter_patch(change)
-                .map(|(patch, is_partner)| {
-                    let storage = {
-                        if is_partner {
-                            &mut self.merged_partner_patches
-                        } else {
-                            &mut self.merged_patches
-                        }
-                    };
-                    storage
+                .map(|patch| {
+                    self.merged_patches
                         .entry(patch.id)
                         .or_insert_with(|| TrackPatchEvent::new(patch.id))
                         .merge(patch);
@@ -574,11 +556,6 @@ impl TrackPatchDeduper {
         self.merged_patches
             .into_iter()
             .map(|(_, patch)| TrackChange::TrackPatch(patch))
-            .chain(
-                self.merged_partner_patches
-                    .into_iter()
-                    .map(|(_, patch)| TrackChange::PartnerTrackPatch(patch)),
-            )
     }
 }
 
@@ -703,14 +680,14 @@ impl<T> Peer<T> {
         let mut filtered_changes_queue = VecDeque::new();
         for track_change in track_changes_queue {
             if track_change.can_force_apply() {
-                forcible_changes.push(track_change);
+                forcible_changes.push(track_change.dispatch_with(self));
             } else {
                 filtered_changes_queue.push_back(track_change);
             }
         }
         self.context.track_changes_queue = filtered_changes_queue;
 
-        let whitelist = forcible_changes
+        let deduper_whitelist = forcible_changes
             .iter()
             .filter_map(|t| match t {
                 TrackChange::TrackPatch(patch)
@@ -718,17 +695,15 @@ impl<T> Peer<T> {
                 _ => None,
             })
             .collect();
-        let mut deduper = TrackPatchDeduper::with_whitelist(whitelist);
+        let mut deduper = TrackPatchDeduper::with_whitelist(deduper_whitelist);
         deduper.merge(&mut self.context.pending_track_updates);
         deduper.merge(&mut forcible_changes);
         forcible_changes.extend(deduper.into_track_change_iter());
 
-        let mut updates = Vec::new();
-        for change in forcible_changes {
-            let change = change.dispatch_with(self);
-            let track_update = change.as_track_update(self.partner_member_id());
-            updates.push(track_update);
-        }
+        let updates: Vec<_> = forcible_changes
+            .into_iter()
+            .map(|c| c.as_track_update(self.partner_member_id()))
+            .collect();
 
         self.dedup_pending_track_updates();
 

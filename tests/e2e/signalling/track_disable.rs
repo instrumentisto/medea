@@ -698,7 +698,7 @@ async fn ordering_on_force_update_is_correct() {
             if let TrackUpdate::Updated(patch) = update {
                 assert_eq!(patch.id, alice_sender_id);
                 assert_eq!(patch.is_muted_individual, Some(false));
-                assert_eq!(patch.is_muted_general, Some(true));
+                assert_eq!(patch.is_muted_general, Some(false));
             }
             assert_eq!(updates.len(), 0);
             assert_eq!(negotiation_role, None);
@@ -737,11 +737,11 @@ async fn ordering_on_force_update_is_correct() {
 
             assert_eq!(patches[1].id, bob_sender_id);
             assert_eq!(patches[1].is_muted_individual, Some(true));
-            assert_eq!(patches[1].is_muted_general, None);
+            assert_eq!(patches[1].is_muted_general, Some(true));
 
             assert_eq!(patches[0].id, alice_sender_id);
-            assert_eq!(patches[0].is_muted_individual, Some(false));
-            assert_eq!(patches[0].is_muted_general, None);
+            assert_eq!(patches[0].is_muted_individual, None);
+            assert_eq!(patches[0].is_muted_general, Some(false));
 
             assert_eq!(patches.len(), 2);
             assert_eq!(negotiation_role, None);
@@ -766,10 +766,7 @@ async fn ordering_on_force_update_is_correct() {
         } = bob_events_rx
         {
             assert_eq!(peer_id, bob_peer_id);
-            assert_eq!(updates.len(), 1);
-            if let TrackUpdate::Updated(patch) = &updates[0] {
-                assert_eq!(patch.is_muted_general, Some(true));
-            }
+            assert_eq!(updates.len(), 0);
             assert_eq!(
                 negotiation_role,
                 Some(NegotiationRole::Answerer("sdp_offer".to_string()))
