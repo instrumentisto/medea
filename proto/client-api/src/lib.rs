@@ -524,6 +524,8 @@ pub struct VideoSettings {
     ///
     /// If `false` then video may be not published.
     pub is_required: bool,
+
+    pub is_display: bool,
 }
 
 /// Estimated connection quality.

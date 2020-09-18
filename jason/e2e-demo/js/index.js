@@ -518,10 +518,14 @@ window.onload = async function() {
           } else {
             video.device_id(videoSource.value);
           }
+          let display_video = new rust.DisplayVideoTrackConstraints();
+          constraints.display_video(display_video);
           constraints.device_video(video);
         }
       } else {
+        // let display_video = new rust.DisplayVideoTrackConstraints();
         constraints.device_video(new rust.DeviceVideoTrackConstraints());
+        // constraints.display_video(display_video);
       }
     }
 
@@ -536,7 +540,7 @@ window.onload = async function() {
       await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
       await room.set_local_media_settings(constraints);
     } catch (e) {
-      console.error("Init local video failed: " + e);
+      console.error("Init local video failed: " + e.message());
     }
 
     room.on_new_connection( (connection) => {
@@ -603,12 +607,13 @@ window.onload = async function() {
     });
 
     room.on_local_stream((stream) => {
+      console.log("New local stream");
       updateLocalVideo(stream);
       stream.free();
     });
 
     room.on_failed_local_stream((error) => {
-      console.error(error.message());
+      console.error(error.trace());
     });
 
     room.on_connection_loss( async (reconnectHandle) => {
@@ -686,7 +691,7 @@ window.onload = async function() {
         }
         await room.set_local_media_settings(constraints);
       } catch (e) {
-        console.error("Changing video source failed: " + e);
+        console.error("Changing video source failed: " + e.message());
       }
     });
 

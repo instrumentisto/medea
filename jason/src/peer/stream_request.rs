@@ -11,7 +11,8 @@ use tracerr::Traced;
 use crate::{
     media::{
         AudioTrackConstraints, MediaStream, MediaStreamSettings,
-        TrackConstraints, TrackKind, VideoTrackConstraints,
+        MediaStreamTrackConstraints, TrackConstraints, TrackKind,
+        VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
@@ -73,7 +74,7 @@ type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
 #[derive(Debug, Default)]
 pub struct StreamRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
-    video: HashMap<TrackId, VideoTrackConstraints>,
+    video: HashMap<TrackId, MediaStreamTrackConstraints>,
 }
 
 impl StreamRequest {
@@ -99,7 +100,7 @@ impl StreamRequest {
 #[derive(Debug)]
 pub struct SimpleStreamRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
-    video: Option<(TrackId, VideoTrackConstraints)>,
+    video: Vec<(TrackId, Option<MediaStreamTrackConstraints>)>,
 }
 
 impl SimpleStreamRequest {
@@ -142,14 +143,23 @@ impl SimpleStreamRequest {
                 }
             }
         }
-
-        if let Some((id, video)) = &self.video {
-            if let Some(track) = video_tracks.into_iter().next() {
-                if video.satisfies(track.as_ref()) {
-                    result_stream.add_track(*id, track);
-                } else {
-                    return Err(tracerr::new!(InvalidVideoTrack));
+        let mut cons: HashMap<_, _> =
+            self.video.iter().map(|(id, video)| (id, video)).collect();
+        let mut added_tracks = 0;
+        for track in video_tracks {
+            let mut id_to_remove = None;
+            for (id, video) in &cons {
+                if let Some(video) = video {
+                    if video.satisfies(track.as_ref()) {
+                        result_stream.add_track(**id, track);
+                        added_tracks += 1;
+                        id_to_remove = Some(**id);
+                        break;
+                    }
                 }
+            }
+            if let Some(id_to_remove) = id_to_remove {
+                cons.remove(&id_to_remove);
             }
         }
 
@@ -179,16 +189,22 @@ impl SimpleStreamRequest {
     ) -> Result<()> {
         let other = other.into();
 
-        if let Some((_, video_caps)) = &self.video {
+        let mut remove_me = false;
+        for (_, video_caps) in &self.video {
             if !other.is_video_enabled() {
-                if video_caps.is_required() {
-                    return Err(tracerr::new!(
+                if let Some(video_caps) = video_caps {
+                    if video_caps.is_required() {
+                        return Err(tracerr::new!(
                         StreamRequestError::ExpectedVideoTracks
                     ));
-                } else {
-                    self.video.take();
+                    } else {
+                        remove_me |= true;
+                    }
                 }
             }
+        }
+        if remove_me {
+            self.video.drain(..);
         }
         if let Some((_, audio_caps)) = &self.audio {
             if !other.is_audio_enabled() {
@@ -208,8 +224,25 @@ impl SimpleStreamRequest {
             }
         }
         if other.is_video_enabled() {
-            if let Some((_, video)) = self.video.as_mut() {
-                video.merge(other.get_video().clone());
+            for (_, video) in &mut self.video {
+                let mut to_none = false;
+                if let Some(video) = video {
+                    match video {
+                        MediaStreamTrackConstraints::Device(device) => {
+                            if !other.get_video().is_some_device() {
+                                to_none = true;
+                            }
+                        }
+                        MediaStreamTrackConstraints::Display(display) => {
+                            if !other.get_video().is_some_display() {
+                                to_none = true;
+                            }
+                        }
+                    }
+                }
+                if to_none {
+                    video.take();
+                }
             }
         }
 
@@ -227,7 +260,7 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
             NoTracks, TooManyAudioTracks, TooManyVideoTracks,
         };
 
-        if value.video.len() > 1 {
+        if value.video.len() > 2 {
             return Err(TooManyVideoTracks);
         } else if value.audio.len() > 1 {
             return Err(TooManyAudioTracks);
@@ -237,13 +270,13 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
 
         let mut req = Self {
             audio: None,
-            video: None,
+            video: Vec::new(),
         };
         for (id, audio) in value.audio {
             req.audio.replace((id, audio));
         }
         for (id, video) in value.video {
-            req.video.replace((id, video));
+            req.video.push((id, Some(video)));
         }
         Ok(req)
     }
@@ -256,8 +289,15 @@ impl From<&SimpleStreamRequest> for MediaStreamSettings {
         if let Some((_, audio)) = &request.audio {
             constraints.audio(audio.clone());
         }
-        if let Some((_, video)) = &request.video {
-            constraints.video(video.clone());
+        for (_, video) in &request.video {
+            if let Some(video) = video {
+                if let MediaStreamTrackConstraints::Device(device_video) = video {
+                    constraints.device_video(device_video.clone());
+                }
+                if let MediaStreamTrackConstraints::Display(display_video) = video {
+                    constraints.display_video(display_video.clone());
+                }
+            }
         }
 
         constraints

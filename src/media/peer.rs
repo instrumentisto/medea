@@ -946,12 +946,24 @@ impl<'a> PeerChangesScheduler<'a> {
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: video_settings.publish_policy.is_required(),
+                    is_display: false,
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(track_video);
+            let track_screenshare = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: video_settings.publish_policy.is_required(),
+                    is_display: true,
+                }),
+            ));
+            self.add_sender(Rc::clone(&track_screenshare));
+            partner_peer
+                .as_changes_scheduler()
+                .add_receiver(track_screenshare);
         }
     }
 

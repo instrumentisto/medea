@@ -27,6 +27,7 @@ use crate::{
 };
 
 use super::InputDeviceInfo;
+use std::collections::HashMap;
 
 // TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
@@ -90,7 +91,7 @@ pub struct MediaManager(Rc<InnerMediaManager>);
 #[derive(Default)]
 struct InnerMediaManager {
     /// Obtained tracks storage
-    tracks: Rc<RefCell<Vec<WeakMediaStreamTrack>>>,
+    tracks: Rc<RefCell<HashMap<String, WeakMediaStreamTrack>>>,
 }
 
 impl InnerMediaManager {
@@ -153,7 +154,9 @@ impl InnerMediaManager {
         let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
         match caps {
-            None => Ok((MediaStream::new(result, original_caps), false)),
+            None => {
+                Ok((MediaStream::new(result, original_caps), false))
+            }
             Some(MultiSourceMediaStreamConstraints::Display(caps)) => {
                 let mut tracks = self.get_display_media(caps).await?;
                 result.append(&mut tracks);
@@ -193,14 +196,14 @@ impl InnerMediaManager {
         // cleanup weak links
         self.tracks
             .borrow_mut()
-            .retain(WeakMediaStreamTrack::can_be_upgraded);
+            .retain(|_, track| track.can_be_upgraded());
 
         let mut tracks = Vec::new();
         let storage: Vec<_> = self
             .tracks
             .borrow()
             .iter()
-            .map(|track| track.upgrade().unwrap())
+            .map(|(_, track)| track.upgrade().unwrap())
             .collect();
 
         if caps.is_audio_enabled() {
@@ -216,14 +219,32 @@ impl InnerMediaManager {
         }
 
         if caps.is_video_enabled() {
-            let track = storage
-                .iter()
-                .find(|track| caps.get_video().satisfies(track.as_ref()))
-                .cloned();
-
-            if let Some(track) = track {
+            let mut done = false;
+            tracks.extend(
+                storage
+                    .iter()
+                    .filter(|track| {
+                        if caps.get_video().satisfies_device(track.as_ref()) {
+                            caps.take_device_video();
+                            done = true;
+                            true
+                        } else if caps
+                            .get_video()
+                            .satisfies_display(track.as_ref())
+                        {
+                            caps.take_display_video();
+                            done = true;
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                    .cloned(),
+            );
+            if !caps.get_video().is_some_device()
+                && !caps.get_video().is_some_display()
+            {
                 caps.toggle_publish_video(false);
-                tracks.push(track);
             }
         }
 
@@ -267,7 +288,9 @@ impl InnerMediaManager {
             .unwrap()
             .unwrap()
             .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-            .inspect(|track| storage.push(track.downgrade()))
+            .inspect(|track| {
+                storage.insert(track.id(), track.downgrade());
+            })
             .collect();
 
         Ok(tracks)
@@ -311,7 +334,9 @@ impl InnerMediaManager {
             .unwrap()
             .unwrap()
             .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-            .inspect(|track| storage.push(track.downgrade()))
+            .inspect(|track| {
+                storage.insert(track.id(), track.downgrade());
+            })
             .collect();
 
         Ok(tracks)

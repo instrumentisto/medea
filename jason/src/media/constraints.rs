@@ -115,12 +115,33 @@ impl LocalStreamConstraints {
     }
 }
 
-/// Helper to distinguish objects related to media captured from device and
-/// media captured from display.
 #[derive(Clone, Debug)]
-enum StreamSource<D, S> {
-    Device(D),
-    Display(S),
+pub struct StreamSource<D, S> {
+    pub device: Option<D>,
+    pub display: Option<S>,
+}
+
+impl<D, S> Default for StreamSource<D, S> {
+    fn default() -> Self {
+        Self {
+            device: None,
+            display: None,
+        }
+    }
+}
+
+impl<D, S> StreamSource<D, S> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_device(&mut self, device: D) {
+        self.device = Some(device);
+    }
+
+    pub fn set_display(&mut self, display: S) {
+        self.display = Some(display);
+    }
 }
 
 impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
@@ -131,20 +152,20 @@ impl StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
             DisplayVideoTrackConstraints,
         >,
     ) {
-        use StreamSource::{Device, Display};
-
-        match self {
-            Device(this) => {
-                if let Device(that) = other {
-                    this.merge(that);
-                }
+        if let Some(this) = &mut self.device {
+            if let Some(that) = other.device {
+                this.merge(that);
             }
-            Display(this) => {
-                if let Display(that) = other {
-                    this.merge(that);
-                }
+        } else {
+            self.device = other.device;
+        }
+        if let Some(this) = &mut self.display {
+            if let Some(that) = other.display {
+                this.merge(that);
             }
-        };
+        } else {
+            self.display = other.display;
+        }
     }
 }
 
@@ -240,14 +261,14 @@ impl MediaStreamSettings {
     /// media device.
     pub fn device_video(&mut self, constraints: DeviceVideoTrackConstraints) {
         self.video.is_enabled = true;
-        self.video.constraints = constraints.into();
+        self.video.constraints.constraints.set_device(constraints);
     }
 
     /// Set constraints that will be used to capture local video from user
     /// display.
     pub fn display_video(&mut self, constraints: DisplayVideoTrackConstraints) {
         self.video.is_enabled = true;
-        self.video.constraints = constraints.into();
+        self.video.constraints.constraints.set_display(constraints);
     }
 }
 
@@ -262,6 +283,14 @@ impl MediaStreamSettings {
     #[inline]
     pub fn get_video(&self) -> &VideoTrackConstraints {
         &self.video.constraints
+    }
+
+    pub fn take_device_video(&mut self) {
+        self.video.constraints.constraints.device.take();
+    }
+
+    pub fn take_display_video(&mut self) {
+        self.video.constraints.constraints.display.take();
     }
 
     /// Set [`VideoTrackConstraints`].
@@ -345,6 +374,7 @@ impl MediaStreamSettings {
 /// sources.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamconstraints
+#[derive(Debug)]
 pub enum MultiSourceMediaStreamConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
@@ -377,24 +407,47 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
         use MultiSourceMediaStreamConstraints as C;
 
         let (audio, video) = (constraints.audio, constraints.video);
-        let mut sys_constraints = SysMediaStreamConstraints::new();
         let video = if video.is_enabled {
-            match video.constraints.constraints {
-                Some(StreamSource::Device(device)) => {
-                    sys_constraints
+            let video_stream_source = video.constraints.constraints;
+            let mut out_stream_source = StreamSource::new();
+            match (video_stream_source.device, video_stream_source.display) {
+                (Some(device), Some(display)) => {
+                    let mut device_cons = SysMediaStreamConstraints::new();
+                    device_cons
                         .video(&SysMediaTrackConstraints::from(device).into());
-                    Some(StreamSource::Device(sys_constraints))
-                }
-                Some(StreamSource::Display(display)) => {
-                    sys_constraints
+                    let mut display_cons = SysMediaStreamConstraints::new();
+                    display_cons
                         .video(&SysMediaTrackConstraints::from(display).into());
-                    Some(StreamSource::Display(sys_constraints))
+
+                    out_stream_source.set_device(device_cons);
+                    out_stream_source.set_display(display_cons);
+
+                    Some(out_stream_source)
                 }
-                None => {
-                    // defaults to device video
-                    sys_constraints
-                        .video(&SysMediaTrackConstraints::new().into());
-                    Some(StreamSource::Device(sys_constraints))
+                (Some(device), None) => {
+                    let mut device_cons = SysMediaStreamConstraints::new();
+                    device_cons
+                        .video(&SysMediaTrackConstraints::from(device).into());
+                    out_stream_source.set_device(device_cons);
+
+                    Some(out_stream_source)
+                }
+                (None, Some(display)) => {
+                    let mut display_cons = SysMediaStreamConstraints::new();
+                    display_cons
+                        .video(&SysMediaTrackConstraints::from(display).into());
+
+                    out_stream_source.set_display(display_cons);
+
+                    Some(out_stream_source)
+                }
+                (None, None) => {
+                    let mut device_cons = SysMediaStreamConstraints::new();
+                    device_cons.video(&SysMediaTrackConstraints::new().into());
+
+                    out_stream_source.set_device(device_cons);
+
+                    Some(out_stream_source)
                 }
             }
         } else {
@@ -402,38 +455,99 @@ impl From<MediaStreamSettings> for Option<MultiSourceMediaStreamConstraints> {
         };
 
         if audio.is_enabled {
-            match video {
-                Some(StreamSource::Device(mut caps)) => {
-                    caps.audio(
-                        &SysMediaTrackConstraints::from(audio.constraints)
-                            .into(),
-                    );
-                    Some(C::Device(caps))
-                }
-                Some(StreamSource::Display(caps)) => {
-                    let mut audio_caps = SysMediaStreamConstraints::new();
-                    audio_caps.audio(
-                        &SysMediaTrackConstraints::from(audio.constraints)
-                            .into(),
-                    );
+            if let Some(video) = video {
+                if let Some(mut device) = video.device {
+                    if let Some(display) = video.display {
+                        device.audio(
+                            &SysMediaTrackConstraints::from(audio.constraints)
+                                .into(),
+                        );
+                        Some(C::DeviceAndDisplay(device, display))
+                    } else {
+                        device.audio(
+                            &SysMediaTrackConstraints::from(audio.constraints)
+                                .into(),
+                        );
+                        Some(C::Device(device))
+                    }
+                } else {
+                    if let Some(display) = video.display {
+                        let mut device = SysMediaStreamConstraints::new();
+                        device.audio(
+                            &SysMediaTrackConstraints::from(audio.constraints)
+                                .into(),
+                        );
 
-                    Some(C::DeviceAndDisplay(audio_caps, caps))
+                        Some(C::DeviceAndDisplay(device, display))
+                    } else {
+                        let mut device = SysMediaStreamConstraints::new();
+                        device.audio(
+                            &SysMediaTrackConstraints::from(audio.constraints)
+                                .into(),
+                        );
+
+                        Some(C::Device(device))
+                    }
                 }
-                None => {
-                    let mut audio_caps = SysMediaStreamConstraints::new();
-                    audio_caps.audio(
-                        &SysMediaTrackConstraints::from(audio.constraints)
-                            .into(),
-                    );
-                    Some(C::Device(audio_caps))
-                }
+            } else {
+                let mut device = SysMediaStreamConstraints::new();
+                device.audio(
+                    &SysMediaTrackConstraints::from(audio.constraints).into(),
+                );
+
+                Some(C::Device(device))
             }
         } else {
-            match video {
-                Some(StreamSource::Device(caps)) => Some(C::Device(caps)),
-                Some(StreamSource::Display(caps)) => Some(C::Display(caps)),
-                None => None,
+            if let Some(video) = video {
+                match (video.device, video.display) {
+                    (Some(device), Some(display)) => {
+                        Some(C::DeviceAndDisplay(device, display))
+                    }
+                    (Some(device), None) => Some(C::Device(device)),
+                    (None, Some(display)) => Some(C::Display(display)),
+                    (None, None) => None,
+                }
+            } else {
+                None
             }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum MediaStreamTrackConstraints {
+    Device(DeviceVideoTrackConstraints),
+    Display(DisplayVideoTrackConstraints),
+}
+
+impl MediaStreamTrackConstraints {
+    pub fn is_required(&self) -> bool {
+        match self {
+            MediaStreamTrackConstraints::Device(device) => device.is_required,
+            MediaStreamTrackConstraints::Display(display) => false,
+        }
+    }
+
+    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
+        let track = track.as_ref();
+        if track.kind() != "video" {
+            return false;
+        }
+
+        if track.ready_state() != MediaStreamTrackState::Live {
+            return false;
+        }
+
+        match self {
+            MediaStreamTrackConstraints::Display(display) => {
+                VideoTrackConstraints::guess_is_from_display(&track)
+            }
+            MediaStreamTrackConstraints::Device(device) => {
+                ConstrainString::satisfies(&device.device_id, track)
+                    && ConstrainString::satisfies(&device.facing_mode, track)
+                    && !VideoTrackConstraints::guess_is_from_display(&track)
+            }
+            _ => false,
         }
     }
 }
@@ -446,7 +560,7 @@ pub enum TrackConstraints {
     /// Audio constraints.
     Audio(AudioTrackConstraints),
     /// Video constraints.
-    Video(VideoTrackConstraints),
+    Video(MediaStreamTrackConstraints),
 }
 
 impl TrackConstraints {
@@ -467,7 +581,10 @@ impl TrackConstraints {
     /// [`TrackConstraints`] call session can't be started.
     pub fn is_required(&self) -> bool {
         match self {
-            TrackConstraints::Video(video) => video.is_required,
+            TrackConstraints::Video(video) => {
+                // TODO: make it correct!!!!!!!!!!!!!!!
+                false
+            }
             TrackConstraints::Audio(audio) => audio.is_required,
         }
     }
@@ -477,7 +594,21 @@ impl From<ProtoTrackConstraints> for TrackConstraints {
     fn from(caps: ProtoTrackConstraints) -> Self {
         match caps {
             ProtoTrackConstraints::Audio(audio) => Self::Audio(audio.into()),
-            ProtoTrackConstraints::Video(video) => Self::Video(video.into()),
+            ProtoTrackConstraints::Video(video) => {
+                if video.is_display {
+                    Self::Video(MediaStreamTrackConstraints::Display(
+                        DisplayVideoTrackConstraints {},
+                    ))
+                } else {
+                    Self::Video(MediaStreamTrackConstraints::Device(
+                        DeviceVideoTrackConstraints {
+                            device_id: None,
+                            facing_mode: None,
+                            is_required: video.is_required,
+                        },
+                    ))
+                }
+            }
         }
     }
 }
@@ -587,9 +718,8 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
 #[derive(Clone, Debug, Default)]
 pub struct VideoTrackConstraints {
     /// Constraints applicable to video tracks.
-    constraints: Option<
+    pub constraints:
         StreamSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints>,
-    >,
 
     /// Importance of this [`VideoTrackConstraints`].
     ///
@@ -806,6 +936,56 @@ impl DisplayVideoTrackConstraints {
 }
 
 impl VideoTrackConstraints {
+    pub fn satisfies_device<T: AsRef<SysMediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
+        let track = track.as_ref();
+        if track.kind() != "video" {
+            return false;
+        }
+
+        if track.ready_state() != MediaStreamTrackState::Live {
+            return false;
+        }
+
+        if let Some(device) = &self.constraints.device {
+            ConstrainString::satisfies(&device.device_id, track)
+                && ConstrainString::satisfies(&device.facing_mode, track)
+                && !Self::guess_is_from_display(&track)
+        } else {
+            false
+        }
+    }
+
+    pub fn is_some_display(&self) -> bool {
+        self.constraints.display.is_some()
+    }
+
+    pub fn is_some_device(&self) -> bool {
+        self.constraints.device.is_some()
+    }
+
+    pub fn satisfies_display<T: AsRef<SysMediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
+        let track = track.as_ref();
+        if track.kind() != "video" {
+            return false;
+        }
+
+        if track.ready_state() != MediaStreamTrackState::Live {
+            return false;
+        }
+
+        if let Some(_) = &self.constraints.display {
+            Self::guess_is_from_display(&track)
+        } else {
+            false
+        }
+    }
+
     /// Checks if provided [MediaStreamTrack][1] satisfies constraints
     /// contained.
     ///
@@ -820,18 +1000,19 @@ impl VideoTrackConstraints {
             return false;
         }
 
-        match &self.constraints {
-            None => true,
-            Some(StreamSource::Device(constraints)) => {
-                ConstrainString::satisfies(&constraints.device_id, track)
-                    && ConstrainString::satisfies(
-                        &constraints.facing_mode,
-                        track,
-                    )
+        match (&self.constraints.device, &self.constraints.display) {
+            (None, None) => true,
+            (Some(device), None) => {
+                ConstrainString::satisfies(&device.device_id, track)
+                    && ConstrainString::satisfies(&device.facing_mode, track)
                     && !Self::guess_is_from_display(&track)
             }
-            Some(StreamSource::Display(_)) => {
-                Self::guess_is_from_display(&track)
+            (None, Some(display)) => Self::guess_is_from_display(&track),
+            (Some(device), Some(display)) => {
+                ConstrainString::satisfies(&device.device_id, track)
+                    && ConstrainString::satisfies(&device.facing_mode, track)
+                    && !Self::guess_is_from_display(&track)
+                    || Self::guess_is_from_display(&track)
             }
         }
     }
@@ -866,15 +1047,7 @@ impl VideoTrackConstraints {
         if !self.is_required && another.is_required {
             self.is_required = another.is_required;
         }
-        match (self.constraints.as_mut(), another.constraints) {
-            (None, Some(another)) => {
-                self.constraints.replace(another);
-            }
-            (Some(this), Some(another)) => {
-                this.merge(another);
-            }
-            _ => {}
-        };
+        self.constraints.merge(another.constraints);
     }
 
     /// Returns importance of this [`VideoTrackConstraints`].
@@ -889,7 +1062,7 @@ impl VideoTrackConstraints {
 impl From<ProtoVideoConstraints> for VideoTrackConstraints {
     fn from(caps: ProtoVideoConstraints) -> Self {
         Self {
-            constraints: None,
+            constraints: StreamSource::new(),
             is_required: caps.is_required,
         }
     }
@@ -915,23 +1088,5 @@ impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
 impl From<DisplayVideoTrackConstraints> for SysMediaTrackConstraints {
     fn from(_: DisplayVideoTrackConstraints) -> Self {
         Self::new()
-    }
-}
-
-impl From<DeviceVideoTrackConstraints> for VideoTrackConstraints {
-    fn from(constraints: DeviceVideoTrackConstraints) -> Self {
-        Self {
-            is_required: constraints.is_required,
-            constraints: Some(StreamSource::Device(constraints)),
-        }
-    }
-}
-
-impl From<DisplayVideoTrackConstraints> for VideoTrackConstraints {
-    fn from(constraints: DisplayVideoTrackConstraints) -> Self {
-        Self {
-            is_required: true,
-            constraints: Some(StreamSource::Display(constraints)),
-        }
     }
 }

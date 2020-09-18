@@ -74,6 +74,13 @@ impl MediaStream {
             TrackKind::Video => false,
         });
     }
+
+    pub fn video_tracks_count(&self) -> usize {
+        self.tracks
+            .iter()
+            .filter(|track| track.kind() == TrackKind::Video)
+            .count()
+    }
 }
 
 /// Weak reference to [MediaStreamTrack][1].
