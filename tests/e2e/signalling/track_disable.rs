@@ -1,5 +1,6 @@
 use std::{
     cell::Cell,
+    collections::HashMap,
     rc::Rc,
     sync::atomic::{AtomicU8, Ordering},
     time::Duration,
@@ -29,7 +30,6 @@ use crate::{
     },
     test_name,
 };
-use std::collections::HashMap;
 
 // Sends 2 UpdateTracks with is_muted = `disabled`.
 // Waits for single/multiple TracksApplied with expected track changes on on
@@ -177,17 +177,10 @@ async fn track_disables_and_enables_are_instant() {
                             if let TrackUpdate::Updated(patch) =
                                 updates.pop().unwrap()
                             {
-                                let is_muted = match (
-                                    patch.is_muted_general,
-                                    patch.is_muted_individual,
-                                ) {
-                                    (Some(_), Some(individual)) => individual,
-                                    (Some(general), None) => general,
-                                    (None, Some(individual)) => individual,
-                                    (None, None) => unreachable!(),
-                                };
-
-                                Some((is_muted, negotiation_role))
+                                Some((
+                                    patch.is_muted_general?,
+                                    negotiation_role,
+                                ))
                             } else {
                                 unreachable!();
                             }

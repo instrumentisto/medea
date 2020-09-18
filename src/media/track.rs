@@ -66,7 +66,8 @@ impl MediaTrack {
 /// Mute state of the [`MediaTrack`].
 ///
 /// Contains mute state for the `Send` and `Recv` side.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 struct MuteState {
     /// Mute state of the `Send` side.
     ///

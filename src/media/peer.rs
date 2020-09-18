@@ -690,8 +690,7 @@ impl<T> Peer<T> {
         let deduper_whitelist = forcible_changes
             .iter()
             .filter_map(|t| match t {
-                TrackChange::TrackPatch(patch)
-                | TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                TrackChange::TrackPatch(patch) => Some(patch.id),
                 _ => None,
             })
             .collect();
