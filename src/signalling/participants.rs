@@ -37,7 +37,7 @@ use crate::{
             member::MemberError,
             parse_members, Member, MembersLoadError,
         },
-        room::{ActFuture, RoomError},
+        room::RoomError,
         Room,
     },
     AppContext,
@@ -208,14 +208,14 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
         conn: Box<dyn RpcConnection>,
-    ) -> ActFuture<Result<Member, ParticipantServiceErr>> {
+    ) -> LocalBoxFuture<'static, Result<Member, ParticipantServiceErr>> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
-                return Box::new(wrap_future(future::err(
+                return Box::pin(future::err(
                     ParticipantServiceErr::ParticipantNotFound(
                         self.get_fid_to_member(member_id),
                     ),
-                )));
+                ));
             }
             Some(member) => member,
         };
@@ -231,14 +231,14 @@ impl ParticipantService {
                 ctx.cancel_future(handler);
             }
             self.insert_connection(member_id, conn);
-            Box::new(wrap_future(
+            Box::pin(
                 connection
                     .close(CloseDescription::new(CloseReason::Reconnected))
                     .map(move |_| Ok(member)),
-            ))
+            )
         } else {
             self.insert_connection(member_id, conn);
-            Box::new(wrap_future(future::ok(member)))
+            Box::pin(future::ok(member))
         }
     }
 

@@ -76,6 +76,7 @@ struct ControlApiService {
     public_url: String,
 }
 
+// TODO: This can be easily refactored to async fn's.
 impl ControlApiService {
     /// Implementation of `Create` method for [`Room`].
     fn create_room(

@@ -702,12 +702,8 @@ mod test {
             ))
             .await
             .unwrap();
-        // TODO: Change to `FirstText` when upgrade actix-web to v3.
-        //       Fixed in https://github.com/actix/actix-web/pull/1465.
         client
-            .send(Message::Continuation(Item::FirstBinary(
-                command.slice(0..10),
-            )))
+            .send(Message::Continuation(Item::FirstText(command.slice(0..10))))
             .await
             .unwrap();
         client
@@ -716,12 +712,8 @@ mod test {
             )))
             .await
             .unwrap();
-        // TODO: Change to `FirstText` when upgrade actix-web to v3.
-        //       Fixed in https://github.com/actix/actix-web/pull/1465.
         client
-            .send(Message::Continuation(Item::FirstBinary(
-                command.slice(0..10),
-            )))
+            .send(Message::Continuation(Item::FirstText(command.slice(0..10))))
             .await
             .unwrap();
         client

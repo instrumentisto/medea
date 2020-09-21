@@ -2,14 +2,9 @@
 
 mod actix_try_join_all;
 
-use std::{future::Future, pin::Pin, time::Instant};
+use std::time::Instant;
 
-use actix::prelude::dev::{
-    Actor, ActorFuture, Arbiter, AsyncContext, ContextFutureSpawner as _,
-    Message, MessageResponse, ResponseChannel, WrapFuture as _,
-};
 use chrono::{DateTime, Utc};
-use futures::future;
 
 pub use self::actix_try_join_all::actix_try_join_all;
 
@@ -121,58 +116,6 @@ macro_rules! actix_try {
             }
         };
     };
-}
-
-// TODO: remove after https://github.com/actix/actix/pull/313
-/// Specialized future for asynchronous message handling. Exists because
-/// [`actix::ResponseFuture`] implements [`actix::dev::MessageResponse`] only
-/// for `Output = Result<_, _>`.
-pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
-
-// TODO: remove after https://github.com/actix/actix/pull/310
-/// Specialized actor future for asynchronous message handling. Exists because
-/// [`actix::ResponseActFuture`] implements [`actix::dev::MessageResponse`] only
-/// for `Output = Result<_, _>`.
-pub struct ResponseActAnyFuture<A, O>(
-    pub Box<dyn ActorFuture<Output = O, Actor = A>>,
-);
-
-impl<A, M, T: 'static> MessageResponse<A, M> for ResponseAnyFuture<T>
-where
-    A: Actor,
-    M::Result: Send,
-    M: Message<Result = T>,
-    A::Context: AsyncContext<A>,
-{
-    fn handle<R: ResponseChannel<M>>(self, _: &mut A::Context, tx: Option<R>) {
-        Arbiter::spawn(async move {
-            if let Some(tx) = tx {
-                tx.send(self.0.await)
-            }
-        });
-    }
-}
-
-impl<A, M, O: 'static> MessageResponse<A, M> for ResponseActAnyFuture<A, O>
-where
-    A: Actor,
-    M: Message<Result = O>,
-    A::Context: AsyncContext<A>,
-{
-    fn handle<R: ResponseChannel<M>>(
-        self,
-        ctx: &mut A::Context,
-        tx: Option<R>,
-    ) {
-        self.0
-            .then(move |res, this, _| {
-                if let Some(tx) = tx {
-                    tx.send(res);
-                }
-                future::ready(()).into_actor(this)
-            })
-            .spawn(ctx);
-    }
 }
 
 /// Converts provided [`Instant`] into [`chrono::DateTime`].
