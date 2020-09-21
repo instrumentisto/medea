@@ -670,43 +670,25 @@ impl PeerConnection {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(&self) -> Result<()> {
-        // Получаем is_required для всех треков, больше ничего
         if let Some(request) = self.media_connections.get_stream_request() {
-            // Преобразовываем в объект, который будет парсить MediaStream и
-            // выдавать PeerMediaStream.
             let mut required_caps = SimpleStreamRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
-            // Мерджим LocalStreamConstraints полученные от JS-side с
-            // constraints'ами для треков.
-            //
-            // На основании Sender's constraints выпиливает disabled
-            // constraints'ы, мерджит их вместе.
             required_caps
                 .merge(self.send_constraints.inner())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            // Запрос, который будет использован в getUserMedia и
-            // getUserDisplay.
-            //
-            // С помощью этого объекта и будет получаться MediaStream.
             let used_caps = MediaStreamSettings::from(&required_caps);
 
-            // Запрос стрима с нашими Constraints.
-            //
-            // Может вернуть новосозданный MediaStream, либо закэшированный
-            // старый, если он подходит.
             let (media_stream, is_new_stream) = self
                 .media_manager
                 .get_stream(used_caps)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
-            // Получает PeerMediaStream, который и будет отдаваться в JS.
             let peer_stream = required_caps
                 .parse_stream(media_stream.clone())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            // Вроде-бы, ничего интересного дальше нет.
 
             self.media_connections
                 .insert_local_stream(&peer_stream)

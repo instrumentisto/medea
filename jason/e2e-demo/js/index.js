@@ -559,27 +559,80 @@ window.onload = async function() {
       let remoteMemberId = connection.get_remote_member_id();
       isCallStarted = true;
 
-      connection.on_track_added((track) => {
-        console.log('Track added');
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-        let video = document.createElement("video");
-        video.playsinline = "true";
-        video.controls = "true";
-        let mediaStream = new MediaStream();
-        mediaStream.addTrack(track.get_track());
-        video.srcObject = mediaStream;
-        let innerVideoDiv = document.createElement("div");
-        innerVideoDiv.className = "video";
-        innerVideoDiv.appendChild(video);
-        let remoteMemberIdSpan = document.createElement('span');
-        remoteMemberIdSpan.innerText = remoteMemberId;
-        innerVideoDiv.appendChild(remoteMemberIdSpan);
-        remote_videos[remoteMemberId] = innerVideoDiv;
-        videoDiv.appendChild(innerVideoDiv);
+      let memberVideoDiv = remote_videos[remoteMemberId];
+      let remoteVideos = document.getElementsByClassName("remote-videos")[0];
+      if (memberVideoDiv === undefined) {
+        memberVideoDiv = document.createElement("div");
+        memberVideoDiv.className = "video";
+        remoteVideos.appendChild(memberVideoDiv);
+        remote_videos[remoteMemberId] = memberVideoDiv;
+      }
 
-        video.oncanplay = async () => {
-          await video.play();
-        };
+      let memberIdEl = document.createElement('span');
+      memberIdEl.innerHTML = remoteMemberId;
+      memberIdEl.classList.add('member-id');
+      memberIdEl.classList.add('order-4');
+      memberVideoDiv.appendChild(memberIdEl);
+
+      connection.on_quality_score_update((score) => {
+        let qualityScoreEl = memberVideoDiv.getElementsByClassName('quality-score')[0];
+        if (qualityScoreEl === undefined) {
+          qualityScoreEl = document.createElement('span');
+          qualityScoreEl.classList.add('quality-score');
+          qualityScoreEl.classList.add('order-5');
+          memberVideoDiv.appendChild(qualityScoreEl);
+        }
+        qualityScoreEl.innerHTML = score;
+      });
+
+      connection.on_track_added((track) => {
+        if (track.kind() === 'video') {
+          if (track.is_display()) {
+            let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
+            if (displayVideoEl === undefined) {
+              displayVideoEl = document.createElement('video');
+              displayVideoEl.classList.add('display-video');
+              displayVideoEl.classList.add('order-2');
+              displayVideoEl.playsinline = "true";
+              displayVideoEl.controls = "true";
+              displayVideoEl.autoplay = "true";
+              memberVideoDiv.appendChild(displayVideoEl);
+            }
+            let mediaStream = new MediaStream();
+            mediaStream.addTrack(track.get_track());
+            displayVideoEl.srcObject = mediaStream;
+          } else {
+            let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
+            if (cameraVideoEl === undefined) {
+              cameraVideoEl = document.createElement('video');
+              cameraVideoEl.className = 'camera-video';
+              cameraVideoEl.classList.add('camera-video');
+              cameraVideoEl.classList.add('order-1');
+              cameraVideoEl.playsinline = "true";
+              cameraVideoEl.controls = "true";
+              cameraVideoEl.autoplay = "true";
+              memberVideoDiv.appendChild(cameraVideoEl);
+            }
+            let mediaStream = new MediaStream();
+            mediaStream.addTrack(track.get_track());
+            cameraVideoEl.srcObject = mediaStream;
+          }
+        } else {
+          let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
+          if (audioEl === undefined) {
+            audioEl = document.createElement('audio');
+            audioEl.className = 'audio';
+            audioEl.classList.add('audio');
+            audioEl.classList.add('order-3');
+            audioEl.controls = "true";
+            audioEl.autoplay = "true";
+            memberVideoDiv.appendChild(audioEl);
+          }
+          let mediaStream = new MediaStream();
+          mediaStream.addTrack(track.get_track());
+          audioEl.srcObject = mediaStream;
+        }
+
         track.on_enabled( () => {
           console.log(`Track enabled: ${track.kind()}`);
           // console.log(`Has active audio: ${stream.has_active_audio()}`);
@@ -590,66 +643,12 @@ window.onload = async function() {
           // console.log(`Has active audio: ${stream.has_active_audio()}`);
           // console.log(`Has active video: ${stream.has_active_video()}`);
         });
-      })
-
-      // connection.on_remote_stream( async (stream) => {
-      //   let videoDiv = document.getElementsByClassName("remote-videos")[0];
-      //   let video = document.createElement("video");
-      //   video.playsinline = "true";
-      //   video.controls = "true";
-      //   video.srcObject = stream.get_media_stream();
-      //   let innerVideoDiv = document.createElement("div");
-      //   innerVideoDiv.className = "video";
-      //   innerVideoDiv.appendChild(video);
-      //   let remoteMemberIdSpan = document.createElement('span');
-      //   remoteMemberIdSpan.innerText = remoteMemberId;
-      //   innerVideoDiv.appendChild(remoteMemberIdSpan);
-      //   remote_videos[remoteMemberId] = innerVideoDiv;
-      //   videoDiv.appendChild(innerVideoDiv);
-
-      //   video.oncanplay = async () => {
-      //     await video.play();
-      //   };
-      //   stream.on_track_added( (track) => {
-      //     // switch controls off and on, cause controls are not updated
-      //     // automatically
-      //     let video = remote_videos[connection.get_remote_member_id()]
-      //       .getElementsByTagName("video")[0];
-      //     video.controls = false;
-      //     video.controls = true;
-      //     console.log(`Track added: ${track.kind}`);
-      //     console.log(`Has active audio: ${stream.has_active_audio()}`);
-      //     console.log(`Has active video: ${stream.has_active_video()}`);
-      //   });
-      //   stream.on_track_enabled( (track) => {
-      //     console.log(`Track enabled: ${track.kind}`);
-      //     console.log(`Has active audio: ${stream.has_active_audio()}`);
-      //     console.log(`Has active video: ${stream.has_active_video()}`);
-      //   });
-      //   stream.on_track_disabled( (track) => {
-      //     console.log(`Track disabled: ${track.kind}`);
-      //     console.log(`Has active audio: ${stream.has_active_audio()}`);
-      //     console.log(`Has active video: ${stream.has_active_video()}`);
-      //   });
-      // });
+      });
 
       connection.on_close(() => {
         remote_videos[remoteMemberId].remove();
         delete remote_videos[remoteMemberId];
       });
-
-      connection.on_quality_score_update((score) => {
-        let videoDiv = remote_videos[remoteMemberId];
-        let el = videoDiv.getElementsByClassName('quality-score');
-
-        if (el[0] === undefined) {
-          let qualityEl = document.createElement('span');
-          qualityEl.innerHTML = score;
-          qualityEl.className = 'quality-score';
-          videoDiv.appendChild(qualityEl);
-        }
-        el[0].innerHTML = score;
-      })
     });
 
     // room.on_local_stream((stream) => {

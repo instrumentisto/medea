@@ -588,6 +588,10 @@ impl TrackConstraints {
             TrackConstraints::Audio(audio) => audio.is_required,
         }
     }
+
+    pub fn is_display(&self) -> bool {
+        matches!(self, Self::Video(MediaStreamTrackConstraints::Display(_)))
+    }
 }
 
 impl From<ProtoTrackConstraints> for TrackConstraints {

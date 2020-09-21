@@ -23,6 +23,11 @@
       justify-content: space-around;
     }
 
+    .video video {
+      max-width: 600px;
+      margin-top: 10px;
+    }
+
     .video {
       display: flex;
       justify-content: center;
@@ -43,6 +48,9 @@
     .local-video {
       float: left;
       width: auto;
+    }
+
+    .local-video video {
       height: 150px;
       max-width: 225px;
     }
@@ -196,12 +204,11 @@
     </div>
   </nav>
 
-  <div class="remote-videos">
+  <div class="remote-videos container">
   </div>
 
   <div class="footer m-3">
     <div id="local-video" class="local-video video">
-      <!-- <video id="local-video" muted autoplay width="100%" height="100%"></video> -->
     </div>
     <div class="mb-3">
       <button id="control__mute_audio_send" class="btn btn-secondary">Disable audio send</button>

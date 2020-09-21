@@ -115,6 +115,7 @@ struct InnerMediaStreamTrack {
 
     on_enabled: Callback0,
     on_disabled: Callback0,
+    is_display: bool,
 
     /// [enabled] property of [MediaStreamTrack][1].
     ///
@@ -133,6 +134,43 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
+    pub fn new<T>(track: T, is_display: bool) -> Self
+        where
+            SysMediaStreamTrack: From<T>,
+    {
+        let track = SysMediaStreamTrack::from(track);
+        let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+            enabled: ObservableCell::new(track.enabled()),
+            on_enabled: Callback0::default(),
+            on_disabled: Callback0::default(),
+            is_display,
+            track,
+        }));
+
+        let mut track_enabled_state_changes =
+            track.enabled().subscribe().skip(1);
+        spawn_local({
+            let weak_inner = Rc::downgrade(&track.0);
+            async move {
+                while let Some(enabled) =
+                track_enabled_state_changes.next().await
+                {
+                    if let Some(track) = weak_inner.upgrade() {
+                        if enabled {
+                            track.on_enabled.call();
+                        } else {
+                            track.on_disabled.call();
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
+
+        track
+    }
+
     /// Returns `true` if this [`MediaStreamTrack`] is enabled.
     #[inline]
     pub fn enabled(&self) -> &ObservableCell<bool> {
@@ -190,6 +228,10 @@ impl MediaStreamTrackHandle {
     pub fn kind(&self) -> String {
         MediaStreamTrack(self.0.clone()).kind().to_string()
     }
+
+    pub fn is_display(&self) -> bool {
+        self.0.is_display
+    }
 }
 
 /// [MediaStreamTrack.kind][1] representation.
@@ -204,45 +246,6 @@ pub enum TrackKind {
     /// Video track.
     #[display(fmt = "video")]
     Video,
-}
-
-impl<T> From<T> for MediaStreamTrack
-where
-    SysMediaStreamTrack: From<T>,
-{
-    #[inline]
-    fn from(track: T) -> Self {
-        let track = SysMediaStreamTrack::from(track);
-        let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            enabled: ObservableCell::new(track.enabled()),
-            on_enabled: Callback0::default(),
-            on_disabled: Callback0::default(),
-            track,
-        }));
-
-        let mut track_enabled_state_changes =
-            track.enabled().subscribe().skip(1);
-        spawn_local({
-            let weak_inner = Rc::downgrade(&track.0);
-            async move {
-                while let Some(enabled) =
-                    track_enabled_state_changes.next().await
-                {
-                    if let Some(track) = weak_inner.upgrade() {
-                        if enabled {
-                            track.on_enabled.call();
-                        } else {
-                            track.on_disabled.call();
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
-        });
-
-        track
-    }
 }
 
 impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
