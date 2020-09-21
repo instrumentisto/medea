@@ -419,7 +419,14 @@ impl MediaManagerHandle {
             inner?
                 .get_stream(caps)
                 .await
-                .map(|(stream, _)| stream.into())
+                .map(|(stream, _)| {
+                    let arr = js_sys::Array::new();
+                    let tracks = stream.into_tracks();
+                    for track in tracks {
+                        arr.push(&track.new_handle().into());
+                    }
+                    JsValue::from(arr)
+                })
                 .map_err(tracerr::wrap!(=> MediaManagerError))
                 .map_err(|e| JasonError::from(e).into())
         })

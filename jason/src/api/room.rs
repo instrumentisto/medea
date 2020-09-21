@@ -37,6 +37,7 @@ use crate::{
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
+use crate::media::MediaStreamTrackHandle;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -297,6 +298,11 @@ impl RoomHandle {
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_local_stream.set_func(f))
+    }
+
+    pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.on_local_track.set_func(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -639,6 +645,8 @@ struct InnerRoom {
     //       understand purpose of obtaining this stream.
     on_local_stream: Callback1<MediaStream>,
 
+    on_local_track: Callback1<MediaStreamTrackHandle>,
+
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_stream: Rc<Callback1<JasonError>>,
@@ -676,6 +684,7 @@ impl InnerRoom {
             on_local_stream: Callback1::default(),
             on_connection_loss: Callback1::default(),
             on_failed_local_stream: Rc::new(Callback1::default()),
+            on_local_track: Callback1::default(),
             on_close: Rc::new(Callback1::default()),
             close_reason: RefCell::new(CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
@@ -1080,9 +1089,9 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_local_stream(
         &self,
         _: PeerId,
-        stream: MediaStream,
+        stream: MediaStreamTrack,
     ) -> Self::Output {
-        self.on_local_stream.call(stream);
+        self.on_local_track.call(stream.new_handle());
         Ok(())
     }
 

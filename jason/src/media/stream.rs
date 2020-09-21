@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
+use derive_more::Display;
 
 use crate::{
     utils::{Callback0, HandlerDetachedError},
@@ -149,51 +150,60 @@ impl MediaStreamTrack {
     }
 
     pub fn new_handle(&self) -> MediaStreamTrackHandle {
-        MediaStreamTrackHandle(Rc::downgrade(&self.0))
+        MediaStreamTrackHandle(Rc::clone(&self.0))
     }
 }
 
+// TODO: use Weak
 #[wasm_bindgen]
-pub struct MediaStreamTrackHandle(Weak<InnerMediaStreamTrack>);
+pub struct MediaStreamTrackHandle(Rc<InnerMediaStreamTrack>);
 
 #[wasm_bindgen]
 impl MediaStreamTrackHandle {
     pub fn get_track(&self) -> SysMediaStreamTrack {
-        if let Some(this) = self.0.upgrade() {
-            this.track.clone()
-        } else {
-            todo!()
-        }
+        // if let Some(this) = self.0.upgrade() {
+            self.0.track.clone()
+        // } else {
+        //     todo!()
+        // }
     }
 
     pub fn on_enabled(
         &self,
         callback: js_sys::Function,
     ) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_enabled.set_func(callback);
-        })
+        // upgrade_or_detached!(self.0).map(|inner| {
+        self.0.on_enabled.set_func(callback);
+            Ok(())
+        // })
     }
 
     pub fn on_disabled(
         &self,
         callback: js_sys::Function,
     ) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| {
-            inner.on_disabled.set_func(callback);
-        })
+        // upgrade_or_detached!(self.0).map(|inner| {
+        self.0.on_disabled.set_func(callback);
+            Ok(())
+        // })
+    }
+
+    pub fn kind(&self) -> String {
+        MediaStreamTrack(self.0.clone()).kind().to_string()
     }
 }
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
 pub enum TrackKind {
     /// Audio track.
+    #[display(fmt = "audio")]
     Audio,
 
     /// Video track.
+    #[display(fmt = "video")]
     Video,
 }
 

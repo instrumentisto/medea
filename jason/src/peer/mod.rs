@@ -136,7 +136,7 @@ pub enum PeerEvent {
         peer_id: Id,
 
         /// Local [`MediaStream`] that is sent to remote members.
-        local_stream: MediaStream,
+        local_stream: MediaStreamTrack,
     },
 
     /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
@@ -714,12 +714,14 @@ impl PeerConnection {
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             if is_new_stream {
-                let _ = self.peer_events_sender.unbounded_send(
-                    PeerEvent::NewLocalStream {
-                        peer_id: self.id,
-                        local_stream: media_stream,
-                    },
-                );
+                for track in media_stream.into_tracks() {
+                    let _ = self.peer_events_sender.unbounded_send(
+                        PeerEvent::NewLocalStream {
+                            peer_id: self.id,
+                            local_stream: track,
+                        },
+                    );
+                }
             }
         }
         Ok(())

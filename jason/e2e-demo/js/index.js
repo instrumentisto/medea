@@ -388,8 +388,20 @@ async function startPublishing() {
 }
 
 async function updateLocalVideo(stream) {
-  localVideo.srcObject = stream.get_media_stream();
-  await localVideo.play();
+  for (const track of stream) {
+    if (track.kind() == 'audio') {
+      continue;
+    }
+    let mediaStream = new MediaStream();
+    mediaStream.addTrack(track.get_track());
+    let videoEl = document.createElement('video');
+    videoEl.srcObject = mediaStream;
+    videoEl.width = 200;
+    localVideo.appendChild(videoEl);
+    await videoEl.play();
+  }
+  // localVideo.srcObject = stream.get_media_stream();
+  // await localVideo.play();
 }
 
 window.onload = async function() {
@@ -458,8 +470,8 @@ window.onload = async function() {
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
+    // const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
+    // const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -467,11 +479,11 @@ window.onload = async function() {
       option.value = device_info.device_id();
       if (device_info.kind() === 'audio') {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
-        option.selected = option.text === current_audio;
+        // option.selected = option.text === current_audio;
         audio_select.append(option);
       } else if (device_info.kind() === 'video') {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
-        option.selected = option.text === current_video;
+        // option.selected = option.text === current_video;
         video_select.append(option);
       }
     }
@@ -537,10 +549,10 @@ window.onload = async function() {
 
     try {
       const constraints = await initLocalStream();
-      await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+      await fillMediaDevicesInputs(audioSelect, videoSelect, null);
       await room.set_local_media_settings(constraints);
     } catch (e) {
-      console.error("Init local video failed: " + e.message());
+      console.error("Init local video failed: " + e);
     }
 
     room.on_new_connection( (connection) => {
@@ -568,13 +580,13 @@ window.onload = async function() {
         video.oncanplay = async () => {
           await video.play();
         };
-        track.on_enabled( (track) => {
-          console.log(`Track enabled: ${track.kind}`);
+        track.on_enabled( () => {
+          console.log(`Track enabled: ${track.kind()}`);
           // console.log(`Has active audio: ${stream.has_active_audio()}`);
           // console.log(`Has active video: ${stream.has_active_video()}`);
         });
-        track.on_disabled( (track) => {
-          console.log(`Track disabled: ${track.kind}`);
+        track.on_disabled( () => {
+          console.log(`Track disabled: ${track.kind()}`);
           // console.log(`Has active audio: ${stream.has_active_audio()}`);
           // console.log(`Has active video: ${stream.has_active_video()}`);
         });
@@ -640,11 +652,15 @@ window.onload = async function() {
       })
     });
 
-    room.on_local_stream((stream) => {
-      console.log("New local stream");
-      updateLocalVideo(stream);
-      stream.free();
-    });
+    // room.on_local_stream((stream) => {
+    //   console.log("New local stream");
+    //   updateLocalVideo(stream);
+    //   stream.free();
+    // });
+    room.on_local_track((track) => {
+      console.log("New local track");
+      updateLocalVideo(track);
+    })
 
     room.on_failed_local_stream((error) => {
       console.error(error.trace());
