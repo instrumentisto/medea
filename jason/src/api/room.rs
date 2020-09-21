@@ -24,7 +24,7 @@ use crate::{
     api::connection::Connections,
     media::{
         LocalStreamConstraints, MediaStream, MediaStreamSettings,
-        MediaStreamTrack, RecvConstraints,
+        MediaStreamTrack, MediaStreamTrackHandle, RecvConstraints,
     },
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
@@ -37,7 +37,6 @@ use crate::{
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
-use crate::media::MediaStreamTrackHandle;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -287,17 +286,6 @@ impl RoomHandle {
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
-    }
-
-    /// Sets `on_local_stream` callback. This callback is invoked each time
-    /// media acquisition request will resolve successfully. This might
-    /// happen in such cases:
-    /// 1. Media server initiates media request.
-    /// 2. `unmute_audio`/`unmute_video` is called.
-    /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
-    pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_local_stream.set_func(f))
     }
 
     pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
@@ -637,14 +625,6 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
-    /// Callback to be invoked when new [`MediaStream`] is acquired providing
-    /// its actual underlying [MediaStream][1] object.
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    // TODO: will be extended with some metadata that would allow client to
-    //       understand purpose of obtaining this stream.
-    on_local_stream: Callback1<MediaStream>,
-
     on_local_track: Callback1<MediaStreamTrackHandle>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
@@ -681,7 +661,6 @@ impl InnerRoom {
             peers,
             peer_event_sender,
             connections: Connections::default(),
-            on_local_stream: Callback1::default(),
             on_connection_loss: Callback1::default(),
             on_failed_local_stream: Rc::new(Callback1::default()),
             on_local_track: Callback1::default(),
@@ -1086,7 +1065,7 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Invokes `on_local_stream` [`Room`]'s callback.
-    async fn on_new_local_stream(
+    async fn on_new_local_track(
         &self,
         _: PeerId,
         stream: MediaStreamTrack,

@@ -18,6 +18,7 @@ use crate::{
 };
 
 use super::PeerMediaStream;
+use crate::media::MediaStreamTrack;
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
@@ -121,15 +122,16 @@ impl SimpleStreamRequest {
     ///
     /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
     /// [`MediaStream`] doesn't have expected video track.
-    pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
+    pub fn parse_stream(
+        &self,
+        stream: Vec<MediaStreamTrack>,
+    ) -> Result<PeerMediaStream> {
         use StreamRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let result_stream = PeerMediaStream::new();
 
-        let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
-            .into_tracks()
-            .into_iter()
-            .partition(|track| match track.kind() {
+        let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) =
+            stream.into_iter().partition(|track| match track.kind() {
                 TrackKind::Audio { .. } => false,
                 TrackKind::Video { .. } => true,
             });

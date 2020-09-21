@@ -318,7 +318,7 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
-            PeerEvent::NewLocalStream { .. } => {}
+            PeerEvent::NewLocalTrack { .. } => {}
             _ => unreachable!(),
         }
     }
@@ -346,7 +346,7 @@ async fn send_event_on_new_local_stream() {
 
     while let Some(event) = rx.next().await {
         match event {
-            PeerEvent::NewLocalStream { peer_id, .. } => {
+            PeerEvent::NewLocalTrack { peer_id, .. } => {
                 assert_eq!(peer_id, id);
                 break;
             }

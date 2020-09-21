@@ -129,7 +129,8 @@ impl ConnectionHandle {
     }
 
     pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0).map(|inner| inner.on_track_added.set_func(f))
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.on_track_added.set_func(f))
     }
 
     /// Sets callback, which will be invoked when connection quality score will

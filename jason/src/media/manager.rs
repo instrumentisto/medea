@@ -148,22 +148,22 @@ impl InnerMediaManager {
     async fn get_stream(
         &self,
         mut caps: MediaStreamSettings,
-    ) -> Result<(MediaStream, bool)> {
+    ) -> Result<(Vec<MediaStreamTrack>, bool)> {
         let original_caps = caps.clone();
 
         let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
         match caps {
-            None => Ok((MediaStream::new(result, original_caps), false)),
+            None => Ok((result, false)),
             Some(MultiSourceMediaStreamConstraints::Display(caps)) => {
                 let mut tracks = self.get_display_media(caps).await?;
                 result.append(&mut tracks);
-                Ok((MediaStream::new(result, original_caps), true))
+                Ok((result, true))
             }
             Some(MultiSourceMediaStreamConstraints::Device(caps)) => {
                 let mut tracks = self.get_user_media(caps).await?;
                 result.append(&mut tracks);
-                Ok((MediaStream::new(result, original_caps), true))
+                Ok((result, true))
             }
             Some(MultiSourceMediaStreamConstraints::DeviceAndDisplay(
                 device_caps,
@@ -176,7 +176,7 @@ impl InnerMediaManager {
                 result.append(&mut get_user_media);
                 result.append(&mut get_display_media);
 
-                Ok((MediaStream::new(result, original_caps), true))
+                Ok((result, true))
             }
         }
     }
@@ -360,7 +360,7 @@ impl MediaManager {
     pub async fn get_stream<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
-    ) -> Result<(MediaStream, bool)> {
+    ) -> Result<(Vec<MediaStreamTrack>, bool)> {
         self.0.get_stream(caps.into()).await
     }
 
@@ -419,9 +419,8 @@ impl MediaManagerHandle {
             inner?
                 .get_stream(caps)
                 .await
-                .map(|(stream, _)| {
+                .map(|(tracks, _)| {
                     let arr = js_sys::Array::new();
-                    let tracks = stream.into_tracks();
                     for track in tracks {
                         arr.push(&track.new_handle().into());
                     }

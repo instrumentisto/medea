@@ -4,13 +4,12 @@
 
 use std::rc::{Rc, Weak};
 
-use derive_more::AsRef;
+use derive_more::{AsRef, Display};
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
-use derive_more::Display;
 
 use crate::{
     utils::{Callback0, HandlerDetachedError},
@@ -162,7 +161,7 @@ pub struct MediaStreamTrackHandle(Rc<InnerMediaStreamTrack>);
 impl MediaStreamTrackHandle {
     pub fn get_track(&self) -> SysMediaStreamTrack {
         // if let Some(this) = self.0.upgrade() {
-            self.0.track.clone()
+        self.0.track.clone()
         // } else {
         //     todo!()
         // }
@@ -174,7 +173,7 @@ impl MediaStreamTrackHandle {
     ) -> Result<(), JsValue> {
         // upgrade_or_detached!(self.0).map(|inner| {
         self.0.on_enabled.set_func(callback);
-            Ok(())
+        Ok(())
         // })
     }
 
@@ -184,7 +183,7 @@ impl MediaStreamTrackHandle {
     ) -> Result<(), JsValue> {
         // upgrade_or_detached!(self.0).map(|inner| {
         self.0.on_disabled.set_func(callback);
-            Ok(())
+        Ok(())
         // })
     }
 
