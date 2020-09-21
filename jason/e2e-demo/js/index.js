@@ -546,12 +546,16 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       let remoteMemberId = connection.get_remote_member_id();
       isCallStarted = true;
-      connection.on_remote_stream( async (stream) => {
+
+      connection.on_track_added((track) => {
+        console.log('Track added');
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
         video.playsinline = "true";
         video.controls = "true";
-        video.srcObject = stream.get_media_stream();
+        let mediaStream = new MediaStream();
+        mediaStream.addTrack(track.get_track());
+        video.srcObject = mediaStream;
         let innerVideoDiv = document.createElement("div");
         innerVideoDiv.className = "video";
         innerVideoDiv.appendChild(video);
@@ -564,28 +568,58 @@ window.onload = async function() {
         video.oncanplay = async () => {
           await video.play();
         };
-        stream.on_track_added( (track) => {
-          // switch controls off and on, cause controls are not updated
-          // automatically
-          let video = remote_videos[connection.get_remote_member_id()]
-            .getElementsByTagName("video")[0];
-          video.controls = false;
-          video.controls = true;
-          console.log(`Track added: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
-        });
-        stream.on_track_enabled( (track) => {
+        track.on_enabled( (track) => {
           console.log(`Track enabled: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
+          // console.log(`Has active audio: ${stream.has_active_audio()}`);
+          // console.log(`Has active video: ${stream.has_active_video()}`);
         });
-        stream.on_track_disabled( (track) => {
+        track.on_disabled( (track) => {
           console.log(`Track disabled: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
+          // console.log(`Has active audio: ${stream.has_active_audio()}`);
+          // console.log(`Has active video: ${stream.has_active_video()}`);
         });
-      });
+      })
+
+      // connection.on_remote_stream( async (stream) => {
+      //   let videoDiv = document.getElementsByClassName("remote-videos")[0];
+      //   let video = document.createElement("video");
+      //   video.playsinline = "true";
+      //   video.controls = "true";
+      //   video.srcObject = stream.get_media_stream();
+      //   let innerVideoDiv = document.createElement("div");
+      //   innerVideoDiv.className = "video";
+      //   innerVideoDiv.appendChild(video);
+      //   let remoteMemberIdSpan = document.createElement('span');
+      //   remoteMemberIdSpan.innerText = remoteMemberId;
+      //   innerVideoDiv.appendChild(remoteMemberIdSpan);
+      //   remote_videos[remoteMemberId] = innerVideoDiv;
+      //   videoDiv.appendChild(innerVideoDiv);
+
+      //   video.oncanplay = async () => {
+      //     await video.play();
+      //   };
+      //   stream.on_track_added( (track) => {
+      //     // switch controls off and on, cause controls are not updated
+      //     // automatically
+      //     let video = remote_videos[connection.get_remote_member_id()]
+      //       .getElementsByTagName("video")[0];
+      //     video.controls = false;
+      //     video.controls = true;
+      //     console.log(`Track added: ${track.kind}`);
+      //     console.log(`Has active audio: ${stream.has_active_audio()}`);
+      //     console.log(`Has active video: ${stream.has_active_video()}`);
+      //   });
+      //   stream.on_track_enabled( (track) => {
+      //     console.log(`Track enabled: ${track.kind}`);
+      //     console.log(`Has active audio: ${stream.has_active_audio()}`);
+      //     console.log(`Has active video: ${stream.has_active_video()}`);
+      //   });
+      //   stream.on_track_disabled( (track) => {
+      //     console.log(`Track disabled: ${track.kind}`);
+      //     console.log(`Has active audio: ${stream.has_active_audio()}`);
+      //     console.log(`Has active video: ${stream.has_active_video()}`);
+      //   });
+      // });
 
       connection.on_close(() => {
         remote_videos[remoteMemberId].remove();

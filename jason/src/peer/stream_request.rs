@@ -195,8 +195,8 @@ impl SimpleStreamRequest {
                 if let Some(video_caps) = video_caps {
                     if video_caps.is_required() {
                         return Err(tracerr::new!(
-                        StreamRequestError::ExpectedVideoTracks
-                    ));
+                            StreamRequestError::ExpectedVideoTracks
+                        ));
                     } else {
                         remove_me |= true;
                     }
@@ -291,10 +291,13 @@ impl From<&SimpleStreamRequest> for MediaStreamSettings {
         }
         for (_, video) in &request.video {
             if let Some(video) = video {
-                if let MediaStreamTrackConstraints::Device(device_video) = video {
+                if let MediaStreamTrackConstraints::Device(device_video) = video
+                {
                     constraints.device_video(device_video.clone());
                 }
-                if let MediaStreamTrackConstraints::Display(display_video) = video {
+                if let MediaStreamTrackConstraints::Display(display_video) =
+                    video
+                {
                     constraints.display_video(display_video.clone());
                 }
             }

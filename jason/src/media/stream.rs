@@ -11,7 +11,12 @@ use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::MediaStreamSettings;
+use crate::{
+    utils::{Callback0, HandlerDetachedError},
+    MediaStreamSettings,
+};
+use futures::StreamExt;
+use wasm_bindgen_futures::spawn_local;
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -108,6 +113,9 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
+    on_enabled: Callback0,
+    on_disabled: Callback0,
+
     /// [enabled] property of [MediaStreamTrack][1].
     ///
     /// [enabled]: https://tinyurl.com/y5byqdea
@@ -139,6 +147,42 @@ impl MediaStreamTrack {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
     }
+
+    pub fn new_handle(&self) -> MediaStreamTrackHandle {
+        MediaStreamTrackHandle(Rc::downgrade(&self.0))
+    }
+}
+
+#[wasm_bindgen]
+pub struct MediaStreamTrackHandle(Weak<InnerMediaStreamTrack>);
+
+#[wasm_bindgen]
+impl MediaStreamTrackHandle {
+    pub fn get_track(&self) -> SysMediaStreamTrack {
+        if let Some(this) = self.0.upgrade() {
+            this.track.clone()
+        } else {
+            todo!()
+        }
+    }
+
+    pub fn on_enabled(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_enabled.set_func(callback);
+        })
+    }
+
+    pub fn on_disabled(
+        &self,
+        callback: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0).map(|inner| {
+            inner.on_disabled.set_func(callback);
+        })
+    }
 }
 
 /// [MediaStreamTrack.kind][1] representation.
@@ -160,10 +204,35 @@ where
     #[inline]
     fn from(track: T) -> Self {
         let track = SysMediaStreamTrack::from(track);
-        MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+        let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
             enabled: ObservableCell::new(track.enabled()),
+            on_enabled: Callback0::default(),
+            on_disabled: Callback0::default(),
             track,
-        }))
+        }));
+
+        let mut track_enabled_state_changes =
+            track.enabled().subscribe().skip(1);
+        spawn_local({
+            let weak_inner = Rc::downgrade(&track.0);
+            async move {
+                while let Some(enabled) =
+                    track_enabled_state_changes.next().await
+                {
+                    if let Some(track) = weak_inner.upgrade() {
+                        if enabled {
+                            track.on_enabled.call();
+                        } else {
+                            track.on_disabled.call();
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
+
+        track
     }
 }
 

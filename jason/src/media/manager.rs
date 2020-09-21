@@ -154,9 +154,7 @@ impl InnerMediaManager {
         let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
         match caps {
-            None => {
-                Ok((MediaStream::new(result, original_caps), false))
-            }
+            None => Ok((MediaStream::new(result, original_caps), false)),
             Some(MultiSourceMediaStreamConstraints::Display(caps)) => {
                 let mut tracks = self.get_display_media(caps).await?;
                 result.append(&mut tracks);
