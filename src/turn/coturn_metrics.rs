@@ -3,6 +3,7 @@
 
 use std::{
     collections::HashMap,
+    pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -29,7 +30,7 @@ const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
 pub type ActFuture<O> =
-    Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
+    Pin<Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>>;
 
 /// Service responsible for processing [`PeerConnection`]'s metrics received
 /// from Coturn.
@@ -71,7 +72,7 @@ impl CoturnMetricsService {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();
 
-        Box::new(
+        Box::pin(
             async move {
                 let conn = client.get_async_connection().await?;
                 let mut pubsub = conn.into_pubsub();
@@ -102,7 +103,7 @@ impl CoturnMetricsService {
 
     /// Connects Redis until succeeds.
     fn connect_until_success(&mut self) -> ActFuture<()> {
-        Box::new(self.connect_and_subscribe().then(|res, this, _| {
+        Box::pin(self.connect_and_subscribe().then(|res, this, _| {
             if let Err(err) = res {
                 warn!(
                     "Error while creating Redis PubSub connection for the \

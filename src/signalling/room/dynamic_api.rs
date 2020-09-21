@@ -228,27 +228,28 @@ impl Room {
 
         member.insert_sink(sink);
 
-        let fut = fut::ready(()).map(move |_, this: &mut Self, ctx| {
-            let member_id = member.id();
-            if this.members.member_has_connection(&member_id) {
-                ctx.spawn(this.init_member_connections(&member).map(
-                    move |res, this, ctx| {
-                        if let Err(e) = res {
-                            error!(
-                                "Failed to interconnect Members, because {}. \
-                                 Connection with Member [id = {}, room_id: \
-                                 {}] will be stopped.",
-                                e, member_id, this.id,
-                            );
-                            this.members
-                                .close_member_connection(&member_id, ctx);
-                        }
-                    },
-                ));
-            }
-            Ok(())
-        });
-        Ok(Box::new(fut))
+        Ok(Box::pin(fut::ready(()).map(
+            move |_, this: &mut Self, ctx| {
+                let member_id = member.id();
+                if this.members.member_has_connection(&member_id) {
+                    ctx.spawn(this.init_member_connections(&member).map(
+                        move |res, this, ctx| {
+                            if let Err(e) = res {
+                                error!(
+                                    "Failed to interconnect Members, because \
+                                     {}. Connection with Member [id = {}, \
+                                     room_id: {}] will be stopped.",
+                                    e, member_id, this.id,
+                                );
+                                this.members
+                                    .close_member_connection(&member_id, ctx);
+                            }
+                        },
+                    ));
+                }
+                Ok(())
+            },
+        )))
     }
 
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
@@ -435,8 +436,8 @@ impl Handler<CreateEndpoint> for Room {
                     msg.endpoint_id.into(),
                     endpoint,
                 ) {
-                    Ok(fut) => Box::new(fut),
-                    Err(e) => Box::new(fut::err(e)),
+                    Ok(fut) => Box::pin(fut),
+                    Err(e) => Box::pin(fut::err(e)),
                 }
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
@@ -445,9 +446,9 @@ impl Handler<CreateEndpoint> for Room {
                     msg.endpoint_id.into(),
                     &endpoint,
                 ) {
-                    Box::new(fut::err(e))
+                    Box::pin(fut::err(e))
                 } else {
-                    Box::new(fut::ok(()))
+                    Box::pin(fut::ok(()))
                 }
             }
         }

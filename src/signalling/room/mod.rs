@@ -6,7 +6,7 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{rc::Rc, sync::Arc, time::Duration};
+use std::{pin::Pin, rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
     fut, Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
@@ -36,7 +36,7 @@ use crate::{
         peers::{PeerTrafficWatcher, PeersService},
     },
     turn::TurnServiceErr,
-    utils::{actix_try_join_all, ResponseActAnyFuture},
+    utils::actix_try_join_all,
     AppContext,
 };
 
@@ -45,7 +45,7 @@ pub use dynamic_api::{
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-pub type ActFuture<O> = Box<dyn ActorFuture<Actor = Room, Output = O>>;
+pub type ActFuture<O> = Pin<Box<dyn ActorFuture<Actor = Room, Output = O>>>;
 
 #[derive(Debug, Display, Fail, From)]
 pub enum RoomError {
@@ -225,7 +225,7 @@ impl Room {
             }
         }
 
-        Box::new(
+        Box::pin(
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
                 .map(move |result, room: &mut Room, _| {
@@ -264,7 +264,7 @@ impl Room {
                 }
             });
 
-        Box::new(
+        Box::pin(
             actix_try_join_all(connect_members_tasks)
                 .map(|result, _, _| result.map(|_| ())),
         )
@@ -294,7 +294,7 @@ impl Room {
                 );
             });
 
-        Box::new(self.members.drop_connections(ctx).into_actor(self).map(
+        Box::pin(self.members.drop_connections(ctx).into_actor(self).map(
             |_, room: &mut Self, _| {
                 room.state = State::Stopped;
             },
@@ -323,14 +323,14 @@ impl Room {
 
             return self.close_gracefully(ctx);
         }
-        Box::new(
+        Box::pin(
             fut::ready(self.send_peers_removed(member_id, peers_id)).then(
                 |err, this: &mut Room, ctx: &mut Context<Self>| {
                     if let Err(e) = err {
                         match e {
                             RoomError::ConnectionNotExists(_)
                             | RoomError::UnableToSendEvent(_) => {
-                                Box::new(actix::fut::ready(()))
+                                Box::pin(actix::fut::ready(()))
                             }
                             _ => {
                                 error!(
@@ -342,7 +342,7 @@ impl Room {
                             }
                         }
                     } else {
-                        Box::new(actix::fut::ready(()))
+                        Box::pin(actix::fut::ready(()))
                     }
                 },
             ),
@@ -399,7 +399,7 @@ impl Actor for Room {
 }
 
 impl Handler<ShutdownGracefully> for Room {
-    type Result = ResponseActAnyFuture<Self, ()>;
+    type Result = ActFuture<()>;
 
     fn handle(
         &mut self,
@@ -411,6 +411,6 @@ impl Handler<ShutdownGracefully> for Room {
              down",
             self.id
         );
-        ResponseActAnyFuture(self.close_gracefully(ctx))
+        self.close_gracefully(ctx)
     }
 }
