@@ -146,7 +146,10 @@ impl CommandHandler for Room {
             PeerMetrics::PeerConnectionState(state) => {
                 self.peers.update_peer_connection_state(peer_id, state);
             }
-            PeerMetrics::IceConnectionState(_) => (),
+            PeerMetrics::IceConnectionState(state) => {
+                self.peers
+                    .update_peer_connection_state(peer_id, state.into());
+            }
         }
         Ok(())
     }

@@ -649,7 +649,6 @@ impl<T> Peer<T> {
         self.dedup_track_patches();
     }
 
-
     /// Dedups [`TrackChange::IceRestart`]s.
     fn dedup_ice_restarts(&mut self) {
         let pending_track_updates = &mut self.context.pending_track_updates;
@@ -1117,9 +1116,9 @@ pub mod tests {
 
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1149,9 +1148,9 @@ pub mod tests {
 
         let peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1193,9 +1192,9 @@ pub mod tests {
 
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1239,9 +1238,9 @@ pub mod tests {
             .returning(move |_: PeerId| {});
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1336,9 +1335,9 @@ pub mod tests {
             .returning(move |_: PeerId| {});
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );

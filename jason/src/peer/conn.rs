@@ -612,7 +612,7 @@ impl RtcPeerConnection {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
         let mut offer_options = RtcOfferOptions::new();
-        if self.ice_restart.replace(false) {
+        if self.ice_restart.take() {
             offer_options.ice_restart(true);
         }
         let create_offer = JsFuture::from(

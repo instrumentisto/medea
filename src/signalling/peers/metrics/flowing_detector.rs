@@ -347,6 +347,7 @@ impl RtcStatsHandler for TrafficFlowDetector {
         _: PeerId,
         _: PeerConnectionState,
     ) {
+        // TODO: should take connection state into account
     }
 
     /// Does nothing.

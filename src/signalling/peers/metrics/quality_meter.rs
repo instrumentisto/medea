@@ -42,18 +42,29 @@ impl QualityMeterStatsHandler {
         }
     }
 
-    /// Sends [`ConnectionQualityScore`] update with a [`EventSender`].
-    ///
-    /// Doesn't sends anything if [`PeerMetric::last_quality_score`] equals to
-    /// the provided [`ConnectionQualityScore`].
-    fn send_quality_score_update(
-        &self,
-        peer: &mut PeerMetric,
-        quality_score: ConnectionQualityScore,
-    ) {
-        if quality_score == peer.last_quality_score {
-            peer.last_quality_score = quality_score;
+    /// Recalculates [`ConnectionQualityScore`] for the provided
+    /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
+    /// new score is not equal to the previously calculated score.
+    fn update_quality_score(&self, peer: &mut PeerMetric) {
+        let partner_score = peer
+            .partner_peer
+            .upgrade()
+            .and_then(|p| p.borrow_mut().calculate());
+        let score = peer
+            .calculate()
+            .and_then(|score| {
+                partner_score
+                    .map(|partner_score| score.min(partner_score))
+                    .or_else(|| Some(score))
+            })
+            .or_else(|| partner_score);
 
+        if let Some(quality_score) = score {
+            if quality_score == peer.last_quality_score {
+                return;
+            }
+
+            peer.last_quality_score = quality_score;
             if let Some(partner_member_id) = peer.get_partner_member_id() {
                 self.event_tx.send_event(
                     PeersMetricsEvent::QualityMeterUpdate {
@@ -63,19 +74,6 @@ impl QualityMeterStatsHandler {
                     },
                 );
             }
-        }
-    }
-
-    /// Recalculates [`ConnectionQualityScore`] for the provided
-    /// [`PeerMetric`], sends [`PeersMetricsEvent::QualityMeterUpdate`] if
-    /// new score is not equal to the previously calculated score.
-    fn update_quality_score(&self, peer: &mut PeerMetric) {
-        let score = peer
-            .calculate_quality_score_based_on_connection_state()
-            .or_else(|| peer.calculate_quality_score_based_on_rtc_stats());
-
-        if let Some(quality_score) = score {
-            self.send_quality_score_update(peer, quality_score);
         }
     }
 }
@@ -98,8 +96,8 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
             member_id: peer.member_id(),
             partner_peer,
             quality_meter: QualityMeter::new(Duration::from_secs(5)),
-            last_connection_state: PeerConnectionState::New,
-            last_quality_score: ConnectionQualityScore::Low,
+            connection_state: PeerConnectionState::New,
+            last_quality_score: ConnectionQualityScore::Poor,
         }));
         self.peers.insert(peer.id(), peer_metric.clone());
 
@@ -117,7 +115,6 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
     }
 
     /// Does nothing.
-    #[inline]
     fn update_peer(&mut self, _: &PeerStateMachine) {}
 
     /// Calculates new score for every registered `Peer`, sends
@@ -129,7 +126,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
-    /// Tries to add proivded [`RtcStat`]s to the [`QualityMeter`] of the
+    /// Tries to add provided [`RtcStat`]s to the [`QualityMeter`] of the
     /// [`PeerMetric`] with a provided [`PeerId`].
     ///
     /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] not exists.
@@ -159,9 +156,10 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
-    /// Updates [`PeerMetric::last_connection_state`].
+    /// Updates `Peer`s [`PeerConnectionState`], recalculates
+    /// [`ConnectionQualityScore`] for specified `Peer`.
     ///
-    /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] is not exists.
+    /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] not exists.
     #[inline]
     fn update_peer_connection_state(
         &mut self,
@@ -169,7 +167,8 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         connection_state: PeerConnectionState,
     ) {
         if let Some(peer) = self.peers.get(&peer_id) {
-            peer.borrow_mut().last_connection_state = connection_state;
+            peer.borrow_mut().connection_state = connection_state;
+            self.update_quality_score(&mut peer.borrow_mut());
         }
     }
 
@@ -197,8 +196,8 @@ struct PeerMetric {
     /// Last calculated [`ConnectionQualityScore`].
     last_quality_score: ConnectionQualityScore,
 
-    /// Last received [`PeerConnectionState`].
-    last_connection_state: PeerConnectionState,
+    /// Current [`PeerConnectionState`].
+    connection_state: PeerConnectionState,
 }
 
 impl PeerMetric {
@@ -238,38 +237,22 @@ impl PeerMetric {
             .map(|partner_peer| partner_peer.borrow().member_id.clone())
     }
 
-    /// Calculates [`ConnectionQualityScore`] based on the
-    /// [`PeerMetric::last_connection_state`].
-    ///
-    /// Returns `Some(ConnectionQualityScore::Poor)` if
-    /// [`PeerMetric::last_connection_state`] is
-    /// [`PeerConnectionState::Failed`].
-    fn calculate_quality_score_based_on_connection_state(
-        &self,
-    ) -> Option<ConnectionQualityScore> {
-        match self.last_connection_state {
-            PeerConnectionState::Failed => Some(ConnectionQualityScore::Poor),
-            _ => None,
-        }
+    /// Calculates current [`ConnectionQualityScore`] based on the current
+    /// connection state and [`QualityMeter`] estimation.
+    fn calculate(&mut self) -> Option<ConnectionQualityScore> {
+        self.calculate_from_connection_state()
+            .or_else(|| self.quality_meter.calculate())
     }
 
-    /// Calculates [`ConnectionQualityScore`] with [`Peer`]'s and partner
-    /// [`Peer`]'s [`QualityMeter`].
-    fn calculate_quality_score_based_on_rtc_stats(
-        &mut self,
+    /// Calculates [`ConnectionQualityScore`] based on the
+    /// current connection state.
+    fn calculate_from_connection_state(
+        &self,
     ) -> Option<ConnectionQualityScore> {
-        let partner_score = self
-            .partner_peer
-            .upgrade()
-            .and_then(|p| p.borrow_mut().quality_meter.calculate());
-        self.quality_meter
-            .calculate()
-            .and_then(|score| {
-                partner_score
-                    .map(|partner_score| score.min(partner_score))
-                    .or_else(|| Some(score))
-            })
-            .or_else(|| partner_score)
+        match self.connection_state {
+            PeerConnectionState::Connected => None,
+            _ => Some(ConnectionQualityScore::Poor),
+        }
     }
 }
 
@@ -542,6 +525,13 @@ struct PacketsSent(u64);
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt as _;
+    use medea_client_api_proto::stats::{
+        Float, HighResTimeStamp, RtcInboundRtpStreamMediaType,
+    };
+
+    use crate::media::{peer::MockPeerUpdatesSubscriber, Peer};
+
     use super::*;
 
     const STATS_TTL: Duration = Duration::from_secs(5);
@@ -747,5 +737,131 @@ mod tests {
 
         assert_eq!(meter.packets_sent.len(), 0);
         assert_eq!(meter.packets_lost.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn connection_state() {
+        let mut stats_handler = QualityMeterStatsHandler::new();
+        let metrics_events = stats_handler.subscribe();
+        let member_id = MemberId::from("member-1");
+        let partner_member_id = MemberId::from("member-1");
+
+        let peer1: PeerStateMachine = Peer::new(
+            PeerId(0),
+            member_id.clone(),
+            PeerId(1),
+            partner_member_id.clone(),
+            false,
+            Rc::new(MockPeerUpdatesSubscriber::new()),
+        )
+        .into();
+        let peer2: PeerStateMachine = Peer::new(
+            PeerId(1),
+            partner_member_id.clone(),
+            PeerId(0),
+            member_id.clone(),
+            false,
+            Rc::new(MockPeerUpdatesSubscriber::new()),
+        )
+        .into();
+
+        stats_handler.register_peer(&peer1);
+        stats_handler.register_peer(&peer2);
+        stats_handler.add_stats(
+            PeerId(1),
+            &[RtcStat {
+                id: StatId::from("InboundRtp"),
+                timestamp: HighResTimeStamp(0.),
+                stats: RtcStatsType::InboundRtp(Box::new(
+                    RtcInboundRtpStreamStats {
+                        track_id: None,
+                        media_specific_stats:
+                            RtcInboundRtpStreamMediaType::Audio {
+                                voice_activity_flag: None,
+                                total_samples_received: None,
+                                concealed_samples: None,
+                                silent_concealed_samples: None,
+                                audio_level: None,
+                                total_audio_energy: None,
+                                total_samples_duration: None,
+                            },
+                        bytes_received: 0,
+                        packets_received: 100,
+                        packets_lost: Some(0),
+                        jitter: None,
+                        total_decode_time: None,
+                        jitter_buffer_emitted_count: None,
+                    },
+                )),
+            }],
+        );
+        stats_handler.add_stats(
+            PeerId(0),
+            &[RtcStat {
+                id: StatId::from("RemoteInboundRtp"),
+                timestamp: HighResTimeStamp(0.),
+                stats: RtcStatsType::RemoteInboundRtp(Box::new(
+                    RtcRemoteInboundRtpStreamStats {
+                        local_id: None,
+                        jitter: Some(Float(0.01)),
+                        round_trip_time: Some(Float(0.01)),
+                        fraction_lost: None,
+                        reports_received: None,
+                        round_trip_time_measurements: None,
+                    },
+                )),
+            }],
+        );
+        stats_handler.check();
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Connecting,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Connecting,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Disconnected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Disconnected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Failed,
+        );
+        drop(stats_handler);
+
+        let high = PeersMetricsEvent::QualityMeterUpdate {
+            member_id: partner_member_id.clone(),
+            partner_member_id: member_id.clone(),
+            quality_score: ConnectionQualityScore::High,
+        };
+        let poor = PeersMetricsEvent::QualityMeterUpdate {
+            member_id: partner_member_id,
+            partner_member_id: member_id,
+            quality_score: ConnectionQualityScore::Poor,
+        };
+        let events: Vec<_> = metrics_events.collect().await;
+        assert_eq!(events, &[high.clone(), poor.clone(), high, poor]);
     }
 }

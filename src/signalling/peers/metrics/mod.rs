@@ -9,8 +9,8 @@
 //!
 //! Stores [`RtcStatsHandler`]s implementors.
 
+mod connection_failure_detector;
 mod flowing_detector;
-mod ice_restart_detector;
 mod quality_meter;
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
@@ -34,8 +34,8 @@ use crate::{
     media::PeerStateMachine,
     signalling::peers::{
         metrics::{
+            connection_failure_detector::ConnectionFailureDetector,
             flowing_detector::TrafficFlowDetector,
-            ice_restart_detector::IceRestartDetector,
             quality_meter::QualityMeterStatsHandler,
         },
         PeerTrafficWatcher,
@@ -44,7 +44,7 @@ use crate::{
 
 /// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
 #[dispatchable]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PeersMetricsEvent {
     /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
     NoTrafficFlow {
@@ -155,7 +155,7 @@ impl PeerMetricsService {
                 stats_ttl,
             )),
             Box::new(QualityMeterStatsHandler::new()),
-            Box::new(IceRestartDetector::new()),
+            Box::new(ConnectionFailureDetector::new()),
         ];
 
         Self { event_tx, handlers }

@@ -43,7 +43,7 @@ mod peer_state {
 
     impl PeerState {
         /// Returns new [`PeerState`] pair for the provided [`PeerId`]s.
-        pub fn new_pair(
+        pub(super) fn new_pair(
             first_peer_id: PeerId,
             second_peer_id: PeerId,
         ) -> (Self, Self) {
@@ -63,22 +63,22 @@ mod peer_state {
         }
 
         /// Returns [`PeerId`] of this [`PeerState`].
-        pub fn id(&self) -> PeerId {
+        pub(super) fn id(&self) -> PeerId {
             self.0.borrow().id
         }
 
         /// Returns partner [`PeerState`].
-        pub fn partner_peer(&self) -> Self {
+        pub(super) fn partner_peer(&self) -> Self {
             Self(self.0.borrow().partner_peer.upgrade().unwrap())
         }
 
         /// Returns current [`PeerConnectionState`] from this [`PeerState`].
-        pub fn connection_state(&self) -> PeerConnectionState {
+        pub(super) fn state(&self) -> PeerConnectionState {
             self.0.borrow().connection_state
         }
 
-        /// Updates [`PeerConnectionState`] of this [`PeerState`].
-        pub fn update_connection_state(&self, new_state: PeerConnectionState) {
+        /// Sets [`PeerConnectionState`] of this [`PeerState`].
+        pub(super) fn set_state(&self, new_state: PeerConnectionState) {
             self.0.borrow_mut().connection_state = new_state;
         }
     }
@@ -87,25 +87,25 @@ mod peer_state {
 /// [`RtcStatsHandler`] responsible for the detecting ICE connection fails and
 /// sending [`PeerMetricEvent::IceRestartNeeded`].
 #[derive(Debug)]
-pub struct IceRestartDetector {
-    /// All [`PeerState`]s registered in this [`IceRestartDetector`].
+pub struct ConnectionFailureDetector {
+    /// All [`PeerState`]s registered in this [`ConnectionFailureDetector`].
     peers: HashMap<PeerId, PeerState>,
 
     /// [`PeerMetricsEvent`]s sender.
     event_tx: EventSender,
 }
 
-impl IceRestartDetector {
-    /// Returns new [`IceRestartDetector`].
-    pub fn new() -> Self {
-        IceRestartDetector {
+impl ConnectionFailureDetector {
+    /// Returns new [`ConnectionFailureDetector`].
+    pub(super) fn new() -> Self {
+        ConnectionFailureDetector {
             peers: HashMap::new(),
             event_tx: EventSender::new(),
         }
     }
 }
 
-impl RtcStatsHandler for IceRestartDetector {
+impl RtcStatsHandler for ConnectionFailureDetector {
     /// Creates [`PeerState`] pair for the provided [`PeerStateMachine`] and
     /// it's partner [`PeerStateMachine`].
     ///
@@ -157,23 +157,14 @@ impl RtcStatsHandler for IceRestartDetector {
         peer_id: PeerId,
         new_state: PeerConnectionState,
     ) {
-        debug!(
-            "Receiver Peer [id = {}] connection state update: {:?}",
-            peer_id, new_state
-        );
+        use PeerConnectionState::{
+            Connected, Connecting, Disconnected, Failed,
+        };
         if let Some(peer) = self.peers.get(&peer_id) {
-            if let PeerConnectionState::Failed = new_state {
-                let old_state = peer.connection_state();
-                match old_state {
-                    PeerConnectionState::Connected
-                    | PeerConnectionState::Disconnected => {
-                        let partner_state =
-                            peer.partner_peer().connection_state();
-                        if let PeerConnectionState::Failed = partner_state {
-                            debug!(
-                                "Sending ICE restart for the Peer [id = {}].",
-                                peer_id
-                            );
+            if let Failed = new_state {
+                match peer.state() {
+                    Connecting | Connected | Disconnected => {
+                        if let Failed = peer.partner_peer().state() {
                             self.event_tx.send_event(
                                 PeersMetricsEvent::PeerConnectionFailed {
                                     peer_id,
@@ -184,7 +175,7 @@ impl RtcStatsHandler for IceRestartDetector {
                     _ => (),
                 }
             }
-            peer.update_connection_state(new_state);
+            peer.set_state(new_state);
         } else {
             warn!("Peer [id = {}] not found.", peer_id);
         }
