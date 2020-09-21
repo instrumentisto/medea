@@ -19,7 +19,7 @@ use clap::{
 use slog::{o, Drain};
 use slog_scope::GlobalLoggerGuard;
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() {
     dotenv::dotenv().ok();
 

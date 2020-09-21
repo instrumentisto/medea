@@ -1,6 +1,9 @@
 //! Implementation of the [`RpcServer`] and related [`Command`]s and functions.
 
-use actix::{ActorFuture, Addr, ContextFutureSpawner as _, Handler};
+use actix::{
+    fut::{self, Either},
+    ActorFuture, Addr, ContextFutureSpawner as _, Handler, WrapFuture,
+};
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
@@ -19,7 +22,6 @@ use crate::{
     log::prelude::*,
     media::PeerStateMachine,
     signalling::room::RoomError,
-    utils::ResponseActAnyFuture,
 };
 
 use super::{ActFuture, Room};
@@ -143,7 +145,7 @@ impl Handler<Authorize> for Room {
 }
 
 impl Handler<CommandMessage> for Room {
-    type Result = ResponseActAnyFuture<Self, ()>;
+    type Result = ActFuture<()>;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
     /// handlers. Will emit `CloseRoom` on any error.
@@ -152,7 +154,7 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let fut = match self.validate_command(&msg) {
+        match self.validate_command(&msg) {
             Ok(_) => {
                 if let Err(err) = msg.command.dispatch_with(self) {
                     error!(
@@ -162,7 +164,7 @@ impl Handler<CommandMessage> for Room {
                     );
                     self.close_gracefully(ctx)
                 } else {
-                    Box::new(actix::fut::ready(()))
+                    Box::pin(fut::ready(()))
                 }
             }
             Err(err) => {
@@ -171,10 +173,9 @@ impl Handler<CommandMessage> for Room {
                      cause: {}",
                     msg.member_id, err
                 );
-                Box::new(actix::fut::ready(()))
+                Box::pin(fut::ready(()))
             }
-        };
-        ResponseActAnyFuture(fut)
+        }
     }
 }
 
@@ -197,28 +198,29 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.member_id
         );
 
-        let fut = self
-            .members
-            .connection_established(ctx, msg.member_id, msg.connection)
-            .then(|res, room, _| {
-                let member = actix_try!(res);
-                Box::new(
-                    room.init_member_connections(&member)
-                        .map(|res, _, _| res.map(|_| member)),
-                )
-            })
-            .map(|result, room, _| {
-                let member = result?;
-                if let Some(callback_url) = member.get_on_join() {
-                    room.callbacks.send_callback(
-                        callback_url,
-                        member.get_fid().into(),
-                        OnJoinEvent,
-                    );
-                };
-                Ok(())
-            });
-        Box::new(fut)
+        Box::pin(
+            self.members
+                .connection_established(ctx, msg.member_id, msg.connection)
+                .into_actor(self)
+                .then(|res, room, _| match res {
+                    Ok(member) => Either::Left(
+                        room.init_member_connections(&member)
+                            .map(|res, _, _| res.map(|_| member)),
+                    ),
+                    Err(err) => Either::Right(fut::err(err.into())),
+                })
+                .map(|result, room, _| {
+                    let member = result?;
+                    if let Some(callback_url) = member.get_on_join() {
+                        room.callbacks.send_callback(
+                            callback_url,
+                            member.get_fid().into(),
+                            OnJoinEvent,
+                        );
+                    };
+                    Ok(())
+                }),
+        )
     }
 }
 
