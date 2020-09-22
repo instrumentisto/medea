@@ -210,30 +210,30 @@ pub enum PeerMetrics {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub enum IceConnectionState {
-    /// The ICE agent is gathering addresses or is waiting to be given remote
+    /// ICE agent is gathering addresses or is waiting to be given remote
     /// candidates.
     New,
 
-    /// The ICE agent has been given one or more remote candidates and is
-    /// checking pairs of local and remote candidates against one another to
-    /// try to find a compatible match, but has not yet found a pair which will
-    /// allow the peer connection to be made. It's possible that gathering of
-    /// candidates is also still underway.
+    /// ICE agent has been given one or more remote candidates and is checking
+    /// pairs of local and remote candidates against one another to try to find
+    /// a compatible match, but hasn't yet found a pair which will allow the
+    /// `PeerConnection` to be made. It's possible that gathering of candidates
+    /// is also still underway.
     Checking,
 
-    /// A usable pairing of local and remote candidates has been found for all
+    /// Usable pairing of local and remote candidates has been found for all
     /// components of the connection, and the connection has been established.
     /// It's possible that gathering is still underway, and it's also possible
     /// that the ICE agent is still checking candidates against one another
     /// looking for a better connection to use.
     Connected,
 
-    /// The ICE agent has finished gathering candidates, has checked all pairs
+    /// ICE agent has finished gathering candidates, has checked all pairs
     /// against one another, and has found a connection for all components.
     Completed,
 
-    /// The ICE candidate has checked all candidates pairs against one another
-    /// and has failed to find compatible matches for all components of the
+    /// ICE candidate has checked all candidates pairs against one another and
+    /// has failed to find compatible matches for all components of the
     /// connection. It is, however, possible that the ICE agent did find
     /// compatible connections for some components.
     Failed,
@@ -246,7 +246,7 @@ pub enum IceConnectionState {
     /// return to the [`IceConnectionState::Connected`] state.
     Disconnected,
 
-    /// The ICE agent for this `PeerConnection` has shut down and is no longer
+    /// ICE agent for this `PeerConnection` has shut down and is no longer
     /// handling requests.
     Closed,
 }

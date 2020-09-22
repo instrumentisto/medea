@@ -649,29 +649,28 @@ impl<T> Peer<T> {
         self.dedup_track_patches();
     }
 
-    /// Dedups [`TrackChange::IceRestart`]s.
+    /// Dedupes [`TrackChange::IceRestart`]s.
     fn dedup_ice_restarts(&mut self) {
         let pending_track_updates = &mut self.context.pending_track_updates;
         let last_ice_restart_rev_index = pending_track_updates
             .iter()
             .rev()
             .position(|item| matches!(item, TrackChange::IceRestart));
-        if let Some(last_ice_restart_rev_index) = last_ice_restart_rev_index {
-            let last_ice_restart_index =
-                pending_track_updates.len() - 1 - last_ice_restart_rev_index;
+        if let Some(idx) = last_ice_restart_rev_index {
+            let last_ice_restart_index = pending_track_updates.len() - 1 - idx;
             pending_track_updates.retain({
                 let mut i = 0;
                 move |item| {
                     let is_last_ice_restart = i == last_ice_restart_index;
                     i += 1;
-                    !matches!(item, TrackChange::IceRestart)
-                        || is_last_ice_restart
+                    is_last_ice_restart
+                        || !matches!(item, TrackChange::IceRestart)
                 }
             });
         }
     }
 
-    /// Dedups [`TrackChange`]s from this [`Peer`].
+    /// Dedupes [`TrackChange`]s from this [`Peer`].
     fn dedup_track_patches(&mut self) {
         let mut grouped_patches: HashMap<TrackId, TrackPatchEvent> =
             HashMap::new();
@@ -956,6 +955,7 @@ impl<'a> PeerChangesScheduler<'a> {
     }
 
     /// Schedules [`TrackChange::IceRestart`].
+    #[inline]
     pub fn restart_ice(&mut self) {
         self.schedule_change(TrackChange::IceRestart);
     }

@@ -63,21 +63,25 @@ mod peer_state {
         }
 
         /// Returns [`PeerId`] of this [`PeerState`].
+        #[inline]
         pub(super) fn id(&self) -> PeerId {
             self.0.borrow().id
         }
 
         /// Returns partner [`PeerState`].
+        #[inline]
         pub(super) fn partner_peer(&self) -> Self {
             Self(self.0.borrow().partner_peer.upgrade().unwrap())
         }
 
         /// Returns current [`PeerConnectionState`] from this [`PeerState`].
+        #[inline]
         pub(super) fn state(&self) -> PeerConnectionState {
             self.0.borrow().connection_state
         }
 
         /// Sets [`PeerConnectionState`] of this [`PeerState`].
+        #[inline]
         pub(super) fn set_state(&self, new_state: PeerConnectionState) {
             self.0.borrow_mut().connection_state = new_state;
         }
@@ -157,14 +161,13 @@ impl RtcStatsHandler for ConnectionFailureDetector {
         peer_id: PeerId,
         new_state: PeerConnectionState,
     ) {
-        use PeerConnectionState::{
-            Connected, Connecting, Disconnected, Failed,
-        };
+        use PeerConnectionState as S;
+
         if let Some(peer) = self.peers.get(&peer_id) {
-            if let Failed = new_state {
+            if let S::Failed = new_state {
                 match peer.state() {
-                    Connecting | Connected | Disconnected => {
-                        if let Failed = peer.partner_peer().state() {
+                    S::Connecting | S::Connected | S::Disconnected => {
+                        if let S::Failed = peer.partner_peer().state() {
                             self.event_tx.send_event(
                                 PeersMetricsEvent::PeerConnectionFailed {
                                     peer_id,
@@ -181,6 +184,7 @@ impl RtcStatsHandler for ConnectionFailureDetector {
         }
     }
 
+    #[inline]
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
     }
