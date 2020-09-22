@@ -686,13 +686,13 @@ impl PeerConnection {
 
             let used_caps = MediaStreamSettings::from(&required_caps);
 
-            let (media_stream, is_new_stream) = self
+            let (media_tracks, is_new_stream) = self
                 .media_manager
-                .get_stream(used_caps)
+                .get_tracks(used_caps)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
             let peer_stream = required_caps
-                .parse_stream(media_stream.clone())
+                .parse_stream(media_tracks.clone())
                 .map_err(tracerr::map_from_and_wrap!())?;
             self.media_connections
                 .insert_local_stream(&peer_stream)
@@ -700,7 +700,7 @@ impl PeerConnection {
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             if is_new_stream {
-                for track in media_stream {
+                for track in media_tracks {
                     let _ = self.peer_events_sender.unbounded_send(
                         PeerEvent::NewLocalTrack {
                             peer_id: self.id,

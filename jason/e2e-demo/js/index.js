@@ -390,7 +390,6 @@ async function startPublishing() {
 async function updateLocalVideo(stream) {
   for (const track of stream) {
     if (track.kind() == 'audio') {
-      // track.free();
       continue;
     }
     let mediaStream = new MediaStream();

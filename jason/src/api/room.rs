@@ -627,6 +627,8 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
+    /// Callback to be inboked when new local [`MediaStreamTrack`] will be
+    /// added to this [`Room`].
     on_local_track: Callback1<MediaStreamTrack>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
@@ -1072,9 +1074,9 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_local_track(
         &self,
         _: PeerId,
-        stream: MediaStreamTrack,
+        track: MediaStreamTrack,
     ) -> Self::Output {
-        self.on_local_track.call(stream);
+        self.on_local_track.call(track);
         Ok(())
     }
 

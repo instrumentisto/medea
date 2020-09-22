@@ -269,7 +269,7 @@ async fn get_video_track() -> MediaStreamTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
+    let (stream, _) = manager.get_tracks(settings).await.unwrap();
     stream.into_iter().next().unwrap()
 }
 
@@ -277,7 +277,7 @@ async fn get_audio_track() -> MediaStreamTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
+    let (stream, _) = manager.get_tracks(settings).await.unwrap();
     stream.into_iter().next().unwrap()
 }
 

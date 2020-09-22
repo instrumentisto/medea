@@ -13,7 +13,7 @@ async fn track_autostop() {
     let mut caps = MediaStreamSettings::new();
     caps.device_video(DeviceVideoTrackConstraints::new());
 
-    let (stream, is_new) = media_manager.get_stream(caps).await.unwrap();
+    let (stream, is_new) = media_manager.get_tracks(caps).await.unwrap();
     assert!(is_new);
 
     let mut tracks = stream;

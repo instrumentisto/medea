@@ -5,15 +5,15 @@
 use std::rc::{Rc, Weak};
 
 use derive_more::{AsRef, Display};
+use futures::StreamExt;
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
 use crate::{utils::Callback0, MediaStreamSettings};
-use futures::StreamExt;
-use wasm_bindgen_futures::spawn_local;
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -103,7 +103,10 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
+    /// Callback to be invoked when this [`MediaStreamTrack`] will be enabled.
     on_enabled: Callback0,
+
+    /// Callback to be invoked when this [`MediaStreamTrack`] will be disabled.
     on_disabled: Callback0,
 
     /// [enabled] property of [MediaStreamTrack][1].
@@ -260,12 +263,7 @@ impl Drop for MediaStreamTrack {
     #[inline]
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
-        log::debug!(
-            "Trying to drop. Count of refs: {}",
-            Rc::strong_count(&self.0)
-        );
         if Rc::strong_count(&self.0) == 1 {
-            log::debug!("Dropped MediaStreamTrack");
             self.0.track.stop();
         }
     }

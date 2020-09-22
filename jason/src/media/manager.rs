@@ -144,7 +144,7 @@ impl InnerMediaManager {
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    async fn get_stream(
+    async fn get_tracks(
         &self,
         mut caps: MediaStreamSettings,
     ) -> Result<(Vec<MediaStreamTrack>, bool)> {
@@ -332,11 +332,11 @@ impl MediaManager {
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    pub async fn get_stream<I: Into<MediaStreamSettings>>(
+    pub async fn get_tracks<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
     ) -> Result<(Vec<MediaStreamTrack>, bool)> {
-        self.0.get_stream(caps.into()).await
+        self.0.get_tracks(caps.into()).await
     }
 
     /// Instantiates new [`MediaManagerHandle`] for use on JS side.
@@ -392,7 +392,7 @@ impl MediaManagerHandle {
         let caps = caps.clone();
         future_to_promise(async move {
             inner?
-                .get_stream(caps)
+                .get_tracks(caps)
                 .await
                 .map(|(tracks, _)| {
                     let arr = js_sys::Array::new();

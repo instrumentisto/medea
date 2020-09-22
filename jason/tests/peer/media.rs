@@ -43,7 +43,7 @@ async fn get_test_media_connections(
     let request = media_connections.get_stream_request().unwrap();
     let caps = SimpleStreamRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
-    let (stream, _) = manager.get_stream(&caps).await.unwrap();
+    let (stream, _) = manager.get_tracks(&caps).await.unwrap();
 
     media_connections
         .insert_local_stream(&caps.parse_stream(stream).unwrap())
