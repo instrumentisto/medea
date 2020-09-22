@@ -390,6 +390,7 @@ async function startPublishing() {
 async function updateLocalVideo(stream) {
   for (const track of stream) {
     if (track.kind() == 'audio') {
+      // track.free();
       continue;
     }
     let mediaStream = new MediaStream();
@@ -415,6 +416,7 @@ async function updateLocalVideo(stream) {
       }
       deviceVideoEl.srcObject = mediaStream;
     }
+    // track.free();
   }
 }
 
@@ -446,7 +448,7 @@ window.onload = async function() {
   Object.values(controlDebugWindows).forEach(s => s());
 
   let isCallStarted = false;
-  let localStream = null;
+  let localStream = [];
   let isAudioSendMuted = false;
   let isVideoSendMuted = false;
   let isAudioRecvMuted = false;
@@ -672,7 +674,8 @@ window.onload = async function() {
     // });
     room.on_local_track((track) => {
       console.log("New local track");
-      updateLocalVideo(track);
+      updateLocalVideo([track]);
+      track.free();
     })
 
     room.on_failed_local_stream((error) => {
@@ -731,8 +734,8 @@ window.onload = async function() {
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0 ){
-          localStream.free();
+        for (const track of localStream) {
+          track.free();
         }
         if (!isAudioSendMuted) {
           constraints = await initLocalStream();
@@ -746,8 +749,9 @@ window.onload = async function() {
     videoSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0 ){
-          localStream.free();
+        for (const track of localStream) {
+          console.log("Freeing MediaTrack");
+          track.free();
         }
         if (!isVideoSendMuted) {
           constraints = await initLocalStream();

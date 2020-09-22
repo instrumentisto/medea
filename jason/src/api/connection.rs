@@ -106,8 +106,6 @@ struct InnerConnection {
 
     on_track_added: Callback1<MediaStreamTrackHandle>,
 
-    tracks: RefCell<Vec<MediaStreamTrack>>,
-
     /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
     /// be updated.
     on_quality_score_update: Callback1<u8>,
@@ -160,7 +158,6 @@ impl Connection {
             on_quality_score_update: Callback1::default(),
             on_close: Callback0::default(),
             on_track_added: Callback1::default(),
-            tracks: RefCell::new(Vec::new()),
         }))
     }
 
@@ -170,7 +167,6 @@ impl Connection {
     /// If this is the first track added to this [`Connection`], then a new
     /// [`PeerMediaStream`] is built and sent to `on_remote_stream` callback.
     pub fn add_remote_track(&self, track_id: TrackId, track: MediaStreamTrack) {
-        self.0.tracks.borrow_mut().push(track.clone());
         self.0.on_track_added.call(track.new_handle());
     }
 

@@ -186,20 +186,20 @@ impl MediaStreamTrack {
         self.0.track.set_enabled(enabled);
     }
 
-    pub fn new_handle(&self) -> MediaStreamTrackHandle {
-        MediaStreamTrackHandle(Rc::clone(&self.0))
+    pub fn new_handle(self) -> MediaStreamTrackHandle {
+        MediaStreamTrackHandle(self)
     }
 }
 
 // TODO: use Weak
 #[wasm_bindgen]
-pub struct MediaStreamTrackHandle(Rc<InnerMediaStreamTrack>);
+pub struct MediaStreamTrackHandle(MediaStreamTrack);
 
 #[wasm_bindgen]
 impl MediaStreamTrackHandle {
     pub fn get_track(&self) -> SysMediaStreamTrack {
         // if let Some(this) = self.0.upgrade() {
-        self.0.track.clone()
+        self.0.0.track.clone()
         // } else {
         //     todo!()
         // }
@@ -210,7 +210,7 @@ impl MediaStreamTrackHandle {
         callback: js_sys::Function,
     ) -> Result<(), JsValue> {
         // upgrade_or_detached!(self.0).map(|inner| {
-        self.0.on_enabled.set_func(callback);
+        self.0.0.on_enabled.set_func(callback);
         Ok(())
         // })
     }
@@ -220,17 +220,17 @@ impl MediaStreamTrackHandle {
         callback: js_sys::Function,
     ) -> Result<(), JsValue> {
         // upgrade_or_detached!(self.0).map(|inner| {
-        self.0.on_disabled.set_func(callback);
+        self.0.0.on_disabled.set_func(callback);
         Ok(())
         // })
     }
 
     pub fn kind(&self) -> String {
-        MediaStreamTrack(self.0.clone()).kind().to_string()
+        self.0.kind().to_string()
     }
 
     pub fn is_display(&self) -> bool {
-        self.0.is_display
+        self.0.0.is_display
     }
 }
 
@@ -288,6 +288,7 @@ impl Drop for MediaStreamTrack {
     #[inline]
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
+        log::debug!("MediaStreamTrack refs count: {}", Rc::strong_count(&self.0));
         if Rc::strong_count(&self.0) == 1 {
             self.0.track.stop();
         }

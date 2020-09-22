@@ -579,6 +579,8 @@ impl MediaConnections {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaStream
                 ));
+            } else {
+                sender.free_track();
             }
         }
 

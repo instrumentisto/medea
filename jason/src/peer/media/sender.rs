@@ -180,6 +180,10 @@ impl Sender {
         Ok(())
     }
 
+    pub(super) fn free_track(&self) {
+        self.track.borrow_mut().take();
+    }
+
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
     pub fn update(&self, track: &TrackPatchEvent) {
