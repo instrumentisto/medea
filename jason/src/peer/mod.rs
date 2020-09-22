@@ -689,7 +689,6 @@ impl PeerConnection {
                 .parse_stream(media_stream.clone())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-
             self.media_connections
                 .insert_local_stream(&peer_stream)
                 .await

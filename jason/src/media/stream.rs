@@ -135,8 +135,8 @@ pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
     pub fn new<T>(track: T, is_display: bool) -> Self
-        where
-            SysMediaStreamTrack: From<T>,
+    where
+        SysMediaStreamTrack: From<T>,
     {
         let track = SysMediaStreamTrack::from(track);
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
@@ -153,7 +153,7 @@ impl MediaStreamTrack {
             let weak_inner = Rc::downgrade(&track.0);
             async move {
                 while let Some(enabled) =
-                track_enabled_state_changes.next().await
+                    track_enabled_state_changes.next().await
                 {
                     if let Some(track) = weak_inner.upgrade() {
                         if enabled {

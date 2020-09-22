@@ -394,14 +394,28 @@ async function updateLocalVideo(stream) {
     }
     let mediaStream = new MediaStream();
     mediaStream.addTrack(track.get_track());
-    let videoEl = document.createElement('video');
-    videoEl.srcObject = mediaStream;
-    videoEl.width = 200;
-    localVideo.appendChild(videoEl);
-    await videoEl.play();
+    if (track.is_display()) {
+      let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
+      if (displayVideoEl === undefined) {
+        displayVideoEl = document.createElement('video');
+        displayVideoEl.className = 'local-display-video';
+        displayVideoEl.width = 200;
+        displayVideoEl.autoplay = 'true';
+        localVideo.appendChild(displayVideoEl);
+      }
+      displayVideoEl.srcObject = mediaStream;
+    } else {
+      let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
+      if (deviceVideoEl === undefined) {
+        deviceVideoEl = document.createElement('video');
+        deviceVideoEl.className = 'local-device-video';
+        deviceVideoEl.width = 200;
+        deviceVideoEl.autoplay = 'true';
+        localVideo.appendChild(deviceVideoEl);
+      }
+      deviceVideoEl.srcObject = mediaStream;
+    }
   }
-  // localVideo.srcObject = stream.get_media_stream();
-  // await localVideo.play();
 }
 
 window.onload = async function() {
@@ -740,7 +754,7 @@ window.onload = async function() {
         }
         await room.set_local_media_settings(constraints);
       } catch (e) {
-        console.error("Changing video source failed: " + e.message());
+        console.error("Changing video source failed: " + e);
       }
     });
 
