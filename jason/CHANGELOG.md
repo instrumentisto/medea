@@ -72,7 +72,7 @@ All user visible changes to this project will be documented in this file. This p
         - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
-        - `TracksApplied` ([#105]);
+        - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
         - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:
@@ -104,6 +104,7 @@ All user visible changes to this project will be documented in this file. This p
 [#127]: /../../pull/127
 [#132]: /../../pull/132
 [#137]: /../../pull/137
+[#138]: /../../pull/138
 
 
 

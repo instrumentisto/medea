@@ -298,7 +298,7 @@ mod specs {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
             assert_eq!(endpoint_id, String::from("endpoint_id").into());
             let (member_id, room_uri) = member_uri.take_member_id();
-            assert_eq!(member_id, MemberId("room_element_id".to_string()));
+            assert_eq!(member_id, MemberId::from("room_element_id"));
             let room_id = room_uri.take_room_id();
             assert_eq!(room_id, RoomId::from("room_id"));
         } else {

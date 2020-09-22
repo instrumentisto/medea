@@ -28,10 +28,10 @@ members = [
 lto = "thin"
 
 [dependencies]
-actix = "0.9"
-actix-http = "1.0"
-actix-web = "2.0"
-actix-web-actors = "2.0"
+actix = "0.10"
+actix-http = "2.0"
+actix-web = "3.0"
+actix-web-actors = "3.0"
 async-trait = "0.1"
 bytes = "0.5"
 chrono = "0.4"
@@ -74,13 +74,13 @@ url = "2.1"
     features = ["tokio-comp"]
 
 [dev-dependencies]
-# TODO: Upgrade this dependency when `awc` 2.0 will be released.
-actix-codec = "0.2"
-actix-rt = "1.0"
-awc = "1.0"
+actix-codec = "0.3"
+actix-rt = "1.1"
+awc = "2.0"
 derive_builder = "0.9"
 function_name = "0.2"
 lazy_static = "1.4"
 mockall = "0.8"
 serial_test = "0.5"
 tempfile = "3.1"
+tokio = { version = "0.2", features = ["macros", "rt-threaded"] }

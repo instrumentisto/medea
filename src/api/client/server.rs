@@ -2,7 +2,7 @@
 
 use std::io;
 
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Addr, Handler, ResponseFuture};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -26,7 +26,6 @@ use crate::{
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
-    utils::ResponseAnyFuture,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -49,7 +48,7 @@ async fn ws_index(
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> Result<HttpResponse, actix_web::Error> {
+) -> actix_web::Result<HttpResponse> {
     debug!("Request params: {:?}", info);
     let RequestParams {
         room_id,
@@ -64,7 +63,8 @@ async fn ws_index(
                     member_id: member_id.clone(),
                     credentials,
                 })
-                .await?;
+                .await
+                .map_err(|_| HttpResponse::InternalServerError())?;
             match auth_result {
                 Ok(settings) => ws::start(
                     WsSession::new(
@@ -78,14 +78,14 @@ async fn ws_index(
                     payload,
                 ),
                 Err(AuthorizationError::MemberNotExists) => {
-                    Ok(HttpResponse::NotFound().into())
+                    Err(HttpResponse::NotFound().into())
                 }
                 Err(AuthorizationError::InvalidCredentials) => {
-                    Ok(HttpResponse::Forbidden().into())
+                    Err(HttpResponse::Forbidden().into())
                 }
             }
         }
-        None => Ok(HttpResponse::NotFound().into()),
+        None => Err(HttpResponse::NotFound().into()),
     }
 }
 
@@ -147,7 +147,7 @@ impl Actor for Server {
 }
 
 impl Handler<ShutdownGracefully> for Server {
-    type Result = ResponseAnyFuture<()>;
+    type Result = ResponseFuture<()>;
 
     fn handle(
         &mut self,
@@ -155,7 +155,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: &mut Self::Context,
     ) -> Self::Result {
         info!("Server received ShutdownGracefully message so shutting down");
-        ResponseAnyFuture(self.0.stop(true).boxed_local())
+        self.0.stop(true).boxed_local()
     }
 }
 

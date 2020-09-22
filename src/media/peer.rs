@@ -359,6 +359,9 @@ pub enum TrackChange {
     /// Changes to some [`MediaTrack`] made by this [`Peer`]s partner [`Peer`],
     /// that remote [`Peer`] is not aware of.
     PartnerTrackPatch(TrackPatchEvent),
+
+    /// ICE restart request.
+    IceRestart,
 }
 
 impl TrackChange {
@@ -369,7 +372,7 @@ impl TrackChange {
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
         match self.as_track_update(partner_member_id) {
             TrackUpdate::Added(track) => Some(track),
-            TrackUpdate::Updated(_) => None,
+            TrackUpdate::Updated(_) | TrackUpdate::IceRestart => None,
         }
     }
 
@@ -396,13 +399,16 @@ impl TrackChange {
             | Self::PartnerTrackPatch(track_patch) => {
                 TrackUpdate::Updated(track_patch.clone())
             }
+            Self::IceRestart => TrackUpdate::IceRestart,
         }
     }
 
     /// Returns `true` if this [`TrackChange`] can be forcibly applied.
     fn can_force_apply(&self) -> bool {
         match self {
-            Self::AddSendTrack(_) | Self::AddRecvTrack(_) => false,
+            Self::AddSendTrack(_)
+            | Self::AddRecvTrack(_)
+            | Self::IceRestart => false,
             Self::TrackPatch(_) | Self::PartnerTrackPatch(_) => true,
         }
     }
@@ -466,6 +472,12 @@ impl<T> TrackChangeHandler for Peer<T> {
         }
 
         TrackChange::TrackPatch(patch)
+    }
+
+    /// Does nothing.
+    #[inline]
+    fn on_ice_restart(&mut self) -> Self::Output {
+        TrackChange::IceRestart
     }
 }
 
@@ -633,6 +645,33 @@ impl<T> Peer<T> {
 
     /// Deduplicates pending [`TrackChange`]s.
     fn dedup_pending_track_updates(&mut self) {
+        self.dedup_ice_restarts();
+        self.dedup_track_patches();
+    }
+
+    /// Dedupes [`TrackChange::IceRestart`]s.
+    fn dedup_ice_restarts(&mut self) {
+        let pending_track_updates = &mut self.context.pending_track_updates;
+        let last_ice_restart_rev_index = pending_track_updates
+            .iter()
+            .rev()
+            .position(|item| matches!(item, TrackChange::IceRestart));
+        if let Some(idx) = last_ice_restart_rev_index {
+            let last_ice_restart_index = pending_track_updates.len() - 1 - idx;
+            pending_track_updates.retain({
+                let mut i = 0;
+                move |item| {
+                    let is_last_ice_restart = i == last_ice_restart_index;
+                    i += 1;
+                    is_last_ice_restart
+                        || !matches!(item, TrackChange::IceRestart)
+                }
+            });
+        }
+    }
+
+    /// Dedupes [`TrackChange`]s from this [`Peer`].
+    fn dedup_track_patches(&mut self) {
         let mut grouped_patches: HashMap<TrackId, TrackPatchEvent> =
             HashMap::new();
         let mut track_changes = Vec::new();
@@ -915,6 +954,12 @@ impl<'a> PeerChangesScheduler<'a> {
         }
     }
 
+    /// Schedules [`TrackChange::IceRestart`].
+    #[inline]
+    pub fn restart_ice(&mut self) {
+        self.schedule_change(TrackChange::IceRestart);
+    }
+
     /// Schedules `send` tracks adding to `self` and `recv` tracks for this
     /// `send` to `partner_peer`.
     ///
@@ -1083,9 +1128,9 @@ pub mod tests {
 
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1115,9 +1160,9 @@ pub mod tests {
 
         let peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1159,9 +1204,9 @@ pub mod tests {
 
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1205,9 +1250,9 @@ pub mod tests {
             .returning(move |_: PeerId| {});
         let mut peer = Peer::new(
             PeerId(0),
-            MemberId("member-1".to_string()),
+            MemberId::from("member-1"),
             PeerId(1),
-            MemberId("member-2".to_string()),
+            MemberId::from("member-2"),
             false,
             Rc::new(negotiation_sub),
         );
@@ -1271,5 +1316,50 @@ pub mod tests {
         assert_eq!(first_track_patch.is_muted_general, None);
 
         assert!(track_patches_after.is_empty());
+    }
+
+    /// Checks that [`TrackChange::IceRestart`] correctly dedups.
+    #[test]
+    fn ice_restart_dedupping_works() {
+        let changes = vec![
+            TrackChange::IceRestart,
+            TrackChange::IceRestart,
+            TrackChange::IceRestart,
+            TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(0),
+                is_muted_individual: None,
+                is_muted_general: None,
+            }),
+            TrackChange::IceRestart,
+            TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(0),
+                is_muted_individual: None,
+                is_muted_general: None,
+            }),
+        ];
+
+        let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+        negotiation_sub
+            .expect_force_update()
+            .returning(move |_: PeerId, _: Vec<TrackUpdate>| {});
+        negotiation_sub
+            .expect_negotiation_needed()
+            .returning(move |_: PeerId| {});
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId::from("member-1"),
+            PeerId(1),
+            MemberId::from("member-2"),
+            false,
+            Rc::new(negotiation_sub),
+        );
+
+        peer.context.pending_track_updates = changes;
+
+        peer.dedup_ice_restarts();
+
+        let deduped_track_updates = peer.context.pending_track_updates;
+        assert_eq!(deduped_track_updates.len(), 3);
+        assert!(matches!(deduped_track_updates[1], TrackChange::IceRestart));
     }
 }

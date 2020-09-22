@@ -13,7 +13,7 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    ConnectionQualityScore, MemberId, PeerId,
+    ConnectionQualityScore, MemberId, PeerConnectionState, PeerId,
 };
 
 use crate::{
@@ -49,9 +49,8 @@ impl QualityMeterStatsHandler {
         let partner_score = peer
             .partner_peer
             .upgrade()
-            .and_then(|p| p.borrow_mut().quality_meter.calculate());
+            .and_then(|p| p.borrow_mut().calculate());
         let score = peer
-            .quality_meter
             .calculate()
             .and_then(|score| {
                 partner_score
@@ -97,7 +96,8 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
             member_id: peer.member_id(),
             partner_peer,
             quality_meter: QualityMeter::new(Duration::from_secs(5)),
-            last_quality_score: ConnectionQualityScore::Low,
+            connection_state: PeerConnectionState::New,
+            last_quality_score: ConnectionQualityScore::Poor,
         }));
         self.peers.insert(peer.id(), peer_metric.clone());
 
@@ -126,7 +126,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
-    /// Tries to add proivded [`RtcStat`]s to the [`QualityMeter`] of the
+    /// Tries to add provided [`RtcStat`]s to the [`QualityMeter`] of the
     /// [`PeerMetric`] with a provided [`PeerId`].
     ///
     /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] not exists.
@@ -156,6 +156,22 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
         }
     }
 
+    /// Updates `Peer`s [`PeerConnectionState`], recalculates
+    /// [`ConnectionQualityScore`] for specified `Peer`.
+    ///
+    /// Does nothing if [`PeerMetric`] with a provided [`PeerId`] not exists.
+    #[inline]
+    fn update_peer_connection_state(
+        &mut self,
+        peer_id: PeerId,
+        connection_state: PeerConnectionState,
+    ) {
+        if let Some(peer) = self.peers.get(&peer_id) {
+            peer.borrow_mut().connection_state = connection_state;
+            self.update_quality_score(&mut peer.borrow_mut());
+        }
+    }
+
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
     }
@@ -179,6 +195,9 @@ struct PeerMetric {
 
     /// Last calculated [`ConnectionQualityScore`].
     last_quality_score: ConnectionQualityScore,
+
+    /// Current [`PeerConnectionState`].
+    connection_state: PeerConnectionState,
 }
 
 impl PeerMetric {
@@ -216,6 +235,24 @@ impl PeerMetric {
         self.partner_peer
             .upgrade()
             .map(|partner_peer| partner_peer.borrow().member_id.clone())
+    }
+
+    /// Calculates current [`ConnectionQualityScore`] based on the current
+    /// connection state and [`QualityMeter`] estimation.
+    fn calculate(&mut self) -> Option<ConnectionQualityScore> {
+        self.calculate_from_connection_state()
+            .or_else(|| self.quality_meter.calculate())
+    }
+
+    /// Calculates [`ConnectionQualityScore`] based on the
+    /// current connection state.
+    fn calculate_from_connection_state(
+        &self,
+    ) -> Option<ConnectionQualityScore> {
+        match self.connection_state {
+            PeerConnectionState::Connected => None,
+            _ => Some(ConnectionQualityScore::Poor),
+        }
     }
 }
 
@@ -488,6 +525,13 @@ struct PacketsSent(u64);
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt as _;
+    use medea_client_api_proto::stats::{
+        Float, HighResTimeStamp, RtcInboundRtpStreamMediaType,
+    };
+
+    use crate::media::{peer::MockPeerUpdatesSubscriber, Peer};
+
     use super::*;
 
     const STATS_TTL: Duration = Duration::from_secs(5);
@@ -693,5 +737,131 @@ mod tests {
 
         assert_eq!(meter.packets_sent.len(), 0);
         assert_eq!(meter.packets_lost.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn connection_state() {
+        let mut stats_handler = QualityMeterStatsHandler::new();
+        let metrics_events = stats_handler.subscribe();
+        let member_id = MemberId::from("member-1");
+        let partner_member_id = MemberId::from("member-1");
+
+        let peer1: PeerStateMachine = Peer::new(
+            PeerId(0),
+            member_id.clone(),
+            PeerId(1),
+            partner_member_id.clone(),
+            false,
+            Rc::new(MockPeerUpdatesSubscriber::new()),
+        )
+        .into();
+        let peer2: PeerStateMachine = Peer::new(
+            PeerId(1),
+            partner_member_id.clone(),
+            PeerId(0),
+            member_id.clone(),
+            false,
+            Rc::new(MockPeerUpdatesSubscriber::new()),
+        )
+        .into();
+
+        stats_handler.register_peer(&peer1);
+        stats_handler.register_peer(&peer2);
+        stats_handler.add_stats(
+            PeerId(1),
+            &[RtcStat {
+                id: StatId::from("InboundRtp"),
+                timestamp: HighResTimeStamp(0.),
+                stats: RtcStatsType::InboundRtp(Box::new(
+                    RtcInboundRtpStreamStats {
+                        track_id: None,
+                        media_specific_stats:
+                            RtcInboundRtpStreamMediaType::Audio {
+                                voice_activity_flag: None,
+                                total_samples_received: None,
+                                concealed_samples: None,
+                                silent_concealed_samples: None,
+                                audio_level: None,
+                                total_audio_energy: None,
+                                total_samples_duration: None,
+                            },
+                        bytes_received: 0,
+                        packets_received: 100,
+                        packets_lost: Some(0),
+                        jitter: None,
+                        total_decode_time: None,
+                        jitter_buffer_emitted_count: None,
+                    },
+                )),
+            }],
+        );
+        stats_handler.add_stats(
+            PeerId(0),
+            &[RtcStat {
+                id: StatId::from("RemoteInboundRtp"),
+                timestamp: HighResTimeStamp(0.),
+                stats: RtcStatsType::RemoteInboundRtp(Box::new(
+                    RtcRemoteInboundRtpStreamStats {
+                        local_id: None,
+                        jitter: Some(Float(0.01)),
+                        round_trip_time: Some(Float(0.01)),
+                        fraction_lost: None,
+                        reports_received: None,
+                        round_trip_time_measurements: None,
+                    },
+                )),
+            }],
+        );
+        stats_handler.check();
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Connecting,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Connecting,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Disconnected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Disconnected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(0),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Connected,
+        );
+        stats_handler.update_peer_connection_state(
+            PeerId(1),
+            PeerConnectionState::Failed,
+        );
+        drop(stats_handler);
+
+        let high = PeersMetricsEvent::QualityMeterUpdate {
+            member_id: partner_member_id.clone(),
+            partner_member_id: member_id.clone(),
+            quality_score: ConnectionQualityScore::High,
+        };
+        let poor = PeersMetricsEvent::QualityMeterUpdate {
+            member_id: partner_member_id,
+            partner_member_id: member_id,
+            quality_score: ConnectionQualityScore::Poor,
+        };
+        let events: Vec<_> = metrics_events.collect().await;
+        assert_eq!(events, &[high.clone(), poor.clone(), high, poor]);
     }
 }
