@@ -123,6 +123,8 @@ impl ConnectionHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
     }
 
+    /// Sets callback, which will be invoked when new [`MediaStreamTrack`] will
+    /// be added to this [`Connection`].
     pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_track_added.set_func(f))

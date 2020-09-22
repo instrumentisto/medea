@@ -288,6 +288,8 @@ impl RoomHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
+    /// Sets callback, which will be invoked when new local [`MediaStreamTrack`]
+    /// will be added to this [`Room`].
     pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_local_track.set_func(f))

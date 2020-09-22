@@ -124,10 +124,55 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
-    pub fn new<T>(track: T) -> Self
-    where
-        SysMediaStreamTrack: From<T>,
-    {
+    /// Returns `true` if this [`MediaStreamTrack`] is enabled.
+    #[inline]
+    pub fn enabled(&self) -> &ObservableCell<bool> {
+        &self.0.enabled
+    }
+
+    /// Sets [`MediaStreamTrack::enabled`] to the provided value.
+    ///
+    /// Updates `enabled` in the underlying [`SysMediaStreamTrack`].
+    #[inline]
+    pub fn set_enabled(&self, enabled: bool) {
+        self.0.enabled.set(enabled);
+        self.0.track.set_enabled(enabled);
+    }
+}
+
+#[wasm_bindgen]
+impl MediaStreamTrack {
+    /// Returns underlying [`SysMediaStreamTrack`] from this
+    /// [`MediaStreamTrack`].
+    pub fn get_track(&self) -> SysMediaStreamTrack {
+        Clone::clone(&self.0.track)
+    }
+
+    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
+    /// be enabled.
+    pub fn on_enabled(&self, callback: js_sys::Function) {
+        self.0.on_enabled.set_func(callback);
+    }
+
+    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
+    /// be enabled.
+    pub fn on_disabled(&self, callback: js_sys::Function) {
+        self.0.on_disabled.set_func(callback);
+    }
+
+    /// Returns [`TrackKind`] of this [`MediaStreamTrack`] converted to
+    /// [`String`].
+    #[wasm_bindgen(js_name = kind)]
+    pub fn js_kind(&self) -> String {
+        self.kind().to_string()
+    }
+}
+
+impl<T> From<T> for MediaStreamTrack
+where
+    SysMediaStreamTrack: From<T>,
+{
+    fn from(track: T) -> Self {
         let track = SysMediaStreamTrack::from(track);
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
             enabled: ObservableCell::new(track.enabled()),
@@ -158,41 +203,6 @@ impl MediaStreamTrack {
         });
 
         track
-    }
-
-    /// Returns `true` if this [`MediaStreamTrack`] is enabled.
-    #[inline]
-    pub fn enabled(&self) -> &ObservableCell<bool> {
-        &self.0.enabled
-    }
-
-    /// Sets [`MediaStreamTrack::enabled`] to the provided value.
-    ///
-    /// Updates `enabled` in the underlying [`SysMediaStreamTrack`].
-    #[inline]
-    pub fn set_enabled(&self, enabled: bool) {
-        self.0.enabled.set(enabled);
-        self.0.track.set_enabled(enabled);
-    }
-}
-
-#[wasm_bindgen]
-impl MediaStreamTrack {
-    pub fn get_track(&self) -> SysMediaStreamTrack {
-        Clone::clone(&self.0.track)
-    }
-
-    pub fn on_enabled(&self, callback: js_sys::Function) {
-        self.0.on_enabled.set_func(callback);
-    }
-
-    pub fn on_disabled(&self, callback: js_sys::Function) {
-        self.0.on_disabled.set_func(callback);
-    }
-
-    #[wasm_bindgen(js_name = kind)]
-    pub fn js_kind(&self) -> String {
-        self.kind().to_string()
     }
 }
 

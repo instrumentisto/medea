@@ -264,7 +264,7 @@ impl InnerMediaManager {
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::new(tr.unwrap()))
+            .map(|tr| MediaStreamTrack::from(tr.unwrap()))
             .inspect(|track| storage.push(track.downgrade()))
             .collect();
 
@@ -308,7 +308,7 @@ impl InnerMediaManager {
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::new(tr.unwrap()))
+            .map(|tr| MediaStreamTrack::from(tr.unwrap()))
             .inspect(|track| storage.push(track.downgrade()))
             .collect();
 
