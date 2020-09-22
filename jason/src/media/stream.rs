@@ -4,14 +4,19 @@
 
 use std::rc::{Rc, Weak};
 
-use derive_more::AsRef;
+use derive_more::{AsRef, Display};
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::MediaStreamSettings;
+use crate::{
+    utils::{Callback0, HandlerDetachedError},
+    MediaStreamSettings,
+};
+use futures::StreamExt;
+use wasm_bindgen_futures::spawn_local;
 
 /// Representation of [MediaStream][1] object. Contains strong references to
 /// [`MediaStreamTrack`].
@@ -101,6 +106,9 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
+    on_enabled: Callback0,
+    on_disabled: Callback0,
+
     /// [enabled] property of [MediaStreamTrack][1].
     ///
     /// [enabled]: https://tinyurl.com/y5byqdea
@@ -118,6 +126,42 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
+    pub fn new<T>(track: T) -> Self
+    where
+        SysMediaStreamTrack: From<T>,
+    {
+        let track = SysMediaStreamTrack::from(track);
+        let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+            enabled: ObservableCell::new(track.enabled()),
+            on_enabled: Callback0::default(),
+            on_disabled: Callback0::default(),
+            track,
+        }));
+
+        let mut track_enabled_state_changes =
+            track.enabled().subscribe().skip(1);
+        spawn_local({
+            let weak_inner = Rc::downgrade(&track.0);
+            async move {
+                while let Some(enabled) =
+                    track_enabled_state_changes.next().await
+                {
+                    if let Some(track) = weak_inner.upgrade() {
+                        if enabled {
+                            track.on_enabled.call();
+                        } else {
+                            track.on_disabled.call();
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
+
+        track
+    }
+
     /// Returns `true` if this [`MediaStreamTrack`] is enabled.
     #[inline]
     pub fn enabled(&self) -> &ObservableCell<bool> {
@@ -132,32 +176,46 @@ impl MediaStreamTrack {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
     }
+
+    pub fn new_handle(self) -> MediaStreamTrackHandle {
+        MediaStreamTrackHandle(self)
+    }
+}
+
+#[wasm_bindgen]
+pub struct MediaStreamTrackHandle(MediaStreamTrack);
+
+#[wasm_bindgen]
+impl MediaStreamTrackHandle {
+    pub fn get_track(&self) -> SysMediaStreamTrack {
+        Clone::clone(&self.0.0.track)
+    }
+
+    pub fn on_enabled(&self, callback: js_sys::Function) {
+        self.0.0.on_enabled.set_func(callback);
+    }
+
+    pub fn on_disabled(&self, callback: js_sys::Function) {
+        self.0.0.on_disabled.set_func(callback);
+    }
+
+    pub fn kind(&self) -> String {
+        self.0.kind().to_string()
+    }
 }
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
 pub enum TrackKind {
     /// Audio track.
+    #[display(fmt = "audio")]
     Audio,
 
     /// Video track.
+    #[display(fmt = "video")]
     Video,
-}
-
-impl<T> From<T> for MediaStreamTrack
-where
-    SysMediaStreamTrack: From<T>,
-{
-    #[inline]
-    fn from(track: T) -> Self {
-        let track = SysMediaStreamTrack::from(track);
-        MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            enabled: ObservableCell::new(track.enabled()),
-            track,
-        }))
-    }
 }
 
 impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
@@ -200,7 +258,12 @@ impl Drop for MediaStreamTrack {
     #[inline]
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
+        log::debug!(
+            "Trying to drop. Count of refs: {}",
+            Rc::strong_count(&self.0)
+        );
         if Rc::strong_count(&self.0) == 1 {
+            log::debug!("Dropped MediaStreamTrack");
             self.0.track.stop();
         }
     }

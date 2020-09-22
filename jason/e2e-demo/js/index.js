@@ -388,8 +388,23 @@ async function startPublishing() {
 }
 
 async function updateLocalVideo(stream) {
-  localVideo.srcObject = stream.get_media_stream();
-  await localVideo.play();
+  for (const track of stream) {
+    if (track.kind() == 'audio') {
+      // track.free();
+      continue;
+    }
+    let mediaStream = new MediaStream();
+    mediaStream.addTrack(track.get_track());
+    let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
+    if (deviceVideoEl === undefined) {
+      deviceVideoEl = document.createElement('video');
+      deviceVideoEl.className = 'local-device-video';
+      deviceVideoEl.width = 200;
+      deviceVideoEl.autoplay = 'true';
+      localVideo.appendChild(deviceVideoEl);
+    }
+    deviceVideoEl.srcObject = mediaStream;
+  }
 }
 
 window.onload = async function() {
@@ -420,7 +435,7 @@ window.onload = async function() {
   Object.values(controlDebugWindows).forEach(s => s());
 
   let isCallStarted = false;
-  let localStream = null;
+  let localStream = [];
   let isAudioSendMuted = false;
   let isVideoSendMuted = false;
   let isAudioRecvMuted = false;
@@ -458,8 +473,8 @@ window.onload = async function() {
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
+    // const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
+    // const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -467,11 +482,11 @@ window.onload = async function() {
       option.value = device_info.device_id();
       if (device_info.kind() === 'audio') {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
-        option.selected = option.text === current_audio;
+        // option.selected = option.text === current_audio;
         audio_select.append(option);
       } else if (device_info.kind() === 'video') {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
-        option.selected = option.text === current_video;
+        // option.selected = option.text === current_video;
         video_select.append(option);
       }
     }
@@ -533,7 +548,7 @@ window.onload = async function() {
 
     try {
       const constraints = await initLocalStream();
-      await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+      await fillMediaDevicesInputs(audioSelect, videoSelect, null);
       await room.set_local_media_settings(constraints);
     } catch (e) {
       console.error("Init local video failed: " + e);
@@ -542,44 +557,74 @@ window.onload = async function() {
     room.on_new_connection( (connection) => {
       let remoteMemberId = connection.get_remote_member_id();
       isCallStarted = true;
-      connection.on_remote_stream( async (stream) => {
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-        let video = document.createElement("video");
-        video.playsinline = "true";
-        video.controls = "true";
-        video.srcObject = stream.get_media_stream();
-        let innerVideoDiv = document.createElement("div");
-        innerVideoDiv.className = "video";
-        innerVideoDiv.appendChild(video);
-        let remoteMemberIdSpan = document.createElement('span');
-        remoteMemberIdSpan.innerText = remoteMemberId;
-        innerVideoDiv.appendChild(remoteMemberIdSpan);
-        remote_videos[remoteMemberId] = innerVideoDiv;
-        videoDiv.appendChild(innerVideoDiv);
 
-        video.oncanplay = async () => {
-          await video.play();
-        };
-        stream.on_track_added( (track) => {
-          // switch controls off and on, cause controls are not updated
-          // automatically
-          let video = remote_videos[connection.get_remote_member_id()]
-            .getElementsByTagName("video")[0];
-          video.controls = false;
-          video.controls = true;
-          console.log(`Track added: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
+      let memberVideoDiv = remote_videos[remoteMemberId];
+      let remoteVideos = document.getElementsByClassName("remote-videos")[0];
+      if (memberVideoDiv === undefined) {
+        memberVideoDiv = document.createElement("div");
+        memberVideoDiv.className = "video";
+        remoteVideos.appendChild(memberVideoDiv);
+        remote_videos[remoteMemberId] = memberVideoDiv;
+      }
+
+      let memberIdEl = document.createElement('span');
+      memberIdEl.innerHTML = remoteMemberId;
+      memberIdEl.classList.add('member-id');
+      memberIdEl.classList.add('order-4');
+      memberVideoDiv.appendChild(memberIdEl);
+
+      connection.on_quality_score_update((score) => {
+        let qualityScoreEl = memberVideoDiv.getElementsByClassName('quality-score')[0];
+        if (qualityScoreEl === undefined) {
+          qualityScoreEl = document.createElement('span');
+          qualityScoreEl.classList.add('quality-score');
+          qualityScoreEl.classList.add('order-5');
+          memberVideoDiv.appendChild(qualityScoreEl);
+        }
+        qualityScoreEl.innerHTML = score;
+      });
+
+      connection.on_track_added((track) => {
+        if (track.kind() === 'video') {
+            let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
+            if (cameraVideoEl === undefined) {
+              cameraVideoEl = document.createElement('video');
+              cameraVideoEl.className = 'camera-video';
+              cameraVideoEl.classList.add('camera-video');
+              cameraVideoEl.classList.add('order-1');
+              cameraVideoEl.playsinline = "true";
+              cameraVideoEl.controls = "true";
+              cameraVideoEl.autoplay = "true";
+              memberVideoDiv.appendChild(cameraVideoEl);
+            }
+            let mediaStream = new MediaStream();
+            mediaStream.addTrack(track.get_track());
+            cameraVideoEl.srcObject = mediaStream;
+        } else {
+          let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
+          if (audioEl === undefined) {
+            audioEl = document.createElement('audio');
+            audioEl.className = 'audio';
+            audioEl.classList.add('audio');
+            audioEl.classList.add('order-3');
+            audioEl.controls = "true";
+            audioEl.autoplay = "true";
+            memberVideoDiv.appendChild(audioEl);
+          }
+          let mediaStream = new MediaStream();
+          mediaStream.addTrack(track.get_track());
+          audioEl.srcObject = mediaStream;
+        }
+
+        track.on_enabled( () => {
+          console.log(`Track enabled: ${track.kind()}`);
+          // console.log(`Has active audio: ${stream.has_active_audio()}`);
+          // console.log(`Has active video: ${stream.has_active_video()}`);
         });
-        stream.on_track_enabled( (track) => {
-          console.log(`Track enabled: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
-        });
-        stream.on_track_disabled( (track) => {
-          console.log(`Track disabled: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
+        track.on_disabled( () => {
+          console.log(`Track disabled: ${track.kind()}`);
+          // console.log(`Has active audio: ${stream.has_active_audio()}`);
+          // console.log(`Has active video: ${stream.has_active_video()}`);
         });
       });
 
@@ -587,25 +632,18 @@ window.onload = async function() {
         remote_videos[remoteMemberId].remove();
         delete remote_videos[remoteMemberId];
       });
-
-      connection.on_quality_score_update((score) => {
-        let videoDiv = remote_videos[remoteMemberId];
-        let el = videoDiv.getElementsByClassName('quality-score');
-
-        if (el[0] === undefined) {
-          let qualityEl = document.createElement('span');
-          qualityEl.innerHTML = score;
-          qualityEl.className = 'quality-score';
-          videoDiv.appendChild(qualityEl);
-        }
-        el[0].innerHTML = score;
-      })
     });
 
-    room.on_local_stream((stream) => {
-      updateLocalVideo(stream);
-      stream.free();
-    });
+    // room.on_local_stream((stream) => {
+    //   console.log("New local stream");
+    //   updateLocalVideo(stream);
+    //   stream.free();
+    // });
+    room.on_local_track((track) => {
+      console.log("New local track");
+      updateLocalVideo([track]);
+      track.free();
+    })
 
     room.on_failed_local_stream((error) => {
       console.error(error.message());
@@ -663,8 +701,8 @@ window.onload = async function() {
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0 ){
-          localStream.free();
+        for (const track of localStream) {
+          track.free();
         }
         if (!isAudioSendMuted) {
           constraints = await initLocalStream();
@@ -678,8 +716,8 @@ window.onload = async function() {
     videoSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0 ){
-          localStream.free();
+        for (const track of localStream) {
+          track.free();
         }
         if (!isVideoSendMuted) {
           constraints = await initLocalStream();
@@ -701,8 +739,12 @@ window.onload = async function() {
           }
         } else {
           await room.mute_audio();
-          if (localStream && localStream.ptr > 0 ){
-            localStream.free_audio();
+          for (const track of localStream) {
+            if (track.ptr > 0) {
+              if (track.kind() === 'audio') {
+                track.free();
+              }
+            }
           }
           isAudioSendMuted = true;
           muteAudioSend.textContent = "Enable audio send";
@@ -722,14 +764,18 @@ window.onload = async function() {
           }
         } else {
           await room.mute_video();
-          if (localStream && localStream.ptr > 0 ){
-            localStream.free_video();
+          for (const track of localStream) {
+            if (track.ptr > 0) {
+              if (track.kind() === 'video') {
+                track.free();
+              }
+            }
           }
           isVideoSendMuted = true;
           muteVideoSend.textContent = "Enable video send";
         }
       } catch (e) {
-        console.error(e.message());
+        console.error(e);
       }
     });
     muteAudioRecv.addEventListener('click', async () => {
