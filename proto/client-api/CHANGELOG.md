@@ -55,7 +55,8 @@ All user visible changes to this project will be documented in this file. This p
 - `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
 - `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]);
 - `ConnectionQualityUpdated` event ([#132]);
-- `TrackPatchEvent` and `TrackPatchCommand` types ([#127]).
+- `TrackPatchEvent` and `TrackPatchCommand` types ([#127]);
+- `IceRestart` variant to `TrackUpdate` ([#138]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -71,6 +72,7 @@ All user visible changes to this project will be documented in this file. This p
 [#115]: /../../pull/115
 [#132]: /../../pull/132
 [#127]: /../../pull/127
+[#138]: /../../pull/138
 
 
 

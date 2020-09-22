@@ -139,8 +139,17 @@ impl CommandHandler for Room {
         peer_id: PeerId,
         metrics: PeerMetrics,
     ) -> Self::Output {
-        if let PeerMetrics::RtcStats(stats) = &metrics {
-            self.peers.add_stats(peer_id, stats);
+        match metrics {
+            PeerMetrics::RtcStats(ref stats) => {
+                self.peers.add_stats(peer_id, stats);
+            }
+            PeerMetrics::PeerConnectionState(state) => {
+                self.peers.update_peer_connection_state(peer_id, state);
+            }
+            PeerMetrics::IceConnectionState(state) => {
+                self.peers
+                    .update_peer_connection_state(peer_id, state.into());
+            }
         }
         Ok(())
     }

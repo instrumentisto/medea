@@ -1,4 +1,8 @@
-use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    convert::TryFrom as _,
+    rc::Rc,
+};
 
 use derive_more::{Display, From};
 use medea_client_api_proto::{
@@ -8,7 +12,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
-    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
@@ -212,6 +216,10 @@ pub struct RtcPeerConnection {
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
 
+    /// Flag which indicates that ICE restart will be performed on next
+    /// [`RtcPeerConnection::create_and_set_offer`] call.
+    ice_restart: Cell<bool>,
+
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
     /// [`icecandidate`][3] event. It fires when [RTCPeerConnection][1]
     /// discovers a new [RTCIceCandidate][4].
@@ -286,6 +294,7 @@ impl RtcPeerConnection {
 
         Ok(Self {
             peer: Rc::new(peer),
+            ice_restart: Cell::new(false),
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_connection_state_changed: RefCell::new(None),
@@ -535,6 +544,15 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Marks [`RtcPeerConnection`] to trigger ICE restart.
+    ///
+    /// After this function returns, the offer returned by the next call to
+    /// [`RtcPeerConnection::create_and_set_offer`] is automatically configured
+    /// to trigger ICE restart.
+    pub fn restart_ice(&self) {
+        self.ice_restart.set(true);
+    }
+
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
     /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
     /// description.
@@ -593,11 +611,17 @@ impl RtcPeerConnection {
     pub async fn create_and_set_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(peer.create_offer())
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateOfferFailed)
-            .map_err(tracerr::wrap!())?;
+        let mut offer_options = RtcOfferOptions::new();
+        if self.ice_restart.take() {
+            offer_options.ice_restart(true);
+        }
+        let create_offer = JsFuture::from(
+            peer.create_offer_with_rtc_offer_options(&offer_options),
+        )
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::CreateOfferFailed)
+        .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);

@@ -514,6 +514,15 @@ impl PeerConnection {
         Ok(())
     }
 
+    /// Marks [`PeerConnection`] to trigger ICE restart.
+    ///
+    /// After this function returns, the offer returned by the next call to
+    /// [`PeerConnection::get_offer`] is automatically configured to trigger ICE
+    /// restart.
+    pub fn restart_ice(&self) {
+        self.peer.restart_ice();
+    }
+
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()

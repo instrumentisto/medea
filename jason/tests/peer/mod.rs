@@ -1055,3 +1055,52 @@ async fn new_remote_track() {
         );
     }
 }
+
+/// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
+/// `ice-ufrag` IDs will be updated in the SDP offer.
+#[wasm_bindgen_test]
+async fn ice_restart_works() {
+    fn get_ice_pwds(offer: &str) -> Vec<&str> {
+        offer
+            .lines()
+            .filter_map(|line| {
+                if line.contains("ice-pwd") {
+                    Some(line.split(':').skip(1).next().unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn get_ice_ufrags(offer: &str) -> Vec<&str> {
+        offer
+            .lines()
+            .filter_map(|line| {
+                if line.contains("ice-ufrag") {
+                    Some(line.split(':').skip(1).next().unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    let peers = InterconnectedPeers::new().await;
+    let sdp_offer_before = peers.first_peer.get_offer(vec![]).await.unwrap();
+    let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
+    let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
+    peers.first_peer.restart_ice();
+    let sdp_offer_after = peers.first_peer.get_offer(vec![]).await.unwrap();
+    let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
+    let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
+
+    ice_pwds_before
+        .into_iter()
+        .zip(ice_pwds_after.into_iter())
+        .for_each(|(before, after)| assert_ne!(before, after));
+    ice_ufrags_before
+        .into_iter()
+        .zip(ice_ufrags_after.into_iter())
+        .for_each(|(before, after)| assert_ne!(before, after));
+}

@@ -20,7 +20,7 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    MediaType as MediaTypeProto, MemberId, PeerId,
+    MediaType as MediaTypeProto, MemberId, PeerConnectionState, PeerId,
 };
 
 use crate::{
@@ -340,6 +340,18 @@ impl RtcStatsHandler for TrafficFlowDetector {
         }
     }
 
+    /// Does nothing.
+    #[inline]
+    fn update_peer_connection_state(
+        &mut self,
+        _: PeerId,
+        _: PeerConnectionState,
+    ) {
+        // TODO: should take connection state into account
+    }
+
+    /// Does nothing.
+    #[inline]
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
     }

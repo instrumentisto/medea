@@ -118,6 +118,17 @@ impl PeersMetricsEventHandler for Room {
             },
         )
     }
+
+    /// Schedules ICE restart and commits scheduled changes.
+    fn on_peer_connection_failed(&mut self, peer_id: PeerId) -> Self::Output {
+        debug!("PeerConnection failed [peer_id = {}].", peer_id);
+        self.peers.map_peer_by_id_mut(peer_id, |peer| {
+            peer.as_changes_scheduler().restart_ice();
+        })?;
+        self.peers.commit_scheduled_changes(peer_id)?;
+
+        Ok(())
+    }
 }
 
 /// Message which indicates that `Peer` with provided [`PeerId`] has started.
