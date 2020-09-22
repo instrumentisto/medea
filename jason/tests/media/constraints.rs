@@ -34,7 +34,7 @@ async fn video_constraints_satisfies() {
     let media_manager = MediaManager::default();
     let (stream, _) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
 
@@ -61,7 +61,7 @@ async fn audio_constraints_satisfies() {
     let (stream, _) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
 
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
     assert_eq!(tracks.len(), 1);
 
     let track = tracks.pop().unwrap();
@@ -104,7 +104,7 @@ async fn both_constraints_satisfies() {
     let video_constraints = constraints.get_video().clone();
     let audio_constraints = constraints.get_audio().clone();
 
-    let tracks = stream.into_tracks();
+    let tracks = stream;
     assert_eq!(tracks.len(), 2);
 
     let (mut audio, mut video): (Vec<_>, Vec<_>) =
@@ -142,10 +142,10 @@ async fn equal_constraints_produce_equal_streams() {
     let manager = MediaManager::default();
 
     let (stream, _) = manager.get_stream(constraints.clone()).await.unwrap();
-    let stream_tracks = stream.into_tracks();
+    let stream_tracks = stream;
 
     let (stream, _) = manager.get_stream(constraints.clone()).await.unwrap();
-    let another_stream_tracks = stream.into_tracks();
+    let another_stream_tracks = stream;
 
     let audio_track = stream_tracks
         .iter()
@@ -186,12 +186,12 @@ async fn different_constraints_produce_different_streams() {
         let manager = MediaManager::default();
 
         let (stream, _) = manager.get_stream(constraints).await.unwrap();
-        let stream_tracks = stream.into_tracks();
+        let stream_tracks = stream;
 
         let constraints = build_constraints(audio_devices.next(), None);
         let (another_stream, _) =
             manager.get_stream(constraints).await.unwrap();
-        let another_stream_tracks = another_stream.into_tracks();
+        let another_stream_tracks = another_stream;
 
         let audio_track = stream_tracks
             .iter()

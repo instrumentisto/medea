@@ -16,7 +16,7 @@ async fn track_autostop() {
     let (stream, is_new) = media_manager.get_stream(caps).await.unwrap();
     assert!(is_new);
 
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
     assert_eq!(1, tracks.len());
     let strong_track = tracks.pop().unwrap();
     let sys_track = Clone::clone(strong_track.as_ref());

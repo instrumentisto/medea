@@ -270,7 +270,7 @@ async fn get_video_track() -> MediaStreamTrack {
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
     let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
+    stream.into_iter().next().unwrap()
 }
 
 async fn get_audio_track() -> MediaStreamTrack {
@@ -278,7 +278,7 @@ async fn get_audio_track() -> MediaStreamTrack {
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
     let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
+    stream.into_iter().next().unwrap()
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within

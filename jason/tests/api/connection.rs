@@ -15,6 +15,8 @@ use wasm_bindgen_test::*;
 use crate::{
     get_audio_track, get_video_track, timeout, wait_and_check_test_result,
 };
+use futures::channel::mpsc::unbounded;
+use medea_jason::media::{MediaStreamTrack, TrackKind};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -44,19 +46,12 @@ async fn on_remote_stream_fires() {
     let con = cons.get(&"bob".into()).unwrap();
     let con_handle = con.new_handle();
 
-    let (cb, test_result) = js_callback!(|stream: RemoteMediaStream| {
-        cb_assert_eq!(
-            stream
-                .get_media_stream()
-                .unwrap()
-                .get_video_tracks()
-                .length(),
-            1
-        );
+    let (cb, test_result) = js_callback!(|track: MediaStreamTrack| {
+        cb_assert_eq!(track.kind(), TrackKind::Video);
     });
-    con_handle.on_remote_stream(cb.into()).unwrap();
+    con_handle.on_track_added(cb.into()).unwrap();
 
-    con.add_remote_track(TrackId(1), get_video_track().await);
+    con.add_remote_track(get_video_track().await);
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -71,19 +66,23 @@ async fn tracks_are_added_to_remote_stream() {
     let con_handle = con.new_handle();
 
     let (tx, rx) = oneshot::channel();
-    let closure = Closure::once_into_js(move |stream: RemoteMediaStream| {
-        assert!(tx.send(stream).is_ok());
+    let closure = Closure::once_into_js(move |track: MediaStreamTrack| {
+        assert!(tx.send(track).is_ok());
     });
-    con_handle.on_remote_stream(closure.into()).unwrap();
+    con_handle.on_track_added(closure.into()).unwrap();
 
-    con.add_remote_track(TrackId(1), get_video_track().await);
+    con.add_remote_track(get_video_track().await);
+    let video_track = timeout(100, rx).await.unwrap().unwrap();
+    assert_eq!(video_track.kind(), TrackKind::Video);
 
-    let stream = timeout(100, rx).await.unwrap().unwrap();
-    let stream = stream.get_media_stream().unwrap();
-    assert_eq!(stream.get_tracks().length(), 1);
-
-    con.add_remote_track(TrackId(2), get_audio_track().await);
-    assert_eq!(stream.get_tracks().length(), 2);
+    let (tx, rx) = oneshot::channel();
+    let closure = Closure::once_into_js(move |track: MediaStreamTrack| {
+        assert!(tx.send(track).is_ok());
+    });
+    con_handle.on_track_added(closure.into()).unwrap();
+    con.add_remote_track(get_audio_track().await);
+    let audio_track = timeout(200, rx).await.unwrap().unwrap();
+    assert_eq!(audio_track.kind(), TrackKind::Audio);
 }
 
 #[wasm_bindgen_test]

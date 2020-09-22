@@ -131,7 +131,7 @@ async fn same_track_for_same_constraints() {
     // first request
     let (stream, is_new) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track1 = tracks.pop().unwrap();
@@ -143,7 +143,7 @@ async fn same_track_for_same_constraints() {
     // second request, same track, no additional getUserMedia requests
     let (stream, is_new) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track2 = tracks.pop().unwrap();
@@ -173,7 +173,7 @@ async fn new_track_if_previous_dropped() {
     // first request
     let (stream, is_new) =
         media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track1 = tracks.pop().unwrap();
@@ -186,7 +186,7 @@ async fn new_track_if_previous_dropped() {
     let track1_id = track1.id();
     drop(track1);
     let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track2 = tracks.pop().unwrap();
@@ -218,7 +218,6 @@ async fn request_audio_video_then_audio_then_video() {
 
     let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
     let (mut audio_tracks, mut video_tracks): (Vec<_>, Vec<_>) = stream
-        .into_tracks()
         .into_iter()
         .partition(|track| track.kind() == TrackKind::Audio);
     assert!(is_new);
@@ -237,7 +236,7 @@ async fn request_audio_video_then_audio_then_video() {
     let (stream, is_new) =
         media_manager.get_stream(audio_constraints).await.unwrap();
     assert!(!is_new);
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
     assert_eq!(tracks.len(), 1);
     let audio_track2 = tracks.pop().unwrap();
 
@@ -250,7 +249,7 @@ async fn request_audio_video_then_audio_then_video() {
     let (stream, is_new) =
         media_manager.get_stream(video_constraints).await.unwrap();
     assert!(!is_new);
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
     assert_eq!(tracks.len(), 1);
     let video_track2 = tracks.pop().unwrap();
 
@@ -281,7 +280,7 @@ async fn display_track_is_cached() {
     };
 
     let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
-    let tracks = stream.into_tracks();
+    let tracks = stream;
 
     assert!(is_new);
     assert_eq!(tracks.len(), 2);
@@ -299,7 +298,7 @@ async fn display_track_is_cached() {
     };
 
     let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
 
     assert!(!is_new);
     assert_eq!(tracks.len(), 1);
