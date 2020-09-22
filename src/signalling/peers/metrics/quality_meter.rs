@@ -13,7 +13,7 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    ConnectionQualityScore, MemberId, PeerConnectionState, PeerId,
+    ConnectionQualityScore, MemberId, PeerConnectionState, PeerId, TrackId,
 };
 
 use crate::{
@@ -22,6 +22,7 @@ use crate::{
         EventSender, PeersMetricsEvent, RtcStatsHandler,
     },
 };
+use std::collections::hash_map::RandomState;
 
 /// [`RtcStatsHandler`] responsible for `Peer` connection quality estimation.
 #[derive(Debug)]
@@ -174,6 +175,13 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
 
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
+    }
+
+    fn update_transceivers_statuses(
+        &mut self,
+        peer_id: PeerId,
+        transceivers_statuses: HashMap<TrackId, bool, RandomState>,
+    ) {
     }
 }
 

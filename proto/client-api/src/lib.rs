@@ -435,6 +435,8 @@ pub enum TrackUpdate {
 
     /// [`Peer`] should start ICE restart process on the next renegotiation.
     IceRestart,
+
+    TransceicerDesync,
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

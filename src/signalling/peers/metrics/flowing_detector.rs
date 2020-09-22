@@ -21,6 +21,7 @@ use medea_client_api_proto::{
         RtcStatsType, StatId,
     },
     MediaType as MediaTypeProto, MemberId, PeerConnectionState, PeerId,
+    TrackId,
 };
 
 use crate::{
@@ -42,6 +43,7 @@ use crate::{
 };
 
 use super::PeersMetricsEvent;
+use std::collections::hash_map::RandomState;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]
@@ -354,6 +356,14 @@ impl RtcStatsHandler for TrafficFlowDetector {
     #[inline]
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
+    }
+
+    fn update_transceivers_statuses(
+        &mut self,
+        peer_id: PeerId,
+        transceivers_statuses: HashMap<TrackId, bool, RandomState>,
+    ) {
+        // TODO: update.
     }
 }
 

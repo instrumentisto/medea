@@ -23,6 +23,7 @@ use super::{
     mute_state::{MuteStateController, StableMuteState},
     MediaConnectionsError, Muteable, Result,
 };
+use crate::peer::conn::RTCPeerConnectionError::PeerConnectionEventBindFailed;
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -224,6 +225,7 @@ impl Sender {
     fn set_transceiver_direction(&self, direction: TransceiverDirection) {
         self.transceiver.set_direction(direction.into());
         self.transceiver_direction.set(direction);
+        let _ = self.peer_events_sender.unbounded_send(PeerEvent::TransceiverStatusUpdated { peer_id: self.peer_id });
     }
 
     /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by

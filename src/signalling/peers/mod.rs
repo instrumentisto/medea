@@ -553,6 +553,16 @@ impl PeersService {
             .update_peer_connection_state(peer_id, state);
     }
 
+    pub fn update_transceivers_statuses(
+        &self,
+        peer_id: PeerId,
+        transceivers_statuses: HashMap<TrackId, bool>,
+    ) {
+        self.peer_metrics_service
+            .borrow_mut()
+            .update_transceivers_statuses(peer_id, transceivers_statuses);
+    }
+
     /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
     pub fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check();

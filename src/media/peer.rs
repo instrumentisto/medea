@@ -362,6 +362,8 @@ pub enum TrackChange {
 
     /// ICE restart request.
     IceRestart,
+
+    TransceiverDesync,
 }
 
 impl TrackChange {
@@ -372,7 +374,7 @@ impl TrackChange {
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
         match self.as_track_update(partner_member_id) {
             TrackUpdate::Added(track) => Some(track),
-            TrackUpdate::Updated(_) | TrackUpdate::IceRestart => None,
+            TrackUpdate::Updated(_) | TrackUpdate::IceRestart | TrackUpdate::TransceicerDesync => None,
         }
     }
 
@@ -400,6 +402,7 @@ impl TrackChange {
                 TrackUpdate::Updated(track_patch.clone())
             }
             Self::IceRestart => TrackUpdate::IceRestart,
+            Self::TransceiverDesync => TrackUpdate::TransceicerDesync,
         }
     }
 
@@ -408,6 +411,7 @@ impl TrackChange {
         match self {
             Self::AddSendTrack(_)
             | Self::AddRecvTrack(_)
+            | Self::TransceiverDesync
             | Self::IceRestart => false,
             Self::TrackPatch(_) | Self::PartnerTrackPatch(_) => true,
         }
@@ -478,6 +482,10 @@ impl<T> TrackChangeHandler for Peer<T> {
     #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
         TrackChange::IceRestart
+    }
+
+    fn on_transceiver_desync(&mut self) -> Self::Output {
+        TrackChange::TransceiverDesync
     }
 }
 
@@ -938,6 +946,10 @@ pub struct PeerChangesScheduler<'a> {
 }
 
 impl<'a> PeerChangesScheduler<'a> {
+    pub fn transceiver_desync(&mut self) {
+        self.schedule_change(TrackChange::TransceiverDesync);
+    }
+
     /// Schedules provided [`TrackPatchCommand`]s as
     /// [`TrackChange::TrackPatch`].
     pub fn patch_tracks(&mut self, patches: Vec<TrackPatchCommand>) {

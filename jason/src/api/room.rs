@@ -993,6 +993,9 @@ impl EventHandler for InnerRoom {
                 TrackUpdate::IceRestart => {
                     peer.restart_ice();
                 }
+                TrackUpdate::TransceicerDesync => {
+
+                }
             }
         }
         peer.patch_tracks(patches)
@@ -1142,6 +1145,19 @@ impl PeerEventHandler for InnerRoom {
         {
             self.on_failed_local_stream.call(JasonError::from(err));
         };
+        Ok(())
+    }
+
+    async fn on_transceiver_status_updated(&self, peer_id: PeerId) -> Self::Output {
+        let peer = self
+            .peers
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        let transceiver_statuses = peer.get_transceivers_statuses();
+        if !transceiver_statuses.is_empty() {
+            self.rpc.send_command(Command::AddPeerConnectionMetrics { peer_id, metrics: PeerMetrics::TransceiversStatuses(transceiver_statuses) });
+        }
+
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MemberId, TrackPatchEvent};
+use medea_client_api_proto::{MemberId, TrackPatchEvent, PeerId};
 use proto::TrackId;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
@@ -28,6 +28,7 @@ use super::mute_state::StableMuteState;
 /// We can save related [`RtcRtpTransceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
+    peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
     sender_id: MemberId,
@@ -54,6 +55,7 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
     pub fn new(
+        peer_id: PeerId,
         track_id: TrackId,
         caps: TrackConstraints,
         sender_id: MemberId,
@@ -77,6 +79,7 @@ impl Receiver {
             Some(_) => None,
         };
         Self {
+            peer_id,
             track_id,
             caps,
             sender_id,
@@ -99,6 +102,9 @@ impl Receiver {
             return false;
         }
         if self.transceiver.borrow().is_none() {
+            return false;
+        }
+        if self.track.borrow().is_none() {
             return false;
         }
         match self.transceiver_direction.get() {
@@ -134,6 +140,7 @@ impl Receiver {
         self.transceiver.replace(Some(transceiver));
         self.track.replace(Some(new_track));
         self.maybe_notify_track();
+        let _ = self.peer_events_sender.unbounded_send(PeerEvent::TransceiverStatusUpdated { peer_id: self.peer_id });
     }
 
     /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].

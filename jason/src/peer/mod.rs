@@ -181,6 +181,10 @@ pub enum PeerEvent {
         /// ID of the [`PeerConnection`] that requested new media stream.
         peer_id: Id,
     },
+
+    TransceiverStatusUpdated {
+        peer_id: Id,
+    }
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
