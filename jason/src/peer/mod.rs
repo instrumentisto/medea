@@ -30,7 +30,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
     media::{
-        LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
+        LocalStreamConstraints, MediaManager, MediaManagerError,
         MediaStreamTrack, RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
@@ -121,9 +121,6 @@ pub enum PeerEvent {
     NewRemoteTrack {
         /// Remote `Member` ID.
         sender_id: MemberId,
-
-        /// [`TrackId`] of provided [`MediaStreamTrack`].
-        track_id: TrackId,
 
         /// Received [`MediaStreamTrack`].
         track: MediaStreamTrack,

@@ -6,14 +6,11 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{
-    ConnectionQualityScore, MemberId, PeerId, TrackId,
-};
+use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    media::{MediaStreamTrack, MediaStreamTrackHandle},
-    peer::{PeerMediaStream, RemoteMediaStream},
+    media::MediaStreamTrack,
     utils::{Callback0, Callback1, HandlerDetachedError},
 };
 
@@ -104,7 +101,7 @@ struct InnerConnection {
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
     quality_score: Cell<Option<ConnectionQualityScore>>,
 
-    on_track_added: Callback1<MediaStreamTrackHandle>,
+    on_track_added: Callback1<MediaStreamTrack>,
 
     /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
     /// be updated.
@@ -166,8 +163,8 @@ impl Connection {
     ///
     /// If this is the first track added to this [`Connection`], then a new
     /// [`PeerMediaStream`] is built and sent to `on_remote_stream` callback.
-    pub fn add_remote_track(&self, track_id: TrackId, track: MediaStreamTrack) {
-        self.0.on_track_added.call(track.new_handle());
+    pub fn add_remote_track(&self, track: MediaStreamTrack) {
+        self.0.on_track_added.call(track);
     }
 
     /// Creates new [`ConnectionHandle`] for using [`Connection`] on JS side.

@@ -10,8 +10,8 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStream, MediaStreamSettings,
-        TrackConstraints, TrackKind, VideoTrackConstraints,
+        AudioTrackConstraints, MediaStreamSettings, TrackConstraints,
+        TrackKind, VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };

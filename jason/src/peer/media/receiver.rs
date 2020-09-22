@@ -168,7 +168,6 @@ impl Receiver {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::NewRemoteTrack {
                     sender_id: self.sender_id.clone(),
-                    track_id: self.track_id,
                     track: track.clone(),
                 },
             );

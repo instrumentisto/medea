@@ -23,8 +23,8 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
-        LocalStreamConstraints, MediaStream, MediaStreamSettings,
-        MediaStreamTrack, MediaStreamTrackHandle, RecvConstraints,
+        LocalStreamConstraints, MediaStreamSettings, MediaStreamTrack,
+        RecvConstraints,
     },
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
@@ -625,7 +625,7 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
-    on_local_track: Callback1<MediaStreamTrackHandle>,
+    on_local_track: Callback1<MediaStreamTrack>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
@@ -1055,14 +1055,13 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,
-        track_id: TrackId,
         track: MediaStreamTrack,
     ) -> Self::Output {
         let conn = self
             .connections
             .get(&sender_id)
             .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
-        conn.add_remote_track(track_id, track);
+        conn.add_remote_track(track);
 
         Ok(())
     }
@@ -1073,7 +1072,7 @@ impl PeerEventHandler for InnerRoom {
         _: PeerId,
         stream: MediaStreamTrack,
     ) -> Self::Output {
-        self.on_local_track.call(stream.new_handle());
+        self.on_local_track.call(stream);
         Ok(())
     }
 

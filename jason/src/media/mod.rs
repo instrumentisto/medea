@@ -17,7 +17,5 @@ pub use self::{
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
-    stream::{
-        MediaStream, MediaStreamTrack, MediaStreamTrackHandle, TrackKind,
-    },
+    stream::{MediaStream, MediaStreamTrack, TrackKind},
 };

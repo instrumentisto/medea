@@ -11,10 +11,7 @@ use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::{
-    utils::{Callback0, HandlerDetachedError},
-    MediaStreamSettings,
-};
+use crate::{utils::Callback0, MediaStreamSettings};
 use futures::StreamExt;
 use wasm_bindgen_futures::spawn_local;
 
@@ -122,6 +119,7 @@ struct InnerMediaStreamTrack {
 /// left.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+#[wasm_bindgen]
 #[derive(Clone)]
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
@@ -176,31 +174,25 @@ impl MediaStreamTrack {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
     }
-
-    pub fn new_handle(self) -> MediaStreamTrackHandle {
-        MediaStreamTrackHandle(self)
-    }
 }
 
 #[wasm_bindgen]
-pub struct MediaStreamTrackHandle(MediaStreamTrack);
-
-#[wasm_bindgen]
-impl MediaStreamTrackHandle {
+impl MediaStreamTrack {
     pub fn get_track(&self) -> SysMediaStreamTrack {
-        Clone::clone(&self.0.0.track)
+        Clone::clone(&self.0.track)
     }
 
     pub fn on_enabled(&self, callback: js_sys::Function) {
-        self.0.0.on_enabled.set_func(callback);
+        self.0.on_enabled.set_func(callback);
     }
 
     pub fn on_disabled(&self, callback: js_sys::Function) {
-        self.0.0.on_disabled.set_func(callback);
+        self.0.on_disabled.set_func(callback);
     }
 
-    pub fn kind(&self) -> String {
-        self.0.kind().to_string()
+    #[wasm_bindgen(js_name = kind)]
+    pub fn js_kind(&self) -> String {
+        self.kind().to_string()
     }
 }
 

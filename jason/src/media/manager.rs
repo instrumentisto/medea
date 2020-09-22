@@ -20,7 +20,7 @@ use web_sys::{
 
 use crate::{
     media::{
-        stream::{MediaStream, MediaStreamTrack, WeakMediaStreamTrack},
+        stream::{MediaStreamTrack, WeakMediaStreamTrack},
         MediaStreamSettings, MultiSourceMediaStreamConstraints,
     },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
@@ -148,8 +148,6 @@ impl InnerMediaManager {
         &self,
         mut caps: MediaStreamSettings,
     ) -> Result<(Vec<MediaStreamTrack>, bool)> {
-        let original_caps = caps.clone();
-
         let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceMediaStreamConstraints> = caps.into();
         match caps {
@@ -399,7 +397,7 @@ impl MediaManagerHandle {
                 .map(|(tracks, _)| {
                     let arr = js_sys::Array::new();
                     for track in tracks {
-                        arr.push(&track.new_handle().into());
+                        arr.push(&track.into());
                     }
                     JsValue::from(arr)
                 })
