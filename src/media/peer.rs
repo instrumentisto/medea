@@ -374,7 +374,9 @@ impl TrackChange {
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
         match self.as_track_update(partner_member_id) {
             TrackUpdate::Added(track) => Some(track),
-            TrackUpdate::Updated(_) | TrackUpdate::IceRestart | TrackUpdate::TransceicerDesync => None,
+            TrackUpdate::Updated(_)
+            | TrackUpdate::IceRestart
+            | TrackUpdate::TransceicerDesync => None,
         }
     }
 

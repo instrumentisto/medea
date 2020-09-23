@@ -23,8 +23,8 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
-        LocalStreamConstraints, MediaStream, MediaStreamSettings,
-        MediaStreamTrack, MediaStreamTrackHandle, RecvConstraints,
+        LocalTracksConstraints, MediaStreamTrack, MediaTracksSettings,
+        RecvConstraints,
     },
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
@@ -114,14 +114,14 @@ enum RoomError {
     #[display(fmt = "Unable to connect RPC server: {}", _0)]
     CouldNotConnectToServer(#[js(cause)] RpcClientError),
 
-    /// Returned if the previously added local media stream does not satisfy
+    /// Returned if the previously added local media tracks does not satisfy
     /// the tracks sent from the media server.
-    #[display(fmt = "Invalid local stream: {}", _0)]
-    InvalidLocalStream(#[js(cause)] PeerError),
+    #[display(fmt = "Invalid local tracks: {}", _0)]
+    InvalidLocalTracks(#[js(cause)] PeerError),
 
-    /// Returned if [`PeerConnection`] cannot receive the local stream from
+    /// Returned if [`PeerConnection`] cannot receive the local tracks from
     /// [`MediaManager`].
-    #[display(fmt = "Failed to get local stream: {}", _0)]
+    #[display(fmt = "Failed to get local tracks: {}", _0)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
@@ -133,7 +133,7 @@ enum RoomError {
     #[display(fmt = "Some PeerConnection error: {}", _0)]
     PeerConnectionError(#[js(cause)] PeerError),
 
-    /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
+    /// Returned if was received event [`PeerEvent::NewRemoteTracks`] without
     /// [`Connection`] with remote [`Member`].
     #[display(fmt = "Remote stream from unknown member")]
     UnknownRemoteMember,
@@ -163,7 +163,7 @@ impl From<TransportError> for RoomError {
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         use PeerError::{
-            MediaConnections, MediaManager, RtcPeerConnection, StreamRequest,
+            MediaConnections, MediaManager, RtcPeerConnection, TracksRequest,
         };
 
         match err {
@@ -171,9 +171,9 @@ impl From<PeerError> for RoomError {
                 MediaConnectionsError::InvalidTrackPatch(id) => {
                     Self::FailedTrackPatch(*id)
                 }
-                _ => Self::InvalidLocalStream(err),
+                _ => Self::InvalidLocalTracks(err),
             },
-            StreamRequest(_) => Self::InvalidLocalStream(err),
+            TracksRequest(_) => Self::InvalidLocalTracks(err),
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
         }
@@ -200,7 +200,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
     /// `on_connection_loss` callbacks are not set.
     ///
     /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
@@ -208,9 +208,9 @@ impl RoomHandle {
     pub async fn inner_join(&self, token: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
-        if !inner.on_failed_local_stream.is_set() {
+        if !inner.on_failed_local_media.is_set() {
             return Err(JasonError::from(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_failed_local_stream()")
+                RoomError::CallbackNotSet("Room.on_failed_local_media()")
             )));
         }
 
@@ -288,19 +288,25 @@ impl RoomHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
+    /// Sets callback, which will be invoked when new local [`MediaStreamTrack`]
+    /// will be added to this [`Room`].
+    /// This might happen in such cases:
+    /// 1. Media server initiates media request.
+    /// 2. `unmute_audio`/`unmute_video` is called.
+    /// 3. [`MediaTracksSettings`] updated via `set_local_media_settings`.
     pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_local_track.set_func(f))
     }
 
-    /// Sets `on_failed_local_stream` callback, which will be invoked on local
+    /// Sets `on_failed_local_media` callback, which will be invoked on local
     /// media acquisition failures.
-    pub fn on_failed_local_stream(
+    pub fn on_failed_local_media(
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_failed_local_stream.set_func(f))
+            .map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
@@ -318,7 +324,7 @@ impl RoomHandle {
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
-    ///   - `on_failed_local_stream` callback is not set
+    ///   - `on_failed_local_media` callback is not set
     ///   - `on_connection_loss` callback is not set
     ///   - unable to connect to media server.
     ///
@@ -331,21 +337,21 @@ impl RoomHandle {
         })
     }
 
-    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
-    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// Updates this [`Room`]s [`MediaTracksSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaTracksSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
     /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// [`MediaTracksSettings`] update will change [`MediaStream`] in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
-    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
     pub fn set_local_media_settings(
         &self,
-        settings: &MediaStreamSettings,
+        settings: &MediaTracksSettings,
     ) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
@@ -530,15 +536,13 @@ impl Room {
                                 {
                                     let (err, trace) = err.into_parts();
                                     match err {
-                                        RoomError::InvalidLocalStream(_)
+                                        RoomError::InvalidLocalTracks(_)
                                         | RoomError::CouldNotGetLocalMedia(_) =>
                                         {
                                             let e =
                                                 JasonError::from((err, trace));
                                             e.print();
-                                            inner
-                                                .on_failed_local_stream
-                                                .call(e);
+                                            inner.on_failed_local_media.call(e);
                                         }
                                         _ => JasonError::from((err, trace))
                                             .print(),
@@ -610,7 +614,7 @@ struct InnerRoom {
 
     /// Constraints to local [`MediaStream`] that is being published by
     /// [`PeerConnection`]s in this [`Room`].
-    send_constraints: LocalStreamConstraints,
+    send_constraints: LocalTracksConstraints,
 
     /// Constraints to the [`MediaStream`]s received by [`PeerConnection`]s in
     /// this [`Room`]. Used to disable or enable media receiving.
@@ -625,11 +629,13 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
-    on_local_track: Callback1<MediaStreamTrackHandle>,
+    /// Callback to be invoked when new local [`MediaStreamTrack`] will be
+    /// added to this [`Room`].
+    on_local_track: Callback1<MediaStreamTrack>,
 
-    /// Callback to be invoked when failed obtain [`MediaStream`] from
+    /// Callback to be invoked when failed obtain [`MediaTrack`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_stream: Rc<Callback1<JasonError>>,
+    on_failed_local_media: Rc<Callback1<JasonError>>,
 
     /// Callback to be invoked when [`RpcClient`] loses connection.
     on_connection_loss: Callback1<ReconnectHandle>,
@@ -656,13 +662,13 @@ impl InnerRoom {
     ) -> Self {
         Self {
             rpc,
-            send_constraints: LocalStreamConstraints::default(),
+            send_constraints: LocalTracksConstraints::default(),
             recv_constraints: Rc::new(RecvConstraints::default()),
             peers,
             peer_event_sender,
             connections: Connections::default(),
             on_connection_loss: Callback1::default(),
-            on_failed_local_stream: Rc::new(Callback1::default()),
+            on_failed_local_media: Rc::new(Callback1::default()),
             on_local_track: Callback1::default(),
             on_close: Rc::new(Callback1::default()),
             close_reason: RefCell::new(CloseReason::ByClient {
@@ -784,19 +790,19 @@ impl InnerRoom {
             .is_none()
     }
 
-    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
-    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// Updates this [`Room`]s [`MediaTracksSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaTracksSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
     /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// [`MediaTracksSettings`] update will change [`MediaStreamTrack`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
-    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
-    async fn set_local_media_settings(&self, settings: MediaStreamSettings) {
+    async fn set_local_media_settings(&self, settings: MediaTracksSettings) {
         self.send_constraints.constrain(settings);
         for peer in self.peers.get_all() {
             if let Err(err) = peer
@@ -804,7 +810,7 @@ impl InnerRoom {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
-                self.on_failed_local_stream.call(JasonError::from(err));
+                self.on_failed_local_media.call(JasonError::from(err));
             }
         }
     }
@@ -993,9 +999,7 @@ impl EventHandler for InnerRoom {
                 TrackUpdate::IceRestart => {
                     peer.restart_ice();
                 }
-                TrackUpdate::TransceicerDesync => {
-
-                }
+                TrackUpdate::TransceicerDesync => {}
             }
         }
         peer.patch_tracks(patches)
@@ -1058,14 +1062,13 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,
-        track_id: TrackId,
         track: MediaStreamTrack,
     ) -> Self::Output {
         let conn = self
             .connections
             .get(&sender_id)
             .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
-        conn.add_remote_track(track_id, track);
+        conn.add_remote_track(track);
 
         Ok(())
     }
@@ -1073,10 +1076,9 @@ impl PeerEventHandler for InnerRoom {
     /// Invokes `on_local_stream` [`Room`]'s callback.
     async fn on_new_local_track(
         &self,
-        _: PeerId,
-        stream: MediaStreamTrack,
+        track: MediaStreamTrack,
     ) -> Self::Output {
-        self.on_local_track.call(stream.new_handle());
+        self.on_local_track.call(track);
         Ok(())
     }
 
@@ -1143,19 +1145,27 @@ impl PeerEventHandler for InnerRoom {
             .await
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
         {
-            self.on_failed_local_stream.call(JasonError::from(err));
+            self.on_failed_local_media.call(JasonError::from(err));
         };
         Ok(())
     }
 
-    async fn on_transceiver_status_updated(&self, peer_id: PeerId) -> Self::Output {
+    async fn on_transceiver_status_updated(
+        &self,
+        peer_id: PeerId,
+    ) -> Self::Output {
         let peer = self
             .peers
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         let transceiver_statuses = peer.get_transceivers_statuses();
         if !transceiver_statuses.is_empty() {
-            self.rpc.send_command(Command::AddPeerConnectionMetrics { peer_id, metrics: PeerMetrics::TransceiversStatuses(transceiver_statuses) });
+            self.rpc.send_command(Command::AddPeerConnectionMetrics {
+                peer_id,
+                metrics: PeerMetrics::TransceiversStatuses(
+                    transceiver_statuses,
+                ),
+            });
         }
 
         Ok(())

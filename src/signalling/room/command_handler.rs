@@ -35,7 +35,10 @@ impl CommandHandler for Room {
             self.peers.take_inner_peer(from_peer.partner_peer_id())?;
 
         from_peer.set_mids(mids)?;
-        self.peers.update_transceivers_statuses(from_peer_id, senders_statuses.clone());
+        self.peers.update_transceivers_statuses(
+            from_peer_id,
+            senders_statuses.clone(),
+        );
         from_peer.update_senders_statuses(senders_statuses);
 
         let from_peer = from_peer.set_local_offer(sdp_offer.clone());
@@ -85,7 +88,10 @@ impl CommandHandler for Room {
         let to_peer: Peer<WaitRemoteSdp> =
             self.peers.take_inner_peer(from_peer.partner_peer_id())?;
 
-        self.peers.update_transceivers_statuses(from_peer_id, senders_statuses.clone());
+        self.peers.update_transceivers_statuses(
+            from_peer_id,
+            senders_statuses.clone(),
+        );
         from_peer.update_senders_statuses(senders_statuses);
 
         let from_peer = from_peer.set_local_answer(sdp_answer.clone());

@@ -10,7 +10,7 @@
     import init, {
       Jason,
       JasonError,
-      MediaStreamSettings,
+      MediaTracksSettings,
       AudioTrackConstraints,
       DeviceVideoTrackConstraints,
       DisplayVideoTrackConstraints,
@@ -48,7 +48,7 @@
     let room = null;
 
     let isForceRelay = false;
-    let localStream = null;
+    let localTracks = [];
     let audioPublishPolicy = 'Optional';
     let videoPublishPolicy = 'Optional';
     let isCallStarted = false;
@@ -58,7 +58,7 @@
     let isAudioRecvMuted = false;
     let isVideoRecvMuted = false;
     let isPublishingEnabled = true;
-    let remote_videos = {};
+    let remote_videos = [];
 
     async function createRoom(roomId) {
       await axios({
@@ -193,32 +193,28 @@
       return resp.data.sids[memberId]
     }
 
-    async function updateLocalVideo(stream) {
-      localVideo.srcObject = stream.get_media_stream();
-      localVideo.oncanplay = async () => {
-        await localVideo.play();
-      };
-    }
-
-    async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-      const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-      const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
-
+    async function fillMediaDevicesInputs(audio_select, video_select) {
+      let currentAudio = 'disable';
+      let currentVideo = 'disable';
+      for (const track of localTracks) {
+        if (track.kind() === 'video') {
+          currentVideo = track.get_track().label || 'disable';
+        } else {
+          currentAudio = track.get_track().label || 'disable';
+        }
+      }
       const device_infos = await jason.media_manager().enumerate_devices();
       console.log('Available input and output devices:', device_infos);
-
       for (const device_info of device_infos) {
         const option = document.createElement('option');
         option.value = device_info.device_id();
         if (device_info.kind() === 'audio') {
-          option.text = device_info.label()
-            || `Microphone ${audio_select.length + 1}`;
-          option.selected = option.text === current_audio;
+          option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
+          option.selected = option.text === currentAudio;
           audio_select.append(option);
         } else if (device_info.kind() === 'video') {
-          option.text = device_info.label()
-            || `Camera ${video_select.length + 1}`;
-          option.selected = option.text === current_video;
+          option.text = device_info.label() || `Camera ${video_select.length + 1}`;
+          option.selected = option.text === currentVideo;
           video_select.append(option);
         }
       }
@@ -240,7 +236,7 @@
     }
 
     async function build_constraints(audio_select, video_select) {
-      let constraints = new MediaStreamSettings();
+      let constraints = new MediaTracksSettings();
       if (audio_select != null) {
         let audio = new AudioTrackConstraints();
         let audioSource = audio_select.options[audio_select.selectedIndex];
@@ -281,23 +277,23 @@
         isVideoSendMuted ? null : videoSelect
       );
       try {
-        localStream = await jason
+        localTracks = await jason
           .media_manager()
-          .init_local_stream(constraints)
+          .init_local_tracks(constraints)
       } catch (e) {
         let origError = e.source();
         if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
           if (origError.message.includes("audio")) {
             constraints = await build_constraints(null, videoSelect);
-            localStream = await jason
+            localTracks = await jason
               .media_manager()
-              .init_local_stream(constraints);
+              .init_local_tracks(constraints);
             alert("unable to get audio, will try to enter room with video only");
           } else if (origError.message.includes("video")) {
             constraints = await build_constraints(audioSelect, null);
-            localStream = await jason
+            localTracks = await jason
               .media_manager()
-              .init_local_stream(constraints);
+              .init_local_tracks(constraints);
             alert("unable to get video, will try to enter room with audio only");
           } else {
             throw e;
@@ -306,9 +302,28 @@
           throw e;
         }
       }
-      await updateLocalVideo(localStream);
+      await updateLocalVideo(localTracks);
 
       return constraints;
+    }
+
+    async function updateLocalVideo(stream) {
+      for (const track of stream) {
+        if (track.kind() == 'audio') {
+          continue;
+        }
+        let mediaStream = new MediaStream();
+        mediaStream.addTrack(track.get_track());
+        let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
+        if (deviceVideoEl === undefined) {
+          deviceVideoEl = document.createElement('video');
+          deviceVideoEl.className = 'local-device-video';
+          deviceVideoEl.width = 200;
+          deviceVideoEl.autoplay = 'true';
+          localVideo.appendChild(deviceVideoEl);
+        }
+        deviceVideoEl.srcObject = mediaStream;
+      }
     }
 
     async function isAudioEnabledListener(e) {
@@ -326,13 +341,13 @@
           isVideoEnabledCheckbox.checked ? videoSelect : null
         );
       }
-      if (localStream.ptr > 0) {
-        localStream.free();
+      for (const track of localTracks) {
+        track.free();
       }
-      localStream = await jason
+      localTracks = await jason
         .media_manager()
-        .init_local_stream(constraints);
-      await updateLocalVideo(localStream);
+        .init_local_tracks(constraints);
+      await updateLocalVideo(localTracks);
       await room.set_local_media_settings(constraints);
     }
 
@@ -350,13 +365,13 @@
           isAudioEnabledCheckbox.checked ? audioSelect : null, null
         );
       }
-      if (localStream.ptr > 0) {
-        localStream.free();
+      for (const track of localTracks) {
+        track.free();
       }
-      localStream = await jason
+      localTracks = await jason
         .media_manager()
-        .init_local_stream(constraints);
-      await updateLocalVideo(localStream);
+        .init_local_tracks(constraints);
+      await updateLocalVideo(localTracks);
       await room.set_local_media_settings(constraints);
     }
 
@@ -463,8 +478,8 @@
 
       audioSelect.addEventListener('change', async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0) {
-          localStream.free();
+        for (const track of localTracks) {
+          track.free();
         }
         if (!isAudioSendMuted) {
           constraints = await initLocalStream();
@@ -474,8 +489,8 @@
 
       videoSelect.addEventListener('change', async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0) {
-          localStream.free();
+        for (const track of localTracks) {
+          track.free();
         }
         if (!isVideoSendMuted) {
           constraints = await initLocalStream();
@@ -483,55 +498,81 @@
         await room.set_local_media_settings(constraints);
       });
 
-      room.on_failed_local_stream(function (error) {
-        console.error(error);
+      room.on_failed_local_media((error) => {
+        console.error(error.message());
       });
 
       room.on_new_connection((connection) => {
         let remoteMemberId = connection.get_remote_member_id();
         logsTextArea.value += `connection with a Member '${remoteMemberId}' established\r\n`;
         isCallStarted = true;
-        connection.on_remote_stream(async (stream) => {
-          let video = document.createElement("video");
-          video.playsinline = "true";
-          video.srcObject = stream.get_media_stream();
-          video.controls = "true";
-          video.style.maxWidth = "100%";
+        let memberVideoDiv = remote_videos[remoteMemberId];
+        let remoteVideos = document.getElementById("remote-videos");
+        if (memberVideoDiv === undefined) {
+          memberVideoDiv = document.createElement("div");
+          memberVideoDiv.classList.add("video");
+          memberVideoDiv.classList.add("d-flex");
+          memberVideoDiv.classList.add("flex-column");
+          memberVideoDiv.classList.add("align-items-center");
+          memberVideoDiv.style = "margin: 10px";
+          remoteVideos.appendChild(memberVideoDiv);
+          remote_videos[remoteMemberId] = memberVideoDiv;
+        }
 
-          let innerVideoDiv = document.createElement("div");
-          innerVideoDiv.className = "col-md-3";
-          innerVideoDiv.appendChild(video);
-          let remoteMemberIdEl = document.createElement('span');
-          remoteMemberIdEl.innerHTML = remoteMemberId;
-          innerVideoDiv.appendChild(remoteMemberIdEl);
-          innerVideoDiv.appendChild(document.createElement('br'));
-          remote_videos[remoteMemberId] = innerVideoDiv;
-          videoDiv.appendChild(innerVideoDiv);
+        let memberIdEl = document.createElement('span');
+        memberIdEl.innerHTML = remoteMemberId;
+        memberIdEl.classList.add('member-id');
+        memberIdEl.classList.add('order-4');
+        memberVideoDiv.appendChild(memberIdEl);
 
-          video.oncanplay = async () => {
-            await video.play();
-          };
+        connection.on_quality_score_update((score) => {
+          let qualityScoreEl = memberVideoDiv.getElementsByClassName('quality-score')[0];
+          if (qualityScoreEl === undefined) {
+            qualityScoreEl = document.createElement('span');
+            qualityScoreEl.classList.add('quality-score');
+            qualityScoreEl.classList.add('order-5');
+            memberVideoDiv.appendChild(qualityScoreEl);
+          }
+          qualityScoreEl.innerHTML = score;
+        });
 
-          stream.on_track_added( (track) => {
-            // switch controls off and on, cause controls are not updated
-            // automatically
-            let video = remote_videos[connection.get_remote_member_id()]
-              .getElementsByTagName("video")[0];
-            video.controls = false;
-            video.controls = true;
-            console.log(`Track added: ${track.kind}`);
-            console.log(`Has active audio: ${stream.has_active_audio()}`);
-            console.log(`Has active video: ${stream.has_active_video()}`);
+        connection.on_track_added((track) => {
+          if (track.kind() === 'video') {
+              let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
+              if (cameraVideoEl === undefined) {
+                cameraVideoEl = document.createElement('video');
+                cameraVideoEl.className = 'camera-video';
+                cameraVideoEl.classList.add('camera-video');
+                cameraVideoEl.classList.add('order-1');
+                cameraVideoEl.playsinline = "true";
+                cameraVideoEl.controls = "true";
+                cameraVideoEl.autoplay = "true";
+                memberVideoDiv.appendChild(cameraVideoEl);
+              }
+              let mediaStream = new MediaStream();
+              mediaStream.addTrack(track.get_track());
+              cameraVideoEl.srcObject = mediaStream;
+          } else {
+            let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
+            if (audioEl === undefined) {
+              audioEl = document.createElement('audio');
+              audioEl.className = 'audio';
+              audioEl.classList.add('audio');
+              audioEl.classList.add('order-3');
+              audioEl.controls = "true";
+              audioEl.autoplay = "true";
+              memberVideoDiv.appendChild(audioEl);
+            }
+            let mediaStream = new MediaStream();
+            mediaStream.addTrack(track.get_track());
+            audioEl.srcObject = mediaStream;
+          }
+
+          track.on_enabled( () => {
+            console.log(`Track enabled: ${track.kind()}`);
           });
-          stream.on_track_enabled( (track) => {
-            console.log(`Track enabled: ${track.kind}`);
-            console.log(`Has active audio: ${stream.has_active_audio()}`);
-            console.log(`Has active video: ${stream.has_active_video()}`);
-          });
-          stream.on_track_disabled( (track) => {
-            console.log(`Track disabled: ${track.kind}`);
-            console.log(`Has active audio: ${stream.has_active_audio()}`);
-            console.log(`Has active video: ${stream.has_active_video()}`);
+          track.on_disabled( () => {
+            console.log(`Track disabled: ${track.kind()}`);
           });
         });
 
@@ -539,25 +580,12 @@
           remote_videos[remoteMemberId].remove();
           delete remote_videos[remoteMemberId];
         });
-
-        connection.on_quality_score_update((score) => {
-          let videoDiv = remote_videos[remoteMemberId];
-          let el = videoDiv.getElementsByClassName('quality-score');
-
-          if (el[0] === undefined) {
-            let qualityEl = document.createElement('span');
-            qualityEl.innerHTML = score;
-            qualityEl.className = 'quality-score';
-            videoDiv.appendChild(qualityEl);
-          }
-          el[0].innerHTML = score;
-        })
       });
 
-      room.on_local_stream((stream) => {
-        updateLocalVideo(stream);
-        stream.free();
-      });
+      room.on_local_track((track) => {
+        updateLocalVideo([track]);
+        track.free();
+      })
 
       room.on_connection_loss(async (reconnectHandle) => {
         connectionState.className = 'badge badge-warning';
@@ -589,8 +617,12 @@
           }
         } else {
           await room.mute_audio();
-          if (localStream && localStream.ptr > 0) {
-            localStream.free_audio();
+          for (const track of localTracks) {
+            if (track.ptr > 0) {
+              if (track.kind() === 'audio') {
+                track.free();
+              }
+            }
           }
           isAudioSendMuted = true;
           muteAudioSendBtn.textContent = "Enable audio send";
@@ -606,8 +638,12 @@
           }
         } else {
           await room.mute_video();
-          if (localStream && localStream.ptr > 0) {
-            localStream.free_video();
+          for (const track of localTracks) {
+            if (track.ptr > 0) {
+              if (track.kind() === 'video') {
+                track.free();
+              }
+            }
           }
           isVideoSendMuted = true;
           muteVideoSendBtn.textContent = "Enable video send";
@@ -645,7 +681,7 @@
         videoCallDiv.style.display = "";
 
         const constraints = await initLocalStream();
-        await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+        await fillMediaDevicesInputs(audioSelect, videoSelect);
         await room.set_local_media_settings(constraints);
       } else {
         chooseRoomButton.onclick = async function () {
@@ -655,7 +691,7 @@
           bindJoinButtons(roomId);
 
           const constraints = await initLocalStream();
-          await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
+          await fillMediaDevicesInputs(audioSelect, videoSelect);
           await room.set_local_media_settings(constraints);
 
           chooseRoomDiv.style.display = "none";
@@ -723,12 +759,11 @@
   </div>
 
   <div id="video-call" style="display: none">
-    <div id="remote-videos" class="row text-center">
+    <div id="remote-videos" class="d-flex flex-row justify-content-center">
     </div>
 
     <div class="row h-25 w-75">
-      <div class="col-md-4">
-        <video id="local-video__video" muted autoplay width="100%" height="100%"></video>
+      <div class="col-md-4" id="local-video__video">
       </div>
       <div class="col-md-4">
 

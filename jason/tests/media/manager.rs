@@ -7,7 +7,7 @@ use wasm_bindgen_test::*;
 use medea_jason::{
     media::{MediaManager, TrackKind},
     AudioTrackConstraints, DeviceVideoTrackConstraints,
-    DisplayVideoTrackConstraints, MediaStreamSettings,
+    DisplayVideoTrackConstraints, MediaTracksSettings,
 };
 
 use crate::{get_jason_error, is_firefox, MockNavigator};
@@ -55,13 +55,13 @@ async fn failed_get_user_media() {
     mock_navigator.error_get_user_media("failed_get_user_media".into());
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints.device_video(DeviceVideoTrackConstraints::new());
         constraints
     };
     let result = JsFuture::from(
-        media_manager.new_handle().init_local_stream(&constraints),
+        media_manager.new_handle().init_local_tracks(&constraints),
     )
     .await;
     mock_navigator.stop();
@@ -89,13 +89,13 @@ async fn failed_get_user_media2() {
     mock_navigator.error_get_user_media(error.into());
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints.device_video(DeviceVideoTrackConstraints::new());
         constraints
     };
     let result = JsFuture::from(
-        media_manager.new_handle().init_local_stream(&constraints),
+        media_manager.new_handle().init_local_tracks(&constraints),
     )
     .await;
     mock_navigator.stop();
@@ -123,15 +123,15 @@ async fn same_track_for_same_constraints() {
 
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints
     };
 
     // first request
     let (stream, is_new) =
-        media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+        media_manager.get_tracks(constraints.clone()).await.unwrap();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track1 = tracks.pop().unwrap();
@@ -142,8 +142,8 @@ async fn same_track_for_same_constraints() {
 
     // second request, same track, no additional getUserMedia requests
     let (stream, is_new) =
-        media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+        media_manager.get_tracks(constraints.clone()).await.unwrap();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track2 = tracks.pop().unwrap();
@@ -165,15 +165,15 @@ async fn new_track_if_previous_dropped() {
 
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints
     };
 
     // first request
     let (stream, is_new) =
-        media_manager.get_stream(constraints.clone()).await.unwrap();
-    let mut tracks = stream.into_tracks();
+        media_manager.get_tracks(constraints.clone()).await.unwrap();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track1 = tracks.pop().unwrap();
@@ -185,8 +185,8 @@ async fn new_track_if_previous_dropped() {
     // now drop track, and we got new track and second getUserMedia request
     let track1_id = track1.id();
     drop(track1);
-    let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let (stream, is_new) = media_manager.get_tracks(constraints).await.unwrap();
+    let mut tracks = stream;
 
     assert_eq!(tracks.len(), 1);
     let track2 = tracks.pop().unwrap();
@@ -210,15 +210,14 @@ async fn request_audio_video_then_audio_then_video() {
 
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints.device_video(DeviceVideoTrackConstraints::new());
         constraints
     };
 
-    let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
+    let (stream, is_new) = media_manager.get_tracks(constraints).await.unwrap();
     let (mut audio_tracks, mut video_tracks): (Vec<_>, Vec<_>) = stream
-        .into_tracks()
         .into_iter()
         .partition(|track| track.kind() == TrackKind::Audio);
     assert!(is_new);
@@ -230,27 +229,27 @@ async fn request_audio_video_then_audio_then_video() {
 
     // request audio only
     let audio_constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints
     };
     let (stream, is_new) =
-        media_manager.get_stream(audio_constraints).await.unwrap();
+        media_manager.get_tracks(audio_constraints).await.unwrap();
     assert!(!is_new);
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
     assert_eq!(tracks.len(), 1);
     let audio_track2 = tracks.pop().unwrap();
 
     // request video only
     let video_constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.device_video(DeviceVideoTrackConstraints::new());
         constraints
     };
     let (stream, is_new) =
-        media_manager.get_stream(video_constraints).await.unwrap();
+        media_manager.get_tracks(video_constraints).await.unwrap();
     assert!(!is_new);
-    let mut tracks = stream.into_tracks();
+    let mut tracks = stream;
     assert_eq!(tracks.len(), 1);
     let video_track2 = tracks.pop().unwrap();
 
@@ -274,14 +273,14 @@ async fn display_track_is_cached() {
 
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.audio(AudioTrackConstraints::new());
         constraints.display_video(DisplayVideoTrackConstraints::new());
         constraints
     };
 
-    let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
-    let tracks = stream.into_tracks();
+    let (stream, is_new) = media_manager.get_tracks(constraints).await.unwrap();
+    let tracks = stream;
 
     assert!(is_new);
     assert_eq!(tracks.len(), 2);
@@ -293,13 +292,13 @@ async fn display_track_is_cached() {
 
     // do second request
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
+        let mut constraints = MediaTracksSettings::new();
         constraints.display_video(DisplayVideoTrackConstraints::new());
         constraints
     };
 
-    let (stream, is_new) = media_manager.get_stream(constraints).await.unwrap();
-    let mut tracks = stream.into_tracks();
+    let (stream, is_new) = media_manager.get_tracks(constraints).await.unwrap();
+    let mut tracks = stream;
 
     assert!(!is_new);
     assert_eq!(tracks.len(), 1);

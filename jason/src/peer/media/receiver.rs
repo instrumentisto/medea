@@ -7,7 +7,7 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MemberId, TrackPatchEvent, PeerId};
+use medea_client_api_proto::{MemberId, PeerId, TrackPatchEvent};
 use proto::TrackId;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
@@ -140,7 +140,11 @@ impl Receiver {
         self.transceiver.replace(Some(transceiver));
         self.track.replace(Some(new_track));
         self.maybe_notify_track();
-        let _ = self.peer_events_sender.unbounded_send(PeerEvent::TransceiverStatusUpdated { peer_id: self.peer_id });
+        let _ = self.peer_events_sender.unbounded_send(
+            PeerEvent::TransceiverStatusUpdated {
+                peer_id: self.peer_id,
+            },
+        );
     }
 
     /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].
@@ -176,7 +180,6 @@ impl Receiver {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::NewRemoteTrack {
                     sender_id: self.sender_id.clone(),
-                    track_id: self.track_id,
                     track: track.clone(),
                 },
             );

@@ -131,7 +131,11 @@ impl PeersMetricsEventHandler for Room {
     }
 
     fn on_peer_tracks_desynced(&mut self, peer_id: PeerId) -> Self::Output {
-        println!("\n\n\n\n\n\n\n\n\n\n\nPeerConnection desynced [peer_id = {}].\n\n\n\n\n\n\n\n\n\n\n\n", peer_id);
+        println!(
+            "\n\n\n\n\n\n\n\n\n\n\nPeerConnection desynced [peer_id = \
+             {}].\n\n\n\n\n\n\n\n\n\n\n\n",
+            peer_id
+        );
         self.peers.map_peer_by_id_mut(peer_id, |peer| {
             peer.as_changes_scheduler().transceiver_desync();
         })?;

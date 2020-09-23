@@ -7,8 +7,7 @@ mod ice_server;
 mod media;
 mod repo;
 mod stats;
-mod stream;
-mod stream_request;
+mod tracks_request;
 
 use std::{
     cell::RefCell,
@@ -30,11 +29,11 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
     media::{
-        LocalStreamConstraints, MediaManager, MediaManagerError, MediaStream,
+        LocalTracksConstraints, MediaManager, MediaManagerError,
         MediaStreamTrack, RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
-    MediaStreamSettings,
+    MediaTracksSettings,
 };
 
 #[cfg(feature = "mockable")]
@@ -53,8 +52,7 @@ pub use self::{
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
-    stream::{PeerMediaStream, RemoteMediaStream},
-    stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
+    tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -77,10 +75,10 @@ pub enum PeerError {
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
-    /// Errors that may occur when validating [`StreamRequest`] or
-    /// parsing [`MediaStream`].
+    /// Errors that may occur when validating [`TracksRequest`] or
+    /// parsing [`MediaStreamTrack`]s.
     #[display(fmt = "{}", _0)]
-    StreamRequest(#[js(cause)] StreamRequestError),
+    TracksRequest(#[js(cause)] TracksRequestError),
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
@@ -122,21 +120,14 @@ pub enum PeerEvent {
         /// Remote `Member` ID.
         sender_id: MemberId,
 
-        /// [`TrackId`] of provided [`MediaStreamTrack`].
-        track_id: TrackId,
-
         /// Received [`MediaStreamTrack`].
         track: MediaStreamTrack,
     },
 
-    /// [`RtcPeerConnection`] sent new local stream to remote members.
+    /// [`RtcPeerConnection`] sent new local track to remote members.
     NewLocalTrack {
-        /// ID of the [`PeerConnection`] that sent new local stream to remote
-        /// members.
-        peer_id: Id,
-
-        /// Local [`MediaStream`] that is sent to remote members.
-        local_stream: MediaStreamTrack,
+        /// Local [`MediaStreamTrack`] that is sent to remote members.
+        local_track: MediaStreamTrack,
     },
 
     /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
@@ -184,7 +175,7 @@ pub enum PeerEvent {
 
     TransceiverStatusUpdated {
         peer_id: Id,
-    }
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -221,7 +212,7 @@ pub struct PeerConnection {
     sent_stats_cache: RefCell<HashMap<StatId, u64>>,
 
     /// Local media stream constraints used in this [`PeerConnection`].
-    send_constraints: LocalStreamConstraints,
+    send_constraints: LocalTracksConstraints,
 
     /// Constraints to the [`MediaStream`]s received by this
     /// [`PeerConnection`]. Used to disable or enable media receiving.
@@ -249,7 +240,7 @@ impl PeerConnection {
         ice_servers: I,
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
-        send_constraints: LocalStreamConstraints,
+        send_constraints: LocalTracksConstraints,
         recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
@@ -503,7 +494,7 @@ impl PeerConnection {
     }
 
     /// Handle `track` event from underlying peer adding new track to
-    /// `media_connections` and emitting [`PeerEvent::NewRemoteStream`]
+    /// `media_connections` and emitting [`PeerEvent::NewRemoteTracks`]
     /// event into this peers `peer_events_sender` if all tracks from this
     /// sender has arrived.
     fn on_track(
@@ -661,21 +652,21 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`StreamRequestError`] if current state of peer's [`Sender`]s
-    /// cannot be represented as [`SimpleStreamRequest`] (max 1 audio [`Sender`]
+    /// With [`TracksRequestError`] if current state of peer's [`Sender`]s
+    /// cannot be represented as [`SimpleTracksRequest`] (max 1 audio [`Sender`]
     /// and max 1 video [`Sender`]), or [`MediaStream`] requested from
     /// [`MediaManager`] does not satisfy [`Sender`]s constraints.
     ///
-    /// With [`StreamRequestError::ExpectedAudioTracks`] or
-    /// [`StreamRequestError::ExpectedVideoTracks`] if provided
-    /// [`MediaStreamSettings`] are incompatible with this peer [`Sender`]s
+    /// With [`TracksRequestError::ExpectedAudioTracks`] or
+    /// [`TracksRequestError::ExpectedVideoTracks`] if provided
+    /// [`MediaTracksSettings`] are incompatible with this peer [`Sender`]s
     /// constraints.
     ///
     /// With [`MediaManagerError::GetUserMediaFailed`] or
     /// [`MediaManagerError::GetDisplayMediaFailed`] if corresponding request to
     /// UA failed.
     ///
-    /// With [`MediaConnectionsError::InvalidMediaStream`],
+    /// With [`MediaConnectionsError::InvalidMediaTracks`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
     /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if [`MediaStream`]
     /// cannot be inserted into peer's [`Sender`]s.
@@ -683,37 +674,34 @@ impl PeerConnection {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(&self) -> Result<()> {
-        if let Some(request) = self.media_connections.get_stream_request() {
-            let mut required_caps = SimpleStreamRequest::try_from(request)
+        if let Some(request) = self.media_connections.get_tracks_request() {
+            let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
             required_caps
                 .merge(self.send_constraints.inner())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let used_caps = MediaStreamSettings::from(&required_caps);
+            let used_caps = MediaTracksSettings::from(&required_caps);
 
-            let (media_stream, is_new_stream) = self
+            let (media_tracks, is_new_tracks) = self
                 .media_manager
-                .get_stream(used_caps)
+                .get_tracks(used_caps)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
-            let peer_stream = required_caps
-                .parse_stream(media_stream.clone())
+            let peer_tracks = required_caps
+                .parse_tracks(media_tracks.clone())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             self.media_connections
-                .insert_local_stream(&peer_stream)
+                .insert_local_tracks(&peer_tracks)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            if is_new_stream {
-                for track in media_stream {
+            if is_new_tracks {
+                for track in media_tracks {
                     let _ = self.peer_events_sender.unbounded_send(
-                        PeerEvent::NewLocalTrack {
-                            peer_id: self.id,
-                            local_stream: track,
-                        },
+                        PeerEvent::NewLocalTrack { local_track: track },
                     );
                 }
             }
@@ -807,7 +795,7 @@ impl PeerConnection {
     /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
-    /// With [`StreamRequestError`], [`MediaManagerError`] or
+    /// With [`TracksRequestError`], [`MediaManagerError`] or
     /// [`MediaConnectionsError`] if cannot get or insert [`MediaStream`].
     ///
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if

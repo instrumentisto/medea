@@ -5,9 +5,9 @@ use std::{convert::TryFrom, mem, rc::Rc};
 use futures::channel::mpsc;
 use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
 use medea_jason::{
-    media::{LocalStreamConstraints, MediaManager, RecvConstraints},
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        MediaConnections, Muteable, RtcPeerConnection, SimpleStreamRequest,
+        MediaConnections, Muteable, RtcPeerConnection, SimpleTracksRequest,
         StableMuteState,
     },
 };
@@ -40,13 +40,13 @@ async fn get_test_media_connections(
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_stream_request().unwrap();
-    let caps = SimpleStreamRequest::try_from(request).unwrap();
+    let request = media_connections.get_tracks_request().unwrap();
+    let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
-    let (stream, _) = manager.get_stream(&caps).await.unwrap();
+    let (stream, _) = manager.get_tracks(&caps).await.unwrap();
 
     media_connections
-        .insert_local_stream(&caps.parse_stream(stream).unwrap())
+        .insert_local_tracks(&caps.parse_tracks(stream).unwrap())
         .await
         .unwrap();
 
@@ -65,7 +65,7 @@ async fn get_test_media_connections(
 }
 
 #[wasm_bindgen_test]
-fn get_stream_request1() {
+fn get_tracks_request1() {
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
@@ -81,12 +81,12 @@ fn get_stream_request1() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_stream_request();
+    let request = media_connections.get_tracks_request();
     assert!(request.is_some());
 }
 
 #[wasm_bindgen_test]
-fn get_stream_request2() {
+fn get_tracks_request2() {
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
@@ -97,11 +97,11 @@ fn get_stream_request2() {
     media_connections
         .create_tracks(
             Vec::new(),
-            &LocalStreamConstraints::default(),
+            &LocalTracksConstraints::default(),
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_stream_request();
+    let request = media_connections.get_tracks_request();
     assert!(request.is_none());
 }
 

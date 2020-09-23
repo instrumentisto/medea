@@ -390,7 +390,6 @@ async function startPublishing() {
 async function updateLocalVideo(stream) {
   for (const track of stream) {
     if (track.kind() == 'audio') {
-      // track.free();
       continue;
     }
     let mediaStream = new MediaStream();
@@ -416,7 +415,6 @@ async function updateLocalVideo(stream) {
       }
       deviceVideoEl.srcObject = mediaStream;
     }
-    // track.free();
   }
 }
 
@@ -448,7 +446,7 @@ window.onload = async function() {
   Object.values(controlDebugWindows).forEach(s => s());
 
   let isCallStarted = false;
-  let localStream = [];
+  let localTracks = [];
   let isAudioSendMuted = false;
   let isVideoSendMuted = false;
   let isAudioRecvMuted = false;
@@ -461,17 +459,17 @@ window.onload = async function() {
         isVideoSendMuted ? null : videoSelect
       );
       try {
-        localStream = await jason.media_manager().init_local_stream(constraints)
+        localTracks = await jason.media_manager().init_local_tracks(constraints)
       } catch (e) {
         let origError = e.source();
         if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
           if (origError.message.includes("audio")) {
             constraints = await build_constraints(null, videoSelect);
-            localStream = await jason.media_manager().init_local_stream(constraints);
+            localTracks = await jason.media_manager().init_local_tracks(constraints);
             alert("unable to get audio, will try to enter room with video only");
           } else if (origError.message.includes("video")) {
             constraints = await build_constraints(audioSelect, null);
-            localStream = await jason.media_manager().init_local_stream(constraints);
+            localTracks = await jason.media_manager().init_local_tracks(constraints);
             alert("unable to get video, will try to enter room with audio only");
           } else {
             throw e;
@@ -480,14 +478,21 @@ window.onload = async function() {
           throw e;
         }
       }
-      await updateLocalVideo(localStream);
+      await updateLocalVideo(localTracks);
 
       return constraints;
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    // const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-    // const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
+    let currentAudio = 'disable';
+    let currentVideo = 'disable';
+    for (const track of localTracks) {
+      if (track.kind() === 'video') {
+        currentVideo = track.get_track().label || 'disable';
+      } else {
+        currentAudio = track.get_track().label || 'disable';
+      }
+    }
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -495,11 +500,11 @@ window.onload = async function() {
       option.value = device_info.device_id();
       if (device_info.kind() === 'audio') {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
-        // option.selected = option.text === current_audio;
+        option.selected = option.text === currentAudio;
         audio_select.append(option);
       } else if (device_info.kind() === 'video') {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
-        // option.selected = option.text === current_video;
+        option.selected = option.text === currentVideo;
         video_select.append(option);
       }
     }
@@ -521,7 +526,7 @@ window.onload = async function() {
   }
 
   async function build_constraints(audio_select, video_select) {
-    let constraints = new rust.MediaStreamSettings();
+    let constraints = new rust.MediaTracksSettings();
     if (audio_select != null) {
       let audio = new rust.AudioTrackConstraints();
       let audioSource = audio_select.options[audio_select.selectedIndex];
@@ -579,7 +584,11 @@ window.onload = async function() {
       let remoteVideos = document.getElementsByClassName("remote-videos")[0];
       if (memberVideoDiv === undefined) {
         memberVideoDiv = document.createElement("div");
-        memberVideoDiv.className = "video";
+        memberVideoDiv.classList.add("video");
+        memberVideoDiv.classList.add("d-flex");
+        memberVideoDiv.classList.add("flex-column");
+        memberVideoDiv.classList.add("align-items-center");
+        memberVideoDiv.style = "margin: 10px";
         remoteVideos.appendChild(memberVideoDiv);
         remote_videos[remoteMemberId] = memberVideoDiv;
       }
@@ -667,19 +676,14 @@ window.onload = async function() {
       });
     });
 
-    // room.on_local_stream((stream) => {
-    //   console.log("New local stream");
-    //   updateLocalVideo(stream);
-    //   stream.free();
-    // });
     room.on_local_track((track) => {
       console.log("New local track");
       updateLocalVideo([track]);
       track.free();
     })
 
-    room.on_failed_local_stream((error) => {
-      console.error(error.trace());
+    room.on_failed_local_media((error) => {
+      console.error(error.message());
     });
 
     room.on_connection_loss( async (reconnectHandle) => {
@@ -734,7 +738,7 @@ window.onload = async function() {
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        for (const track of localStream) {
+        for (const track of localTracks) {
           track.free();
         }
         if (!isAudioSendMuted) {
@@ -749,8 +753,7 @@ window.onload = async function() {
     videoSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        for (const track of localStream) {
-          console.log("Freeing MediaTrack");
+        for (const track of localTracks) {
           track.free();
         }
         if (!isVideoSendMuted) {
@@ -773,8 +776,12 @@ window.onload = async function() {
           }
         } else {
           await room.mute_audio();
-          if (localStream && localStream.ptr > 0 ){
-            localStream.free_audio();
+          for (const track of localTracks) {
+            if (track.ptr > 0) {
+              if (track.kind() === 'audio') {
+                track.free();
+              }
+            }
           }
           isAudioSendMuted = true;
           muteAudioSend.textContent = "Enable audio send";
@@ -794,14 +801,18 @@ window.onload = async function() {
           }
         } else {
           await room.mute_video();
-          if (localStream && localStream.ptr > 0 ){
-            localStream.free_video();
+          for (const track of localTracks) {
+            if (track.ptr > 0) {
+              if (track.kind() === 'video') {
+                track.free();
+              }
+            }
           }
           isVideoSendMuted = true;
           muteVideoSend.textContent = "Enable video send";
         }
       } catch (e) {
-        console.error(e.message());
+        console.error(e);
       }
     });
     muteAudioRecv.addEventListener('click', async () => {

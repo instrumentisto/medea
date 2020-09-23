@@ -38,12 +38,12 @@ use crate::{
             connection_failure_detector::ConnectionFailureDetector,
             flowing_detector::TrafficFlowDetector,
             quality_meter::QualityMeterStatsHandler,
+            tracks_desync_detector::TracksDesyncDetector,
         },
         PeerTrafficWatcher,
     },
 };
 use std::collections::{hash_map::RandomState, HashMap};
-use crate::signalling::peers::metrics::tracks_desync_detector::TracksDesyncDetector;
 
 /// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
 #[dispatchable]
