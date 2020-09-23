@@ -472,8 +472,15 @@ window.onload = async function() {
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    // const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-    // const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
+    let currentAudio = 'disable';
+    let currentVideo = 'disable';
+    for (const track of localStream) {
+      if (track.kind() === 'video') {
+        currentVideo = track.get_track().label || 'disable';
+      } else {
+        currentAudio = track.get_track().label || 'disable';
+      }
+    }
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -481,11 +488,11 @@ window.onload = async function() {
       option.value = device_info.device_id();
       if (device_info.kind() === 'audio') {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
-        // option.selected = option.text === current_audio;
+        option.selected = option.text === currentAudio;
         audio_select.append(option);
       } else if (device_info.kind() === 'video') {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
-        // option.selected = option.text === current_video;
+        option.selected = option.text === currentVideo;
         video_select.append(option);
       }
     }
@@ -507,7 +514,7 @@ window.onload = async function() {
   }
 
   async function build_constraints(audio_select, video_select) {
-    let constraints = new rust.MediaStreamSettings();
+    let constraints = new rust.MediaTracksSettings();
     if (audio_select != null) {
       let audio = new rust.AudioTrackConstraints();
       let audioSource = audio_select.options[audio_select.selectedIndex];
