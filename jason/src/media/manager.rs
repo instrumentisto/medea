@@ -382,9 +382,9 @@ impl MediaManagerHandle {
         })
     }
 
-    /// Returns [`MediaStream`](LocalMediaStream) object, built from provided
+    /// Returns [`MediaStreamTrack`]s objects, built from provided
     /// [`MediaTracksSettings`].
-    pub fn init_local_stream(&self, caps: &MediaTracksSettings) -> Promise {
+    pub fn init_local_tracks(&self, caps: &MediaTracksSettings) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let caps = caps.clone();
         future_to_promise(async move {

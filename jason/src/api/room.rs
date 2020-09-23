@@ -794,7 +794,7 @@ impl InnerRoom {
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaTracksSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
     /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaTracksSettings`] update will change [`MediaStream`] in all
+    /// [`MediaTracksSettings`] update will change [`MediaStreamTrack`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`

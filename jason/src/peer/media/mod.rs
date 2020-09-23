@@ -15,7 +15,7 @@ use tracerr::Traced;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
-    media::{LocalTracksConstraints, RecvConstraints},
+    media::{LocalTracksConstraints, MediaStreamTrack, RecvConstraints},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
@@ -32,7 +32,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::media::MediaStreamTrack;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {

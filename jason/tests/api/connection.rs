@@ -55,7 +55,7 @@ async fn on_track_added_fires() {
 }
 
 #[wasm_bindgen_test]
-async fn tracks_are_added_to_remote_stream() {
+async fn tracks_are_added_to_connection() {
     let cons = Connections::default();
 
     cons.create_connection(PeerId(1), &"bob".into());

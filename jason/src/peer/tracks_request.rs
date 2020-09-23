@@ -97,7 +97,8 @@ pub struct SimpleTracksRequest {
 }
 
 impl SimpleTracksRequest {
-    /// Parses [`MediaStream`] and returns [`PeerMediaStream`] wrapper.
+    /// Parses [`MediaStreamTrack`]s and returns [`HashMap`] with [`TrackId`]s
+    /// and [`MediaStreamTracks`]s.
     ///
     /// # Errors
     ///
@@ -106,14 +107,14 @@ impl SimpleTracksRequest {
     /// contained constrains.
     ///
     /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if provided
-    /// [`MediaStream`] doesn't have expected audio track.
+    /// [`HashMap`] doesn't have expected audio track.
     ///
     /// Errors with [`TracksRequestError::InvalidVideoTrack`] if some video
-    /// track from provided [`MediaStream`] not satisfies
+    /// track from provided [`HashMap`] not satisfies
     /// contained constrains.
     ///
     /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if provided
-    /// [`MediaStream`] doesn't have expected video track.
+    /// [`HashMap`] doesn't have expected video track.
     pub fn parse_tracks(
         &self,
         tracks: Vec<MediaStreamTrack>,

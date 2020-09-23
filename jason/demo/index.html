@@ -48,7 +48,7 @@
     let room = null;
 
     let isForceRelay = false;
-    let localStream = null;
+    let localTracks = [];
     let audioPublishPolicy = 'Optional';
     let videoPublishPolicy = 'Optional';
     let isCallStarted = false;
@@ -196,7 +196,7 @@
     async function fillMediaDevicesInputs(audio_select, video_select) {
       let currentAudio = 'disable';
       let currentVideo = 'disable';
-      for (const track of localStream) {
+      for (const track of localTracks) {
         if (track.kind() === 'video') {
           currentVideo = track.get_track().label || 'disable';
         } else {
@@ -277,23 +277,23 @@
         isVideoSendMuted ? null : videoSelect
       );
       try {
-        localStream = await jason
+        localTracks = await jason
           .media_manager()
-          .init_local_stream(constraints)
+          .init_local_tracks(constraints)
       } catch (e) {
         let origError = e.source();
         if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
           if (origError.message.includes("audio")) {
             constraints = await build_constraints(null, videoSelect);
-            localStream = await jason
+            localTracks = await jason
               .media_manager()
-              .init_local_stream(constraints);
+              .init_local_tracks(constraints);
             alert("unable to get audio, will try to enter room with video only");
           } else if (origError.message.includes("video")) {
             constraints = await build_constraints(audioSelect, null);
-            localStream = await jason
+            localTracks = await jason
               .media_manager()
-              .init_local_stream(constraints);
+              .init_local_tracks(constraints);
             alert("unable to get video, will try to enter room with audio only");
           } else {
             throw e;
@@ -302,7 +302,7 @@
           throw e;
         }
       }
-      await updateLocalVideo(localStream);
+      await updateLocalVideo(localTracks);
 
       return constraints;
     }
@@ -341,13 +341,13 @@
           isVideoEnabledCheckbox.checked ? videoSelect : null
         );
       }
-      for (const track of localStream) {
+      for (const track of localTracks) {
         track.free();
       }
-      localStream = await jason
+      localTracks = await jason
         .media_manager()
-        .init_local_stream(constraints);
-      await updateLocalVideo(localStream);
+        .init_local_tracks(constraints);
+      await updateLocalVideo(localTracks);
       await room.set_local_media_settings(constraints);
     }
 
@@ -365,13 +365,13 @@
           isAudioEnabledCheckbox.checked ? audioSelect : null, null
         );
       }
-      for (const track of localStream) {
+      for (const track of localTracks) {
         track.free();
       }
-      localStream = await jason
+      localTracks = await jason
         .media_manager()
-        .init_local_stream(constraints);
-      await updateLocalVideo(localStream);
+        .init_local_tracks(constraints);
+      await updateLocalVideo(localTracks);
       await room.set_local_media_settings(constraints);
     }
 
@@ -478,7 +478,7 @@
 
       audioSelect.addEventListener('change', async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        for (const track of localStream) {
+        for (const track of localTracks) {
           track.free();
         }
         if (!isAudioSendMuted) {
@@ -489,7 +489,7 @@
 
       videoSelect.addEventListener('change', async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        for (const track of localStream) {
+        for (const track of localTracks) {
           track.free();
         }
         if (!isVideoSendMuted) {
@@ -535,7 +535,6 @@
           }
           qualityScoreEl.innerHTML = score;
         });
-        console.log("5");
 
         connection.on_track_added((track) => {
           if (track.kind() === 'video') {
@@ -571,13 +570,9 @@
 
           track.on_enabled( () => {
             console.log(`Track enabled: ${track.kind()}`);
-            // console.log(`Has active audio: ${stream.has_active_audio()}`);
-            // console.log(`Has active video: ${stream.has_active_video()}`);
           });
           track.on_disabled( () => {
             console.log(`Track disabled: ${track.kind()}`);
-            // console.log(`Has active audio: ${stream.has_active_audio()}`);
-            // console.log(`Has active video: ${stream.has_active_video()}`);
           });
         });
 
@@ -588,7 +583,6 @@
       });
 
       room.on_local_track((track) => {
-        console.log("New local track");
         updateLocalVideo([track]);
         track.free();
       })
@@ -623,7 +617,7 @@
           }
         } else {
           await room.mute_audio();
-          for (const track of localStream) {
+          for (const track of localTracks) {
             if (track.ptr > 0) {
               if (track.kind() === 'audio') {
                 track.free();
@@ -644,7 +638,7 @@
           }
         } else {
           await room.mute_video();
-          for (const track of localStream) {
+          for (const track of localTracks) {
             if (track.ptr > 0) {
               if (track.kind() === 'video') {
                 track.free();
@@ -687,7 +681,7 @@
         videoCallDiv.style.display = "";
 
         const constraints = await initLocalStream();
-        await fillMediaDevicesInputs(audioSelect, videoSelect, null);
+        await fillMediaDevicesInputs(audioSelect, videoSelect);
         await room.set_local_media_settings(constraints);
       } else {
         chooseRoomButton.onclick = async function () {
@@ -697,7 +691,7 @@
           bindJoinButtons(roomId);
 
           const constraints = await initLocalStream();
-          await fillMediaDevicesInputs(audioSelect, videoSelect, null);
+          await fillMediaDevicesInputs(audioSelect, videoSelect);
           await room.set_local_media_settings(constraints);
 
           chooseRoomDiv.style.display = "none";

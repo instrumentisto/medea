@@ -61,7 +61,7 @@ async fn failed_get_user_media() {
         constraints
     };
     let result = JsFuture::from(
-        media_manager.new_handle().init_local_stream(&constraints),
+        media_manager.new_handle().init_local_tracks(&constraints),
     )
     .await;
     mock_navigator.stop();
@@ -95,7 +95,7 @@ async fn failed_get_user_media2() {
         constraints
     };
     let result = JsFuture::from(
-        media_manager.new_handle().init_local_stream(&constraints),
+        media_manager.new_handle().init_local_tracks(&constraints),
     )
     .await;
     mock_navigator.stop();

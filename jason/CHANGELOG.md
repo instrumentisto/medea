@@ -14,9 +14,9 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Library API:
-    - Replace `MediaStreamHandle` with `LocalMediaStream` and `RemoteMediaStream` ([#97]);
-    - Expose `on_local_stream` callback in `Room` instead of `Jason` ([#54]);
-    - Remove error argument from `on_local_stream` callback ([#54]);
+    - Remove `MediaStreamHandle` ([#143]);
+    - Expose `on_local_track` callback in `Room` instead of `Jason` ([#54], [#143]);
+    - Replace `on_local_stream` callback with `on_local_track` ([#143]);
     - Room initialization ([#46]):
         - Remove `Jason.join_room()`.
 - Transport and messaging:
@@ -34,9 +34,9 @@ All user visible changes to this project will be documented in this file. This p
         - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46]);
         - `MediaManager` class obtainable via `Jason.media_manager()` ([#46]):
             - `MediaManager.enumerate_devices()`;
-            - `MediaManager.init_local_stream()`.
+            - `MediaManager.init_local_tracks()` ([#143]).
         - Local media stream constraints:
-            - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
+            - `MediaTracksSettings`, `AudioTrackConstraints` classes ([#46], [#97], [#143]);
             - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
             - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
             - `FacingMode` enum ([#137]).
@@ -44,11 +44,10 @@ All user visible changes to this project will be documented in this file. This p
             - `Jason.init_room()`;
             - `Room.join()`;
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
-        - `Room.on_failed_local_stream` callback ([#54]);
+        - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RemoteMediaStream.on_track_enabled` and `RemoteMediaStream.on_track_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123]);
-        - `RemoteMediaStream.on_track_added` callback being called when new receiver `MediaTrack` is added ([#123]);
-        - `RemoteMediaStream.has_active_audio` and `RemoteMediaStream.has_active_video` methods returning current state of the receivers ([#123]);
+        - `MediaStreamTrack.on_enabled` and `MediaStreamTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
+        - `ConnectionHandle.on_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
         - Muting/unmuting remote video/audio ([#127]):
             - `Room.mute_remote_audio`;
             - `Room.unmute_remote_audio`;
@@ -105,6 +104,7 @@ All user visible changes to this project will be documented in this file. This p
 [#132]: /../../pull/132
 [#137]: /../../pull/137
 [#138]: /../../pull/138
+[#143]: /../../pull/143
 
 
 
