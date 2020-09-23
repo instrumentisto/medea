@@ -76,7 +76,7 @@ pub enum PeerError {
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or
-    /// parsing [`MediaStream`].
+    /// parsing [`MediaStreamTrack`]s.
     #[display(fmt = "{}", _0)]
     TracksRequest(#[js(cause)] TracksRequestError),
 }
@@ -670,7 +670,7 @@ impl PeerConnection {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(&self) -> Result<()> {
-        if let Some(request) = self.media_connections.get_stream_request() {
+        if let Some(request) = self.media_connections.get_tracks_request() {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 

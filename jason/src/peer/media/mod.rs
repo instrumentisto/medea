@@ -494,7 +494,7 @@ impl MediaConnections {
     }
 
     /// Returns [`TracksRequest`] if this [`MediaConnections`] has [`Sender`]s.
-    pub fn get_stream_request(&self) -> Option<TracksRequest> {
+    pub fn get_tracks_request(&self) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
             if let MuteState::Stable(StableMuteState::Unmuted) =
