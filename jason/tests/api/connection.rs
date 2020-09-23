@@ -4,10 +4,10 @@ use futures::{
     channel::{mpsc, oneshot},
     StreamExt,
 };
-use medea_client_api_proto::{PeerId, TrackId};
+use medea_client_api_proto::PeerId;
 use medea_jason::{
     api::{ConnectionHandle, Connections},
-    peer::RemoteMediaStream,
+    media::{MediaStreamTrack, TrackKind},
 };
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
@@ -15,8 +15,6 @@ use wasm_bindgen_test::*;
 use crate::{
     get_audio_track, get_video_track, timeout, wait_and_check_test_result,
 };
-use futures::channel::mpsc::unbounded;
-use medea_jason::media::{MediaStreamTrack, TrackKind};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -38,7 +36,7 @@ async fn on_new_connection_fires() {
 }
 
 #[wasm_bindgen_test]
-async fn on_remote_stream_fires() {
+async fn on_track_added_fires() {
     let cons = Connections::default();
 
     cons.create_connection(PeerId(1), &"bob".into());

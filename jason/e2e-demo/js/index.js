@@ -644,7 +644,7 @@ window.onload = async function() {
       track.free();
     })
 
-    room.on_failed_local_stream((error) => {
+    room.on_failed_local_media((error) => {
       console.error(error.message());
     });
 
