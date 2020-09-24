@@ -999,7 +999,6 @@ impl EventHandler for InnerRoom {
                 TrackUpdate::IceRestart => {
                     peer.restart_ice();
                 }
-                TrackUpdate::TransceicerDesync => {}
             }
         }
         peer.patch_tracks(patches)
@@ -1150,23 +1149,40 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
-    async fn on_transceiver_status_updated(
+    async fn on_tracks_constrained(
         &self,
         peer_id: PeerId,
+        tracks_ids: Vec<TrackId>,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        let transceiver_statuses = peer.get_transceivers_statuses();
-        if !transceiver_statuses.is_empty() {
-            self.rpc.send_command(Command::AddPeerConnectionMetrics {
-                peer_id,
-                metrics: PeerMetrics::TransceiversStatuses(
-                    transceiver_statuses,
-                ),
-            });
-        }
+        self.rpc.send_command(Command::UpdateTracks {
+            peer_id,
+            tracks_patches: tracks_ids
+                .into_iter()
+                .map(|id| TrackPatchCommand {
+                    id,
+                    is_muted: Some(false),
+                })
+                .collect(),
+        });
+
+        Ok(())
+    }
+
+    async fn on_tracks_unconstrained(
+        &self,
+        peer_id: PeerId,
+        tracks_ids: Vec<TrackId>,
+    ) -> Self::Output {
+        self.rpc.send_command(Command::UpdateTracks {
+            peer_id,
+            tracks_patches: tracks_ids
+                .into_iter()
+                .map(|id| TrackPatchCommand {
+                    id,
+                    is_muted: Some(true),
+                })
+                .collect(),
+        });
 
         Ok(())
     }

@@ -754,7 +754,11 @@ window.onload = async function() {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
-          track.free();
+          if (track.ptr > 0) {
+            console.log("Freeing");
+            track.free();
+            console.log("Freed");
+          }
         }
         if (!isVideoSendMuted) {
           constraints = await initLocalStream();

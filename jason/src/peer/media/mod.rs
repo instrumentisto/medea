@@ -32,6 +32,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use medea_client_api_proto::MediaType;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -444,7 +445,34 @@ impl MediaConnections {
                 Direction::Send { mid, .. } => {
                     let mute_state;
                     if send_constraints.is_enabled(&track.media_type) {
-                        mute_state = StableMuteState::Unmuted;
+                        match &track.media_type {
+                            MediaType::Video(video) => {
+                                if video.is_display {
+                                    if send_constraints
+                                        .0
+                                        .borrow()
+                                        .is_display_enabled()
+                                    {
+                                        mute_state = StableMuteState::Unmuted;
+                                    } else {
+                                        mute_state = StableMuteState::Muted;
+                                    }
+                                } else {
+                                    if send_constraints
+                                        .0
+                                        .borrow()
+                                        .is_device_enabled()
+                                    {
+                                        mute_state = StableMuteState::Unmuted;
+                                    } else {
+                                        mute_state = StableMuteState::Muted;
+                                    }
+                                }
+                            }
+                            MediaType::Audio(_) => {
+                                mute_state = StableMuteState::Unmuted;
+                            }
+                        }
                     } else if is_required {
                         use MediaConnectionsError as Error;
                         return Err(tracerr::new!(
@@ -516,16 +544,13 @@ impl MediaConnections {
     pub fn get_tracks_request(&self) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            if let MuteState::Stable(StableMuteState::Unmuted) =
-                sender.mute_state()
-            {
-                stream_request
-                    .get_or_insert_with(TracksRequest::default)
-                    .add_track_request(
-                        sender.track_id(),
-                        sender.caps().clone(),
-                    );
-            }
+            // if let MuteState::Stable(StableMuteState::Unmuted) =
+            //     sender.mute_state()
+            // {
+            stream_request
+                .get_or_insert_with(TracksRequest::default)
+                .add_track_request(sender.track_id(), sender.caps().clone());
+            // }
         }
         stream_request
     }
@@ -558,14 +583,20 @@ impl MediaConnections {
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
+        let mut senders_to_unmute = Vec::new();
+        let mut senders_to_mute = Vec::new();
         for sender in inner.senders.values() {
             // skip senders that are not Unmuted
-            if !sender.is_unmuted() {
-                continue;
-            }
 
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
+                    log::debug!(
+                        "Sender [id = {}] satisfied.",
+                        sender.track_id()
+                    );
+                    if !sender.is_unmuted() {
+                        senders_to_unmute.push(sender.track_id());
+                    }
                     sender_and_track.push((sender, track));
                 } else {
                     return Err(tracerr::new!(
@@ -577,8 +608,28 @@ impl MediaConnections {
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
+                if !sender.is_muted() {
+                    senders_to_mute.push(sender.track_id());
+                }
                 sender.free_track();
             }
+        }
+
+        if !senders_to_unmute.is_empty() {
+            inner.peer_events_sender.unbounded_send(
+                PeerEvent::TracksConstrained {
+                    peer_id: inner.peer_id,
+                    track_ids: senders_to_unmute,
+                },
+            );
+        }
+        if !senders_to_mute.is_empty() {
+            inner.peer_events_sender.unbounded_send(
+                PeerEvent::TracksUnconstrained {
+                    peer_id: inner.peer_id,
+                    track_ids: senders_to_mute,
+                },
+            );
         }
 
         future::try_join_all(sender_and_track.into_iter().map(

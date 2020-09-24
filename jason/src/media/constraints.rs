@@ -22,7 +22,7 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
-pub struct LocalTracksConstraints(Rc<RefCell<MediaTracksSettings>>);
+pub struct LocalTracksConstraints(pub Rc<RefCell<MediaTracksSettings>>);
 
 /// Constraints to the media received from remote. Used to disable or enable
 /// media receiving.
@@ -203,6 +203,9 @@ struct VideoMediaTracksSettings {
     /// Indicator whether video is enabled and this constraints should be
     /// injected into `Peer`.
     is_enabled: bool,
+
+    is_display_enabled: bool,
+    is_device_enabled: bool,
 }
 
 impl Default for VideoMediaTracksSettings {
@@ -211,6 +214,8 @@ impl Default for VideoMediaTracksSettings {
         Self {
             constraints: VideoTrackConstraints::default(),
             is_enabled: true,
+            is_device_enabled: true,
+            is_display_enabled: true,
         }
     }
 }
@@ -245,8 +250,18 @@ impl MediaTracksSettings {
             video: VideoMediaTracksSettings {
                 constraints: VideoTrackConstraints::default(),
                 is_enabled: false,
+                is_display_enabled: false,
+                is_device_enabled: false,
             },
         }
+    }
+
+    pub fn is_device_enabled(&self) -> bool {
+        self.video.is_device_enabled
+    }
+
+    pub fn is_display_enabled(&self) -> bool {
+        self.video.is_display_enabled
     }
 
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
@@ -261,6 +276,7 @@ impl MediaTracksSettings {
     /// media device.
     pub fn device_video(&mut self, constraints: DeviceVideoTrackConstraints) {
         self.video.is_enabled = true;
+        self.video.is_device_enabled = true;
         self.video.constraints.constraints.set_device(constraints);
     }
 
@@ -268,6 +284,7 @@ impl MediaTracksSettings {
     /// display.
     pub fn display_video(&mut self, constraints: DisplayVideoTrackConstraints) {
         self.video.is_enabled = true;
+        self.video.is_display_enabled = true;
         self.video.constraints.constraints.set_display(constraints);
     }
 }
@@ -360,6 +377,8 @@ impl MediaTracksSettings {
         // room.
         self.audio.is_enabled &= other.audio.is_enabled;
         self.video.is_enabled &= other.video.is_enabled;
+        self.video.is_display_enabled = other.video.is_display_enabled;
+        self.video.is_device_enabled = other.video.is_device_enabled;
 
         self.audio.constraints = other.audio.constraints;
         self.video.constraints = other.video.constraints;
@@ -1047,12 +1066,12 @@ impl VideoTrackConstraints {
     /// Merges this [`VideoTrackConstraints`] with `another` one, meaning that
     /// if some constraint is not set on this one, then it will be applied from
     /// `another`.
-    pub fn merge(&mut self, another: VideoTrackConstraints) {
-        if !self.is_required && another.is_required {
-            self.is_required = another.is_required;
-        }
-        self.constraints.merge(another.constraints);
-    }
+    // pub fn merge(&mut self, another: VideoTrackConstraints) {
+    //     if !self.is_required && another.is_required {
+    //         self.is_required = another.is_required;
+    //     }
+    //     self.constraints.merge(another.constraints);
+    // }
 
     /// Returns importance of this [`VideoTrackConstraints`].
     ///

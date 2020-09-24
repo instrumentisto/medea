@@ -140,11 +140,6 @@ impl Receiver {
         self.transceiver.replace(Some(transceiver));
         self.track.replace(Some(new_track));
         self.maybe_notify_track();
-        let _ = self.peer_events_sender.unbounded_send(
-            PeerEvent::TransceiverStatusUpdated {
-                peer_id: self.peer_id,
-            },
-        );
     }
 
     /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].

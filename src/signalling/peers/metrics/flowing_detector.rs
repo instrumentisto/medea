@@ -357,14 +357,6 @@ impl RtcStatsHandler for TrafficFlowDetector {
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
     }
-
-    fn update_transceivers_statuses(
-        &mut self,
-        peer_id: PeerId,
-        transceivers_statuses: HashMap<TrackId, bool, RandomState>,
-    ) {
-        // TODO: update.
-    }
 }
 
 /// Media type of a [`MediaTrack`].

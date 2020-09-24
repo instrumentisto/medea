@@ -12,7 +12,6 @@
 mod connection_failure_detector;
 mod flowing_detector;
 mod quality_meter;
-mod tracks_desync_detector;
 
 use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
 
@@ -38,7 +37,6 @@ use crate::{
             connection_failure_detector::ConnectionFailureDetector,
             flowing_detector::TrafficFlowDetector,
             quality_meter::QualityMeterStatsHandler,
-            tracks_desync_detector::TracksDesyncDetector,
         },
         PeerTrafficWatcher,
     },
@@ -84,10 +82,6 @@ pub enum PeersMetricsEvent {
         /// [`PeerId`] of `PeerConnection`.
         peer_id: PeerId,
     },
-
-    PeerTracksDesynced {
-        peer_id: PeerId,
-    },
 }
 
 /// [`RtcStatsHandler`] performs [`RtcStat`]s analysis.
@@ -131,12 +125,6 @@ pub trait RtcStatsHandler: Debug {
     /// one subscription. Events are not saved or buffered at sending side, so
     /// you won't receive any events happened before subscription was made.
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
-
-    fn update_transceivers_statuses(
-        &mut self,
-        peer_id: PeerId,
-        transceivers_statuses: HashMap<TrackId, bool>,
-    );
 }
 
 #[cfg(test)]
@@ -169,7 +157,6 @@ impl PeerMetricsService {
             )),
             Box::new(QualityMeterStatsHandler::new()),
             Box::new(ConnectionFailureDetector::new()),
-            Box::new(TracksDesyncDetector::new()),
         ];
 
         Self { event_tx, handlers }
@@ -240,19 +227,6 @@ impl RtcStatsHandler for PeerMetricsService {
             self.handlers.iter_mut().map(|handler| handler.subscribe()),
         )
         .boxed_local()
-    }
-
-    fn update_transceivers_statuses(
-        &mut self,
-        peer_id: PeerId,
-        transceivers_statuses: HashMap<TrackId, bool, RandomState>,
-    ) {
-        for handler in &mut self.handlers {
-            handler.update_transceivers_statuses(
-                peer_id,
-                transceivers_statuses.clone(),
-            );
-        }
     }
 }
 

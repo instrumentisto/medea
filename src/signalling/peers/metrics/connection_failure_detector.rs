@@ -15,7 +15,6 @@ use crate::{
 use super::{PeersMetricsEvent, RtcStatsHandler};
 
 use self::peer_state::PeerState;
-use std::collections::hash_map::RandomState;
 
 /// Implementation of the ICE connection state of `PeerConnection`.
 mod peer_state {
@@ -190,12 +189,5 @@ impl RtcStatsHandler for ConnectionFailureDetector {
     #[inline]
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         self.event_tx.subscribe()
-    }
-
-    fn update_transceivers_statuses(
-        &mut self,
-        peer_id: PeerId,
-        transceivers_statuses: HashMap<TrackId, bool, RandomState>,
-    ) {
     }
 }

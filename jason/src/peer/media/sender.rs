@@ -23,7 +23,6 @@ use super::{
     mute_state::{MuteStateController, StableMuteState},
     MediaConnectionsError, Muteable, Result,
 };
-use crate::peer::conn::RTCPeerConnectionError::PeerConnectionEventBindFailed;
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -88,6 +87,12 @@ impl<'a> SenderBuilder<'a> {
                 }
             }
         });
+
+        log::debug!(
+            "Sender's [id = {}] mute state: {:?}",
+            this.track_id(),
+            this.mute_state()
+        );
 
         Ok(this)
     }
@@ -220,7 +225,7 @@ impl Sender {
 
     /// Checks whether general mute state of the [`Sender`] is in
     /// [`MuteState::Unmuted`].
-    fn is_general_unmuted(&self) -> bool {
+    pub fn is_general_unmuted(&self) -> bool {
         self.general_mute_state.get() == StableMuteState::Unmuted
     }
 
@@ -229,11 +234,6 @@ impl Sender {
     fn set_transceiver_direction(&self, direction: TransceiverDirection) {
         self.transceiver.set_direction(direction.into());
         self.transceiver_direction.set(direction);
-        let _ = self.peer_events_sender.unbounded_send(
-            PeerEvent::TransceiverStatusUpdated {
-                peer_id: self.peer_id,
-            },
-        );
     }
 
     /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by

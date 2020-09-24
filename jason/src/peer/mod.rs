@@ -173,8 +173,14 @@ pub enum PeerEvent {
         peer_id: Id,
     },
 
-    TransceiverStatusUpdated {
+    TracksConstrained {
         peer_id: Id,
+        track_ids: Vec<TrackId>,
+    },
+
+    TracksUnconstrained {
+        peer_id: Id,
+        track_ids: Vec<TrackId>,
     },
 }
 
