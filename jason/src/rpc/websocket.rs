@@ -17,6 +17,7 @@ use crate::utils::{
 };
 
 use super::{ClientDisconnect, CloseMsg};
+use url::Url;
 
 /// RPC transport between a client and a server.
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -249,8 +250,8 @@ impl WebSocketRpcTransport {
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
-    pub async fn new(url: &str) -> Result<Self> {
-        let socket = Rc::new(RefCell::new(InnerSocket::new(url)?));
+    pub async fn new(url: Url) -> Result<Self> {
+        let socket = Rc::new(RefCell::new(InnerSocket::new(url.as_str())?));
         {
             let mut socket_mut = socket.borrow_mut();
             let inner = Rc::clone(&socket);

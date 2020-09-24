@@ -393,9 +393,19 @@ async function updateLocalVideo(stream) {
 }
 
 window.onload = async function() {
-  let rust = await import("../../pkg");
-  let jason = new rust.Jason();
-  console.log(baseUrl);
+  if (window.asd) {
+    return;
+  }
+
+  if (!window.parent.jason) {
+    let rust = await import("../../pkg");
+    if (!window.parent.jason) {
+      window.parent.rust = rust;
+      window.parent.jason = new rust.Jason();
+    }
+  }
+  let jason = window.parent.jason;
+  let rust = window.parent.rust;
   usernameInput.addEventListener('change', (e) => {
     usernameMenuButton.innerHTML = e.target.value;
   });
@@ -428,33 +438,36 @@ window.onload = async function() {
   let room = await newRoom();
 
   async function initLocalStream() {
-      let constraints = await build_constraints(
-        isAudioSendMuted ? null : audioSelect,
-        isVideoSendMuted ? null : videoSelect
-      );
-      try {
-        localStream = await jason.media_manager().init_local_stream(constraints)
-      } catch (e) {
-        let origError = e.source();
-        if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
-          if (origError.message.includes("audio")) {
-            constraints = await build_constraints(null, videoSelect);
-            localStream = await jason.media_manager().init_local_stream(constraints);
-            alert("unable to get audio, will try to enter room with video only");
-          } else if (origError.message.includes("video")) {
-            constraints = await build_constraints(audioSelect, null);
-            localStream = await jason.media_manager().init_local_stream(constraints);
-            alert("unable to get video, will try to enter room with audio only");
-          } else {
-            throw e;
-          }
+    let constraints = await build_constraints(
+      isAudioSendMuted ? null : audioSelect,
+      isVideoSendMuted ? null : videoSelect
+    );
+
+    try {
+      console.error(constraints);
+      localStream = await jason.media_manager().init_local_stream(constraints)
+    } catch (e) {
+      console.error(e);
+      let origError = e.source();
+      if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
+        if (origError.message.includes("audio")) {
+          constraints = await build_constraints(null, videoSelect);
+          localStream = await jason.media_manager().init_local_stream(constraints);
+          alert("unable to get audio, will try to enter room with video only");
+        } else if (origError.message.includes("video")) {
+          constraints = await build_constraints(audioSelect, null);
+          localStream = await jason.media_manager().init_local_stream(constraints);
+          alert("unable to get video, will try to enter room with audio only");
         } else {
           throw e;
         }
+      } else {
+        throw e;
       }
-      await updateLocalVideo(localStream);
+    }
+    await updateLocalVideo(localStream);
 
-      return constraints;
+    return constraints;
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
@@ -530,6 +543,7 @@ window.onload = async function() {
 
   async function newRoom() {
     let room = await jason.init_room();
+    console.log(room);
 
     try {
       const constraints = await initLocalStream();
@@ -656,10 +670,6 @@ window.onload = async function() {
       );
     });
 
-    return room;
-  }
-
-  try {
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
@@ -754,6 +764,11 @@ window.onload = async function() {
         muteVideoRecv.textContent = "Enable video recv"
       }
     });
+
+    return room;
+  }
+
+  try {
     closeApp.addEventListener('click', () => {
       jason.dispose();
     });

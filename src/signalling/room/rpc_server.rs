@@ -7,14 +7,13 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
-use medea_client_api_proto::{Command, MemberId, PeerId};
+use medea_client_api_proto::{Command, MemberId, PeerId, Token};
 
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, ClosedReason, CommandMessage,
-            RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
-            RpcConnectionSettings,
+            ClosedReason, CommandMessage, RpcConnection, RpcConnectionClosed,
+            RpcConnectionEstablished, RpcConnectionSettings,
         },
         control::callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
         RpcServer,
@@ -85,10 +84,12 @@ impl RpcServer for Addr<Room> {
     fn connection_established(
         &self,
         member_id: MemberId,
+        token: Token,
         connection: Box<dyn RpcConnection>,
-    ) -> LocalBoxFuture<'static, Result<(), ()>> {
+    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>> {
         self.send(RpcConnectionEstablished {
             member_id,
+            token,
             connection,
         })
         .map(|r| {
@@ -123,24 +124,6 @@ impl RpcServer for Addr<Room> {
     /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
     fn send_command(&self, member_id: MemberId, msg: Command) {
         self.do_send(CommandMessage::new(member_id, msg));
-    }
-}
-
-impl Handler<Authorize> for Room {
-    type Result = Result<RpcConnectionSettings, AuthorizationError>;
-
-    /// Responses with `Ok` if `RpcConnection` is authorized, otherwise `Err`s.
-    fn handle(
-        &mut self,
-        msg: Authorize,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        self.members
-            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
-            .map(move |member| RpcConnectionSettings {
-                idle_timeout: member.get_idle_timeout(),
-                ping_interval: member.get_ping_interval(),
-            })
     }
 }
 
@@ -180,7 +163,7 @@ impl Handler<CommandMessage> for Room {
 }
 
 impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<Result<(), RoomError>>;
+    type Result = ActFuture<Result<RpcConnectionSettings, RoomError>>;
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`][1], initiates
     /// media establishment between members.
@@ -198,29 +181,39 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.member_id
         );
 
-        Box::pin(
-            self.members
-                .connection_established(ctx, msg.member_id, msg.connection)
-                .into_actor(self)
-                .then(|res, room, _| match res {
-                    Ok(member) => Either::Left(
-                        room.init_member_connections(&member)
-                            .map(|res, _, _| res.map(|_| member)),
-                    ),
-                    Err(err) => Either::Right(fut::err(err.into())),
-                })
-                .map(|result, room, _| {
-                    let member = result?;
-                    if let Some(callback_url) = member.get_on_join() {
-                        room.callbacks.send_callback(
-                            callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
-                        );
-                    };
-                    Ok(())
-                }),
-        )
+        if let Some(member) = self
+            .members
+            .get_member_by_id_and_credentials(&msg.member_id, &msg.token)
+        {
+            Box::pin(
+                self.members
+                    .connection_established(ctx, msg.member_id, msg.connection)
+                    .into_actor(self)
+                    .then(|res, room, _| match res {
+                        Ok(member) => Either::Left(
+                            room.init_member_connections(&member)
+                                .map(|res, _, _| res.map(|_| member)),
+                        ),
+                        Err(err) => Either::Right(fut::err(err.into())),
+                    })
+                    .map(|result, room, _| {
+                        let member = result?;
+                        if let Some(callback_url) = member.get_on_join() {
+                            room.callbacks.send_callback(
+                                callback_url,
+                                member.get_fid().into(),
+                                OnJoinEvent,
+                            );
+                        };
+                        Ok(RpcConnectionSettings {
+                            idle_timeout: member.get_idle_timeout(),
+                            ping_interval: member.get_ping_interval(),
+                        })
+                    }),
+            )
+        } else {
+            Box::pin(fut::err(RoomError::AuthorizationError))
+        }
     }
 }
 

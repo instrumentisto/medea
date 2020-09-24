@@ -1850,6 +1850,7 @@ dependencies = [
  "serde 1.0.116",
  "serde_json",
  "tracerr",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",

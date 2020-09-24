@@ -6,22 +6,16 @@ use actix::{Actor, Addr, Handler, ResponseFuture};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
-    web::{resource, Data, Path, Payload, ServiceConfig},
+    web::{resource, Data, Payload, ServiceConfig},
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
 use futures::FutureExt as _;
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{MemberId, RoomId};
 use serde::Deserialize;
 
 use crate::{
-    api::{
-        client::{
-            rpc_connection::{AuthorizationError, Authorize},
-            session::WsSession,
-        },
-        control::RoomId,
-    },
+    api::client::session::WsSession,
     conf::{Conf, Rpc},
     log::prelude::*,
     shutdown::ShutdownGracefully,
@@ -45,48 +39,18 @@ struct RequestParams {
 /// new [`WsSession`] for WebSocket connection.
 async fn ws_index(
     request: HttpRequest,
-    info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
 ) -> actix_web::Result<HttpResponse> {
-    debug!("Request params: {:?}", info);
-    let RequestParams {
-        room_id,
-        member_id,
-        credentials,
-    } = info.into_inner();
-
-    match state.rooms.get(&room_id) {
-        Some(room) => {
-            let auth_result = room
-                .send(Authorize {
-                    member_id: member_id.clone(),
-                    credentials,
-                })
-                .await
-                .map_err(|_| HttpResponse::InternalServerError())?;
-            match auth_result {
-                Ok(settings) => ws::start(
-                    WsSession::new(
-                        member_id,
-                        room_id,
-                        Box::new(room),
-                        settings.idle_timeout,
-                        settings.ping_interval,
-                    ),
-                    &request,
-                    payload,
-                ),
-                Err(AuthorizationError::MemberNotExists) => {
-                    Err(HttpResponse::NotFound().into())
-                }
-                Err(AuthorizationError::InvalidCredentials) => {
-                    Err(HttpResponse::Forbidden().into())
-                }
-            }
-        }
-        None => Err(HttpResponse::NotFound().into()),
-    }
+    ws::start(
+        WsSession::new(
+            state.rooms.clone(),
+            state.config.idle_timeout,
+            state.config.ping_interval,
+        ),
+        &request,
+        payload,
+    )
 }
 
 /// Context for [`App`] which holds all the necessary dependencies.
@@ -135,10 +99,7 @@ impl Server {
     /// Run external configuration as part of the application building
     /// process
     fn configure(cfg: &mut ServiceConfig) {
-        cfg.service(
-            resource("/ws/{room_id}/{member_id}/{credentials}")
-                .route(actix_web::web::get().to(ws_index)),
-        );
+        cfg.service(resource("/ws").route(actix_web::web::get().to(ws_index)));
     }
 }
 

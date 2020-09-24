@@ -9,9 +9,7 @@ pub mod repo;
 pub mod service;
 
 use derive_more::Display;
-use medea_client_api_proto::PeerId;
-
-use crate::api::control::RoomId;
+use medea_client_api_proto::{PeerId, RoomId};
 
 #[doc(inline)]
 pub use self::service::{

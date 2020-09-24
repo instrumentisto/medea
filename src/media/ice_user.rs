@@ -3,9 +3,7 @@
 //! [Coturn]: https://github.com/coturn/coturn
 
 use derive_more::{AsRef, Display, From, Into};
-use medea_client_api_proto::{IceServer, PeerId};
-
-use crate::api::control::RoomId;
+use medea_client_api_proto::{IceServer, PeerId, RoomId};
 
 /// Username for authorization on [Coturn] server.
 ///

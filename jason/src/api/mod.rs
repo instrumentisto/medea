@@ -31,13 +31,18 @@ pub use self::{
 /// Responsible for managing shared transports, local media
 /// and room initialization.
 #[wasm_bindgen]
-#[derive(Default)]
 pub struct Jason(Rc<RefCell<Inner>>);
 
-#[derive(Default)]
 struct Inner {
-    media_manager: Rc<MediaManager>,
+    /// Connection with Medea media server. Only one [`RpcClient`] is supported
+    /// atm.
+    rpc: Rc<dyn RpcClient>,
+    /// [`Room`]s maintained by this [`Jason`] instance.
     rooms: Vec<Room>,
+    /// [`Jason`]s [`MediaManager`]. It is shared across [`Room`]s since
+    /// [`MediaManager`] contains media tracks that can be used by multiple
+    /// [`Room`]s.
+    media_manager: Rc<MediaManager>,
 }
 
 #[wasm_bindgen]
@@ -47,19 +52,26 @@ impl Jason {
     pub fn new() -> Self {
         set_panic_hook();
         wasm_logger::init(wasm_logger::Config::default());
-        Self::default()
-    }
 
-    /// Returns [`RoomHandle`] for [`Room`].
-    pub fn init_room(&self) -> RoomHandle {
-        let rpc = Rc::new(WebSocketRpcClient::new(Box::new(|token| {
+        let rpc = Rc::new(WebSocketRpcClient::new(Box::new(|url| {
             Box::pin(async move {
-                let ws = WebSocketRpcTransport::new(&token)
+                let ws = WebSocketRpcTransport::new(url)
                     .await
                     .map_err(|e| tracerr::new!(e))?;
                 Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
             })
         })));
+
+        Self(Rc::new(RefCell::new(Inner {
+            rpc,
+            rooms: Vec::new(),
+            media_manager: Rc::new(MediaManager::default()),
+        })))
+    }
+
+    /// Returns [`RoomHandle`] for [`Room`].
+    pub fn init_room(&self) -> RoomHandle {
+        let rpc = Rc::clone(&self.0.borrow().rpc);
         self.inner_init_room(rpc)
     }
 

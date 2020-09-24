@@ -15,7 +15,9 @@ use actix::{
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Event, MemberId, NegotiationRole, PeerId};
+use medea_client_api_proto::{
+    Event, MemberId, NegotiationRole, PeerId, RoomId,
+};
 
 use crate::{
     api::control::{
@@ -25,7 +27,6 @@ use crate::{
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
         room::RoomSpec,
-        RoomId,
     },
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, Stable},
@@ -53,6 +54,9 @@ pub enum RoomError {
     PeerNotFound(PeerId),
 
     MemberError(MemberError),
+
+    #[display(fmt = "Could not find Member with provided Id or Token")]
+    AuthorizationError,
 
     #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     #[from(ignore)]

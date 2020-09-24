@@ -89,37 +89,6 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
     assert_eq!(stream.next().await.unwrap(), SRV_EVENT);
 }
 
-/// Tests [`WebSocketRpcClient::unsub`] function.
-///
-/// # Algorithm
-///
-/// 1. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`].
-///
-/// 2. Call [`WebSocketRpcClient::unsub`].
-///
-/// 3. Wait for `None` received from [`WebSocketRpcClient::subscribe`]'s
-/// `Stream`.
-#[wasm_bindgen_test]
-async fn unsub_drops_subs() {
-    let ws = new_client(Rc::new(MockRpcTransport::new()));
-    let (test_tx, test_rx) = oneshot::channel();
-    let mut subscriber_stream = ws.subscribe();
-    spawn_local(async move {
-        loop {
-            match subscriber_stream.next().await {
-                Some(_) => (),
-                None => {
-                    test_tx.send(()).unwrap();
-                    break;
-                }
-            }
-        }
-    });
-    ws.unsub();
-
-    timeout(1000, test_rx).await.unwrap().unwrap();
-}
-
 /// Tests that [`RpcTransport`] will be dropped when [`WebSocketRpcClient`] was
 /// dropped.
 ///

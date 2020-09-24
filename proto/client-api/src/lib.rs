@@ -25,13 +25,20 @@
 
 pub mod stats;
 
-use std::{collections::HashMap, convert::TryInto as _};
+use std::collections::HashMap;
 
 use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
+
+/// ID of `Room`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct RoomId(pub String);
 
 /// ID of `Member`.
 #[derive(
@@ -57,6 +64,13 @@ pub struct PeerId(pub u32);
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
+
+/// `Member` authentication token.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct Token(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -87,8 +101,7 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-// TODO: should be properly shared between medea and jason
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `ping` message that `Media Server` is expected to send to `Client`
@@ -97,11 +110,37 @@ pub enum ServerMsg {
 
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
-    Event(Event),
+    Event { room_id: RoomId, event: Event },
 
     /// `Media Server` notifies `Client` about necessity to update its RPC
     /// settings.
     RpcSettings(RpcSettings),
+
+    JoinedRoom {
+        room_id: RoomId,
+        member_id: MemberId,
+    },
+
+    LeftRoom {
+        room_id: RoomId,
+        close_reason: CloseReason,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// Message from 'Client' to 'Media Server'.
+pub enum ClientMsg {
+    /// `pong` message that `Client` answers with to `Media Server` in response
+    /// to received [`ServerMsg::Ping`].
+    Pong(u32),
+
+    /// Request of `Client` to change the state on `Media Server`.
+    Command {
+        room_id: RoomId,
+        command: Command,
+    },
+
+    JoinRoom((RoomId, MemberId, Token)),
 }
 
 /// RPC settings of `Client` received from `Media Server`.
@@ -117,18 +156,6 @@ pub struct RpcSettings {
     ///
     /// Unit: millisecond.
     pub ping_interval_ms: u32,
-}
-
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
-/// Message from 'Client' to 'Media Server'.
-pub enum ClientMsg {
-    /// `pong` message that `Client` answers with to `Media Server` in response
-    /// to received [`ServerMsg::Ping`].
-    Pong(u32),
-
-    /// Request of `Client` to change the state on `Media Server`.
-    Command(Command),
 }
 
 /// WebSocket message from Web Client to Media Server.
@@ -625,337 +652,445 @@ pub enum ConnectionQualityScore {
     /// Satisfied.
     High = 4,
 }
+// #[cfg(feature = "jason")]
+// impl Serialize for ClientMsg {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         use serde::{
+//             private::ser::FlatMapSerializer,
+//             ser::{SerializeMap, SerializeStruct},
+//         };
+//
+//         match self {
+//             Self::Pong(n) => {
+//                 let mut ping = serializer.serialize_struct("pong", 1)?;
+//                 ping.serialize_field("pong", n)?;
+//                 ping.end()
+//             }
+//             Self::Command { room_id, command } => {
+//                 let mut serializer = serializer.serialize_map(None)?;
+//                 serializer.serialize_entry("room_id", &room_id)?;
+//                 command.serialize(FlatMapSerializer(&mut serializer))?;
+//                 serializer.end()
+//             }
+//             ClientMsg::JoinRooms(credentials)=> {
+//                 // let mut serde_state = match Serializer::serialize_struct(
+//                 //     serializer,
+//                 //     "ClientMsg",
+//                 //     0 + 1,
+//                 // ) {
+//                 //     Ok(val) => val,
+//                 //     Err(err) => {
+//                 //         return Err(err);
+//                 //     }
+//                 // };
+//                 // match SerializeStruct::serialize_field(
+//                 //     &mut serde_state,
+//                 //     "credentials",
+//                 //     credentials,
+//                 // ) {
+//                 //     Ok(val) => val,
+//                 //     Err(err) => {
+//                 //         return Err(err);
+//                 //     }
+//                 // };
+//                 // SerializeStruct::end(serde_state)
+//
+//             }
+//         }
+//     }
+// }
+//
+// #[cfg(feature = "medea")]
+// impl<'de> Deserialize<'de> for ClientMsg {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         use serde::de::Error as _;
+//
+//         let mut ev = serde_json::Value::deserialize(deserializer)?;
+//         let map = ev.as_object_mut().ok_or_else(|| {
+//             D::Error::custom(
+//                 "unable to deserialize ClientMsg: Value is not an Object",
+//             )
+//         })?;
+//
+//         if let Some(v) = map.get("pong") {
+//             let n = v
+//                 .as_u64()
+//                 .ok_or_else(|| {
+//                     D::Error::custom(format!(
+//                         "unable to deserialize ClientMsg::Pong: {:?}",
+//                         &ev,
+//                     ))
+//                 })?
+//                 .try_into()
+//                 .map_err(|e| {
+//                     D::Error::custom(format!(
+//                         "ClientMsg::Pong overflows 32 bits: {}",
+//                         e,
+//                     ))
+//                 })?;
+//
+//             Ok(Self::Pong(n))
+//         } else if let Some(serde_json::Value::String(room_id)) =
+//             map.remove("room_id")
+//         {
+//             if let Some(serde_json::Value::String(token)) =
+// map.remove("token")             {
+//                 Ok(Self::JoinRooms {
+//                     room_id: RoomId(room_id),
+//                     token,
+//                 })
+//             } else {
+//                 let command =
+//                     serde_json::from_value::<Command>(ev).map_err(|e| {
+//                         D::Error::custom(format!(
+//                             "unable to deserialize ClientMsg::Command: {:?}",
+//                             e,
+//                         ))
+//                     })?;
+//                 Ok(Self::Command {
+//                     room_id: RoomId(room_id),
+//                     command,
+//                 })
+//             }
+//         } else {
+//             Err(D::Error::custom(
+//                 "unable to deserialize ClientMsg::Command: missing field \
+//                  `room_id`",
+//             ))
+//         }
+//     }
+// }
+//
+// #[cfg(feature = "medea")]
+// impl Serialize for ServerMsg {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         use serde::{
+//             private::ser::FlatMapSerializer,
+//             ser::{SerializeMap, SerializeStruct},
+//         };
+//
+//         match self {
+//             Self::Ping(n) => {
+//                 let mut ping = serializer.serialize_struct("ping", 1)?;
+//                 ping.serialize_field("ping", n)?;
+//                 ping.end()
+//             }
+//             Self::Event { room_id, event } => {
+//                 let mut serializer = serializer.serialize_map(None)?;
+//                 serializer.serialize_entry("room_id", &room_id)?;
+//                 event.serialize(FlatMapSerializer(&mut serializer))?;
+//                 serializer.end()
+//             }
+//             Self::RpcSettings(rpc_settings) => {
+//                 rpc_settings.serialize(serializer)
+//             }
+//         }
+//     }
+// }
+//
+// #[cfg(feature = "jason")]
+// impl<'de> Deserialize<'de> for ServerMsg {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         use serde::de::Error as _;
+//
+//         let mut ev = serde_json::Value::deserialize(deserializer)?;
+//         let map = ev.as_object_mut().ok_or_else(|| {
+//             D::Error::custom(
+//                 "unable to deserialize ServerMsg: Value is not an Object",
+//             )
+//         })?;
+//
+//         if let Some(v) = map.get("ping") {
+//             let n = v
+//                 .as_u64()
+//                 .ok_or_else(|| {
+//                     D::Error::custom(format!(
+//                         "unable to deserialize ServerMsg::Ping [{:?}]",
+//                         &ev
+//                     ))
+//                 })?
+//                 .try_into()
+//                 .map_err(|e| {
+//                     D::Error::custom(format!(
+//                         "ServerMsg::Ping overflows 32 bits: {}",
+//                         e,
+//                     ))
+//                 })?;
+//
+//             Ok(Self::Ping(n))
+//         } else if let Some(serde_json::Value::String(room_id)) =
+//             map.remove("room_id")
+//         {
+//             let event = serde_json::from_value::<Event>(ev).map_err(|e| {
+//                 D::Error::custom(format!(
+//                     "unable to deserialize ServerMsg::Event: {:?}",
+//                     e,
+//                 ))
+//             })?;
+//             Ok(Self::Event {
+//                 room_id: RoomId(room_id),
+//                 event,
+//             })
+//         } else {
+//             serde_json::from_value::<RpcSettings>(ev)
+//                 .map(Self::RpcSettings)
+//                 .map_err(|e| {
+//                     D::Error::custom(format!(
+//                         "unable to deserialize ServerMsg::RpcSettings: {:?}",
+//                         e,
+//                     ))
+//                 })
+//         }
+//     }
+// }
 
-#[cfg(feature = "jason")]
-impl Serialize for ClientMsg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        match self {
-            Self::Pong(n) => {
-                let mut ping = serializer.serialize_struct("pong", 1)?;
-                ping.serialize_field("pong", n)?;
-                ping.end()
-            }
-            Self::Command(command) => command.serialize(serializer),
-        }
-    }
-}
-
-#[cfg(feature = "medea")]
-impl<'de> Deserialize<'de> for ClientMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
-
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ClientMsg [{:?}]",
-                &ev,
-            ))
-        })?;
-
-        if let Some(v) = map.get("pong") {
-            let n = v
-                .as_u64()
-                .ok_or_else(|| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ClientMsg::Pong [{:?}]",
-                        &ev,
-                    ))
-                })?
-                .try_into()
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "ClientMsg::Pong overflows 32 bits: {}",
-                        e,
-                    ))
-                })?;
-
-            Ok(Self::Pong(n))
-        } else {
-            let command =
-                serde_json::from_value::<Command>(ev).map_err(|e| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ClientMsg::Command [{:?}]",
-                        e,
-                    ))
-                })?;
-            Ok(Self::Command(command))
-        }
-    }
-}
-
-#[cfg(feature = "medea")]
-impl Serialize for ServerMsg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        match self {
-            Self::Ping(n) => {
-                let mut ping = serializer.serialize_struct("ping", 1)?;
-                ping.serialize_field("ping", n)?;
-                ping.end()
-            }
-            Self::Event(command) => command.serialize(serializer),
-            Self::RpcSettings(rpc_settings) => {
-                rpc_settings.serialize(serializer)
-            }
-        }
-    }
-}
-
-#[cfg(feature = "jason")]
-impl<'de> Deserialize<'de> for ServerMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
-
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ServerMsg [{:?}]",
-                &ev,
-            ))
-        })?;
-
-        if let Some(v) = map.get("ping") {
-            let n = v
-                .as_u64()
-                .ok_or_else(|| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ServerMsg::Ping [{:?}]",
-                        &ev
-                    ))
-                })?
-                .try_into()
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "ServerMsg::Ping overflows 32 bits: {}",
-                        e,
-                    ))
-                })?;
-
-            Ok(Self::Ping(n))
-        } else {
-            let msg = serde_json::from_value::<Event>(ev.clone())
-                .map(Self::Event)
-                .or_else(move |_| {
-                    serde_json::from_value::<RpcSettings>(ev)
-                        .map(Self::RpcSettings)
-                })
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ServerMsg [{:?}]",
-                        e,
-                    ))
-                })?;
-            Ok(msg)
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn command() {
-        let mut mids = HashMap::new();
-        mids.insert(TrackId(0), String::from("1"));
-
-        let command = ClientMsg::Command(Command::MakeSdpOffer {
-            peer_id: PeerId(77),
-            sdp_offer: "offer".to_owned(),
-            mids,
-            transceivers_statuses: HashMap::new(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let command_str =
-            "{\
-                \"command\":\"MakeSdpOffer\",\
-                \"data\":{\
-                    \"peer_id\":77,\
-                    \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"},\
-                    \"transceivers_statuses\":{}\
-                }\
-            }";
-
-        assert_eq!(command_str, serde_json::to_string(&command).unwrap());
-        assert_eq!(
-            command,
-            serde_json::from_str(&serde_json::to_string(&command).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn ping() {
-        let ping = ServerMsg::Ping(15);
-        let ping_str = "{\"ping\":15}";
-
-        assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
-        assert_eq!(
-            ping,
-            serde_json::from_str(&serde_json::to_string(&ping).unwrap())
-                .unwrap()
-        )
-    }
-
-    #[test]
-    fn event() {
-        let event = ServerMsg::Event(Event::SdpAnswerMade {
-            peer_id: PeerId(45),
-            sdp_answer: "answer".to_owned(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let event_str =
-            "{\
-                \"event\":\"SdpAnswerMade\",\
-                \"data\":{\
-                    \"peer_id\":45,\
-                    \"sdp_answer\":\"answer\"\
-                }\
-            }";
-
-        assert_eq!(event_str, serde_json::to_string(&event).unwrap());
-        assert_eq!(
-            event,
-            serde_json::from_str(&serde_json::to_string(&event).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn pong() {
-        let pong = ClientMsg::Pong(5);
-        let pong_str = "{\"pong\":5}";
-
-        assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
-        assert_eq!(
-            pong,
-            serde_json::from_str(&serde_json::to_string(&pong).unwrap())
-                .unwrap()
-        )
-    }
-
-    #[test]
-    fn track_patch_merge() {
-        for (track_patches, result) in vec![
-            (
-                vec![
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: Some(false),
-                        is_muted_individual: Some(false),
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
-                    },
-                ],
-                TrackPatchEvent {
-                    id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
-                },
-            ),
-            (
-                vec![
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
-                    },
-                ],
-                TrackPatchEvent {
-                    id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
-                },
-            ),
-            (
-                vec![
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
-                    },
-                ],
-                TrackPatchEvent {
-                    id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
-                },
-            ),
-            (
-                vec![
-                    TrackPatchEvent {
-                        id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
-                    },
-                    TrackPatchEvent {
-                        id: TrackId(2),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
-                    },
-                ],
-                TrackPatchEvent {
-                    id: TrackId(1),
-                    is_muted_general: None,
-                    is_muted_individual: None,
-                },
-            ),
-        ] {
-            let mut merge_track_patch = TrackPatchEvent::new(TrackId(1));
-            for track_patch in &track_patches {
-                merge_track_patch.merge(track_patch);
-            }
-
-            assert_eq!(
-                result, merge_track_patch,
-                "track patches: {:?}",
-                track_patches
-            );
-        }
-    }
-}
+// #[cfg(test)]
+// mod test {
+//     use super::*;
+//
+//     #[test]
+//     fn command() {
+//         let mut mids = HashMap::new();
+//         mids.insert(TrackId(0), String::from("1"));
+//
+//         let command = ClientMsg::Command {
+//             room_id: RoomId::from("room"),
+//             command: Command::MakeSdpOffer {
+//                 peer_id: PeerId(77),
+//                 sdp_offer: "offer".to_owned(),
+//                 mids,
+//                 transceivers_statuses: HashMap::new(),
+//             },
+//         };
+//         #[cfg_attr(nightly, rustfmt::skip)]
+//             let command_str =
+//             "{\
+//                 \"room_id\":\"room\",\
+//                 \"command\":\"MakeSdpOffer\",\
+//                 \"data\":{\
+//                     \"peer_id\":77,\
+//                     \"sdp_offer\":\"offer\",\
+//                     \"mids\":{\"0\":\"1\"},\
+//                     \"transceivers_statuses\":{}\
+//                 }\
+//             }";
+//
+//         assert_eq!(command_str, serde_json::to_string(&command).unwrap());
+//         assert_eq!(
+//             command,
+//             serde_json::from_str(&serde_json::to_string(&command).unwrap())
+//                 .unwrap()
+//         );
+//     }
+//
+//     #[test]
+//     fn join_room() {
+//         let join_room = ClientMsg::JoinRooms {
+//             credentials: vec![
+//                 (RoomId::from("room1"), MemberId::from("member1"),
+// Token::from("token1")),                 (RoomId::from("room2"),
+// MemberId::from("member2"), Token::from("token2")),             ]
+//         };
+//         let msg_str = "{\"room_id\":\"room123\",\"token\":\"token123\"}";
+//
+//         assert_eq!(msg_str, serde_json::to_string(&join_room).unwrap());
+//         assert_eq!(
+//             join_room,
+//             serde_json::from_str(&serde_json::to_string(&join_room).unwrap())
+//                 .unwrap()
+//         );
+//     }
+//
+//     #[test]
+//     fn pong() {
+//         let pong = ClientMsg::Pong(5);
+//         let pong_str = "{\"pong\":5}";
+//
+//         assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
+//         assert_eq!(
+//             pong,
+//             serde_json::from_str(&serde_json::to_string(&pong).unwrap())
+//                 .unwrap()
+//         )
+//     }
+//
+//     #[test]
+//     fn event() {
+//         let event = ServerMsg::Event {
+//             room_id: RoomId::from("room"),
+//             event: Event::SdpAnswerMade {
+//                 peer_id: PeerId(45),
+//                 sdp_answer: "answer".to_owned(),
+//             },
+//         };
+//         #[cfg_attr(nightly, rustfmt::skip)]
+//             let event_str =
+//             "{\
+//                 \"room_id\":\"room\",\
+//                 \"event\":\"SdpAnswerMade\",\
+//                 \"data\":{\
+//                     \"peer_id\":45,\
+//                     \"sdp_answer\":\"answer\"\
+//                 }\
+//             }";
+//
+//         assert_eq!(event_str, serde_json::to_string(&event).unwrap());
+//         assert_eq!(
+//             event,
+//             serde_json::from_str(&serde_json::to_string(&event).unwrap())
+//                 .unwrap()
+//         );
+//     }
+//
+//     #[test]
+//     fn ping() {
+//         let ping = ServerMsg::Ping(15);
+//         let ping_str = "{\"ping\":15}";
+//
+//         assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
+//         assert_eq!(
+//             ping,
+//             serde_json::from_str(&serde_json::to_string(&ping).unwrap())
+//                 .unwrap()
+//         )
+//     }
+//
+//     #[test]
+//     fn rpc_settings() {
+//         let rpc_settings = ServerMsg::RpcSettings(RpcSettings {
+//             idle_timeout_ms: 123,
+//             ping_interval_ms: 456,
+//         });
+//         let serialized =
+// "{\"idle_timeout_ms\":123,\"ping_interval_ms\":456}";
+//
+//         assert_eq!(serialized,
+// serde_json::to_string(&rpc_settings).unwrap());         assert_eq!(
+//             rpc_settings,
+//             serde_json::from_str(
+//                 &serde_json::to_string(&rpc_settings).unwrap()
+//             )
+//             .unwrap()
+//         )
+//     }
+//
+//     #[test]
+//     fn track_patch_merge() {
+//         for (track_patches, result) in vec![
+//             (
+//                 vec![
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: Some(true),
+//                         is_muted_individual: Some(true),
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: Some(false),
+//                         is_muted_individual: Some(false),
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: None,
+//                         is_muted_individual: None,
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: Some(true),
+//                         is_muted_individual: Some(true),
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: Some(true),
+//                         is_muted_individual: Some(true),
+//                     },
+//                 ],
+//                 TrackPatchEvent {
+//                     id: TrackId(1),
+//                     is_muted_general: Some(true),
+//                     is_muted_individual: Some(true),
+//                 },
+//             ),
+//             (
+//                 vec![
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: None,
+//                         is_muted_individual: None,
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: Some(true),
+//                         is_muted_individual: Some(true),
+//                     },
+//                 ],
+//                 TrackPatchEvent {
+//                     id: TrackId(1),
+//                     is_muted_general: Some(true),
+//                     is_muted_individual: Some(true),
+//                 },
+//             ),
+//             (
+//                 vec![
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: Some(true),
+//                         is_muted_individual: Some(true),
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: None,
+//                         is_muted_individual: None,
+//                     },
+//                 ],
+//                 TrackPatchEvent {
+//                     id: TrackId(1),
+//                     is_muted_general: Some(true),
+//                     is_muted_individual: Some(true),
+//                 },
+//             ),
+//             (
+//                 vec![
+//                     TrackPatchEvent {
+//                         id: TrackId(1),
+//                         is_muted_general: None,
+//                         is_muted_individual: None,
+//                     },
+//                     TrackPatchEvent {
+//                         id: TrackId(2),
+//                         is_muted_general: Some(true),
+//                         is_muted_individual: Some(true),
+//                     },
+//                 ],
+//                 TrackPatchEvent {
+//                     id: TrackId(1),
+//                     is_muted_general: None,
+//                     is_muted_individual: None,
+//                 },
+//             ),
+//         ] {
+//             let mut merge_track_patch = TrackPatchEvent::new(TrackId(1));
+//             for track_patch in &track_patches {
+//                 merge_track_patch.merge(track_patch);
+//             }
+//
+//             assert_eq!(
+//                 result, merge_track_patch,
+//                 "track patches: {:?}",
+//                 track_patches
+//             );
+//         }
+//     }
+// }

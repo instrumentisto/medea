@@ -3,12 +3,6 @@
 <head>
   <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <title>Medea E2E demo</title>
-  <script>
-    function goToCall() {
-      let roomId = document.getElementsByClassName('choose-room__id')[0].value;
-      document.location = "/video-call#" + roomId;
-    }
-  </script>
 
   <style>
     .choose-room {
@@ -29,9 +23,10 @@
     }
   </style>
 </head>
-<body>
-  <div class="choose-room">
-    <input class="choose-room__id" placeholder="Room ID">
-    <button class="choose-room__join" onclick="goToCall()" type="submit">JOIN</button>
-  </div>
+<body style="height:850px">
+<script>
+  window.asd = "111";
+</script>
+  <iframe src="http://localhost:8081/video-call#111" style="border:none; width:50%; height:100%; float:left"></iframe>
+  <iframe src="http://localhost:8081/video-call#222" style="border:none; width:50%; height:100%; float:right"></iframe>
 </body>

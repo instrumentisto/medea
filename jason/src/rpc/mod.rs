@@ -5,7 +5,7 @@ mod heartbeat;
 mod reconnect_handle;
 pub mod websocket;
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
@@ -16,11 +16,12 @@ use futures::{
 };
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
-    Event, RpcSettings, ServerMsg,
+    Event, MemberId, RoomId, RpcSettings, ServerMsg, Token,
 };
 use medea_reactive::ObservableCell;
 use serde::Serialize;
 use tracerr::Traced;
+use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
@@ -198,6 +199,50 @@ pub enum RpcClientError {
     /// Occurs if [`RpcClient::connect`] fails.
     #[display(fmt = "Connection failed. {:?}", _0)]
     ConnectionFailed(ClosedStateReason),
+
+    #[display(fmt = "join_room url parsing error: {}", _0)]
+    UrlParsingError(String),
+}
+
+pub fn parse_join_room_url(
+    url: &str,
+) -> Result<(Url, RoomId, MemberId, Token), Traced<RpcClientError>> {
+    static SEGMENTS_PARSE_ERROR_FN: fn() -> Traced<RpcClientError> = || {
+        tracerr::new!(RpcClientError::UrlParsingError(
+            "URL path must end with 3 segments, e.g.: \
+             `/room_id/member_id/token`"
+                .to_owned()
+        ))
+    };
+
+    let mut url = Url::parse(&url).map_err(|err| {
+        tracerr::new!(RpcClientError::UrlParsingError(err.to_string()))
+    })?;
+    url.set_fragment(None);
+    url.set_query(None);
+
+    let mut segments = url
+        .path_segments()
+        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
+        .rev();
+    let token = segments
+        .next()
+        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
+        .to_owned()
+        .into();
+    let member_id = segments
+        .next()
+        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
+        .to_owned()
+        .into();
+    let room_id = segments
+        .next()
+        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
+        .to_owned()
+        .into();
+    url.set_path("/ws");
+
+    Ok((url, room_id, member_id, token))
 }
 
 /// Client to talk with server via Client API RPC.
@@ -212,7 +257,7 @@ pub trait RpcClient {
     /// new RPC connection.
     ///
     /// If [`RpcClient`] already in [`State::Connecting`] then this function
-    /// will not perform one more connection try. It will subsribe to
+    /// will not perform one more connection try. It will subscribe to
     /// [`State`] changes and wait for first connection result. And based on
     /// this result - this function will be resolved.
     ///
@@ -220,19 +265,19 @@ pub trait RpcClient {
     /// instantly resolved.
     async fn connect(
         self: Rc<Self>,
-        token: String,
+        url: Url,
+        room_id: RoomId,
+        member_id: MemberId,
+        token: Token,
     ) -> Result<(), Traced<RpcClientError>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
     /// [`Stream`]: futures::Stream
-    fn subscribe(&self) -> LocalBoxStream<'static, Event>;
-
-    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
-    fn unsub(&self);
+    fn subscribe(&self, room_id: RoomId) -> LocalBoxStream<'static, Event>;
 
     /// Sends [`Command`] to server.
-    fn send_command(&self, command: Command);
+    fn send_command(&self, room_id: RoomId, command: Command);
 
     /// [`Future`] which will resolve on normal [`RpcClient`] connection
     /// closing.
@@ -263,12 +308,7 @@ pub trait RpcClient {
     ///
     /// This will fire when connection to RPC server is reestablished after
     /// connection loss.
-    fn on_reconnected(&self) -> LocalBoxStream<'static, ()>;
-
-    /// Returns current token with which this [`RpcClient`] was connected.
-    ///
-    /// If token is `None` then [`RpcClient`] never was connected to a server.
-    fn get_token(&self) -> Option<String>;
+    fn on_reconnected(&self, room_id: RoomId) -> LocalBoxStream<'static, ()>;
 }
 
 /// Inner state of [`WebsocketRpcClient`].
@@ -280,7 +320,7 @@ struct Inner {
     heartbeat: Option<Heartbeat>,
 
     /// Event's subscribers list.
-    subs: Vec<mpsc::UnboundedSender<Event>>,
+    subs: HashMap<RoomId, Vec<mpsc::UnboundedSender<Event>>>,
 
     /// [`oneshot::Sender`] with which [`CloseReason`] will be sent when
     /// WebSocket connection normally closed by server.
@@ -314,7 +354,7 @@ struct Inner {
 /// [`WebSocketRpcClient::establish_connection`] function.
 type RpcTransportFactory = Box<
     dyn Fn(
-        String,
+        Url,
     ) -> LocalBoxFuture<
         'static,
         Result<Rc<dyn RpcTransport>, Traced<TransportError>>,
@@ -326,7 +366,7 @@ impl Inner {
         RefCell::new(Self {
             sock: None,
             on_close_subscribers: Vec::new(),
-            subs: Vec::new(),
+            subs: HashMap::new(),
             heartbeat: None,
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             on_connection_loss_subs: Vec::new(),
@@ -339,11 +379,6 @@ impl Inner {
     }
 }
 
-// TODO:
-// 1. Proper sub registry.
-// 2. Reconnect.
-// 3. Disconnect if no pongs.
-// 4. Buffering if no socket?
 /// Client API RPC client to talk with server via [WebSocket].
 ///
 /// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
@@ -359,6 +394,7 @@ impl WebSocketRpcClient {
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
     /// subs about connection loss.
     fn handle_connection_loss(&self, closed_state_reason: ClosedStateReason) {
+        log::error!("WebSocketRpcClient::handle_connection_loss: {:?}", closed_state_reason);
         self.0
             .borrow()
             .state
@@ -411,12 +447,10 @@ impl WebSocketRpcClient {
     /// Handles [`ServerMsg`]s from a remote server.
     fn on_transport_message(&self, msg: ServerMsg) {
         match msg {
-            ServerMsg::Event(event) => {
-                // TODO: filter messages by session
-                self.0
-                    .borrow_mut()
-                    .subs
-                    .retain(|sub| sub.unbounded_send(event.clone()).is_ok());
+            ServerMsg::Event { room_id, event } => {
+                self.0.borrow_mut().subs.get_mut(&room_id).map(|subs| {
+                    subs.retain(|sub| sub.unbounded_send(event.clone()).is_ok())
+                });
             }
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
@@ -436,6 +470,16 @@ impl WebSocketRpcClient {
                 .ok();
             }
             ServerMsg::Ping(_) => {}
+
+            ServerMsg::JoinedRoom { room_id, member_id} => {
+                // unimplemented!()
+            },
+            ServerMsg::LeftRoom {
+                room_id: _,
+                close_reason: _,
+            } => {
+                unimplemented!()
+            },
         }
     }
 
@@ -473,14 +517,12 @@ impl WebSocketRpcClient {
     /// Tries to establish [`RpcClient`] connection.
     async fn establish_connection(
         self: Rc<Self>,
-        token: String,
+        url: Url,
     ) -> Result<(), Traced<RpcClientError>> {
-        self.0.borrow_mut().token = Some(token.clone());
         self.0.borrow().state.set(ClientState::Connecting);
 
         // wait for transport open
-        let create_transport_fut =
-            (self.0.borrow().rpc_transport_factory)(token);
+        let create_transport_fut = (self.0.borrow().rpc_transport_factory)(url);
         let transport = create_transport_fut.await.map_err(|e| {
             let transport_err = e.into_inner();
             self.0.borrow().state.set(ClientState::Closed(
@@ -586,53 +628,13 @@ impl WebSocketRpcClient {
                 heartbeat.update_settings(idle_timeout, ping_interval)
             })
     }
-}
 
-#[async_trait(?Send)]
-impl RpcClient for WebSocketRpcClient {
-    async fn connect(
-        self: Rc<Self>,
-        token: String,
-    ) -> Result<(), Traced<RpcClientError>> {
-        let current_token = self.0.borrow().token.clone();
-        if let Some(current_token) = current_token {
-            if current_token == token {
-                let state = self.0.borrow().state.borrow().clone();
-                match state {
-                    ClientState::Open(_) => Ok(()),
-                    ClientState::Connecting => self.connecting_result().await,
-                    ClientState::Closed(_) => {
-                        self.establish_connection(token).await
-                    }
-                }
-            } else {
-                self.establish_connection(token).await
-            }
-        } else {
-            self.establish_connection(token).await
-        }
-    }
-
-    // TODO: proper sub registry
-    fn subscribe(&self) -> LocalBoxStream<'static, Event> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().subs.push(tx);
-
-        Box::pin(rx)
-    }
-
-    // TODO: proper sub registry
-    fn unsub(&self) {
-        self.0.borrow_mut().subs.clear();
-    }
-
-    // TODO: proper sub registry
-    fn send_command(&self, command: Command) {
+    fn send_client_msg(&self, msg: &ClientMsg) {
         let socket_borrow = &self.0.borrow().sock;
 
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
-            if let Err(err) = socket.send(&ClientMsg::Command(command)) {
+            if let Err(err) = socket.send(msg) {
                 // TODO: we will just wait for reconnect at this moment
                 //       should be handled properly as a part of future
                 //       state synchronization mechanism
@@ -640,6 +642,53 @@ impl RpcClient for WebSocketRpcClient {
                 JasonError::from(err).print()
             }
         }
+    }
+}
+
+#[async_trait(?Send)]
+impl RpcClient for WebSocketRpcClient {
+    async fn connect(
+        self: Rc<Self>,
+        url: Url,
+        room_id: RoomId,
+        member_id: MemberId,
+        token: Token,
+    ) -> Result<(), Traced<RpcClientError>> {
+        let state = self.0.borrow().state.borrow().clone();
+        match state {
+            ClientState::Open(_) => {
+                // match session_state {
+                //      authorized => Ok,
+                //      authorizing => join
+                //      not_authorized => authorize
+                // }
+                // return Ok(());
+            }
+            ClientState::Connecting => self.connecting_result().await?,
+            ClientState::Closed(_) => {
+                Rc::clone(&self)
+                    .establish_connection(url)
+                    .await?
+            }
+        };
+        self.send_client_msg(&ClientMsg::JoinRoom((room_id, member_id, token)));
+        Ok(())
+    }
+
+    fn subscribe(&self, room_id: RoomId) -> LocalBoxStream<'static, Event> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0
+            .borrow_mut()
+            .subs
+            .entry(room_id)
+            .or_default()
+            .push(tx);
+
+        Box::pin(rx)
+    }
+
+    fn send_command(&self, room_id: RoomId, command: Command) {
+        self.send_client_msg(&ClientMsg::Command { room_id, command });
     }
 
     fn on_normal_close(
@@ -656,7 +705,7 @@ impl RpcClient for WebSocketRpcClient {
         Box::pin(rx)
     }
 
-    fn on_reconnected(&self) -> LocalBoxStream<'static, ()> {
+    fn on_reconnected(&self, room_id: RoomId) -> LocalBoxStream<'static, ()> {
         self.0
             .borrow()
             .state
@@ -673,10 +722,6 @@ impl RpcClient for WebSocketRpcClient {
 
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason
-    }
-
-    fn get_token(&self) -> Option<String> {
-        self.0.borrow().token.clone()
     }
 }
 

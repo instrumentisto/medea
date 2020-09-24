@@ -16,11 +16,10 @@ use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
     stats::RtcStat, Incrementable, MemberId, PeerConnectionState, PeerId,
-    TrackId,
+    RoomId, TrackId,
 };
 
 use crate::{
-    api::control::RoomId,
     conf,
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, PeerStateMachine},

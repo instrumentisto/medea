@@ -3,9 +3,7 @@
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
 use derive_more::Display;
-use medea_client_api_proto::PeerId;
-
-use crate::api::control::RoomId;
+use medea_client_api_proto::{PeerId, RoomId};
 
 /// Errors of [`CoturnEvent`] parsing.
 #[derive(Debug, Display)]

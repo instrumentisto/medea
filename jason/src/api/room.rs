@@ -13,8 +13,8 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
-    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatchCommand, TrackUpdate,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, RoomId, Track,
+    TrackId, TrackPatchCommand, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -32,8 +32,8 @@ use crate::{
         TrackDirection, TransceiverKind, TransceiverSide,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
-        RpcClientError, TransportError,
+        parse_join_room_url, ClientDisconnect, CloseReason, ReconnectHandle,
+        RpcClient, RpcClientError, TransportError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
@@ -205,8 +205,18 @@ impl RoomHandle {
     ///
     /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
     /// server.
-    pub async fn inner_join(&self, token: String) -> Result<(), JasonError> {
+    pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
+        enum RoomEvent {
+            RpcEvent(RpcEvent),
+            PeerEvent(PeerEvent),
+            RpcClientLostConnection,
+            RpcClientReconnected,
+        }
+
         let inner = upgrade_or_detached!(self.0, JasonError)?;
+
+        let (url, room_id, member_id, token) =
+            parse_join_room_url(&url).unwrap();
 
         if !inner.on_failed_local_stream.is_set() {
             return Err(JasonError::from(tracerr::new!(
@@ -220,19 +230,79 @@ impl RoomHandle {
             )));
         }
 
+        inner.room_id.replace(Some(room_id.clone()));
         Rc::clone(&inner.rpc)
-            .connect(token)
+            .connect(url, room_id.clone(), member_id, token)
             .await
             .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
+        log::error!("333");
 
-        let mut connection_loss_stream = inner.rpc.on_connection_loss();
-        let weak_inner = Rc::downgrade(&inner);
+        let (tx, peer_events_rx) = mpsc::unbounded();
+        inner.peer_event_sender.replace(Some(tx));
+
+        let mut rpc_events_stream = inner
+            .rpc
+            .subscribe(inner.room_id.borrow().as_ref().unwrap().clone())
+            .map(RoomEvent::RpcEvent)
+            .fuse();
+        let mut peer_events_stream =
+            peer_events_rx.map(RoomEvent::PeerEvent).fuse();
+        let mut rpc_connection_lost = inner
+            .rpc
+            .on_connection_loss()
+            .map(|_| RoomEvent::RpcClientLostConnection)
+            .fuse();
+        let mut rpc_client_reconnected = inner
+            .rpc
+            .on_reconnected(inner.room_id.borrow().as_ref().unwrap().clone())
+            .map(|_| RoomEvent::RpcClientReconnected)
+            .fuse();
+        log::error!("444");
+        let inner = Rc::downgrade(&inner);
         spawn_local(async move {
-            while connection_loss_stream.next().await.is_some() {
-                if let Some(inner) = weak_inner.upgrade() {
-                    let reconnect_handle =
-                        ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                    inner.on_connection_loss.call(reconnect_handle);
+            loop {
+                let event: RoomEvent = futures::select! {
+                    event = rpc_events_stream.select_next_some() => event,
+                    event = peer_events_stream.select_next_some() => event,
+                    event = rpc_connection_lost.select_next_some() => event,
+                    event = rpc_client_reconnected.select_next_some() => event,
+                    complete => break,
+                };
+
+                if let Some(inner) = inner.upgrade() {
+                    let event_handle_result = match event {
+                        RoomEvent::RpcEvent(event) => {
+                            log::error!("RoomEvent::RpcEvent");
+                            event.dispatch_with(inner.deref()).await
+                        }
+                        RoomEvent::PeerEvent(event) => {
+                            log::error!("RoomEvent::PeerEvent");
+                            event.dispatch_with(inner.deref()).await
+                        }
+                        RoomEvent::RpcClientLostConnection => {
+                            log::error!("RoomEvent::RpcClientLostConnection");
+                            inner.handle_rpc_connection_lost();
+                            Ok(())
+                        }
+                        RoomEvent::RpcClientReconnected => {
+                            log::error!("RoomEvent::RpcClientReconnected");
+                            inner.handle_rpc_connection_recovered();
+                            Ok(())
+                        }
+                    };
+
+                    if let Err(err) = event_handle_result {
+                        let (err, trace) = err.into_parts();
+                        match err {
+                            RoomError::InvalidLocalStream(_)
+                            | RoomError::CouldNotGetLocalMedia(_) => {
+                                let e = JasonError::from((err, trace));
+                                e.print();
+                                inner.on_failed_local_stream.call(e);
+                            }
+                            _ => JasonError::from((err, trace)).print(),
+                        };
+                    }
                 } else {
                     log::error!("Inner Room dropped unexpectedly");
                     break;
@@ -488,89 +558,7 @@ impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
     #[allow(clippy::mut_mut)]
     pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
-        enum RoomEvent {
-            RpcEvent(RpcEvent),
-            PeerEvent(PeerEvent),
-            RpcClientLostConnection,
-            RpcClientReconnected,
-        }
-
-        let (tx, peer_events_rx) = mpsc::unbounded();
-
-        let mut rpc_events_stream =
-            rpc.subscribe().map(RoomEvent::RpcEvent).fuse();
-        let mut peer_events_stream =
-            peer_events_rx.map(RoomEvent::PeerEvent).fuse();
-        let mut rpc_connection_lost = rpc
-            .on_connection_loss()
-            .map(|_| RoomEvent::RpcClientLostConnection)
-            .fuse();
-        let mut rpc_client_reconnected = rpc
-            .on_reconnected()
-            .map(|_| RoomEvent::RpcClientReconnected)
-            .fuse();
-
-        let room = Rc::new(InnerRoom::new(rpc, peers, tx));
-        let inner = Rc::downgrade(&room);
-
-        spawn_local(async move {
-            loop {
-                let event: RoomEvent = futures::select! {
-                    event = rpc_events_stream.select_next_some() => event,
-                    event = peer_events_stream.select_next_some() => event,
-                    event = rpc_connection_lost.select_next_some() => event,
-                    event = rpc_client_reconnected.select_next_some() => event,
-                    complete => break,
-                };
-
-                match inner.upgrade() {
-                    None => {
-                        log::error!("Inner Room dropped unexpectedly");
-                        break;
-                    }
-                    Some(inner) => {
-                        match event {
-                            RoomEvent::RpcEvent(event) => {
-                                if let Err(err) =
-                                    event.dispatch_with(inner.deref()).await
-                                {
-                                    let (err, trace) = err.into_parts();
-                                    match err {
-                                        RoomError::InvalidLocalStream(_)
-                                        | RoomError::CouldNotGetLocalMedia(_) =>
-                                        {
-                                            let e =
-                                                JasonError::from((err, trace));
-                                            e.print();
-                                            inner
-                                                .on_failed_local_stream
-                                                .call(e);
-                                        }
-                                        _ => JasonError::from((err, trace))
-                                            .print(),
-                                    };
-                                };
-                            }
-                            RoomEvent::PeerEvent(event) => {
-                                if let Err(err) =
-                                    event.dispatch_with(inner.deref()).await
-                                {
-                                    JasonError::from(err).print();
-                                };
-                            }
-                            RoomEvent::RpcClientLostConnection => {
-                                inner.handle_rpc_connection_lost();
-                            }
-                            RoomEvent::RpcClientReconnected => {
-                                inner.handle_rpc_connection_recovered();
-                            }
-                        };
-                    }
-                }
-            }
-        });
-
-        Self(room)
+        Self(Rc::new(InnerRoom::new(rpc, peers)))
     }
 
     /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
@@ -611,6 +599,8 @@ impl Room {
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
+    room_id: RefCell<Option<RoomId>>,
+    // id: Option<RoomId>,
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcClient>,
 
@@ -626,7 +616,7 @@ struct InnerRoom {
     peers: Box<dyn PeerRepository>,
 
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
-    peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+    peer_event_sender: RefCell<Option<mpsc::UnboundedSender<PeerEvent>>>,
 
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
@@ -661,17 +651,14 @@ struct InnerRoom {
 impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
-    fn new(
-        rpc: Rc<dyn RpcClient>,
-        peers: Box<dyn PeerRepository>,
-        peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-    ) -> Self {
+    fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
         Self {
+            room_id: RefCell::new(None),
             rpc,
             send_constraints: LocalStreamConstraints::default(),
             recv_constraints: Rc::new(RecvConstraints::default()),
             peers,
-            peer_event_sender,
+            peer_event_sender: RefCell::new(None),
             connections: Connections::default(),
             on_local_stream: Callback1::default(),
             on_connection_loss: Callback1::default(),
@@ -761,10 +748,13 @@ impl InnerRoom {
                     .collect();
 
                 if !tracks_patches.is_empty() {
-                    self.rpc.send_command(Command::UpdateTracks {
-                        peer_id: peer.id(),
-                        tracks_patches,
-                    });
+                    self.rpc.send_command(
+                        self.room_id.borrow().as_ref().unwrap().clone(),
+                        Command::UpdateTracks {
+                            peer_id: peer.id(),
+                            tracks_patches,
+                        },
+                    );
                 }
 
                 Either::Right(future::try_join_all(wait_state_change))
@@ -827,6 +817,8 @@ impl InnerRoom {
         for peer in self.peers.get_all() {
             peer.stop_state_transitions_timers();
         }
+        self.on_connection_loss
+            .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
 
     /// Resets state transition timers in all [`PeerConnection`]'s in this
@@ -858,23 +850,29 @@ impl InnerRoom {
                     .map_err(tracerr::map_from_and_wrap!())?;
                 let mids =
                     peer.get_mids().map_err(tracerr::map_from_and_wrap!())?;
-                self.rpc.send_command(Command::MakeSdpOffer {
-                    peer_id: peer.id(),
-                    sdp_offer,
-                    transceivers_statuses: peer.get_transceivers_statuses(),
-                    mids,
-                });
+                self.rpc.send_command(
+                    self.room_id.borrow().as_ref().unwrap().clone(),
+                    Command::MakeSdpOffer {
+                        peer_id: peer.id(),
+                        sdp_offer,
+                        transceivers_statuses: peer.get_transceivers_statuses(),
+                        mids,
+                    },
+                );
             }
             Some(NegotiationRole::Answerer(offer)) => {
                 let sdp_answer = peer
                     .process_offer(offer, tracks)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
-                self.rpc.send_command(Command::MakeSdpAnswer {
-                    peer_id: peer.id(),
-                    sdp_answer,
-                    transceivers_statuses: peer.get_transceivers_statuses(),
-                });
+                self.rpc.send_command(
+                    self.room_id.borrow().as_ref().unwrap().clone(),
+                    Command::MakeSdpAnswer {
+                        peer_id: peer.id(),
+                        sdp_answer,
+                        transceivers_statuses: peer.get_transceivers_statuses(),
+                    },
+                );
             }
         };
         Ok(())
@@ -899,12 +897,16 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
+        let sender =
+            self.peer_event_sender.borrow().as_ref().cloned().expect(
+                "peer_event_sender is None, room main loop hasn't started",
+            );
         let peer = self
             .peers
             .create_peer(
                 peer_id,
                 ice_servers,
-                self.peer_event_sender.clone(),
+                sender,
                 is_force_relayed,
                 self.send_constraints.clone(),
                 Rc::clone(&self.recv_constraints),
@@ -1051,14 +1053,17 @@ impl PeerEventHandler for InnerRoom {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> Self::Output {
-        self.rpc.send_command(Command::SetIceCandidate {
-            peer_id,
-            candidate: IceCandidate {
-                candidate,
-                sdp_m_line_index,
-                sdp_mid,
+        self.rpc.send_command(
+            self.room_id.borrow().as_ref().unwrap().clone(),
+            Command::SetIceCandidate {
+                peer_id,
+                candidate: IceCandidate {
+                    candidate,
+                    sdp_m_line_index,
+                    sdp_mid,
+                },
             },
-        });
+        );
         Ok(())
     }
 
@@ -1096,10 +1101,13 @@ impl PeerEventHandler for InnerRoom {
         peer_id: PeerId,
         ice_connection_state: IceConnectionState,
     ) -> Self::Output {
-        self.rpc.send_command(Command::AddPeerConnectionMetrics {
-            peer_id,
-            metrics: PeerMetrics::IceConnectionState(ice_connection_state),
-        });
+        self.rpc.send_command(
+            self.room_id.borrow().as_ref().unwrap().clone(),
+            Command::AddPeerConnectionMetrics {
+                peer_id,
+                metrics: PeerMetrics::IceConnectionState(ice_connection_state),
+            },
+        );
         Ok(())
     }
 
@@ -1110,10 +1118,15 @@ impl PeerEventHandler for InnerRoom {
         peer_id: PeerId,
         peer_connection_state: PeerConnectionState,
     ) -> Self::Output {
-        self.rpc.send_command(Command::AddPeerConnectionMetrics {
-            peer_id,
-            metrics: PeerMetrics::PeerConnectionState(peer_connection_state),
-        });
+        self.rpc.send_command(
+            self.room_id.borrow().as_ref().unwrap().clone(),
+            Command::AddPeerConnectionMetrics {
+                peer_id,
+                metrics: PeerMetrics::PeerConnectionState(
+                    peer_connection_state,
+                ),
+            },
+        );
 
         if let PeerConnectionState::Connected = peer_connection_state {
             if let Some(peer) = self.peers.get(peer_id) {
@@ -1130,10 +1143,13 @@ impl PeerEventHandler for InnerRoom {
         peer_id: PeerId,
         stats: RtcStats,
     ) -> Self::Output {
-        self.rpc.send_command(Command::AddPeerConnectionMetrics {
-            peer_id,
-            metrics: PeerMetrics::RtcStats(stats.0),
-        });
+        self.rpc.send_command(
+            self.room_id.borrow().as_ref().unwrap().clone(),
+            Command::AddPeerConnectionMetrics {
+                peer_id,
+                metrics: PeerMetrics::RtcStats(stats.0),
+            },
+        );
         Ok(())
     }
 
@@ -1147,13 +1163,9 @@ impl PeerEventHandler for InnerRoom {
             .peers
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        if let Err(err) = peer
-            .update_local_stream()
+        peer.update_local_stream()
             .await
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-        {
-            self.on_failed_local_stream.call(JasonError::from(err));
-        };
+            .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
         Ok(())
     }
 }
@@ -1161,8 +1173,6 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
-        self.rpc.unsub();
-
         if let CloseReason::ByClient { reason, .. } =
             *self.close_reason.borrow()
         {

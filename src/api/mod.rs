@@ -6,9 +6,14 @@ pub mod control;
 use std::fmt::Debug;
 
 use futures::future::LocalBoxFuture;
-use medea_client_api_proto::{Command, MemberId};
+use medea_client_api_proto::{Command, MemberId, Token};
 
-use crate::api::client::rpc_connection::{ClosedReason, RpcConnection};
+use crate::{
+    api::client::rpc_connection::{
+        ClosedReason, RpcConnection, RpcConnectionSettings,
+    },
+    signalling::room::RoomError,
+};
 
 /// Server side of Medea RPC protocol.
 #[cfg_attr(test, mockall::automock)]
@@ -21,8 +26,9 @@ pub trait RpcServer: Debug + Send {
     fn connection_established(
         &self,
         member_id: MemberId,
+        token: Token,
         connection: Box<dyn RpcConnection>,
-    ) -> LocalBoxFuture<'static, Result<(), ()>>;
+    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>>;
 
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
     /// closed.
