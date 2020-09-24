@@ -540,8 +540,17 @@ window.onload = async function() {
       let videoSource = video_select.options[video_select.selectedIndex];
       if (videoSource) {
         if (videoSource.value === "screen") {
+          let device = new rust.DeviceVideoTrackConstraints();
+          if (videoSource.value === 'facingModeUser') {
+            device.exact_facing_mode(rust.FacingMode.User);
+          } else if (videoSource.value === 'facingModeEnvironment') {
+            device.exact_facing_mode(rust.FacingMode.Environment);
+          } else {
+            // device.device_id(videoSource.value);
+          }
           let video = new rust.DisplayVideoTrackConstraints();
           constraints.display_video(video);
+          constraints.device_video(device);
         } else {
           let video = new rust.DeviceVideoTrackConstraints();
           if (videoSource.value === 'facingModeUser') {
@@ -551,14 +560,10 @@ window.onload = async function() {
           } else {
             video.device_id(videoSource.value);
           }
-          let display_video = new rust.DisplayVideoTrackConstraints();
-          constraints.display_video(display_video);
           constraints.device_video(video);
         }
       } else {
-        // let display_video = new rust.DisplayVideoTrackConstraints();
         constraints.device_video(new rust.DeviceVideoTrackConstraints());
-        // constraints.display_video(display_video);
       }
     }
 
@@ -765,7 +770,7 @@ window.onload = async function() {
         }
         await room.set_local_media_settings(constraints);
       } catch (e) {
-        console.error("Changing video source failed: " + e);
+        console.error("Changing video source failed: " + e.message());
       }
     });
 

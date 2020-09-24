@@ -611,7 +611,6 @@ impl MediaConnections {
                 if !sender.is_muted() {
                     senders_to_mute.push(sender.track_id());
                 }
-                sender.free_track();
             }
         }
 
