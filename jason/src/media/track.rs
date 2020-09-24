@@ -171,44 +171,6 @@ impl MediaStreamTrack {
     }
 }
 
-// impl<T> From<T> for MediaStreamTrack
-// where
-//     SysMediaStreamTrack: From<T>,
-// {
-//     fn from(track: T) -> Self {
-//         let track = SysMediaStreamTrack::from(track);
-//         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-//             enabled: ObservableCell::new(track.enabled()),
-//             on_enabled: Callback0::default(),
-//             on_disabled: Callback0::default(),
-//             track,
-//         }));
-//
-//         let mut track_enabled_state_changes =
-//             track.enabled().subscribe().skip(1);
-//         spawn_local({
-//             let weak_inner = Rc::downgrade(&track.0);
-//             async move {
-//                 while let Some(enabled) =
-//                     track_enabled_state_changes.next().await
-//                 {
-//                     if let Some(track) = weak_inner.upgrade() {
-//                         if enabled {
-//                             track.on_enabled.call();
-//                         } else {
-//                             track.on_disabled.call();
-//                         }
-//                     } else {
-//                         break;
-//                     }
-//                 }
-//             }
-//         });
-//
-//         track
-//     }
-// }
-
 impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
     #[inline]
     fn as_ref(&self) -> &SysMediaStreamTrack {

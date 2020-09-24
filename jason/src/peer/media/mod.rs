@@ -585,6 +585,7 @@ impl MediaConnections {
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         let mut senders_to_unmute = Vec::new();
         let mut senders_to_mute = Vec::new();
+        let mut transitions_futs = Vec::new();
         for sender in inner.senders.values() {
             // skip senders that are not Unmuted
 
@@ -596,6 +597,13 @@ impl MediaConnections {
                     );
                     if !sender.is_unmuted() {
                         senders_to_unmute.push(sender.track_id());
+                        sender
+                            .mute_state_transition_to(StableMuteState::Unmuted);
+                        transitions_futs.push(
+                            sender.when_mute_state_stable(
+                                StableMuteState::Unmuted,
+                            ),
+                        );
                     }
                     sender_and_track.push((sender, track));
                 } else {
@@ -610,6 +618,10 @@ impl MediaConnections {
             } else {
                 if !sender.is_muted() {
                     senders_to_mute.push(sender.track_id());
+                    sender.mute_state_transition_to(StableMuteState::Muted);
+                    transitions_futs.push(
+                        sender.when_mute_state_stable(StableMuteState::Muted),
+                    );
                 }
             }
         }
@@ -639,6 +651,9 @@ impl MediaConnections {
             },
         ))
         .await?;
+
+        drop(inner);
+        future::try_join_all(transitions_futs).await?;
 
         Ok(())
     }
