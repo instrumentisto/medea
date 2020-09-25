@@ -38,10 +38,10 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    /// Callback to be invoked when this [`MediaStreamTrack`] will be enabled.
+    /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
     on_enabled: Callback0,
 
-    /// Callback to be invoked when this [`MediaStreamTrack`] will be disabled.
+    /// Callback to be invoked when this [`MediaStreamTrack`] is disabled.
     on_disabled: Callback0,
 
     /// [enabled] property of [MediaStreamTrack][1].
@@ -119,14 +119,14 @@ impl MediaStreamTrack {
         self.0.enabled.get()
     }
 
-    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
-    /// be enabled.
+    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] is
+    /// enabled.
     pub fn on_enabled(&self, callback: js_sys::Function) {
         self.0.on_enabled.set_func(callback);
     }
 
-    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
-    /// be enabled.
+    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] is
+    /// enabled.
     pub fn on_disabled(&self, callback: js_sys::Function) {
         self.0.on_disabled.set_func(callback);
     }

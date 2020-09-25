@@ -165,7 +165,7 @@ impl Connection {
         }))
     }
 
-    /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with a
+    /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with the
     /// provided [`MediaStreamTrack`].
     pub fn add_remote_track(&self, track: MediaStreamTrack) {
         self.0.on_remote_track_added.call(track);
