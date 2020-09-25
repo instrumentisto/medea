@@ -57,7 +57,7 @@ struct InnerMediaStreamTrack {
 /// left.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = MediaTrack)]
 #[derive(Clone)]
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
@@ -105,12 +105,18 @@ impl MediaStreamTrack {
     }
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = MediaTrack)]
 impl MediaStreamTrack {
     /// Returns underlying [`SysMediaStreamTrack`] from this
     /// [`MediaStreamTrack`].
     pub fn get_track(&self) -> SysMediaStreamTrack {
         Clone::clone(&self.0.track)
+    }
+
+    /// Returns is this [`MediaStreamTrack`] enabled.
+    #[wasm_bindgen(js_name = enabled)]
+    pub fn js_enabled(&self) -> bool {
+        self.0.enabled.get()
     }
 
     /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will

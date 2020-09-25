@@ -594,7 +594,7 @@ window.onload = async function() {
         qualityScoreEl.innerHTML = score;
       });
 
-      connection.on_track_added((track) => {
+      connection.on_remote_track_added((track) => {
         if (track.kind() === 'video') {
             let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
             if (cameraVideoEl === undefined) {

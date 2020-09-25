@@ -103,7 +103,7 @@ struct InnerConnection {
 
     /// JS callback, that will be invoked when remote [`MediaStreamTrack`] is
     /// received.
-    on_track_added: Callback1<MediaStreamTrack>,
+    on_remote_track_added: Callback1<MediaStreamTrack>,
 
     /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
     /// be updated.
@@ -127,9 +127,12 @@ impl ConnectionHandle {
 
     /// Sets callback, which will be invoked when new remote
     /// [`MediaStreamTrack`] will be added to this [`Connection`].
-    pub fn on_track_added(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_remote_track_added(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_track_added.set_func(f))
+            .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
     /// Sets callback, which will be invoked when connection quality score will
@@ -158,14 +161,14 @@ impl Connection {
             quality_score: Cell::default(),
             on_quality_score_update: Callback1::default(),
             on_close: Callback0::default(),
-            on_track_added: Callback1::default(),
+            on_remote_track_added: Callback1::default(),
         }))
     }
 
-    /// Invokes [`InnerConnection::on_track_added`] JS callback with a provided
-    /// [`MediaStreamTrack`].
+    /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with a
+    /// provided [`MediaStreamTrack`].
     pub fn add_remote_track(&self, track: MediaStreamTrack) {
-        self.0.on_track_added.call(track);
+        self.0.on_remote_track_added.call(track);
     }
 
     /// Creates new [`ConnectionHandle`] for using [`Connection`] on JS side.

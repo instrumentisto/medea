@@ -35,16 +35,20 @@ async fn track_autostop() {
 async fn on_track_enabled_works() {
     let track = get_audio_track().await;
 
+    let track_clone = track.clone();
     let (test_tx, test_rx) = oneshot::channel();
     track.on_enabled(
         Closure::once_into_js(move || {
+            assert!(track_clone.js_enabled());
             test_tx.send(()).unwrap();
         })
         .into(),
     );
 
     track.set_enabled(false);
+    assert!(!track.js_enabled());
     track.set_enabled(true);
+    assert!(track.js_enabled());
 
     timeout(100, test_rx).await.unwrap().unwrap();
 }
@@ -53,9 +57,11 @@ async fn on_track_enabled_works() {
 async fn on_track_disabled_works() {
     let track = get_audio_track().await;
 
+    let track_clone = track.clone();
     let (test_tx, test_rx) = oneshot::channel();
     track.on_disabled(
         Closure::once_into_js(move || {
+            assert!(!track_clone.js_enabled());
             test_tx.send(()).unwrap();
         })
         .into(),

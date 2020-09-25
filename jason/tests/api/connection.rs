@@ -36,7 +36,7 @@ async fn on_new_connection_fires() {
 }
 
 #[wasm_bindgen_test]
-async fn on_track_added_fires() {
+async fn on_remote_track_added_fires() {
     let cons = Connections::default();
 
     cons.create_connection(PeerId(1), &"bob".into());
@@ -47,7 +47,7 @@ async fn on_track_added_fires() {
     let (cb, test_result) = js_callback!(|track: MediaStreamTrack| {
         cb_assert_eq!(track.kind(), TrackKind::Video);
     });
-    con_handle.on_track_added(cb.into()).unwrap();
+    con_handle.on_remote_track_added(cb.into()).unwrap();
 
     con.add_remote_track(get_video_track().await);
 
@@ -67,7 +67,7 @@ async fn tracks_are_added_to_connection() {
     let closure = Closure::once_into_js(move |track: MediaStreamTrack| {
         assert!(tx.send(track).is_ok());
     });
-    con_handle.on_track_added(closure.into()).unwrap();
+    con_handle.on_remote_track_added(closure.into()).unwrap();
 
     con.add_remote_track(get_video_track().await);
     let video_track = timeout(100, rx).await.unwrap().unwrap();
@@ -77,7 +77,7 @@ async fn tracks_are_added_to_connection() {
     let closure = Closure::once_into_js(move |track: MediaStreamTrack| {
         assert!(tx.send(track).is_ok());
     });
-    con_handle.on_track_added(closure.into()).unwrap();
+    con_handle.on_remote_track_added(closure.into()).unwrap();
     con.add_remote_track(get_audio_track().await);
     let audio_track = timeout(200, rx).await.unwrap().unwrap();
     assert_eq!(audio_track.kind(), TrackKind::Audio);
