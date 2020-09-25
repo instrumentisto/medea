@@ -814,59 +814,51 @@ impl InnerRoom {
                 Ok(constrained_tracks) => {
                     let mut waits = Vec::new();
                     let mut track_patches = Vec::new();
-                    for (track_id, is_muted) in constrained_tracks {
-                        let new_mute_state = StableMuteState::from(is_muted);
-                        if let Some(sender) = peer.get_sender_by_id(track_id) {
+
+                    constrained_tracks
+                        .into_iter()
+                        .filter_map(|(track_id, is_muted)| {
+                            peer.get_sender_by_id(track_id).map(|sender| {
+                                (sender, StableMuteState::from(is_muted))
+                            })
+                        })
+                        .filter_map(|(sender, new_mute_state)| {
                             match sender.mute_state() {
-                                MuteState::Transition(transition) => {
-                                    if transition.intended() == new_mute_state {
-                                        waits.push(
-                                            sender.when_mute_state_stable(
-                                                new_mute_state,
-                                            ),
-                                        );
-                                    } else {
-                                        if let Err(_) = sender
-                                            .mute_state_transition_to(
-                                                new_mute_state,
-                                            )
-                                        {
-                                            continue;
-                                        }
-                                        track_patches.push(TrackPatchCommand {
-                                            id: track_id,
-                                            is_muted: Some(is_muted),
-                                        });
-                                        waits.push(
-                                            sender.when_mute_state_stable(
-                                                new_mute_state,
-                                            ),
-                                        );
-                                    }
-                                }
+                                MuteState::Transition(transition) => Some((
+                                    sender,
+                                    new_mute_state,
+                                    transition.intended() != new_mute_state,
+                                )),
                                 MuteState::Stable(stable) => {
-                                    if stable != new_mute_state {
-                                        if let Err(_) = sender
-                                            .mute_state_transition_to(
-                                                new_mute_state,
-                                            )
-                                        {
-                                            continue;
-                                        }
-                                        track_patches.push(TrackPatchCommand {
-                                            id: track_id,
-                                            is_muted: Some(is_muted),
-                                        });
-                                        waits.push(
-                                            sender.when_mute_state_stable(
-                                                new_mute_state,
-                                            ),
-                                        );
+                                    if stable == new_mute_state {
+                                        None
+                                    } else {
+                                        Some((sender, new_mute_state, true))
                                     }
                                 }
                             }
-                        }
-                    }
+                        })
+                        .for_each(|(sender, new_mute_state, should_update)| {
+                            if sender
+                                .mute_state_transition_to(new_mute_state)
+                                .is_ok()
+                            {
+                                waits
+                                    .push(sender.when_mute_state_stable(
+                                        new_mute_state,
+                                    ));
+                                if should_update {
+                                    track_patches.push(TrackPatchCommand {
+                                        id: sender.track_id(),
+                                        is_muted: Some(
+                                            new_mute_state
+                                                == StableMuteState::Muted,
+                                        ),
+                                    });
+                                }
+                            }
+                        });
+
                     self.rpc.send_command(Command::UpdateTracks {
                         peer_id: peer.id(),
                         tracks_patches: track_patches,
