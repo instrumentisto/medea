@@ -235,7 +235,6 @@ impl RoomHandle {
             .connect(url, room_id.clone(), member_id, token)
             .await
             .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
-        log::error!("333");
 
         let (tx, peer_events_rx) = mpsc::unbounded();
         inner.peer_event_sender.replace(Some(tx));
@@ -257,7 +256,7 @@ impl RoomHandle {
             .on_reconnected(inner.room_id.borrow().as_ref().unwrap().clone())
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
-        log::error!("444");
+
         let inner = Rc::downgrade(&inner);
         spawn_local(async move {
             loop {
@@ -272,20 +271,16 @@ impl RoomHandle {
                 if let Some(inner) = inner.upgrade() {
                     let event_handle_result = match event {
                         RoomEvent::RpcEvent(event) => {
-                            log::error!("RoomEvent::RpcEvent");
                             event.dispatch_with(inner.deref()).await
                         }
                         RoomEvent::PeerEvent(event) => {
-                            log::error!("RoomEvent::PeerEvent");
                             event.dispatch_with(inner.deref()).await
                         }
                         RoomEvent::RpcClientLostConnection => {
-                            log::error!("RoomEvent::RpcClientLostConnection");
                             inner.handle_rpc_connection_lost();
                             Ok(())
                         }
                         RoomEvent::RpcClientReconnected => {
-                            log::error!("RoomEvent::RpcClientReconnected");
                             inner.handle_rpc_connection_recovered();
                             Ok(())
                         }

@@ -5,7 +5,6 @@ mod actix_try_join_all;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use derive_more::{Display, From};
 
 pub use self::actix_try_join_all::actix_try_join_all;
 

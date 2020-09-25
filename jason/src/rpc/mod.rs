@@ -265,7 +265,7 @@ pub trait RpcClient {
     /// instantly resolved.
     async fn connect(
         self: Rc<Self>,
-        url: Url,
+        url: Url, // ws://ip:port/ws
         room_id: RoomId,
         member_id: MemberId,
         token: Token,
