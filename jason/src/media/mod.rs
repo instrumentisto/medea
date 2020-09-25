@@ -12,7 +12,7 @@ pub use self::{
     constraints::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, FacingMode, LocalTracksConstraints,
-        MediaStreamTrackConstraints, MediaTracksSettings,
+        MediaStreamTrackConstraints, MediaStreamSettings,
         MultiSourceTracksConstraints, RecvConstraints, TrackConstraints,
         VideoTrackConstraints,
     },

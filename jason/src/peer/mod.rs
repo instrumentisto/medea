@@ -33,7 +33,7 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
-    MediaTracksSettings,
+    MediaStreamSettings,
 };
 
 #[cfg(feature = "mockable")]
@@ -655,7 +655,7 @@ impl PeerConnection {
     ///
     /// With [`TracksRequestError::ExpectedAudioTracks`] or
     /// [`TracksRequestError::ExpectedVideoTracks`] if provided
-    /// [`MediaTracksSettings`] are incompatible with this peer [`Sender`]s
+    /// [`MediaStreamSettings`] are incompatible with this peer [`Sender`]s
     /// constraints.
     ///
     /// With [`MediaManagerError::GetUserMediaFailed`] or
@@ -678,15 +678,17 @@ impl PeerConnection {
                 .merge(self.send_constraints.inner())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let used_caps = MediaTracksSettings::from(&required_caps);
+            let used_caps = MediaStreamSettings::from(&required_caps);
 
-            let (media_tracks, is_new_tracks) = self
+            let media_tracks = self
                 .media_manager
                 .get_tracks(used_caps)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
             let peer_tracks = required_caps
-                .parse_tracks(media_tracks.clone())
+                .parse_tracks(
+                    media_tracks.iter().map(|(t, _)| t).cloned().collect(),
+                )
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             let constrained_tracks = self
@@ -695,8 +697,8 @@ impl PeerConnection {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            if is_new_tracks {
-                for track in media_tracks {
+            for (track, is_new) in media_tracks {
+                if is_new {
                     let _ = self.peer_events_sender.unbounded_send(
                         PeerEvent::NewLocalTrack { local_track: track },
                     );

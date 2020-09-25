@@ -560,7 +560,7 @@ impl MediaConnections {
         stream_request
     }
 
-    /// Inserts the provided tracks into [`Sender`]s based on track IDs.
+    /// Inserts provided tracks into [`Sender`]s based on track IDs.
     ///
     ///  [`MediaStreamTrack`]s are inserted into [`Sender`]'s
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its

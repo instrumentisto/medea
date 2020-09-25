@@ -526,7 +526,7 @@ window.onload = async function() {
   }
 
   async function build_constraints(audio_select, video_select) {
-    let constraints = new rust.MediaTracksSettings();
+    let constraints = new rust.MediaStreamSettings();
     if (audio_select != null) {
       let audio = new rust.AudioTrackConstraints();
       let audioSource = audio_select.options[audio_select.selectedIndex];
@@ -743,7 +743,9 @@ window.onload = async function() {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
-          track.free();
+          if (track.ptr > 0) {
+            track.free();
+          }
         }
         if (!isAudioSendMuted) {
           constraints = await initLocalStream();
@@ -784,7 +786,7 @@ window.onload = async function() {
           await room.mute_audio();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'audio') {
+              if (track.kind() === 'audio' && track.ptr > 0) {
                 track.free();
               }
             }
@@ -809,7 +811,7 @@ window.onload = async function() {
           await room.mute_video();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'video') {
+              if (track.kind() === 'video' && track.ptr > 0) {
                 track.free();
               }
             }

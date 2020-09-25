@@ -34,9 +34,9 @@ All user visible changes to this project will be documented in this file. This p
         - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46]);
         - `MediaManager` class obtainable via `Jason.media_manager()` ([#46]):
             - `MediaManager.enumerate_devices()`;
-            - `MediaManager.init_local_tracks()` ([#143]).
+            - `MediaManager.init_local_tracks()` ([#46], [#143]).
         - Local media stream constraints:
-            - `MediaTracksSettings`, `AudioTrackConstraints` classes ([#46], [#97], [#143]);
+            - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
             - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
             - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
             - `FacingMode` enum ([#137]).

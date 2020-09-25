@@ -10,7 +10,7 @@
     import init, {
       Jason,
       JasonError,
-      MediaTracksSettings,
+      MediaStreamSettings,
       AudioTrackConstraints,
       DeviceVideoTrackConstraints,
       DisplayVideoTrackConstraints,
@@ -236,7 +236,7 @@
     }
 
     async function build_constraints(audio_select, video_select) {
-      let constraints = new MediaTracksSettings();
+      let constraints = new MediaStreamSettings();
       if (audio_select != null) {
         let audio = new AudioTrackConstraints();
         let audioSource = audio_select.options[audio_select.selectedIndex];
@@ -342,7 +342,9 @@
         );
       }
       for (const track of localTracks) {
-        track.free();
+        if (track.ptr > 0) {
+          track.free();
+        }
       }
       localTracks = await jason
         .media_manager()
@@ -366,7 +368,9 @@
         );
       }
       for (const track of localTracks) {
-        track.free();
+        if (track.ptr > 0) {
+          track.free();
+        }
       }
       localTracks = await jason
         .media_manager()
@@ -479,7 +483,9 @@
       audioSelect.addEventListener('change', async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
-          track.free();
+          if (track.ptr > 0) {
+            track.free();
+          }
         }
         if (!isAudioSendMuted) {
           constraints = await initLocalStream();
@@ -490,7 +496,9 @@
       videoSelect.addEventListener('change', async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
-          track.free();
+          if (track.ptr > 0) {
+            track.free();
+          }
         }
         if (!isVideoSendMuted) {
           constraints = await initLocalStream();
@@ -619,7 +627,7 @@
           await room.mute_audio();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'audio') {
+              if (track.kind() === 'audio' && track.ptr > 0) {
                 track.free();
               }
             }
@@ -640,7 +648,7 @@
           await room.mute_video();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'video') {
+              if (track.kind() === 'video' && track.ptr > 0) {
                 track.free();
               }
             }
