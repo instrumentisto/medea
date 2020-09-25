@@ -4,7 +4,7 @@
 
 use std::rc::{Rc, Weak};
 
-use derive_more::{AsRef, Display};
+use derive_more::Display;
 use futures::StreamExt;
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
@@ -182,10 +182,6 @@ impl Drop for MediaStreamTrack {
     #[inline]
     fn drop(&mut self) {
         // Last strong ref being dropped, so stop underlying MediaTrack
-        log::debug!(
-            "MediaStreamTrack refs count: {}",
-            Rc::strong_count(&self.0)
-        );
         if Rc::strong_count(&self.0) == 1 {
             self.0.track.stop();
         }

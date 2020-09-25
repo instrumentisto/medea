@@ -7,7 +7,7 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MemberId, PeerId, TrackPatchEvent};
+use medea_client_api_proto::{MemberId, TrackPatchEvent};
 use proto::TrackId;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
@@ -28,7 +28,6 @@ use super::mute_state::StableMuteState;
 /// We can save related [`RtcRtpTransceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
-    peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
     sender_id: MemberId,
@@ -55,7 +54,6 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
     pub fn new(
-        peer_id: PeerId,
         track_id: TrackId,
         caps: TrackConstraints,
         sender_id: MemberId,
@@ -79,7 +77,6 @@ impl Receiver {
             Some(_) => None,
         };
         Self {
-            peer_id,
             track_id,
             caps,
             sender_id,
@@ -254,5 +251,9 @@ impl TransceiverSide for Receiver {
             }
         }
         self.mid.borrow().clone()
+    }
+
+    fn is_can_be_constrained(&self) -> bool {
+        true
     }
 }

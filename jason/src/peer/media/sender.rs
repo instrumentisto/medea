@@ -11,7 +11,7 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
+    media::{LocalTracksConstraints, MediaStreamTrack, TrackConstraints},
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         media::TransceiverSide,
@@ -34,6 +34,7 @@ pub struct SenderBuilder<'a> {
     pub mid: Option<String>,
     pub mute_state: StableMuteState,
     pub is_required: bool,
+    pub send_constraints: LocalTracksConstraints,
 }
 
 impl<'a> SenderBuilder<'a> {
@@ -67,6 +68,7 @@ impl<'a> SenderBuilder<'a> {
             is_required: self.is_required,
             transceiver_direction: Cell::new(TransceiverDirection::Inactive),
             peer_events_sender: self.peer_events_sender,
+            send_constraints: self.send_constraints,
         });
         spawn_local({
             let weak_this = Rc::downgrade(&this);
@@ -88,12 +90,6 @@ impl<'a> SenderBuilder<'a> {
             }
         });
 
-        log::debug!(
-            "Sender's [id = {}] mute state: {:?}",
-            this.track_id(),
-            this.mute_state()
-        );
-
         Ok(this)
     }
 }
@@ -111,6 +107,7 @@ pub struct Sender {
     general_mute_state: Cell<StableMuteState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+    send_constraints: LocalTracksConstraints,
 }
 
 impl Sender {
@@ -266,6 +263,14 @@ impl TransceiverSide for Sender {
 
     fn mid(&self) -> Option<String> {
         self.transceiver.mid()
+    }
+
+    fn is_can_be_constrained(&self) -> bool {
+        if self.caps.is_display() {
+            self.send_constraints.is_display_video_enabled()
+        } else {
+            self.send_constraints.is_device_video_enabled()
+        }
     }
 }
 

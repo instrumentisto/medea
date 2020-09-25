@@ -172,16 +172,6 @@ pub enum PeerEvent {
         /// ID of the [`PeerConnection`] that requested new media stream.
         peer_id: Id,
     },
-
-    TracksConstrained {
-        peer_id: Id,
-        track_ids: Vec<TrackId>,
-    },
-
-    TracksUnconstrained {
-        peer_id: Id,
-        track_ids: Vec<TrackId>,
-    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -679,7 +669,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub async fn update_local_stream(&self) -> Result<()> {
+    pub async fn update_local_stream(&self) -> Result<HashMap<TrackId, bool>> {
         if let Some(request) = self.media_connections.get_tracks_request() {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
@@ -699,7 +689,8 @@ impl PeerConnection {
                 .parse_tracks(media_tracks.clone())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            self.media_connections
+            let constrained_tracks = self
+                .media_connections
                 .insert_local_tracks(&peer_tracks)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
@@ -711,8 +702,15 @@ impl PeerConnection {
                     );
                 }
             }
+
+            Ok(constrained_tracks)
+        } else {
+            Ok(HashMap::new())
         }
-        Ok(())
+    }
+
+    pub fn get_sender_by_id(&self, track_id: TrackId) -> Option<Rc<Sender>> {
+        self.media_connections.get_sender_by_id(track_id)
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.

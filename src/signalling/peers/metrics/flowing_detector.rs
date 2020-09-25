@@ -43,7 +43,6 @@ use crate::{
 };
 
 use super::PeersMetricsEvent;
-use std::collections::hash_map::RandomState;
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 #[derive(Debug)]

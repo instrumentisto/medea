@@ -13,7 +13,10 @@ mod connection_failure_detector;
 mod flowing_detector;
 mod quality_meter;
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
+use std::{
+    cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc, sync::Arc,
+    time::Duration,
+};
 
 use chrono::{DateTime, Utc};
 use futures::{
@@ -41,7 +44,6 @@ use crate::{
         PeerTrafficWatcher,
     },
 };
-use std::collections::{hash_map::RandomState, HashMap};
 
 /// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
 #[dispatchable]

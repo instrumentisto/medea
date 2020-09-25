@@ -9,6 +9,7 @@ use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
+use medea_client_api_proto::MediaType;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
@@ -32,7 +33,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use medea_client_api_proto::MediaType;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -44,6 +44,8 @@ pub trait TransceiverSide: Muteable {
 
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
+
+    fn is_can_be_constrained(&self) -> bool;
 }
 
 /// Default functions for dealing with [`MuteStateController`] for objects that
@@ -296,6 +298,14 @@ impl MediaConnections {
             .get_transceivers_by_direction_and_kind(direction, kind)
     }
 
+    pub fn get_senders(&self, track_ids: Vec<TrackId>) -> Vec<Rc<Sender>> {
+        let inner = self.0.borrow();
+        track_ids
+            .iter()
+            .filter_map(|track_id| inner.senders.get(track_id).cloned())
+            .collect()
+    }
+
     /// Returns `true` if all [`TransceiverSide`]s with provided
     /// [`TransceiverKind`] and [`TrackDirection`] is in provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
@@ -309,6 +319,9 @@ impl MediaConnections {
             .borrow()
             .get_transceivers_by_direction_and_kind(direction, kind);
         for transceiver in transceivers {
+            if !transceiver.is_can_be_constrained() {
+                continue;
+            }
             if transceiver.mute_state() != mute_state.into() {
                 return false;
             }
@@ -449,9 +462,7 @@ impl MediaConnections {
                             MediaType::Video(video) => {
                                 if video.is_display {
                                     if send_constraints
-                                        .0
-                                        .borrow()
-                                        .is_display_enabled()
+                                        .is_display_video_enabled()
                                     {
                                         mute_state = StableMuteState::Unmuted;
                                     } else {
@@ -459,9 +470,7 @@ impl MediaConnections {
                                     }
                                 } else {
                                     if send_constraints
-                                        .0
-                                        .borrow()
-                                        .is_device_enabled()
+                                        .is_device_video_enabled()
                                     {
                                         mute_state = StableMuteState::Unmuted;
                                     } else {
@@ -490,6 +499,7 @@ impl MediaConnections {
                         mid,
                         mute_state,
                         is_required,
+                        send_constraints: send_constraints.clone(),
                     }
                     .build()
                     .map_err(tracerr::wrap!())?;
@@ -497,7 +507,6 @@ impl MediaConnections {
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Rc::new(Receiver::new(
-                        inner.peer_id,
                         track.id,
                         track.media_type.into(),
                         sender,
@@ -544,13 +553,9 @@ impl MediaConnections {
     pub fn get_tracks_request(&self) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            // if let MuteState::Stable(StableMuteState::Unmuted) =
-            //     sender.mute_state()
-            // {
             stream_request
                 .get_or_insert_with(TracksRequest::default)
                 .add_track_request(sender.track_id(), sender.caps().clone());
-            // }
         }
         stream_request
     }
@@ -578,32 +583,17 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
-    ) -> Result<()> {
+    ) -> Result<HashMap<TrackId, bool>> {
         let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
-        let mut senders_to_unmute = Vec::new();
-        let mut senders_to_mute = Vec::new();
-        let mut transitions_futs = Vec::new();
+        let mut constrained_tracks = HashMap::new();
         for sender in inner.senders.values() {
-            // skip senders that are not Unmuted
-
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
-                    log::debug!(
-                        "Sender [id = {}] satisfied.",
-                        sender.track_id()
-                    );
                     if !sender.is_unmuted() {
-                        senders_to_unmute.push(sender.track_id());
-                        sender
-                            .mute_state_transition_to(StableMuteState::Unmuted);
-                        transitions_futs.push(
-                            sender.when_mute_state_stable(
-                                StableMuteState::Unmuted,
-                            ),
-                        );
+                        constrained_tracks.insert(sender.track_id(), false);
                     }
                     sender_and_track.push((sender, track));
                 } else {
@@ -617,30 +607,9 @@ impl MediaConnections {
                 ));
             } else {
                 if !sender.is_muted() {
-                    senders_to_mute.push(sender.track_id());
-                    sender.mute_state_transition_to(StableMuteState::Muted);
-                    transitions_futs.push(
-                        sender.when_mute_state_stable(StableMuteState::Muted),
-                    );
+                    constrained_tracks.insert(sender.track_id(), true);
                 }
             }
-        }
-
-        if !senders_to_unmute.is_empty() {
-            inner.peer_events_sender.unbounded_send(
-                PeerEvent::TracksConstrained {
-                    peer_id: inner.peer_id,
-                    track_ids: senders_to_unmute,
-                },
-            );
-        }
-        if !senders_to_mute.is_empty() {
-            inner.peer_events_sender.unbounded_send(
-                PeerEvent::TracksUnconstrained {
-                    peer_id: inner.peer_id,
-                    track_ids: senders_to_mute,
-                },
-            );
         }
 
         future::try_join_all(sender_and_track.into_iter().map(
@@ -652,10 +621,7 @@ impl MediaConnections {
         ))
         .await?;
 
-        drop(inner);
-        future::try_join_all(transitions_futs).await?;
-
-        Ok(())
+        Ok(constrained_tracks)
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to the

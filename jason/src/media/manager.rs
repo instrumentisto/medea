@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    collections::HashMap,
     convert::TryFrom,
     rc::{Rc, Weak},
 };
@@ -25,7 +26,6 @@ use crate::{
 };
 
 use super::InputDeviceInfo;
-use std::collections::HashMap;
 
 // TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
@@ -212,21 +212,18 @@ impl InnerMediaManager {
         }
 
         if caps.is_video_enabled() {
-            let mut done = false;
             tracks.extend(
                 storage
                     .iter()
                     .filter(|track| {
                         if caps.get_video().satisfies_device(track.as_ref()) {
                             caps.take_device_video();
-                            done = true;
                             true
                         } else if caps
                             .get_video()
                             .satisfies_display(track.as_ref())
                         {
                             caps.take_display_video();
-                            done = true;
                             true
                         } else {
                             false

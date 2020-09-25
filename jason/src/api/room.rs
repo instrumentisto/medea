@@ -27,8 +27,8 @@ use crate::{
         RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
+        MediaConnectionsError, MuteState, Muteable, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
         TrackDirection, TransceiverKind, TransceiverSide,
     },
     rpc::{
@@ -733,23 +733,24 @@ impl InnerRoom {
                     Vec::new();
                 let mut tracks_patches = Vec::new();
                 for trnscvr in trnscvrs {
-                    if let Err(e) =
-                        trnscvr.mute_state_transition_to(desired_state)
-                    {
-                        processed_trnscvrs
-                            .iter()
-                            .for_each(|trnscvr| trnscvr.cancel_transition());
-                        return Either::Left(future::err(tracerr::new!(e)));
+                    if trnscvr.is_can_be_constrained() {
+                        if let Err(e) =
+                            trnscvr.mute_state_transition_to(desired_state)
+                        {
+                            processed_trnscvrs.iter().for_each(|trnscvr| {
+                                trnscvr.cancel_transition()
+                            });
+                            return Either::Left(future::err(tracerr::new!(e)));
+                        }
+                        tracks_patches.push(TrackPatchCommand {
+                            id: trnscvr.track_id(),
+                            is_muted: Some(is_muted),
+                        });
+                        processed_trnscvrs.push(trnscvr);
                     }
-                    tracks_patches.push(TrackPatchCommand {
-                        id: trnscvr.track_id(),
-                        is_muted: Some(is_muted),
-                    });
-                    processed_trnscvrs.push(trnscvr);
                 }
 
-                let wait_state_change: Vec<_> = peer
-                    .get_transceivers_sides(kind, direction)
+                let wait_state_change: Vec<_> = processed_trnscvrs
                     .into_iter()
                     .map(|track| track.when_mute_state_stable(desired_state))
                     .collect();
@@ -805,12 +806,77 @@ impl InnerRoom {
     async fn set_local_media_settings(&self, settings: MediaTracksSettings) {
         self.send_constraints.constrain(settings);
         for peer in self.peers.get_all() {
-            if let Err(err) = peer
+            match peer
                 .update_local_stream()
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
-                self.on_failed_local_media.call(JasonError::from(err));
+                Ok(constrained_tracks) => {
+                    let mut waits = Vec::new();
+                    let mut track_patches = Vec::new();
+                    for (track_id, is_muted) in constrained_tracks {
+                        let new_mute_state = StableMuteState::from(is_muted);
+                        if let Some(sender) = peer.get_sender_by_id(track_id) {
+                            match sender.mute_state() {
+                                MuteState::Transition(transition) => {
+                                    if transition.intended() == new_mute_state {
+                                        waits.push(
+                                            sender.when_mute_state_stable(
+                                                new_mute_state,
+                                            ),
+                                        );
+                                    } else {
+                                        if let Err(_) = sender
+                                            .mute_state_transition_to(
+                                                new_mute_state,
+                                            )
+                                        {
+                                            continue;
+                                        }
+                                        track_patches.push(TrackPatchCommand {
+                                            id: track_id,
+                                            is_muted: Some(is_muted),
+                                        });
+                                        waits.push(
+                                            sender.when_mute_state_stable(
+                                                new_mute_state,
+                                            ),
+                                        );
+                                    }
+                                }
+                                MuteState::Stable(stable) => {
+                                    if stable != new_mute_state {
+                                        if let Err(_) = sender
+                                            .mute_state_transition_to(
+                                                new_mute_state,
+                                            )
+                                        {
+                                            continue;
+                                        }
+                                        track_patches.push(TrackPatchCommand {
+                                            id: track_id,
+                                            is_muted: Some(is_muted),
+                                        });
+                                        waits.push(
+                                            sender.when_mute_state_stable(
+                                                new_mute_state,
+                                            ),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.rpc.send_command(Command::UpdateTracks {
+                        peer_id: peer.id(),
+                        tracks_patches: track_patches,
+                    });
+                    // TODO: maybe do something with this error??
+                    let _ = future::try_join_all(waits).await;
+                }
+                Err(err) => {
+                    self.on_failed_local_media.call(JasonError::from(err));
+                }
             }
         }
     }
@@ -1146,44 +1212,6 @@ impl PeerEventHandler for InnerRoom {
         {
             self.on_failed_local_media.call(JasonError::from(err));
         };
-        Ok(())
-    }
-
-    async fn on_tracks_constrained(
-        &self,
-        peer_id: PeerId,
-        tracks_ids: Vec<TrackId>,
-    ) -> Self::Output {
-        self.rpc.send_command(Command::UpdateTracks {
-            peer_id,
-            tracks_patches: tracks_ids
-                .into_iter()
-                .map(|id| TrackPatchCommand {
-                    id,
-                    is_muted: Some(false),
-                })
-                .collect(),
-        });
-
-        Ok(())
-    }
-
-    async fn on_tracks_unconstrained(
-        &self,
-        peer_id: PeerId,
-        tracks_ids: Vec<TrackId>,
-    ) -> Self::Output {
-        self.rpc.send_command(Command::UpdateTracks {
-            peer_id,
-            tracks_patches: tracks_ids
-                .into_iter()
-                .map(|id| TrackPatchCommand {
-                    id,
-                    is_muted: Some(true),
-                })
-                .collect(),
-        });
-
         Ok(())
     }
 }

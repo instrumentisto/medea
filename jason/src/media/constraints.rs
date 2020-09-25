@@ -22,7 +22,7 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
-pub struct LocalTracksConstraints(pub Rc<RefCell<MediaTracksSettings>>);
+pub struct LocalTracksConstraints(Rc<RefCell<MediaTracksSettings>>);
 
 /// Constraints to the media received from remote. Used to disable or enable
 /// media receiving.
@@ -113,6 +113,16 @@ impl LocalTracksConstraints {
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow_mut().is_enabled(kind)
     }
+
+    #[inline]
+    pub fn is_device_video_enabled(&self) -> bool {
+        self.0.borrow().is_device_enabled()
+    }
+
+    #[inline]
+    pub fn is_display_video_enabled(&self) -> bool {
+        self.0.borrow().is_display_enabled()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -141,31 +151,6 @@ impl<D, S> MediaSource<D, S> {
 
     pub fn set_display(&mut self, display: S) {
         self.display = Some(display);
-    }
-}
-
-impl MediaSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints> {
-    fn merge(
-        &mut self,
-        other: MediaSource<
-            DeviceVideoTrackConstraints,
-            DisplayVideoTrackConstraints,
-        >,
-    ) {
-        if let Some(this) = &mut self.device {
-            if let Some(that) = other.device {
-                this.merge(that);
-            }
-        } else {
-            self.device = other.device;
-        }
-        if let Some(this) = &mut self.display {
-            if let Some(that) = other.display {
-                this.merge(that);
-            }
-        } else {
-            self.display = other.display;
-        }
     }
 }
 
@@ -543,7 +528,10 @@ impl MediaStreamTrackConstraints {
     pub fn is_required(&self) -> bool {
         match self {
             MediaStreamTrackConstraints::Device(device) => device.is_required,
-            MediaStreamTrackConstraints::Display(display) => false,
+            MediaStreamTrackConstraints::Display(_) => {
+                // TODO: Maybe this is incorrect??????
+                false
+            }
         }
     }
 
@@ -558,7 +546,7 @@ impl MediaStreamTrackConstraints {
         }
 
         match self {
-            MediaStreamTrackConstraints::Display(display) => {
+            MediaStreamTrackConstraints::Display(_) => {
                 VideoTrackConstraints::guess_is_from_display(&track)
             }
             MediaStreamTrackConstraints::Device(device) => {
@@ -566,7 +554,6 @@ impl MediaStreamTrackConstraints {
                     && ConstrainString::satisfies(&device.facing_mode, track)
                     && !VideoTrackConstraints::guess_is_from_display(&track)
             }
-            _ => false,
         }
     }
 }
@@ -600,10 +587,7 @@ impl TrackConstraints {
     /// [`TrackConstraints`] call session can't be started.
     pub fn is_required(&self) -> bool {
         match self {
-            TrackConstraints::Video(video) => {
-                // TODO: make it correct!!!!!!!!!!!!!!!
-                false
-            }
+            TrackConstraints::Video(video) => video.is_required(),
             TrackConstraints::Audio(audio) => audio.is_required,
         }
     }
@@ -741,7 +725,7 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
 #[derive(Clone, Debug, Default)]
 pub struct VideoTrackConstraints {
     /// Constraints applicable to video tracks.
-    pub constraints:
+    constraints:
         MediaSource<DeviceVideoTrackConstraints, DisplayVideoTrackConstraints>,
 
     /// Importance of this [`VideoTrackConstraints`].
@@ -877,21 +861,6 @@ pub struct DeviceVideoTrackConstraints {
 }
 
 impl DeviceVideoTrackConstraints {
-    /// Merges this [`DeviceVideoTrackConstraints`] with `another` one , meaning
-    /// that if some constraint is not set on this one, then it will be applied
-    /// from `another`.
-    fn merge(&mut self, another: DeviceVideoTrackConstraints) {
-        if self.device_id.is_none() && another.device_id.is_some() {
-            self.device_id = another.device_id;
-        }
-        if !self.is_required && another.is_required {
-            self.is_required = another.is_required;
-        }
-        if self.facing_mode.is_none() && another.facing_mode.is_some() {
-            self.facing_mode = another.facing_mode;
-        }
-    }
-
     /// Returns importance of this [`DeviceVideoTrackConstraints`].
     ///
     /// If this [`DeviceVideoTrackConstraints`] is important then without this
@@ -937,16 +906,6 @@ impl DeviceVideoTrackConstraints {
 #[wasm_bindgen]
 #[derive(Clone, Debug, Default)]
 pub struct DisplayVideoTrackConstraints {}
-
-impl DisplayVideoTrackConstraints {
-    /// Merges this [`DisplayVideoTrackConstraints`] with `another` one, meaning
-    /// that if some constraint is not set on this one, then it will be applied
-    /// from `another`.
-    #[allow(clippy::unused_self)]
-    fn merge(&mut self, _: DisplayVideoTrackConstraints) {
-        // no constraints => nothing to do here atm
-    }
-}
 
 #[wasm_bindgen]
 impl DisplayVideoTrackConstraints {
@@ -1030,8 +989,8 @@ impl VideoTrackConstraints {
                     && ConstrainString::satisfies(&device.facing_mode, track)
                     && !Self::guess_is_from_display(&track)
             }
-            (None, Some(display)) => Self::guess_is_from_display(&track),
-            (Some(device), Some(display)) => {
+            (None, Some(_)) => Self::guess_is_from_display(&track),
+            (Some(device), Some(_)) => {
                 ConstrainString::satisfies(&device.device_id, track)
                     && ConstrainString::satisfies(&device.facing_mode, track)
                     && !Self::guess_is_from_display(&track)
@@ -1062,16 +1021,6 @@ impl VideoTrackConstraints {
             .is_some()
         }
     }
-
-    /// Merges this [`VideoTrackConstraints`] with `another` one, meaning that
-    /// if some constraint is not set on this one, then it will be applied from
-    /// `another`.
-    // pub fn merge(&mut self, another: VideoTrackConstraints) {
-    //     if !self.is_required && another.is_required {
-    //         self.is_required = another.is_required;
-    //     }
-    //     self.constraints.merge(another.constraints);
-    // }
 
     /// Returns importance of this [`VideoTrackConstraints`].
     ///
@@ -1113,21 +1062,3 @@ impl From<DisplayVideoTrackConstraints> for SysMediaTrackConstraints {
         Self::new()
     }
 }
-
-// impl From<DeviceVideoTrackConstraints> for VideoTrackConstraints {
-//     fn from(constraints: DeviceVideoTrackConstraints) -> Self {
-//         Self {
-//             is_required: constraints.is_required,
-//             constraints: MediaSource::Device(constraints),
-//         }
-//     }
-// }
-//
-// impl From<DisplayVideoTrackConstraints> for VideoTrackConstraints {
-//     fn from(constraints: DisplayVideoTrackConstraints) -> Self {
-//         Self {
-//             is_required: true,
-//             constraints: MediaSource::Display(constraints),
-//         }
-//     }
-// }

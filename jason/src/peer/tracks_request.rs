@@ -12,7 +12,6 @@ use crate::{
     media::{
         AudioTrackConstraints, MediaStreamTrack, MediaStreamTrackConstraints,
         MediaTracksSettings, TrackConstraints, TrackKind,
-        VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
@@ -141,14 +140,12 @@ impl SimpleTracksRequest {
         }
         let mut cons: HashMap<_, _> =
             self.video.iter().map(|(id, video)| (id, video)).collect();
-        let mut added_tracks = 0;
         for track in video_tracks {
             let mut id_to_remove = None;
             for (id, video) in &cons {
                 if let Some(video) = video {
                     if video.satisfies(track.as_ref()) {
                         parsed_tracks.insert(**id, track);
-                        added_tracks += 1;
                         id_to_remove = Some(**id);
                         break;
                     }
@@ -156,6 +153,8 @@ impl SimpleTracksRequest {
             }
             if let Some(id_to_remove) = id_to_remove {
                 cons.remove(&id_to_remove);
+            } else {
+                return Err(tracerr::new!(InvalidVideoTrack));
             }
         }
 
@@ -224,12 +223,12 @@ impl SimpleTracksRequest {
                 let mut to_none = false;
                 if let Some(video) = video {
                     match video {
-                        MediaStreamTrackConstraints::Device(device) => {
+                        MediaStreamTrackConstraints::Device(_) => {
                             if !other.get_video().is_some_device() {
                                 to_none = true;
                             }
                         }
-                        MediaStreamTrackConstraints::Display(display) => {
+                        MediaStreamTrackConstraints::Display(_) => {
                             if !other.get_video().is_some_display() {
                                 to_none = true;
                             }

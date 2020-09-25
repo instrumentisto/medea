@@ -682,7 +682,6 @@ window.onload = async function() {
     });
 
     room.on_local_track((track) => {
-      console.log("New local track");
       updateLocalVideo([track]);
       track.free();
     })
@@ -760,9 +759,7 @@ window.onload = async function() {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
           if (track.ptr > 0) {
-            console.log("Freeing");
             track.free();
-            console.log("Freed");
           }
         }
         if (!isVideoSendMuted) {
@@ -821,7 +818,7 @@ window.onload = async function() {
           muteVideoSend.textContent = "Enable video send";
         }
       } catch (e) {
-        console.error(e);
+        console.error(e.trace());
       }
     });
     muteAudioRecv.addEventListener('click', async () => {
