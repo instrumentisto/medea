@@ -22,7 +22,7 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
-pub struct LocalTracksConstraints(Rc<RefCell<MediaTracksSettings>>);
+pub struct LocalTracksConstraints(Rc<RefCell<MediaStreamSettings>>);
 
 /// Constraints to the media received from remote. Used to disable or enable
 /// media receiving.
@@ -68,9 +68,9 @@ impl RecvConstraints {
 }
 
 #[cfg(feature = "mockable")]
-impl From<MediaTracksSettings> for LocalTracksConstraints {
+impl From<MediaStreamSettings> for LocalTracksConstraints {
     #[inline]
-    fn from(from: MediaTracksSettings) -> Self {
+    fn from(from: MediaStreamSettings) -> Self {
         Self(Rc::new(RefCell::new(from)))
     }
 }
@@ -82,25 +82,25 @@ impl LocalTracksConstraints {
         Self::default()
     }
 
-    /// Constrains the underlying [`MediaTracksSettings`] with the given `other`
-    /// [`MediaTracksSettings`].
+    /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
+    /// [`MediaStreamSettings`].
     #[inline]
-    pub fn constrain(&self, other: MediaTracksSettings) {
+    pub fn constrain(&self, other: MediaStreamSettings) {
         self.0.borrow_mut().constrain(other)
     }
 
-    /// Clones underlying [`MediaTracksSettings`].
+    /// Clones underlying [`MediaStreamSettings`].
     #[inline]
-    pub fn inner(&self) -> MediaTracksSettings {
+    pub fn inner(&self) -> MediaStreamSettings {
         self.0.borrow().clone()
     }
 
     /// Enables or disables audio or video type in underlying
-    /// [`MediaTracksSettings`].
+    /// [`MediaStreamSettings`].
     ///
-    /// Doesn't do anything if no [`MediaTracksSettings`] was set.
+    /// Doesn't do anything if no [`MediaStreamSettings`] was set.
     ///
-    /// If some type of the [`MediaTracksSettings`] is disabled, then this kind
+    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
     pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
@@ -108,7 +108,7 @@ impl LocalTracksConstraints {
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
-    /// [`MediaTracksSettings`].
+    /// [`MediaStreamSettings`].
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow_mut().is_enabled(kind)
@@ -199,7 +199,7 @@ impl Default for VideoMediaTracksSettings {
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
 #[derive(Clone, Debug, Default)]
-pub struct MediaTracksSettings {
+pub struct MediaStreamSettings {
     /// [MediaStreamConstraints][1] for the audio media type.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
@@ -212,7 +212,7 @@ pub struct MediaTracksSettings {
 }
 
 #[wasm_bindgen]
-impl MediaTracksSettings {
+impl MediaStreamSettings {
     /// Creates new [`MediaStreamConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
@@ -251,7 +251,7 @@ impl MediaTracksSettings {
     }
 }
 
-impl MediaTracksSettings {
+impl MediaStreamSettings {
     /// Returns only audio constraints.
     #[inline]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
@@ -271,9 +271,9 @@ impl MediaTracksSettings {
         self.video.constraints = constraints;
     }
 
-    /// Enables or disables audio or video type in this [`MediaTracksSettings`].
+    /// Enables or disables audio or video type in this [`MediaStreamSettings`].
     ///
-    /// If some type of the [`MediaTracksSettings`] is disabled, then this kind
+    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
     pub fn set_track_enabled(&mut self, enabled: bool, kind: TransceiverKind) {
@@ -301,20 +301,20 @@ impl MediaTracksSettings {
         self.video.is_enabled = is_enabled;
     }
 
-    /// Indicates whether audio is enabled in this [`MediaTracksSettings`].
+    /// Indicates whether audio is enabled in this [`MediaStreamSettings`].
     #[inline]
     pub fn is_audio_enabled(&self) -> bool {
         self.audio.is_enabled
     }
 
-    /// Indicates whether video is enabled in this [`MediaTracksSettings`].
+    /// Indicates whether video is enabled in this [`MediaStreamSettings`].
     #[inline]
     pub fn is_video_enabled(&self) -> bool {
         self.video.is_enabled
     }
 
     /// Indicates whether the given [`MediaType`] is enabled in this
-    /// [`MediaTracksSettings`].
+    /// [`MediaStreamSettings`].
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         match kind {
@@ -323,8 +323,8 @@ impl MediaTracksSettings {
         }
     }
 
-    /// Constrains this [`MediaTracksSettings`] with the given `other`
-    /// [`MediaTracksSettings`].
+    /// Constrains this [`MediaStreamSettings`] with the given `other`
+    /// [`MediaStreamSettings`].
     #[inline]
     fn constrain(&mut self, other: Self) {
         // `&=` cause we should not unmute muted Room, but we can mute not muted
@@ -372,8 +372,8 @@ pub enum MultiSourceTracksConstraints {
 /// `{Some, Device}` => `Device`
 /// `{Some, Display}` => `DeviceAndDisplay`
 /// `{Some, Any}` => `Device`
-impl From<MediaTracksSettings> for Option<MultiSourceTracksConstraints> {
-    fn from(constraints: MediaTracksSettings) -> Self {
+impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
+    fn from(constraints: MediaStreamSettings) -> Self {
         use MultiSourceTracksConstraints as C;
 
         let (audio, video) = (constraints.audio, constraints.video);

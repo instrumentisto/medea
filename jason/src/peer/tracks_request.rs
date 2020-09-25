@@ -10,7 +10,7 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStreamTrack, MediaTracksSettings,
+        AudioTrackConstraints, MediaStreamSettings, MediaStreamTrack,
         TrackConstraints, TrackKind, VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
@@ -152,24 +152,24 @@ impl SimpleTracksRequest {
         Ok(parsed_tracks)
     }
 
-    /// Merges [`SimpleTracksRequest`] with provided [`MediaTracksSettings`].
+    /// Merges [`SimpleTracksRequest`] with provided [`MediaStreamSettings`].
     ///
     /// Applies new settings if possible, meaning that if this
     /// [`SimpleTracksRequest`] does not have some constraint, then it will be
-    /// applied from [`MediaTracksSettings`].
+    /// applied from [`MediaStreamSettings`].
     ///
     /// # Errors
     ///
     /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if
     /// [`SimpleTracksRequest`] contains [`AudioTrackConstraints`], but provided
-    /// [`MediaTracksSettings`] doesn't and this [`AudioTrackConstraints`] are
+    /// [`MediaStreamSettings`] doesn't and this [`AudioTrackConstraints`] are
     /// important.
     ///
     /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if
     /// [`SimpleTracksRequest`] contains [`VideoTrackConstraints`], but provided
-    /// [`MediaTracksSettings`] doesn't and this [`VideoTrackConstraints`] are
+    /// [`MediaStreamSettings`] doesn't and this [`VideoTrackConstraints`] are
     /// important.
-    pub fn merge<T: Into<MediaTracksSettings>>(
+    pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
     ) -> Result<()> {
@@ -245,7 +245,7 @@ impl TryFrom<TracksRequest> for SimpleTracksRequest {
     }
 }
 
-impl From<&SimpleTracksRequest> for MediaTracksSettings {
+impl From<&SimpleTracksRequest> for MediaStreamSettings {
     fn from(request: &SimpleTracksRequest) -> Self {
         let mut constraints = Self::new();
 

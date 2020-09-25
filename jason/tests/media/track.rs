@@ -2,7 +2,7 @@
 
 use futures::channel::oneshot;
 use medea_jason::{
-    media::MediaManager, DeviceVideoTrackConstraints, MediaTracksSettings,
+    media::MediaManager, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen_test::*;
@@ -14,15 +14,14 @@ use crate::{get_audio_track, timeout};
 #[wasm_bindgen_test]
 async fn track_autostop() {
     let media_manager = MediaManager::default();
-    let mut caps = MediaTracksSettings::new();
+    let mut caps = MediaStreamSettings::new();
     caps.device_video(DeviceVideoTrackConstraints::new());
 
-    let (stream, is_new) = media_manager.get_tracks(caps).await.unwrap();
-    assert!(is_new);
+    let mut tracks = media_manager.get_tracks(caps).await.unwrap();
 
-    let mut tracks = stream;
     assert_eq!(1, tracks.len());
-    let strong_track = tracks.pop().unwrap();
+    let (strong_track, strong_track_is_new) = tracks.pop().unwrap();
+    assert!(strong_track_is_new);
     let sys_track = Clone::clone(strong_track.as_ref());
     let weak_track = strong_track.downgrade();
 

@@ -125,7 +125,8 @@ impl MediaStreamTrack {
         self.0.on_disabled.set_func(callback);
     }
 
-    /// Returns a [`String`] set to `audio` if the track is an audio track and to `video`, if it is a video track.
+    /// Returns a [`String`] set to `audio` if the track is an audio track and
+    /// to `video`, if it is a video track.
     #[wasm_bindgen(js_name = kind)]
     pub fn js_kind(&self) -> String {
         self.kind().to_string()

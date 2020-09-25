@@ -23,7 +23,7 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
-        LocalTracksConstraints, MediaStreamTrack, MediaTracksSettings,
+        LocalTracksConstraints, MediaStreamSettings, MediaStreamTrack,
         RecvConstraints,
     },
     peer::{
@@ -293,7 +293,7 @@ impl RoomHandle {
     /// This might happen in such cases:
     /// 1. Media server initiates media request.
     /// 2. `unmute_audio`/`unmute_video` is called.
-    /// 3. [`MediaTracksSettings`] updated via `set_local_media_settings`.
+    /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_local_track.set_func(f))
@@ -337,11 +337,11 @@ impl RoomHandle {
         })
     }
 
-    /// Updates this [`Room`]s [`MediaTracksSettings`]. This affects all
-    /// [`PeerConnection`]s in this [`Room`]. If [`MediaTracksSettings`] is
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
     /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaTracksSettings`] update will change [`MediaStream`] in all
+    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
@@ -351,7 +351,7 @@ impl RoomHandle {
     /// [1]: https://tinyurl.com/rnxcavf
     pub fn set_local_media_settings(
         &self,
-        settings: &MediaTracksSettings,
+        settings: &MediaStreamSettings,
     ) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
@@ -790,11 +790,11 @@ impl InnerRoom {
             .is_none()
     }
 
-    /// Updates this [`Room`]s [`MediaTracksSettings`]. This affects all
-    /// [`PeerConnection`]s in this [`Room`]. If [`MediaTracksSettings`] is
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
     /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaTracksSettings`] update will change [`MediaStreamTrack`]s in all
+    /// [`MediaStreamSettings`] update will change [`MediaStreamTrack`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
@@ -802,7 +802,7 @@ impl InnerRoom {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
-    async fn set_local_media_settings(&self, settings: MediaTracksSettings) {
+    async fn set_local_media_settings(&self, settings: MediaStreamSettings) {
         self.send_constraints.constrain(settings);
         for peer in self.peers.get_all() {
             if let Err(err) = peer

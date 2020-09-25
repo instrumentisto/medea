@@ -93,7 +93,7 @@ use medea_jason::{
     },
     peer::TransceiverKind,
     utils::{window, JasonError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaTracksSettings,
+    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -143,8 +143,8 @@ pub fn get_test_unrequired_tracks() -> (Track, Track) {
 pub fn get_media_stream_settings(
     audio_enabled: bool,
     video_enabled: bool,
-) -> MediaTracksSettings {
-    let mut settings = MediaTracksSettings::default();
+) -> MediaStreamSettings {
+    let mut settings = MediaStreamSettings::default();
     settings.set_track_enabled(audio_enabled, TransceiverKind::Audio);
     settings.set_track_enabled(video_enabled, TransceiverKind::Video);
 
@@ -220,8 +220,8 @@ pub async fn delay_for(delay_ms: i32) {
 fn media_stream_settings(
     is_audio_enabled: bool,
     is_video_enabled: bool,
-) -> MediaTracksSettings {
-    let mut settings = MediaTracksSettings::new();
+) -> MediaStreamSettings {
+    let mut settings = MediaStreamSettings::new();
     if is_audio_enabled {
         settings.audio(AudioTrackConstraints::default());
     }
@@ -267,18 +267,18 @@ async fn wait_and_check_test_result(
 
 async fn get_video_track() -> MediaStreamTrack {
     let manager = MediaManager::default();
-    let mut settings = MediaTracksSettings::new();
+    let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
-    let (stream, _) = manager.get_tracks(settings).await.unwrap();
-    stream.into_iter().next().unwrap()
+    let stream = manager.get_tracks(settings).await.unwrap();
+    stream.into_iter().next().unwrap().0
 }
 
 async fn get_audio_track() -> MediaStreamTrack {
     let manager = MediaManager::default();
-    let mut settings = MediaTracksSettings::new();
+    let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
-    let (stream, _) = manager.get_tracks(settings).await.unwrap();
-    stream.into_iter().next().unwrap()
+    let stream = manager.get_tracks(settings).await.unwrap();
+    stream.into_iter().next().unwrap().0
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within

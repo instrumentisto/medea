@@ -43,10 +43,14 @@ async fn get_test_media_connections(
     let request = media_connections.get_tracks_request().unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
-    let (stream, _) = manager.get_tracks(&caps).await.unwrap();
+    let tracks = manager.get_tracks(&caps).await.unwrap();
 
     media_connections
-        .insert_local_tracks(&caps.parse_tracks(stream).unwrap())
+        .insert_local_tracks(
+            &caps
+                .parse_tracks(tracks.into_iter().map(|(t, _)| t).collect())
+                .unwrap(),
+        )
         .await
         .unwrap();
 

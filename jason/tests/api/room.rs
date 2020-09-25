@@ -14,7 +14,7 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     api::Room,
-    media::{AudioTrackConstraints, MediaManager, MediaTracksSettings},
+    media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{MockPeerRepository, PeerConnection, Repository, TransceiverKind},
     rpc::MockRpcClient,
     utils::JasonError,
@@ -57,7 +57,7 @@ fn get_test_room(
 async fn get_test_room_and_exist_peer(
     audio_track: Track,
     video_track: Track,
-    media_stream_settings: Option<MediaTracksSettings>,
+    media_stream_settings: Option<MediaStreamSettings>,
 ) -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
 
@@ -143,7 +143,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 
     let (audio_track, video_track) = get_test_required_tracks();
 
-    let mut constraints = MediaTracksSettings::new();
+    let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
 
     JsFuture::from(room_handle.set_local_media_settings(&constraints))
@@ -184,7 +184,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (room, _peer) =
         get_test_room_and_exist_peer(audio_track, video_track, None).await;
 
-    let mut constraints = MediaTracksSettings::new();
+    let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
     let room_handle = room.new_handle();
     room_handle.on_failed_local_media(cb.into()).unwrap();
@@ -212,7 +212,7 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         let (room, _peer) =
             get_test_room_and_exist_peer(audio_track, video_track, None).await;
 
-        let mut constraints = MediaTracksSettings::new();
+        let mut constraints = MediaStreamSettings::new();
         if add_audio {
             constraints.audio(AudioTrackConstraints::new());
         }
@@ -1038,7 +1038,7 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let mut local_stream = MediaTracksSettings::new();
+            let mut local_stream = MediaStreamSettings::new();
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,

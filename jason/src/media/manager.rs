@@ -19,7 +19,7 @@ use web_sys::{
 use crate::{
     media::{
         track::{MediaStreamTrack, WeakMediaStreamTrack},
-        MediaTracksSettings, MultiSourceTracksConstraints,
+        MediaStreamSettings, MultiSourceTracksConstraints,
     },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
@@ -127,7 +127,7 @@ impl InnerMediaManager {
     }
 
     /// Obtains [`MediaStreamTrack`]s based on a provided
-    /// [`MediaTracksSettings`]. This can be the tracks that were acquired
+    /// [`MediaStreamSettings`]. This can be the tracks that were acquired
     /// earlier, or new tracks, acquired via [getUserMedia()][1] or/and
     /// [getDisplayMedia()][2] requests.
     ///
@@ -143,47 +143,62 @@ impl InnerMediaManager {
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     async fn get_tracks(
         &self,
-        mut caps: MediaTracksSettings,
+        mut caps: MediaStreamSettings,
     ) -> Result<Vec<(MediaStreamTrack, bool)>> {
-        let mut result = self.get_from_storage(&mut caps);
-        let caps: Option<MultiSourceTracksConstraints> = caps.into();
-        match caps {
-            None => Ok((result, false)),
+        let tracks_from_storage = self
+            .get_from_storage(&mut caps)
+            .into_iter()
+            .map(|t| (t, false));
+        match caps.into() {
+            None => Ok(tracks_from_storage.collect()),
             Some(MultiSourceTracksConstraints::Display(caps)) => {
-                let mut tracks = self.get_display_media(caps).await?;
-                result.append(&mut tracks);
-                Ok((result, true))
+                Ok(tracks_from_storage
+                    .chain(
+                        self.get_display_media(caps)
+                            .await?
+                            .into_iter()
+                            .map(|t| (t, true)),
+                    )
+                    .collect())
             }
             Some(MultiSourceTracksConstraints::Device(caps)) => {
-                let mut tracks = self.get_user_media(caps).await?;
-                result.append(&mut tracks);
-                Ok((result, true))
+                Ok(tracks_from_storage
+                    .chain(
+                        self.get_user_media(caps)
+                            .await?
+                            .into_iter()
+                            .map(|t| (t, true)),
+                    )
+                    .collect())
             }
             Some(MultiSourceTracksConstraints::DeviceAndDisplay(
                 device_caps,
                 display_caps,
             )) => {
-                let mut get_user_media =
-                    self.get_user_media(device_caps).await?;
-                let mut get_display_media =
+                let device_tracks = self.get_user_media(device_caps).await?;
+                let display_tracks =
                     self.get_display_media(display_caps).await?;
-                result.append(&mut get_user_media);
-                result.append(&mut get_display_media);
-
-                Ok((result, true))
+                Ok(tracks_from_storage
+                    .chain(
+                        device_tracks
+                            .into_iter()
+                            .chain(display_tracks.into_iter())
+                            .map(|t| (t, true)),
+                    )
+                    .collect())
             }
         }
     }
 
     /// Tries to find [`MediaStreamTrack`]s that satisfies
-    /// [`MediaTracksSettings`], from tracks that were acquired earlier to avoid
+    /// [`MediaStreamSettings`], from tracks that were acquired earlier to avoid
     /// redundant [getUserMedia()][1]/[getDisplayMedia()][2] calls.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     fn get_from_storage(
         &self,
-        caps: &mut MediaTracksSettings,
+        caps: &mut MediaStreamSettings,
     ) -> Vec<MediaStreamTrack> {
         // cleanup weak links
         self.tracks
@@ -315,7 +330,7 @@ impl InnerMediaManager {
 
 impl MediaManager {
     /// Obtains [`MediaStreamTrack`]s based on a provided
-    /// [`MediaTracksSettings`]. This can be the tracks that were acquired
+    /// [`MediaStreamSettings`]. This can be the tracks that were acquired
     /// earlier, or new tracks, acquired via [getUserMedia()][1] or/and
     /// [getDisplayMedia()][2] requests.
     ///
@@ -329,10 +344,10 @@ impl MediaManager {
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    pub async fn get_tracks<I: Into<MediaTracksSettings>>(
+    pub async fn get_tracks<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
-    ) -> Result<(Vec<MediaStreamTrack>, bool)> {
+    ) -> Result<Vec<(MediaStreamTrack, bool)>> {
         self.0.get_tracks(caps.into()).await
     }
 
@@ -383,17 +398,18 @@ impl MediaManagerHandle {
     }
 
     /// Returns [`MediaStreamTrack`]s objects, built from provided
-    /// [`MediaTracksSettings`].
-    pub fn init_local_tracks(&self, caps: &MediaTracksSettings) -> Promise {
+    /// [`MediaStreamSettings`].
+    pub fn init_local_tracks(&self, caps: &MediaStreamSettings) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let caps = caps.clone();
         future_to_promise(async move {
             inner?
                 .get_tracks(caps)
                 .await
-                .map(|(tracks, _)| {
+                .map(|tracks| {
                     tracks
                         .into_iter()
+                        .map(|(t, _)| t)
                         .map(JsValue::from)
                         .collect::<js_sys::Array>()
                         .into()
