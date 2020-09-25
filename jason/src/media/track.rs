@@ -13,18 +13,23 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::utils::Callback0;
 
-/// [MediaStreamTrack.kind][1] representation.
+/// Weak reference to [MediaStreamTrack][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
-pub enum TrackKind {
-    /// Audio track.
-    #[display(fmt = "audio")]
-    Audio,
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
 
-    /// Video track.
-    #[display(fmt = "video")]
-    Video,
+impl WeakMediaStreamTrack {
+    /// Tries to upgrade this weak reference to a strong one.
+    #[inline]
+    pub fn upgrade(&self) -> Option<MediaStreamTrack> {
+        self.0.upgrade().map(MediaStreamTrack)
+    }
+
+    /// Checks whether this weak reference can be upgraded to a strong one.
+    #[inline]
+    pub fn can_be_upgraded(&self) -> bool {
+        self.0.strong_count() > 0
+    }
 }
 
 /// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
@@ -120,12 +125,25 @@ impl MediaStreamTrack {
         self.0.on_disabled.set_func(callback);
     }
 
-    /// Returns [`TrackKind`] of this [`MediaStreamTrack`] converted to
-    /// [`String`].
+    /// Returns a [`String`] set to `audio` if the track is an audio track and to `video`, if it is a video track.
     #[wasm_bindgen(js_name = kind)]
     pub fn js_kind(&self) -> String {
         self.kind().to_string()
     }
+}
+
+/// [MediaStreamTrack.kind][1] representation.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
+pub enum TrackKind {
+    /// Audio track.
+    #[display(fmt = "audio")]
+    Audio,
+
+    /// Video track.
+    #[display(fmt = "video")]
+    Video,
 }
 
 impl<T> From<T> for MediaStreamTrack
@@ -180,24 +198,5 @@ impl Drop for MediaStreamTrack {
         if Rc::strong_count(&self.0) == 1 {
             self.0.track.stop();
         }
-    }
-}
-
-/// Weak reference to [MediaStreamTrack][1].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
-
-impl WeakMediaStreamTrack {
-    /// Tries to upgrade this weak reference to a strong one.
-    #[inline]
-    pub fn upgrade(&self) -> Option<MediaStreamTrack> {
-        self.0.upgrade().map(MediaStreamTrack)
-    }
-
-    /// Checks whether this weak reference can be upgraded to a strong one.
-    #[inline]
-    pub fn can_be_upgraded(&self) -> bool {
-        self.0.strong_count() > 0
     }
 }

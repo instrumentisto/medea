@@ -144,7 +144,7 @@ impl InnerMediaManager {
     async fn get_tracks(
         &self,
         mut caps: MediaTracksSettings,
-    ) -> Result<(Vec<MediaStreamTrack>, bool)> {
+    ) -> Result<Vec<(MediaStreamTrack, bool)>> {
         let mut result = self.get_from_storage(&mut caps);
         let caps: Option<MultiSourceTracksConstraints> = caps.into();
         match caps {
@@ -392,11 +392,11 @@ impl MediaManagerHandle {
                 .get_tracks(caps)
                 .await
                 .map(|(tracks, _)| {
-                    let arr = js_sys::Array::new();
-                    for track in tracks {
-                        arr.push(&track.into());
-                    }
-                    JsValue::from(arr)
+                    tracks
+                        .into_iter()
+                        .map(JsValue::from)
+                        .collect::<js_sys::Array>()
+                        .into()
                 })
                 .map_err(tracerr::wrap!(=> MediaManagerError))
                 .map_err(|e| JasonError::from(e).into())
