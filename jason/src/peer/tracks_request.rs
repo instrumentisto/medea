@@ -12,6 +12,7 @@ use crate::{
     media::{
         AudioTrackConstraints, MediaStreamSettings, MediaStreamTrack,
         MediaStreamTrackConstraints, TrackConstraints, TrackKind,
+        VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
@@ -113,18 +114,18 @@ impl SimpleTracksRequest {
     /// track from provided [`HashMap`] not satisfies
     /// contained constrains.
     ///
-    /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
-    /// [`MediaStream`] doesn't have expected video track.
+    /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if provided
+    /// [`HashMap`] doesn't have expected video track.
     pub fn parse_tracks(
         &self,
-        stream: Vec<MediaStreamTrack>,
+        tracks: Vec<MediaStreamTrack>,
     ) -> Result<HashMap<TrackId, MediaStreamTrack>> {
         use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let mut parsed_tracks = HashMap::new();
 
         let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) =
-            stream.into_iter().partition(|track| match track.kind() {
+            tracks.into_iter().partition(|track| match track.kind() {
                 TrackKind::Audio { .. } => false,
                 TrackKind::Video { .. } => true,
             });

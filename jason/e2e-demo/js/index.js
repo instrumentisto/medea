@@ -615,7 +615,7 @@ window.onload = async function() {
         qualityScoreEl.innerHTML = score;
       });
 
-      connection.on_track_added((track) => {
+      connection.on_remote_track_added((track) => {
         if (track.kind() === 'video') {
           if (track.is_display()) {
             let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
@@ -682,6 +682,7 @@ window.onload = async function() {
     });
 
     room.on_local_track((track) => {
+      console.log("New local track");
       updateLocalVideo([track]);
       track.free();
     })

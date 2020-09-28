@@ -324,9 +324,9 @@ impl RoomHandle {
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
-    ///   - `on_failed_local_media` callback is not set
-    ///   - `on_connection_loss` callback is not set
-    ///   - unable to connect to media server.
+    /// - `on_failed_local_media` callback is not set
+    /// - `on_connection_loss` callback is not set
+    /// - unable to connect to media server.
     ///
     /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {

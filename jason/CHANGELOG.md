@@ -46,8 +46,8 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `MediaStreamTrack.on_enabled` and `MediaStreamTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
-        - `ConnectionHandle.on_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
+        - `MediaTrack.on_enabled` and `MediaTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
+        - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
         - Muting/unmuting remote video/audio ([#127]):
             - `Room.mute_remote_audio`;
             - `Room.unmute_remote_audio`;

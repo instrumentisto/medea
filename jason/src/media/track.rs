@@ -33,13 +33,13 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    /// Callback to be invoked when this [`MediaStreamTrack`] will be enabled.
+    is_display: bool,
+
+    /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
     on_enabled: Callback0,
 
-    /// Callback to be invoked when this [`MediaStreamTrack`] will be disabled.
+    /// Callback to be invoked when this [`MediaStreamTrack`] is disabled.
     on_disabled: Callback0,
-
-    is_display: bool,
 
     /// [enabled] property of [MediaStreamTrack][1].
     ///
@@ -54,7 +54,7 @@ struct InnerMediaStreamTrack {
 /// left.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = MediaTrack)]
 #[derive(Clone)]
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
@@ -139,7 +139,7 @@ impl MediaStreamTrack {
     }
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = MediaTrack)]
 impl MediaStreamTrack {
     /// Returns underlying [`SysMediaStreamTrack`] from this
     /// [`MediaStreamTrack`].
