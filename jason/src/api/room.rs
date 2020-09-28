@@ -801,6 +801,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
+    /// Update [`MuteState`] of the unconstrained [`Sender`]s.
+    ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
     async fn set_local_media_settings(&self, settings: MediaStreamSettings) {

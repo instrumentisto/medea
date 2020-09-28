@@ -231,18 +231,7 @@ impl InnerMediaManager {
                 storage
                     .iter()
                     .filter(|track| {
-                        if caps.get_video().satisfies_device(track.as_ref()) {
-                            caps.take_device_video();
-                            true
-                        } else if caps
-                            .get_video()
-                            .satisfies_display(track.as_ref())
-                        {
-                            caps.take_display_video();
-                            true
-                        } else {
-                            false
-                        }
+                        caps.get_video_mut().take_if_satisfies(track.as_ref())
                     })
                     .cloned(),
             );
