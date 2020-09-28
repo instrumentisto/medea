@@ -229,7 +229,9 @@ impl InnerMediaManager {
         tracks.extend(
             storage
                 .iter()
-                .filter(|track| caps.unconstrain_if_satisfies_video(track.as_ref()))
+                .filter(|track| {
+                    caps.unconstrain_if_satisfies_video(track.as_ref())
+                })
                 .cloned(),
         );
 

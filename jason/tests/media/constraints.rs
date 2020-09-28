@@ -10,7 +10,7 @@ use medea_jason::{
     media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints, MediaManager,
         MediaStreamSettings, MultiSourceTracksConstraints, TrackKind,
-        VideoTrackConstraints,
+        VideoSource,
     },
     utils::{get_property_by_name, window},
     DisplayVideoTrackConstraints,
@@ -40,7 +40,7 @@ async fn video_constraints_satisfies() {
     let track = tracks.pop().unwrap().0;
 
     assert!(track.kind() == TrackKind::Video);
-    assert!(VideoTrackConstraints::from(track_constraints).satisfies(&track));
+    assert!(VideoSource::from(track_constraints).satisfies(&track));
 }
 
 // 1. Get device id of non default audio device from enumerate_devices();
@@ -356,9 +356,7 @@ async fn multi_source_media_stream_constraints_build6() {
 async fn multi_source_media_stream_constraints_build7() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
-    constraints.video(VideoTrackConstraints::from(VideoSettings {
-        is_required: true,
-    }));
+    constraints.video(VideoSource::from(VideoSettings { is_required: true }));
 
     let constraints: Option<MultiSourceTracksConstraints> = constraints.into();
 
@@ -383,9 +381,7 @@ async fn multi_source_media_stream_constraints_build7() {
 #[wasm_bindgen_test]
 async fn multi_source_media_stream_constraints_build8() {
     let mut constraints = MediaStreamSettings::new();
-    constraints.video(VideoTrackConstraints::from(VideoSettings {
-        is_required: true,
-    }));
+    constraints.video(VideoSource::from(VideoSettings { is_required: true }));
 
     let constraints: Option<MultiSourceTracksConstraints> = constraints.into();
 

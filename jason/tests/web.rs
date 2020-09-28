@@ -88,8 +88,7 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     media::{
-        LocalTracksConstraints, MediaManager, MediaStreamTrack,
-        VideoTrackConstraints,
+        LocalTracksConstraints, MediaManager, MediaStreamTrack, VideoSource,
     },
     peer::TransceiverKind,
     utils::{window, JasonError},
@@ -226,7 +225,7 @@ fn media_stream_settings(
         settings.audio(AudioTrackConstraints::default());
     }
     if is_video_enabled {
-        settings.video(VideoTrackConstraints::default());
+        settings.video(VideoSource::default());
     }
 
     settings
