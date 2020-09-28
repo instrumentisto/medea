@@ -358,7 +358,9 @@ impl RoomHandle {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
         future_to_promise(async move {
-            inner?.set_local_media_settings(settings).await;
+            // TODO: MEEH return error from here to JS side (don't forget about
+            // tracerr).
+            inner?.set_local_media_settings(settings).await.unwrap();
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -842,7 +844,10 @@ impl InnerRoom {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
-    async fn set_local_media_settings(&self, settings: MediaStreamSettings) {
+    async fn set_local_media_settings(
+        &self,
+        settings: MediaStreamSettings,
+    ) -> Result<(), Traced<RoomError>> {
         self.send_constraints.constrain(settings);
 
         let mut mute_states_update = HashMap::new();
@@ -869,8 +874,9 @@ impl InnerRoom {
             }
         }
 
-        // TODO: return Err
-        self.update_mute_states(mute_states_update).await;
+        self.update_mute_states(mute_states_update)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this
