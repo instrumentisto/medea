@@ -422,6 +422,23 @@ impl MediaConnections {
         out
     }
 
+    pub fn get_transceiver_side_by_id(
+        &self,
+        track_id: TrackId,
+    ) -> Option<Rc<dyn TransceiverSide>> {
+        let inner = self.0.borrow();
+        inner
+            .senders
+            .get(&track_id)
+            .map(|sndr| Rc::clone(&sndr) as Rc<dyn TransceiverSide>)
+            .or_else(|| {
+                inner
+                    .receivers
+                    .get(&track_id)
+                    .map(|rcvr| Rc::clone(&rcvr) as Rc<dyn TransceiverSide>)
+            })
+    }
+
     /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
     ///
     /// # Errors
@@ -576,9 +593,7 @@ impl MediaConnections {
         for sender in inner.senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
-                    if !sender.is_unmuted() {
-                        constrained_tracks.insert(sender.track_id(), false);
-                    }
+                    constrained_tracks.insert(sender.track_id(), false);
                     sender_and_track.push((sender, track));
                 } else {
                     return Err(tracerr::new!(
@@ -590,9 +605,7 @@ impl MediaConnections {
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
-                if !sender.is_muted() {
-                    constrained_tracks.insert(sender.track_id(), true);
-                }
+                constrained_tracks.insert(sender.track_id(), true);
             }
         }
 

@@ -716,6 +716,13 @@ impl PeerConnection {
         self.media_connections.get_sender_by_id(track_id)
     }
 
+    pub fn get_transceiver_side_by_id(
+        &self,
+        track_id: TrackId,
+    ) -> Option<Rc<dyn TransceiverSide>> {
+        self.media_connections.get_transceiver_side_by_id(track_id)
+    }
+
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
     ///
     /// # Errors
