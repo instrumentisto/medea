@@ -10,40 +10,34 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStream, MediaStreamSettings,
+        AudioTrackConstraints, MediaStreamSettings, MediaStreamTrack,
         TrackConstraints, TrackKind, VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
 
-use super::PeerMediaStream;
-
-/// Errors that may occur when validating [`StreamRequest`] or
-/// parsing [`MediaStream`].
+/// Errors that may occur when validating [`TracksRequest`] or
+/// parsing [`MediaStreamTrack`]s.
 #[derive(Debug, Display, JsCaused)]
-pub enum StreamRequestError {
-    /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
-    #[display(fmt = "only one audio track is allowed in SimpleStreamRequest")]
+pub enum TracksRequestError {
+    /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
+    #[display(fmt = "only one audio track is allowed in SimpleTracksRequest")]
     TooManyAudioTracks,
 
-    /// [`StreamRequest`] contains multiple [`VideoTrackConstraints`].
-    #[display(fmt = "only one video track is allowed in SimpleStreamRequest")]
+    /// [`TracksRequest`] contains multiple [`VideoTrackConstraints`].
+    #[display(fmt = "only one video track is allowed in SimpleTracksRequest")]
     TooManyVideoTracks,
 
-    /// [`StreamRequest`] contains no track constraints at all.
-    #[display(fmt = "SimpleStreamRequest should have at least one track")]
+    /// [`TracksRequest`] contains no track constraints at all.
+    #[display(fmt = "SimpleTracksRequest should have at least one track")]
     NoTracks,
 
-    /// Provided [`MediaStream`] has multiple audio tracks.
-    #[display(
-        fmt = "provided MediaStream was expected to have single audio track"
-    )]
+    /// Provided multiple audio [`MediaStreamTrack`]s.
+    #[display(fmt = "provided multiple audio MediaStreamTracks")]
     ExpectedAudioTracks,
 
-    /// Provided [`MediaStream`] has multiple video tracks.
-    #[display(
-        fmt = "provided MediaStream was expected to have single video track"
-    )]
+    /// Provided multiple video [`MediaStreamTrack`]s.
+    #[display(fmt = "provided multiple video MediaStreamTracks")]
     ExpectedVideoTracks,
 
     /// Audio track fails to satisfy specified constraints.
@@ -59,7 +53,7 @@ pub enum StreamRequestError {
     InvalidVideoTrack,
 }
 
-type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
+type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
@@ -71,13 +65,13 @@ type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;
 /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [3]: https://w3.org/TR/mediacapture-streams/#mediastream
 #[derive(Debug, Default)]
-pub struct StreamRequest {
+pub struct TracksRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
     video: HashMap<TrackId, VideoTrackConstraints>,
 }
 
-impl StreamRequest {
-    /// Adds track request to this [`StreamRequest`].
+impl TracksRequest {
+    /// Adds track request to this [`TracksRequest`].
     pub fn add_track_request<T: Into<TrackConstraints>>(
         &mut self,
         track_id: TrackId,
@@ -94,41 +88,43 @@ impl StreamRequest {
     }
 }
 
-/// Subtype of [`StreamRequest`], which can have maximum one track of each kind
+/// Subtype of [`TracksRequest`], which can have maximum one track of each kind
 /// and must have at least one track of any kind.
 #[derive(Debug)]
-pub struct SimpleStreamRequest {
+pub struct SimpleTracksRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
     video: Option<(TrackId, VideoTrackConstraints)>,
 }
 
-impl SimpleStreamRequest {
-    /// Parses [`MediaStream`] and returns [`PeerMediaStream`] wrapper.
+impl SimpleTracksRequest {
+    /// Parses [`MediaStreamTrack`]s and returns [`HashMap`] with [`TrackId`]s
+    /// and [`MediaStreamTracks`]s.
     ///
     /// # Errors
     ///
-    /// Errors with [`StreamRequestError::InvalidAudioTrack`] if some audio
+    /// Errors with [`TracksRequestError::InvalidAudioTrack`] if some audio
     /// track from provided [`MediaStream`] not satisfies
     /// contained constrains.
     ///
-    /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if provided
-    /// [`MediaStream`] doesn't have expected audio track.
+    /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if provided
+    /// [`HashMap`] doesn't have expected audio track.
     ///
-    /// Errors with [`StreamRequestError::InvalidVideoTrack`] if some video
-    /// track from provided [`MediaStream`] not satisfies
+    /// Errors with [`TracksRequestError::InvalidVideoTrack`] if some video
+    /// track from provided [`HashMap`] not satisfies
     /// contained constrains.
     ///
-    /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if provided
-    /// [`MediaStream`] doesn't have expected video track.
-    pub fn parse_stream(&self, stream: MediaStream) -> Result<PeerMediaStream> {
-        use StreamRequestError::{InvalidAudioTrack, InvalidVideoTrack};
+    /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if provided
+    /// [`HashMap`] doesn't have expected video track.
+    pub fn parse_tracks(
+        &self,
+        tracks: Vec<MediaStreamTrack>,
+    ) -> Result<HashMap<TrackId, MediaStreamTrack>> {
+        use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
-        let result_stream = PeerMediaStream::new();
+        let mut parsed_tracks = HashMap::new();
 
-        let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) = stream
-            .into_tracks()
-            .into_iter()
-            .partition(|track| match track.kind() {
+        let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) =
+            tracks.into_iter().partition(|track| match track.kind() {
                 TrackKind::Audio { .. } => false,
                 TrackKind::Video { .. } => true,
             });
@@ -136,7 +132,7 @@ impl SimpleStreamRequest {
         if let Some((id, audio)) = &self.audio {
             if let Some(track) = audio_tracks.into_iter().next() {
                 if audio.satisfies(track.as_ref()) {
-                    result_stream.add_track(*id, track);
+                    parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
                 }
@@ -146,31 +142,31 @@ impl SimpleStreamRequest {
         if let Some((id, video)) = &self.video {
             if let Some(track) = video_tracks.into_iter().next() {
                 if video.satisfies(track.as_ref()) {
-                    result_stream.add_track(*id, track);
+                    parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
                 }
             }
         }
 
-        Ok(result_stream)
+        Ok(parsed_tracks)
     }
 
-    /// Merges [`SimpleStreamRequest`] with provided [`MediaStreamSettings`].
+    /// Merges [`SimpleTracksRequest`] with provided [`MediaStreamSettings`].
     ///
     /// Applies new settings if possible, meaning that if this
-    /// [`SimpleStreamRequest`] does not have some constraint, then it will be
+    /// [`SimpleTracksRequest`] does not have some constraint, then it will be
     /// applied from [`MediaStreamSettings`].
     ///
     /// # Errors
     ///
-    /// Errors with [`StreamRequestError::ExpectedAudioTracks`] if
-    /// [`SimpleStreamRequest`] contains [`AudioTrackConstraints`], but provided
+    /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if
+    /// [`SimpleTracksRequest`] contains [`AudioTrackConstraints`], but provided
     /// [`MediaStreamSettings`] doesn't and this [`AudioTrackConstraints`] are
     /// important.
     ///
-    /// Errors with [`StreamRequestError::ExpectedVideoTracks`] if
-    /// [`SimpleStreamRequest`] contains [`VideoTrackConstraints`], but provided
+    /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if
+    /// [`SimpleTracksRequest`] contains [`VideoTrackConstraints`], but provided
     /// [`MediaStreamSettings`] doesn't and this [`VideoTrackConstraints`] are
     /// important.
     pub fn merge<T: Into<MediaStreamSettings>>(
@@ -183,7 +179,7 @@ impl SimpleStreamRequest {
             if !other.is_video_enabled() {
                 if video_caps.is_required() {
                     return Err(tracerr::new!(
-                        StreamRequestError::ExpectedVideoTracks
+                        TracksRequestError::ExpectedVideoTracks
                     ));
                 } else {
                     self.video.take();
@@ -194,7 +190,7 @@ impl SimpleStreamRequest {
             if !other.is_audio_enabled() {
                 if audio_caps.is_required() {
                     return Err(tracerr::new!(
-                        StreamRequestError::ExpectedAudioTracks
+                        TracksRequestError::ExpectedAudioTracks
                     ));
                 } else {
                     self.audio.take();
@@ -217,13 +213,13 @@ impl SimpleStreamRequest {
     }
 }
 
-impl TryFrom<StreamRequest> for SimpleStreamRequest {
-    type Error = StreamRequestError;
+impl TryFrom<TracksRequest> for SimpleTracksRequest {
+    type Error = TracksRequestError;
 
     fn try_from(
-        value: StreamRequest,
+        value: TracksRequest,
     ) -> std::result::Result<Self, Self::Error> {
-        use StreamRequestError::{
+        use TracksRequestError::{
             NoTracks, TooManyAudioTracks, TooManyVideoTracks,
         };
 
@@ -249,8 +245,8 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
     }
 }
 
-impl From<&SimpleStreamRequest> for MediaStreamSettings {
-    fn from(request: &SimpleStreamRequest) -> Self {
+impl From<&SimpleTracksRequest> for MediaStreamSettings {
+    fn from(request: &SimpleTracksRequest) -> Self {
         let mut constraints = Self::new();
 
         if let Some((_, audio)) = &request.audio {

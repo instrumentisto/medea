@@ -394,7 +394,10 @@ impl WebSocketRpcClient {
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
     /// subs about connection loss.
     fn handle_connection_loss(&self, closed_state_reason: ClosedStateReason) {
-        log::error!("WebSocketRpcClient::handle_connection_loss: {:?}", closed_state_reason);
+        log::error!(
+            "WebSocketRpcClient::handle_connection_loss: {:?}",
+            closed_state_reason
+        );
         self.0
             .borrow()
             .state
@@ -471,15 +474,13 @@ impl WebSocketRpcClient {
             }
             ServerMsg::Ping(_) => {}
 
-            ServerMsg::JoinedRoom { room_id, member_id} => {
+            ServerMsg::JoinedRoom { room_id, member_id } => {
                 // unimplemented!()
-            },
+            }
             ServerMsg::LeftRoom {
                 room_id: _,
                 close_reason: _,
-            } => {
-                unimplemented!()
-            },
+            } => unimplemented!(),
         }
     }
 
@@ -666,9 +667,7 @@ impl RpcClient for WebSocketRpcClient {
             }
             ClientState::Connecting => self.connecting_result().await?,
             ClientState::Closed(_) => {
-                Rc::clone(&self)
-                    .establish_connection(url)
-                    .await?
+                Rc::clone(&self).establish_connection(url).await?
             }
         };
         self.send_client_msg(&ClientMsg::JoinRoom((room_id, member_id, token)));

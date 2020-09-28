@@ -452,7 +452,7 @@ mod test {
 
     pub fn empty_participants_service() -> ParticipantService {
         let room_spec = RoomSpec {
-            id: RoomId::from("test"),
+            id: "test".into(),
             pipeline: Pipeline::new(HashMap::new()),
         };
         let ctx = AppContext::new(
@@ -471,7 +471,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             None,
@@ -479,7 +479,7 @@ mod test {
             None,
         );
 
-        let test_member_id = MemberId(String::from("test-member"));
+        let test_member_id = MemberId::from("test-member");
         members
             .create_member(test_member_id.clone(), &test_member_spec)
             .unwrap();
@@ -513,7 +513,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             Some(idle_timeout),
@@ -521,7 +521,7 @@ mod test {
             Some(ping_interval),
         );
 
-        let test_member_id = MemberId(String::from("test-member"));
+        let test_member_id = MemberId::from("test-member");
         members
             .create_member(test_member_id.clone(), &test_member_spec)
             .unwrap();

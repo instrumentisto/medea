@@ -6,14 +6,11 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{
-    ConnectionQualityScore, MemberId, PeerId, TrackId,
-};
+use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
     media::MediaStreamTrack,
-    peer::{PeerMediaStream, RemoteMediaStream},
     utils::{Callback0, Callback1, HandlerDetachedError},
 };
 
@@ -101,15 +98,12 @@ struct InnerConnection {
     /// Remote [`Member`] ID.
     remote_id: MemberId,
 
-    /// [`PeerMediaStream`] received from remote member.
-    remote_stream: RefCell<Option<PeerMediaStream>>,
-
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
     quality_score: Cell<Option<ConnectionQualityScore>>,
 
-    /// JS callback, that will be invoked when remote [`PeerMediaStream`] is
+    /// JS callback, that will be invoked when remote [`MediaStreamTrack`] is
     /// received.
-    on_remote_stream: Callback1<RemoteMediaStream>,
+    on_remote_track_added: Callback1<MediaStreamTrack>,
 
     /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
     /// be updated.
@@ -121,17 +115,6 @@ struct InnerConnection {
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked as soon as first media track from
-    /// remote `Member` is received.
-    ///
-    /// It's guaranteed that provided stream will have at least one media track
-    /// when this callback is fired. List of tracks in provided stream is not
-    /// final and can be changed in future.
-    pub fn on_remote_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_remote_stream.set_func(f))
-    }
-
     /// Sets callback, which will be invoked when this `Connection` will close.
     pub fn on_close(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
@@ -140,6 +123,16 @@ impl ConnectionHandle {
     /// Returns remote `Member` ID.
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
         upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
+    }
+
+    /// Sets callback, which will be invoked when new remote
+    /// [`MediaStreamTrack`] will be added to this [`Connection`].
+    pub fn on_remote_track_added(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        upgrade_or_detached!(self.0)
+            .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
     /// Sets callback, which will be invoked when connection quality score will
@@ -165,28 +158,17 @@ impl Connection {
     pub fn new(remote_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
-            remote_stream: RefCell::default(),
             quality_score: Cell::default(),
-            on_remote_stream: Callback1::default(),
             on_quality_score_update: Callback1::default(),
             on_close: Callback0::default(),
+            on_remote_track_added: Callback1::default(),
         }))
     }
 
-    /// Adds provided [`MediaStreamTrack`] to remote stream of this
-    /// [`Connection`].
-    ///
-    /// If this is the first track added to this [`Connection`], then a new
-    /// [`PeerMediaStream`] is built and sent to `on_remote_stream` callback.
-    pub fn add_remote_track(&self, track_id: TrackId, track: MediaStreamTrack) {
-        let is_new_stream = self.0.remote_stream.borrow().is_none();
-        let mut remote_stream_ref = self.0.remote_stream.borrow_mut();
-        let stream = remote_stream_ref.get_or_insert_with(PeerMediaStream::new);
-        stream.add_track(track_id, track);
-
-        if is_new_stream {
-            self.0.on_remote_stream.call(stream.new_handle());
-        }
+    /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with the
+    /// provided [`MediaStreamTrack`].
+    pub fn add_remote_track(&self, track: MediaStreamTrack) {
+        self.0.on_remote_track_added.call(track);
     }
 
     /// Creates new [`ConnectionHandle`] for using [`Connection`] on JS side.

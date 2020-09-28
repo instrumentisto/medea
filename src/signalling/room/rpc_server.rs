@@ -288,7 +288,7 @@ mod test {
     use super::*;
 
     use crate::{
-        api::control::{pipeline::Pipeline, MemberSpec, RoomId, RoomSpec},
+        api::control::{pipeline::Pipeline, MemberSpec, RoomSpec},
         conf::{self, Conf},
         media::peer::tests::dummy_negotiation_sub_mock,
         signalling::{
@@ -303,7 +303,7 @@ mod test {
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
-            id: RoomId::from("test"),
+            id: "test".into(),
             pipeline: Pipeline::new(HashMap::new()),
         };
         let context = AppContext::new(
@@ -332,7 +332,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             None,
@@ -341,11 +341,11 @@ mod test {
         );
 
         room.members
-            .create_member(MemberId(String::from("member1")), &member1)
+            .create_member("member1".into(), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            MemberId(String::from("member1")),
+            "member1".into(),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -370,7 +370,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             None,
@@ -379,11 +379,11 @@ mod test {
         );
 
         room.members
-            .create_member(MemberId(String::from("member1")), &member1)
+            .create_member("member1".into(), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            MemberId(String::from("member1")),
+            "member1".into(),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {

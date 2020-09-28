@@ -736,7 +736,7 @@ mod tests {
     use std::{collections::HashSet, time::Duration};
 
     use futures::{channel::mpsc, future, Stream, StreamExt as _};
-    use medea_client_api_proto::TrackUpdate;
+    use medea_client_api_proto::{TrackUpdate, Token};
     use tokio::time::timeout;
 
     use crate::{
@@ -889,7 +889,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -897,7 +897,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -994,7 +994,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1002,7 +1002,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
