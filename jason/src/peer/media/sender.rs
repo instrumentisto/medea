@@ -265,13 +265,12 @@ impl TransceiverSide for Sender {
         self.transceiver.mid()
     }
 
-    /// Returns `true` if [`TrackConstraints`] for this [`Sender`] can't be
-    /// satisfied based on current [`LocalTracksConstraints`].
+    // TODO: rename
     fn is_can_be_constrained(&self) -> bool {
-        if self.caps.is_display() {
-            self.send_constraints.is_display_video_enabled()
+        if self.caps.is_display_video() {
+            self.send_constraints.is_display_video_constrained()
         } else {
-            self.send_constraints.is_device_video_enabled()
+            self.send_constraints.is_device_video_constrained()
         }
     }
 }

@@ -11,7 +11,7 @@ use tracerr::Traced;
 use crate::{
     media::{
         AudioTrackConstraints, MediaStreamSettings, MediaStreamTrack,
-        MediaStreamTrackConstraints, TrackConstraints, TrackKind,
+        TrackConstraints, TrackKind, VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
@@ -67,7 +67,7 @@ type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 #[derive(Debug, Default)]
 pub struct TracksRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
-    video: HashMap<TrackId, MediaStreamTrackConstraints>,
+    video: HashMap<TrackId, VideoTrackConstraints>,
 }
 
 impl TracksRequest {
@@ -93,7 +93,7 @@ impl TracksRequest {
 #[derive(Debug)]
 pub struct SimpleTracksRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
-    video: Vec<(TrackId, Option<MediaStreamTrackConstraints>)>,
+    video: Vec<(TrackId, Option<VideoTrackConstraints>)>,
 }
 
 impl SimpleTracksRequest {
@@ -222,10 +222,10 @@ impl SimpleTracksRequest {
             for (_, video) in &mut self.video {
                 if let Some(video_cons) = video {
                     let is_fit = match video_cons {
-                        MediaStreamTrackConstraints::Device(_) => {
+                        VideoTrackConstraints::Device(_) => {
                             other.is_device_constrained()
                         }
-                        MediaStreamTrackConstraints::Display(_) => {
+                        VideoTrackConstraints::Display(_) => {
                             other.is_display_constrained()
                         }
                     };
@@ -281,13 +281,10 @@ impl From<&SimpleTracksRequest> for MediaStreamSettings {
         }
         for (_, video) in &request.video {
             if let Some(video) = video {
-                if let MediaStreamTrackConstraints::Device(device_video) = video
-                {
+                if let VideoTrackConstraints::Device(device_video) = video {
                     constraints.device_video(device_video.clone());
                 }
-                if let MediaStreamTrackConstraints::Display(display_video) =
-                    video
-                {
+                if let VideoTrackConstraints::Display(display_video) = video {
                     constraints.display_video(display_video.clone());
                 }
             }

@@ -446,7 +446,7 @@ impl MediaConnections {
                             MediaType::Video(video) => {
                                 if video.is_display {
                                     if send_constraints
-                                        .is_display_video_enabled()
+                                        .is_display_video_constrained()
                                     {
                                         mute_state = StableMuteState::Unmuted;
                                     } else {
@@ -454,7 +454,7 @@ impl MediaConnections {
                                     }
                                 } else {
                                     if send_constraints
-                                        .is_device_video_enabled()
+                                        .is_device_video_constrained()
                                     {
                                         mute_state = StableMuteState::Unmuted;
                                     } else {

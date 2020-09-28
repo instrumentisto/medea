@@ -226,21 +226,12 @@ impl InnerMediaManager {
             }
         }
 
-        if caps.is_video_enabled() {
-            tracks.extend(
-                storage
-                    .iter()
-                    .filter(|track| {
-                        caps.clear_if_satisfies(track.as_ref())
-                    })
-                    .cloned(),
-            );
-            if !caps.is_device_constrained()
-                && !caps.is_display_constrained()
-            {
-                caps.toggle_publish_video(false);
-            }
-        }
+        tracks.extend(
+            storage
+                .iter()
+                .filter(|track| caps.unconstrain_if_satisfies_video(track.as_ref()))
+                .cloned(),
+        );
 
         tracks
     }
