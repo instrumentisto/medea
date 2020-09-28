@@ -15,15 +15,14 @@ use tracerr::Traced;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
-    media::{LocalStreamConstraints, RecvConstraints},
+    media::{LocalTracksConstraints, MediaStreamTrack, RecvConstraints},
     peer::PeerEvent,
     utils::{JsCaused, JsError},
 };
 
 use super::{
     conn::{RtcPeerConnection, TransceiverKind},
-    stream::PeerMediaStream,
-    stream_request::StreamRequest,
+    tracks_request::TracksRequest,
 };
 
 use self::{mute_state::MuteStateController, sender::SenderBuilder};
@@ -166,7 +165,7 @@ pub enum MediaConnectionsError {
     /// Occurs when inserted [`PeerMediaStream`] dont have all necessary
     /// [`MediaStreamTrack`]s.
     #[display(fmt = "Provided stream does not have all necessary Tracks")]
-    InvalidMediaStream,
+    InvalidMediaTracks,
 
     /// Occurs when [`MediaStreamTrack`] of inserted [`PeerMediaStream`] does
     /// not satisfy [`Sender`] constraints.
@@ -417,7 +416,7 @@ impl MediaConnections {
     pub fn create_tracks<I: IntoIterator<Item = proto::Track>>(
         &self,
         tracks: I,
-        send_constraints: &LocalStreamConstraints,
+        send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
         let mut inner = self.0.borrow_mut();
@@ -494,15 +493,15 @@ impl MediaConnections {
         Ok(())
     }
 
-    /// Returns [`StreamRequest`] if this [`MediaConnections`] has [`Sender`]s.
-    pub fn get_stream_request(&self) -> Option<StreamRequest> {
+    /// Returns [`TracksRequest`] if this [`MediaConnections`] has [`Sender`]s.
+    pub fn get_tracks_request(&self) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
             if let MuteState::Stable(StableMuteState::Unmuted) =
                 sender.mute_state()
             {
                 stream_request
-                    .get_or_insert_with(StreamRequest::default)
+                    .get_or_insert_with(TracksRequest::default)
                     .add_track_request(
                         sender.track_id(),
                         sender.caps().clone(),
@@ -512,31 +511,29 @@ impl MediaConnections {
         stream_request
     }
 
-    /// Inserts tracks from a provided [`PeerMediaStream`] into [`Sender`]s
-    /// based on track IDs.
+    /// Inserts provided tracks into [`Sender`]s based on track IDs.
     ///
-    /// Provided [`PeerMediaStream`] must have all required
-    /// [`MediaStreamTrack`]s. [`MediaStreamTrack`]s are inserted into
-    /// [`Sender`]'s [`RtcRtpTransceiver`]s via [`replaceTrack` method][1],
-    /// changing its direction to `sendonly`.
+    ///  [`MediaStreamTrack`]s are inserted into [`Sender`]'s
+    /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
+    /// direction to `sendonly`.
     ///
     /// # Errors
     ///
-    /// With [`MediaConnectionsError::InvalidMediaStream`] if provided
-    /// [`PeerMediaStream`] doesn't contain required [`MediaStreamTrack`].
+    /// With [`MediaConnectionsError::InvalidMediaTracks`] if provided
+    /// [`HashMap`] doesn't contain required [`MediaStreamTrack`].
     ///
     /// With [`MediaConnectionsError::InvalidMediaTrack`] if some
     /// [`MediaStreamTrack`] cannot be inserted into associated [`Sender`]
     /// because of constraints mismatch.
     ///
     /// With [`MediaConnectionsError::CouldNotInsertLocalTrack`] if some
-    /// [`MediaStreamTrack`] from provided [`PeerMediaStream`] cannot be
-    /// inserted into provided [`Sender`]s transceiver.
+    /// [`MediaStreamTrack`] cannot be inserted into provided [`Sender`]s
+    /// transceiver.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    pub async fn insert_local_stream(
+    pub async fn insert_local_tracks(
         &self,
-        stream: &PeerMediaStream,
+        tracks: &HashMap<TrackId, MediaStreamTrack>,
     ) -> Result<()> {
         let inner = self.0.borrow();
 
@@ -548,7 +545,7 @@ impl MediaConnections {
                 continue;
             }
 
-            if let Some(track) = stream.get_track_by_id(sender.track_id()) {
+            if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
                     sender_and_track.push((sender, track));
                 } else {
@@ -558,7 +555,7 @@ impl MediaConnections {
                 }
             } else if sender.caps().is_required() {
                 return Err(tracerr::new!(
-                    MediaConnectionsError::InvalidMediaStream
+                    MediaConnectionsError::InvalidMediaTracks
                 ));
             }
         }

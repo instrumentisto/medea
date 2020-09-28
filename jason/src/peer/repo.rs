@@ -6,7 +6,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{LocalStreamConstraints, MediaManager, RecvConstraints},
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     utils::{delay_for, TaskHandle},
 };
 
@@ -27,7 +27,7 @@ pub trait PeerRepository {
         ice_servers: Vec<IceServer>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         is_force_relayed: bool,
-        local_stream_constraints: LocalStreamConstraints,
+        local_stream_constraints: LocalTracksConstraints,
         recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
@@ -103,7 +103,7 @@ impl PeerRepository for Repository {
         ice_servers: Vec<IceServer>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         is_force_relayed: bool,
-        send_constraints: LocalStreamConstraints,
+        send_constraints: LocalTracksConstraints,
         recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
         let peer = PeerConnection::new(
