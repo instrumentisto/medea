@@ -223,10 +223,10 @@ impl SimpleTracksRequest {
                 if let Some(video_cons) = video {
                     let is_fit = match video_cons {
                         MediaStreamTrackConstraints::Device(_) => {
-                            other.get_video().is_some_device()
+                            other.is_device_constrained()
                         }
                         MediaStreamTrackConstraints::Display(_) => {
-                            other.get_video().is_some_display()
+                            other.is_display_constrained()
                         }
                     };
                     if !is_fit {

@@ -14,7 +14,6 @@ pub use self::{
         DisplayVideoTrackConstraints, FacingMode, LocalTracksConstraints,
         MediaStreamSettings, MediaStreamTrackConstraints,
         MultiSourceTracksConstraints, RecvConstraints, TrackConstraints,
-        VideoTrackConstraints,
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},

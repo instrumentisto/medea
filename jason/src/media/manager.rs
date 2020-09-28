@@ -231,12 +231,12 @@ impl InnerMediaManager {
                 storage
                     .iter()
                     .filter(|track| {
-                        caps.get_video_mut().take_if_satisfies(track.as_ref())
+                        caps.clear_if_satisfies(track.as_ref())
                     })
                     .cloned(),
             );
-            if !caps.get_video().is_some_device()
-                && !caps.get_video().is_some_display()
+            if !caps.is_device_constrained()
+                && !caps.is_display_constrained()
             {
                 caps.toggle_publish_video(false);
             }
