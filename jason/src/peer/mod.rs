@@ -711,6 +711,7 @@ impl PeerConnection {
         }
     }
 
+    /// Lookups [`Sender`] by [`TrackId`].
     pub fn get_sender_by_id(&self, track_id: TrackId) -> Option<Rc<Sender>> {
         self.media_connections.get_sender_by_id(track_id)
     }

@@ -33,6 +33,8 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
+    /// Flag which indicates that this [`MediaStreamTrack`] was received from
+    /// `getDisplayMedia`.
     is_display: bool,
 
     /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
@@ -59,6 +61,8 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
+    /// Creates new [`MediaStreamTrack`], spawns listener for
+    /// [`InnerMediaStreamTrack::enabled`] state changes.
     pub fn new<T>(track: T, is_display: bool) -> Self
     where
         SysMediaStreamTrack: From<T>,
@@ -166,6 +170,8 @@ impl MediaStreamTrack {
         self.kind().to_string()
     }
 
+    /// Returns `true` if this [`MediaStreamTrack`] was received from
+    /// `getDisplayMedia`.
     pub fn is_display(&self) -> bool {
         self.0.is_display
     }

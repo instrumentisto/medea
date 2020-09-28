@@ -218,7 +218,7 @@ impl Sender {
 
     /// Checks whether general mute state of the [`Sender`] is in
     /// [`MuteState::Unmuted`].
-    pub fn is_general_unmuted(&self) -> bool {
+    fn is_general_unmuted(&self) -> bool {
         self.general_mute_state.get() == StableMuteState::Unmuted
     }
 
@@ -265,6 +265,8 @@ impl TransceiverSide for Sender {
         self.transceiver.mid()
     }
 
+    /// Returns `true` if [`TrackConstraints`] for this [`Sender`] can't be
+    /// satisfied based on current [`LocalTracksConstraints`].
     fn is_can_be_constrained(&self) -> bool {
         if self.caps.is_display() {
             self.send_constraints.is_display_video_enabled()

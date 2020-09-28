@@ -12,7 +12,6 @@ use crate::{
     media::{
         AudioTrackConstraints, MediaStreamSettings, MediaStreamTrack,
         MediaStreamTrackConstraints, TrackConstraints, TrackKind,
-        VideoTrackConstraints,
     },
     utils::{JsCaused, JsError},
 };
@@ -221,23 +220,18 @@ impl SimpleTracksRequest {
         }
         if other.is_video_enabled() {
             for (_, video) in &mut self.video {
-                let mut to_none = false;
-                if let Some(video) = video {
-                    match video {
+                if let Some(video_cons) = video {
+                    let is_fit = match video_cons {
                         MediaStreamTrackConstraints::Device(_) => {
-                            if !other.get_video().is_some_device() {
-                                to_none = true;
-                            }
+                            other.get_video().is_some_device()
                         }
                         MediaStreamTrackConstraints::Display(_) => {
-                            if !other.get_video().is_some_display() {
-                                to_none = true;
-                            }
+                            other.get_video().is_some_display()
                         }
+                    };
+                    if !is_fit {
+                        video.take();
                     }
-                }
-                if to_none {
-                    video.take();
                 }
             }
         }

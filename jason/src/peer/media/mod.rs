@@ -45,6 +45,8 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
 
+    /// Returns `true` if [`MediaStreamTrack`] currently can be obtained for
+    /// this [`TransceiverSide`].
     fn is_can_be_constrained(&self) -> bool;
 }
 
@@ -222,8 +224,6 @@ struct InnerMediaConnections {
 
     /// [`TrackId`] to its [`Receiver`].
     receivers: HashMap<TrackId, Rc<Receiver>>,
-
-    transceivers_statuses: HashMap<TrackId, bool>,
 }
 
 impl InnerMediaConnections {
@@ -282,7 +282,6 @@ impl MediaConnections {
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            transceivers_statuses: HashMap::new(),
         }))
     }
 
@@ -411,7 +410,7 @@ impl MediaConnections {
     /// Returns activity statuses of the all [`Sender`]s and [`Receiver`]s from
     /// this [`MediaConnections`].
     pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
-        let mut inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
 
         let mut out = HashMap::new();
         for (track_id, sender) in &inner.senders {
@@ -420,21 +419,6 @@ impl MediaConnections {
         for (track_id, receiver) in &inner.receivers {
             out.insert(*track_id, receiver.is_receiving());
         }
-
-        out.retain(|id, status| {
-            if let Some(old_status) =
-                inner.transceivers_statuses.insert(*id, *status)
-            {
-                if old_status == *status {
-                    false
-                } else {
-                    true
-                }
-            } else {
-                true
-            }
-        });
-
         out
     }
 
