@@ -28,6 +28,7 @@
     let controlBtns = document.getElementById('control');
     let audioSelect = document.getElementById('connect__select-device_audio');
     let videoSelect = document.getElementById('connect__select-device_video');
+    let screenshareSwitchEl = document.getElementById('connection-settings__screenshare');
     let localVideo = document.getElementById('local-video__video');
     let isForceRelayCheckbox = document.getElementById("is_force_relay");
     let isAudioEnabledCheckbox = document.getElementById('is-audio-enabled');
@@ -262,6 +263,9 @@
               video.device_id(videoSource.value);
             }
             constraints.device_video(video);
+            if (screenshareSwitchEl.checked) {
+              constraints.display_video(new DisplayVideoTrackConstraints());
+            }
           }
         } else {
           constraints.device_video(new DeviceVideoTrackConstraints());
@@ -314,15 +318,27 @@
         }
         let mediaStream = new MediaStream();
         mediaStream.addTrack(track.get_track());
-        let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
-        if (deviceVideoEl === undefined) {
-          deviceVideoEl = document.createElement('video');
-          deviceVideoEl.className = 'local-device-video';
-          deviceVideoEl.width = 200;
-          deviceVideoEl.autoplay = 'true';
-          localVideo.appendChild(deviceVideoEl);
+        if (track.is_display()) {
+          let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
+          if (displayVideoEl === undefined) {
+            displayVideoEl = document.createElement('video');
+            displayVideoEl.className = 'local-display-video';
+            displayVideoEl.width = 200;
+            displayVideoEl.autoplay = 'true';
+            localVideo.appendChild(displayVideoEl);
+          }
+          displayVideoEl.srcObject = mediaStream;
+        } else {
+          let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
+          if (deviceVideoEl === undefined) {
+            deviceVideoEl = document.createElement('video');
+            deviceVideoEl.className = 'local-device-video';
+            deviceVideoEl.width = 200;
+            deviceVideoEl.autoplay = 'true';
+            localVideo.appendChild(deviceVideoEl);
+          }
+          deviceVideoEl.srcObject = mediaStream;
         }
-        deviceVideoEl.srcObject = mediaStream;
       }
     }
 
@@ -493,7 +509,7 @@
         await room.set_local_media_settings(constraints);
       });
 
-      videoSelect.addEventListener('change', async () => {
+      let videoSwitch = async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
           if (track.ptr > 0) {
@@ -504,7 +520,9 @@
           constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
-      });
+      };
+      videoSelect.addEventListener('change', videoSwitch);
+      screenshareSwitchEl.addEventListener('change', videoSwitch);
 
       room.on_failed_local_media((error) => {
         console.error(error.message());
@@ -546,6 +564,22 @@
 
         connection.on_remote_track_added((track) => {
           if (track.kind() === 'video') {
+            if (track.is_display()) {
+              let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
+              if (displayVideoEl === undefined) {
+                displayVideoEl = document.createElement('video');
+                displayVideoEl.classList.add('display-video');
+                displayVideoEl.classList.add('order-2');
+                displayVideoEl.playsinline = "true";
+                displayVideoEl.width = 650;
+                displayVideoEl.controls = "true";
+                displayVideoEl.autoplay = "true";
+                memberVideoDiv.appendChild(displayVideoEl);
+              }
+              let mediaStream = new MediaStream();
+              mediaStream.addTrack(track.get_track());
+              displayVideoEl.srcObject = mediaStream;
+            } else {
               let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
               if (cameraVideoEl === undefined) {
                 cameraVideoEl = document.createElement('video');
@@ -560,6 +594,7 @@
               let mediaStream = new MediaStream();
               mediaStream.addTrack(track.get_track());
               cameraVideoEl.srcObject = mediaStream;
+            }
           } else {
             let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
             if (audioEl === undefined) {
@@ -578,9 +613,13 @@
 
           track.on_enabled( () => {
             console.log(`Track enabled: ${track.kind()}`);
+            // console.log(`Has active audio: ${stream.has_active_audio()}`);
+            // console.log(`Has active video: ${stream.has_active_video()}`);
           });
           track.on_disabled( () => {
             console.log(`Track disabled: ${track.kind()}`);
+            // console.log(`Has active audio: ${stream.has_active_audio()}`);
+            // console.log(`Has active video: ${stream.has_active_video()}`);
           });
         });
 
@@ -794,6 +833,17 @@
             <label class="input-group-text" for="connect__select-device_video">Video</label>
           </div>
           <select class="custom-select" id="connect__select-device_video"></select>
+        </div>
+
+        <div class="custom-control custom-switch">
+          <input type="checkbox"
+                 id="connection-settings__screenshare"
+                 class="custom-control-input"
+                 autocomplete="off">
+          <label for="connection-settings__screenshare"
+                 class="custom-control-label">
+            Screenshare
+          </label>
         </div>
 
         <div id="control" class="input-group mb-3" style="display: none">

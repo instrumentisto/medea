@@ -15,6 +15,7 @@ let muteVideoRecv = document.getElementById('control__mute_video_recv');
 let closeApp = document.getElementById('control__close_app');
 let audioSelect = document.getElementById('connect__select-device_audio');
 let videoSelect = document.getElementById('connect__select-device_video');
+let screenshareSwitchEl = document.getElementById('connection-settings__screenshare');
 let localVideo = document.getElementById("local-video");
 
 function getMemberId() {
@@ -540,17 +541,8 @@ window.onload = async function() {
       let videoSource = video_select.options[video_select.selectedIndex];
       if (videoSource) {
         if (videoSource.value === "screen") {
-          let device = new rust.DeviceVideoTrackConstraints();
-          if (videoSource.value === 'facingModeUser') {
-            device.exact_facing_mode(rust.FacingMode.User);
-          } else if (videoSource.value === 'facingModeEnvironment') {
-            device.exact_facing_mode(rust.FacingMode.Environment);
-          } else {
-            // device.device_id(videoSource.value);
-          }
           let video = new rust.DisplayVideoTrackConstraints();
           constraints.display_video(video);
-          constraints.device_video(device);
         } else {
           let video = new rust.DeviceVideoTrackConstraints();
           if (videoSource.value === 'facingModeUser') {
@@ -561,6 +553,9 @@ window.onload = async function() {
             video.device_id(videoSource.value);
           }
           constraints.device_video(video);
+          if (screenshareSwitchEl.checked) {
+            constraints.display_video(new rust.DisplayVideoTrackConstraints());
+          }
         }
       } else {
         constraints.device_video(new rust.DeviceVideoTrackConstraints());
@@ -757,7 +752,7 @@ window.onload = async function() {
       }
     });
 
-    videoSelect.addEventListener('change', async () => {
+    let videoSwitch = async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
@@ -772,7 +767,9 @@ window.onload = async function() {
       } catch (e) {
         console.error("Changing video source failed: " + e.message());
       }
-    });
+    };
+    videoSelect.addEventListener('change', videoSwitch);
+    screenshareSwitchEl.addEventListener('change', videoSwitch);
 
     muteAudioSend.addEventListener('click', async () => {
       try {
