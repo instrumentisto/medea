@@ -45,9 +45,13 @@ pub enum TracksRequestError {
     #[display(fmt = "provided multiple audio MediaStreamTracks")]
     ExpectedAudioTracks,
 
-    /// Provided multiple video [`MediaStreamTrack`]s.
-    #[display(fmt = "provided multiple video MediaStreamTracks")]
-    ExpectedVideoTracks,
+    /// Provided multiple device video [`MediaStreamTrack`]s.
+    #[display(fmt = "provided multiple device video MediaStreamTracks")]
+    ExpectedDeviceVideoTracks,
+
+    /// Provided multiple display video [`MediaStreamTrack`]s.
+    #[display(fmt = "provided multiple display video MediaStreamTracks")]
+    ExpectedDisplayVideoTracks,
 
     /// Audio track fails to satisfy specified constraints.
     #[display(
@@ -55,11 +59,15 @@ pub enum TracksRequestError {
     )]
     InvalidAudioTrack,
 
-    /// Video track fails to satisfy specified constraints.
-    #[display(
-        fmt = "provided video track does not satisfy specified constraints"
-    )]
-    InvalidVideoTrack,
+    /// Device video track fails to satisfy specified constraints.
+    #[display(fmt = "provided device video track does not satisfy specified \
+                     constraints")]
+    InvalidDeviceVideoTrack,
+
+    /// Display video track fails to satisfy specified constraints.
+    #[display(fmt = "provided display video track does not satisfy \
+                     specified constraints")]
+    InvalidDisplayVideoTrack,
 }
 
 type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
@@ -125,17 +133,27 @@ impl SimpleTracksRequest {
     /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if provided
     /// [`HashMap`] doesn't have expected audio track.
     ///
-    /// Errors with [`TracksRequestError::InvalidVideoTrack`] if some video
-    /// track from provided [`HashMap`] not satisfies
+    /// Errors with [`TracksRequestError::InvalidDeviceVideoTrack`] if some
+    /// device video track from provided [`HashMap`] not satisfies
     /// contained constrains.
     ///
-    /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if provided
-    /// [`HashMap`] doesn't have expected video track.
+    /// Errors with [`TracksRequestError::ExpectedDeviceVideoTracks`] if
+    /// provided [`HashMap`] doesn't have expected device video track.
+    ///
+    /// Errors with [`TracksRequestError::InvalidDisplayVideoTrack`] if some
+    /// display video track from provided [`HashMap`] not satisfies
+    /// contained constrains.
+    ///
+    /// Errors with [`TracksRequestError::ExpectedDisplayVideoTracks`] if
+    /// provided [`HashMap`] doesn't have expected display video track.
     pub fn parse_tracks(
         &self,
         tracks: Vec<MediaStreamTrack>,
     ) -> Result<HashMap<TrackId, MediaStreamTrack>> {
-        use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
+        use TracksRequestError::{
+            InvalidAudioTrack, InvalidDeviceVideoTrack,
+            InvalidDisplayVideoTrack,
+        };
 
         let mut parsed_tracks = HashMap::new();
 
@@ -171,8 +189,7 @@ impl SimpleTracksRequest {
                 if device_video.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
-                    // TODO: rename err
-                    return Err(tracerr::new!(InvalidVideoTrack));
+                    return Err(tracerr::new!(InvalidDeviceVideoTrack));
                 }
             }
         }
@@ -181,8 +198,7 @@ impl SimpleTracksRequest {
                 if display_video.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
-                    // TODO: rename err
-                    return Err(tracerr::new!(InvalidVideoTrack));
+                    return Err(tracerr::new!(InvalidDisplayVideoTrack));
                 }
             }
         }
@@ -203,10 +219,15 @@ impl SimpleTracksRequest {
     /// [`MediaStreamSettings`] doesn't and this [`AudioTrackConstraints`] are
     /// important.
     ///
-    /// Errors with [`TracksRequestError::ExpectedVideoTracks`] if
-    /// [`SimpleTracksRequest`] contains [`VideoTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] doesn't and this [`VideoTrackConstraints`] are
-    /// important.
+    /// Errors with [`TracksRequestError::ExpectedDeviceVideoTracks`] if
+    /// [`SimpleTracksRequest`] contains [`DeviceVideoTrackConstraints`], but
+    /// provided [`MediaStreamSettings`] doesn't and this
+    /// [`DeviceVideoTrackConstraints`] are important.
+    ///
+    /// Errors with [`TracksRequestError::ExpectedDisplayVideoTracks`] if
+    /// [`SimpleTracksRequest`] contains [`DisplayVideoTrackConstraints`], but
+    /// provided [`MediaStreamSettings`] doesn't and this
+    /// [`DisplayVideoTrackConstraints`] are important.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
@@ -227,9 +248,8 @@ impl SimpleTracksRequest {
         if let Some((_, device_video_caps)) = &self.device_video {
             if !other.is_device_video_enabled() {
                 if device_video_caps.is_required() {
-                    // TODO: rename err
                     return Err(tracerr::new!(
-                        TracksRequestError::ExpectedVideoTracks
+                        TracksRequestError::ExpectedDeviceVideoTracks
                     ));
                 } else {
                     self.device_video.take();
@@ -239,9 +259,8 @@ impl SimpleTracksRequest {
         if let Some((_, display_video_caps)) = &self.display_video {
             if !other.is_display_video_enabled() {
                 if display_video_caps.is_required() {
-                    // TODO: rename err
                     return Err(tracerr::new!(
-                        TracksRequestError::ExpectedVideoTracks
+                        TracksRequestError::ExpectedDisplayVideoTracks
                     ));
                 } else {
                     self.display_video.take();

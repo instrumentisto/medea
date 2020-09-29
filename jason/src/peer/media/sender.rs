@@ -70,7 +70,6 @@ impl<'a> SenderBuilder<'a> {
             peer_events_sender: self.peer_events_sender,
             send_constraints: self.send_constraints,
         });
-        log::debug!("Created sender with mute state: {:?}", self.mute_state);
         spawn_local({
             let weak_this = Rc::downgrade(&this);
             async move {

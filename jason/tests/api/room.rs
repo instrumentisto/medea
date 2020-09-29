@@ -177,7 +177,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalTracks");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local tracks: provided multiple video MediaStreamTracks"
+            "Invalid local tracks: provided multiple device video \
+             MediaStreamTracks"
         );
     });
     let (audio_track, video_track) = get_test_required_tracks();

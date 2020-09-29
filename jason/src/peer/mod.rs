@@ -646,6 +646,8 @@ impl PeerConnection {
     /// [`Sender`]s, which are configured by server during signalling, and
     /// [`LocalStreamConstraints`], that are optionally configured by JS-side.
     ///
+    /// Returns [`HashMap`] with [`MuteState`]s updates for the [`Sender`]s.
+    ///
     /// # Errors
     ///
     /// With [`TracksRequestError`] if current state of peer's [`Sender`]s

@@ -44,8 +44,8 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
 
-    /// Returns `true` if [`MediaStreamTrack`] currently can be obtained for
-    /// this [`TransceiverSide`].
+    /// Returns `true` if this [`TransceiverKind`] currently can be
+    /// mutes/unmuted without [`LocalMediaStreamConstraints`] updating.
     fn is_transitable(&self) -> bool;
 }
 
@@ -537,6 +537,8 @@ impl MediaConnections {
     ///  [`MediaStreamTrack`]s are inserted into [`Sender`]'s
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
+    ///
+    /// Returns [`HashMap`] with [`MuteState`]s updates for the [`Sender`]s.
     ///
     /// # Errors
     ///

@@ -987,28 +987,28 @@ impl<'a> PeerChangesScheduler<'a> {
 
         let video_settings = src.video_settings();
         if video_settings.publish_policy != PublishPolicy::Disabled {
-            let track_video = Rc::new(MediaTrack::new(
+            let camera_video_track = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: video_settings.publish_policy.is_required(),
                     is_display: false,
                 }),
             ));
-            self.add_sender(Rc::clone(&track_video));
+            self.add_sender(Rc::clone(&camera_video_track));
             partner_peer
                 .as_changes_scheduler()
-                .add_receiver(track_video);
-            let track_screenshare = Rc::new(MediaTrack::new(
+                .add_receiver(camera_video_track);
+            let display_video_track = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: false,
                     is_display: true,
                 }),
             ));
-            self.add_sender(Rc::clone(&track_screenshare));
+            self.add_sender(Rc::clone(&display_video_track));
             partner_peer
                 .as_changes_scheduler()
-                .add_receiver(track_screenshare);
+                .add_receiver(display_video_track);
         }
     }
 

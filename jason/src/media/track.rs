@@ -157,20 +157,20 @@ impl MediaStreamTrack {
         self.0.enabled.get()
     }
 
-    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
-    /// be enabled.
+    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] is
+    /// enabled.
     pub fn on_enabled(&self, callback: js_sys::Function) {
         self.0.on_enabled.set_func(callback);
     }
 
-    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
-    /// be enabled.
+    /// Sets callback, which will be invoked when this [`MediaStreamTrack`] is
+    /// enabled.
     pub fn on_disabled(&self, callback: js_sys::Function) {
         self.0.on_disabled.set_func(callback);
     }
 
-    /// Returns [`TrackKind`] of this [`MediaStreamTrack`] converted to
-    /// [`String`].
+    /// Returns a [`String`] set to `audio` if the track is an audio track and
+    /// to `video`, if it is a video track.
     #[wasm_bindgen(js_name = kind)]
     pub fn js_kind(&self) -> String {
         self.kind().to_string()

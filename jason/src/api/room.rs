@@ -709,6 +709,10 @@ impl InnerRoom {
     /// Toggles [`TransceiverSide`]s [`MuteState`] by provided
     /// [`TransceiverKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
+    /// Will fallback to the previous [`MuteState`]s if some [`TransceiverSide`]
+    /// can't be muted because
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`].
+    ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     #[allow(clippy::filter_map)]
     async fn toggle_mute(
@@ -763,6 +767,8 @@ impl InnerRoom {
         update_result
     }
 
+    /// Update [`MuteState`]s of the [`TransceiverSide`] with a provided
+    /// [`PeerId`] and [`TrackId`] to a provided [`StableMuteState`]s.
     #[allow(clippy::filter_map)]
     async fn update_mute_states(
         &self,
@@ -880,7 +886,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Updates [`MuteState`] of the unconstrained [`Sender`]s.
+    /// Will update [`MuteState`]s of the [`Sender`]s which are should be
+    /// enabled or disabled.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
